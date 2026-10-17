@@ -705,7 +705,7 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
         persist_manifest,
     )
     from astrolift_registry import brain_substrate as bs
-    from astrolift_registry.brain_template import dump_config
+    from astrolift_registry.brain_template import CONFIG_SCHEMA, dump_config
     from astrolift_scm.providers import ProviderError
     from astrolift_scm.providers.repo_writes import TreeFile, update_files
     from astrolift_scm.services.workflows import _pick_source_connection
@@ -755,6 +755,20 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
         raise SubstrateChangeError("VALIDATION", exc.message, field=exc.field) from exc
     except ManifestError as exc:
         raise SubstrateChangeError("VALIDATION", f"the rendered manifest does not parse: {exc}") from exc
+    if bs.adds_app_slug(config, new_config):
+        # A Mimwell version without deploy.app_slug refuses the key and would
+        # rename the app <client.slug>-brain on its next make astrolift-manifest.
+        try:
+            schema = _read_json(connection, app, CONFIG_SCHEMA, branch)
+        except ProviderError as exc:
+            raise SubstrateChangeError("PRECONDITION", exc.message) from exc
+        if not bs.declares_app_slug(schema):
+            raise SubstrateChangeError(
+                "PRECONDITION",
+                f"keeping the name {app.slug!r} needs deploy.app_slug, which this brain's Mimwell "
+                "version does not have; update the brain's engine first",
+                field="slug",
+            )
     if new_config == config and manifest == current_manifest:
         record_substrate(app, after, user=user)
         return {"before": before, "after": after, "commit_sha": ""}

@@ -14,10 +14,14 @@ path's) and ``deploy.replicas``.
 
 Astrolift does not invent a model of its own. ``cell_status`` is a port of
 ``knowledge_store.cell_status()`` (the one source of the statuses), and
-``render_manifest`` is a port of ``scripts/gen-astrolift.py``'s mapping. Both
-are pinned to a Mimwell commit and held to it by parity tests against the
-real function's table and the real script's output; Astrolift never runs
-template code.
+``render_manifest`` is a port of ``scripts/gen-astrolift.py``'s mapping, with
+``app_slug`` its naming of the app. They are pinned to Mimwell commits and held
+to them by parity tests against the real function's table and the real
+script's output; Astrolift never runs template code.
+
+A brain takes any slug. One ending in ``-brain`` keeps Mimwell's default name,
+``<client.slug>-brain``; any other is written to ``client.config.json`` as
+``deploy.app_slug``, which the brain's Mimwell version must have.
 
 Two things only the brain can do stay with the brain: adopting a non-files
 authority (``knowledge-store.py`` cutover writes ``contract.json`` and
@@ -29,10 +33,19 @@ and reports whether the brain has adopted it.
 from __future__ import annotations
 
 import dataclasses
+import re
 from typing import Any
 
 #: The Mimwell commit the ports below are held to.
 MIMWELL_SOURCE = "mimwell-pvt 7e103f9"
+#: ``app_slug`` (``deploy.app_slug``) is held to the commit that added it.
+MIMWELL_APP_SLUG_SOURCE = "mimwell-pvt 416dbf5"
+#: An Astrolift app slug, and the rule Mimwell holds ``deploy.app_slug`` to: a
+#: letter, then lowercase letters, digits and dashes, 1 to 63 characters, not
+#: ending in a dash.
+APP_SLUG = re.compile(r"[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?")
+#: Mimwell's default app name is ``<client.slug>-brain``.
+BRAIN_SUFFIX = "-brain"
 
 AXES: dict[str, tuple[str, ...]] = {
     "authority": ("files", "sqlite", "postgres", "mysql", "mongo", "d1"),
@@ -199,11 +212,29 @@ def apply_to_config(
     """``client.config.json`` with the selection written where Mimwell reads it:
     ``deploy.*`` always, and the legacy ``brain.blobs`` / ``semantic.substrate``
     fields where the selection has a value for them. ``brain.authority`` and
-    ``contract.json`` are the brain's own cutover's to write."""
+    ``contract.json`` are the brain's own cutover's to write.
+
+    A config that Mimwell would not name ``slug`` is made to: a slug ending in
+    ``-brain`` sets ``client.slug`` to the rest and drops ``deploy.app_slug``;
+    any other is both ``client.slug`` and ``deploy.app_slug``. A config that
+    already names it keeps its ``client.slug``, the brain's identity."""
     data = dict(config)
-    client = dict(data.get("client") or {})
-    client["slug"] = client_slug(slug)
-    data["client"] = client
+    deploy = dict(data.get("deploy") or {})
+    if not _names(data, slug):
+        client = dict(data.get("client") or {})
+        if slug.endswith(BRAIN_SUFFIX) and slug != BRAIN_SUFFIX:
+            client["slug"] = slug[: -len(BRAIN_SUFFIX)]
+            deploy.pop("app_slug", None)
+        elif APP_SLUG.fullmatch(slug):
+            client["slug"] = slug
+            deploy["app_slug"] = slug
+        else:
+            raise SubstrateError(
+                f"{slug!r} cannot be written as deploy.app_slug: a brain's slug starts with a letter "
+                "and is 1 to 63 lowercase letters, digits and dashes, not ending in a dash",
+                field="slug",
+            )
+        data["client"] = client
     brain = dict(data.get("brain") or {})
     if name:
         brain["name"] = name
@@ -216,7 +247,6 @@ def apply_to_config(
         semantic = dict(data.get("semantic") or {})
         semantic["substrate"] = selection.vectors
         data["semantic"] = semantic
-    deploy = dict(data.get("deploy") or {})
     deploy.update(target="astrolift", persistence=list(selection.persistence), replicas=selection.replicas)
     if selection.image:
         deploy.update(image=selection.image, port=selection.port)
@@ -227,11 +257,39 @@ def apply_to_config(
     return data
 
 
-def client_slug(slug: str) -> str:
-    """Mimwell names the app ``<client.slug>-brain``."""
-    if not slug.endswith("-brain") or slug == "-brain":
-        raise SubstrateError("a brain's slug is its client slug plus -brain, e.g. acme-brain", field="slug")
-    return slug[: -len("-brain")]
+def app_slug(config: dict[str, Any]) -> str:
+    """The app slug ``gen-astrolift.py`` renders for ``config``:
+    ``deploy.app_slug`` verbatim when set, else ``<client.slug>-brain``. A
+    port of its ``_app_slug``, refusal of a malformed value included."""
+    value = (config.get("deploy") or {}).get("app_slug")
+    if value is None:
+        return f"{(config.get('client') or {}).get('slug') or 'brain'}{BRAIN_SUFFIX}"
+    if not isinstance(value, str) or not APP_SLUG.fullmatch(value):
+        raise SubstrateError(f"deploy.app_slug {value!r} is not an Astrolift slug", field="slug")
+    return value
+
+
+def _names(config: dict[str, Any], slug: str) -> bool:
+    try:
+        return app_slug(config) == slug
+    except SubstrateError:
+        return False
+
+
+def adds_app_slug(before: dict[str, Any], after: dict[str, Any]) -> bool:
+    """Whether ``after`` sets a ``deploy.app_slug`` that ``before`` does not have."""
+    value = (after.get("deploy") or {}).get("app_slug")
+    return value is not None and value != (before.get("deploy") or {}).get("app_slug")
+
+
+def declares_app_slug(schema: Any) -> bool:
+    """Whether a Mimwell ``client.config.schema.json`` declares
+    ``deploy.app_slug``. A version from before it refuses the key (``deploy``
+    takes no other) and names the app ``<client.slug>-brain`` regardless."""
+    try:
+        return "app_slug" in schema["properties"]["deploy"]["properties"]
+    except (KeyError, TypeError):
+        return False
 
 
 def render_manifest(
