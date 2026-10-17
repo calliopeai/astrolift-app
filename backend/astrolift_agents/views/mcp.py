@@ -337,6 +337,9 @@ def _serialize_agent(workload, *, include_package: bool) -> dict[str, Any]:
             "timeout_seconds": workload.tool_timeout_seconds,
             "max_retries": workload.max_retries,
             "max_parallel": workload.run_max_parallel,
+            # Brains its runs read, and what a launch may add (null: any) (#2432).
+            "brains": list(workload.brains or []),
+            "brains_allowed": workload.brains_allowed,
         },
         "package": {
             "brief_id": str(brief.guid) if brief else None,
@@ -684,8 +687,22 @@ def _serialize_task(task, *, include_result: bool = True) -> dict[str, Any]:
         else None,
     }
     if include_result:
-        data.update(result=task.result, failure=task.failure)
+        data.update(result=task.result, failure=task.failure, brains=_task_brains(task))
     return data
+
+
+def _task_brains(task) -> list[dict[str, Any]]:
+    """The brains a run reads (#2432), its agent's own first."""
+    return [
+        {
+            "slug": row.slug,
+            "name": row.name,
+            "source": row.source,
+            "revoked_at": _iso(row.revoked_at),
+            "revoked_reason": row.revoked_reason,
+        }
+        for row in task.brain_bindings.order_by("pk")
+    ]
 
 
 def _get_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
@@ -785,10 +802,18 @@ def _run_agent(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
             client_request_id=args.get("client_request_id"),
             trigger="mcp",
             trigger_kind=RunTrigger.API,
+            brain_slugs=args.get("brain_slugs"),
         )
     except AgentDispatchError as exc:
         raise McpCallError(exc.message, code=exc.code) from exc
-    return {"task_id": str(task.guid), "status": task.status, "timeout_seconds": task.timeout_seconds}
+    brains = _task_brains(task)
+    request._mcp_audit_extra = {"agent_task": str(task.guid), "brains": [brain["slug"] for brain in brains]}
+    return {
+        "task_id": str(task.guid),
+        "status": task.status,
+        "timeout_seconds": task.timeout_seconds,
+        "brains": brains,
+    }
 
 
 def _cancel_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
@@ -1390,7 +1415,12 @@ def _audit(request: HttpRequest, name: str, *, decision: str, duration_ms: int, 
             target_id=safe_name,
             request_ip=(request.META.get("REMOTE_ADDR") or "")[:64],
             request_user_agent=(request.headers.get("User-Agent") or "")[:1024],
-            data={"duration_ms": duration_ms, "error": error[:512] if error else ""},
+            data={
+                "duration_ms": duration_ms,
+                "error": error[:512] if error else "",
+                # What a handler adds about its call, such as a run's brains (#2432).
+                **(getattr(request, "_mcp_audit_extra", None) or {}),
+            },
         )
     except Exception:  # noqa: BLE001 — audit failure must not corrupt the MCP response
         log.exception("failed to audit MCP tool call %s", name)

@@ -459,6 +459,10 @@ export type AstroliftAgentBoxMutationResult = {
 
 export type AstroliftAgentDetail = {
   appSlug: Scalars['String']['output'];
+  /** Brains every run a person launches reads, from the agent's manifest (#2432). */
+  brains: Array<Scalars['String']['output']>;
+  /** Brains a launch may add with brainSlugs (#2432). Null accepts any brain the launcher can read; empty accepts none. */
+  brainsAllowed?: Maybe<Array<Scalars['String']['output']>>;
   brief?: Maybe<AstroliftBrief>;
   dockerfilePath: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -780,6 +784,7 @@ export type AstroliftAgentStartupDiagnostic = {
 export type AstroliftAgentTask = {
   agentName: Scalars['String']['output'];
   agentSlug: Scalars['String']['output'];
+  brains: Array<AstroliftAgentTaskBrain>;
   callbackAttempts: Scalars['Int']['output'];
   callbackLastError?: Maybe<Scalars['String']['output']>;
   callbackStatus?: Maybe<Scalars['String']['output']>;
@@ -823,6 +828,15 @@ export type AstroliftAgentTaskBacklogItem = {
   id: Scalars['String']['output'];
   status: Scalars['String']['output'];
   text: Scalars['String']['output'];
+};
+
+/** A brain a run reads as the person who launched it (#2432). source is default (its agent's own) or requested (brainSlugs at launch). revokedAt and revokedReason are set once the run can no longer read it: the run ended or was cancelled, the brain is gone, or that person lost access. */
+export type AstroliftAgentTaskBrain = {
+  name: Scalars['String']['output'];
+  revokedAt?: Maybe<Scalars['DateTime']['output']>;
+  revokedReason: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  source: Scalars['String']['output'];
 };
 
 export type AstroliftAgentTaskDispatcher = {
@@ -15902,6 +15916,8 @@ export type Route53DnsZonesInventory = {
 
 export type RunAstroliftAgentInput = {
   agentSlug: Scalars['String']['input'];
+  /** Brains the run reads as the caller, besides its agent's own (#2432): at most 10 in all, each one the caller can read and, when the agent declares brains_allowed, one it accepts. */
+  brainSlugs: InputMaybe<Array<Scalars['String']['input']>>;
   callbackMode: AgentTaskCallbackMode;
   callbackSecretRef: InputMaybe<Scalars['String']['input']>;
   callbackUrl: InputMaybe<Scalars['String']['input']>;

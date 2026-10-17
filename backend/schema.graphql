@@ -467,6 +467,16 @@ type AstroliftAgentDetail {
   scheduledScaleTo: Int
   scaleUpCron: String!
   scaleDownCron: String!
+
+  """
+  Brains every run a person launches reads, from the agent's manifest (#2432).
+  """
+  brains: [String!]!
+
+  """
+  Brains a launch may add with brainSlugs (#2432). Null accepts any brain the launcher can read; empty accepts none.
+  """
+  brainsAllowed: [String!]
 }
 
 type AstroliftAgentEnvironmentSpec {
@@ -811,6 +821,7 @@ type AstroliftAgentTask {
   callbackAttempts: Int!
   callbackLastError: String
   model: String!
+  brains: [AstroliftAgentTaskBrain!]!
 }
 
 type AstroliftAgentTaskBacklog {
@@ -827,6 +838,17 @@ type AstroliftAgentTaskBacklogItem {
   status: String!
   activeForm: String
   details: String
+}
+
+"""
+A brain a run reads as the person who launched it (#2432). source is default (its agent's own) or requested (brainSlugs at launch). revokedAt and revokedReason are set once the run can no longer read it: the run ended or was cancelled, the brain is gone, or that person lost access.
+"""
+type AstroliftAgentTaskBrain {
+  slug: String!
+  name: String!
+  source: String!
+  revokedAt: DateTime
+  revokedReason: String!
 }
 
 type AstroliftAgentTaskDispatcher {
@@ -11924,6 +11946,11 @@ input RunAstroliftAgentInput {
   callbackSecretRef: String = null
   correlationId: String = null
   callbackMode: AgentTaskCallbackMode! = FULL
+
+  """
+  Brains the run reads as the caller, besides its agent's own (#2432): at most 10 in all, each one the caller can read and, when the agent declares brains_allowed, one it accepts.
+  """
+  brainSlugs: [String!] = null
 }
 
 type RunInputContract {

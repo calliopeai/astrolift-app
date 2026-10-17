@@ -41,10 +41,12 @@ _REF = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$")
 
 
 class TemplateError(Exception):
-    def __init__(self, code: str, message: str):
+    def __init__(self, code: str, message: str, field: str = "templateRef"):
         super().__init__(message)
         self.code = code
         self.message = message
+        # The createBrain input the refusal is about.
+        self.field = field
 
 
 @dataclasses.dataclass(frozen=True)
@@ -238,6 +240,7 @@ def scaffold(
                     f"the template at {edition.ref!r} has no deploy.app_slug, so it names the app "
                     f"<client.slug>-brain; use a slug ending in -brain ({slug}-brain), or an edition "
                     "that has deploy.app_slug",
+                    field="slug",
                 )
         out.append(item)
     manifest = render_manifest(selection, slug=slug, display_name=name, environment_name=environment_name)

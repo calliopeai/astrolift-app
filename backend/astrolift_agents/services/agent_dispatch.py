@@ -21,7 +21,14 @@ class AgentDispatchError(RuntimeError):
 
 
 def _replay_or_conflict(
-    existing, *, workload, environment_spec, trigger_payload, effective_timeout: int, callback=None
+    existing,
+    *,
+    workload,
+    environment_spec,
+    trigger_payload,
+    effective_timeout: int,
+    callback=None,
+    requested_brains: list[str],
 ):
     """``existing`` if it is the same request the caller is retrying under a
     ``client_request_id``, else raise ``precondition`` (#2072).
@@ -31,12 +38,15 @@ def _replay_or_conflict(
     (since-deleted) one, mirroring ``AgentTaskInputMessage``'s "reserve after
     soft deletion" rule.
     """
+    from astrolift_registry.brain_runs import requested_slugs
+
     same = (
         existing.deleted_at is None
         and existing.agent_definition_id == workload.pk
         and existing.environment_spec_id == (environment_spec.pk if environment_spec else None)
         and existing.dispatch_input == (trigger_payload or None)
         and existing.timeout_seconds == effective_timeout
+        and sorted(requested_slugs(existing)) == sorted(requested_brains)
     )
     from astrolift_agents.models import AgentTaskCompletionCallback
 
@@ -71,6 +81,7 @@ def dispatch_registered_agent(
     correlation_id: str | None = None,
     callback_mode: str = "FULL",
     conversation_transfer=None,
+    brain_slugs: list[str] | None = None,
 ):
     """Create, prepare, queue, and durably dispatch one registered agent.
 
@@ -102,6 +113,12 @@ def dispatch_registered_agent(
     ``conversation_transfer`` (#1971) is linked to the task in the same
     transaction that creates it, so the spawner always sees the paused
     arrival it must install.
+
+    ``brain_slugs`` (#2432) are the brains the run reads besides its agent's
+    own (``brains`` in its manifest), as the requester; each must be one the
+    requester can read now and, when the agent declares ``brains_allowed``,
+    one it accepts (``astrolift_registry.brain_runs``). The bindings are made
+    with the task; the spawn gives the run their tokens.
     """
     from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
     from astrolift_agents.services.task_preparation import (
@@ -269,6 +286,16 @@ def dispatch_registered_agent(
             "timeout_seconds",
         )
 
+    from astrolift_registry.brain_runs import BrainRunError, bind, resolve_launch
+
+    try:
+        brains = resolve_launch(
+            workload, organization_id=organization_id, requested=brain_slugs, launcher_id=requester_id
+        )
+    except BrainRunError as exc:
+        raise AgentDispatchError(exc.code, exc.message, "brain_slugs") from None
+    requested_brains = [item.brain.slug for item in brains if item.source == "requested"]
+
     if request_id is not None:
         existing = AgentTask.all_objects.filter(
             organization_id=organization_id, created_by_id=requester_id, client_request_id=request_id
@@ -281,6 +308,7 @@ def dispatch_registered_agent(
                 trigger_payload=trigger_payload,
                 effective_timeout=effective_timeout,
                 callback=callback,
+                requested_brains=requested_brains,
             )
 
     try:
@@ -316,6 +344,7 @@ def dispatch_registered_agent(
                 from astrolift_agents.models import AgentTaskCompletionCallback
 
                 AgentTaskCompletionCallback.objects.create(task=task, organization=organization, **callback)
+            bind(task, brains)
             if conversation_transfer is not None:
                 conversation_transfer.agent_task = task
                 conversation_transfer.save(update_fields=["agent_task", "updated_at", "version"])
@@ -336,6 +365,7 @@ def dispatch_registered_agent(
             trigger_payload=trigger_payload,
             effective_timeout=effective_timeout,
             callback=callback,
+            requested_brains=requested_brains,
         )
 
     if brief is None:

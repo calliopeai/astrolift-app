@@ -814,6 +814,56 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     return JsonResponse(payload)
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+@_require_agent_callback_auth
+def agent_brains(request: HttpRequest, task_id: str) -> JsonResponse:
+    """Fresh read tokens for the brains the run reads (#2432).
+
+    The run's ``BRAINS`` index names this URL. Only the run's own callback
+    key gets an answer, never a dispatcher key. Each brain is checked again
+    as the person who launched the run: ``brains`` carries a new 15-minute
+    token for each one still readable (its index entry plus ``token``), and
+    ``revoked`` each brain the run lost and why, so the run is told. Once the
+    run has ended or a cancel was asked for, the answer is 409 with
+    ``continue: false``.
+    """
+    from astrolift_registry.brain_runs import BrainRunError, refresh
+
+    callback_hash = getattr(request, "agent_callback_token_hash", "")
+    if not callback_hash:
+        return JsonResponse({"error": "brain tokens go to the run itself, with its callback key"}, status=403)
+    with transaction.atomic():
+        # Locked like a cancel locks it, so no token is issued past one.
+        task = (
+            AgentTask.objects.select_for_update()
+            .filter(guid=task_id, callback_token_hash=callback_hash, deleted_at__isnull=True)
+            .first()
+        )
+        if task is None:
+            return JsonResponse({"error": "task not found or callback token expired"}, status=404)
+        if task.status in AgentTask.TERMINAL_STATUSES or task.cancel_requested_at:
+            return JsonResponse(
+                {"error": "the run has ended or is being cancelled; it reads no brains", "continue": False},
+                status=409,
+            )
+        try:
+            payload = refresh(task)
+        except BrainRunError as exc:
+            return JsonResponse({"error": exc.message}, status=409)
+    record_interaction(
+        task,
+        kind=AgentInteraction.Kind.CONTROL_API,
+        name="brain_tokens",
+        status="error" if payload["revoked"] else "ok",
+        detail={
+            "brains": [entry["slug"] for entry in payload["brains"]],
+            "revoked": [entry["slug"] for entry in payload["revoked"]],
+        },
+    )
+    return JsonResponse(payload)
+
+
 _MAX_TRANSFER_PROGRESS_BYTES = 512 * 1024
 
 

@@ -264,7 +264,8 @@ def test_task_list_does_not_query_callback_once_per_task(org, django_assert_num_
     rows = list(
         AgentTask.objects.select_related("organization", "project", "team", "agent_definition", "dispatcher")
     )
-    with django_assert_num_queries(1):
+    # The callbacks, then the brains the runs read (#2432): one query each, whatever the count.
+    with django_assert_num_queries(2):
         result = agent_tasks_to_types(rows)
     assert len(result) == 12
     assert all(row.callback_status == "pending" for row in result)

@@ -211,6 +211,8 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
                 max_retries=m.max_retries,
                 tool_timeout_seconds=m.tool_timeout_seconds,
                 result_ttl_hours=m.result_ttl_hours,
+                brains=list(m.brains),
+                brains_allowed=_brains_allowed(m.brains_allowed),
             )
             result.workloads_created += 1
         elif _workload_changed(row, m):
@@ -232,6 +234,8 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
             row.max_retries = m.max_retries
             row.tool_timeout_seconds = m.tool_timeout_seconds
             row.result_ttl_hours = m.result_ttl_hours
+            row.brains = list(m.brains)
+            row.brains_allowed = _brains_allowed(m.brains_allowed)
             row.save()
             result.workloads_updated += 1
 
@@ -727,7 +731,14 @@ def _workload_changed(row, m: WorkloadManifest) -> bool:
         or row.max_retries != m.max_retries
         or row.tool_timeout_seconds != m.tool_timeout_seconds
         or row.result_ttl_hours != m.result_ttl_hours
+        or list(row.brains or []) != list(m.brains)
+        or row.brains_allowed != _brains_allowed(m.brains_allowed)
     )
+
+
+def _brains_allowed(declared: tuple[str, ...] | None) -> list[str] | None:
+    """``None`` (accept any brain) stays ``None``; a declared list, even an empty one, is kept."""
+    return None if declared is None else list(declared)
 
 
 def _container_changed(row, m: ContainerManifest, env_dict: dict) -> bool:

@@ -231,6 +231,59 @@ def workflow_id(organization_guid: str, slug: str) -> str:
     return f"BrainCreateWorkflow-{organization_guid}-{slug}"
 
 
+def preflight(
+    *, organization, slug: str, name: str, repo: str, template_ref: str, selection, environment_name: str
+) -> tuple[str, str, str] | None:
+    """The refusals a creation would otherwise meet in ``BrainCreateWorkflow``
+    after its repository exists, as ``(code, message, field)``: ``createBrain``
+    answers them before it makes anything. They are the scaffold's (the
+    edition at ``template_ref`` downloaded and verified, then the files
+    rendered: a slug its schema cannot name, no portal Dockerfile) and
+    ``registerApp``'s that depend only on the request (no managed cluster,
+    the org's source policy, a taken namespace or hostname label). The steps
+    keep their own checks, for a ref that moves in between."""
+    from _sdk.k8s_naming import app_namespace
+    from django.db.models import Q
+
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_registry import brain_template
+    from astrolift_registry.hostname_claims import hostname_label_refusal
+    from astrolift_registry.namespaces import namespace_refusal
+    from astrolift_scm.org_repo_policy import rejection_reason
+
+    if not TenantCluster.objects.filter(
+        Q(organization=organization) | Q(organization__isnull=True),
+        deleted_at__isnull=True,
+        is_active=True,
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    ).exists():
+        return (
+            "PRECONDITION",
+            "No managed cluster connected. Visit /clusters and finish bringing a cluster into management "
+            "before adding apps.",
+            "",
+        )
+    refusal = rejection_reason(repo, organization)
+    if refusal:
+        return "VALIDATION", refusal, "repo"
+    refusal = namespace_refusal(
+        app_namespace(organization_slug=organization.slug, app_slug=slug), organization_id=organization.pk
+    )
+    if refusal:
+        return "VALIDATION", refusal, "slug"
+    refusal = hostname_label_refusal(slug, organization=organization)
+    if refusal:
+        return "CONFLICT", refusal, "slug"
+    try:
+        edition = brain_template.read_edition(brain_template.download(template_ref), ref=template_ref)
+        brain_template.scaffold(
+            edition, slug=slug, name=name, selection=selection, environment_name=environment_name
+        )
+    except brain_template.TemplateError as exc:
+        return exc.code, exc.message, exc.field
+    return None
+
+
 def _load(creation_id: int) -> BrainCreation:
     return BrainCreation.objects.select_related(
         "organization", "project", "project__team", "created_by", "source_connection", "registered_app"

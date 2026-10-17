@@ -373,12 +373,12 @@ describe("native connection actual SDL over HTTP", () => {
     unknownReply = mode === "missing";
     replyForeign = mode === "foreign";
     fireEvent.click(screen.getByRole("button", { name: "Register connection" }));
+    // The unconfirmed status line shows as soon as the write is sent. The alert
+    // shows only once its outcome is back, after the server has the request.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Register connection" })).toBeDisabled()
+      expect(screen.getByRole("alert")).toHaveTextContent(/The write outcome is unconfirmed/)
     );
-    await waitFor(() =>
-      expect(screen.getAllByText(/The write outcome is unconfirmed/).length).toBeGreaterThan(0)
-    );
+    expect(screen.getByRole("button", { name: "Register connection" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Register connection" }));
     expect(requests.filter((row) => row.operationName === "RegisterBedrockModel")).toHaveLength(1);
     expect(screen.queryByRole("link", { name: "Open deployment" })).toBeNull();

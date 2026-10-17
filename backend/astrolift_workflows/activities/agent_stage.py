@@ -725,6 +725,10 @@ def _cancel_agent_task_sync(
                 if current.status not in _TERMINAL_STATUSES and not current.cancel_requested_at:
                     current.cancel_requested_at = timezone.now()
                     current.save(update_fields=["cancel_requested_at", "updated_at", "version"])
+                    # Brain access ends with the intent, before the pod is gone (#2432).
+                    from astrolift_registry.brain_runs import CANCELLED, revoke_run
+
+                    revoke_run(current, CANCELLED)
             return _cancel_agent_task_locked(task_guid, owner=owner, safe_failure=execution is not None)
     except TaskControlBusy as exc:
         return {"ok": False, "status": task.status, "error": str(exc), "pending": True}

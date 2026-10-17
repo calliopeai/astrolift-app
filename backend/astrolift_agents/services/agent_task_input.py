@@ -108,7 +108,7 @@ def queue_agent_task_input(
                 return previous
         if current.status not in ACCEPTS_INPUT_STATUSES:
             raise AgentTaskInputError("precondition", f"task is not accepting input ({current.status})")
-        return AgentTaskInputMessage.objects.create(
+        message = AgentTaskInputMessage.objects.create(
             organization_id=current.organization_id,
             agent_task=current,
             client_request_id=request_id,
@@ -116,6 +116,11 @@ def queue_agent_task_input(
             author=author,
             author_label=(author_label or "")[:255],
         )
+    # A steer checks again that the run may still read its brains (#2432).
+    from astrolift_registry.brain_runs import recheck
+
+    recheck(current)
+    return message
 
 
 def pending_input_count(task: AgentTask) -> int:

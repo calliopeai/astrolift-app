@@ -234,6 +234,22 @@ def startup_diagnostic_to_type(row) -> AgentStartupDiagnosticType | None:
     )
 
 
+@strawberry.type(
+    name="AstroliftAgentTaskBrain",
+    description=(
+        "A brain a run reads as the person who launched it (#2432). source is default (its agent's own) "
+        "or requested (brainSlugs at launch). revokedAt and revokedReason are set once the run can no "
+        "longer read it: the run ended or was cancelled, the brain is gone, or that person lost access."
+    ),
+)
+class AgentTaskBrainType:
+    slug: str
+    name: str
+    source: str
+    revoked_at: dt.datetime | None
+    revoked_reason: str
+
+
 @strawberry.type(name="AstroliftAgentTask")
 class AgentTaskType:
     id: GUID
@@ -295,6 +311,8 @@ class AgentTaskType:
     # The model the run used, as the harness reported it (#2416); empty
     # until a report arrives.
     model: str = ""
+    # The brains the run reads (#2432), its agent's own first.
+    brains: list[AgentTaskBrainType] = strawberry.field(default_factory=list)
 
 
 @strawberry.type(name="AstroliftAgentInteraction")
@@ -803,7 +821,7 @@ def agent_tasks_to_types(tasks) -> list[AgentTaskType]:
     rows = list(tasks)
     from django.db.models import prefetch_related_objects
 
-    prefetch_related_objects(rows, "completion_callback")
+    prefetch_related_objects(rows, "completion_callback", "brain_bindings")
     watchable = watchable_task_ids(rows)
     return [agent_task_to_type(task, can_watch=task.pk in watchable) for task in rows]
 
@@ -857,6 +875,16 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
         callback_attempts=callback.attempts if callback is not None else 0,
         callback_last_error=(callback.last_error or None) if callback is not None else None,
         model=t.model,
+        brains=[
+            AgentTaskBrainType(
+                slug=row.slug,
+                name=row.name,
+                source=row.source,
+                revoked_at=row.revoked_at,
+                revoked_reason=row.revoked_reason,
+            )
+            for row in sorted(t.brain_bindings.all(), key=lambda row: row.pk)
+        ],
     )
 
 
@@ -1201,6 +1229,17 @@ class AgentDetailType:
     scheduled_scale_to: int | None = None
     scale_up_cron: str = ""
     scale_down_cron: str = ""
+    brains: list[str] = strawberry.field(
+        default_factory=list,
+        description="Brains every run a person launches reads, from the agent's manifest (#2432).",
+    )
+    brains_allowed: list[str] | None = strawberry.field(
+        default=None,
+        description=(
+            "Brains a launch may add with brainSlugs (#2432). Null accepts any brain the launcher can read; "
+            "empty accepts none."
+        ),
+    )
 
 
 @strawberry.type(name="AstroliftAgentLiveStatus")
@@ -1415,6 +1454,8 @@ def agent_detail_to_type(w) -> AgentDetailType:
         scheduled_scale_to=getattr(w, "scheduled_scale_to", None),
         scale_up_cron=getattr(w, "scale_up_cron", "") or "",
         scale_down_cron=getattr(w, "scale_down_cron", "") or "",
+        brains=list(getattr(w, "brains", None) or []),
+        brains_allowed=(list(w.brains_allowed) if getattr(w, "brains_allowed", None) is not None else None),
     )
 
 

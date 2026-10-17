@@ -153,6 +153,13 @@ class Workload(NamedBaseCoreModel):
         on_delete=models.SET_NULL,
     )
 
+    # Brains an agent's runs read (#2432), from the manifest's ``brains`` and
+    # ``brains_allowed``. Only meaningful when ``kind == AGENT``. ``brains``
+    # are read by every run a person launches; ``brains_allowed`` is what a
+    # launch may add, and null accepts any brain the launcher can read.
+    brains = models.JSONField(default=list, blank=True)
+    brains_allowed = models.JSONField(null=True, blank=True)
+
     # ---- Run spec (spec 33, PR-1) ------------------------------------
     # How an ``agent`` workload runs. Only meaningful when
     # ``kind == AGENT``; every other kind carries the defaults and
