@@ -229,8 +229,15 @@ test("every compatibility alias resolves to an active route and parked routes re
     if (!location) {
       // A nested layout can serialize the redirect in RSC rather than a
       // response header. Verify the actual browser redirect in that case.
-      await page.goto(path, { waitUntil: "networkidle" });
-      expect(new URL(page.url()).pathname + new URL(page.url()).search, path).not.toBe(path);
+      // The client follows it after hydration, which on a busy runner can
+      // come after network idle, so wait for the URL itself to change.
+      await page.goto(path);
+      await expect
+        .poll(() => new URL(page.url()).pathname + new URL(page.url()).search, {
+          message: path,
+          timeout: 15_000,
+        })
+        .not.toBe(path);
       location = page.url();
     }
     expect(location, `${path} must be a real redirect, not a silent empty page`).toBeTruthy();
