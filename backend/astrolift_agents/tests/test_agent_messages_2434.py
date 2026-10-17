@@ -568,8 +568,8 @@ def test_a_failed_reply_insert_rolls_back_delivery(world, monkeypatch, gate):
         raise RuntimeError("reply persistence failed")
 
     monkeypatch.setattr(AgentMessageReply.objects, "create", fail)
-    with pytest.raises(RuntimeError, match="reply persistence failed"):
-        _reply(world, world.user, message_id, body="continue", decision="allow" if gate else None)
+    result = _reply(world, world.user, message_id, body="continue", decision="allow" if gate else None)
+    assert not result.ok and result.errors[0].code == "INTERNAL"
     assert not AgentTaskInputMessage.objects.filter(agent_task=task).exists()
     assert not AgentTaskInputReply.objects.filter(request_event__agent_task=task).exists()
 
