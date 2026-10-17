@@ -16,11 +16,83 @@ RUNTIME_KINDS = frozenset(
         "HorizontalPodAutoscaler",
         "PodMonitor",
         "HTTPRoute",
+        "HTTPRouteFilter",
         "SecurityPolicy",
         "ReferenceGrant",
         "Certificate",
     }
 )
+_INVENTORY_KINDS = (
+    "apps/v1/Deployment",
+    "apps/v1/StatefulSet",
+    "apps/v1/DaemonSet",
+    "batch/v1/Job",
+    "batch/v1/CronJob",
+    "Service",
+    "networking.k8s.io/v1/Ingress",
+    "autoscaling/v2/HorizontalPodAutoscaler",
+)
+
+
+def _stale_runtime(app, driver, slug, namespace):
+    """Manifest edits must not hide older app controllers still running natively."""
+    from _sdk.cluster import ClusterDriver
+
+    if type(driver).list_manifests is ClusterDriver.list_manifests:
+        raise RuntimeError("EXPIRY_RUNTIME_INVENTORY_UNAVAILABLE")
+    result = []
+    for kind in _INVENTORY_KINDS:
+        values = driver.list_manifests(slug, namespace, kind)
+        if not isinstance(values, list) or len(values) > 1024:
+            raise RuntimeError("EXPIRY_RUNTIME_INVENTORY_UNCONFIRMED")
+        for value in values:
+            meta = value.get("metadata") or {}
+            labels = meta.get("labels") or {}
+            if (
+                meta.get("namespace") == namespace
+                and labels.get("astrolift.dev/app") == app.slug
+                and (
+                    labels.get("astrolift.dev/workload")
+                    or value.get("kind") == "Ingress"
+                    and (
+                        labels.get("astrolift.dev/managed-subdomain")
+                        or labels.get("astrolift.dev/custom-domain")
+                    )
+                )
+                and not meta.get("ownerReferences")
+            ):
+                result.append(value)
+    from _sdk._kube_health import PLATFORM_NAMESPACE
+    from _sdk.k8s_dynamic_client import NotFoundError
+    from kubernetes.dynamic.exceptions import NotFoundError as DynamicNotFoundError
+    from kubernetes.dynamic.exceptions import ResourceNotFoundError
+
+    from providers.k8s_native.edge_gateway import EDGE_NAMESPACE
+
+    if driver.get_namespace(slug, EDGE_NAMESPACE) is not None:
+        for target_namespace, kind in (
+            (EDGE_NAMESPACE, "gateway.networking.k8s.io/v1/HTTPRoute"),
+            (EDGE_NAMESPACE, "gateway.envoyproxy.io/v1alpha1/HTTPRouteFilter"),
+            (EDGE_NAMESPACE, "gateway.envoyproxy.io/v1alpha1/SecurityPolicy"),
+            (PLATFORM_NAMESPACE, "networking.k8s.io/v1/Ingress"),
+            (namespace, "gateway.networking.k8s.io/v1beta1/ReferenceGrant"),
+        ):
+            try:
+                values = driver.list_manifests(slug, target_namespace, kind)
+            except (NotFoundError, DynamicNotFoundError, ResourceNotFoundError):
+                continue
+            if not isinstance(values, list) or len(values) > 1024:
+                raise RuntimeError("EXPIRY_RUNTIME_INVENTORY_UNCONFIRMED")
+            for value in values:
+                meta = value.get("metadata") or {}
+                labels = meta.get("labels") or {}
+                if (
+                    labels.get("astrolift.dev/app") == app.slug
+                    and (target_namespace == namespace or labels.get("astrolift.dev/namespace") == namespace)
+                    and not meta.get("ownerReferences")
+                ):
+                    result.append(value)
+    return result
 
 
 def _kind(ref):
@@ -144,6 +216,7 @@ def retire_runtime(app_id):
             resources = (
                 render_resources_for_deployment(deploy, include_managed_filesystems=False) if deploy else []
             )
+            resources.extend(_stale_runtime(app, driver, ctx.slug, namespace))
             from astrolift_registry.models import Workload
             from astrolift_workflows.activities.app_lifecycle import (
                 _app_env_secret_name,
@@ -169,12 +242,22 @@ def retire_runtime(app_id):
                 for name, label in sorted(secret_names)
             )
             refs = []
+            seen = set()
             for resource in resources:
                 if resource.get("kind") not in RUNTIME_KINDS and resource.get("kind") != "Secret":
                     continue
                 meta = resource.get("metadata") or {}
                 if not meta.get("name"):
                     raise RuntimeError("EXPIRY_RUNTIME_REFERENCE_INVALID")
+                key = (
+                    resource["apiVersion"],
+                    resource["kind"],
+                    meta.get("namespace", namespace),
+                    meta["name"],
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
                 ref = {
                     "apiVersion": resource["apiVersion"],
                     "kind": resource["kind"],
@@ -218,9 +301,16 @@ def retire_runtime(app_id):
             proof = _owned_runtime(app, namespace, ref, actual)
             if not ref["native"] or proof["metadata"]["uid"] != ref["native"]["metadata"]["uid"]:
                 raise RuntimeError("EXPIRY_RUNTIME_REPLACED")
-            result = driver.delete_manifests(ctx.slug, target_namespace, [proof])
+            result = driver.delete_manifests(
+                ctx.slug, target_namespace, [proof], propagation_policy="Foreground"
+            )
             if result is None or not result.ok:
                 raise RuntimeError("EXPIRY_RUNTIME_DELETE_UNCONFIRMED")
+            if (
+                driver.get_manifest(ctx.slug, target_namespace, _kind(ref), ref["metadata"]["name"])
+                is not None
+            ):
+                raise RuntimeError("EXPIRY_RUNTIME_DELETE_PENDING")
             deleted.append(f"{target_namespace}/{ref['kind']}/{proof['metadata']['name']}")
     return deleted
 

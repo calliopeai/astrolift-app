@@ -40,6 +40,13 @@ class NativeObjects:
     def get(self, *, kind, namespace, name):
         return deepcopy(self.objects.get((kind, namespace, name)))
 
+    def list(self, *, kind, namespace):
+        return [
+            deepcopy(value)
+            for (key_kind, key_namespace, _), value in self.objects.items()
+            if key_kind == kind and key_namespace == namespace
+        ]
+
     def get_namespace(self, *, name):
         value = self.get(kind="Namespace", namespace=None, name=name)
         if value is None:
@@ -182,6 +189,75 @@ def test_retry_refuses_replacement_runtime_identity(native):
     with pytest.raises(RuntimeError, match="RUNTIME_REPLACED"):
         retire_runtime(n.app.pk)
     assert len(n.objects.deletes) == 1
+
+
+def test_old_app_controller_is_removed_when_current_manifest_no_longer_names_it(native):
+    old = native.objects.put(
+        {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": "old-worker",
+                "namespace": native.namespace,
+                "labels": {"astrolift.dev/app": native.app.slug, "astrolift.dev/workload": "old-worker"},
+            },
+        }
+    )
+    managed = native.objects.put(
+        {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "name": "managed-database",
+                "namespace": native.namespace,
+                "labels": {"cnpg.io/cluster": "database"},
+                "ownerReferences": [{"uid": "database-uid"}],
+            },
+        }
+    )
+    assert f"{native.namespace}/Deployment/old-worker" in retire_runtime(native.app.pk)
+    assert ("apps/v1/Deployment", native.namespace, old["metadata"]["name"]) not in native.objects.objects
+    assert ("apps/v1/Deployment", native.namespace, managed["metadata"]["name"]) in native.objects.objects
+
+
+def test_stale_shared_edge_routes_and_paused_filters_are_cleaned_by_exact_namespace_owner(native):
+    n = native
+    n.objects.put({"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "astrolift-edge"}})
+    for version, kind, name in (
+        ("gateway.networking.k8s.io/v1", "HTTPRoute", "old-route"),
+        ("gateway.envoyproxy.io/v1alpha1", "HTTPRouteFilter", "old-paused-filter"),
+    ):
+        n.objects.put(
+            {
+                "apiVersion": version,
+                "kind": kind,
+                "metadata": {
+                    "name": name,
+                    "namespace": "astrolift-edge",
+                    "labels": {"astrolift.dev/app": n.app.slug, "astrolift.dev/namespace": n.namespace},
+                },
+            }
+        )
+    other = n.objects.put(
+        {
+            "apiVersion": "gateway.networking.k8s.io/v1",
+            "kind": "HTTPRoute",
+            "metadata": {
+                "name": "another-environment",
+                "namespace": "astrolift-edge",
+                "labels": {"astrolift.dev/app": n.app.slug, "astrolift.dev/namespace": "other-namespace"},
+            },
+        }
+    )
+    removed = retire_runtime(n.app.pk)
+    assert "astrolift-edge/HTTPRoute/old-route" in removed
+    assert "astrolift-edge/HTTPRouteFilter/old-paused-filter" in removed
+    assert ("Namespace", None, "astrolift-edge") in n.objects.objects
+    assert (
+        "gateway.networking.k8s.io/v1/HTTPRoute",
+        "astrolift-edge",
+        other["metadata"]["name"],
+    ) in n.objects.objects
 
 
 @pytest.mark.parametrize("target", ["Namespace", "apps/v1/Deployment"])
