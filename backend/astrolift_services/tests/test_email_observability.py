@@ -200,7 +200,7 @@ def _info(user=None, ip: str | None = None):
     else:
         meta: dict[str, str] = {}
         if ip:
-            meta["HTTP_X_FORWARDED_FOR"] = ip
+            meta["REMOTE_ADDR"] = ip
         request = SimpleNamespace(user=user, META=meta)
     return SimpleNamespace(context=SimpleNamespace(user=user, request=request))
 
