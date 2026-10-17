@@ -579,6 +579,19 @@ def test_a_refresh_checks_again_and_tells_the_run_what_it_lost(world, started, d
     }
 
 
+def test_a_brain_no_environment_serves_just_now_still_gets_a_token(world, started, driver):
+    kb = _brain(world, "kb")
+    task, key = _launched(world, driver, brains=["kb"])
+    AppEnvironment.objects.filter(registered_app=kb).update(url="")
+
+    response = _refresh(task, key)
+
+    assert response.status_code == 200, response.content
+    [entry] = response.json()["brains"]
+    assert (entry["slug"], entry["mcp_url"], entry["mcp_urls"]) == ("kb", "", [])
+    assert _verify(entry["token"], kb)["agent_task"] == str(task.guid)
+
+
 def test_ending_the_run_revokes_its_tokens(world, started, driver):
     _brain(world, "kb")
     task, key = _launched(world, driver, brains=["kb"])
