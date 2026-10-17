@@ -1193,7 +1193,8 @@ class RegistryQuery:
         from astrolift_identity.models import Organization
         from astrolift_registry.schema.types import policy_to_type
 
-        return policy_to_type(Organization.objects.get(pk=_caller_org_id()))
+        org_id = _caller_org_id()
+        return policy_to_type(Organization.objects.get(pk=org_id, deleted_at__isnull=True))
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)

@@ -159,7 +159,8 @@ class ExpiryMutations:
         from astrolift_registry import expiry
 
         tenant = get_current_tenant()
-        org = Organization.objects.filter(pk=tenant.organization_id if tenant else None).first()
+        org_id = tenant.organization_id if tenant else None
+        org = Organization.objects.filter(pk=org_id, deleted_at__isnull=True).first()
         if org is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found")
         try:
