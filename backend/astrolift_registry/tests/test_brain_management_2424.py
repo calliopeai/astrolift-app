@@ -319,8 +319,9 @@ def test_another_orgs_project_or_connection_is_not_found(world, other, host, sta
 
 
 def test_a_failed_step_records_why_and_stops(world, host, started, monkeypatch):
-    monkeypatch.setattr(brain_template, "download", lambda ref: edition_zip(tamper="README.md"))
     row = BrainCreation.objects.get(guid=str(_create(world).data.id))
+    # The ref moved after createBrain checked it.
+    monkeypatch.setattr(brain_template, "download", lambda ref: edition_zip(tamper="README.md"))
     assert brain_manage.ensure_repo(row.pk)["state"] == "repo_ready"
     assert brain_manage.scaffold(row.pk)["state"] == "failed"
     row.refresh_from_db()
@@ -772,21 +773,86 @@ def test_any_slug_is_a_brain_that_keeps_its_name(world, host, started):
     assert 'name = "acme-kb"' in files["astrolift.toml"].decode()
 
 
-def test_a_slug_without_brain_needs_an_edition_with_app_slug(world, host, started, monkeypatch):
+def _edition_without_app_slug():
     from astrolift_registry.tests.test_brain_scaffold_2424 import CONFIG, OLD_DEPLOY, config_schema
 
-    old = {
-        "client.config.json": json.dumps(CONFIG).encode(),
-        brain_template.CONFIG_SCHEMA: config_schema(*OLD_DEPLOY),
-        brain_template.DOCKERFILE: b"FROM nginx\n",
-    }
-    monkeypatch.setattr(brain_template, "download", lambda ref: edition_zip(files=old))
+    return edition_zip(
+        files={
+            "client.config.json": json.dumps(CONFIG).encode(),
+            brain_template.CONFIG_SCHEMA: config_schema(*OLD_DEPLOY),
+            brain_template.DOCKERFILE: b"FROM nginx\n",
+        }
+    )
+
+
+def test_a_slug_the_edition_cannot_name_is_refused_before_anything_is_made(world, host, started, monkeypatch):
+    monkeypatch.setattr(brain_template, "download", lambda ref: _edition_without_app_slug())
+
+    result = _create(world, slug="acme")
+
+    assert not result.ok
+    error = result.errors[0]
+    assert (error.code, error.field) == ("PRECONDITION", "slug")
+    assert "has no deploy.app_slug" in error.message and "(acme-brain)" in error.message
+    assert not BrainCreation.objects.exists()
+    assert not started and not host.created and not host.commits
+    assert _create(world, slug="acme-brain").ok  # the slug the refusal names
+
+
+def test_the_scaffold_step_still_refuses_an_edition_that_changed_since(world, host, started, monkeypatch):
     row = BrainCreation.objects.get(guid=str(_create(world, slug="acme").data.id))
+    monkeypatch.setattr(brain_template, "download", lambda ref: _edition_without_app_slug())
     assert brain_manage.ensure_repo(row.pk)["state"] == "repo_ready"
     assert brain_manage.scaffold(row.pk)["state"] == "failed"
     row.refresh_from_db()
     assert row.error_code == "PRECONDITION" and "has no deploy.app_slug" in row.error_message
     assert not host.commits
+
+
+@pytest.mark.parametrize(
+    ("case", "code", "field", "says"),
+    [
+        ("tampered edition", "PRECONDITION", "templateRef", "README.md (hash differs)"),
+        ("no portal Dockerfile", "PRECONDITION", "templateRef", brain_template.DOCKERFILE),
+        ("namespace taken", "VALIDATION", "slug", "is already used by another app"),
+        ("no managed cluster", "PRECONDITION", None, "No managed cluster connected"),
+    ],
+)
+def test_create_refuses_what_the_workflow_would_before_it_makes_anything(
+    world, host, started, monkeypatch, case, code, field, says
+):
+    from _sdk.k8s_naming import app_namespace
+
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_registry.tests.test_brain_scaffold_2424 import CONFIG
+
+    if case == "tampered edition":
+        monkeypatch.setattr(brain_template, "download", lambda ref: edition_zip(tamper="README.md"))
+    elif case == "no portal Dockerfile":
+        files = {"client.config.json": json.dumps(CONFIG).encode(), "README.md": b"# Mimwell\n"}
+        monkeypatch.setattr(brain_template, "download", lambda ref: edition_zip(files=files))
+    elif case == "namespace taken":
+        RegisteredApp.objects.create(
+            organization=world.org,
+            team=world.medops,
+            project=world.medops_project,
+            name="Squatter",
+            slug="squatter",
+            k8s_namespace=app_namespace(organization_slug=world.org.slug, app_slug="acme-brain"),
+        )
+    else:
+        TenantCluster.objects.filter(pk=world.cluster.pk).update(
+            lifecycle=TenantCluster.Lifecycle.REGISTERED.value
+        )
+
+    result = _create(world)
+
+    assert not result.ok
+    error = result.errors[0]
+    assert (error.code, error.field) == (code, field)
+    assert says in error.message
+    assert not BrainCreation.objects.exists()
+    assert not started and not host.created and not host.commits
 
 
 class FakeRepo:

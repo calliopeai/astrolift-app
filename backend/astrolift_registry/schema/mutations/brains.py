@@ -450,6 +450,20 @@ class BrainManagementMutations:
                 "repository first, or use a user OAuth or PAT connection",
                 field="repo",
             )
+        organization = Organization.objects.get(pk=org_id)
+        # Everything the workflow would refuse once the repository exists.
+        refused = brain_manage.preflight(
+            organization=organization,
+            slug=slug,
+            name=name,
+            repo=repo,
+            template_ref=ref,
+            selection=selection,
+            environment_name=environment,
+        )
+        if refused is not None:
+            code, message, field = refused
+            return gql_failure(code, message, field=field or None)
         if input.deploy:
             from astrolift_identity.action_safety import gate
 
@@ -469,7 +483,6 @@ class BrainManagementMutations:
                 deny = gate(info, "deploy.production", resolver_name="create_brain")
                 if deny is not None:
                     return deny
-        organization = Organization.objects.get(pk=org_id)
         row = BrainCreation.objects.create(
             organization_id=org_id,
             project=project,
