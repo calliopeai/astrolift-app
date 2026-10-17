@@ -20445,6 +20445,23 @@ export type AppViewerPermissionsQueryVariables = Exact<{
 
 export type AppViewerPermissionsQuery = { astroliftApp?: { id: string, viewerPermissions: Array<string> } | null };
 
+export type TemporaryAppCapabilitiesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type TemporaryAppCapabilitiesQuery = { astroliftServerInfo: { capabilities: Array<string> } };
+
+export type TemporaryAppPolicyQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type TemporaryAppPolicyQuery = { astroliftTemporaryAppPolicy: { minTtlSeconds: number, maxTtlSeconds: number, temporaryOnlyForMembers: boolean, ttlRequiredSurfaces: Array<string>, dataGraceDays: number } };
+
+export type EnvironmentAppExpiryQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type EnvironmentAppExpiryQuery = { astroliftApp?: { id: string, slug: string, expiresAt?: string | null } | null };
+
 export type StartReviewedWorkflowMutationVariables = Exact<{
   input: StartWorkflowDefinitionInput;
 }>;

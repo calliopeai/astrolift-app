@@ -76,6 +76,20 @@ export const DETAILS: Omit<AppDetailsStepViewProps<AppDetailsFields>, "state" | 
   allProjects: PROJECTS,
   slugValid: true,
   projectsLoading: false,
+  temporary: {
+    rules: {
+      policy: {
+        minTtlSeconds: 900,
+        maxTtlSeconds: 7776000,
+        temporaryOnlyForMembers: false,
+        ttlRequiredSurfaces: [],
+        dataGraceDays: 7,
+      },
+      permanentAllowed: true,
+    },
+    loading: false,
+    failed: false,
+  },
 };
 
 export const LONG_DETAILS_STATE: AppDetailsFields = {
@@ -103,4 +117,18 @@ export const LONG_DETAILS: typeof DETAILS = {
   ] as unknown as AstroliftProject[],
   slugValid: true,
   projectsLoading: false,
+  temporary: {
+    rules: {
+      policy: {
+        minTtlSeconds: 900,
+        maxTtlSeconds: 7776000,
+        temporaryOnlyForMembers: false,
+        ttlRequiredSurfaces: [],
+        dataGraceDays: 7,
+      },
+      permanentAllowed: true,
+    },
+    loading: false,
+    failed: false,
+  },
 };

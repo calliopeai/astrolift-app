@@ -4067,6 +4067,22 @@
       "extendLabel": "Um einen Tag verlängern",
       "extended": "Verlängert bis {when}",
       "extendFailed": "Die App konnte nicht verlängert werden"
+    },
+    "temporaryCreation": {
+      "ttl": "Lebensdauer der Anwendung",
+      "help": "Leer lassen, um den Ablauf aus dem Manifest zu übernehmen oder eine dauerhafte Anwendung zu erstellen, sofern die Richtlinie dies erlaubt. Monate haben 30 Tage.",
+      "inherited": "Laut Manifest läuft diese Anwendung nach {ttl} ab. Geben Sie eine Dauer ein, um dies zu überschreiben.",
+      "bounds": "Zulässige Lebensdauer: {min} bis {max} Minuten.",
+      "required": "Ihre Organisation verlangt für diese Anwendung ein Ablaufdatum.",
+      "invalid": "Geben Sie eine Dauer innerhalb der Organisationsgrenzen ein: 30m, 4h, 7d, 6w oder 3mo.",
+      "deleteData": "Verwaltete Daten beim Ablauf der Anwendung löschen",
+      "deleteWarning": "Beim Ablauf werden auch Datenbanken, Buckets und Volumes der Anwendung gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "keepData": "Verwaltete Daten werden nach Ablauf {days} Tage aufbewahrt und dann gelöscht.",
+      "loading": "Richtlinie zur Lebensdauer wird geladen…",
+      "unavailable": "Die Richtlinie konnte nicht gelesen werden. Versuchen Sie es vor dem Erstellen erneut.",
+      "unsupported": "Dieser Server unterstützt keine temporären Anwendungen.",
+      "retry": "Erneut versuchen",
+      "reviewKeep": "Es gilt die Datenaufbewahrungsrichtlinie der Organisation."
     }
   },
   "sourceProviders": {

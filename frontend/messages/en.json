@@ -4010,6 +4010,22 @@
       "extendLabel": "Extend by one day",
       "extended": "Extended to {when}",
       "extendFailed": "Could not extend the app"
+    },
+    "temporaryCreation": {
+      "ttl": "App lifetime",
+      "help": "Leave blank to keep the manifest expiry, or make the app permanent when policy permits. Months are 30 days.",
+      "inherited": "The manifest expires this app after {ttl}. Enter a duration to override it.",
+      "bounds": "Allowed lifetime: {min} to {max} minutes.",
+      "required": "Your organization requires this app to expire.",
+      "invalid": "Enter a duration within the organization’s limits: 30m, 4h, 7d, 6w or 3mo.",
+      "deleteData": "Delete managed data when the app expires",
+      "deleteWarning": "Expiry also deletes the app’s databases, buckets and volumes. This cannot be undone.",
+      "keepData": "Managed data is kept for {days} days after expiry, then deleted.",
+      "loading": "Loading app lifetime policy…",
+      "unavailable": "The app lifetime policy could not be read. Try again before creating the app.",
+      "unsupported": "This server does not support temporary apps.",
+      "retry": "Try again",
+      "reviewKeep": "The organization’s data retention policy applies."
     }
   },
   "lists": {

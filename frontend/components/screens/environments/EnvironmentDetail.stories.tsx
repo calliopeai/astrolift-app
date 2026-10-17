@@ -66,3 +66,20 @@ export const KoreanWidth768: Story = {
     </NextIntlClientProvider>
   ),
 };
+
+export const TemporaryApp: Story = {
+  render: () => (
+    <EnvironmentDetail
+      {...ENVIRONMENT}
+      appExpiresAt={new Date(Date.now() + 20 * 3600000).toISOString()}
+    />
+  ),
+};
+export const ExpiredApp: Story = {
+  render: () => (
+    <EnvironmentDetail
+      {...ENVIRONMENT}
+      appExpiresAt={new Date(Date.now() - 3600000).toISOString()}
+    />
+  ),
+};
