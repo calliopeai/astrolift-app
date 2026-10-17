@@ -14614,33 +14614,138 @@
   },
   "zentinelleScreen": {
     "title": "保護 · Zentinelle",
-    "description": "AI エージェント GRC: Astrolift 上で動くすべてのエージェントワークロードのガバナンス、リスク、コンプライアンス。",
-    "tagline": "MIT ライセンス · セルフホスト可能 · Calliope AI のコンパニオン製品",
-    "intro": "Zentinelle は BROCS スタックの <strong>Control + Secure</strong> を担う柱です。Astrolift と並行して動作し、Astrolift があえて担わない AI 固有のレイヤーを提供します。ポリシーの適用、コンテンツスキャン、コンプライアンスフレームワーク、そして AI ガバナンス規制が求める完全なインタラクション監査証跡です。",
-    "statusTitle": "連携は設計中",
-    "statusBody": "Astrolift と Zentinelle の間の認証ハンドシェイクとテナント委任は設計中です。Zentinelle を Astrolift に認証を委任する組み込み Django アプリにする案と、トークン交換を行う独立サービスにする案があります。方式が決まると、このページは接続管理 UI になります。",
-    "github": "GitHub の Zentinelle",
-    "docs": "連携ドキュメント",
-    "addsTitle": "Zentinelle が Astrolift に加えるもの",
-    "capabilities": {
-      "governance": {
-        "title": "ガバナンス",
-        "description": "ポリシーエンジン: コンテンツルール (PII、有害性、ジェイルブレイク検出)、モデル許可リスト、トークン予算の適用、バージョン管理されたシステムプロンプトライブラリ。"
-      },
-      "risk": {
-        "title": "リスク",
-        "description": "5×5 リスク登録簿、FMEA 分析、インシデント追跡、異常検知、エージェントの挙動ドリフトに対する自動アラート。"
-      },
-      "compliance": {
-        "title": "コンプライアンス",
-        "description": "SOC 2、GDPR、HIPAA、EU AI 法、NIST RMF のコントロールマッピング。証跡の収集、ギャップ分析、監査対応レポート。"
-      },
-      "observability": {
-        "title": "オブザーバビリティ",
-        "description": "完全なインタラクション監査 (プロンプト、レスポンス、ツール呼び出し)、コンテンツスキャン結果、ポリシー評価ログ、ワークロードごとのトークン使用量の計測。"
+    "description": "この組織を Zentinelle に接続し、エージェントのガバナンス、使用量とコスト、ポリシー、監査を扱います。",
+    "noAccess": "Zentinelle へのアクセス権がありません",
+    "noAccessBody": "ここでは、あなたのロールに Zentinelle の権限がありません。組織の管理者に Zentinelle の権限を依頼してください。",
+    "error": "Zentinelle の接続を読み取れませんでした",
+    "notConnected": "Zentinelle に接続されていません",
+    "notConnectedBody": "組織の管理者がこのページから Zentinelle に接続します。接続後に各セクションが表示されます。",
+    "tabsLabel": "Zentinelle のセクション",
+    "writeFailed": "Zentinelle が変更を受け付けませんでした",
+    "tabs": {
+      "overview": "概要",
+      "clusters": "クラスター",
+      "usage": "使用量とコスト",
+      "policies": "ポリシー",
+      "audit": "監査"
+    },
+    "health": {
+      "healthy": "ゲートウェイ稼働中",
+      "pending": "ゲートウェイ未デプロイ",
+      "off": "ゲートウェイ停止",
+      "error": "ゲートウェイのエラー"
+    },
+    "connect": {
+      "title": "Zentinelle に接続",
+      "description": "Zentinelle の URL と、Zentinelle で発行した一回限りの登録コードを貼り付けてください。Zentinelle が返す認証情報はシークレットとして保存され、表示されることはありません。",
+      "url": "Zentinelle の URL",
+      "code": "登録コード",
+      "codeHelp": "Zentinelle で発行します。一度だけ使えます。",
+      "gatewayUrl": "ゲートウェイ URL(任意)",
+      "gatewayUrlHelp": "クラスターのゲートウェイが上記以外の URL で Zentinelle に到達する場合の宛先です(クラスター内のプライベートアドレスなど)。",
+      "required": "Zentinelle の URL と登録コードを入力してください。",
+      "connecting": "接続中…",
+      "submit": "接続"
+    },
+    "connection": {
+      "title": "接続",
+      "status": "接続状態",
+      "connected": "接続済み",
+      "revoked": "Zentinelle により失効",
+      "revokedBody": "Zentinelle はこの接続を受け付けなくなりました: {reason}。切断してから、新しい登録コードで接続し直してください。",
+      "url": "Zentinelle の URL",
+      "gatewayUrl": "ゲートウェイ URL",
+      "sameAsUrl": "Zentinelle の URL と同じ",
+      "installId": "Zentinelle のインストール ID",
+      "tenants": "Zentinelle のテナント",
+      "none": "なし",
+      "connectedAt": "接続日時",
+      "editGatewayUrl": "ゲートウェイ URL を変更",
+      "disconnect": "切断",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "gatewayUrlHelp": "空欄にすると Zentinelle の URL を使います。稼働中のゲートウェイは再デプロイされます。",
+      "disconnectTitle": "Zentinelle から切断しますか?",
+      "disconnectBody": "Zentinelle でインストールと登録済みのすべてのクラスターを失効させ、その後クラスターからゲートウェイとそのシークレットを削除します。再接続には新しい登録コードが必要です。",
+      "disconnected": "Zentinelle から切断しました"
+    },
+    "overview": {
+      "degraded": "対応が必要なクラスターゲートウェイがあります。下のクラスターを確認してください。",
+      "title": "稼働状況",
+      "gateways": "稼働中のゲートウェイ",
+      "gatewaysValue": "{total} 件中 {healthy} 件",
+      "agents": "今月観測されたエージェント",
+      "requests": "モデルリクエスト(過去 24 時間)",
+      "spend": "今月の支出",
+      "usageError": "Zentinelle から使用量を読み取れませんでした",
+      "clustersTitle": "クラスターごとのゲートウェイの状態",
+      "clustersDescription": "登録済みの各クラスターの Zentinelle ゲートウェイです。",
+      "installOff": "このインストールでは Zentinelle ゲートウェイがオフになっています。登録済みのクラスターは認証情報を保持し、プラットフォーム運用者がオンにするとゲートウェイがデプロイされます。",
+      "noClusters": "Zentinelle に登録されたクラスターはまだありません。"
+    },
+    "clusters": {
+      "installOff": "このインストールでは Zentinelle ゲートウェイがオフになっています。クラスターを登録すると認証情報が保存され、プラットフォーム運用者がゲートウェイをオンにするとデプロイされます。",
+      "title": "登録済みのクラスター",
+      "empty": "Zentinelle に登録されたクラスターはまだありません。",
+      "never": "なし",
+      "registeredAt": "登録: {when}",
+      "rotatedAt": "認証情報の更新: {when}",
+      "turnOff": "ゲートウェイをオフにする",
+      "turnOn": "ゲートウェイをオンにする",
+      "rotate": "認証情報を更新",
+      "unregister": "登録解除",
+      "registerTitle": "クラスターを登録",
+      "registerDescription": "登録すると、ゲートウェイの認証情報がクラスターに書き込まれ、ゲートウェイがデプロイされます。",
+      "search": "クラスターを検索",
+      "noChoices": "一致する未登録のクラスターはありません。",
+      "register": "登録",
+      "unregisterTitle": "{cluster} を Zentinelle から登録解除しますか?",
+      "unregisterBody": "Zentinelle でクラスターを失効させ、その後ゲートウェイと認証情報のシークレットを削除します。このクラスター上のエージェントの通信は Zentinelle を経由しなくなります。"
+    },
+    "filters": {
+      "window": "期間",
+      "scope": "範囲",
+      "all": "表示できるものすべて",
+      "agent": "特定のエージェント",
+      "projects": "プロジェクト",
+      "teams": "チーム",
+      "agentSlug": "エージェントのスラッグ",
+      "windows": {
+        "24h": "過去 24 時間",
+        "7d": "過去 7 日間",
+        "30d": "過去 30 日間",
+        "month": "今月"
       }
     },
-    "division": "<label>責任の分担:</label> Astrolift は<em>ランタイムレイヤー</em>を担います。コンテナのオーケストレーション、デプロイ、Pod の健全性、インフラのオブザーバビリティです。Zentinelle は<em>AI の振る舞いレイヤー</em>を担います。エージェントの発言と行動、ポリシーへの準拠、規制当局が求める監査証跡です。<strong>OBSERVE › Agents</strong> では、<code>Astrolift</code> と表示されたタブは現在利用でき、<code>Zentinelle</code> のタブは連携の提供後に有効になります。"
+    "usage": {
+      "error": "Zentinelle から使用量を読み取れませんでした",
+      "requests": "モデルリクエスト",
+      "tokens": "使用トークン",
+      "cost": "モデルのコスト",
+      "title": "エージェントとモデル別",
+      "empty": "この期間にモデルの使用はありません。",
+      "noAgent": "(エージェントなし)",
+      "requestCount": "{count, plural, other {# 件のリクエスト}}",
+      "tokenCount": "入力 {input}、出力 {output}"
+    },
+    "policies": {
+      "error": "Zentinelle からポリシーを読み取れませんでした",
+      "empty": "ここで有効な Zentinelle ポリシーはありません。",
+      "meta": "範囲 {scope}、優先度 {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "NDJSON でエクスポート",
+        "csv": "CSV でエクスポート"
+      },
+      "label": "Zentinelle の監査",
+      "error": "Zentinelle から監査ストリームを読み取れませんでした",
+      "loadMore": "さらに読み込む",
+      "loadingMore": "読み込み中…",
+      "empty": "この期間の監査イベントはありません",
+      "emptyBody": "表示できるエージェントについて Zentinelle が記録したイベントがここに表示されます。",
+      "exported": "{count, plural, other {# 件のイベントをエクスポートしました}}"
+    }
   },
   "modelDeploy": {
     "title": "モデルをデプロイ",

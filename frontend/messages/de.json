@@ -14617,33 +14617,138 @@
   },
   "zentinelleScreen": {
     "title": "Absichern · Zentinelle",
-    "description": "AI-Agent-GRC: Governance, Risk und Compliance für jeden Agent-Workload auf Astrolift.",
-    "tagline": "MIT-Lizenz · Selbst hostbar · Begleitprodukt von Calliope AI",
-    "intro": "Zentinelle ist die Säule <strong>Control + Secure</strong> des BROCS-Stacks. Es läuft neben Astrolift und liefert die KI-spezifische Schicht, die Astrolift bewusst nicht übernimmt: Richtliniendurchsetzung, Inhaltsprüfung, Compliance-Frameworks und den vollständigen Audit-Trail aller Interaktionen, den KI-Governance-Vorschriften verlangen.",
-    "statusTitle": "Integration in Planung",
-    "statusBody": "Der Auth-Handshake und die Mandantendelegation zwischen Astrolift und Zentinelle werden gerade entworfen. Optionen sind Zentinelle als eingebettete Django-App, die die Authentifizierung an Astrolift delegiert, oder ein separater Dienst mit Token-Austausch. Sobald die Form feststeht, wird diese Seite zur Verwaltung der Verbindung.",
-    "github": "Zentinelle auf GitHub",
-    "docs": "Integrationsdokumentation",
-    "addsTitle": "Was Zentinelle zu Astrolift beiträgt",
-    "capabilities": {
-      "governance": {
-        "title": "Governance",
-        "description": "Richtlinien-Engine: Inhaltsregeln (PII, Toxizität, Jailbreak-Erkennung), Modell-Allowlists, Durchsetzung von Token-Budgets und eine versionierte Bibliothek von System-Prompts."
-      },
-      "risk": {
-        "title": "Risiko",
-        "description": "5×5-Risikoregister, FMEA-Analyse, Vorfallverfolgung, Anomalieerkennung und automatische Warnungen bei Abweichungen im Agentenverhalten."
-      },
-      "compliance": {
-        "title": "Compliance",
-        "description": "Kontrollzuordnungen für SOC 2, DSGVO, HIPAA, EU AI Act und NIST RMF. Nachweissammlung, Lückenanalyse und prüfungsfertige Berichte."
-      },
-      "observability": {
-        "title": "Beobachtbarkeit",
-        "description": "Vollständiges Interaktions-Audit (Prompts, Antworten, Tool-Aufrufe), Ergebnisse der Inhaltsprüfung, Protokolle der Richtlinienauswertung und Messung des Token-Verbrauchs pro Workload."
+    "description": "Verbinden Sie diese Organisation mit Zentinelle für Agent-Governance, Nutzung und Kosten, Richtlinien und Prüfprotokoll.",
+    "noAccess": "Kein Zugriff auf Zentinelle",
+    "noAccessBody": "Ihre Rollen gewähren hier nichts für Zentinelle. Bitten Sie einen Organisationsadministrator um eine Zentinelle-Berechtigung.",
+    "error": "Die Zentinelle-Verbindung konnte nicht gelesen werden",
+    "notConnected": "Nicht mit Zentinelle verbunden",
+    "notConnectedBody": "Ein Organisationsadministrator verbindet Zentinelle auf dieser Seite. Die Bereiche erscheinen nach dem Verbinden.",
+    "tabsLabel": "Zentinelle-Bereiche",
+    "writeFailed": "Zentinelle hat die Änderung nicht angenommen",
+    "tabs": {
+      "overview": "Übersicht",
+      "clusters": "Cluster",
+      "usage": "Nutzung und Kosten",
+      "policies": "Richtlinien",
+      "audit": "Prüfprotokoll"
+    },
+    "health": {
+      "healthy": "Gateway läuft",
+      "pending": "Gateway noch nicht bereitgestellt",
+      "off": "Gateway aus",
+      "error": "Gateway-Fehler"
+    },
+    "connect": {
+      "title": "Mit Zentinelle verbinden",
+      "description": "Fügen Sie die Zentinelle-URL und einen in Zentinelle erzeugten Einmal-Registrierungscode ein. Die von Zentinelle zurückgegebene Zugangsberechtigung wird als Geheimnis gespeichert und nie angezeigt.",
+      "url": "Zentinelle-URL",
+      "code": "Registrierungscode",
+      "codeHelp": "In Zentinelle erzeugt; er funktioniert einmal.",
+      "gatewayUrl": "Gateway-URL (optional)",
+      "gatewayUrlHelp": "Wo Cluster-Gateways Zentinelle erreichen, wenn das nicht die obige URL ist, etwa eine private Adresse im Cluster.",
+      "required": "Geben Sie die Zentinelle-URL und den Registrierungscode ein.",
+      "connecting": "Verbindung wird hergestellt…",
+      "submit": "Verbinden"
+    },
+    "connection": {
+      "title": "Verbindung",
+      "status": "Verbindungsstatus",
+      "connected": "Verbunden",
+      "revoked": "Von Zentinelle widerrufen",
+      "revokedBody": "Zentinelle akzeptiert diese Verbindung nicht mehr: {reason}. Trennen Sie sie und verbinden Sie erneut mit einem neuen Registrierungscode.",
+      "url": "Zentinelle-URL",
+      "gatewayUrl": "Gateway-URL",
+      "sameAsUrl": "Wie die Zentinelle-URL",
+      "installId": "Zentinelle-Installations-ID",
+      "tenants": "Zentinelle-Mandanten",
+      "none": "Keine",
+      "connectedAt": "Verbunden am",
+      "editGatewayUrl": "Gateway-URL ändern",
+      "disconnect": "Trennen",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "gatewayUrlHelp": "Leer lassen, um die Zentinelle-URL zu verwenden. Laufende Gateways werden neu bereitgestellt.",
+      "disconnectTitle": "Verbindung zu Zentinelle trennen?",
+      "disconnectBody": "Damit werden die Installation und jeder registrierte Cluster in Zentinelle widerrufen und anschließend die Gateways und ihre Geheimnisse aus den Clustern entfernt. Für eine neue Verbindung ist ein neuer Registrierungscode nötig.",
+      "disconnected": "Verbindung zu Zentinelle getrennt"
+    },
+    "overview": {
+      "degraded": "Mindestens ein Cluster-Gateway braucht Aufmerksamkeit. Siehe die Cluster unten.",
+      "title": "Zustand",
+      "gateways": "Laufende Gateways",
+      "gatewaysValue": "{healthy} von {total}",
+      "agents": "Beobachtete Agents in diesem Monat",
+      "requests": "Modellanfragen, letzte 24 Stunden",
+      "spend": "Ausgaben in diesem Monat",
+      "usageError": "Die Nutzung konnte nicht von Zentinelle gelesen werden",
+      "clustersTitle": "Gateway-Zustand je Cluster",
+      "clustersDescription": "Das Zentinelle-Gateway jedes registrierten Clusters.",
+      "installOff": "Zentinelle-Gateways sind für diese Installation ausgeschaltet. Registrierte Cluster behalten ihre Zugangsdaten; Gateways werden bereitgestellt, sobald der Plattformbetreiber sie einschaltet.",
+      "noClusters": "Noch keine Cluster bei Zentinelle registriert."
+    },
+    "clusters": {
+      "installOff": "Zentinelle-Gateways sind für diese Installation ausgeschaltet. Beim Registrieren wird die Zugangsberechtigung des Clusters gespeichert; das Gateway wird bereitgestellt, sobald der Plattformbetreiber Gateways einschaltet.",
+      "title": "Registrierte Cluster",
+      "empty": "Noch keine Cluster bei Zentinelle registriert.",
+      "never": "nie",
+      "registeredAt": "Registriert {when}",
+      "rotatedAt": "Zugangsdaten rotiert {when}",
+      "turnOff": "Gateway ausschalten",
+      "turnOn": "Gateway einschalten",
+      "rotate": "Zugangsdaten rotieren",
+      "unregister": "Abmelden",
+      "registerTitle": "Cluster registrieren",
+      "registerDescription": "Beim Registrieren werden die Gateway-Zugangsdaten in den Cluster geschrieben und sein Gateway bereitgestellt.",
+      "search": "Cluster suchen",
+      "noChoices": "Keine nicht registrierten Cluster gefunden.",
+      "register": "Registrieren",
+      "unregisterTitle": "{cluster} bei Zentinelle abmelden?",
+      "unregisterBody": "Damit wird der Cluster in Zentinelle widerrufen und anschließend sein Gateway und das Geheimnis mit den Zugangsdaten entfernt. Agent-Verkehr dort läuft nicht mehr über Zentinelle."
+    },
+    "filters": {
+      "window": "Zeitraum",
+      "scope": "Bereich",
+      "all": "Alles, was ich sehen darf",
+      "agent": "Ein Agent",
+      "projects": "Projekte",
+      "teams": "Teams",
+      "agentSlug": "Agent-Slug",
+      "windows": {
+        "24h": "Letzte 24 Stunden",
+        "7d": "Letzte 7 Tage",
+        "30d": "Letzte 30 Tage",
+        "month": "Dieser Monat"
       }
     },
-    "division": "<label>Aufgabenteilung:</label> Astrolift verantwortet die <em>Laufzeitschicht</em>: Container-Orchestrierung, Deployments, Pod-Zustand und Infrastruktur-Observability. Zentinelle verantwortet die <em>KI-Verhaltensschicht</em>: was der Agent sagt und tut, ob er Richtlinien einhält, und den Audit-Trail, den Aufsichtsbehörden verlangen. Unter <strong>OBSERVE › Agents</strong> sind mit <code>Astrolift</code> markierte Tabs bereits aktiv; <code>Zentinelle</code>-Tabs werden aktiv, sobald die Integration verfügbar ist."
+    "usage": {
+      "error": "Die Nutzung konnte nicht von Zentinelle gelesen werden",
+      "requests": "Modellanfragen",
+      "tokens": "Verbrauchte Tokens",
+      "cost": "Modellkosten",
+      "title": "Nach Agent und Modell",
+      "empty": "Keine Modellnutzung in diesem Zeitraum.",
+      "noAgent": "(kein Agent)",
+      "requestCount": "{count, plural, one {# Anfrage} other {# Anfragen}}",
+      "tokenCount": "{input} ein, {output} aus"
+    },
+    "policies": {
+      "error": "Richtlinien konnten nicht von Zentinelle gelesen werden",
+      "empty": "Hier gelten keine Zentinelle-Richtlinien.",
+      "meta": "Bereich {scope}, Priorität {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "Als NDJSON exportieren",
+        "csv": "Als CSV exportieren"
+      },
+      "label": "Zentinelle-Prüfprotokoll",
+      "error": "Der Prüfprotokoll-Stream konnte nicht von Zentinelle gelesen werden",
+      "loadMore": "Mehr laden",
+      "loadingMore": "Wird geladen…",
+      "empty": "Keine Prüfereignisse in diesem Zeitraum",
+      "emptyBody": "Ereignisse erscheinen hier, sobald Zentinelle sie für die Agents erfasst, die Sie sehen dürfen.",
+      "exported": "{count, plural, one {# Ereignis exportiert} other {# Ereignisse exportiert}}"
+    }
   },
   "modelDeploy": {
     "title": "Modell bereitstellen",

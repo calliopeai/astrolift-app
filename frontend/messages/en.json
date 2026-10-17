@@ -14614,33 +14614,138 @@
   },
   "zentinelleScreen": {
     "title": "Secure · Zentinelle",
-    "description": "AI Agent GRC: Governance, Risk, and Compliance for every agent workload running on Astrolift.",
-    "tagline": "MIT-licensed · Self-hostable · Calliope AI companion product",
-    "intro": "Zentinelle is the <strong>Control + Secure</strong> pillar of the BROCS stack. It runs alongside Astrolift and provides the AI-specific layer that Astrolift deliberately does not own: policy enforcement, content scanning, compliance frameworks, and the full interaction audit trail that AI governance regulations require.",
-    "statusTitle": "Integration under design",
-    "statusBody": "The auth handshake and tenant delegation between Astrolift and Zentinelle is being designed. Options include Zentinelle as an embedded Django app delegating auth to Astrolift, or a separate service with a token exchange. Once the shape is decided, this page becomes the connection management UI.",
-    "github": "Zentinelle on GitHub",
-    "docs": "Integration docs",
-    "addsTitle": "What Zentinelle adds to Astrolift",
-    "capabilities": {
-      "governance": {
-        "title": "Governance",
-        "description": "Policy engine: content rules (PII, toxicity, jailbreak detection), model allowlists, token budget enforcement, and versioned system prompt library."
-      },
-      "risk": {
-        "title": "Risk",
-        "description": "5×5 risk register, FMEA analysis, incident tracking, anomaly detection, and automated alerts on agent behavior drift."
-      },
-      "compliance": {
-        "title": "Compliance",
-        "description": "SOC 2, GDPR, HIPAA, EU AI Act, and NIST RMF control mappings. Evidence collection, gap analysis, and audit-ready reports."
-      },
-      "observability": {
-        "title": "Observability",
-        "description": "Full interaction audit (prompts + responses + tool calls), content scan results, policy evaluation logs, and per-workload token usage metering."
+    "description": "Connect this organization to Zentinelle for agent governance, usage and cost, policies and audit.",
+    "noAccess": "No Zentinelle access",
+    "noAccessBody": "Your roles grant nothing on Zentinelle here. Ask an organization admin for a Zentinelle permission.",
+    "error": "Could not read the Zentinelle connection",
+    "notConnected": "Not connected to Zentinelle",
+    "notConnectedBody": "An organization admin connects Zentinelle from this page. Its sections appear once it is connected.",
+    "tabsLabel": "Zentinelle sections",
+    "writeFailed": "Zentinelle did not accept the change",
+    "tabs": {
+      "overview": "Overview",
+      "clusters": "Clusters",
+      "usage": "Usage and cost",
+      "policies": "Policies",
+      "audit": "Audit"
+    },
+    "health": {
+      "healthy": "Gateway running",
+      "pending": "Gateway not deployed yet",
+      "off": "Gateway off",
+      "error": "Gateway error"
+    },
+    "connect": {
+      "title": "Connect to Zentinelle",
+      "description": "Paste the Zentinelle URL and a one-time enrollment code generated in Zentinelle. The credential Zentinelle returns is stored as a secret and never shown.",
+      "url": "Zentinelle URL",
+      "code": "Enrollment code",
+      "codeHelp": "Generated in Zentinelle; it works once.",
+      "gatewayUrl": "Gateway URL (optional)",
+      "gatewayUrlHelp": "Where cluster gateways reach Zentinelle when that is not the URL above, such as a private in-cluster address.",
+      "required": "Enter the Zentinelle URL and the enrollment code.",
+      "connecting": "Connecting…",
+      "submit": "Connect"
+    },
+    "connection": {
+      "title": "Connection",
+      "status": "Connection status",
+      "connected": "Connected",
+      "revoked": "Revoked by Zentinelle",
+      "revokedBody": "Zentinelle no longer accepts this connection: {reason}. Disconnect, then connect again with a new enrollment code.",
+      "url": "Zentinelle URL",
+      "gatewayUrl": "Gateway URL",
+      "sameAsUrl": "Same as the Zentinelle URL",
+      "installId": "Zentinelle install ID",
+      "tenants": "Zentinelle tenants",
+      "none": "None",
+      "connectedAt": "Connected on",
+      "editGatewayUrl": "Change gateway URL",
+      "disconnect": "Disconnect",
+      "save": "Save",
+      "cancel": "Cancel",
+      "gatewayUrlHelp": "Leave empty to use the Zentinelle URL. Running gateways are redeployed.",
+      "disconnectTitle": "Disconnect from Zentinelle?",
+      "disconnectBody": "This revokes the install and every registered cluster in Zentinelle, then removes the gateways and their secrets from the clusters. Connecting again needs a new enrollment code.",
+      "disconnected": "Disconnected from Zentinelle"
+    },
+    "overview": {
+      "degraded": "One or more cluster gateways need attention. See the clusters below.",
+      "title": "Health",
+      "gateways": "Gateways running",
+      "gatewaysValue": "{healthy} of {total}",
+      "agents": "Agents observed this month",
+      "requests": "Model requests, last 24 hours",
+      "spend": "Spend this month",
+      "usageError": "Could not read usage from Zentinelle",
+      "clustersTitle": "Gateway health per cluster",
+      "clustersDescription": "Each registered cluster's Zentinelle gateway.",
+      "installOff": "Zentinelle gateways are turned off for this install. Registered clusters keep their credentials; gateways deploy once the platform operator turns them on.",
+      "noClusters": "No clusters are registered with Zentinelle yet."
+    },
+    "clusters": {
+      "installOff": "Zentinelle gateways are turned off for this install. Registering a cluster stores its credential; the gateway deploys once the platform operator turns gateways on.",
+      "title": "Registered clusters",
+      "empty": "No clusters are registered with Zentinelle yet.",
+      "never": "never",
+      "registeredAt": "Registered {when}",
+      "rotatedAt": "credential rotated {when}",
+      "turnOff": "Turn gateway off",
+      "turnOn": "Turn gateway on",
+      "rotate": "Rotate credential",
+      "unregister": "Unregister",
+      "registerTitle": "Register a cluster",
+      "registerDescription": "Registering writes the cluster's gateway credential into the cluster and deploys its gateway.",
+      "search": "Search clusters",
+      "noChoices": "No unregistered clusters match.",
+      "register": "Register",
+      "unregisterTitle": "Unregister {cluster} from Zentinelle?",
+      "unregisterBody": "This revokes the cluster in Zentinelle, then removes its gateway and credential secret. Agent traffic on it stops going through Zentinelle."
+    },
+    "filters": {
+      "window": "Time window",
+      "scope": "Scope",
+      "all": "Everything I can see",
+      "agent": "One agent",
+      "projects": "Projects",
+      "teams": "Teams",
+      "agentSlug": "Agent slug",
+      "windows": {
+        "24h": "Last 24 hours",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "month": "This month"
       }
     },
-    "division": "<label>Division of responsibility:</label> Astrolift owns the <em>runtime layer</em>: container orchestration, deployments, pod health, and infrastructure observability. Zentinelle owns the <em>AI behavior layer</em>: what the agent says and does, whether it complies with policy, and the audit trail regulators require. In <strong>OBSERVE › Agents</strong>, tabs marked <code>Astrolift</code> are live today; <code>Zentinelle</code> tabs activate once the integration ships."
+    "usage": {
+      "error": "Could not read usage from Zentinelle",
+      "requests": "Model requests",
+      "tokens": "Tokens used",
+      "cost": "Model cost",
+      "title": "By agent and model",
+      "empty": "No model usage in this window.",
+      "noAgent": "(no agent)",
+      "requestCount": "{count, plural, one {# request} other {# requests}}",
+      "tokenCount": "{input} in, {output} out"
+    },
+    "policies": {
+      "error": "Could not read policies from Zentinelle",
+      "empty": "No Zentinelle policies are in effect here.",
+      "meta": "Scope {scope}, priority {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "Export NDJSON",
+        "csv": "Export CSV"
+      },
+      "label": "Zentinelle audit",
+      "error": "Could not read the audit stream from Zentinelle",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "empty": "No audit events in this window",
+      "emptyBody": "Events appear here as Zentinelle records them for the agents you can see.",
+      "exported": "{count, plural, one {Exported # event} other {Exported # events}}"
+    }
   },
   "modelDeploy": {
     "title": "Deploy model",
