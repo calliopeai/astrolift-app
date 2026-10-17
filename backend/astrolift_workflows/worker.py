@@ -588,3 +588,15 @@ ACTIVITIES = (
 TASK_QUEUE_DEPLOY = "astrolift.deploy"
 TASK_QUEUE_PROVISION = "astrolift.provision"
 TASK_QUEUE_OBSERVABILITY = "astrolift.observability"
+
+
+def polled_task_queues() -> tuple[str, ...]:
+    """Every queue the worker polls; the backlog metric job reports the same set.
+
+    The per-concern queues plus ``settings.TEMPORAL_TASK_QUEUE``, which
+    workflows started without explicit routing land on.
+    """
+    from django.conf import settings
+
+    default_queue = getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main")
+    return (TASK_QUEUE_DEPLOY, TASK_QUEUE_PROVISION, TASK_QUEUE_OBSERVABILITY, default_queue)

@@ -377,6 +377,14 @@ DATABASES = {
         "HOST": env_str("POSTGRES_HOST"),
         "PORT": env_str("POSTGRES_PORT"),
         "OPTIONS": {"options": "-c search_path=public"},
+        # Scale-out (#2435), docs/operators/scale-out-readiness.md. 0 closes
+        # each connection after its request or activity, right behind RDS
+        # Proxy or PgBouncer; raise it only to reuse connections without one.
+        "CONN_MAX_AGE": int(env_str("POSTGRES_CONN_MAX_AGE", "0")),
+        "CONN_HEALTH_CHECKS": True,
+        # Required behind PgBouncer transaction pooling: ``.iterator()``
+        # cursors outlive the transaction that owns the server connection.
+        "DISABLE_SERVER_SIDE_CURSORS": env_bool("POSTGRES_DISABLE_SERVER_SIDE_CURSORS", False),
     },
 }
 
@@ -392,6 +400,12 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
 }
+
+# GraphQL subscription fan-out across replicas (#2435): events published by
+# a worker or another webservice task reach every subscriber through Redis.
+# Installs point it at the cache Redis; empty keeps the single-process
+# in-memory broker (tests, local dev).
+PUBSUB_REDIS_URL = env_str("ASTROLIFT_PUBSUB_REDIS_URL", "")
 
 CSRF_TRUSTED_ORIGINS = [
     "https://storage.googleapis.com/",
