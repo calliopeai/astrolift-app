@@ -843,7 +843,9 @@ def reply(
 
     # Serialize retries with both delivery and reply persistence. A failed
     # reply insert must roll back its gate answer or queued input as well.
-    message = AgentMessage.objects.select_for_update().get(pk=message.pk)
+    message = AgentMessage.objects.select_for_update().filter(pk=message.pk).first()
+    if message is None:
+        raise AgentMessageError("not_found", "message not found", "messageId", 404)
     if not visible_recipient_rows(user, message.organization_id).filter(message=message).exists():
         raise AgentMessageError("not_found", "message not found", "messageId", 404)
     if not can_read_agent(user, message.organization_id, message.agent_definition_id):
@@ -890,7 +892,7 @@ def reply(
 
     label = getattr(user, "username", "") or getattr(user, "email", "") or ""
     task = (
-        AgentTask.objects.select_for_update().get(pk=message.agent_task_id)
+        AgentTask.objects.select_for_update().filter(pk=message.agent_task_id).first()
         if message.agent_task_id is not None
         else None
     )
