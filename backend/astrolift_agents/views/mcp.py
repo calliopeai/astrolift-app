@@ -322,6 +322,9 @@ def _serialize_agent(workload, *, include_package: bool) -> dict[str, Any]:
         "name": workload.name,
         "slug": workload.slug,
         "project_slug": project.slug if project else "",
+        "app_slug": app.slug,
+        "expires_at": _iso(app.expires_at),
+        "delete_data_on_expiry": app.delete_data_on_expiry,
         "source": {
             "kind": app.source_kind,
             "repo": app.source_repo,
@@ -442,7 +445,12 @@ def _get_brain_status(_request: HttpRequest, args: dict[str, Any]) -> dict[str, 
     row = status(app, str(args.get("environment_name") or "production").strip())
     if row is None:
         raise McpCallError("environment not found", code="not_found")
-    return {"slug": app.slug, **row}
+    return {
+        "slug": app.slug,
+        "expires_at": _iso(app.expires_at),
+        "delete_data_on_expiry": app.delete_data_on_expiry,
+        **row,
+    }
 
 
 def _create_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:

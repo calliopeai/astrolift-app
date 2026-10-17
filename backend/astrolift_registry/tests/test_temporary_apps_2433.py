@@ -230,6 +230,7 @@ def test_register_with_expires_in_makes_a_temporary_app(world, armed, audit):
     app = RegisteredApp.objects.get(organization=world.org, slug="demo")
     assert before + dt.timedelta(hours=4) <= app.expires_at <= timezone.now() + dt.timedelta(hours=4)
     assert app.delete_data_on_expiry is True
+    assert app.created_by_id == world.user.pk
     assert result.data.expires_at == app.expires_at
     assert armed == [app.pk]
     rows = [a for a in audit if a.action == "app.expiry.set"]
@@ -457,6 +458,26 @@ def test_an_expiry_set_inside_the_hour_sends_only_the_last_warning(world, monkey
     assert app.expiry_warnings_sent == ["1h", "24h"]
 
 
+def test_failed_warning_rolls_back_delivery_marker_and_notifications(world, monkeypatch):
+    _member(world, "tmp-warning-retry")
+    app = _temp_app(world, expires_at=timezone.now() + dt.timedelta(minutes=40))
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("event persistence unavailable")
+
+    monkeypatch.setattr("core.events.Event.emit", staticmethod(fail))
+    with pytest.raises(RuntimeError, match="persistence unavailable"):
+        expiry.next_step(app.pk)
+    app.refresh_from_db()
+    assert app.expiry_warnings_sent == []
+    assert not Notification.objects.filter(kind="app_expiring").exists()
+    monkeypatch.setattr("core.events.Event.emit", staticmethod(lambda *args, **kwargs: None))
+    expiry.next_step(app.pk)
+    app.refresh_from_db()
+    assert app.expiry_warnings_sent == ["1h", "24h"]
+    assert Notification.objects.filter(kind="app_expiring").count() == 1
+
+
 def test_fire_scales_to_zero_and_keeps_data_for_the_grace(world):
     app = _temp_app(world, expires_at=timezone.now() - dt.timedelta(seconds=1))
     wl = Workload.objects.create(registered_app=app, name="web", slug="web", replicas=3)
@@ -517,8 +538,10 @@ def test_grace_period_then_purge_then_done(world, audit):
         "managed_service_ids": [service.pk],
     }
     fired = [a for a in audit if a.action == "app.expiry.fire"][0].extra
+    assert fired["surface"] == "temporal"
     assert fired["kept_managed_services"][0]["name"] == "db"
     assert "deployments_cancelled" in fired["torn_down"]
+    assert "managed_services" not in fired["torn_down"]
 
     ManagedService.objects.filter(pk=service.pk).update(deleted_at=now)
     expiry.record_purge(app.pk, [{"managed_service_id": service.pk, "ok": True}])
@@ -540,16 +563,30 @@ def test_sweep_starts_only_missing_timers(world, other, monkeypatch):
     )
     starts = []
     monkeypatch.setattr(
-        "astrolift_workflows.client.start_workflow",
-        lambda name, args, *, workflow_id: starts.append(workflow_id),
+        "astrolift_workflows.client.signal_or_start_workflow",
+        lambda name, args, *, workflow_id, signal_name: starts.append((workflow_id, signal_name)),
     )
     assert expiry.sweep() == 1
-    assert starts == [expiry.workflow_id(str(lost.guid))]
+    assert starts == [(expiry.workflow_id(str(lost.guid)), "reschedule")]
 
 
 # ---------------------------------------------------------------------------
 # MCP
 # ---------------------------------------------------------------------------
+
+
+def test_mcp_app_reads_expose_the_actual_expiry(world):
+    from astrolift_agents.views.mcp import _serialize_agent
+    from astrolift_registry.brains import describe_brain
+
+    app = _temp_app(world, app_kind="mimwell", delete_data_on_expiry=True)
+    agent = Workload.objects.create(
+        registered_app=app, name="worker", slug="worker", kind=Workload.Kind.AGENT
+    )
+    for data in (describe_brain(app), _serialize_agent(agent, include_package=False)):
+        assert data["expires_at"] == app.expires_at.isoformat()
+        assert data["delete_data_on_expiry"] is True
+
 
 WRITE = [SCOPE_MCP_READ, SCOPE_MCP_WRITE, SCOPE_READ_APPS, SCOPE_WRITE_APPS]
 

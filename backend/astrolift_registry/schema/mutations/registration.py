@@ -281,6 +281,7 @@ class RegistrationMutations:
             return gql_failure(ErrorCode.CONFLICT.value, _host_refusal, field="slug")
         app = RegisteredApp.objects.create(
             organization=project.organization,
+            created_by_id=tenant.actor_user_id,
             team=project.team,
             project=project,
             name=eff_name,

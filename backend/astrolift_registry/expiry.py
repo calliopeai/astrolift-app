@@ -326,14 +326,15 @@ def workflow_id(guid: str) -> str:
 def arm(app_id: int, guid: str) -> None:
     """Wake the app's timer to re-read its row, or start it. Best-effort:
     the sweep starts any timer this misses."""
-    from astrolift_workflows.client import signal_workflow, start_workflow
+    from astrolift_workflows.client import signal_or_start_workflow
     from astrolift_workflows.inputs import AppExpiryInput
 
-    if signal_workflow(workflow_id(guid), "reschedule"):
-        return
     try:
-        start_workflow(
-            "AppExpiryWorkflow", [AppExpiryInput(registered_app_id=app_id)], workflow_id=workflow_id(guid)
+        signal_or_start_workflow(
+            "AppExpiryWorkflow",
+            [AppExpiryInput(registered_app_id=app_id)],
+            workflow_id=workflow_id(guid),
+            signal_name="reschedule",
         )
     except Exception:  # noqa: BLE001 - the sweep re-arms it
         log.exception("could not start the expiry timer for app %s", guid)
@@ -391,13 +392,12 @@ def next_step(app_id: int, *, now: dt.datetime | None = None) -> dict[str, Any]:
         }
     if app.data_retained_until is not None:
         ids = _live_managed_service_ids(app.pk)
-        if ids:
-            if app.data_retained_until <= now:
-                return {"action": "purge", "managed_service_ids": ids}
-            return {
-                "action": "sleep",
-                "seconds": max(1, int((app.data_retained_until - now).total_seconds()) + 1),
-            }
+        if app.data_retained_until <= now:
+            return {"action": "purge", "managed_service_ids": ids}
+        return {
+            "action": "sleep",
+            "seconds": max(1, int((app.data_retained_until - now).total_seconds()) + 1),
+        }
     return {"action": "done"}
 
 
@@ -416,8 +416,8 @@ def _send_due_warning(app, remaining: dt.timedelta) -> None:
             return
         row.expiry_warnings_sent = sorted(set(row.expiry_warnings_sent or []) | set(due))
         row.save(update_fields=["expiry_warnings_sent", "updated_at", "version"])
+        warn(row, due[-1])
     app.expiry_warnings_sent = row.expiry_warnings_sent
-    warn(row, due[-1])
 
 
 def warning_recipients(app) -> list[int]:
@@ -539,8 +539,17 @@ def record_teardown(app_id: int, teardown: dict[str, Any] | None) -> None:
         "app.expiry.fire",
         app,
         actor_user_id=None,
+        surface="temporal",
         expires_at=_iso(app.expires_at),
-        torn_down=sorted(k for k, v in steps.items() if v.get("ok")),
+        torn_down=sorted(
+            k
+            for k, v in steps.items()
+            if v.get("ok") and (app.delete_data_on_expiry or k not in {"namespaces", "managed_services"})
+        ),
+        kept_namespaces=[
+            {"cluster_id": row["cluster_id"], **row["namespace"]["metadata"]}
+            for row in app.expiry_cleanup or []
+        ],
         still_live=list((teardown or {}).get("still_live_resources") or []),
         kept_managed_services=kept,
         data_retained_until=_iso(app.data_retained_until),
@@ -555,8 +564,8 @@ def record_purge(app_id: int, results: list[dict[str, Any]]) -> None:
     if app is None:
         return
     if all(r.get("ok") for r in results) and not _live_managed_service_ids(app.pk):
-        RegisteredApp.all_objects.filter(pk=app.pk).update(data_retained_until=None)
-    _audit("app.expiry.purge", app, actor_user_id=None, managed_services=results)
+        RegisteredApp.all_objects.filter(pk=app.pk).update(data_retained_until=None, expiry_cleanup=[])
+    _audit("app.expiry.purge", app, actor_user_id=None, surface="temporal", managed_services=results)
 
 
 def sweep(*, now: dt.datetime | None = None, limit: int = 500) -> int:
@@ -566,20 +575,18 @@ def sweep(*, now: dt.datetime | None = None, limit: int = 500) -> int:
     from django.db.models import Q
 
     from astrolift_registry.models import RegisteredApp
-    from astrolift_services.models import ManagedService
-    from astrolift_workflows.client import start_workflow, workflow_run_state
-    from astrolift_workflows.inputs import AppExpiryInput
+    from astrolift_workflows.client import workflow_run_state
 
     now = now or timezone.now()
-    kept = ManagedService.objects.filter(deleted_at__isnull=True).values("registered_app_id")
     rows = (
         RegisteredApp.all_objects.filter(
             Q(expires_at__isnull=False, expiry_fired_at__isnull=True, deleted_at__isnull=True)
             | Q(expiry_fired_at__isnull=False, deleted_at__isnull=True)
-            | Q(expiry_fired_at__isnull=False, data_retained_until__isnull=False, pk__in=kept)
+            | Q(expiry_fired_at__isnull=False, data_retained_until__isnull=False)
         )
         .order_by("expires_at")
-        .values_list("pk", "guid")[:limit]
+        .values_list("pk", "guid")
+        .iterator(chunk_size=max(1, limit))
     )
     started = 0
     for pk, guid in rows:
@@ -588,11 +595,7 @@ def sweep(*, now: dt.datetime | None = None, limit: int = 500) -> int:
             # No answer is not "not running": starting replaces a running timer.
             if state is None or state.running:
                 continue
-            start_workflow(
-                "AppExpiryWorkflow",
-                [AppExpiryInput(registered_app_id=pk)],
-                workflow_id=workflow_id(str(guid)),
-            )
+            arm(pk, str(guid))
             started += 1
         except Exception:  # noqa: BLE001 - one app must not stop the sweep
             log.exception("expiry sweep could not arm app %s", guid)

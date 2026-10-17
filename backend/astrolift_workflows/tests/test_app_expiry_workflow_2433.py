@@ -31,6 +31,7 @@ class Script:
         self.steps = list(steps)
         self.step_times: list[Any] = []
         self.calls: list[tuple[str, Any]] = []
+        self.namespace_failures = 0
 
     def activities(self):
         script = self
@@ -62,7 +63,14 @@ class Script:
         async def finalize(ms_id: int) -> None:
             script.calls.append(("finalize", ms_id))
 
-        return [next_step, fire, record_teardown, record_purge, deprovision, finalize]
+        @activity.defn(name="astrolift.app.expiry_purge_namespaces")
+        async def purge_namespaces(app_id: int) -> None:
+            script.calls.append(("purge_namespaces", app_id))
+            if script.namespace_failures:
+                script.namespace_failures -= 1
+                raise RuntimeError("native namespace deletion unconfirmed")
+
+        return [next_step, fire, record_teardown, record_purge, deprovision, finalize, purge_namespaces]
 
 
 @workflow.defn(name="DeregisterAppWorkflow")
@@ -123,7 +131,7 @@ async def test_timer_fires_tears_down_keeping_data_then_purges(temporal_env):
         )
     assert result.ok
     names = [name for name, _ in script.calls]
-    assert names == ["fire", "record_teardown", "deprovision", "finalize", "record_purge"]
+    assert names == ["fire", "record_teardown", "deprovision", "finalize", "purge_namespaces", "record_purge"]
     teardown = dict(script.calls)["record_teardown"]
     assert teardown["input"] == {"keep_managed_services": True, "skip_grace": True, "delete_data": False}
     assert dict(script.calls)["deprovision"] == (41, True, False)
@@ -147,6 +155,34 @@ async def test_delete_data_on_expiry_deletes_with_the_app(temporal_env):
         )
     teardown = dict(script.calls)["record_teardown"]
     assert teardown["input"] == {"keep_managed_services": False, "skip_grace": True, "delete_data": True}
+
+
+async def test_namespace_purge_failure_keeps_retention_and_retries_after_an_hour(temporal_env):
+    script = Script(
+        [
+            {"action": "purge", "managed_service_ids": [41]},
+            {"action": "purge", "managed_service_ids": []},
+            {"action": "done"},
+        ]
+    )
+    script.namespace_failures = 3
+    queue = f"expiry-{uuid.uuid4()}"
+    async with _worker(temporal_env, queue, script):
+        result = await asyncio.wait_for(
+            temporal_env.client.execute_workflow(
+                AppExpiryWorkflow.run,
+                AppExpiryInput(registered_app_id=7),
+                id=f"AppExpiryWorkflow-{queue}",
+                task_queue=queue,
+            ),
+            timeout=60,
+        )
+    assert result.ok
+    assert [name for name, _ in script.calls].count("deprovision") == 1
+    purges = [data for name, data in script.calls if name == "record_purge"]
+    assert purges[0][-1]["namespace_cleanup"] and not purges[0][-1]["ok"]
+    assert purges[1] == []
+    assert script.step_times[1] - script.step_times[0] >= timedelta(hours=1)
 
 
 async def test_reschedule_wakes_the_timer(temporal_env):

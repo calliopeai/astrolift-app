@@ -30,6 +30,7 @@ with workflow.unsafe.imports_passed_through():
         deprovision_managed_service,
         finalize_managed_service_deletion,
         fire_app_expiry,
+        purge_expired_app_namespaces,
         record_app_expiry_purge,
         record_app_expiry_teardown,
         sweep_app_expiry,
@@ -138,6 +139,16 @@ class AppExpiryWorkflow:
                 )
             except Exception as exc:  # noqa: BLE001 - one service must not strand the rest
                 results.append({"managed_service_id": ms_id, "ok": False, "message": str(exc)})
+        if all(r["ok"] for r in results):
+            try:
+                await workflow.execute_activity(
+                    purge_expired_app_namespaces,
+                    app_id,
+                    start_to_close_timeout=_DEPROVISION,
+                    retry_policy=_CLEANUP_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001 - retry retained namespaces with their original identity
+                results.append({"namespace_cleanup": True, "ok": False, "message": str(exc)})
         await workflow.execute_activity(
             record_app_expiry_purge,
             args=[app_id, results],

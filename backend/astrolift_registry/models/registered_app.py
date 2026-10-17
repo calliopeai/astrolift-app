@@ -216,6 +216,7 @@ class RegisteredApp(NamedBaseCoreModel):
     expiry_warnings_sent = models.JSONField(default=list, blank=True)
     expiry_fired_at = models.DateTimeField(null=True, blank=True)
     data_retained_until = models.DateTimeField(null=True, blank=True)
+    expiry_cleanup = models.JSONField(default=list, blank=True, editable=False)
 
     webhook_deploys_paused = models.BooleanField(default=False)
     webhook_deploys_paused_at = models.DateTimeField(null=True, blank=True)

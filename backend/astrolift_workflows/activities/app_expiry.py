@@ -23,6 +23,20 @@ async def fire_app_expiry(registered_app_id: int) -> bool:
     return await sync_to_async(fire)(registered_app_id)
 
 
+@activity.defn(name="astrolift.app.expiry_retire_runtime")
+async def retire_expired_app_runtime(registered_app_id: int) -> list[str]:
+    from astrolift_registry.expiry_cleanup import retire_runtime
+
+    return await sync_to_async(retire_runtime)(registered_app_id)
+
+
+@activity.defn(name="astrolift.app.expiry_purge_namespaces")
+async def purge_expired_app_namespaces(registered_app_id: int) -> None:
+    from astrolift_registry.expiry_cleanup import purge_namespaces
+
+    await sync_to_async(purge_namespaces)(registered_app_id)
+
+
 @activity.defn(name="astrolift.app.expiry_record_teardown")
 async def record_app_expiry_teardown(registered_app_id: int, teardown: dict[str, Any] | None) -> None:
     from astrolift_registry.expiry import record_teardown

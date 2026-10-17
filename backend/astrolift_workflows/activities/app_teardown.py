@@ -169,6 +169,7 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
         ).select_related("tenant_cluster__provider_plugin"),
     )
     deleted: list[str] = []
+    failed: list[str] = []
     for env in envs:
         cluster = env.tenant_cluster
         if cluster is None:
@@ -215,6 +216,7 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
                     raise RuntimeError(str(detail))
             deleted.append(f"{cluster.slug}/{namespace}")
         except Exception as exc:  # noqa: BLE001 — log + continue
+            failed.append(f"{cluster.slug}/{namespace}")
             log.warning(
                 "delete_namespace failed for app=%s cluster=%s ns=%s: %s",
                 app.slug,
@@ -222,6 +224,8 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
                 namespace,
                 exc,
             )
+    if failed:
+        raise RuntimeError(f"namespace teardown incomplete: {', '.join(failed)}")
     return deleted
 
 
@@ -229,10 +233,8 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
 async def delete_app_namespaces(registered_app_id: int) -> list[str]:
     """Delete the app's namespace on every cluster it's deployed to.
 
-    Per-cluster failures are logged + skipped so a single
-    unreachable cluster doesn't strand the teardown. The workflow
-    can retry the activity to converge; reports list the namespaces
-    that did get deleted for the operator audit trail.
+    Attempt every environment, then fail if any namespace remains unconfirmed.
+    The workflow must retain the app row and retry incomplete teardown.
     """
     from asgiref.sync import sync_to_async
 
