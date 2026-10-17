@@ -44,6 +44,14 @@ import django  # noqa: E402
 
 django.setup()
 
+# Django's documented advice for test suites: a fast hasher. Set here, not in
+# config/test_settings.py, because CI exports DJANGO_SETTINGS_MODULE=config.settings,
+# which outranks pytest.ini. Without it the admin user post_migrate creates on
+# every flush costs a 1.2M-iteration PBKDF2 hash per transactional test (#2415).
+from django.conf import settings  # noqa: E402
+
+settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
 import pytest  # noqa: E402  (must follow the env-pop + django.setup above)
 
 # ---------------------------------------------------------------------------
@@ -77,11 +85,19 @@ _original_sql_flush_base = BaseDatabaseOperations.sql_flush
 _original_sql_flush_pg = PostgresDatabaseOperations.sql_flush
 
 
+# core.Interval and core.Period are a fixed calendar that post_migrate seeds
+# (15k rows, about a second of work). No test writes them, so they survive the
+# flush and Intervals.register finds them already in place (#2415).
+_KEEP_ACROSS_FLUSH = frozenset({"core_interval", "core_period"})
+
+
 def _sql_flush_with_cascade_base(self, style, tables, *, reset_sequences=False, allow_cascade=False):
+    tables = [t for t in tables if t not in _KEEP_ACROSS_FLUSH]
     return _original_sql_flush_base(self, style, tables, reset_sequences=reset_sequences, allow_cascade=True)
 
 
 def _sql_flush_with_cascade_pg(self, style, tables, *, reset_sequences=False, allow_cascade=False):
+    tables = [t for t in tables if t not in _KEEP_ACROSS_FLUSH]
     return _original_sql_flush_pg(self, style, tables, reset_sequences=reset_sequences, allow_cascade=True)
 
 

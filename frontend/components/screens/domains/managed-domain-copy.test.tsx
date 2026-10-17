@@ -65,6 +65,7 @@ const keys = [
   "certificateStatus",
   "certificateValidationRecords",
   "certificateNotRecorded",
+  "certificateEdgeTerminated",
   "certificateClusterUnavailable",
   "certificateUnavailable",
   "certificateIssued",
@@ -95,6 +96,8 @@ const keys = [
   "provisioned",
   "unprovisioned",
   "provisioning",
+  "stalled",
+  "provisionStalled",
   "provisionHelp",
   "zone",
   "driver",
@@ -207,6 +210,11 @@ const internationalWords: Partial<Record<(typeof locales)[number], readonly stri
   de: ["routing", "zone", "name", "hostname", "ping"],
   "pt-BR": ["ping"],
 };
+// The ICU arguments a key takes; every other key takes none.
+const argsByKey: Partial<Record<(typeof keys)[number], readonly string[]>> = {
+  recordCount: ["count"],
+  provisionStalled: ["step", "reason"],
+};
 describe("managed domain multilingual contract", () => {
   it.each(locales)("%s has exact keys and ICU arguments without English fallback", (locale) => {
     const copy = catalogs[locale].managedDomains;
@@ -220,7 +228,7 @@ describe("managed domain multilingual contract", () => {
         expect(node.type, `${locale}.${key}`).toBe(TYPE.argument);
         return "value" in node ? [node.value] : [];
       });
-      expect(args, `${locale}.${key}`).toEqual(key === "recordCount" ? ["count"] : []);
+      expect(args, `${locale}.${key}`).toEqual(argsByKey[key] ?? []);
       const t = createTranslator({
         locale,
         messages: copy,
@@ -228,7 +236,7 @@ describe("managed domain multilingual contract", () => {
           throw error;
         },
       });
-      expect(t(key, { count: 3 })).not.toContain("{count}");
+      expect(t(key, { count: 3, step: "s", reason: "r" })).not.toMatch(/\{(count|step|reason)\}/);
     }
   });
   it.each(locales)(

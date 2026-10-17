@@ -162,6 +162,12 @@ class TenantCluster(NamedBaseCoreModel):
     # app's access or an environment's hostnames change; the edge's shared
     # SecurityPolicy renders its authorization rules from it.
     edge_access_rules = models.JSONField(default=dict, blank=True)
+    # An operator-managed ingress-nginx install moving to the Envoy edge
+    # (#2117). Until the operator records the cutover complete, recipe runs
+    # never delete these HelmReleases, nor any labelled
+    # astrolift.ai/managed-by=operator.
+    preserved_ingress_releases = models.JSONField(default=list, blank=True, editable=False)
+    ingress_cutover_completed_at = models.DateTimeField(null=True, blank=True, editable=False)
     default_namespace_prefix = models.CharField(max_length=64, blank=True, default="")
     capabilities = models.JSONField(default=dict, blank=True)
     capabilities_probed_at = models.DateTimeField(null=True, blank=True)

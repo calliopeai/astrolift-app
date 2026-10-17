@@ -137,3 +137,20 @@ def test_no_recorded_certificate_unverified_cluster_and_tenants_never_reach_the_
     world.user.save()
     assert certificate(client, world, dns_wire)["reason"] == "PLATFORM_OPERATOR_REQUIRED"
     assert acm["calls"] == []
+
+
+def test_an_envoy_edge_cluster_says_the_edge_terminates_tls(world, client, dns_wire, acm):
+    """The edge serves the zone's routes on its own certificate (#2389), so a
+    missing or pending ACM certificate is not why the zone serves or fails."""
+    query = QUERY.replace("validationRecords}", "validationRecords edgeTerminated}")
+    cluster = aws_cluster(world)
+    ManagedDomain.objects.filter(pk=world.domain.pk).update(provision_cert_id="")
+    cluster.ingress_class = "envoy"
+    cluster.save(update_fields=["ingress_class"])
+
+    diagnostics.dns_answers(dns_wire)
+    reply = diagnostics.ask(client, world, query)
+
+    assert not reply.get("errors"), reply.get("errors")
+    cert = reply["data"]["astroliftManagedDomainDiagnostics"]["certificate"]
+    assert (cert["reason"], cert["edgeTerminated"]) == ("CERTIFICATE_TERMINATED_AT_EDGE", True)

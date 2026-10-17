@@ -79,6 +79,10 @@ class ManagedDomain(BaseCoreModel):
         default="",
         help_text="Cloud cert ID/ARN — used for poll and reissue operations.",
     )
+    # Where and why the provisioning run ended without activating the zone
+    # (#2389), recorded with provision_state 'failed'. Platform-written only.
+    provision_failed_step = models.CharField(max_length=64, blank=True, default="", editable=False)
+    provision_failure_reason = models.CharField(max_length=300, blank=True, default="", editable=False)
     provision_zone_id = models.CharField(
         max_length=255,
         blank=True,

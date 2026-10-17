@@ -3595,6 +3595,8 @@ export type AstroliftManagedDomain = {
   isWildcardManaged: Scalars['Boolean']['output'];
   organizationSlug?: Maybe<Scalars['String']['output']>;
   provisionClusterId?: Maybe<Scalars['String']['output']>;
+  provisionFailedStep: Scalars['String']['output'];
+  provisionFailureReason: Scalars['String']['output'];
   provisionNameservers: Scalars['JSON']['output'];
   provisionState: Scalars['String']['output'];
   provisionValidationRecords: Scalars['JSON']['output'];
@@ -8179,6 +8181,18 @@ export type ImportWorkflowManifestResult = {
   repointedSlugs: Array<Scalars['String']['output']>;
 };
 
+export type IngressCutoverPayload = {
+  clusterId: Scalars['GUID']['output'];
+  completedAt?: Maybe<Scalars['DateTime']['output']>;
+  preservedReleases: Array<Scalars['String']['output']>;
+};
+
+export type IngressCutoverPayloadMutationResult = {
+  data?: Maybe<IngressCutoverPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type InstallAlertMailSupport = {
   allowed: Scalars['Boolean']['output'];
   checkedAt: Scalars['DateTime']['output'];
@@ -8497,6 +8511,7 @@ export type ManagedDomainAppRouteWriteInput = {
 
 export type ManagedDomainCertificate = {
   checkedAt: Scalars['DateTime']['output'];
+  edgeTerminated: Scalars['Boolean']['output'];
   reason: Scalars['String']['output'];
   state: ManagedDomainCheckState;
   status?: Maybe<Scalars['String']['output']>;
@@ -8541,6 +8556,8 @@ export type ManagedDomainDiagnostics = {
   id: Scalars['GUID']['output'];
   providerZone: ManagedDomainProviderZone;
   provisionClusterId?: Maybe<Scalars['GUID']['output']>;
+  provisionFailedStep: Scalars['String']['output'];
+  provisionFailureReason: Scalars['String']['output'];
   provisionState: Scalars['String']['output'];
   routes: Array<ManagedDomainRoute>;
   routesTruncated: Scalars['Boolean']['output'];
@@ -9610,6 +9627,7 @@ export type Mutation = {
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
+  setIngressCutover: IngressCutoverPayloadMutationResult;
   setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
@@ -11514,6 +11532,11 @@ export type MutationSetEnvironmentSettingArgs = {
 export type MutationSetFeatureFlagArgs = {
   enabled: Scalars['Boolean']['input'];
   key: Scalars['String']['input'];
+};
+
+
+export type MutationSetIngressCutoverArgs = {
+  input: SetIngressCutoverInput;
 };
 
 
@@ -16112,6 +16135,12 @@ export type SetEnvironmentSettingInput = {
   value: Scalars['String']['input'];
 };
 
+export type SetIngressCutoverInput = {
+  clusterId: Scalars['GUID']['input'];
+  complete: InputMaybe<Scalars['Boolean']['input']>;
+  preservedReleases: InputMaybe<Array<Scalars['String']['input']>>;
+};
+
 export type SetModelConnectionRestrictionInput = {
   allowSelfApproval: Scalars['Boolean']['input'];
   expectedClusterId: Scalars['GUID']['input'];
@@ -17862,7 +17891,7 @@ export type RefreshClusterManagementMutation = { refreshClusterManagement: { ok:
 export type ListManagedDomainsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionNameservers: unknown, provisionValidationRecords: unknown, delegationCheck: unknown, provisionClusterId?: string | null }> };
+export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionFailedStep: string, provisionFailureReason: string, provisionNameservers: unknown, provisionValidationRecords: unknown, delegationCheck: unknown, provisionClusterId?: string | null }> };
 
 export type ClusterHealthQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
@@ -18135,7 +18164,7 @@ export type ManagedDomainQueryVariables = Exact<{
 }>;
 
 
-export type ManagedDomainQuery = { astroliftManagedDomain?: { id: string, version: number, zone: string, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, organizationSlug?: string | null, createdAt: string, provisionState: string, provisionNameservers: unknown, provisionValidationRecords: unknown, provisionClusterId?: string | null, verificationState: string, verifiedAt?: string | null, challengeRecordName: string, challengeRecordValue: string, delegationCheck: unknown, delegationConnectionId?: string | null, delegationZoneName: string, delegationWrite: unknown } | null };
+export type ManagedDomainQuery = { astroliftManagedDomain?: { id: string, version: number, zone: string, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, organizationSlug?: string | null, createdAt: string, provisionState: string, provisionFailedStep: string, provisionFailureReason: string, provisionNameservers: unknown, provisionValidationRecords: unknown, provisionClusterId?: string | null, verificationState: string, verifiedAt?: string | null, challengeRecordName: string, challengeRecordValue: string, delegationCheck: unknown, delegationConnectionId?: string | null, delegationZoneName: string, delegationWrite: unknown } | null };
 
 export type ManagedDomainActionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -18148,7 +18177,7 @@ export type ManagedDomainDiagnosticsQueryVariables = Exact<{
 }>;
 
 
-export type ManagedDomainDiagnosticsQuery = { astroliftManagedDomainDiagnostics?: { id: string, version: number, zone: string, verificationState: string, provisionState: string, provisionClusterId?: string | null, checkedAt: string, routesTruncated: boolean, checks: Array<{ key: string, state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, expected: Array<string>, observed: Array<string> }>, providerZone: { bindingSource: string, state: ManagedDomainCheckState, reason: string, checkedAt: string, zoneId?: string | null, zoneName?: string | null, privateZone?: boolean | null, nameservers: Array<string>, truncated: boolean, records: Array<{ name: string, type: string, ttl?: number | null, values: Array<string>, aliasTarget?: string | null, aliasZoneId?: string | null, evaluateTargetHealth?: boolean | null, proxied?: boolean | null, priority?: number | null, routing?: { policy: ManagedDomainRoutingPolicy, reason: string, setIdentifier?: string | null, weight?: number | null, region?: string | null, failover?: string | null, multiValueAnswer?: boolean | null, healthCheckId?: string | null, trafficPolicyInstanceId?: string | null, geoLocation?: { continentCode?: string | null, countryCode?: string | null, subdivisionCode?: string | null } | null, geoProximity?: { awsRegion?: string | null, localZoneGroup?: string | null, bias?: number | null, coordinates?: { latitude: string, longitude: string } | null } | null, cidr?: { collectionId: string, locationName: string } | null } | null }> }, routes: Array<{ appId: string, appName: string, appSlug: string, environmentId: string, environmentName: string, recordedUrl: string, hostname: string, clusterId?: string | null, clusterName?: string | null, clusterSlug?: string | null, ingressClass?: string | null, observedState: ManagedDomainCheckState }>, certificate?: { state: ManagedDomainCheckState, reason: string, checkedAt: string, status?: string | null, validationRecords: number } | null, actions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean, canUpdate: boolean, canSetDefaults: boolean, defaultUpdateReason: string, defaultsFingerprint?: string | null } } | null };
+export type ManagedDomainDiagnosticsQuery = { astroliftManagedDomainDiagnostics?: { id: string, version: number, zone: string, verificationState: string, provisionState: string, provisionClusterId?: string | null, checkedAt: string, routesTruncated: boolean, checks: Array<{ key: string, state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, expected: Array<string>, observed: Array<string> }>, providerZone: { bindingSource: string, state: ManagedDomainCheckState, reason: string, checkedAt: string, zoneId?: string | null, zoneName?: string | null, privateZone?: boolean | null, nameservers: Array<string>, truncated: boolean, records: Array<{ name: string, type: string, ttl?: number | null, values: Array<string>, aliasTarget?: string | null, aliasZoneId?: string | null, evaluateTargetHealth?: boolean | null, proxied?: boolean | null, priority?: number | null, routing?: { policy: ManagedDomainRoutingPolicy, reason: string, setIdentifier?: string | null, weight?: number | null, region?: string | null, failover?: string | null, multiValueAnswer?: boolean | null, healthCheckId?: string | null, trafficPolicyInstanceId?: string | null, geoLocation?: { continentCode?: string | null, countryCode?: string | null, subdivisionCode?: string | null } | null, geoProximity?: { awsRegion?: string | null, localZoneGroup?: string | null, bias?: number | null, coordinates?: { latitude: string, longitude: string } | null } | null, cidr?: { collectionId: string, locationName: string } | null } | null }> }, routes: Array<{ appId: string, appName: string, appSlug: string, environmentId: string, environmentName: string, recordedUrl: string, hostname: string, clusterId?: string | null, clusterName?: string | null, clusterSlug?: string | null, ingressClass?: string | null, observedState: ManagedDomainCheckState }>, certificate?: { state: ManagedDomainCheckState, reason: string, checkedAt: string, status?: string | null, validationRecords: number, edgeTerminated: boolean } | null, actions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean, canUpdate: boolean, canSetDefaults: boolean, defaultUpdateReason: string, defaultsFingerprint?: string | null } } | null };
 
 export type UpdateManagedDomainDefaultsMutationVariables = Exact<{
   input: UpdateManagedDomainInput;

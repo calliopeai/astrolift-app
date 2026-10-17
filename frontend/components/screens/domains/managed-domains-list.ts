@@ -9,10 +9,11 @@ import type { SelectRowsSpec } from "@/components/list/select-rows";
 import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 
-/** A zone's provisioning as one word: active, provisioning, or not provisioned. */
+/** A zone's provisioning as one word: active, provisioning, stalled, or not provisioned. */
 export function zoneState(d: Pick<AstroliftManagedDomain, "provisionState">): string {
   if (d.provisionState === "mark_active") return "active";
   if (d.provisionState === "") return "unprovisioned";
+  if (d.provisionState === "failed") return "stalled";
   return "provisioning";
 }
 
@@ -25,6 +26,7 @@ export const MANAGED_DOMAINS_LIST: ListDefinition = {
       options: [
         { value: "active", label: "provisioned" },
         { value: "provisioning", label: "provisioning" },
+        { value: "stalled", label: "stalled" },
         { value: "unprovisioned", label: "not provisioned" },
       ],
     },

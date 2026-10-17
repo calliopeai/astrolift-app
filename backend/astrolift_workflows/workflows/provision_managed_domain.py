@@ -30,6 +30,10 @@ the ManagedDomain row, ``validate_ns_delegation`` confirms the registrar
 actually delegates the zone to the nameservers Step 1 returned, and only
 then does ``mark_managed_domain_active`` flip the zone active.
 
+A run that ends without activating the zone records where and why on the
+row (``mark_managed_domain_provision_failed``, #2389), so the zone reads
+"stalled at <step>" instead of sitting at the last step it reached.
+
 Workflow id pattern: ``ProvisionManagedDomainWorkflow-<cluster_id>-<zone>``.
 """
 
@@ -49,6 +53,7 @@ with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.provision_managed_domain import (
         delegate_parent_zone,
         mark_managed_domain_active,
+        mark_managed_domain_provision_failed,
         poll_cert_issuance,
         provision_dns_zone,
         register_managed_domain_row,
@@ -75,10 +80,22 @@ _DELEGATION_POLL_INTERVAL = timedelta(minutes=5)
 _DELEGATION_POLL_MAX_ATTEMPTS = 576
 
 
+# Records failures on the row and keeps polling when a poll sleep times out
+# (#2389). Before it, an unsignalled sleep raised TimeoutError and failed the
+# run on the first tick, leaving the row at its last step.
+_TERMINAL_STATE_PATCH = "domain-terminal-state-2389"
+
+
 def _truncate(message: str, *, limit: int = 4000) -> str:
     if len(message) <= limit:
         return message
     return message[: limit - 3] + "..."
+
+
+def _error_kind(exc: BaseException) -> str:
+    """The failing activity's exception class: credential-free, unlike its text."""
+    cause = getattr(exc, "cause", None)
+    return str(getattr(cause, "type", "") or type(cause or exc).__name__)
 
 
 @workflow.defn(name="ProvisionManagedDomainWorkflow")
@@ -106,6 +123,30 @@ class ProvisionManagedDomainWorkflow:
         """
         self._reissue_requested = True
 
+    async def _sleep(self, wake, timeout: timedelta) -> None:
+        """Sleep until ``wake()`` or ``timeout``, whichever comes first."""
+        try:
+            await workflow.wait_condition(wake, timeout=timeout)
+        except TimeoutError:
+            if not workflow.patched(_TERMINAL_STATE_PATCH):
+                raise
+
+    async def _fail(
+        self, input: ProvisionManagedDomainInput, step: str, reason: str, message: str
+    ) -> WorkflowResult:
+        """End the run, recording ``step`` and ``reason`` on the domain row."""
+        if workflow.patched(_TERMINAL_STATE_PATCH):
+            try:
+                await workflow.execute_activity(
+                    mark_managed_domain_provision_failed,
+                    args=[input.cluster_id, input.zone, step, reason],
+                    start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    retry_policy=_ACTIVITY_RETRY,
+                )
+            except Exception:  # noqa: BLE001 - the run's own result still reports the failure
+                pass
+        return WorkflowResult(ok=False, message=_truncate(message))
+
     @workflow.run
     async def run(
         self,
@@ -125,9 +166,11 @@ class ProvisionManagedDomainWorkflow:
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
-                return WorkflowResult(
-                    ok=False,
-                    message=_truncate(f"provision_dns_zone failed: {exc}"),
+                return await self._fail(
+                    input,
+                    "provision_dns_zone",
+                    f"zone creation failed ({_error_kind(exc)})",
+                    f"provision_dns_zone failed: {exc}",
                 )
             zone_id = zone_result.get("zone_id", "") if isinstance(zone_result, dict) else ""
             nameservers = zone_result.get("nameservers", []) if isinstance(zone_result, dict) else []
@@ -158,9 +201,11 @@ class ProvisionManagedDomainWorkflow:
                 retry_policy=_ACTIVITY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
-            return WorkflowResult(
-                ok=False,
-                message=_truncate(f"request_wildcard_cert_for_zone failed: {exc}"),
+            return await self._fail(
+                input,
+                "configure_cert_policy",
+                f"certificate request failed ({_error_kind(exc)})",
+                f"request_wildcard_cert_for_zone failed: {exc}",
             )
 
         self._cert_id = cert_id
@@ -179,9 +224,11 @@ class ProvisionManagedDomainWorkflow:
                         retry_policy=_ACTIVITY_RETRY,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    return WorkflowResult(
-                        ok=False,
-                        message=_truncate(f"reissue_cert failed: {exc}"),
+                    return await self._fail(
+                        input,
+                        "configure_cert_policy",
+                        f"certificate reissue failed ({_error_kind(exc)})",
+                        f"reissue_cert failed: {exc}",
                     )
                 self._cert_id = (
                     reissue_result.get("cert_id", self._cert_id)
@@ -198,9 +245,11 @@ class ProvisionManagedDomainWorkflow:
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
-                return WorkflowResult(
-                    ok=False,
-                    message=_truncate(f"poll_cert_issuance failed: {exc}"),
+                return await self._fail(
+                    input,
+                    "configure_cert_policy",
+                    f"certificate status check failed ({_error_kind(exc)})",
+                    f"poll_cert_issuance failed: {exc}",
                 )
 
             status = poll_result.get("status", "") if isinstance(poll_result, dict) else ""
@@ -208,11 +257,11 @@ class ProvisionManagedDomainWorkflow:
                 issued = True
                 break
             if status == "failed":
-                return WorkflowResult(
-                    ok=False,
-                    message=_truncate(
-                        f"cert issuance failed for zone {zone!r}: " + str(poll_result.get("message", ""))
-                    ),
+                return await self._fail(
+                    input,
+                    "configure_cert_policy",
+                    "the certificate authority reported the certificate failed",
+                    f"cert issuance failed for zone {zone!r}: " + str(poll_result.get("message", "")),
                 )
 
             if attempt >= _POLL_MAX_ATTEMPTS:
@@ -220,20 +269,20 @@ class ProvisionManagedDomainWorkflow:
 
             # Sleep, but allow signals to wake us early.
             self._revalidate_requested = False
-            await workflow.wait_condition(
+            await self._sleep(
                 lambda: self._revalidate_requested or self._reissue_requested,
-                timeout=_POLL_INTERVAL,
+                _POLL_INTERVAL,
             )
             # Clear revalidate (reissue is handled at the top of the next
             # iteration so it survives without being cleared here).
             self._revalidate_requested = False
 
         if not issued:
-            return WorkflowResult(
-                ok=False,
-                message=_truncate(
-                    f"cert issuance timed out for zone {zone!r} " f"after {_POLL_MAX_ATTEMPTS} attempts"
-                ),
+            return await self._fail(
+                input,
+                "configure_cert_policy",
+                "certificate not issued within 72 hours; check its DNS validation records",
+                f"cert issuance timed out for zone {zone!r} after {_POLL_MAX_ATTEMPTS} attempts",
             )
 
         # Step 4: persist the ManagedDomain row.
@@ -245,9 +294,11 @@ class ProvisionManagedDomainWorkflow:
                 retry_policy=_ACTIVITY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
-            return WorkflowResult(
-                ok=False,
-                message=_truncate(f"register_managed_domain_row failed: {exc}"),
+            return await self._fail(
+                input,
+                "register_managed_domain",
+                f"recording the zone failed ({_error_kind(exc)})",
+                f"register_managed_domain_row failed: {exc}",
             )
 
         # Step 5: NS delegation gate. The registrar has to point the zone at
@@ -268,25 +319,24 @@ class ProvisionManagedDomainWorkflow:
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
-                return WorkflowResult(
-                    ok=False,
-                    message=_truncate(f"validate_ns_delegation failed: {exc}"),
+                return await self._fail(
+                    input,
+                    "validate_ns_delegation",
+                    f"delegation check failed ({_error_kind(exc)})",
+                    f"validate_ns_delegation failed: {exc}",
                 )
             if (isinstance(delegation, dict) and delegation.get("passed")) or attempt >= attempts:
                 break
             self._revalidate_requested = False
-            await workflow.wait_condition(
-                lambda: self._revalidate_requested,
-                timeout=_DELEGATION_POLL_INTERVAL,
-            )
+            await self._sleep(lambda: self._revalidate_requested, _DELEGATION_POLL_INTERVAL)
             self._revalidate_requested = False
         if not (isinstance(delegation, dict) and delegation.get("passed")):
             reason = delegation.get("reason", "") if isinstance(delegation, dict) else ""
-            return WorkflowResult(
-                ok=False,
-                message=_truncate(
-                    f"NS delegation not in place for zone {zone!r}; zone left " f"inactive: {reason}"
-                ),
+            return await self._fail(
+                input,
+                "validate_ns_delegation",
+                f"NS delegation not in place: {reason}",
+                f"NS delegation not in place for zone {zone!r}; zone left inactive: {reason}",
             )
 
         # Step 6: activate the zone.
@@ -298,9 +348,11 @@ class ProvisionManagedDomainWorkflow:
                 retry_policy=_ACTIVITY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
-            return WorkflowResult(
-                ok=False,
-                message=_truncate(f"mark_managed_domain_active failed: {exc}"),
+            return await self._fail(
+                input,
+                "mark_active",
+                f"activation failed ({_error_kind(exc)})",
+                f"mark_managed_domain_active failed: {exc}",
             )
 
         return WorkflowResult(

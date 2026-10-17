@@ -172,6 +172,7 @@ from astrolift_workflows.activities.pipeline_job_spawn import (
 from astrolift_workflows.activities.provision_managed_domain import (
     delegate_parent_zone,
     mark_managed_domain_active,
+    mark_managed_domain_provision_failed,
     poll_cert_issuance,
     provision_dns_zone,
     register_managed_domain_row,
@@ -331,6 +332,7 @@ __all__ = [
     "mark_job_run_failed",
     "mark_managed",
     "mark_managed_domain_active",
+    "mark_managed_domain_provision_failed",
     "mark_managed_service_deprovisioning",
     "mark_managed_service_failed",
     "mark_managed_service_provisioning",

@@ -430,6 +430,8 @@ export const LIST_MANAGED_DOMAINS = gql`
       isWildcardManaged
       createdAt
       provisionState
+      provisionFailedStep
+      provisionFailureReason
       provisionNameservers
       provisionValidationRecords
       delegationCheck

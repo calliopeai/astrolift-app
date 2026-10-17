@@ -624,10 +624,17 @@ class _FakeDriver:
     ``result_fn(namespace, manifests) -> ApplyResult`` lets a test simulate
     partial failures (e.g. the CR fails while its Namespace succeeds)."""
 
-    def __init__(self, result_fn=None):  # noqa: ANN001
+    def __init__(self, result_fn=None, labels=None):  # noqa: ANN001
         self.calls: list[tuple[str, str, list[dict]]] = []
         self.deletes: list[tuple[str, str, list[dict]]] = []
         self._result_fn = result_fn
+        # HelmRelease name -> metadata.labels on the live object (#2117).
+        self._labels = labels or {}
+
+    def get_manifest(self, ctx_slug, namespace, kind, name):  # noqa: ANN001
+        if name not in self._labels:
+            return None
+        return {"kind": "HelmRelease", "metadata": {"name": name, "labels": self._labels[name]}}
 
     def apply_manifests(self, ctx_slug, namespace, manifests, *, dry_run=False):  # noqa: ANN001
         self.calls.append((ctx_slug, namespace, list(manifests)))
@@ -892,7 +899,14 @@ def _chart_component(key, *, chart="thechart", repo="https://charts.example/", v
 
 
 def _run_install_sync(  # noqa: ANN001
-    monkeypatch, components, driver, selected_keys, overrides=None, additive=False, recipe_before=frozenset()
+    monkeypatch,
+    components,
+    driver,
+    selected_keys,
+    overrides=None,
+    additive=False,
+    recipe_before=frozenset(),
+    cluster_fields=None,
 ):
     """Drive ``_install_cluster_prereqs_sync`` with the DB row, dispatch, driver,
     and context all mocked, returning its result dict. The IRSA-provision helpers
@@ -903,7 +917,9 @@ def _run_install_sync(  # noqa: ANN001
     from astrolift_workflows.activities import install_prereqs
     from astrolift_workflows.activities.install_prereqs import _install_cluster_prereqs_sync
 
-    fake_cluster = type("FakeCluster", (), {"provider_plugin": type("PP", (), {"slug": "aws"})()})()
+    fake_cluster = type(
+        "FakeCluster", (), {"provider_plugin": type("PP", (), {"slug": "aws"})(), **(cluster_fields or {})}
+    )()
     monkeypatch.setattr(install_prereqs, "_provision_ebs_csi_irsa_role", lambda *a, **k: None)
     monkeypatch.setattr(install_prereqs, "_provision_aws_controller_irsa_role", lambda *a, **k: None)
 
@@ -1022,6 +1038,74 @@ def test_a_normal_run_deletes_the_releases_it_did_not_select(monkeypatch):
 
     deleted = {m["metadata"]["name"] for _slug, _ns, manifests in driver.deletes for m in manifests}
     assert "astrolift-other" in deleted
+
+
+# ---- operator-managed ingress cutover (#2117) ---------------------------
+
+
+def _deleted(driver) -> set[str]:  # noqa: ANN001
+    return {m["metadata"]["name"] for _slug, _ns, manifests in driver.deletes for m in manifests}
+
+
+_OPERATOR_LABEL = {"astrolift.ai/managed-by": "operator"}
+
+
+def test_a_normal_run_keeps_an_operator_labelled_release_until_cutover(monkeypatch):
+    driver = _FakeDriver(labels={"astrolift-ingress-nginx": _OPERATOR_LABEL})
+    components = [_chart_component("edge"), _chart_component("ingress-nginx"), _chart_component("other")]
+
+    _run_install_sync(monkeypatch, components, driver, {"edge"})
+
+    assert "astrolift-ingress-nginx" not in _deleted(driver)
+    assert "astrolift-other" in _deleted(driver)
+
+
+def test_a_release_named_in_the_cluster_setting_is_kept_until_cutover(monkeypatch):
+    driver = _FakeDriver()
+    components = [_chart_component("edge"), _chart_component("ingress-nginx")]
+
+    _run_install_sync(
+        monkeypatch,
+        components,
+        driver,
+        {"edge"},
+        cluster_fields={"preserved_ingress_releases": ["astrolift-ingress-nginx"]},
+    )
+
+    assert "astrolift-ingress-nginx" not in _deleted(driver)
+
+
+def test_an_unreadable_release_is_kept_not_pruned_blind(monkeypatch):
+    driver = _FakeDriver()
+
+    def _unreachable(*args):  # noqa: ANN002
+        raise RuntimeError("apiserver unreachable")
+
+    driver.get_manifest = _unreachable
+
+    _run_install_sync(monkeypatch, [_chart_component("edge"), _chart_component("other")], driver, {"edge"})
+
+    assert "astrolift-other" not in _deleted(driver)
+
+
+def test_the_labelled_release_is_deleted_once_the_cutover_is_complete(monkeypatch):
+    import datetime as dt
+
+    driver = _FakeDriver(labels={"astrolift-ingress-nginx": _OPERATOR_LABEL})
+    components = [_chart_component("edge"), _chart_component("ingress-nginx")]
+
+    _run_install_sync(
+        monkeypatch,
+        components,
+        driver,
+        {"edge"},
+        cluster_fields={
+            "preserved_ingress_releases": ["astrolift-ingress-nginx"],
+            "ingress_cutover_completed_at": dt.datetime(2026, 10, 16, tzinfo=dt.UTC),
+        },
+    )
+
+    assert "astrolift-ingress-nginx" in _deleted(driver)
 
 
 def test_an_additive_run_applies_its_selection_and_deletes_nothing(monkeypatch):
