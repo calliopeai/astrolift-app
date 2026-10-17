@@ -3774,6 +3774,8 @@ type AstroliftManagedDomain {
   isWildcardManaged: Boolean!
   createdAt: DateTime!
   provisionState: String!
+  provisionFailedStep: String!
+  provisionFailureReason: String!
   provisionNameservers: JSON!
   provisionValidationRecords: JSON!
   delegationCheck: JSON!
@@ -8720,6 +8722,18 @@ type ImportWorkflowManifestResult {
   repointedSlugs: [String!]!
 }
 
+type IngressCutoverPayload {
+  clusterId: GUID!
+  preservedReleases: [String!]!
+  completedAt: DateTime
+}
+
+type IngressCutoverPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: IngressCutoverPayload
+}
+
 type InstallAlertMailSupport {
   allowed: Boolean!
   reason: String
@@ -9055,6 +9069,7 @@ type ManagedDomainCertificate {
   checkedAt: DateTime!
   status: String
   validationRecords: Int!
+  edgeTerminated: Boolean!
 }
 
 enum ManagedDomainCheckState {
@@ -9096,6 +9111,8 @@ type ManagedDomainDiagnostics {
   provisionState: String!
   checkedAt: DateTime!
   checks: [ManagedDomainDiagnosticCheck!]!
+  provisionFailedStep: String!
+  provisionFailureReason: String!
   providerZone: ManagedDomainProviderZone!
   routes: [ManagedDomainRoute!]!
   routesTruncated: Boolean!
@@ -10129,6 +10146,7 @@ type Mutation {
   deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
   updateTenantCluster(input: UpdateTenantClusterInput!): AstroliftTenantClusterMutationResult!
   reconcileClusterIngresses(input: ReconcileClusterIngressesInput!): ReconcileClusterIngressesResultMutationResult!
+  setIngressCutover(input: SetIngressCutoverInput!): IngressCutoverPayloadMutationResult!
   bringClusterIntoManagement(input: BringClusterIntoManagementInputType!): AstroliftTenantClusterMutationResult!
   refreshClusterManagement(input: RefreshClusterManagementInputType!): AstroliftTenantClusterMutationResult!
   decommissionCluster(input: DecommissionClusterInputType!): AstroliftTenantClusterMutationResult!
@@ -12138,6 +12156,12 @@ input SetEnvironmentSettingInput {
   environmentId: GUID!
   key: String!
   value: String!
+}
+
+input SetIngressCutoverInput {
+  clusterId: GUID!
+  preservedReleases: [String!] = null
+  complete: Boolean = null
 }
 
 input SetModelConnectionRestrictionInput {

@@ -16,6 +16,7 @@ from django.utils import timezone
 from graphql import GraphQLError
 
 from astrolift_clusters.dns_layout import NsDelegationCheck, evaluate_ns_delegation
+from astrolift_clusters.edge_install import EDGE_INGRESS_CLASS
 from astrolift_clusters.models import ManagedDomain, TenantCluster
 from astrolift_clusters.models.managed_domain import resolve_managed_domain
 from astrolift_clusters.schema.domain_diagnostics import (
@@ -554,10 +555,16 @@ _CERTIFICATE_STATES = {
 def _certificate(info, domain, current, cluster):
     """The zone's recorded certificate, read with the provisioning cluster's
     reviewed, account-pinned ACM client (#2287). Operator-only, like the zone
-    inventory; never the control plane's ambient identity."""
+    inventory; never the control plane's ambient identity. On an Envoy edge
+    cluster the routes' TLS terminates on the edge's own certificate, which
+    ``edge_terminated`` says (#2389)."""
     now = timezone.now()
+    edge = cluster is not None and cluster.ingress_class == EDGE_INGRESS_CLASS
     result = ManagedDomainCertificate(
-        state=State.UNSUPPORTED, reason="CERTIFICATE_NOT_RECORDED", checked_at=now
+        state=State.UNSUPPORTED,
+        reason="CERTIFICATE_TERMINATED_AT_EDGE" if edge else "CERTIFICATE_NOT_RECORDED",
+        checked_at=now,
+        edge_terminated=edge,
     )
     with _auth(info) as user:
         if not _operator(user):
@@ -599,6 +606,7 @@ def _certificate(info, domain, current, cluster):
         checked_at=now,
         status=cert.status,
         validation_records=len(cert.validation_records),
+        edge_terminated=edge,
     )
 
 
@@ -874,6 +882,8 @@ def diagnostics(info, domain_id, version, requested, record_type):
         zone=domain.zone,
         verification_state=domain.verification_state,
         provision_state=domain.provision_state,
+        provision_failed_step=domain.provision_failed_step,
+        provision_failure_reason=domain.provision_failure_reason,
         checked_at=timezone.now(),
         checks=checks,
         provider_zone=provider,

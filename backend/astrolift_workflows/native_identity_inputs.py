@@ -28,3 +28,20 @@ class DeploymentAuthorityContext:
     """A private receipt lookup key, never caller-supplied approval evidence."""
 
     deployment_guid: str
+
+
+@dataclass(frozen=True)
+class NativeConfigurationReceipt:
+    """GUIDs, hashes and observation flags only; it grants no authority."""
+
+    deployment_id: str
+    operation_id: str
+    source_id: str
+    preparation_id: str
+    iam_id: str
+    apply_id: str
+    plan_sha256: str
+    configuration_observed: bool
+    runtime_observation_reason: str
+    workload_ready: bool = False
+    invocation_verified: bool = False

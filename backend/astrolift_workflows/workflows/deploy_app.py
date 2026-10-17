@@ -42,6 +42,13 @@ with workflow.unsafe.imports_passed_through():
         fetch_app_build_strategy,
     )
     from astrolift_workflows.activities.faas import ensure_faas_services
+    from astrolift_workflows.activities.native_endpoint_configuration import (
+        REFUSED as NATIVE_REFUSED,
+    )
+    from astrolift_workflows.activities.native_endpoint_configuration import (
+        complete_native_endpoint_deployment,
+        configure_native_endpoint_deployment,
+    )
     from astrolift_workflows.activities.static_site import (
         SyncStaticAssetsInput,
         ensure_cloudfront_cert,
@@ -76,6 +83,13 @@ _STANDARD_RETRY = RetryPolicy(
 )
 _ROLLOUT_RETRY = RetryPolicy(maximum_attempts=1)
 _MARK_TIMEOUT = timedelta(minutes=2)
+
+# Native configuration (#2278) runs preparation, Endpoint IAM, annotation,
+# guarded apply and bounded rollout observation in one heartbeating attempt.
+# Never retried: a lost reply or dead worker leaves a journal SENT, and only
+# its own recorded evidence, not another send, may resolve it.
+_NATIVE_TIMEOUT = timedelta(minutes=60)
+_NATIVE_HEARTBEAT = timedelta(seconds=30)
 
 
 def _failure_reason(exc: BaseException) -> str:
@@ -112,6 +126,10 @@ class DeployAppWorkflow:
         deployment_id = input.deployment_id
 
         if workflow.patched("deployment-native-original-authority-v1"):
+            # An admitted native origin answers NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED.
+            # Histories from before the native pipeline refuse on it; patched ones
+            # run the native steps. Either way no legacy step runs for it.
+            native = workflow.patched("deployment-native-endpoint-pipeline-v1")
             try:
                 await workflow.execute_activity(
                     validate_deployment_identity_origin,
@@ -121,13 +139,9 @@ class DeployAppWorkflow:
                 )
             except ActivityError as exc:
                 reason = _failure_reason(exc)
-                await workflow.execute_activity(
-                    mark_deployment_identity_refused,
-                    args=[input, reason],
-                    start_to_close_timeout=_MARK_TIMEOUT,
-                    retry_policy=_STANDARD_RETRY,
-                )
-                return WorkflowResult(ok=False, message=reason)
+                if native and reason == "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED":
+                    return await self._run_native(input)
+                return await self._identity_refused(input, reason)
 
         try:
             # Refresh the manifest from the source repo BEFORE validation and
@@ -389,3 +403,45 @@ class DeployAppWorkflow:
                 retry_policy=_STANDARD_RETRY,
             )
             return WorkflowResult(ok=False, message=f"deploy failed: {reason}")
+
+    async def _identity_refused(self, input: DeployAppInput, reason: str) -> WorkflowResult:
+        await workflow.execute_activity(
+            mark_deployment_identity_refused,
+            args=[input, reason],
+            start_to_close_timeout=_MARK_TIMEOUT,
+            retry_policy=_STANDARD_RETRY,
+        )
+        return WorkflowResult(ok=False, message=reason)
+
+    async def _run_native(self, input: DeployAppInput) -> WorkflowResult:
+        """Endpoint-only native pipeline (#2278), bound to the BOUND receipt."""
+        try:
+            await workflow.execute_activity(
+                mark_deploying,
+                input.deployment_id,
+                start_to_close_timeout=_MARK_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+            receipt = await workflow.execute_activity(
+                configure_native_endpoint_deployment,
+                input,
+                start_to_close_timeout=_NATIVE_TIMEOUT,
+                heartbeat_timeout=_NATIVE_HEARTBEAT,
+                cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+                retry_policy=_ROLLOUT_RETRY,
+            )
+            if self._abort_requested:
+                return await self._identity_refused(input, NATIVE_REFUSED + "DEPLOYMENT_ABORTED")
+            await workflow.execute_activity(
+                complete_native_endpoint_deployment,
+                args=[input, receipt],
+                start_to_close_timeout=_MARK_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
+            )
+        except ActivityError as exc:
+            reason = _failure_reason(exc)
+            # A timeout or lost worker carries no fixed reason, and proves nothing.
+            if not reason.startswith(NATIVE_REFUSED):
+                reason = NATIVE_REFUSED + "CONFIGURATION_UNCONFIRMED"
+            return await self._identity_refused(input, reason)
+        return WorkflowResult(ok=True, message="deployed")

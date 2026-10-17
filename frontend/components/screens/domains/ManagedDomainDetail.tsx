@@ -358,15 +358,25 @@ function DetailTabs({
             <section className="space-y-3 rounded-lg border p-4">
               <h2 className="font-semibold">{t("configuration")}</h2>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">
+                <Badge variant={d.provisionState === "failed" ? "destructive" : "outline"}>
                   {d.provisionState === "mark_active"
                     ? t("provisioned")
-                    : d.provisionState
-                      ? t("provisioning")
-                      : t("unprovisioned")}
+                    : d.provisionState === "failed"
+                      ? t("stalled")
+                      : d.provisionState
+                        ? t("provisioning")
+                        : t("unprovisioned")}
                 </Badge>
                 <Badge variant="outline">{d.verificationState || t("unknown")}</Badge>
               </div>
+              {d.provisionState === "failed" && (
+                <p role="status" className="text-sm">
+                  {t("provisionStalled", {
+                    step: d.provisionFailedStep || t("unknown"),
+                    reason: d.provisionFailureReason || t("unknown"),
+                  })}
+                </p>
+              )}
               <p className="text-muted-foreground text-sm">{t("provisionHelp")}</p>
               <p className="text-muted-foreground text-sm">{t("defaultHelp")}</p>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -483,6 +493,12 @@ function DetailTabs({
                       {state(observation.certificate.state)}
                     </div>
                     {reason(observation.certificate.reason)}
+                    {observation.certificate.edgeTerminated &&
+                      observation.certificate.reason !== "CERTIFICATE_TERMINATED_AT_EDGE" && (
+                        <p className="text-muted-foreground text-sm">
+                          {t("certificateEdgeTerminated")}
+                        </p>
+                      )}
                     <dl className="grid gap-2 text-sm sm:grid-cols-3">
                       <div>
                         <dt className="text-muted-foreground">{t("certificateStatus")}</dt>

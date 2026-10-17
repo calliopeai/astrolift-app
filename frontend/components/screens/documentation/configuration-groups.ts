@@ -276,20 +276,14 @@ export const CONFIGURATION_GROUPS: Group[] = [
       {
         name: "ASTROLIFT_ADMIN_EMAIL",
         purpose:
-          "Bootstrap admin user email. Read by the bootstrap_admin management command on first install.",
-        required: false,
-        source: "operator",
-      },
-      {
-        name: "ASTROLIFT_ADMIN_PASSWORD",
-        purpose:
-          "Bootstrap admin user password. Only used when bootstrap_admin creates the user; ignored after.",
+          "First administrator email. bootstrap_admin records it as pending; the first sign-in with this provider-verified email claims org_owner. Ignored once claimed.",
         required: false,
         source: "operator",
       },
       {
         name: "ASTROLIFT_ADMIN_SUPERUSER",
-        purpose: "true to grant Django superuser on the bootstrapped admin (admin panel access).",
+        purpose:
+          "true to grant Django superuser to the first administrator when it is claimed (admin panel access).",
         default: "false",
         required: false,
         source: "operator",

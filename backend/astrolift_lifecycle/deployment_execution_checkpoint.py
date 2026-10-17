@@ -19,6 +19,7 @@ class _ScopedDeploymentExecutionCheckpoint:
         self.context = copy_context()
         self.owner_thread = get_ident()
         self.closed = Event()
+        self.checks = ()
         # Nesting describes only connection ownership, never cached admission.
         self.thread_scope = local()
 
@@ -30,7 +31,27 @@ class _ScopedDeploymentExecutionCheckpoint:
         self._live()
         with admitted_deployment_execution(self.input):
             pass
+        for check in self.checks:
+            if check() is not None:
+                raise DeploymentExecutionError()
+        if self.checks:
+            # Added DB-only fences cannot turn an earlier admission into an
+            # authority cache. Re-admit after the current render/source read.
+            with admitted_deployment_execution(self.input):
+                pass
         self._live()
+
+    def with_checks(self, checks):
+        """Keep extra DB fences inside the exact trusted callback lifetime."""
+        if not callable(checks):
+            raise DeploymentExecutionError()
+        self._live()
+        result = object.__new__(type(self))
+        # Context/owner/closed fence/connection nesting are invocation-owned and
+        # shared. The immutable tuple stores callables, never admission results.
+        result.__dict__ = self.__dict__.copy()
+        result.checks = (*self.checks, checks)
+        return result
 
     def _run(self, checks):
         if self.closed.is_set():
