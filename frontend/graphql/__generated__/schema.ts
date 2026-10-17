@@ -7336,7 +7336,7 @@ export type CreateBrainInput = {
   repo: Scalars['String']['input'];
   slug: Scalars['String']['input'];
   sourceConnectionId: Scalars['GUID']['input'];
-  /** The Mimwell cell and persistence to host it on, checked against the matrix; the files cell with no persistence when omitted. The slug must be the client slug plus -brain. */
+  /** The Mimwell cell and persistence to host it on, checked against the matrix; the files cell with no persistence when omitted. */
   substrate: InputMaybe<BrainSubstrateInput>;
   teamId: InputMaybe<Scalars['GUID']['input']>;
   templateRef: InputMaybe<Scalars['String']['input']>;
@@ -9297,7 +9297,7 @@ export type Mutation = {
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
   createAppEnvironment: AstroliftAppEnvironmentMutationResult;
-  /** Create a semantic layer (#2424): check the request, then scaffold the repository from the verified Mimwell edition in one commit, register it as a brain and deploy it, in the background. Poll astroliftBrainCreation; a retry for the same slug joins the running one. */
+  /** Create a semantic layer (#2424): check the request, then scaffold the repository from the verified Mimwell edition in one commit, register it as a brain and deploy it, in the background. Poll astroliftBrainCreation; a retry for the same slug joins the running one. The slug is any app slug: a letter, then lowercase letters, digits and dashes, up to 63. One ending in -brain keeps Mimwell's default name (client.slug is the rest); any other is written as client.slug and deploy.app_slug, which the edition must have. */
   createBrain: AstroliftBrainCreationMutationResult;
   createClusterAuthGroup: AstroliftClusterAuthUserChangeMutationResult;
   createClusterAuthUser: AstroliftClusterAuthUserMutationResult;

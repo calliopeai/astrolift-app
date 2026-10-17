@@ -228,7 +228,6 @@ class BrainMutations:
 # Managing semantic layers (#2424)
 # ---------------------------------------------------------------------------
 
-_SLUG = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 _REPO = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 _ENV = re.compile(r"^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$")
 
@@ -254,7 +253,7 @@ class CreateBrainInput:
         default=None,
         description=(
             "The Mimwell cell and persistence to host it on, checked against the matrix; the files "
-            "cell with no persistence when omitted. The slug must be the client slug plus -brain."
+            "cell with no persistence when omitted."
         ),
     )
 
@@ -337,7 +336,10 @@ class BrainManagementMutations:
         description=(
             "Create a semantic layer (#2424): check the request, then scaffold the repository from "
             "the verified Mimwell edition in one commit, register it as a brain and deploy it, in "
-            "the background. Poll astroliftBrainCreation; a retry for the same slug joins the running one."
+            "the background. Poll astroliftBrainCreation; a retry for the same slug joins the running one. "
+            "The slug is any app slug: a letter, then lowercase letters, digits and dashes, up to 63. "
+            "One ending in -brain keeps Mimwell's default name (client.slug is the rest); any other is "
+            "written as client.slug and deploy.app_slug, which the edition must have."
         )
     )
     @mutation_audit(action="brain.create", target=_brain_target, extras=_create_extras)
@@ -348,7 +350,7 @@ class BrainManagementMutations:
     @tenant_scoped()
     def create_brain(self, info: Info, input: CreateBrainInput) -> MutationResultType[BrainCreationType]:
         from astrolift_identity.models import Organization, Project, Team
-        from astrolift_registry import brain_manage, brain_template
+        from astrolift_registry import brain_manage, brain_substrate, brain_template
         from astrolift_registry.models import BrainCreation, RegisteredApp
         from astrolift_scm.providers import ProviderError
         from astrolift_scm.providers.repo_writes import repository_state
@@ -378,9 +380,12 @@ class BrainManagementMutations:
                     ErrorCode.VALIDATION.value, "a brain belongs to its project's team", field="teamId"
                 )
         slug = (input.slug or "").strip()
-        if not _SLUG.match(slug):
+        if not brain_substrate.APP_SLUG.fullmatch(slug):
             return gql_failure(
-                ErrorCode.VALIDATION.value, "slug must be lowercase letters, digits and dashes", field="slug"
+                ErrorCode.VALIDATION.value,
+                "slug must start with a letter and be 1 to 63 lowercase letters, digits and dashes, "
+                "not ending in a dash",
+                field="slug",
             )
         repo = (input.repo or "").strip()
         if not _REPO.match(repo) or ".." in repo:
@@ -392,10 +397,7 @@ class BrainManagementMutations:
                 "environmentName must be a short lowercase name",
                 field="environmentName",
             )
-        from astrolift_registry import brain_substrate
-
         try:
-            brain_substrate.client_slug(slug)
             selection = brain_substrate.validate(selection_from_input(input.substrate))
         except brain_substrate.SubstrateError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, exc.message, field=exc.field or "substrate")
@@ -533,7 +535,8 @@ class BrainManagementMutations:
         if current is not None and current.access_level == AppTeamAccess.AccessLevel.OWNER.value:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                f"team {team.slug!r} owns this brain; change owners with astro app access",
+                f"team {team.slug!r} owns this brain, and sharing never changes an owner; change the "
+                "team's access in the web UI, on the app's Settings page (Teams)",
                 field="teamSlug",
             )
         if input.access == BrainShareAccess.DEPLOYER:
@@ -599,7 +602,8 @@ class BrainManagementMutations:
         if current.access_level == AppTeamAccess.AccessLevel.OWNER.value:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                f"team {team.slug!r} owns this brain; change owners with astro app access",
+                f"team {team.slug!r} owns this brain, and unsharing never removes an owner; change the "
+                "team's access in the web UI, on the app's Settings page (Teams)",
                 field="teamSlug",
             )
         revoked = inspect.unwrap(TeamAccessMutations.revoke_team_access_from_app)(

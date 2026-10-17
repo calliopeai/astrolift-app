@@ -1,10 +1,12 @@
 """Astrolift's port of Mimwell's substrate model stays Mimwell's (#2424).
 
-The fixtures are the real outputs at the pinned commit
+The fixtures are the real outputs at the pinned commits
 (``brain_substrate.MIMWELL_SOURCE``): every cell from
 ``knowledge_store.cell_status()`` and ``scripts/gen-astrolift.py``'s
-``render()`` for a set of configs. Regenerate them from mimwell-pvt when the
-pin moves; a drift here means the port has to follow."""
+``render()`` for a set of configs, and (``MIMWELL_APP_SLUG_SOURCE``) its
+``render()`` of a config with ``deploy.app_slug`` and its slug rule.
+Regenerate them from mimwell-pvt when a pin moves; a drift here means the
+port has to follow."""
 
 from __future__ import annotations
 
@@ -33,10 +35,20 @@ def test_every_cell_has_mimwells_status():
         assert bs.cell_status(cell) == (row["status"], row["reason"]), bs.cell_name(cell)
 
 
-@pytest.mark.parametrize("case", sorted(_load("mimwell_gen_astrolift.json")["cases"]))
-def test_the_manifest_follows_gen_astrolift(case):
-    data = _load("mimwell_gen_astrolift.json")
-    assert bs.MIMWELL_SOURCE.split()[-1] in data["source"]
+#: Each gen-astrolift.py fixture and the pin it was rendered at: the configs
+#: without deploy.app_slug at the substrate pin, the one with it at its own.
+RENDERS = {
+    "mimwell_gen_astrolift.json": bs.MIMWELL_SOURCE,
+    "mimwell_gen_astrolift_app_slug.json": bs.MIMWELL_APP_SLUG_SOURCE,
+}
+
+
+@pytest.mark.parametrize(
+    "name, case", [(name, case) for name in RENDERS for case in sorted(_load(name)["cases"])]
+)
+def test_the_manifest_follows_gen_astrolift(name, case):
+    data = _load(name)
+    assert RENDERS[name].split()[-1] in data["source"]
     fixture = data["cases"][case]
     deploy = fixture["config"]["deploy"]
     graph = next(
@@ -51,7 +63,7 @@ def test_the_manifest_follows_gen_astrolift(case):
         image=deploy["image"],
         port=deploy.get("port") or 8080,
     )
-    ours = bs.render_manifest(selection, slug="acme-brain", display_name="Acme")
+    ours = bs.render_manifest(selection, slug=bs.app_slug(fixture["config"]), display_name="Acme")
     theirs = tomllib.loads(fixture["toml"])
     mine = tomllib.loads(ours)
     for key in ("astrolift_version", "name", "environments", "workloads"):
@@ -110,10 +122,75 @@ def test_dropping_persistence_that_holds_data_is_named():
     assert bs.dropped_data(before, after) == ["postgres", "sqlite-volume"]
 
 
-def test_the_slug_is_the_client_slug_plus_brain():
-    assert bs.client_slug("leo-brain") == "leo"
+def test_the_slug_rule_is_gen_astrolifts():
+    data = _load("mimwell_gen_astrolift_app_slug.json")
+    assert bs.APP_SLUG.pattern == data["app_slug_pattern"]
+
+
+@pytest.mark.parametrize(
+    "slug, client, app_slug",
+    [
+        ("leo-brain", "leo", None),
+        ("a-brain", "a", None),
+        ("leo", "leo", "leo"),
+        ("acme-kb", "acme-kb", "acme-kb"),
+        ("brain", "brain", "brain"),
+        ("brainy", "brainy", "brainy"),
+    ],
+)
+def test_any_slug_is_written_so_mimwell_names_the_app_by_it(slug, client, app_slug):
+    config = bs.apply_to_config(
+        {"client": {"slug": "example", "domain": "localhost"}, "deploy": {"target": "cloudflare-worker"}},
+        bs.Selection(),
+        slug=slug,
+    )
+    assert config["client"] == {"slug": client, "domain": "localhost"}
+    assert config["deploy"].get("app_slug") == app_slug
+    assert bs.app_slug(config) == slug
+
+
+def test_a_config_that_already_names_the_app_keeps_its_client_slug():
+    pinned = {"client": {"slug": "acme"}, "deploy": {"app_slug": "kb", "target": "astrolift"}}
+    config = bs.apply_to_config(pinned, bs.Selection(), slug="kb")
+    assert (config["client"], config["deploy"]["app_slug"]) == ({"slug": "acme"}, "kb")
+    default = bs.apply_to_config({"client": {"slug": "acme"}}, bs.Selection(), slug="acme-brain")
+    assert default["client"] == {"slug": "acme"} and "app_slug" not in default["deploy"]
+    # A stale app_slug would rename the app: a -brain slug drops it.
+    stale = {"client": {"slug": "old"}, "deploy": {"app_slug": "old"}}
+    config = bs.apply_to_config(stale, bs.Selection(), slug="acme-brain")
+    assert config["client"] == {"slug": "acme"} and "app_slug" not in config["deploy"]
+    assert bs.app_slug(config) == "acme-brain"
+
+
+def test_a_slug_that_is_no_app_slug_is_never_written_as_one():
+    with pytest.raises(bs.SubstrateError) as exc:
+        bs.apply_to_config({}, bs.Selection(), slug="1acme")
+    assert exc.value.field == "slug" and "deploy.app_slug" in exc.value.message
+    # A registered -brain slug needs no app_slug, as before.
+    assert bs.apply_to_config({}, bs.Selection(), slug="1acme-brain")["client"] == {"slug": "1acme"}
+
+
+@pytest.mark.parametrize("value", ["", "Acme", "1acme", "-acme", "acme-", "acme_kb", "a" * 64, 5])
+def test_app_slug_refuses_what_gen_astrolift_refuses(value):
     with pytest.raises(bs.SubstrateError):
-        bs.client_slug("leo")
+        bs.app_slug({"client": {"slug": "acme"}, "deploy": {"app_slug": value}})
+
+
+def test_app_slug_defaults_like_gen_astrolift():
+    assert bs.app_slug({}) == "brain-brain"
+    assert bs.app_slug({"client": {"slug": ""}, "deploy": {"app_slug": None}}) == "brain-brain"
+    assert bs.app_slug({"client": {"slug": "acme"}}) == "acme-brain"
+    assert bs.app_slug({"client": {"slug": "acme"}, "deploy": {"app_slug": "a" * 63}}) == "a" * 63
+
+
+def test_only_a_schema_that_declares_app_slug_takes_it():
+    assert bs.declares_app_slug({"properties": {"deploy": {"properties": {"app_slug": {"type": "string"}}}}})
+    for schema in (None, [], {}, {"properties": {"deploy": {"properties": {"image": {}}}}}):
+        assert not bs.declares_app_slug(schema)
+    assert bs.adds_app_slug({}, {"deploy": {"app_slug": "kb"}})
+    assert bs.adds_app_slug({"deploy": {"app_slug": "old"}}, {"deploy": {"app_slug": "kb"}})
+    assert not bs.adds_app_slug({"deploy": {"app_slug": "kb"}}, {"deploy": {"app_slug": "kb"}})
+    assert not bs.adds_app_slug({"deploy": {"app_slug": "kb"}}, {"deploy": {}})
 
 
 def test_a_merge_keeps_what_the_brain_declares_beyond_the_substrate():

@@ -280,6 +280,8 @@ def test_a_retry_joins_the_running_creation(world, host, started):
     "extra, code, field",
     [
         ({"slug": "Bad_Slug"}, "VALIDATION", "slug"),
+        ({"slug": "1acme"}, "VALIDATION", "slug"),
+        ({"slug": "acme-"}, "VALIDATION", "slug"),
         ({"repo": "nope"}, "VALIDATION", "repo"),
         ({"template_ref": "../x"}, "VALIDATION", "templateRef"),
         ({"environment_name": "Prod!"}, "VALIDATION", "environmentName"),
@@ -422,7 +424,14 @@ def test_share_never_touches_an_owner(world):
                 slug=app.slug, team_slug=world.platform.slug, access=BrainShareAccess.VIEWER
             ),
         )
-    assert result.errors[0].code == "PRECONDITION"
+        removed = RegistryMutation().unshare_brain(
+            info, input=UnshareBrainInput(slug=app.slug, team_slug=world.platform.slug)
+        )
+    for refused in (result, removed):
+        assert refused.errors[0].code == "PRECONDITION"
+        # Owners change on the app's Teams card; astro app access is the edge sign-in list.
+        assert "web UI, on the app's Settings page (Teams)" in refused.errors[0].message
+        assert "astro app access" not in refused.errors[0].message
     assert AppTeamAccess.objects.get(registered_app=app, team=world.platform).access_level == "owner"
 
 
@@ -747,9 +756,37 @@ def test_create_refuses_a_cell_by_name(world, host, started, fields, says):
     assert not started
 
 
-def test_a_slug_follows_mimwells_client_slug_plus_brain(world, host, started):
+def test_any_slug_is_a_brain_that_keeps_its_name(world, host, started):
+    from astrolift_registry.brain_substrate import app_slug
+
     result = _create(world, slug="acme-kb")
-    assert (result.errors[0].code, result.errors[0].field) == ("VALIDATION", "slug")
+    assert result.ok, result.errors
+    row = BrainCreation.objects.get(guid=str(result.data.id))
+    _run_steps(row.pk)
+    files = {f.path: f.content for f in host.commits[0]["files"]}
+    config = json.loads(files["client.config.json"])
+    assert (config["client"]["slug"], config["deploy"]["app_slug"]) == ("acme-kb", "acme-kb")
+    assert app_slug(config) == "acme-kb"  # what the brain's make astrolift-manifest renders
+    app = RegisteredApp.objects.get(organization=world.org, slug="acme-kb")
+    assert app.app_kind == "mimwell" and 'name = "acme-kb"' in app.manifest_raw
+    assert 'name = "acme-kb"' in files["astrolift.toml"].decode()
+
+
+def test_a_slug_without_brain_needs_an_edition_with_app_slug(world, host, started, monkeypatch):
+    from astrolift_registry.tests.test_brain_scaffold_2424 import CONFIG, OLD_DEPLOY, config_schema
+
+    old = {
+        "client.config.json": json.dumps(CONFIG).encode(),
+        brain_template.CONFIG_SCHEMA: config_schema(*OLD_DEPLOY),
+        brain_template.DOCKERFILE: b"FROM nginx\n",
+    }
+    monkeypatch.setattr(brain_template, "download", lambda ref: edition_zip(files=old))
+    row = BrainCreation.objects.get(guid=str(_create(world, slug="acme").data.id))
+    assert brain_manage.ensure_repo(row.pk)["state"] == "repo_ready"
+    assert brain_manage.scaffold(row.pk)["state"] == "failed"
+    row.refresh_from_db()
+    assert row.error_code == "PRECONDITION" and "has no deploy.app_slug" in row.error_message
+    assert not host.commits
 
 
 class FakeRepo:
@@ -843,6 +880,41 @@ def test_an_unsupported_graduation_is_refused_by_cell(world, repo):
         and "unsupported cell: authority=files, blobs=db-blob" in result.errors[0].message
     )
     assert not repo.commits
+
+
+def test_graduating_a_brain_named_without_brain_writes_app_slug_only_where_mimwell_has_it(world, repo):
+    from astrolift_registry.schema import brain_types as bt
+    from astrolift_registry.tests.test_brain_scaffold_2424 import OLD_DEPLOY, config_schema
+
+    app = _brain(world, slug="kb", build_mode="platform_build")
+    refused = _graduate(world, app.slug, persistence=[bt.BrainPersistence.SQLITE_VOLUME])
+    assert (refused.errors[0].code, refused.errors[0].field) == ("PRECONDITION", "slug")
+    assert "needs deploy.app_slug" in refused.errors[0].message and not repo.commits
+    repo.files[brain_template.CONFIG_SCHEMA] = config_schema(*OLD_DEPLOY).decode()
+    assert _graduate(world, app.slug, persistence=[]).errors[0].code == "PRECONDITION"
+    assert not repo.commits
+
+    repo.files[brain_template.CONFIG_SCHEMA] = config_schema(*OLD_DEPLOY, "app_slug").decode()
+    result = _graduate(world, app.slug, persistence=[bt.BrainPersistence.SQLITE_VOLUME])
+    assert result.ok, result.errors
+    [commit] = repo.commits
+    config = json.loads(commit["files"]["client.config.json"])
+    assert (config["client"]["slug"], config["deploy"]["app_slug"]) == ("kb", "kb")
+    assert 'name = "kb"' in commit["files"]["astrolift.toml"]
+
+
+def test_graduating_keeps_the_client_slug_of_a_config_that_names_the_app(world, repo):
+    from astrolift_registry.schema import brain_types as bt
+
+    app = _brain(world, slug="kb", build_mode="platform_build")
+    repo.files["client.config.json"] = json.dumps(
+        {"client": {"slug": "acme"}, "deploy": {"target": "astrolift", "app_slug": "kb", "persistence": []}}
+    )
+    result = _graduate(world, app.slug, persistence=[bt.BrainPersistence.SQLITE_VOLUME])
+    assert result.ok, result.errors
+    [commit] = repo.commits
+    config = json.loads(commit["files"]["client.config.json"])
+    assert config["client"] == {"slug": "acme"} and config["deploy"]["app_slug"] == "kb"
 
 
 def test_archive_keeps_the_brains_database(world):

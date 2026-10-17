@@ -12,8 +12,9 @@ part of the edition and are left out.
 Astrolift never runs template code. It writes two files of its own:
 
 * ``client.config.json``: the brain's name and short name, the client slug
-  and the substrate selection (``deploy.*`` and the legacy placement keys),
-  each set as a JSON key;
+  (and ``deploy.app_slug`` for a slug that does not end in ``-brain``, which
+  the edition's schema must declare) and the substrate selection
+  (``deploy.*`` and the legacy placement keys), each set as a JSON key;
 * ``astrolift.toml``: ``gen-astrolift.py``'s mapping of that selection, plus
   ``[app] kind = "mimwell"`` (``brain_substrate.render_manifest``).
 """
@@ -31,6 +32,7 @@ from astrolift_scm.providers.repo_writes import TreeFile
 
 DOCKERFILE = "extensions/portal-container/Dockerfile"
 CONFIG = "client.config.json"
+CONFIG_SCHEMA = "schemas/client.config.schema.json"
 MANIFEST = "astrolift.toml"
 EDITION = "edition.json"
 #: An edition is a few megabytes; refuse anything far larger before unpacking.
@@ -202,11 +204,20 @@ def dump_config(data: dict) -> bytes:
     return (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
 
 
+def _schema(edition: Edition):
+    """The edition's ``client.config.schema.json``, or None when it has none that parses."""
+    raw = next((f.content for f in edition.files if f.path == CONFIG_SCHEMA), None)
+    try:
+        return json.loads(raw) if raw is not None else None
+    except ValueError:
+        return None
+
+
 def scaffold(
     edition: Edition, *, slug: str, name: str, selection, environment_name: str = "production"
 ) -> list[TreeFile]:
     """Every file of the first commit: the edition, plus the two files Astrolift writes."""
-    from astrolift_registry.brain_substrate import render_manifest
+    from astrolift_registry.brain_substrate import declares_app_slug, render_manifest
 
     if not selection.image and DOCKERFILE not in {f.path for f in edition.files}:
         raise TemplateError(
@@ -221,6 +232,13 @@ def scaffold(
             item = TreeFile(
                 path=CONFIG, content=client_config(item.content, slug=slug, name=name, selection=selection)
             )
+            if "app_slug" in json.loads(item.content)["deploy"] and not declares_app_slug(_schema(edition)):
+                raise TemplateError(
+                    "PRECONDITION",
+                    f"the template at {edition.ref!r} has no deploy.app_slug, so it names the app "
+                    f"<client.slug>-brain; use a slug ending in -brain ({slug}-brain), or an edition "
+                    "that has deploy.app_slug",
+                )
         out.append(item)
     manifest = render_manifest(selection, slug=slug, display_name=name, environment_name=environment_name)
     out.append(TreeFile(path=MANIFEST, content=manifest.encode("utf-8")))

@@ -15,7 +15,7 @@ import pytest
 
 from astrolift_manifest.parser import parse_raw
 from astrolift_registry import brain_template
-from astrolift_registry.brain_substrate import Selection, render_manifest
+from astrolift_registry.brain_substrate import Selection, app_slug, render_manifest
 from astrolift_scm.providers import ProviderError, repo_writes
 
 CONFIG = {
@@ -23,6 +23,20 @@ CONFIG = {
     "brain": {"store": "json"},
     "deploy": {"target": "cloudflare-worker", "persistence": []},
 }
+
+
+def config_schema(*deploy_keys: str) -> bytes:
+    """A Mimwell ``client.config.schema.json`` whose ``deploy`` takes exactly ``deploy_keys``."""
+    deploy = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {key: {} for key in deploy_keys},
+    }
+    return json.dumps({"type": "object", "properties": {"deploy": deploy}}).encode()
+
+
+#: The deploy keys of a Mimwell version before deploy.app_slug.
+OLD_DEPLOY = ("target", "persistence", "replicas", "public", "image", "port")
 
 
 def edition_zip(*, files=None, tamper=None, drop=None, extra=None, link=None) -> bytes:
@@ -33,6 +47,7 @@ def edition_zip(*, files=None, tamper=None, drop=None, extra=None, link=None) ->
         or {
             "README.md": b"# Mimwell\n",
             "client.config.json": json.dumps(CONFIG).encode(),
+            brain_template.CONFIG_SCHEMA: config_schema(*OLD_DEPLOY, "app_slug"),
             "extensions/portal-container/Dockerfile": b"FROM nginx\n",
             "scripts/build.sh": b"#!/bin/sh\n",
             "assets/mark.png": b"\x89PNG\x00\x01binary",
@@ -124,6 +139,43 @@ def test_the_scaffold_writes_only_the_brains_identity_and_its_manifest():
     assert container["dockerfile_path"] == brain_template.DOCKERFILE
     assert raw.raw["managed_services"][0]["kind"] == "postgres"
     assert container["port"] == 8080 and container["healthcheck"]["value"] == "/health"
+
+
+def _scaffolded(edition, slug):
+    files = {
+        f.path: f.content
+        for f in brain_template.scaffold(edition, slug=slug, name="Acme", selection=Selection())
+    }
+    return json.loads(files["client.config.json"]), parse_raw(files["astrolift.toml"].decode()).raw
+
+
+def test_a_slug_without_brain_is_written_as_deploy_app_slug():
+    edition = brain_template.read_edition(edition_zip(), ref="v0.4.0")
+    config, manifest = _scaffolded(edition, "acme")
+    assert config["client"]["slug"] == "acme" and config["deploy"]["app_slug"] == "acme"
+    assert app_slug(config) == "acme"  # the brain's own make astrolift-manifest keeps the name
+    assert (manifest["name"], manifest["app"]["slug"]) == ("acme", "acme")
+    config, manifest = _scaffolded(edition, "acme-brain")
+    assert config["client"]["slug"] == "acme" and "app_slug" not in config["deploy"]
+    assert (manifest["name"], manifest["app"]["slug"]) == ("acme-brain", "acme-brain")
+
+
+@pytest.mark.parametrize(
+    "schema", [config_schema(*OLD_DEPLOY), None, b"not json"], ids=["older-schema", "no-schema", "not-json"]
+)
+def test_an_edition_without_deploy_app_slug_takes_only_a_brain_slug(schema):
+    files = {
+        "client.config.json": json.dumps(CONFIG).encode(),
+        brain_template.DOCKERFILE: b"FROM nginx\n",
+        **({brain_template.CONFIG_SCHEMA: schema} if schema is not None else {}),
+    }
+    edition = brain_template.read_edition(edition_zip(files=files), ref="v0.3.4")
+    with pytest.raises(brain_template.TemplateError) as exc:
+        _scaffolded(edition, "acme")
+    assert exc.value.code == "PRECONDITION"
+    assert "has no deploy.app_slug" in exc.value.message and "(acme-brain)" in exc.value.message
+    config, manifest = _scaffolded(edition, "acme-brain")
+    assert "app_slug" not in config["deploy"] and manifest["name"] == "acme-brain"
 
 
 def test_a_name_cannot_break_out_of_the_manifest():
