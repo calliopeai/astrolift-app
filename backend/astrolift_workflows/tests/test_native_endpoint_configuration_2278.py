@@ -13,6 +13,7 @@ from dataclasses import asdict
 from datetime import timedelta
 from threading import Event
 from threading import enumerate as active_threads
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -22,6 +23,7 @@ from gcp.gke_identity_preparation import GKEIdentityPreparation
 from gcp.identity_owned import NativeGCPIdentity
 from google.iam.v1 import policy_pb2
 from temporalio import workflow
+from temporalio.api.enums.v1 import EventType, TimeoutType
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, CancelledError
 from temporalio.worker import Replayer, UnsandboxedWorkflowRunner, Worker
@@ -45,6 +47,158 @@ from astrolift_workflows.native_endpoint_configuration import (
 from astrolift_workflows.tests.test_native_execution_checkpoint_2278 import world as original_world
 from providers.tests.gcp.test_gke_app_apply_2278 import native as tls_fixture
 from providers.tests.gcp.test_identity_submission_2278 import SubmissionWire
+
+
+_HISTORY_SCAN_LIMIT = 2048
+_HISTORY_ROW_LIMIT = 8
+_HISTORY_COUNT_LIMIT = 1_000_000
+_SAFE_TIMEOUT_NAMES = {
+    "TIMEOUT_TYPE_START_TO_CLOSE",
+    "TIMEOUT_TYPE_SCHEDULE_TO_START",
+    "TIMEOUT_TYPE_SCHEDULE_TO_CLOSE",
+    "TIMEOUT_TYPE_HEARTBEAT",
+}
+_SAFE_TERMINAL_EVENT_NAMES = {
+    "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_FAILED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW",
+}
+
+
+def _safe_temporal_history_summary(history):
+    """Return only bounded Temporal event codes/IDs, never payloads or messages."""
+    events = getattr(history, "events", ())
+    if not hasattr(events, "__iter__"):
+        events = ()
+    try:
+        available = len(events)
+    except (TypeError, OverflowError):
+        available = 0
+    available = min(max(available, 0), _HISTORY_COUNT_LIMIT)
+    timeout_counts = {name: 0 for name in sorted(_SAFE_TIMEOUT_NAMES)}
+    event_type_counts = {
+        name: 0
+        for name in (
+            "EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT",
+            "EVENT_TYPE_ACTIVITY_TASK_CANCELED",
+            "EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED",
+            *_SAFE_TERMINAL_EVENT_NAMES,
+        )
+    }
+    timeout_rows = []
+    cancellation_ids = []
+    cancel_request_ids = []
+    terminal_rows = []
+    scanned = 0
+    invalid_enum_count = 0
+
+    def safe_id(value):
+        return value if type(value) is int and 0 <= value <= (2**63 - 1) else None
+
+    for event in events:
+        if scanned >= _HISTORY_SCAN_LIMIT:
+            break
+        scanned += 1
+        event_type = getattr(event, "event_type", None)
+        try:
+            name = EventType.Name(event_type) if type(event_type) is int else None
+        except (ValueError, TypeError):
+            name = None
+        event_id = safe_id(getattr(event, "event_id", None))
+        if name in event_type_counts:
+            event_type_counts[name] = min(event_type_counts[name] + 1, _HISTORY_COUNT_LIMIT)
+        if name == "EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT":
+            attrs = getattr(event, "activity_task_timed_out_event_attributes", None)
+            timeout_type = getattr(attrs, "timeout_type", None)
+            try:
+                timeout_name = TimeoutType.Name(timeout_type) if type(timeout_type) is int else None
+            except (ValueError, TypeError):
+                timeout_name = None
+            if timeout_name in timeout_counts:
+                timeout_counts[timeout_name] = min(timeout_counts[timeout_name] + 1, _HISTORY_COUNT_LIMIT)
+                if len(timeout_rows) < _HISTORY_ROW_LIMIT:
+                    timeout_rows.append(
+                        {
+                            "eventId": event_id,
+                            "timeoutType": timeout_name,
+                            "scheduledEventId": safe_id(getattr(attrs, "scheduled_event_id", None)),
+                            "startedEventId": safe_id(getattr(attrs, "started_event_id", None)),
+                        }
+                    )
+            else:
+                invalid_enum_count = min(invalid_enum_count + 1, _HISTORY_COUNT_LIMIT)
+        elif name == "EVENT_TYPE_ACTIVITY_TASK_CANCELED":
+            if len(cancellation_ids) < _HISTORY_ROW_LIMIT:
+                cancellation_ids.append(event_id)
+        elif name == "EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED":
+            if len(cancel_request_ids) < _HISTORY_ROW_LIMIT:
+                cancel_request_ids.append(event_id)
+        elif name in _SAFE_TERMINAL_EVENT_NAMES and len(terminal_rows) < _HISTORY_ROW_LIMIT:
+            terminal_rows.append({"eventId": event_id, "eventType": name})
+        elif name is None:
+            invalid_enum_count = min(invalid_enum_count + 1, _HISTORY_COUNT_LIMIT)
+
+    return {
+        "eventsAvailableCapped": available,
+        "eventsScanned": scanned,
+        "eventsTruncated": scanned < available,
+        "invalidEnumCount": invalid_enum_count,
+        "eventTypeCounts": event_type_counts,
+        "activityTimeoutCounts": timeout_counts,
+        "activityTimeouts": timeout_rows,
+        "activityCancellationEventIds": cancellation_ids,
+        "workflowCancelRequestEventIds": cancel_request_ids,
+        "cancellationObserved": bool(cancellation_ids or cancel_request_ids),
+        "workflowTerminalEvents": terminal_rows,
+    }
+
+
+def test_safe_temporal_history_summary_is_bounded_and_omits_payloads():
+    timeout = SimpleNamespace(
+        timeout_type=TimeoutType.TIMEOUT_TYPE_HEARTBEAT,
+        scheduled_event_id=4,
+        started_event_id=5,
+        details="private-heartbeat-details-canary",
+    )
+    events = [
+        SimpleNamespace(
+            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
+            event_id=6,
+            activity_task_timed_out_event_attributes=timeout,
+            input="private-input-canary",
+            result="private-result-canary",
+            failure="private-failure-canary",
+        ),
+        SimpleNamespace(
+            event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
+            event_id=7,
+            workflow_execution_cancel_requested_event_attributes=SimpleNamespace(
+                cause="private-cancel-cause-canary"
+            ),
+        ),
+        *(
+            SimpleNamespace(event_type=EventType.EVENT_TYPE_TIMER_STARTED, event_id=index + 8)
+            for index in range(_HISTORY_SCAN_LIMIT + 2)
+        ),
+    ]
+    summary = _safe_temporal_history_summary(SimpleNamespace(events=events))
+    encoded = json.dumps(summary, sort_keys=True)
+
+    assert summary["eventsScanned"] == _HISTORY_SCAN_LIMIT
+    assert summary["eventsTruncated"] is True
+    assert summary["activityTimeoutCounts"]["TIMEOUT_TYPE_HEARTBEAT"] == 1
+    assert summary["eventTypeCounts"]["EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT"] == 1
+    assert summary["eventTypeCounts"]["EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED"] == 1
+    assert summary["cancellationObserved"] is True
+    assert summary["activityTimeouts"] == [
+        {"eventId": 6, "timeoutType": "TIMEOUT_TYPE_HEARTBEAT", "scheduledEventId": 4, "startedEventId": 5}
+    ]
+    assert summary["workflowCancelRequestEventIds"] == [7]
+    assert len(encoded) < 4096
+    assert "private-" not in encoded
 
 
 def _safe_exception_chain(error):
@@ -942,9 +1096,15 @@ async def test_runtime_db_boundary_rechecks_render_and_original_caller_after_jou
                 type(w.token).objects.filter(pk=w.token.pk).update(is_revoked=True)
 
     monkeypatch.setattr(AppApplyStore, "validate_runtime_handoff", withdraw_after_current_read)
-    result, _ = await run(w, client, temporal_env)
+    result, history = await run(w, client, temporal_env)
     assert result == {"refused": True}
-    assert len(changed) == 1 and len(w.http["requests"]) == changed[0], getattr(w, "failure_causes", [])
+    assert len(changed) == 1 and len(w.http["requests"]) == changed[0], json.dumps(
+        {
+            "safeFailureCauses": getattr(w, "failure_causes", []),
+            "temporalHistory": _safe_temporal_history_summary(history),
+        },
+        sort_keys=True,
+    )
     assert not any(path.endswith("/pods?limit=257") for _, path, _ in w.http["requests"])
     assert await sync_to_async(lambda: GCPGKEAppApplyJournal.objects.get().state)() == "OBSERVED"
     if withdrawal == "render":
