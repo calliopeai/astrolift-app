@@ -26,6 +26,8 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     locale: "en-US",
     launchOptions: { args: ["--use-mock-keychain", "--password-store=basic"] },
+    // A service worker's requests would bypass the write guard.
+    serviceWorkers: "block",
     // Traces and videos would carry the session; the report is redacted instead.
     trace: "off",
     video: "off",

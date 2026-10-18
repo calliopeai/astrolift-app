@@ -77,8 +77,10 @@ function operationTypes(body: string | null): { types: string[]; names: string[]
   }
 }
 
+// On the context, so a popup or a second tab is guarded too.
 async function guard(page: Page, blocked: string[], telemetry: string[], origin: string) {
-  await page.route("**/*", async (route: Route) => {
+  const context = page.context();
+  await context.route("**/*", async (route: Route) => {
     const request = route.request();
     const method = request.method();
     const url = new URL(request.url());
@@ -97,8 +99,13 @@ async function guard(page: Page, blocked: string[], telemetry: string[], origin:
     blocked.push(`${method} ${url.origin}${url.pathname}`);
     return route.abort("blockedbyclient");
   });
-  // Subscriptions ride the socket; a mutation sent over it is dropped.
-  await page.routeWebSocket(/\/gql\/.*ws/, (socket) => {
+  // Subscriptions ride the socket; a mutation sent over it is dropped. Any
+  // other socket (the exec terminal is a shell) is refused.
+  await context.routeWebSocket(/.*/, (socket) => {
+    if (!new URL(socket.url()).pathname.includes("/gql/")) {
+      blocked.push(`WS ${new URL(socket.url()).pathname}`);
+      return socket.close();
+    }
     const server = socket.connectToServer();
     socket.onMessage((message) => {
       try {

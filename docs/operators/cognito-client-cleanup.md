@@ -148,7 +148,8 @@ Every GraphQL mutation and every non-GET call is aborted before it leaves the
 browser, and the test fails if one was attempted. Two same-origin session
 routes (`/api/session/getToken`, `/api/auth/store-token`) are allowed, because
 they move the browser's own token and write nothing on the server. Telemetry
-posts are dropped and listed. Traces and videos are off.
+posts are dropped and listed. Any WebSocket other than the GraphQL one (the
+exec terminal is a shell) is refused. Traces and videos are off.
 
 ```sh
 cd frontend
@@ -169,7 +170,7 @@ and secret-bearing query values are redacted from the report.
 
 | Test | Pass means | Fail means |
 |---|---|---|
-| fleet overview loads with no fixture rows | `/fleet` rendered its roster from GraphQL reads that all returned below 400, and no route-walk fixture name appears. | `fixtureNames` lists mock rows on screen, or `failedGraphql` lists a read that failed (a 403 usually means the session expired: log in again). |
+| fleet overview loads with no fixture rows | `/fleet` rendered its roster from GraphQL reads that all returned below 400 with no errors, and no route-walk fixture name appears. | `fixtureNames` lists mock rows on screen, or `failedGraphql` lists a read that failed (a 403 usually means the session expired: log in again). |
 | agent overview shows runtime, activity and runs | The first roster agent's Overview shows Latest run, Runtime and Recent runs. | A section is missing or a read failed. Skipped when the fleet lists no agents. |
 | overseer input is gated on a running run and the permission | The input is hidden when no listed run is RUNNING, and hidden when the session lacks `agent_task.send_input`. `overseer` records the statuses, the permission (`null` if the page did not read it) and whether the input showed. | The input was offered without a RUNNING run or without the permission. Nothing is sent either way. |
 | production metrics show traffic and status-code series | `metrics.network` (the Traffic signal, HTTP requests/s) and `metrics.statusCodes` each have at least one series with samples. | Either reads `empty`, with the GraphQL HTTP status, error count and the panel's reason (for example `NOT_CONFIGURED`). Network RX/TX bytes are not in the GraphQL contract yet, so Traffic stands in for the network panel. |

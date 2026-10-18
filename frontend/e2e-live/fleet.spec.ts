@@ -14,11 +14,12 @@ test("fleet overview loads with no fixture rows", async ({ page, live }) => {
   await live.screenshot("fleet");
 
   const fixtures = fixtureNamesIn(await page.locator("main").innerText());
-  const failed = live.graphql.filter((call) => call.status >= 400);
+  const failed = live.graphql.filter((call) => call.status >= 400 || call.errors > 0);
   live.report.fixtureNames = fixtures;
-  live.report.failedGraphql = failed.map(({ operationName, status }) => ({
+  live.report.failedGraphql = failed.map(({ operationName, status, errors }) => ({
     operationName,
     status,
+    errors,
   }));
   expect(live.graphql.length, "the page made no GraphQL reads").toBeGreaterThan(0);
   expect(failed, "a GraphQL read failed").toEqual([]);

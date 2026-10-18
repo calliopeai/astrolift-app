@@ -43,7 +43,7 @@ test("agent overview shows runtime, activity and runs", async ({ page, live }) =
     await expect(page.getByRole("heading", { name: section, exact: true })).toBeVisible();
   }
   await live.screenshot("agent-overview");
-  expect(live.graphql.filter((call) => call.status >= 400)).toEqual([]);
+  expect(live.graphql.filter((call) => call.status >= 400 || call.errors > 0)).toEqual([]);
 });
 
 test("overseer input is gated on a running run and the permission", async ({ page, live }) => {
@@ -54,7 +54,12 @@ test("overseer input is gated on a running run and the permission", async ({ pag
   const running = statuses.includes("running");
   const granted = sendInputGranted(live.graphql);
   const input = page.getByRole("textbox", { name: messages.agentFrame.input.ariaLabel });
-  const shown = await input.isVisible();
+  // The input renders after the tasks response; an instant check would read
+  // "hidden" before React commits and pass the gate for the wrong reason.
+  const shown = await input
+    .waitFor({ timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
   live.report.overseer = {
     agent: href,
     taskStatuses: statuses,
