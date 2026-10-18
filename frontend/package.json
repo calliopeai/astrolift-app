@@ -19,7 +19,9 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build --quiet",
     "test:layout": "playwright test",
-    "test:routes": "playwright test --config playwright.routes.config.ts"
+    "test:routes": "playwright test --config playwright.routes.config.ts",
+    "smoke:live": "playwright test --config playwright.live.config.ts",
+    "smoke:live:login": "LIVE_LOGIN=1 playwright test --config playwright.live.config.ts"
   },
   "dependencies": {
     "@apollo/client": "^4.1.6",
