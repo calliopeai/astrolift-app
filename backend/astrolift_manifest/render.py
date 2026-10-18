@@ -784,6 +784,8 @@ def _mount_empty_directories(pod: dict[str, Any], workload: WorkloadManifest) ->
     if not volumes:
         return
     pod["volumes"] = [render_pod_volume(volume) for volume in volumes]
+    if workload.fs_group is not None:
+        pod.setdefault("securityContext", {})["fsGroup"] = workload.fs_group
     for container in pod["containers"]:
         container.setdefault("volumeMounts", []).extend(render_volume_mount(volume) for volume in volumes)
 

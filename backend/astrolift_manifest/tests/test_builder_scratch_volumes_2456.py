@@ -51,6 +51,16 @@ def test_empty_directory_has_actual_volume_and_mount():
     assert not any("persistentVolumeClaim" in v for v in pod["volumes"])
 
 
+def test_explicit_filesystem_group_makes_scratch_writable_to_image_user():
+    pod = _pod_spec(
+        replace(_deployment_workload(), volumes=(volume(),), fs_group=10001),
+        image_tag="v1",
+        image_repository="registry.test/app",
+        image_digest="",
+    )
+    assert pod["securityContext"] == {"fsGroup": 10001}
+
+
 @pytest.mark.parametrize(
     "declarations",
     [
@@ -60,6 +70,7 @@ def test_empty_directory_has_actual_volume_and_mount():
         (volume(mount_path="/data/../proc"),),
         (volume(mount_path="/var/run/secrets/kubernetes.io/serviceaccount"),),
         (volume(mount_path="/proc/1"),),
+        (volume(mount_path="/var"),),
         (volume(mount_path="/data//nested"),),
         (volume(), volume(mount_path="/other")),
         (volume(), volume(name="other")),
