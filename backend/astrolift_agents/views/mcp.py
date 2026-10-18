@@ -158,9 +158,6 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_provision_project_resource": services_project_scope_by_guid(
         permissions=(Permission.PROJECT_UPDATE,)
     ),
-    "astrolift_preview_project_resource_cost": managed_service_scope_by_guid(
-        permissions=(Permission.PROJECT_READ,)
-    ),
     "astrolift_attach_project_resource": managed_service_scope_by_guid(
         permissions=(Permission.PROJECT_UPDATE,)
     ),
@@ -207,7 +204,6 @@ def _operation_for_tool(name: str, args: dict[str, Any]):
 
         return _creation_operation({"input": args})[0]
     if name in {
-        "astrolift_preview_project_resource_cost",
         "astrolift_attach_project_resource",
         "astrolift_update_project_resource",
         "astrolift_reprovision_project_resource",
@@ -1265,15 +1261,6 @@ def _list_project_resources(_request: HttpRequest, args: dict[str, Any]) -> dict
     }
 
 
-def _preview_project_resource_cost(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
-    from dataclasses import asdict
-
-    from astrolift_services.cost_preview import preview_managed_service_cost
-
-    service = _project_service_for_request(str(args.get("managed_service_id") or ""))
-    return {"managed_service_id": str(service.guid), **asdict(preview_managed_service_cost(service))}
-
-
 def _provision_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     from astrolift_graphql import GUID
     from astrolift_services.schema.mutations import ProvisionProjectManagedServiceInput, ServicesMutation
@@ -1449,7 +1436,6 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_project_resource_clusters": _list_project_resource_clusters,
     "astrolift_list_project_resource_catalog": _list_project_resource_catalog,
     "astrolift_list_project_resources": _list_project_resources,
-    "astrolift_preview_project_resource_cost": _preview_project_resource_cost,
     "astrolift_provision_project_resource": _provision_project_resource,
     "astrolift_attach_project_resource": _attach_project_resource,
     "astrolift_detach_project_resource": _detach_project_resource,

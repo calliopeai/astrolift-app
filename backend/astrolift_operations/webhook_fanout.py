@@ -48,7 +48,7 @@ def matching_subscriptions(envelope) -> list[Any]:
         return []
 
     event_type = str(getattr(envelope, "event_type", "") or "")
-    if not event_type:
+    if not event_type or event_type == "AUDIT.agent.model_spend":
         return []
 
     rows = WebhookSubscription.objects.filter(

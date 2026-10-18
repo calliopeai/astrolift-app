@@ -2,7 +2,7 @@
 
 Covers the new fields: ``ttl_until``, ``source_url``, ``pr_url`` (with
 GitHub URL normalization), ``aggregate_resources`` (default zero when
-not injected), ``estimated_daily_cost_usd`` (null by default).
+not injected).
 """
 
 from __future__ import annotations
@@ -81,7 +81,6 @@ def test_preview_to_type_defaults_aggregate_to_zero_when_not_injected(app, env):
     assert out.aggregate_resources.cpu_cores == 0.0
     assert out.aggregate_resources.memory_bytes == 0.0
     assert out.aggregate_resources.pod_count == 0
-    assert out.estimated_daily_cost_usd is None
 
 
 def test_preview_to_type_passes_through_injected_aggregate(app, env):
@@ -90,12 +89,10 @@ def test_preview_to_type_passes_through_injected_aggregate(app, env):
     out = preview_to_type(
         preview,
         aggregate_resources=agg,
-        estimated_daily_cost_usd=2.34,
     )
     assert out.aggregate_resources.cpu_cores == pytest.approx(0.75)
     assert out.aggregate_resources.memory_bytes == 1024**3
     assert out.aggregate_resources.pod_count == 3
-    assert out.estimated_daily_cost_usd == pytest.approx(2.34)
 
 
 def test_preview_to_type_exposes_ttl_until(app, env):

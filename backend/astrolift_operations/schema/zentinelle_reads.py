@@ -135,7 +135,6 @@ class ZentinelleUsageRowType:
     requests: int
     input_tokens: int
     output_tokens: int
-    cost_usd: float
 
 
 @strawberry.type(name="AstroliftZentinelleUsage")
@@ -281,7 +280,7 @@ class ZentinelleReadsQuery:
         project_id: GUID | None = None,  # type: ignore[valid-type]
         team_id: GUID | None = None,  # type: ignore[valid-type]
     ) -> ZentinelleUsageType:
-        """Model usage and cost from Zentinelle's gateway metering since ``since``
+        """Model token usage from Zentinelle's gateway metering since ``since``
         (default 30 days ago), per agent, provider and model, for the agents the
         caller may see: one agent, a project's, a team's, or all of them."""
         since = since or timezone.now() - DEFAULT_USAGE_WINDOW
@@ -306,7 +305,6 @@ class ZentinelleReadsQuery:
                     requests=r.requests,
                     input_tokens=r.input_tokens,
                     output_tokens=r.output_tokens,
-                    cost_usd=r.cost_usd,
                 )
                 for r in rows
             ],

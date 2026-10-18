@@ -126,6 +126,45 @@ def encoded_body(payload: dict) -> bytes:
     ).encode("utf-8")
 
 
+MAX_CALLBACK_BODY_BYTES = 8 * 1024 * 1024
+
+
+def callback_wire_body(body: bytes) -> bytes:
+    """Remove retired envelope money without changing historical outbox storage."""
+    if not isinstance(body, bytes) or len(body) > MAX_CALLBACK_BODY_BYTES:
+        raise CallbackConfigurationError("callback envelope is unavailable")
+    try:
+
+        def unique_object(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError
+                result[key] = value
+            return result
+
+        def invalid_constant(value):
+            raise ValueError
+
+        envelope = json.loads(
+            body.decode("utf-8"), object_pairs_hook=unique_object, parse_constant=invalid_constant
+        )
+        if not isinstance(envelope, dict) or envelope.get("event") != EVENT:
+            raise ValueError
+        uuid.UUID(envelope.get("task_id"))
+        if envelope.get("status") not in {"completed", "failed", "cancelled", "timed_out"}:
+            raise ValueError
+        usage = envelope.get("usage")
+        if not isinstance(usage, dict):
+            raise ValueError
+        if "total_cost_usd" not in usage:
+            return body
+        del usage["total_cost_usd"]
+        return encoded_body(envelope)
+    except (ValueError, TypeError, AttributeError, UnicodeError, RecursionError):
+        raise CallbackConfigurationError("callback envelope is unavailable") from None
+
+
 def signature(secret: bytes, timestamp: str, body: bytes) -> str:
     if not secret:
         raise CallbackConfigurationError("Callback signing secret is unavailable")

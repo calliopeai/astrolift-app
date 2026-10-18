@@ -31,7 +31,7 @@ def runner_for(platform: FakePlatform, **kwargs) -> LifecycleRunner:
         update_image_ref=UPDATE_IMAGE,
         provision_poll=instant,
         teardown_poll=instant,
-        estimate_logged=True,
+        capacity_resources_authorized=True,
         **kwargs,
     )
 
@@ -168,10 +168,10 @@ def test_buildout_refuses_to_start_on_a_previous_runs_leftover():
     assert "may exist before BUILDOUT" in second.first.result_for(Step.BUILDOUT).assertion
 
 
-def test_buildout_enforces_class_c_estimate_before_registering_anything():
+def test_buildout_requires_capacity_resource_authorization_before_registering_anything():
     platform = FakePlatform()
     runner = runner_for(platform)
-    runner.estimate_logged = False
+    runner.capacity_resources_authorized = False
     class_c_cell = replace(
         happy_cell(),
         bindings=(Binding("postgres", "records", "aurora_postgres_serverless_v2"),),
@@ -181,8 +181,8 @@ def test_buildout_enforces_class_c_estimate_before_registering_anything():
 
     buildout = result.first.result_for(Step.BUILDOUT)
     assert buildout.outcome is Outcome.RED
-    assert "spend gate" in buildout.assertion
-    assert "pre-flight cost estimate" in buildout.detail
+    assert "resource gate" in buildout.assertion
+    assert "--allow-capacity-resources" in buildout.detail
     assert platform.get_app("cert2026q3-happy-aws") is None
 
 
@@ -190,7 +190,9 @@ def test_a_cycle_without_an_orphan_scanner_cannot_claim_clean():
     """A scan is not optional decoration on VERIFY-CLEAN; it is the step. A
     runner with no scanner that reported green would certify teardown on the
     basis of the platform's own opinion of itself."""
-    runner = LifecycleRunner(platform=FakePlatform(), update_image_ref=UPDATE_IMAGE, scan=None, estimate_logged=True)
+    runner = LifecycleRunner(
+        platform=FakePlatform(), update_image_ref=UPDATE_IMAGE, scan=None, capacity_resources_authorized=True
+    )
     runner.provision_poll = runner.teardown_poll = Poll(0.0, 0.0, sleep=lambda _: None, now=lambda: 0.0)
 
     result = runner.run_cell(happy_cell(), reproduce=False)
@@ -291,3 +293,22 @@ def test_every_committed_happy_path_manifest_loads_as_a_runnable_cell():
         assert cell.bindings
         assert cell.public_workload
         assert cell.image_tag and ":" not in cell.image_tag
+
+
+def test_reviewed_capacity_authorization_allows_buildout_without_any_monetary_acknowledgement():
+    platform = FakePlatform()
+    cell = replace(happy_cell(), bindings=(Binding("postgres", "records", "aurora_postgres_serverless_v2"),))
+    runner = runner_for(platform)
+    assert runner.capacity_resources_authorized
+    result = runner.run_cell(cell, reproduce=False)
+    assert outcome_at(result, Step.BUILDOUT) is Outcome.GREEN
+
+
+def test_unsupported_lifecycle_cannot_be_enabled_by_capacity_authorization():
+    platform = FakePlatform()
+    cell = replace(happy_cell(), bindings=(Binding("mssql", "records", "rds_sqlserver_enterprise"),))
+    result = runner_for(platform).run_cell(cell, reproduce=False)
+    buildout = result.first.result_for(Step.BUILDOUT)
+    assert buildout.outcome is Outcome.RED
+    assert "unsupported certification lifecycle" in buildout.detail
+    assert platform.get_app("cert2026q3-happy-aws") is None
