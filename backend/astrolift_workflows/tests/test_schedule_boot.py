@@ -204,6 +204,8 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # of no value held.
         ScheduleKind.PROBE_APP_DNS,
         ScheduleKind.PROBE_APP_CRONJOB_RUNS,
+        # Temporary-app timer safety net (#2433): only starts missing timers.
+        ScheduleKind.APP_EXPIRY_SWEEP,
     }
     assert PHASE_3A_ACTIVE_KINDS == expected
     assert resolve_active_kinds(None) == frozenset(expected)

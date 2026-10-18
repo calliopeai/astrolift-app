@@ -1457,6 +1457,7 @@
         "mine": "Meine",
         "failing": "Fehlerhaft",
         "archived": "Archiviert",
+        "temporary": "Temporär",
         "mineNote": "Meine umfasst Apps, für die Sie direkt oder über Projekt, Team oder Organisation eine Rolle besitzen, solange Apps ihre Eigentümer noch nicht erfassen."
       },
       "bulk": {
@@ -4052,6 +4053,36 @@
       "legendDescription": "Knotentypen und ihre Bedeutung.",
       "legendTitle": "Legende",
       "title": "{name} · Topologie"
+    },
+    "expiry": {
+      "expiresIn": "Läuft ab in {remaining}",
+      "expired": "Abgelaufen",
+      "remaining": {
+        "days": "{days} T {hours} Std.",
+        "hours": "{hours} Std. {minutes} Min.",
+        "minutes": "{minutes} Min."
+      },
+      "title": "Temporäre App: wird am {when} abgebaut",
+      "extend": "+1 Tag",
+      "extendLabel": "Um einen Tag verlängern",
+      "extended": "Verlängert bis {when}",
+      "extendFailed": "Die App konnte nicht verlängert werden"
+    },
+    "temporaryCreation": {
+      "ttl": "Lebensdauer der Anwendung",
+      "help": "Leer lassen, um den Ablauf aus dem Manifest zu übernehmen oder eine dauerhafte Anwendung zu erstellen, sofern die Richtlinie dies erlaubt. Monate haben 30 Tage.",
+      "inherited": "Laut Manifest läuft diese Anwendung nach {ttl} ab. Geben Sie eine Dauer ein, um dies zu überschreiben.",
+      "bounds": "Zulässige Lebensdauer: {min} bis {max} Minuten.",
+      "required": "Ihre Organisation verlangt für diese Anwendung ein Ablaufdatum.",
+      "invalid": "Geben Sie eine Dauer innerhalb der Organisationsgrenzen ein: 30m, 4h, 7d, 6w oder 3mo.",
+      "deleteData": "Verwaltete Daten beim Ablauf der Anwendung löschen",
+      "deleteWarning": "Beim Ablauf werden auch Datenbanken, Buckets und Volumes der Anwendung gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "keepData": "Verwaltete Daten werden nach Ablauf {days} Tage aufbewahrt und dann gelöscht.",
+      "loading": "Richtlinie zur Lebensdauer wird geladen…",
+      "unavailable": "Die Richtlinie konnte nicht gelesen werden. Versuchen Sie es vor dem Erstellen erneut.",
+      "unsupported": "Dieser Server unterstützt keine temporären Anwendungen.",
+      "retry": "Erneut versuchen",
+      "reviewKeep": "Es gilt die Datenaufbewahrungsrichtlinie der Organisation."
     }
   },
   "sourceProviders": {
@@ -4666,7 +4697,8 @@
         "deploy_failure": "Deploy fehlgeschlagen",
         "error_spike": "Fehlerspitze",
         "preview_created": "Vorschau erstellt",
-        "preview_destroyed": "Vorschau entfernt"
+        "preview_destroyed": "Vorschau entfernt",
+        "app_expiring": "Temporäre App läuft ab"
       },
       "toggleLabel": "{kind} für {app}",
       "unsubscribeAll": "Alle abbestellen",
@@ -4688,6 +4720,25 @@
       "subscribeFailed": "Abonnieren fehlgeschlagen",
       "unsubscribed": "{app} abbestellt",
       "unsubscribeFailed": "Abbestellen fehlgeschlagen"
+    },
+    "quietHours": {
+      "title": "Ruhezeiten",
+      "description": "Pausiert persönliche Push- und E-Mail-Benachrichtigungen für Agentennachrichten in diesem täglichen Zeitraum. Nachrichten bleiben im Posteingang. Webhooks der Organisation sind nicht betroffen.",
+      "enabled": "Ruhezeiten aktivieren",
+      "timezone": "Zeitzone (IANA)",
+      "start": "Beginn",
+      "end": "Ende",
+      "active": "Ruhezeiten sind aktiv",
+      "inactive": "Ruhezeiten sind inaktiv",
+      "save": "Speichern",
+      "saved": "Ruhezeiten gespeichert",
+      "loading": "Benachrichtigungseinstellungen werden geladen…",
+      "error": "Benachrichtigungseinstellungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "saveError": "Ruhezeiten konnten nicht gespeichert werden.",
+      "invalidTime": "Gültige Uhrzeit eingeben.",
+      "timezoneRequired": "IANA-Zeitzone eingeben.",
+      "differentTimes": "Beginn und Ende müssen unterschiedlich sein."
     }
   },
   "securitySettings": {
@@ -16312,7 +16363,8 @@
     "semanticLayer": "Semantische Schicht",
     "substrate": "Substrat",
     "sharing": "Freigabe",
-    "connect": "Verbinden"
+    "connect": "Verbinden",
+    "agentInbox": "Posteingang"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17179,5 +17231,42 @@
     "reasonPermission": "Dafür fehlt Ihnen die Berechtigung.",
     "reasonStepUp": "Dafür ist eine erneute Anmeldung nötig.",
     "reasonRateLimited": "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut."
+  },
+  "agentInbox": {
+    "title": "Posteingang",
+    "description": "{count, plural, =0 {Nachrichten deiner Agenten. Nichts ungelesen.} one {Nachrichten deiner Agenten. # ungelesen.} other {Nachrichten deiner Agenten. # ungelesen.}}",
+    "buttonUnread": "Posteingang, {count} ungelesen",
+    "unreadOnly": "Nur ungelesene",
+    "emptyTitle": "Noch keine Nachrichten",
+    "emptyUnreadTitle": "Nichts ungelesen",
+    "emptyDescription": "Wenn ein Agent dir ein Update, eine Frage oder ein Ergebnis schickt, landet es hier.",
+    "pickThread": "Wähle eine Unterhaltung aus, um sie zu lesen.",
+    "threads": "Unterhaltungen",
+    "thread": "Unterhaltung",
+    "unknownAgent": "Entfernter Agent",
+    "more": "Mehr laden",
+    "earlier": "Frühere Nachrichten laden",
+    "openRun": "Lauf öffnen",
+    "markRead": "Als gelesen markieren",
+    "replyToAgent": "Dem Agenten antworten",
+    "answer": "Deine Antwort",
+    "reason": "Begründung (optional)",
+    "allow": "Erlauben",
+    "deny": "Ablehnen",
+    "send": "Senden",
+    "expires": "Läuft ab {when}",
+    "kind": {
+      "update": "Aktualisierung",
+      "question": "Frage",
+      "approval": "Freigabe",
+      "result": "Ergebnis",
+      "alert": "Warnung"
+    },
+    "route": {
+      "live_run": "an den laufenden Agenten gesendet",
+      "gate": "hat die Anfrage des Agenten beantwortet",
+      "woke": "hat den Agenten gestartet",
+      "queued": "wartet auf den nächsten Lauf des Agenten"
+    }
   }
 }

@@ -55,35 +55,49 @@ function source(initial: AstroliftProject[] = [own, foreign, deleted]) {
           requests.push(operation.operationName ?? "");
           queueMicrotask(() => {
             const data =
-              operation.operationName === "ListProjects"
-                ? { astroliftProjects: rows }
-                : operation.operationName === "ListTeams"
-                  ? { astroliftTeams: [] }
-                  : operation.operationName === "ListSourceConnections"
-                    ? { astroliftSourceConnections: AGENT_REPO_PICKER.connections }
-                    : operation.operationName === "ListAvailableRepos"
-                      ? { astroliftAvailableRepos: AGENT_REPO_PICKER.repoList }
-                      : operation.operationName === "ClusterCount"
-                        ? { astroliftClusterCount: 1 }
-                        : operation.operationName === "ListApps"
-                          ? { astroliftApps: [] }
-                          : operation.operationName === "ListAgentFleet"
-                            ? { agentFleet: [] }
-                            : operation.operationName === "RegisterAgentRepo"
-                              ? {
-                                  registerAgentRepo: {
-                                    ok: false,
-                                    data: null,
-                                    errors: [
-                                      {
-                                        field: "projectId",
-                                        message: "Registration denied by the server",
-                                        code: "PERMISSION_DENIED",
-                                      },
-                                    ],
-                                  },
-                                }
-                              : {};
+              operation.operationName === "TemporaryAppCapabilities"
+                ? { astroliftServerInfo: { capabilities: ["apps.temporary_expiry"] } }
+                : operation.operationName === "TemporaryAppPolicy"
+                  ? {
+                      astroliftTemporaryAppPolicy: {
+                        minTtlSeconds: 900,
+                        maxTtlSeconds: 7776000,
+                        dataGraceDays: 7,
+                        temporaryOnlyForMembers: false,
+                        ttlRequiredSurfaces: [],
+                      },
+                    }
+                  : operation.operationName === "GetMyPermissions"
+                    ? { astroliftMyPermissions: [] }
+                    : operation.operationName === "ListProjects"
+                      ? { astroliftProjects: rows }
+                      : operation.operationName === "ListTeams"
+                        ? { astroliftTeams: [] }
+                        : operation.operationName === "ListSourceConnections"
+                          ? { astroliftSourceConnections: AGENT_REPO_PICKER.connections }
+                          : operation.operationName === "ListAvailableRepos"
+                            ? { astroliftAvailableRepos: AGENT_REPO_PICKER.repoList }
+                            : operation.operationName === "ClusterCount"
+                              ? { astroliftClusterCount: 1 }
+                              : operation.operationName === "ListApps"
+                                ? { astroliftApps: [] }
+                                : operation.operationName === "ListAgentFleet"
+                                  ? { agentFleet: [] }
+                                  : operation.operationName === "RegisterAgentRepo"
+                                    ? {
+                                        registerAgentRepo: {
+                                          ok: false,
+                                          data: null,
+                                          errors: [
+                                            {
+                                              field: "projectId",
+                                              message: "Registration denied by the server",
+                                              code: "PERMISSION_DENIED",
+                                            },
+                                          ],
+                                        },
+                                      }
+                                    : {};
             observer.next({ data });
             observer.complete();
           });

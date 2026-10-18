@@ -1457,6 +1457,7 @@
         "mine": "Les miennes",
         "failing": "En échec",
         "archived": "Archivées",
+        "temporary": "Temporaires",
         "mineNote": "Les miennes regroupe les applications sur lesquelles vous avez un rôle, directement ou via leur projet, équipe ou organisation, tant que les applications ne consignent pas leur propriétaire."
       },
       "bulk": {
@@ -4052,6 +4053,36 @@
       "legendDescription": "Types de nœuds et ce qu’ils représentent.",
       "legendTitle": "Légende",
       "title": "{name} · Topologie"
+    },
+    "expiry": {
+      "expiresIn": "Expire dans {remaining}",
+      "expired": "Expirée",
+      "remaining": {
+        "days": "{days} j {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporaire : supprimée le {when}",
+      "extend": "+1 jour",
+      "extendLabel": "Prolonger d’un jour",
+      "extended": "Prolongée jusqu’au {when}",
+      "extendFailed": "Impossible de prolonger l’app"
+    },
+    "temporaryCreation": {
+      "ttl": "Durée de vie de l’application",
+      "help": "Laissez vide pour conserver l’expiration du manifeste, ou rendre l’application permanente si la politique le permet. Les mois comptent 30 jours.",
+      "inherited": "Le manifeste fait expirer cette application après {ttl}. Saisissez une durée pour la remplacer.",
+      "bounds": "Durée autorisée : de {min} à {max} minutes.",
+      "required": "Votre organisation impose une expiration à cette application.",
+      "invalid": "Saisissez une durée respectant les limites de l’organisation : 30m, 4h, 7d, 6w ou 3mo.",
+      "deleteData": "Supprimer les données gérées à l’expiration de l’application",
+      "deleteWarning": "L’expiration supprime aussi les bases de données, les compartiments et les volumes de l’application. Cette action est irréversible.",
+      "keepData": "Les données gérées sont conservées {days} jours après l’expiration, puis supprimées.",
+      "loading": "Chargement de la politique de durée…",
+      "unavailable": "Impossible de lire la politique de durée. Réessayez avant de créer l’application.",
+      "unsupported": "Ce serveur ne prend pas en charge les applications temporaires.",
+      "retry": "Réessayer",
+      "reviewKeep": "La politique de conservation des données de l’organisation s’applique."
     }
   },
   "sourceProviders": {
@@ -4666,7 +4697,8 @@
         "deploy_failure": "Échec du déploiement",
         "error_spike": "Pic d’erreurs",
         "preview_created": "Aperçu créé",
-        "preview_destroyed": "Aperçu supprimé"
+        "preview_destroyed": "Aperçu supprimé",
+        "app_expiring": "App temporaire bientôt expirée"
       },
       "toggleLabel": "{kind} pour {app}",
       "unsubscribeAll": "Tout désabonner",
@@ -4688,6 +4720,25 @@
       "subscribeFailed": "Échec de l’abonnement",
       "unsubscribed": "Désabonné de {app}",
       "unsubscribeFailed": "Échec du désabonnement"
+    },
+    "quietHours": {
+      "title": "Heures calmes",
+      "description": "Suspend les notifications personnelles et les e-mails des agents pendant cette plage quotidienne. Les messages restent dans votre boîte de réception. Les webhooks de l’organisation ne sont pas affectés.",
+      "enabled": "Activer les heures calmes",
+      "timezone": "Fuseau horaire (IANA)",
+      "start": "Début",
+      "end": "Fin",
+      "active": "Les heures calmes sont actives",
+      "inactive": "Les heures calmes sont inactives",
+      "save": "Enregistrer",
+      "saved": "Heures calmes enregistrées",
+      "loading": "Chargement des préférences de notification…",
+      "error": "Impossible de charger les préférences de notification.",
+      "retry": "Réessayer",
+      "saveError": "Impossible d’enregistrer les heures calmes.",
+      "invalidTime": "Saisissez une heure valide.",
+      "timezoneRequired": "Saisissez un fuseau horaire IANA.",
+      "differentTimes": "Les heures de début et de fin doivent être différentes."
     }
   },
   "securitySettings": {
@@ -16312,7 +16363,8 @@
     "semanticLayer": "Couche sémantique",
     "substrate": "Substrat",
     "sharing": "Partage",
-    "connect": "Connexion"
+    "connect": "Connexion",
+    "agentInbox": "Boîte de réception"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17179,5 +17231,42 @@
     "reasonPermission": "Vous n'avez pas l'autorisation pour cela.",
     "reasonStepUp": "Cela nécessite une nouvelle connexion.",
     "reasonRateLimited": "Trop de tentatives. Attendez une minute et réessayez."
+  },
+  "agentInbox": {
+    "title": "Boîte de réception",
+    "description": "{count, plural, =0 {Messages de vos agents. Rien de non lu.} one {Messages de vos agents. # non lu.} other {Messages de vos agents. # non lus.}}",
+    "buttonUnread": "Boîte de réception, {count} non lus",
+    "unreadOnly": "Non lus uniquement",
+    "emptyTitle": "Aucun message pour l'instant",
+    "emptyUnreadTitle": "Rien de non lu",
+    "emptyDescription": "Quand un agent vous envoie une mise à jour, une question ou un résultat, il arrive ici.",
+    "pickThread": "Choisissez une conversation pour la lire.",
+    "threads": "Discussions",
+    "thread": "Discussion",
+    "unknownAgent": "Agent supprimé",
+    "more": "Charger plus",
+    "earlier": "Charger les messages précédents",
+    "openRun": "Ouvrir l'exécution",
+    "markRead": "Marquer comme lu",
+    "replyToAgent": "Répondre à l'agent",
+    "answer": "Votre réponse",
+    "reason": "Motif (facultatif)",
+    "allow": "Autoriser",
+    "deny": "Refuser",
+    "send": "Envoyer",
+    "expires": "Expire {when}",
+    "kind": {
+      "update": "Mise à jour",
+      "question": "Question posée",
+      "approval": "Approbation",
+      "result": "Résultat",
+      "alert": "Alerte"
+    },
+    "route": {
+      "live_run": "envoyé à l'agent en cours",
+      "gate": "a répondu à la demande de l'agent",
+      "woke": "a démarré l'agent",
+      "queued": "attend la prochaine exécution de l'agent"
+    }
   }
 }

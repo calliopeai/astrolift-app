@@ -60,3 +60,27 @@ export const InvalidSlug: Story = {
 export const LongStrings: Story = {
   render: () => <Stateful initial={LONG_DETAILS_STATE} details={LONG_DETAILS} />,
 };
+
+export const Temporary: Story = {
+  render: () => (
+    <Stateful
+      initial={{ ...DETAILS_STATE, expiresIn: "7d", deleteDataOnExpiry: true }}
+      details={DETAILS}
+    />
+  ),
+};
+export const LifetimeRequired: Story = {
+  render: () => (
+    <Stateful
+      initial={DETAILS_STATE}
+      details={{
+        ...DETAILS,
+        temporary: {
+          rules: { ...DETAILS.temporary!.rules!, permanentAllowed: false },
+          loading: false,
+          failed: false,
+        },
+      }}
+    />
+  ),
+};

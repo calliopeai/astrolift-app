@@ -1463,6 +1463,7 @@
         "mine": "我的",
         "failing": "出现故障",
         "archived": "已归档",
+        "temporary": "临时",
         "mineNote": "在应用记录所有者之前，“我的”包含您直接或通过其项目、团队或组织拥有角色的应用。"
       },
       "bulk": {
@@ -4058,6 +4059,36 @@
       "legendDescription": "节点类型及其含义。",
       "legendTitle": "图例",
       "title": "{name} · 拓扑"
+    },
+    "expiry": {
+      "expiresIn": "{remaining} 后过期",
+      "expired": "已过期",
+      "remaining": {
+        "days": "{days} 天 {hours} 小时",
+        "hours": "{hours} 小时 {minutes} 分钟",
+        "minutes": "{minutes} 分钟"
+      },
+      "title": "临时应用：将于 {when} 拆除",
+      "extend": "+1 天",
+      "extendLabel": "延长一天",
+      "extended": "已延长至 {when}",
+      "extendFailed": "无法延长该应用"
+    },
+    "temporaryCreation": {
+      "ttl": "应用有效期",
+      "help": "留空可保留清单的到期设置，或在策略允许时创建永久应用。一个月按30天计算。",
+      "inherited": "清单指定此应用将在 {ttl} 后到期。输入时长可覆盖此设置。",
+      "bounds": "允许的有效期：{min} 到 {max} 分钟。",
+      "required": "组织要求此应用设置到期时间。",
+      "invalid": "请输入组织限制内的时长：30m、4h、7d、6w 或 3mo。",
+      "deleteData": "应用到期时删除托管数据",
+      "deleteWarning": "到期时还会删除应用的数据库、存储桶和卷。此操作无法撤销。",
+      "keepData": "托管数据将在到期后保留 {days} 天，然后删除。",
+      "loading": "正在加载应用有效期策略…",
+      "unavailable": "无法读取有效期策略。创建应用前请重试。",
+      "unsupported": "此服务器不支持临时应用。",
+      "retry": "重试",
+      "reviewKeep": "适用组织的数据保留策略。"
     }
   },
   "sourceProviders": {
@@ -4672,7 +4703,8 @@
         "deploy_failure": "部署失败",
         "error_spike": "错误激增",
         "preview_created": "预览已创建",
-        "preview_destroyed": "预览已销毁"
+        "preview_destroyed": "预览已销毁",
+        "app_expiring": "临时应用即将过期"
       },
       "toggleLabel": "{app} 的{kind}",
       "unsubscribeAll": "全部取消订阅",
@@ -4694,6 +4726,25 @@
       "subscribeFailed": "订阅失败",
       "unsubscribed": "已取消订阅 {app}",
       "unsubscribeFailed": "取消订阅失败"
+    },
+    "quietHours": {
+      "title": "免打扰时段",
+      "description": "在每天的此时段内暂停智能体消息的个人推送和电子邮件。消息仍保留在收件箱中，不影响组织的 Webhook。",
+      "enabled": "启用免打扰时段",
+      "timezone": "时区（IANA）",
+      "start": "开始",
+      "end": "结束",
+      "active": "免打扰时段已生效",
+      "inactive": "当前不在免打扰时段",
+      "save": "保存",
+      "saved": "免打扰时段已保存",
+      "loading": "正在加载通知偏好…",
+      "error": "无法加载通知偏好。",
+      "retry": "重试",
+      "saveError": "无法保存免打扰时段。",
+      "invalidTime": "请输入有效时间。",
+      "timezoneRequired": "请输入 IANA 时区。",
+      "differentTimes": "开始时间和结束时间必须不同。"
     }
   },
   "securitySettings": {
@@ -17073,7 +17124,8 @@
     "semanticLayer": "语义层",
     "substrate": "底层存储",
     "sharing": "共享",
-    "connect": "连接"
+    "connect": "连接",
+    "agentInbox": "收件箱"
   },
   "support": {
     "title": "支持",
@@ -17176,5 +17228,42 @@
     "reasonPermission": "你没有执行此操作的权限。",
     "reasonStepUp": "需要重新登录。",
     "reasonRateLimited": "尝试次数过多。请等待一分钟后重试。"
+  },
+  "agentInbox": {
+    "title": "收件箱",
+    "description": "{count, plural, =0 {来自你的智能体的消息。没有未读消息。} other {来自你的智能体的消息。# 条未读。}}",
+    "buttonUnread": "收件箱，{count} 条未读",
+    "unreadOnly": "仅未读",
+    "emptyTitle": "还没有消息",
+    "emptyUnreadTitle": "没有未读消息",
+    "emptyDescription": "当智能体向你发送更新、问题或结果时，会显示在这里。",
+    "pickThread": "选择一个会话进行阅读。",
+    "threads": "会话",
+    "thread": "会话",
+    "unknownAgent": "已删除的智能体",
+    "more": "加载更多",
+    "earlier": "加载更早的消息",
+    "openRun": "打开运行",
+    "markRead": "标记为已读",
+    "replyToAgent": "回复智能体",
+    "answer": "你的回答",
+    "reason": "原因（可选）",
+    "allow": "允许",
+    "deny": "拒绝",
+    "send": "发送",
+    "expires": "{when}过期",
+    "kind": {
+      "update": "更新",
+      "question": "问题",
+      "approval": "审批",
+      "result": "结果",
+      "alert": "警报"
+    },
+    "route": {
+      "live_run": "已发送给正在运行的智能体",
+      "gate": "已回答智能体的请求",
+      "woke": "已启动智能体",
+      "queued": "等待智能体下次运行"
+    }
   }
 }

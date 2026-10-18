@@ -1463,6 +1463,7 @@
         "mine": "Meus",
         "failing": "Com falha",
         "archived": "Arquivados",
+        "temporary": "Temporários",
         "mineNote": "Meus inclui os aplicativos nos quais você tem uma função, diretamente ou pelo projeto, equipe ou organização, enquanto os aplicativos ainda não registram seus proprietários."
       },
       "bulk": {
@@ -4058,6 +4059,36 @@
       "legendDescription": "Tipos de nó e o que representam.",
       "legendTitle": "Legenda",
       "title": "{name} · Topologia"
+    },
+    "expiry": {
+      "expiresIn": "Expira em {remaining}",
+      "expired": "Expirado",
+      "remaining": {
+        "days": "{days} d {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporário: removido em {when}",
+      "extend": "+1 dia",
+      "extendLabel": "Estender por um dia",
+      "extended": "Estendido até {when}",
+      "extendFailed": "Não foi possível estender o app"
+    },
+    "temporaryCreation": {
+      "ttl": "Tempo de vida do aplicativo",
+      "help": "Deixe em branco para manter a expiração do manifesto ou tornar o aplicativo permanente quando a política permitir. Os meses têm 30 dias.",
+      "inherited": "O manifesto faz este aplicativo expirar após {ttl}. Informe uma duração para substituí-la.",
+      "bounds": "Duração permitida: de {min} a {max} minutos.",
+      "required": "Sua organização exige que este aplicativo expire.",
+      "invalid": "Informe uma duração dentro dos limites da organização: 30m, 4h, 7d, 6w ou 3mo.",
+      "deleteData": "Excluir dados gerenciados quando o aplicativo expirar",
+      "deleteWarning": "A expiração também exclui os bancos de dados, buckets e volumes do aplicativo. Esta ação não pode ser desfeita.",
+      "keepData": "Os dados gerenciados são mantidos por {days} dias após a expiração e depois excluídos.",
+      "loading": "Carregando a política de duração…",
+      "unavailable": "Não foi possível ler a política de duração. Tente novamente antes de criar o aplicativo.",
+      "unsupported": "Este servidor não oferece suporte a aplicativos temporários.",
+      "retry": "Tentar novamente",
+      "reviewKeep": "Aplica-se a política de retenção de dados da organização."
     }
   },
   "sourceProviders": {
@@ -4672,7 +4703,8 @@
         "deploy_failure": "Falha no deploy",
         "error_spike": "Pico de erros",
         "preview_created": "Preview criado",
-        "preview_destroyed": "Preview removido"
+        "preview_destroyed": "Preview removido",
+        "app_expiring": "App temporário expirando"
       },
       "toggleLabel": "{kind} para {app}",
       "unsubscribeAll": "Cancelar todas",
@@ -4694,6 +4726,25 @@
       "subscribeFailed": "Falha ao inscrever",
       "unsubscribed": "Inscrição em {app} cancelada",
       "unsubscribeFailed": "Falha ao cancelar a inscrição"
+    },
+    "quietHours": {
+      "title": "Horário de silêncio",
+      "description": "Pausa as notificações pessoais e os e-mails de mensagens de agentes durante este período diário. As mensagens permanecem na caixa de entrada. Os webhooks da organização não são afetados.",
+      "enabled": "Ativar horário de silêncio",
+      "timezone": "Fuso horário (IANA)",
+      "start": "Início",
+      "end": "Fim",
+      "active": "O horário de silêncio está ativo",
+      "inactive": "O horário de silêncio está inativo",
+      "save": "Salvar",
+      "saved": "Horário de silêncio salvo",
+      "loading": "Carregando preferências de notificação…",
+      "error": "Não foi possível carregar as preferências de notificação.",
+      "retry": "Tentar novamente",
+      "saveError": "Não foi possível salvar o horário de silêncio.",
+      "invalidTime": "Digite um horário válido.",
+      "timezoneRequired": "Digite um fuso horário IANA.",
+      "differentTimes": "Os horários de início e fim devem ser diferentes."
     }
   },
   "securitySettings": {
@@ -16309,7 +16360,8 @@
     "semanticLayer": "Camada semântica",
     "substrate": "Substrato",
     "sharing": "Compartilhamento",
-    "connect": "Conectar"
+    "connect": "Conectar",
+    "agentInbox": "Caixa de entrada"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17176,5 +17228,42 @@
     "reasonPermission": "Você não tem permissão para isso.",
     "reasonStepUp": "Isso exige entrar novamente.",
     "reasonRateLimited": "Tentativas demais. Aguarde um minuto e tente novamente."
+  },
+  "agentInbox": {
+    "title": "Caixa de entrada",
+    "description": "{count, plural, =0 {Mensagens dos seus agentes. Nada não lido.} one {Mensagens dos seus agentes. # não lida.} other {Mensagens dos seus agentes. # não lidas.}}",
+    "buttonUnread": "Caixa de entrada, {count} não lidas",
+    "unreadOnly": "Somente não lidas",
+    "emptyTitle": "Nenhuma mensagem ainda",
+    "emptyUnreadTitle": "Nada não lido",
+    "emptyDescription": "Quando um agente envia uma atualização, uma pergunta ou um resultado, ele aparece aqui.",
+    "pickThread": "Escolha uma conversa para ler.",
+    "threads": "Conversas",
+    "thread": "Conversa",
+    "unknownAgent": "Agente removido",
+    "more": "Carregar mais",
+    "earlier": "Carregar mensagens anteriores",
+    "openRun": "Abrir a execução",
+    "markRead": "Marcar como lida",
+    "replyToAgent": "Responder ao agente",
+    "answer": "Sua resposta",
+    "reason": "Motivo (opcional)",
+    "allow": "Permitir",
+    "deny": "Negar",
+    "send": "Enviar",
+    "expires": "Expira {when}",
+    "kind": {
+      "update": "Atualização",
+      "question": "Pergunta",
+      "approval": "Aprovação",
+      "result": "Resultado",
+      "alert": "Alerta"
+    },
+    "route": {
+      "live_run": "enviada ao agente em execução",
+      "gate": "respondeu à solicitação do agente",
+      "woke": "iniciou o agente",
+      "queued": "aguarda a próxima execução do agente"
+    }
   }
 }

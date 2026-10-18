@@ -8,6 +8,8 @@ export const ALERT_KINDS: { value: string; label: string }[] = [
   { value: "error_spike", label: "Error spike" },
   { value: "preview_created", label: "Preview created" },
   { value: "preview_destroyed", label: "Preview destroyed" },
+  // The 24 h and 1 h warnings before a temporary app is torn down (#2433).
+  { value: "app_expiring", label: "Temporary app expiring" },
 ];
 
 // Map keyed by ``{appSlug}|{alertKind}`` so cell lookups are O(1).

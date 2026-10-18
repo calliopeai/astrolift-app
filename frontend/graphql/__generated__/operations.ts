@@ -609,6 +609,96 @@ export type AstroliftAgentLiveStatus = {
   workloadSlug: Scalars['String']['output'];
 };
 
+export type AstroliftAgentMessage = {
+  agentName?: Maybe<Scalars['String']['output']>;
+  agentSlug?: Maybe<Scalars['String']['output']>;
+  /** A question or approval this person may still answer: not expired and not answered by them. */
+  answerable: Scalars['Boolean']['output'];
+  attachments: Array<AstroliftAgentMessageAttachment>;
+  body: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deliveredAt?: Maybe<Scalars['DateTime']['output']>;
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  options: Array<AstroliftAgentMessageOption>;
+  readAt?: Maybe<Scalars['DateTime']['output']>;
+  replies: Array<AstroliftAgentMessageReply>;
+  replyToId?: Maybe<Scalars['GUID']['output']>;
+  requestSequence?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  taskId?: Maybe<Scalars['GUID']['output']>;
+  taskStatus?: Maybe<Scalars['String']['output']>;
+  threadId: Scalars['GUID']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type AstroliftAgentMessageAttachment = {
+  kind: Scalars['String']['output'];
+  label?: Maybe<Scalars['String']['output']>;
+  ref: Scalars['String']['output'];
+};
+
+export type AstroliftAgentMessageOption = {
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
+export type AstroliftAgentMessagePage = {
+  items: Array<AstroliftAgentMessage>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount?: Maybe<Scalars['Int']['output']>;
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessageReply = {
+  authorLabel: Scalars['String']['output'];
+  body: Scalars['String']['output'];
+  choices: Array<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  decision?: Maybe<Scalars['String']['output']>;
+  deliveredAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  messageId: Scalars['GUID']['output'];
+  route: Scalars['String']['output'];
+  wakeTaskId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftAgentMessageReplyMutationResult = {
+  data?: Maybe<AstroliftAgentMessageReply>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentMessageThread = {
+  agentName?: Maybe<Scalars['String']['output']>;
+  agentSlug?: Maybe<Scalars['String']['output']>;
+  lastMessage: AstroliftAgentMessage;
+  lastMessageAt: Scalars['DateTime']['output'];
+  messageCount: Scalars['Int']['output'];
+  taskId?: Maybe<Scalars['GUID']['output']>;
+  taskStatus?: Maybe<Scalars['String']['output']>;
+  threadId: Scalars['GUID']['output'];
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessageThreadPage = {
+  items: Array<AstroliftAgentMessageThread>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessagesMarked = {
+  marked: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessagesMarkedMutationResult = {
+  data?: Maybe<AstroliftAgentMessagesMarked>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentQuarantine = {
   createdAt: Scalars['DateTime']['output'];
   evidenceUrl: Scalars['String']['output'];
@@ -1368,6 +1458,13 @@ export type AstroliftAppExecTarget = {
   workloadVersion: Scalars['Int']['output'];
 };
 
+export type AstroliftAppExpiryWarning = {
+  appId: Scalars['GUID']['output'];
+  appSlug: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  warningWindow: Scalars['String']['output'];
+};
+
 export type AstroliftAppGoldenSignal = {
   measurement?: Maybe<AstroliftGoldenSignalMeasurement>;
   name: GoldenSignalKind;
@@ -1707,6 +1804,8 @@ export type AstroliftAppsListFilter = {
   status: InputMaybe<Array<AstroliftAppListState>>;
   /** Team slugs. */
   team: InputMaybe<Array<Scalars['String']['input']>>;
+  /** true: temporary apps only (with an expiry). false: permanent only. */
+  temporary: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 export type AstroliftAssembleBriefResult = {
@@ -4134,6 +4233,7 @@ export type AstroliftNavTreeWorkflow = {
 export type AstroliftNotification = {
   body: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  expiryWarning?: Maybe<AstroliftAppExpiryWarning>;
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
   link: Scalars['String']['output'];
@@ -4146,6 +4246,12 @@ export type AstroliftNotificationMutationResult = {
   data?: Maybe<AstroliftNotification>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftNotificationPage = {
+  endCursor: Scalars['String']['output'];
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftNotification>;
 };
 
 export type AstroliftNotificationPreference = {
@@ -4170,6 +4276,20 @@ export type AstroliftNotificationProfile = {
 
 export type AstroliftNotificationProfileMutationResult = {
   data?: Maybe<AstroliftNotificationProfile>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftNotificationQuietHours = {
+  active: Scalars['Boolean']['output'];
+  enabled: Scalars['Boolean']['output'];
+  endMinute: Scalars['Int']['output'];
+  startMinute: Scalars['Int']['output'];
+  timezone: Scalars['String']['output'];
+};
+
+export type AstroliftNotificationQuietHoursMutationResult = {
+  data?: Maybe<AstroliftNotificationQuietHours>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -4908,6 +5028,7 @@ export type AstroliftRegisteredApp = {
   cronExpression: Scalars['String']['output'];
   cronPaused: Scalars['Boolean']['output'];
   defaultBranch: Scalars['String']['output'];
+  deleteDataOnExpiry: Scalars['Boolean']['output'];
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   deployBranch: Scalars['String']['output'];
   deployTokenLast4: Scalars['String']['output'];
@@ -4915,6 +5036,7 @@ export type AstroliftRegisteredApp = {
   dockerfilePath: Scalars['String']['output'];
   ecrPushRoleArn: Scalars['String']['output'];
   ecrRepoUri: Scalars['String']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
   healthPulse?: Maybe<AstroliftAppHealthPulse>;
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
@@ -5062,6 +5184,15 @@ export type AstroliftRenderedManifest = {
   imageTag: Scalars['String']['output'];
   namespace: Scalars['String']['output'];
   resources: Scalars['JSON']['output'];
+};
+
+export type AstroliftReplyToAgentMessageInput = {
+  body: InputMaybe<Scalars['String']['input']>;
+  choices: InputMaybe<Array<Scalars['String']['input']>>;
+  clientRequestId: InputMaybe<Scalars['String']['input']>;
+  /** allow or deny, for an approval. */
+  decision: InputMaybe<Scalars['String']['input']>;
+  messageId: Scalars['GUID']['input'];
 };
 
 export type AstroliftRerunOnboardingPayload = {
@@ -6001,6 +6132,20 @@ export type AstroliftTemplateSendStatPoint = {
   deliveries: Scalars['Int']['output'];
   sends: Scalars['Int']['output'];
   timestamp: Scalars['DateTime']['output'];
+};
+
+export type AstroliftTemporaryAppPolicy = {
+  dataGraceDays: Scalars['Int']['output'];
+  maxTtlSeconds: Scalars['Int']['output'];
+  minTtlSeconds: Scalars['Int']['output'];
+  temporaryOnlyForMembers: Scalars['Boolean']['output'];
+  ttlRequiredSurfaces: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftTemporaryAppPolicyMutationResult = {
+  data?: Maybe<AstroliftTemporaryAppPolicy>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftTenantCluster = {
@@ -8067,6 +8212,11 @@ export type GroupOperationInput = {
 
 export type HostAppOnBrainInput = {
   brainSlug: Scalars['String']['input'];
+  deleteDataOnExpiry: Scalars['Boolean']['input'];
+  /** Make the app temporary: torn down at this time. */
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  /** Make the app temporary: torn down this long after creation (30m, 4h, 7d, 6w, 3mo). */
+  expiresIn: InputMaybe<Scalars['String']['input']>;
   image: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   port: InputMaybe<Scalars['Int']['input']>;
@@ -9463,6 +9613,7 @@ export type Mutation = {
   /** Logout the current user. */
   logout: Scalars['Boolean']['output'];
   logoutAllSessions: AstroliftLogoutAllSessionsPayloadMutationResult;
+  markAgentMessagesRead: AstroliftAgentMessagesMarkedMutationResult;
   markAllNotificationsRead: MarkallreadpayloadMutationResult;
   markNotificationRead: AstroliftNotificationMutationResult;
   markOnboardingComplete: AstroliftMarkOnboardingCompletePayloadMutationResult;
@@ -9553,6 +9704,7 @@ export type Mutation = {
   /** Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order. */
   reorderWorkflowStages: MutationResult;
   replyAgentTaskInput: AstroliftAgentTaskInputReplyMutationResult;
+  replyToAgentMessage: AstroliftAgentMessageReplyMutationResult;
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
@@ -9616,6 +9768,8 @@ export type Mutation = {
   setAgentTaskCallbackSecret: AgentTaskCallbackSecretMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   setAppAccess: AstroliftAppAccessMutationResult;
+  /** Set, extend, shorten or clear a temporary app's expiry (#2433). The timer moves at once and the 24 h and 1 h warnings are sent again for the new time. Audited as app.expiry.set, app.expiry.extend or app.expiry.clear. */
+  setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
@@ -9631,6 +9785,7 @@ export type Mutation = {
   setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
+  setNotificationQuietHours: AstroliftNotificationQuietHoursMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
@@ -9640,6 +9795,8 @@ export type Mutation = {
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   setStepUpPin: AstroliftStepUpPinSetPayloadMutationResult;
+  /** The organization's policy for temporary apps (#2433): the longest an app may live, whether members may create temporary apps only, which surfaces require an expiry and how long an expired app's data is kept. */
+  setTemporaryAppPolicy: AstroliftTemporaryAppPolicyMutationResult;
   /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
   setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   /** Choose the delivery channels a configured Workflow posts its scheduled results to (workflow editors: workflow.update). channelIds replaces the selection; [] clears it. */
@@ -10768,6 +10925,12 @@ export type MutationLogoutAllSessionsArgs = {
 };
 
 
+export type MutationMarkAgentMessagesReadArgs = {
+  ids?: InputMaybe<Array<Scalars['GUID']['input']>>;
+  threadId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
 export type MutationMarkNotificationReadArgs = {
   input: MarkNotificationReadInput;
 };
@@ -11164,6 +11327,11 @@ export type MutationReplyAgentTaskInputArgs = {
 };
 
 
+export type MutationReplyToAgentMessageArgs = {
+  input: AstroliftReplyToAgentMessageInput;
+};
+
+
 export type MutationReprovisionManagedServiceArgs = {
   input: ReprovisionManagedServiceInput;
 };
@@ -11484,6 +11652,11 @@ export type MutationSetAppAccessArgs = {
 };
 
 
+export type MutationSetAppExpiryArgs = {
+  input: SetAppExpiryInput;
+};
+
+
 export type MutationSetAppSecretArgs = {
   input: SetAppSecretInput;
 };
@@ -11555,6 +11728,11 @@ export type MutationSetNotificationProfileArgs = {
 };
 
 
+export type MutationSetNotificationQuietHoursArgs = {
+  input: SetNotificationQuietHoursInput;
+};
+
+
 export type MutationSetOrganizationModuleArgs = {
   input: SetOrganizationModuleInput;
 };
@@ -11589,6 +11767,11 @@ export type MutationSetRetentionPolicyArgs = {
 
 export type MutationSetStepUpPinArgs = {
   input: SetStepUpPinInput;
+};
+
+
+export type MutationSetTemporaryAppPolicyArgs = {
+  input: TemporaryAppPolicyInput;
 };
 
 
@@ -12587,6 +12770,8 @@ export type Query = {
   astroliftActionSafetyRules: Array<AstroliftActionSafetyRule>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
+  astroliftAgentMessageThreads: AstroliftAgentMessageThreadPage;
+  astroliftAgentMessages: AstroliftAgentMessagePage;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
   astroliftAgentRuns: Array<AstroliftAgentRun>;
   astroliftAgentRunsPage: AstroliftAgentRunPage;
@@ -12761,7 +12946,9 @@ export type Query = {
   astroliftMyDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyMobileDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyNotificationPreferences: Array<AstroliftNotificationPreference>;
+  astroliftMyNotificationQuietHours: AstroliftNotificationQuietHours;
   astroliftMyNotifications: Array<AstroliftNotification>;
+  astroliftMyNotificationsPage: AstroliftNotificationPage;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
@@ -12869,6 +13056,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage. */
   astroliftTeams: Array<AstroliftTeam>;
   astroliftTeamsPage: AstroliftTeamPage;
+  /** The organization's rules for temporary apps (#2433): limits a create form or client applies. */
+  astroliftTemporaryAppPolicy: AstroliftTemporaryAppPolicy;
   astroliftTopologyTraffic?: Maybe<TopologyTraffic>;
   astroliftTraceSpans: Array<AstroliftTraceSpan>;
   astroliftTraceSpansResult: AstroliftTraceSpansResult;
@@ -13272,6 +13461,21 @@ export type QueryAstroliftActionApprovalRequestsArgs = {
 
 export type QueryAstroliftActionSafetyArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAgentMessageThreadsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: Scalars['Int']['input'];
+  unreadOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftAgentMessagesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: Scalars['Int']['input'];
+  threadId?: InputMaybe<Scalars['GUID']['input']>;
+  unreadOnly?: Scalars['Boolean']['input'];
 };
 
 
@@ -14276,6 +14480,12 @@ export type QueryAstroliftMyNotificationPreferencesArgs = {
 export type QueryAstroliftMyNotificationsArgs = {
   limit?: Scalars['Int']['input'];
   unreadOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftMyNotificationsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -15586,9 +15796,15 @@ export type RegisterAppInput = {
   buildStrategy: Scalars['String']['input'];
   cronExpression: InputMaybe<Scalars['String']['input']>;
   defaultBranch: InputMaybe<Scalars['String']['input']>;
+  /** Delete the app's managed services (databases, buckets, volumes) with it on expiry, instead of keeping them for the organization's grace period. */
+  deleteDataOnExpiry: Scalars['Boolean']['input'];
   deployBranch: InputMaybe<Scalars['String']['input']>;
   description: InputMaybe<Scalars['String']['input']>;
   dockerfilePath: Scalars['String']['input'];
+  /** Make the app temporary: it is torn down at this time. */
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  /** Make the app temporary: it is torn down this long after registration (30m, 4h, 7d, 6w, 3mo). At least 15 minutes, at most the organization's limit. */
+  expiresIn: InputMaybe<Scalars['String']['input']>;
   manifestPath: InputMaybe<Scalars['String']['input']>;
   manifestRaw: InputMaybe<Scalars['String']['input']>;
   minimumApprovals: InputMaybe<Scalars['Int']['input']>;
@@ -16069,6 +16285,18 @@ export type SetAppAccessInput = {
   users: Array<Scalars['String']['input']>;
 };
 
+export type SetAppExpiryInput = {
+  appSlug: Scalars['String']['input'];
+  /** Make the app permanent. Needs app.update, the organization's rules for app.expiry.clear (a fresh verification by default), and is refused where the organization requires temporary apps. Agents are refused unless the organization allows them. */
+  clear: Scalars['Boolean']['input'];
+  deleteDataOnExpiry: InputMaybe<Scalars['Boolean']['input']>;
+  expiresAt: InputMaybe<Scalars['DateTime']['input']>;
+  /** 30m, 4h, 7d, 6w or 3mo from now. */
+  expiresIn: InputMaybe<Scalars['String']['input']>;
+  /** Move the current expiry later by this long (30m, 4h, 7d, 6w, 3mo). */
+  extendBy: InputMaybe<Scalars['String']['input']>;
+};
+
 export type SetAppSecretInput = {
   appSlug: Scalars['String']['input'];
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
@@ -16163,6 +16391,13 @@ export type SetNotificationProfileInput = {
   config: Scalars['JSON']['input'];
   driver: Scalars['String']['input'];
   retentionDeliveryDays: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type SetNotificationQuietHoursInput = {
+  enabled: Scalars['Boolean']['input'];
+  endMinute: Scalars['Int']['input'];
+  startMinute: Scalars['Int']['input'];
+  timezone: Scalars['String']['input'];
 };
 
 export type SetOrganizationModuleInput = {
@@ -16307,7 +16542,9 @@ export type SubscribeClusterModelInput = {
 };
 
 export type Subscription = {
+  astroliftAgentMessageReceived: AstroliftAgentMessage;
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
+  astroliftMyNotificationStream: AstroliftNotificationPage;
   astroliftOnAppLog: AstroliftAppLogLine;
   astroliftOnAppLogs: AstroliftAppLogLine;
   formSubmissionReceived: Scalars['String']['output'];
@@ -16317,6 +16554,11 @@ export type Subscription = {
 
 export type SubscriptionAstroliftDeploymentLifecycleStreamArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type SubscriptionAstroliftMyNotificationStreamArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -16372,6 +16614,17 @@ export type TearDownAppInput = {
 
 export type TearDownPreviewInputGql = {
   id: Scalars['GUID']['input'];
+};
+
+export type TemporaryAppPolicyInput = {
+  /** Days an expired app's managed services are kept before they are deleted (0 to 90). */
+  dataGraceDays: Scalars['Int']['input'];
+  /** The longest an app may live (15m to 366d). */
+  maxTtl: Scalars['String']['input'];
+  /** Members without org.update may create temporary apps only. */
+  temporaryOnlyForMembers: Scalars['Boolean']['input'];
+  /** Surfaces whose new apps must expire: chat_studio, mcp, api_token. */
+  ttlRequiredSurfaces: Array<Scalars['String']['input']>;
 };
 
 export type TestModelEndpointInput = {
@@ -17419,6 +17672,52 @@ export type AccessOnQueryVariables = Exact<{
 
 
 export type AccessOnQuery = { astroliftAccessOn: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ principalKind: string, source: string, bindingId: string, memberId?: string | null, groupExternalId?: string | null, groupMemberCount?: number | null, teamId?: string | null, teamSlug?: string | null, teamName?: string | null, accessLevel?: string | null, shareId?: string | null, scopeKind: string, scopeGuid?: string | null, sourceScopeLabel: string, inherited: boolean, inherits: boolean, expiresAt?: string | null, user?: { id: string, username: string, email: string } | null, role?: { id: string, slug: string, name: string, description: string, scopeLevel: string, permissions: Array<string>, isSystem: boolean } | null }> } };
+
+export type MarkAgentMessagesReadMutationVariables = Exact<{
+  ids?: InputMaybe<Array<Scalars['GUID']['input']> | Scalars['GUID']['input']>;
+  threadId?: InputMaybe<Scalars['GUID']['input']>;
+}>;
+
+
+export type MarkAgentMessagesReadMutation = { markAgentMessagesRead: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { marked: number } | null } };
+
+export type ReplyToAgentMessageMutationVariables = Exact<{
+  input: AstroliftReplyToAgentMessageInput;
+}>;
+
+
+export type ReplyToAgentMessageMutation = { replyToAgentMessage: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, messageId: string, authorLabel: string, body: string, choices: Array<string>, decision?: string | null, route: string, deliveredAt?: string | null, wakeTaskId?: string | null, createdAt: string } | null } };
+
+export type AgentMessageFieldsFragment = { id: string, threadId: string, kind: string, source: string, title: string, body: string, agentSlug?: string | null, agentName?: string | null, taskId?: string | null, taskStatus?: string | null, replyToId?: string | null, requestSequence?: number | null, expiresAt?: string | null, createdAt: string, deliveredAt?: string | null, readAt?: string | null, answerable: boolean, options: Array<{ id: string, label: string, description?: string | null }>, attachments: Array<{ kind: string, ref: string, label?: string | null }>, replies: Array<{ id: string, messageId: string, authorLabel: string, body: string, choices: Array<string>, decision?: string | null, route: string, deliveredAt?: string | null, wakeTaskId?: string | null, createdAt: string }> };
+
+export type ListAgentMessageThreadsQueryVariables = Exact<{
+  unreadOnly?: Scalars['Boolean']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: Scalars['Int']['input'];
+}>;
+
+
+export type ListAgentMessageThreadsQuery = { astroliftAgentMessageThreads: { unreadCount: number, nextCursor?: string | null, items: Array<{ threadId: string, agentSlug?: string | null, agentName?: string | null, taskId?: string | null, taskStatus?: string | null, lastMessageAt: string, messageCount: number, unreadCount: number, lastMessage: { id: string, threadId: string, kind: string, source: string, title: string, body: string, agentSlug?: string | null, agentName?: string | null, taskId?: string | null, taskStatus?: string | null, replyToId?: string | null, requestSequence?: number | null, expiresAt?: string | null, createdAt: string, deliveredAt?: string | null, readAt?: string | null, answerable: boolean, options: Array<{ id: string, label: string, description?: string | null }>, attachments: Array<{ kind: string, ref: string, label?: string | null }>, replies: Array<{ id: string, messageId: string, authorLabel: string, body: string, choices: Array<string>, decision?: string | null, route: string, deliveredAt?: string | null, wakeTaskId?: string | null, createdAt: string }> } }> } };
+
+export type ListAgentMessagesQueryVariables = Exact<{
+  threadId?: InputMaybe<Scalars['GUID']['input']>;
+  unreadOnly?: Scalars['Boolean']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: Scalars['Int']['input'];
+}>;
+
+
+export type ListAgentMessagesQuery = { astroliftAgentMessages: { unreadCount: number, totalCount?: number | null, nextCursor?: string | null, items: Array<{ id: string, threadId: string, kind: string, source: string, title: string, body: string, agentSlug?: string | null, agentName?: string | null, taskId?: string | null, taskStatus?: string | null, replyToId?: string | null, requestSequence?: number | null, expiresAt?: string | null, createdAt: string, deliveredAt?: string | null, readAt?: string | null, answerable: boolean, options: Array<{ id: string, label: string, description?: string | null }>, attachments: Array<{ kind: string, ref: string, label?: string | null }>, replies: Array<{ id: string, messageId: string, authorLabel: string, body: string, choices: Array<string>, decision?: string | null, route: string, deliveredAt?: string | null, wakeTaskId?: string | null, createdAt: string }> }> } };
+
+export type AgentMessagesUnreadQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AgentMessagesUnreadQuery = { astroliftAgentMessages: { unreadCount: number } };
+
+export type OnAgentMessageReceivedSubscriptionVariables = Exact<{ [key: string]: never; }>;
+
+
+export type OnAgentMessageReceivedSubscription = { astroliftAgentMessageReceived: { id: string, threadId: string, kind: string, source: string, title: string, body: string, agentSlug?: string | null, agentName?: string | null, taskId?: string | null, taskStatus?: string | null, replyToId?: string | null, requestSequence?: number | null, expiresAt?: string | null, createdAt: string, deliveredAt?: string | null, readAt?: string | null, answerable: boolean, options: Array<{ id: string, label: string, description?: string | null }>, attachments: Array<{ kind: string, ref: string, label?: string | null }>, replies: Array<{ id: string, messageId: string, authorLabel: string, body: string, choices: Array<string>, decision?: string | null, route: string, deliveredAt?: string | null, wakeTaskId?: string | null, createdAt: string }> } };
 
 export type AgentSecretSourceOptionsQueryVariables = Exact<{
   orgId: Scalars['ID']['input'];
@@ -19714,6 +20013,33 @@ export type SendInstallAlertMailTestMutationVariables = Exact<{
 
 export type SendInstallAlertMailTestMutation = { sendInstallAlertMailTest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null }>, data?: { id: string, requestId: string, version: number, eventKind: string, transport: string, sender: string, recipient: string, status: string, reasonCode?: string | null, createdAt: string, acceptedAt?: string | null, deliveryObserved: boolean } | null } };
 
+export type GetMyNotificationInboxQueryVariables = Exact<{
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type GetMyNotificationInboxQuery = { astroliftMyNotificationsPage: { endCursor: string, hasMore: boolean, items: Array<{ id: string, kind: string, title: string, body: string, link: string, readAt?: string | null, createdAt: string, expiryWarning?: { appId: string, appSlug: string, expiresAt: string, warningWindow: string } | null }> } };
+
+export type MyNotificationInboxStreamSubscriptionVariables = Exact<{
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type MyNotificationInboxStreamSubscription = { astroliftMyNotificationStream: { endCursor: string, hasMore: boolean, items: Array<{ id: string, kind: string, title: string, body: string, link: string, readAt?: string | null, createdAt: string, expiryWarning?: { appId: string, appSlug: string, expiresAt: string, warningWindow: string } | null }> } };
+
+export type SetMyNotificationQuietHoursMutationVariables = Exact<{
+  input: SetNotificationQuietHoursInput;
+}>;
+
+
+export type SetMyNotificationQuietHoursMutation = { setNotificationQuietHours: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { enabled: boolean, timezone: string, startMinute: number, endMinute: number, active: boolean } | null } };
+
+export type MyNotificationQuietHoursQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyNotificationQuietHoursQuery = { astroliftMyNotificationQuietHours: { enabled: boolean, timezone: string, startMinute: number, endMinute: number, active: boolean } };
+
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;
 }>;
@@ -20180,7 +20506,7 @@ export type GetBrainArchiveStateQueryVariables = Exact<{
 
 export type GetBrainArchiveStateQuery = { astroliftApp?: { id: string, slug: string, name: string, appKind: string, isArchived: boolean, archivedAt?: string | null } | null };
 
-export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
+export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
 
 export type AppFreshnessFieldsFragment = { lastDeployedAt?: string | null, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null };
 
@@ -20189,7 +20515,7 @@ export type ListAppsQueryVariables = Exact<{
 }>;
 
 
-export type ListAppsQuery = { astroliftApps: Array<{ id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> };
+export type ListAppsQuery = { astroliftApps: Array<{ id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> };
 
 export type ListAppsPageQueryVariables = Exact<{
   includeFreshness?: InputMaybe<Scalars['Boolean']['input']>;
@@ -20209,7 +20535,7 @@ export type ListAppsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListAppsPageQuery = { astroliftAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
+export type ListAppsPageQuery = { astroliftAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
 
 export type ListMyAppsPageQueryVariables = Exact<{
   includeFreshness?: InputMaybe<Scalars['Boolean']['input']>;
@@ -20224,7 +20550,7 @@ export type ListMyAppsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListMyAppsPageQuery = { astroliftMyAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
+export type ListMyAppsPageQuery = { astroliftMyAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
 
 export type GetAppQueryVariables = Exact<{
   slug: Scalars['String']['input'];
@@ -20232,7 +20558,7 @@ export type GetAppQueryVariables = Exact<{
 }>;
 
 
-export type GetAppQuery = { astroliftApp?: { buildMode: string, buildContext: string, dockerfilePath: string, stagedEnvChanges: Array<string>, viewerPermissions: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
+export type GetAppQuery = { astroliftApp?: { buildMode: string, buildContext: string, dockerfilePath: string, stagedEnvChanges: Array<string>, viewerPermissions: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
 
 export type ListWorkloadsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -20376,6 +20702,23 @@ export type AppViewerPermissionsQueryVariables = Exact<{
 
 
 export type AppViewerPermissionsQuery = { astroliftApp?: { id: string, viewerPermissions: Array<string> } | null };
+
+export type TemporaryAppCapabilitiesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type TemporaryAppCapabilitiesQuery = { astroliftServerInfo: { capabilities: Array<string> } };
+
+export type TemporaryAppPolicyQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type TemporaryAppPolicyQuery = { astroliftTemporaryAppPolicy: { minTtlSeconds: number, maxTtlSeconds: number, temporaryOnlyForMembers: boolean, ttlRequiredSurfaces: Array<string>, dataGraceDays: number } };
+
+export type EnvironmentAppExpiryQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type EnvironmentAppExpiryQuery = { astroliftApp?: { id: string, slug: string, expiresAt?: string | null } | null };
 
 export type StartReviewedWorkflowMutationVariables = Exact<{
   input: StartWorkflowDefinitionInput;

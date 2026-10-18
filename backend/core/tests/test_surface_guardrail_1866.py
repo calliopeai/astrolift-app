@@ -155,8 +155,15 @@ ALLOWED: dict[str, str] = {
     "Query.astroliftElevationStatus": "self-service: the caller's own step-up state",
     "Query.myStepUpPin": "self-service: the caller's own step-up PIN state",
     "Query.astroliftMyNotifications": "self-service: the caller's own notifications",
+    "Query.astroliftMyNotificationsPage": (
+        "#2457 self-only current tenant/person inbox, rechecking membership, token ceiling and app audience"
+    ),
+    "Subscription.astroliftMyNotificationStream": (
+        "#2457 same current-viewer checks on every database poll; explicit errors on revoked or absent identity"
+    ),
     "Query.astroliftMyMobileDevices": "self-service: the caller's own push registrations",
     "Query.astroliftMyNotificationPreferences": "self-service: the caller's own notification preferences",
+    "Query.astroliftMyNotificationQuietHours": "self-service: the authenticated caller's own quiet hours",
     "Query.astroliftMyDevices": "self-service: the caller's own push devices",
     "Query.astroliftMyAlertSubscriptions": "self-service: the caller's own alert subscriptions",
     "Query.astroliftMyApps": "self-service: the apps the caller's own bindings reach",
@@ -181,6 +188,7 @@ ALLOWED: dict[str, str] = {
     "Mutation.registerMobileDevice": "self-service: registers a push device on the caller's own account",
     "Mutation.revokeMobileDevice": "self-service: revokes one of the caller's own push devices",
     "Mutation.setNotificationPreference": "self-service: one of the caller's own notification preferences",
+    "Mutation.setNotificationQuietHours": "self-service: updates only the authenticated caller's quiet hours",
     "Mutation.astroliftConnectUserSourceProvider": "self-service: the caller's own per-user source connection",
     "Mutation.astroliftDisconnectUserSourceProvider": "self-service: the caller's own per-user source connection",
     "Subscription.notificationReceived": "self-service: the caller's own notifications as they arrive",
