@@ -162,7 +162,9 @@ def test_submit_oversized_payload_rejected(permission_resolver, org, with_tenant
     assert "too large" in result.errors[0].message
 
 
-def test_submit_xff_header_captured_first_hop(permission_resolver, org, published_form, with_tenant_org):
+def test_submit_records_remote_addr_not_the_raw_xff_header(
+    permission_resolver, org, published_form, with_tenant_org
+):
     _grant(permission_resolver, Permission.FORM_SUBMIT)
     request = SimpleNamespace(
         META={
@@ -180,7 +182,7 @@ def test_submit_xff_header_captured_first_hop(permission_resolver, org, publishe
         )
     assert result.ok, result.errors
     row = FormSubmission.objects.get(form=published_form)
-    assert row.source_ip == "203.0.113.5"
+    assert row.source_ip == "10.0.0.2"
 
 
 # ---- permission gate --------------------------------------------

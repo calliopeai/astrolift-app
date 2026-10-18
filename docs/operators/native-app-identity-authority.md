@@ -91,8 +91,10 @@ history or change unrelated app deployments. Protected preparation operations re
 A separate GCP environment does not change ordinary AWS/local target deployment
 behavior. A missing target is never guessed as a supported native origin.
 Unsupported mixed-service unions refuse before creating a Deployment. Deploy-token,
-webhook, scheduled, rollback and legacy promotion origins refuse relevant native
-work before dispatch rather than manufacture a worker actor.
+webhook, scheduled, workflow-created rollback and legacy promotion origins refuse
+relevant native work before dispatch rather than manufacture a worker actor. A
+human `rollbackDeployment` captures its own origin and runs the native
+`DeployAppWorkflow` (see [native configuration](gcp-native-configuration-executor.md#rollback)).
 
 Approval retains the initiating actor and credential; the approver cannot replace
 that authority. Before recording a vote, the original credential and all current

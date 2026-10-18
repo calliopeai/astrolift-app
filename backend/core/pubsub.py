@@ -1,16 +1,17 @@
 """
-In-process publish/subscribe for GraphQL subscriptions.
+Publish/subscribe for GraphQL subscriptions.
 
-Phase 1: a single-process asyncio broker. Producers (model
-``transition_to`` hooks, mutation resolvers, signal handlers) call
-``publish(topic, event)``; consumers (Strawberry subscription
-resolvers) ``async for event in subscribe(topic)``.
+Producers (model ``transition_to`` hooks, mutation resolvers, signal
+handlers) call ``publish(topic, event)``; consumers (Strawberry
+subscription resolvers) ``async for event in subscribe(topic)``.
 
-Single-process only. A multi-worker deployment swaps this for
-Redis (or NATS / Kafka / Postgres LISTEN-NOTIFY) at the broker
-layer; the call shape on both sides — ``publish`` and
-``subscribe`` — stays the same. The swap is one file change in
-this module.
+With ``settings.PUBSUB_REDIS_URL`` set (``ASTROLIFT_PUBSUB_REDIS_URL``)
+events go through Redis pub/sub, so a deployment transition recorded by a
+Temporal worker reaches a websocket held by any webservice replica (#2435).
+Only topics a subscription resolver serves (``_SHARED_TOPICS``) cross
+processes; the rest, such as the plaintext approval token event, never
+leave the process that published them. Without the URL, a single-process
+asyncio broker serves everything (tests, local dev).
 
 Topic discipline:
 
@@ -33,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from collections import defaultdict
 from collections.abc import AsyncIterator
@@ -44,6 +46,32 @@ logger = logging.getLogger(__name__)
 _DEFAULT_QUEUE_SIZE = 64
 _subscribers: dict[str, set[asyncio.Queue]] = defaultdict(set)
 _lock = asyncio.Lock()
+_redis_clients: dict[str, Any] = {}
+
+
+# Topic prefixes served by core.schema.subscriptions; events are JSON.
+_SHARED_TOPICS = ("deployment.lifecycle.",)
+
+
+def _redis_url(topic: str) -> str:
+    from django.conf import settings
+
+    if not topic.startswith(_SHARED_TOPICS):
+        return ""
+    return getattr(settings, "PUBSUB_REDIS_URL", "") or ""
+
+
+def _channel(topic: str) -> str:
+    return f"astrolift:pubsub:{topic}"
+
+
+def _redis_publish(url: str, topic: str, event: Any) -> None:
+    import redis
+
+    client = _redis_clients.get(url)
+    if client is None:
+        client = _redis_clients.setdefault(url, redis.Redis.from_url(url))
+    client.publish(_channel(topic), json.dumps(event, default=str))
 
 
 async def _add_subscriber(topic: str, queue: asyncio.Queue) -> None:
@@ -77,6 +105,9 @@ async def publish(topic: str, event: Any) -> None:
     event loop — schedule it via ``asyncio.ensure_future`` from
     sync code (see ``publish_sync``).
     """
+    if url := _redis_url(topic):
+        await asyncio.to_thread(_redis_publish, url, topic, event)
+        return
     bucket = _subscribers.get(topic)
     if not bucket:
         return
@@ -103,6 +134,9 @@ def publish_sync(topic: str, event: Any) -> None:
     sync request path. This helper schedules the publish on the
     running loop if there is one, or uses a fresh loop if not.
     """
+    if url := _redis_url(topic):
+        _redis_publish(url, topic, event)
+        return
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -129,6 +163,11 @@ async def subscribe(
     wrapper keeps the cleanup path clean even when the consumer
     bails mid-iteration.
     """
+    if url := _redis_url(topic):
+        async with contextlib.aclosing(_redis_subscribe(url, topic)) as events:
+            async for event in events:
+                yield event
+        return
     queue: asyncio.Queue = asyncio.Queue(maxsize=max_queue)
     await _add_subscriber(topic, queue)
     try:
@@ -138,6 +177,22 @@ async def subscribe(
     finally:
         with contextlib.suppress(Exception):
             await _remove_subscriber(topic, queue)
+
+
+async def _redis_subscribe(url: str, topic: str) -> AsyncIterator[Any]:
+    import redis.asyncio
+
+    client = redis.asyncio.Redis.from_url(url)
+    channel = client.pubsub(ignore_subscribe_messages=True)
+    try:
+        await channel.subscribe(_channel(topic))
+        async for message in channel.listen():
+            yield json.loads(message["data"])
+    finally:
+        with contextlib.suppress(Exception):
+            await channel.aclose()
+        with contextlib.suppress(Exception):
+            await client.aclose()
 
 
 def subscriber_count(topic: str) -> int:

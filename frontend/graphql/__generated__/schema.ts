@@ -1465,6 +1465,13 @@ export type AstroliftAppExecTarget = {
   workloadVersion: Scalars['Int']['output'];
 };
 
+export type AstroliftAppExpiryWarning = {
+  appId: Scalars['GUID']['output'];
+  appSlug: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  warningWindow: Scalars['String']['output'];
+};
+
 export type AstroliftAppGoldenSignal = {
   measurement?: Maybe<AstroliftGoldenSignalMeasurement>;
   name: GoldenSignalKind;
@@ -4233,6 +4240,7 @@ export type AstroliftNavTreeWorkflow = {
 export type AstroliftNotification = {
   body: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  expiryWarning?: Maybe<AstroliftAppExpiryWarning>;
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
   link: Scalars['String']['output'];
@@ -4245,6 +4253,12 @@ export type AstroliftNotificationMutationResult = {
   data?: Maybe<AstroliftNotification>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftNotificationPage = {
+  endCursor: Scalars['String']['output'];
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftNotification>;
 };
 
 export type AstroliftNotificationPreference = {
@@ -6686,6 +6700,16 @@ export type AstroliftZentinelleAuditPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftZentinelleBudget = {
+  id: Scalars['String']['output'];
+  level: Scalars['String']['output'];
+  limitUsd: Scalars['Float']['output'];
+  name: Scalars['String']['output'];
+  percent: Scalars['Float']['output'];
+  scope: Scalars['String']['output'];
+  spendUsd: Scalars['Float']['output'];
+};
+
 export type AstroliftZentinelleCapability = {
   connected: Scalars['Boolean']['output'];
 };
@@ -6697,7 +6721,9 @@ export type AstroliftZentinelleClusterGateway = {
   gatewayDeployed: Scalars['Boolean']['output'];
   gatewayEnabled: Scalars['Boolean']['output'];
   gatewayName: Scalars['String']['output'];
+  gatewayVersion?: Maybe<Scalars['String']['output']>;
   lastError: Scalars['String']['output'];
+  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
   registeredAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   unregistered: Scalars['Boolean']['output'];
@@ -6719,6 +6745,7 @@ export type AstroliftZentinelleConnection = {
   gatewayUrl: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastError: Scalars['String']['output'];
+  serverVersion?: Maybe<Scalars['String']['output']>;
   status: Scalars['String']['output'];
   tenantIds: Array<Scalars['String']['output']>;
   zentinelleInstallId: Scalars['String']['output'];
@@ -6739,6 +6766,14 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   data?: Maybe<AstroliftZentinelleDisconnect>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinelleHealth = {
+  available: Scalars['Boolean']['output'];
+  blocks?: Maybe<Scalars['Int']['output']>;
+  budgets?: Maybe<Array<AstroliftZentinelleBudget>>;
+  openApprovals?: Maybe<Scalars['Int']['output']>;
+  windowHours?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftZentinellePolicy = {
@@ -12948,6 +12983,7 @@ export type Query = {
   astroliftMyNotificationPreferences: Array<AstroliftNotificationPreference>;
   astroliftMyNotificationQuietHours: AstroliftNotificationQuietHours;
   astroliftMyNotifications: Array<AstroliftNotification>;
+  astroliftMyNotificationsPage: AstroliftNotificationPage;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
@@ -13085,6 +13121,7 @@ export type Query = {
   astroliftZentinelleAuditPage: AstroliftZentinelleAuditPage;
   astroliftZentinelleCapability: AstroliftZentinelleCapability;
   astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
+  astroliftZentinelleHealth: AstroliftZentinelleHealth;
   astroliftZentinelleInstallConnection?: Maybe<AstroliftZentinelleConnection>;
   astroliftZentinellePolicies: Array<AstroliftZentinellePolicy>;
   astroliftZentinelleUsage: AstroliftZentinelleUsage;
@@ -14483,6 +14520,12 @@ export type QueryAstroliftMyNotificationPreferencesArgs = {
 export type QueryAstroliftMyNotificationsArgs = {
   limit?: Scalars['Int']['input'];
   unreadOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftMyNotificationsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -16575,6 +16618,7 @@ export type SubscribeClusterModelInput = {
 export type Subscription = {
   astroliftAgentMessageReceived: AstroliftAgentMessage;
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
+  astroliftMyNotificationStream: AstroliftNotificationPage;
   astroliftOnAppLog: AstroliftAppLogLine;
   astroliftOnAppLogs: AstroliftAppLogLine;
   formSubmissionReceived: Scalars['String']['output'];
@@ -16584,6 +16628,11 @@ export type Subscription = {
 
 export type SubscriptionAstroliftDeploymentLifecycleStreamArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type SubscriptionAstroliftMyNotificationStreamArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
 };
 
 

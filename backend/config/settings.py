@@ -377,6 +377,14 @@ DATABASES = {
         "HOST": env_str("POSTGRES_HOST"),
         "PORT": env_str("POSTGRES_PORT"),
         "OPTIONS": {"options": "-c search_path=public"},
+        # Scale-out (#2435), docs/operators/scale-out-readiness.md. 0 closes
+        # each connection after its request or activity, right behind RDS
+        # Proxy or PgBouncer; raise it only to reuse connections without one.
+        "CONN_MAX_AGE": int(env_str("POSTGRES_CONN_MAX_AGE", "0")),
+        "CONN_HEALTH_CHECKS": True,
+        # Required behind PgBouncer transaction pooling: ``.iterator()``
+        # cursors outlive the transaction that owns the server connection.
+        "DISABLE_SERVER_SIDE_CURSORS": env_bool("POSTGRES_DISABLE_SERVER_SIDE_CURSORS", False),
     },
 }
 
@@ -392,6 +400,12 @@ CACHES = {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
     },
 }
+
+# GraphQL subscription fan-out across replicas (#2435): events published by
+# a worker or another webservice task reach every subscriber through Redis.
+# Installs point it at the cache Redis; empty keeps the single-process
+# in-memory broker (tests, local dev).
+PUBSUB_REDIS_URL = env_str("ASTROLIFT_PUBSUB_REDIS_URL", "")
 
 CSRF_TRUSTED_ORIGINS = [
     "https://storage.googleapis.com/",
@@ -1153,6 +1167,10 @@ from config.proxies import parse_trusted_proxies  # noqa: E402
 
 TRUSTED_PROXIES = parse_trusted_proxies(env_str("ASTROLIFT_TRUSTED_PROXIES", ""))
 
+# How long ``astro auth login --scope admin`` signs a platform operator in for
+# (#2448), in hours. Never longer than a plain CLI sign-in's refresh chain.
+CLI_ADMIN_SESSION_HOURS = int(env_str("ASTROLIFT_CLI_ADMIN_SESSION_HOURS", "12"))
+
 # Temporal — durable workflow runtime
 TEMPORAL_ADDRESS = env_str("TEMPORAL_ADDRESS", "localhost:7233")
 TEMPORAL_NAMESPACE = env_str("TEMPORAL_NAMESPACE", "default")
@@ -1174,7 +1192,7 @@ LOG_LEVEL = env_str("LOG_LEVEL", env_str("DJANGO_LOG_LEVEL", "INFO"))
 LOG_FORMAT = env_str("LOG_FORMAT", "json")
 LOG_DESTINATION = env_str("LOG_DESTINATION", "stdout")
 
-from core.logging import build_logging_config  # noqa: E402
+from core.logging import build_logging_config, redact_event_url_secrets  # noqa: E402
 
 LOGGING = build_logging_config(
     level=LOG_LEVEL,
@@ -1225,11 +1243,19 @@ def _scrub_graphql_exception_values(event: dict, hint: dict) -> dict:
     return event
 
 
+# A URL in an event (the request's query string, a Referer, a breadcrumb, a
+# transaction's spans) keeps no credential it carries: sign-in codes, session
+# tokens, invitation links (#2440), redacted as the request logs are (#2429).
+def _sentry_before_send(event: dict, hint: dict) -> dict:
+    return redact_event_url_secrets(_scrub_graphql_exception_values(event, hint))
+
+
 SENTRY_PRIVACY_OPTIONS = {
     "max_request_body_size": "never",
     "include_local_variables": False,
     "disabled_integrations": [StrawberryIntegration()],
-    "before_send": _scrub_graphql_exception_values,
+    "before_send": _sentry_before_send,
+    "before_send_transaction": redact_event_url_secrets,
 }
 
 match CONFIGURATION.lower():

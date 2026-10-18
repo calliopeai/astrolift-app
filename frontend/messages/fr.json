@@ -14685,6 +14685,7 @@
     },
     "health": {
       "healthy": "Passerelle en service",
+      "stale": "Gateway sans signal",
       "pending": "Passerelle pas encore déployée",
       "off": "Passerelle désactivée",
       "error": "Erreur de passerelle"
@@ -14735,7 +14736,20 @@
       "clustersTitle": "Santé de la passerelle par cluster",
       "clustersDescription": "La passerelle Zentinelle de chaque cluster inscrit.",
       "installOff": "Les passerelles Zentinelle sont désactivées pour cette installation. Les clusters inscrits gardent leurs identifiants ; les passerelles se déploient dès que l'opérateur de la plateforme les active.",
-      "noClusters": "Aucun cluster n'est encore inscrit auprès de Zentinelle."
+      "noClusters": "Aucun cluster n'est encore inscrit auprès de Zentinelle.",
+      "serverVersion": "Version de Zentinelle",
+      "blocks": "Blocages, dernières 24 heures",
+      "approvals": "Approbations en attente",
+      "budget": "Budget de ce mois",
+      "budgetValue": "{percent} % utilisé",
+      "budgetFooter": "{spend} sur {limit} ({name})",
+      "noBudget": "Aucun budget défini",
+      "notAvailable": "Non disponible",
+      "countsError": "Impossible de lire l'état depuis Zentinelle",
+      "reportNotAvailable": "Version et dernier signal non disponibles",
+      "neverReported": "Aucun signal pour l'instant",
+      "versionUnknown": "version inconnue",
+      "reported": "{version}, vu {seen}"
     },
     "clusters": {
       "installOff": "Les passerelles Zentinelle sont désactivées pour cette installation. Inscrire un cluster stocke son identifiant ; la passerelle se déploie dès que l'opérateur de la plateforme active les passerelles.",

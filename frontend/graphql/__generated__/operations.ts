@@ -1465,6 +1465,13 @@ export type AstroliftAppExecTarget = {
   workloadVersion: Scalars['Int']['output'];
 };
 
+export type AstroliftAppExpiryWarning = {
+  appId: Scalars['GUID']['output'];
+  appSlug: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  warningWindow: Scalars['String']['output'];
+};
+
 export type AstroliftAppGoldenSignal = {
   measurement?: Maybe<AstroliftGoldenSignalMeasurement>;
   name: GoldenSignalKind;
@@ -4233,6 +4240,7 @@ export type AstroliftNavTreeWorkflow = {
 export type AstroliftNotification = {
   body: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  expiryWarning?: Maybe<AstroliftAppExpiryWarning>;
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
   link: Scalars['String']['output'];
@@ -4245,6 +4253,12 @@ export type AstroliftNotificationMutationResult = {
   data?: Maybe<AstroliftNotification>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftNotificationPage = {
+  endCursor: Scalars['String']['output'];
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftNotification>;
 };
 
 export type AstroliftNotificationPreference = {
@@ -6686,6 +6700,16 @@ export type AstroliftZentinelleAuditPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
+export type AstroliftZentinelleBudget = {
+  id: Scalars['String']['output'];
+  level: Scalars['String']['output'];
+  limitUsd: Scalars['Float']['output'];
+  name: Scalars['String']['output'];
+  percent: Scalars['Float']['output'];
+  scope: Scalars['String']['output'];
+  spendUsd: Scalars['Float']['output'];
+};
+
 export type AstroliftZentinelleCapability = {
   connected: Scalars['Boolean']['output'];
 };
@@ -6697,7 +6721,9 @@ export type AstroliftZentinelleClusterGateway = {
   gatewayDeployed: Scalars['Boolean']['output'];
   gatewayEnabled: Scalars['Boolean']['output'];
   gatewayName: Scalars['String']['output'];
+  gatewayVersion?: Maybe<Scalars['String']['output']>;
   lastError: Scalars['String']['output'];
+  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
   registeredAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   unregistered: Scalars['Boolean']['output'];
@@ -6719,6 +6745,7 @@ export type AstroliftZentinelleConnection = {
   gatewayUrl: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastError: Scalars['String']['output'];
+  serverVersion?: Maybe<Scalars['String']['output']>;
   status: Scalars['String']['output'];
   tenantIds: Array<Scalars['String']['output']>;
   zentinelleInstallId: Scalars['String']['output'];
@@ -6739,6 +6766,14 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   data?: Maybe<AstroliftZentinelleDisconnect>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinelleHealth = {
+  available: Scalars['Boolean']['output'];
+  blocks?: Maybe<Scalars['Int']['output']>;
+  budgets?: Maybe<Array<AstroliftZentinelleBudget>>;
+  openApprovals?: Maybe<Scalars['Int']['output']>;
+  windowHours?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftZentinellePolicy = {
@@ -12948,6 +12983,7 @@ export type Query = {
   astroliftMyNotificationPreferences: Array<AstroliftNotificationPreference>;
   astroliftMyNotificationQuietHours: AstroliftNotificationQuietHours;
   astroliftMyNotifications: Array<AstroliftNotification>;
+  astroliftMyNotificationsPage: AstroliftNotificationPage;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
@@ -13085,6 +13121,7 @@ export type Query = {
   astroliftZentinelleAuditPage: AstroliftZentinelleAuditPage;
   astroliftZentinelleCapability: AstroliftZentinelleCapability;
   astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
+  astroliftZentinelleHealth: AstroliftZentinelleHealth;
   astroliftZentinelleInstallConnection?: Maybe<AstroliftZentinelleConnection>;
   astroliftZentinellePolicies: Array<AstroliftZentinellePolicy>;
   astroliftZentinelleUsage: AstroliftZentinelleUsage;
@@ -14483,6 +14520,12 @@ export type QueryAstroliftMyNotificationPreferencesArgs = {
 export type QueryAstroliftMyNotificationsArgs = {
   limit?: Scalars['Int']['input'];
   unreadOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftMyNotificationsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -16575,6 +16618,7 @@ export type SubscribeClusterModelInput = {
 export type Subscription = {
   astroliftAgentMessageReceived: AstroliftAgentMessage;
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
+  astroliftMyNotificationStream: AstroliftNotificationPage;
   astroliftOnAppLog: AstroliftAppLogLine;
   astroliftOnAppLogs: AstroliftAppLogLine;
   formSubmissionReceived: Scalars['String']['output'];
@@ -16584,6 +16628,11 @@ export type Subscription = {
 
 export type SubscriptionAstroliftDeploymentLifecycleStreamArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type SubscriptionAstroliftMyNotificationStreamArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -20071,6 +20120,21 @@ export type SendInstallAlertMailTestMutationVariables = Exact<{
 
 export type SendInstallAlertMailTestMutation = { sendInstallAlertMailTest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null }>, data?: { id: string, requestId: string, version: number, eventKind: string, transport: string, sender: string, recipient: string, status: string, reasonCode?: string | null, createdAt: string, acceptedAt?: string | null, deliveryObserved: boolean } | null } };
 
+export type GetMyNotificationInboxQueryVariables = Exact<{
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type GetMyNotificationInboxQuery = { astroliftMyNotificationsPage: { endCursor: string, hasMore: boolean, items: Array<{ id: string, kind: string, title: string, body: string, link: string, readAt?: string | null, createdAt: string, expiryWarning?: { appId: string, appSlug: string, expiresAt: string, warningWindow: string } | null }> } };
+
+export type MyNotificationInboxStreamSubscriptionVariables = Exact<{
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type MyNotificationInboxStreamSubscription = { astroliftMyNotificationStream: { endCursor: string, hasMore: boolean, items: Array<{ id: string, kind: string, title: string, body: string, link: string, readAt?: string | null, createdAt: string, expiryWarning?: { appId: string, appSlug: string, expiresAt: string, warningWindow: string } | null }> } };
+
 export type SetMyNotificationQuietHoursMutationVariables = Exact<{
   input: SetNotificationQuietHoursInput;
 }>;
@@ -21390,49 +21454,49 @@ export type ConnectZentinelleMutationVariables = Exact<{
 }>;
 
 
-export type ConnectZentinelleMutation = { connectZentinelle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } | null } };
+export type ConnectZentinelleMutation = { connectZentinelle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } | null } };
 
 export type SetZentinelleGatewayUrlMutationVariables = Exact<{
   input: SetZentinelleGatewayUrlInput;
 }>;
 
 
-export type SetZentinelleGatewayUrlMutation = { setZentinelleGatewayUrl: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } | null } };
+export type SetZentinelleGatewayUrlMutation = { setZentinelleGatewayUrl: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } | null } };
 
 export type DisconnectZentinelleMutationVariables = Exact<{
   input: DisconnectZentinelleInput;
 }>;
 
 
-export type DisconnectZentinelleMutation = { disconnectZentinelle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { warnings: Array<string>, connection: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } } | null } };
+export type DisconnectZentinelleMutation = { disconnectZentinelle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { warnings: Array<string>, connection: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } } | null } };
 
 export type RegisterZentinelleClusterMutationVariables = Exact<{
   input: ZentinelleClusterInput;
 }>;
 
 
-export type RegisterZentinelleClusterMutation = { registerZentinelleCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+export type RegisterZentinelleClusterMutation = { registerZentinelleCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
 
 export type SetZentinelleGatewayEnabledMutationVariables = Exact<{
   input: SetZentinelleGatewayEnabledInput;
 }>;
 
 
-export type SetZentinelleGatewayEnabledMutation = { setZentinelleGatewayEnabled: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+export type SetZentinelleGatewayEnabledMutation = { setZentinelleGatewayEnabled: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
 
 export type RotateZentinelleGatewayCredentialMutationVariables = Exact<{
   input: RotateZentinelleGatewayCredentialInput;
 }>;
 
 
-export type RotateZentinelleGatewayCredentialMutation = { rotateZentinelleGatewayCredential: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+export type RotateZentinelleGatewayCredentialMutation = { rotateZentinelleGatewayCredential: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
 
 export type UnregisterZentinelleClusterMutationVariables = Exact<{
   input: ZentinelleClusterInput;
 }>;
 
 
-export type UnregisterZentinelleClusterMutation = { unregisterZentinelleCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+export type UnregisterZentinelleClusterMutation = { unregisterZentinelleCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
 
 export type ExportZentinelleAuditMutationVariables = Exact<{
   input: ExportZentinelleAuditInput;
@@ -21441,9 +21505,9 @@ export type ExportZentinelleAuditMutationVariables = Exact<{
 
 export type ExportZentinelleAuditMutation = { exportZentinelleAudit: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { filename: string, content: string, contentType: string, rowCount: number } | null } };
 
-export type ZentinelleClusterFieldsFragment = { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean };
+export type ZentinelleClusterFieldsFragment = { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null };
 
-export type ZentinelleConnectionFieldsFragment = { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> };
+export type ZentinelleConnectionFieldsFragment = { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> };
 
 export type ZentinelleCapabilityQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -21453,7 +21517,12 @@ export type ZentinelleCapabilityQuery = { astroliftZentinelleCapability: { conne
 export type ZentinelleConnectionQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ZentinelleConnectionQuery = { astroliftZentinelleConnection?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } | null };
+export type ZentinelleConnectionQuery = { astroliftZentinelleConnection?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } | null };
+
+export type ZentinelleHealthQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ZentinelleHealthQuery = { astroliftZentinelleHealth: { available: boolean, windowHours?: number | null, blocks?: number | null, openApprovals?: number | null, budgets?: Array<{ id: string, name: string, scope: string, limitUsd: number, spendUsd: number, percent: number, level: string }> | null } };
 
 export type ZentinelleUsageQueryVariables = Exact<{
   since?: InputMaybe<Scalars['DateTime']['input']>;

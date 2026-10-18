@@ -404,7 +404,12 @@ class JournalStore:
                 return self._reservation(row)
             if row is not None:
                 ledger = self._ledger(row)
-                if row.state != row.State.OBSERVED or ledger.pending or ledger.removals:
+                # RESOLVED is an operator settlement (#2278), never an observation.
+                if (
+                    row.state not in (row.State.OBSERVED, row.State.RESOLVED)
+                    or ledger.pending
+                    or ledger.removals
+                ):
                     raise JournalError("UNRESOLVED_OPERATION")
                 if expected_version != row.version or operation.desired_revision <= row.desired_revision:
                     raise JournalError("STALE_REVISION")

@@ -82,14 +82,15 @@ def test_touch_ipv6_accepted(app):
 # ---- client_ip_from_request / user_agent_from_request ----------------
 
 
-def test_client_ip_prefers_leftmost_xff_hop():
+def test_client_ip_ignores_the_raw_xff_header():
+    # config.asgi already resolved the trusted chain into REMOTE_ADDR (#2440).
     rf = RequestFactory()
     request = rf.get(
         "/",
         HTTP_X_FORWARDED_FOR="203.0.113.7, 10.0.0.1, 10.0.0.2",
         REMOTE_ADDR="10.0.0.99",
     )
-    assert client_ip_from_request(request) == "203.0.113.7"
+    assert client_ip_from_request(request) == "10.0.0.99"
 
 
 def test_client_ip_falls_back_to_remote_addr_when_no_xff():
@@ -185,7 +186,7 @@ def test_middleware_stamps_forensic_columns_on_success(app):
     request = rf.get(
         "/",
         HTTP_AUTHORIZATION=f"Bearer {plaintext}",
-        HTTP_X_FORWARDED_FOR="203.0.113.7",
+        REMOTE_ADDR="203.0.113.7",
         HTTP_USER_AGENT="GitHub-Actions/2.317",
     )
     mw = DeployTokenAuthMiddleware(_ok)
