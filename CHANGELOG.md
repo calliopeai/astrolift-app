@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).
+
 - Preserve existing brain memory and build settings when merging manifests after the monetary parser module is retired (#2464), and correct the operator guide to describe the retained quota APIs and coordinated worker retirement.
 
 - Remove the remaining `billableWindowDays` retention API field and its unused billing helper (#2464); effective retention days, warning windows, policy controls and eviction remain operational.

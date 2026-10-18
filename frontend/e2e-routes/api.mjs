@@ -609,7 +609,6 @@ function value(type, field, args, role) {
       return [
         "zentinelle.enabled",
         "admin.permissions_enabled",
-        "admin.cost_enabled",
         "admin.quotas_enabled",
         "support.enabled",
       ].map((key) => object({ key, enabled: true }));
