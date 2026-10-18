@@ -379,8 +379,14 @@ def test_project_binding_can_register_an_app_in_its_owned_project(world, seed_cl
         slug="creator",
     )
     seed_cluster(world.org)
+    bootstrap_calls = []
+
+    def bootstrap(app, envs, *, defer_workflow=False):
+        assert defer_workflow is False
+        bootstrap_calls.append((app.pk, envs))
+
     monkeypatch.setattr(
-        "astrolift_registry.schema.mutations.registration._bootstrap_app_environments", lambda app, envs: None
+        "astrolift_registry.schema.mutations.registration._bootstrap_app_environments", bootstrap
     )
     with _tenant(world, token_team=world.medops.pk, scopes=("app:onboard",)):
         result = RegistryMutation().register_app(
@@ -390,6 +396,7 @@ def test_project_binding_can_register_an_app_in_its_owned_project(world, seed_cl
             ),
         )
     assert result.ok, result.errors
+    assert len(bootstrap_calls) == 1
     assert world.medops_app.__class__.objects.filter(
         slug="new-owned", project=world.medops_project, team=world.medops
     ).exists()
