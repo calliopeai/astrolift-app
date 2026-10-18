@@ -94,6 +94,43 @@ type AgentTaskCallbackSecretMutationResult {
   data: AgentTaskCallbackSecret
 }
 
+type AgentTaskUsageCost {
+  amount: Decimal
+  currency: String
+  source: TaskUsageSource
+  sourceRecordedAt: DateTime
+  completeness: TaskUsageCompleteness!
+  reconciliation: TaskCostReconciliation!
+  reason: TaskUsageReason
+}
+
+type AgentTaskUsageQuantity {
+  value: Decimal
+  unit: TaskUsageUnit!
+  source: TaskUsageSource
+  sourceRecordedAt: DateTime
+  completeness: TaskUsageCompleteness!
+  reason: TaskUsageReason
+}
+
+type AgentTaskUsageSnapshot {
+  taskId: GUID!
+  taskVersion: Int!
+  taskStatus: String!
+  asOf: DateTime!
+  aggregationScope: String!
+  linkedRunId: GUID
+  linkedRunRetryCount: Int
+  inputTokens: AgentTaskUsageQuantity!
+  outputTokens: AgentTaskUsageQuantity!
+  duration: AgentTaskUsageQuantity!
+  reportedCost: AgentTaskUsageCost!
+  actualCost: AgentTaskUsageCost!
+  model: String
+  modelSource: TaskUsageSource
+  modelSourceRecordedAt: DateTime
+}
+
 type Alertruledeletedpayload {
   id: GUID!
   deleted: Boolean!
@@ -822,6 +859,7 @@ type AstroliftAgentTask {
   callbackLastError: String
   model: String!
   brains: [AstroliftAgentTaskBrain!]!
+  usageSnapshot: AgentTaskUsageSnapshot
 }
 
 type AstroliftAgentTaskBacklog {
@@ -8073,6 +8111,9 @@ input DecideModelConnectionRequestInput {
   ifMatchVersion: Int!
 }
 
+"""Decimal (fixed-point)"""
+scalar Decimal
+
 input DecommissionClusterInputType {
   clusterId: GUID!
   deleteCloudInfra: Boolean! = false
@@ -12416,6 +12457,42 @@ type SwitchUserResult {
 
 input SyncManifestFromRepoInput {
   id: GUID!
+}
+
+enum TaskCostReconciliation {
+  NOT_RECONCILED
+  NO_SOURCE
+}
+
+enum TaskUsageCompleteness {
+  UNKNOWN
+  PARTIAL
+  REPORTED
+  OBSERVED
+}
+
+enum TaskUsageReason {
+  NOT_RECORDED
+  INVALID_VALUE
+  NONTERMINAL_REPORT
+  INCONSISTENT_TIMESTAMPS
+  UNVERIFIED_RUN_BINDING
+  PREMATURE_METER
+  NO_TASK_BILLING_SOURCE
+}
+
+enum TaskUsageSource {
+  COMPLETION_REPORT
+  PLATFORM_TIMESTAMPS
+  K8S_METRICS
+  ECS_METADATA
+  WALL_TIME_ESTIMATE
+  AGENT_REPORTED
+}
+
+enum TaskUsageUnit {
+  TOKENS
+  MILLISECONDS
 }
 
 enum TeamMembershipChangeKind {

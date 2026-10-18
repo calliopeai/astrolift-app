@@ -11,8 +11,11 @@ import datetime as dt
 import enum
 
 import strawberry
+from strawberry.types import Info
 
 from astrolift_graphql import GUID
+
+from .task_usage import TaskUsageSnapshot, read_task_usage
 
 JSON = strawberry.scalars.JSON
 
@@ -252,6 +255,10 @@ class AgentTaskBrainType:
 
 @strawberry.type(name="AstroliftAgentTask")
 class AgentTaskType:
+    @strawberry.field
+    def usage_snapshot(self, info: Info) -> TaskUsageSnapshot | None:
+        return read_task_usage(info, str(self.id))
+
     id: GUID
     agent_slug: str
     agent_name: str

@@ -89,6 +89,7 @@ const config: CodegenConfig = {
         // imports stay clean.
         scalars: {
           GUID: "string",
+          Decimal: "string",
           DateTime: "string",
           // JSON may contain arrays or scalar values; consumers must narrow its shape.
           JSON: "unknown",
@@ -118,6 +119,7 @@ const config: CodegenConfig = {
       config: {
         scalars: {
           GUID: "string",
+          Decimal: "string",
           DateTime: "string",
           JSON: "unknown",
         },

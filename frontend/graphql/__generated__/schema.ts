@@ -16,6 +16,8 @@ export type Scalars = {
   Date: { input: any; output: any; }
   /** Date with time (isoformat) */
   DateTime: { input: string; output: string; }
+  /** Decimal (fixed-point) */
+  Decimal: { input: string; output: string; }
   /** UUID v7 — the platform's external identifier. */
   GUID: { input: string; output: string; }
   /** The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf). */
@@ -116,6 +118,43 @@ export type AgentTaskCallbackSecretMutationResult = {
   data?: Maybe<AgentTaskCallbackSecret>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AgentTaskUsageCost = {
+  amount?: Maybe<Scalars['Decimal']['output']>;
+  completeness: TaskUsageCompleteness;
+  currency?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<TaskUsageReason>;
+  reconciliation: TaskCostReconciliation;
+  source?: Maybe<TaskUsageSource>;
+  sourceRecordedAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AgentTaskUsageQuantity = {
+  completeness: TaskUsageCompleteness;
+  reason?: Maybe<TaskUsageReason>;
+  source?: Maybe<TaskUsageSource>;
+  sourceRecordedAt?: Maybe<Scalars['DateTime']['output']>;
+  unit: TaskUsageUnit;
+  value?: Maybe<Scalars['Decimal']['output']>;
+};
+
+export type AgentTaskUsageSnapshot = {
+  actualCost: AgentTaskUsageCost;
+  aggregationScope: Scalars['String']['output'];
+  asOf: Scalars['DateTime']['output'];
+  duration: AgentTaskUsageQuantity;
+  inputTokens: AgentTaskUsageQuantity;
+  linkedRunId?: Maybe<Scalars['GUID']['output']>;
+  linkedRunRetryCount?: Maybe<Scalars['Int']['output']>;
+  model?: Maybe<Scalars['String']['output']>;
+  modelSource?: Maybe<TaskUsageSource>;
+  modelSourceRecordedAt?: Maybe<Scalars['DateTime']['output']>;
+  outputTokens: AgentTaskUsageQuantity;
+  reportedCost: AgentTaskUsageCost;
+  taskId: Scalars['GUID']['output'];
+  taskStatus: Scalars['String']['output'];
+  taskVersion: Scalars['Int']['output'];
 };
 
 export type Alertruledeletedpayload = {
@@ -810,6 +849,7 @@ export type AstroliftAgentTask = {
   triggeredByMe: Scalars['Boolean']['output'];
   triggeredByUserId?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
+  usageSnapshot?: Maybe<AgentTaskUsageSnapshot>;
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
 };
@@ -16416,6 +16456,37 @@ export type SwitchUserResult = {
 export type SyncManifestFromRepoInput = {
   id: Scalars['GUID']['input'];
 };
+
+export type TaskCostReconciliation =
+  | 'NOT_RECONCILED'
+  | 'NO_SOURCE';
+
+export type TaskUsageCompleteness =
+  | 'OBSERVED'
+  | 'PARTIAL'
+  | 'REPORTED'
+  | 'UNKNOWN';
+
+export type TaskUsageReason =
+  | 'INCONSISTENT_TIMESTAMPS'
+  | 'INVALID_VALUE'
+  | 'NONTERMINAL_REPORT'
+  | 'NOT_RECORDED'
+  | 'NO_TASK_BILLING_SOURCE'
+  | 'PREMATURE_METER'
+  | 'UNVERIFIED_RUN_BINDING';
+
+export type TaskUsageSource =
+  | 'AGENT_REPORTED'
+  | 'COMPLETION_REPORT'
+  | 'ECS_METADATA'
+  | 'K8S_METRICS'
+  | 'PLATFORM_TIMESTAMPS'
+  | 'WALL_TIME_ESTIMATE';
+
+export type TaskUsageUnit =
+  | 'MILLISECONDS'
+  | 'TOKENS';
 
 export type TeamMembershipChangeKind =
   | 'ADD'
