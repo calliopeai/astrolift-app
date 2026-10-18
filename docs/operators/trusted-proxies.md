@@ -15,6 +15,13 @@ client wrote into the header itself sit to its left and are never read.
 uvicorn runs with `--no-proxy-headers`, so its own `FORWARDED_ALLOW_IPS` has
 no effect.
 
+Everything else that records or checks the client's address reads the same
+resolved address (#2440): the audit trail, session tracking, API and deploy
+token "last used from", form submissions, service audit rows and ABAC IP
+rules. None of them reads `X-Forwarded-For` itself. Until the setting lists
+the balancer's ranges, they all record the balancer's address, and an ABAC IP
+allowlist of client ranges denies.
+
 The app refuses to start when the setting holds `*`, a `/0` range, or an
 entry that is not an address or range. Unset, only loopback is trusted, as
 before: every client behind an ALB then shares the ALB node's budget.
