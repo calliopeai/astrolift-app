@@ -9,6 +9,7 @@
 import type { CreateBrainInput, RepoVisibility } from "@/graphql/__generated__/operations";
 
 import {
+  type CellMatrix,
   DEFAULT_SUBSTRATE,
   SUBSTRATE_FIELDS,
   substrateInput,
@@ -73,7 +74,14 @@ export type DraftField =
   | "substrate";
 
 /** Each is a `brains.wizard.problems` message. */
-export type Problem = "required" | "repoFormat" | "refFormat" | "slugFormat" | "envFormat" | "long";
+export type Problem =
+  | "required"
+  | "repoFormat"
+  | "refFormat"
+  | "slugFormat"
+  | "needsAppSlug"
+  | "envFormat"
+  | "long";
 
 /**
  * The rules the server applies first (`schema/mutations/brains.py`). The
@@ -154,6 +162,13 @@ export interface WizardContext {
   connections: readonly { id: string; kind: string }[];
   /** The caller's projects, each with its team. */
   projects: readonly WizardProject[];
+  /** Mimwell's matrix (`astroliftBrainCells`); null until it arrives. */
+  matrix?: CellMatrix | null;
+  /**
+   * Whether the edition the draft names has `deploy.app_slug`
+   * (`astroliftBrainEdition`, #2444); null while unknown.
+   */
+  supportsAppSlug?: boolean | null;
 }
 
 export function draftProblems(
@@ -173,11 +188,14 @@ export function draftProblems(
   if (draft.name.trim().length > 255) out.name = "long";
   if (!draft.slug) out.slug = "required";
   else if (!SLUG.test(draft.slug)) out.slug = "slugFormat";
+  else if (context.supportsAppSlug === false && !draft.slug.endsWith("-brain"))
+    out.slug = "needsAppSlug";
   if (!draft.teamId) out.teamId = "required";
   const project = context.projects.find((p) => p.id === draft.projectId);
   if (!project || project.team.id !== draft.teamId) out.projectId = "required";
   if (!ENV.test(draft.environmentName.trim())) out.environmentName = "envFormat";
-  if (substrateProblems(draft.substrate).length > 0) out.substrate = "required";
+  if (substrateProblems(draft.substrate, context.matrix ?? null).length > 0)
+    out.substrate = "required";
   return out;
 }
 

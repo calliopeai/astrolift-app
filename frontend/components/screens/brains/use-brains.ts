@@ -2,72 +2,59 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { parseListState, useListState } from "@/components/list/use-list-state";
+import { useListState } from "@/components/list/use-list-state";
 import { useLocalizedList } from "@/components/list/use-localized-list";
-import { selectRows } from "@/components/list/select-rows";
 import { useWizardProjects } from "@/components/wizard/use-wizard-projects";
 import type {
   HostAppOnBrainMutation,
   HostAppOnBrainMutationVariables,
   IssueBrainReadTokenMutation,
   IssueBrainReadTokenMutationVariables,
-  ListBrainsQuery,
+  ListBrainsPageQuery,
+  ListBrainsPageQueryVariables,
+  ListTeamsQuery,
 } from "@/graphql/__generated__/operations";
+import { LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import { HOST_APP_ON_BRAIN, ISSUE_BRAIN_READ_TOKEN } from "@/graphql/registry/brains.mutations";
-import { LIST_BRAINS } from "@/graphql/registry/brains.queries";
+import { LIST_BRAINS_PAGE } from "@/graphql/registry/brains.queries";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import type { BrainConnection } from "./brain-connection";
-import { BRAINS_LIST, BRAINS_SELECT, brainTeams, withTeamOptions } from "./brains-list";
+import { BRAINS_LIST, brainsVariables, withTeamOptions } from "./brains-list";
 import type { HostBrainAppValues } from "./HostBrainAppDialog";
 
 export type { BrainRow } from "./brains-list";
 
 /**
- * The data half of BrainsScreen: the server's search over readable brains,
- * filtered by team, sorted and paged from the rows in hand (the field takes
- * no team, sort or page argument). Connect issues the caller a read token
- * for one layer, held in this state only until the dialog is dismissed.
- * Host an app creates one from the brain-app template and opens it (#2243).
+ * The data half of BrainsScreen: one cursor page of `astroliftBrainsPage`
+ * (#2444), searched, filtered by home team and sorted on the server, each
+ * row with its cached health and freshness, so no row reads the source
+ * host. Connect issues the caller a read token for one layer, held in this
+ * state only until the dialog is dismissed. Host an app creates one from the
+ * brain-app template and opens it (#2243).
  */
 export function useBrains() {
   const t = useTranslations("brains");
   const base = useLocalizedList(BRAINS_LIST);
-  // The search reaches the server, so it is read before the team options,
-  // which come from the rows the search returns.
-  const params = useSearchParams();
-  const search = parseListState(base, params?.toString() ?? "").q.trim();
-  const { data, previousData, loading, error, refetch } = useQuery<ListBrainsQuery>(LIST_BRAINS, {
-    variables: { search: search || null },
-    fetchPolicy: "cache-and-network",
-  });
-  const all = (data ?? previousData)?.astroliftBrains;
-  const teams = brainTeams(all ?? []).join("\n");
+  const teamRows = useQuery<ListTeamsQuery>(LIST_TEAMS).data?.astroliftTeams;
+  const teams = (teamRows ?? []).map((team) => team.slug).join("\n");
   const definition = React.useMemo(
-    () => withTeamOptions(base, teams ? teams.split("\n") : []),
+    () => withTeamOptions(base, teams ? teams.split("\n").sort() : []),
     [base, teams]
   );
   const list = useListState(definition);
-  const { state } = list;
-  const page = React.useMemo(
-    () =>
-      selectRows(
-        all ?? [],
-        {
-          filters: list.filters,
-          q: state.q,
-          sort: state.sort,
-          page: state.page,
-          pageSize: state.pageSize,
-        },
-        BRAINS_SELECT
-      ),
-    [all, list.filters, state.q, state.sort, state.page, state.pageSize]
-  );
+  const { data, previousData, loading, error, refetch } = useQuery<
+    ListBrainsPageQuery,
+    ListBrainsPageQueryVariables
+  >(LIST_BRAINS_PAGE, {
+    variables: brainsVariables(list.filters, list.state),
+    fetchPolicy: "cache-and-network",
+  });
+  const page = (data ?? previousData)?.astroliftBrainsPage;
 
   const perms = useMyPermissions();
   const [connection, setConnection] = React.useState<BrainConnection | null>(null);
@@ -84,11 +71,12 @@ export function useBrains() {
   );
   return {
     list,
-    rows: page.rows,
-    totalCount: all ? page.totalCount : null,
-    loading: loading && !all,
-    stale: loading && !!all,
-    error: error && !all ? { message: error.message } : null,
+    rows: page?.items ?? [],
+    totalCount: page?.totalCount ?? null,
+    nextCursor: page?.nextCursor ?? null,
+    loading: loading && !page,
+    stale: loading && !!page,
+    error: error && !page ? { message: error.message } : null,
     onRetry: () => {
       void refetch().catch(() => {});
     },

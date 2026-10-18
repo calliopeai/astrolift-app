@@ -67,7 +67,12 @@ ASTROLIFT_PERSISTENCE = ("sqlite-volume", "efs", "postgres", "s3")
 DATA_PERSISTENCE = ("sqlite-volume", "efs", "postgres")
 MAX_REPLICAS = 20
 DEFAULT_PORT = 8080
-DOCKERFILE = "extensions/portal-container/Dockerfile"
+#: The template-owned portal container (mimwell-pvt#479), built from the repo root.
+DOCKERFILE = "runtime/portal-container/Dockerfile"
+#: A brain's memory: a small one uses about 40 MiB, one of 20,000 records
+#: about 250 MiB (#2441). A brain's manifest that asks more keeps it.
+MEMORY_REQUEST = "128Mi"
+MEMORY_LIMIT = "512Mi"
 
 
 class SubstrateError(Exception):
@@ -315,6 +320,8 @@ def render_manifest(
         "kind": "statefulset" if "sqlite-volume" in persistence else "deployment",
         "replicas": selection.replicas,
         "is_public": True,
+        "memory_request": MEMORY_REQUEST,
+        "memory_limit": MEMORY_LIMIT,
         "containers": [container],
     }
     volumes = []
@@ -424,6 +431,25 @@ S3_COMMENT = (
 )
 
 
+def _keep_own(rendered: dict[str, Any], current: dict[str, Any]) -> None:
+    """What the brain's own ``brain`` workload keeps over the rendered one:
+    more memory than the defaults, and the Dockerfile it builds from (a brain
+    created before the template owned the container builds from its own)."""
+    from astrolift_lifecycle.preview_cost import parse_memory_bytes
+
+    for key in ("memory_request", "memory_limit"):
+        try:
+            if parse_memory_bytes(str(current.get(key) or "")) > parse_memory_bytes(rendered[key]):
+                rendered[key] = current[key]
+        except ValueError:
+            continue
+    own = next(iter(current.get("containers") or []), None) or {}
+    container = rendered["containers"][0]
+    if "dockerfile_path" in container and own.get("dockerfile_path"):
+        container["dockerfile_path"] = own["dockerfile_path"]
+        container["build_context"] = own.get("build_context") or "."
+
+
 def merge_manifest(current: str, rendered: str) -> str:
     """``rendered`` laid over an existing ``astrolift.toml``: the ``brain``
     workload, the ``brain`` postgres service and ``[app]``'s slug, name and
@@ -444,6 +470,9 @@ def merge_manifest(current: str, rendered: str) -> str:
     out["app"] = {**(base.get("app") or {}), **new["app"]}
     out["environments"] = base.get("environments") or new["environments"]
     others = [w for w in base.get("workloads") or [] if w.get("name") != "brain"]
+    current = next((w for w in base.get("workloads") or [] if w.get("name") == "brain"), None)
+    if current is not None:
+        _keep_own(new["workloads"][0], current)
     out["workloads"] = [*new["workloads"], *others]
     services = [
         s

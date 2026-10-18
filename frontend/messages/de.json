@@ -15641,6 +15641,7 @@
     "none": "keins",
     "notServed": "Noch nicht erreichbar",
     "notShared": "Nur das besitzende Team",
+    "archived": "Archiviert",
     "shareTitle": "{team}: {access}",
     "emptyTitle": "Keine semantischen Schichten",
     "emptyDescription": "Apps mit [app] kind = \"mimwell\", die du lesen kannst, erscheinen hier.",
@@ -15682,8 +15683,8 @@
     "columnFreshness": "Aktualität",
     "new": "Neue semantische Schicht",
     "status": {
-      "unavailable": "Nicht verfügbar",
       "unknown": "Unbekannt",
+      "notChecked": "Noch nicht vom Quell-Host gelesen; öffnen Sie die Ebene, um es zu prüfen.",
       "never": "Nie",
       "noEnvironment": "Keine Umgebung {environment}",
       "notDeployed": "Nicht bereitgestellt",
@@ -15746,6 +15747,7 @@
       "templateRef": "Vorlagenreferenz",
       "templateRefHelp": "Ein Tag, ein Branch oder ein Commit der Mimwell-Edition. Leer lassen für die von dieser Installation festgelegte Edition.",
       "pinnedEdition": "Die von dieser Installation festgelegte Edition",
+      "pinnedEditionRef": "Die von dieser Installation festgelegte Edition ({ref})",
       "name": "Name",
       "nameHelp": "Wird in Listen angezeigt. Wenn leer, der Slug.",
       "namePlaceholder": "Plattformwissen",
@@ -15787,6 +15789,7 @@
         "repoFormat": "Verwenden Sie owner/name mit Buchstaben, Ziffern, Punkten, Bindestrichen und Unterstrichen.",
         "refFormat": "Ein Tag-, Branch- oder Commit-Name ohne Leerzeichen und ohne zwei Punkte hintereinander.",
         "slugFormat": "Kleinbuchstaben, Ziffern und Bindestriche, mit einem Buchstaben am Anfang und einem Buchstaben oder einer Ziffer am Ende, höchstens 63 Zeichen.",
+        "needsAppSlug": "Diese Edition hat kein deploy.app_slug, daher muss der Slug auf -brain enden.",
         "envFormat": "Ein kurzer Name in Kleinbuchstaben: Buchstaben, Ziffern und Bindestriche, höchstens 32 Zeichen.",
         "long": "Höchstens 255 Zeichen."
       }
@@ -15807,13 +15810,6 @@
         "graph": "Wo die Graphprojektion liegt."
       },
       "supported": "Von Mimwell unterstützt:",
-      "reasons": {
-        "d1Authority": "d1 ist ein Projektionsziel, nie eine maßgebliche Quelle.",
-        "dbBlobNeedsDatabase": "db-blob legt Binärobjekte in der Datenbank der maßgeblichen Quelle ab, und diese Quelle hat keine.",
-        "inDbVectorsMongo": "Mit in-db sind Vektoren SQL-Vektorspalten, und mongo hat keine.",
-        "inDbVectorsNeedSql": "Mit in-db liegen Vektoren in der Datenbank der maßgeblichen Quelle, und diese Quelle hat keine.",
-        "ageNeedsPostgres": "age ist eine Postgres-Erweiterung und braucht daher postgres als maßgebliche Quelle."
-      },
       "persistence": "Persistenz",
       "persistenceHelp": "Was Astrolift an die Schicht anhängt. Das Repository ist immer dabei.",
       "persistenceKinds": {
@@ -15834,8 +15830,7 @@
       "imageFormat": "Eine Image-Referenz enthält keine Leerzeichen.",
       "imageKept": "Die Schicht behält das Image, das sie ausführt.",
       "port": "Port",
-      "portRange": "1 bis 65535.",
-      "portGraduate": "Die API meldet den aktuellen Port nicht: Behalten Sie den Port bei, auf dem die Schicht erreichbar ist."
+      "portRange": "1 bis 65535."
     },
     "creation": {
       "listCrumb": "Semantische Schichten",
@@ -16565,7 +16560,8 @@
     "brains": {
       "search": "Namen und Slugs suchen…",
       "views": {
-        "all": "Alle"
+        "all": "Alle",
+        "archived": "Mit archivierten"
       },
       "fields": {
         "team": "Team"

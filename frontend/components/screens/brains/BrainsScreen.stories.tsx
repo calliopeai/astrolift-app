@@ -2,14 +2,11 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
-import { selectRows } from "@/components/list/select-rows";
 
-import { type BrainStatus, statusEnvironment } from "./brain-status-model";
-import { BEHIND, DEPLOY_FAILED, DEPLOYING, HEALTHY, NOT_DEPLOYED } from "./brain-status.fixtures";
-import { BRAINS, CONNECTION, HOST_PROJECTS, LONG_BRAIN } from "./brains.fixtures";
-import { BRAINS_LIST, BRAINS_SELECT, brainTeams, withTeamOptions } from "./brains-list";
+import { BEHIND, DEPLOY_FAILED, DEPLOYING, summaryOf } from "./brain-status.fixtures";
+import { ARCHIVED_BRAIN, BRAINS, CONNECTION, HOST_PROJECTS, LONG_BRAIN } from "./brains.fixtures";
+import { BRAINS_LIST, withTeamOptions } from "./brains-list";
 import { BrainsScreen, type BrainsScreenProps } from "./BrainsScreen";
-import { type BrainStatusResult, BrainStatusCell } from "./BrainStatusCell";
 import type { BrainRow } from "./use-brains";
 
 const meta: Meta = {
@@ -20,9 +17,7 @@ export default meta;
 
 type Story = StoryObj;
 
-const READY = (status: BrainStatus | null): BrainStatusResult => ({ state: "ready", status });
-
-/** One row per state the status columns draw. */
+/** One row per state the status columns draw, each with its cached summary (#2444). */
 const ROWS: BrainRow[] = [
   ...BRAINS,
   {
@@ -33,6 +28,7 @@ const ROWS: BrainRow[] = [
     team: "sre",
     project: "runbooks",
     sharedWith: [{ team: "platform", access: "deployer" }],
+    summary: summaryOf(DEPLOY_FAILED),
   },
   {
     ...BRAINS[0]!,
@@ -43,6 +39,7 @@ const ROWS: BrainRow[] = [
     project: "notes",
     environments: [],
     sharedWith: [],
+    summary: summaryOf(DEPLOYING),
   },
   {
     ...BRAINS[0]!,
@@ -53,55 +50,33 @@ const ROWS: BrainRow[] = [
     project: "metrics",
     environments: [{ name: "staging", url: "https://finance-brain.staging.example.test" }],
     sharedWith: [],
+    summary: { ...summaryOf(BEHIND)!, environmentName: "staging" },
   },
 ];
 
-const STATUS: Record<string, BrainStatusResult> = {
-  "leo-brain": READY(HEALTHY),
-  "sales-brain": READY(NOT_DEPLOYED),
-  "ops-brain": READY(DEPLOY_FAILED),
-  "research-brain": READY(DEPLOYING),
-  "finance-brain": READY(BEHIND),
-};
+const TEAMS = [...new Set([...ROWS, ARCHIVED_BRAIN].map((r) => r.team))].sort();
 
-function cellFor(statuses: Record<string, BrainStatusResult>): BrainsScreenProps["statusCell"] {
-  function StatusCell(row: BrainRow, part: Parameters<BrainsScreenProps["statusCell"]>[1]) {
-    return (
-      <BrainStatusCell
-        part={part}
-        result={statuses[row.slug] ?? READY(null)}
-        environment={statusEnvironment(row.environments)}
-      />
-    );
-  }
-  return StatusCell;
-}
-
+/**
+ * The screen over a stand-in for `astroliftBrainsPage`: the team filter and
+ * the With archived view narrow the rows as the server would.
+ */
 function Brains({
   rows: all = ROWS,
-  statuses = STATUS,
+  view,
   ...patch
-}: Partial<Omit<BrainsScreenProps, "list" | "rows">> & {
-  rows?: BrainRow[];
-  statuses?: Record<string, BrainStatusResult>;
-}) {
-  const list = useLocalListState(withTeamOptions(BRAINS_LIST, brainTeams(all)));
-  const { rows, totalCount } = selectRows(
-    all,
-    {
-      filters: list.filters,
-      q: list.state.q,
-      sort: list.state.sort,
-      page: list.state.page,
-      pageSize: list.state.pageSize,
-    },
-    BRAINS_SELECT
+}: Partial<Omit<BrainsScreenProps, "list" | "rows">> & { rows?: BrainRow[]; view?: string }) {
+  const list = useLocalListState(withTeamOptions(BRAINS_LIST, TEAMS), view ? { view } : {});
+  const rows = all.filter(
+    (r) =>
+      (!list.filters.team || r.team === list.filters.team) &&
+      (list.filters.archived === "1" || !r.archived)
   );
   return (
     <BrainsScreen
       list={list}
       rows={rows}
-      totalCount={totalCount}
+      totalCount={rows.length}
+      nextCursor={null}
       loading={false}
       stale={false}
       error={null}
@@ -117,7 +92,6 @@ function Brains({
       onHost={() => {}}
       onDismissHost={() => {}}
       onSubmitHost={async () => {}}
-      statusCell={cellFor(statuses)}
       {...patch}
     />
   );
@@ -144,7 +118,7 @@ export const Full: Story = {
   },
 };
 
-/** The team filter offers the teams of the rows in hand. */
+/** The team filter offers the teams the viewer can see; the server narrows the page. */
 export const FilteredByTeam: Story = {
   render: () => <Brains />,
   play: async ({ canvasElement }) => {
@@ -158,17 +132,58 @@ export const FilteredByTeam: Story = {
   },
 };
 
-/** Status reads still in flight, and one that failed, beside answered rows. */
-export const PartialStatus: Story = {
+/** Rows no status read has reached yet: health from the deployment, freshness unknown. */
+export const NotCheckedYet: Story = {
   render: () => (
     <Brains
-      statuses={{
-        ...STATUS,
-        "leo-brain": { state: "loading" },
-        "ops-brain": { state: "error", message: "source head: the host answered 502" },
-      }}
+      rows={ROWS.map((r) => ({
+        ...r,
+        summary: r.summary && {
+          ...r.summary,
+          checkedAt: null,
+          compiledAt: null,
+          behind: null,
+          lastIngest: null,
+        },
+      }))}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findAllByText("Unknown")).not.toHaveLength(0);
+    await expect(canvas.queryByText("Behind head")).not.toBeInTheDocument();
+  },
+};
+
+/** The default view leaves archived layers out. */
+export const ArchivedLeftOut: Story = {
+  render: () => <Brains rows={[...ROWS, ARCHIVED_BRAIN]} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Leo's brain")).toBeInTheDocument();
+    await expect(canvas.queryByText("Old brain")).not.toBeInTheDocument();
+  },
+};
+
+/** With archived: an archived layer is listed with a badge and opens its page for Restore. */
+export const WithArchived: Story = {
+  render: () => <Brains rows={[...ROWS, ARCHIVED_BRAIN]} view="archived" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "With archived" })).toBeInTheDocument();
+    const row = within(await canvas.findByRole("row", { name: /Old brain/ }));
+    await expect(row.getByText("Archived")).toBeInTheDocument();
+    await expect(row.getByRole("button", { name: "Connect" })).toBeDisabled();
+    await expect(canvas.getByRole("link", { name: /Old brain/ })).toHaveAttribute(
+      "href",
+      "/brains/old-brain"
+    );
+  },
+};
+
+/** More than a page: the server's cursor reaches the next one. */
+export const MorePages: Story = {
+  render: () => <Brains nextCursor="WyJuYW1lX2FzYyIsIkxlbyJd" totalCount={60} />,
 };
 
 /** Connect asks for a token; a layer that is not served has nothing to connect to. */

@@ -602,6 +602,7 @@ def _share_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
         ShareBrainInput(
             slug=str(args.get("slug") or ""),
             team_slug=str(args.get("team_slug") or ""),
+            agent_slug=str(args.get("agent_slug") or ""),
             access=BrainShareAccess(str(args.get("access") or "")),
         ),
     )
@@ -614,7 +615,11 @@ def _unshare_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]
         request,
         "unshare_brain",
         None,
-        UnshareBrainInput(slug=str(args.get("slug") or ""), team_slug=str(args.get("team_slug") or "")),
+        UnshareBrainInput(
+            slug=str(args.get("slug") or ""),
+            team_slug=str(args.get("team_slug") or ""),
+            agent_slug=str(args.get("agent_slug") or ""),
+        ),
     )
 
 
@@ -644,7 +649,15 @@ def _get_agent(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
             f"agent slug {slug!r} is ambiguous; make agent workload slugs unique",
             code="conflict",
         )
-    return _serialize_agent(matches[0], include_package=True)
+    from astrolift_registry.brain_runs import visible_agent_grants
+
+    data = _serialize_agent(matches[0], include_package=True)
+    # Semantic layers shared with the agent that the caller can read (#2449).
+    data["run"]["brain_grants"] = [
+        {"slug": g.brain.slug, "name": g.brain.name, "granted_at": _iso(g.created_at)}
+        for g in visible_agent_grants(matches[0])
+    ]
+    return data
 
 
 def _task_rows(permission=Permission.AGENT_READ):

@@ -15641,6 +15641,7 @@
     "none": "ninguno",
     "notServed": "Aún no se sirve",
     "notShared": "Solo el equipo propietario",
+    "archived": "Archivada",
     "shareTitle": "{team}: {access}",
     "emptyTitle": "No hay capas semánticas",
     "emptyDescription": "Aquí aparecen las aplicaciones declaradas con [app] kind = \"mimwell\" que puedes leer.",
@@ -15682,8 +15683,8 @@
     "columnFreshness": "Frescura",
     "new": "Nueva capa semántica",
     "status": {
-      "unavailable": "No disponible",
       "unknown": "Desconocido",
+      "notChecked": "Aún no se ha leído del host de origen; abre la capa para comprobarlo.",
       "never": "Nunca",
       "noEnvironment": "No hay entorno {environment}",
       "notDeployed": "Sin desplegar",
@@ -15746,6 +15747,7 @@
       "templateRef": "Referencia de plantilla",
       "templateRefHelp": "Una etiqueta, rama o commit de la edición de Mimwell. Déjalo vacío para usar la edición que fija esta instalación.",
       "pinnedEdition": "La edición que fija esta instalación",
+      "pinnedEditionRef": "La edición que fija esta instalación ({ref})",
       "name": "Nombre",
       "nameHelp": "Se muestra en las listas. Si queda vacío, se usa el slug.",
       "namePlaceholder": "Conocimiento de la plataforma",
@@ -15787,6 +15789,7 @@
         "repoFormat": "Usa owner/name, con letras, dígitos, puntos, guiones y guiones bajos.",
         "refFormat": "Un nombre de etiqueta, rama o commit, sin espacios ni puntos consecutivos.",
         "slugFormat": "Letras minúsculas, dígitos y guiones, empezando por una letra y terminando por una letra o un dígito, hasta 63 caracteres.",
+        "needsAppSlug": "Esta edición no tiene deploy.app_slug, así que el slug debe terminar en -brain.",
         "envFormat": "Un nombre corto en minúsculas: letras, dígitos y guiones, hasta 32 caracteres.",
         "long": "Hasta 255 caracteres."
       }
@@ -15807,13 +15810,6 @@
         "graph": "Dónde reside la proyección del grafo."
       },
       "supported": "Compatible con Mimwell:",
-      "reasons": {
-        "d1Authority": "d1 es un destino de proyección, nunca una autoridad.",
-        "dbBlobNeedsDatabase": "db-blob guarda los blobs en la base de datos de la autoridad, y esta autoridad no tiene ninguna.",
-        "inDbVectorsMongo": "Los vectores in-db son columnas vectoriales SQL, y mongo no tiene ninguna.",
-        "inDbVectorsNeedSql": "Los vectores in-db residen en la base de datos de la autoridad, y esta autoridad no tiene ninguna.",
-        "ageNeedsPostgres": "age es una extensión de Postgres, así que necesita la autoridad postgres."
-      },
       "persistence": "Persistencia",
       "persistenceHelp": "Lo que Astrolift adjunta a la capa. El repositorio siempre está presente.",
       "persistenceKinds": {
@@ -15834,8 +15830,7 @@
       "imageFormat": "Una referencia de imagen no tiene espacios.",
       "imageKept": "La capa conserva la imagen que ejecuta.",
       "port": "Puerto",
-      "portRange": "De 1 a 65535.",
-      "portGraduate": "La API no informa del puerto actual: mantén el puerto en el que sirve la capa."
+      "portRange": "De 1 a 65535."
     },
     "creation": {
       "listCrumb": "Capas semánticas",
@@ -16419,7 +16414,8 @@
     "brains": {
       "search": "Buscar nombres e identificadores…",
       "views": {
-        "all": "Todas"
+        "all": "Todas",
+        "archived": "Con archivadas"
       },
       "fields": {
         "team": "Equipo"

@@ -12,15 +12,18 @@ import type {
   CreateBrainMutationVariables,
   GetBrainCreationQuery,
   GetBrainCreationQueryVariables,
+  GetBrainEditionQuery,
+  GetBrainEditionQueryVariables,
 } from "@/graphql/__generated__/operations";
 import { CREATE_BRAIN } from "@/graphql/registry/brains.mutations";
-import { GET_BRAIN_CREATION } from "@/graphql/registry/brains.queries";
+import { GET_BRAIN_CREATION, GET_BRAIN_EDITION } from "@/graphql/registry/brains.queries";
 import { LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
 import type { AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import type { SubstrateServerError } from "../BrainSubstrateForm";
 import { gatedWrite } from "../gated-write";
+import { useBrainCells } from "../use-brain-cells";
 import type { NewBrainWizardProps } from "./NewBrainWizard";
 import {
   createInput,
@@ -87,10 +90,25 @@ export function useNewBrain(): NewBrainWizardProps {
       })),
     [wizardProjects.allProjects]
   );
-  const context = { connections, projects };
-
   const [step, setStep] = React.useState<NewBrainStep>(1);
   const [own, setOwn] = React.useState<NewBrainDraft>(EMPTY_DRAFT);
+  // The edition is read once the ref is chosen (past Source), and the
+  // matrix once the substrate is (from Substrate on).
+  const editionQuery = useQuery<GetBrainEditionQuery, GetBrainEditionQueryVariables>(
+    GET_BRAIN_EDITION,
+    {
+      variables: { templateRef: own.templateRef.trim() || null },
+      skip: Boolean(creationId) || step < 2,
+    }
+  );
+  const edition = editionQuery.data?.astroliftBrainEdition ?? null;
+  const matrix = useBrainCells({ skip: Boolean(creationId) || step < 3 });
+  const context = {
+    connections,
+    projects,
+    matrix,
+    supportsAppSlug: edition?.supportsAppSlug ?? null,
+  };
   const draft = withDefaults(own, context);
   const problems = draftProblems(draft, context);
   const [serverErrors, setServerErrors] = React.useState<Partial<Record<DraftField, string>>>({});
@@ -207,6 +225,8 @@ export function useNewBrain(): NewBrainWizardProps {
     problems,
     serverErrors,
     substrateError,
+    matrix,
+    pinnedRef: edition && !own.templateRef.trim() ? edition.ref : null,
     generalError,
     connections,
     connectionsLoading: connectionsQuery.loading && !connectionsQuery.data,

@@ -19,7 +19,7 @@ import { DefinitionList } from "@/components/ui/definition-list";
 import { useRelativeAge } from "@/lib/format";
 
 import { freshnessOf, healthOf, INGEST_TONE, mcpUrl, shortSha } from "../brain-status-model";
-import type { BrainStatusResult } from "../BrainStatusCell";
+import type { BrainStatusResult } from "../brain-status-model";
 import type { FramedBrain } from "./brain-detail-model";
 import { type EnvironmentChoice, EnvironmentPicker } from "./EnvironmentPicker";
 

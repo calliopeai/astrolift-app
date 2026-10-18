@@ -457,8 +457,16 @@ export type AstroliftAgentBoxMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftAgentBrainGrant = {
+  brainName: Scalars['String']['output'];
+  brainSlug: Scalars['String']['output'];
+  grantedAt: Scalars['String']['output'];
+};
+
 export type AstroliftAgentDetail = {
   appSlug: Scalars['String']['output'];
+  /** Semantic layers shared with the agent that the caller can read (#2449). A run nobody launched reads those the agent also lists in brains or brainsAllowed. */
+  brainGrants: Array<AstroliftAgentBrainGrant>;
   /** Brains every run a person launches reads, from the agent's manifest (#2432). */
   brains: Array<Scalars['String']['output']>;
   /** Brains a launch may add with brainSlugs (#2432). Null accepts any brain the launcher can read; empty accepts none. */
@@ -1811,6 +1819,13 @@ export type AstroliftAuditRetention = {
 };
 
 export type AstroliftBrain = {
+  /** Agents the brain is shared with that the caller can read (#2449). Null in lists. */
+  agentShares?: Maybe<Array<AstroliftBrainAgentShare>>;
+  /** Every environment, served or not, with its state (#2444). */
+  allEnvironments: Array<AstroliftBrainEnvironmentState>;
+  /** Archived: listed only with includeArchived; restoreApp. */
+  archived: Scalars['Boolean']['output'];
+  /** Served environments (with a URL), the ones a client connects to. */
   environments: Array<AstroliftBrainEnvironment>;
   /** Apps hosted on this brain that the caller can read. Filled by astroliftBrain; null in lists. */
   hostedApps?: Maybe<Array<AstroliftBrainHostedApp>>;
@@ -1822,7 +1837,15 @@ export type AstroliftBrain = {
   slug: Scalars['String']['output'];
   /** The cell last applied and the resources it needs, without host reads (adopted and graduationNeeded are null here; astroliftBrainStatus reads them). Null in lists. */
   substrate?: Maybe<AstroliftBrainSubstrate>;
+  /** Health and freshness for lists, without host reads (#2444); null with no environment. */
+  summary?: Maybe<AstroliftBrainSummary>;
   team: Scalars['String']['output'];
+};
+
+export type AstroliftBrainAgentShare = {
+  agent: Scalars['String']['output'];
+  app: Scalars['String']['output'];
+  grantedAt: Scalars['String']['output'];
 };
 
 export type AstroliftBrainApp = {
@@ -1837,6 +1860,16 @@ export type AstroliftBrainAppMutationResult = {
   data?: Maybe<AstroliftBrainApp>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBrainCell = {
+  authority: Scalars['String']['output'];
+  blobs: Scalars['String']['output'];
+  graph: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  /** supported, planned or unsupported. */
+  status: Scalars['String']['output'];
+  vectors: Scalars['String']['output'];
 };
 
 export type AstroliftBrainConnection = {
@@ -1881,8 +1914,32 @@ export type AstroliftBrainDeploymentState = {
   status: Scalars['String']['output'];
 };
 
+export type AstroliftBrainEdition = {
+  error?: Maybe<Scalars['String']['output']>;
+  /** The ref asked for, or the one this install pins. */
+  ref: Scalars['String']['output'];
+  /** Whether the edition ships the portal container a brain with no image builds. */
+  shipsPortalContainer?: Maybe<Scalars['Boolean']['output']>;
+  /** Whether the edition has deploy.app_slug, which a slug not ending in -brain needs; null when the edition could not be read (error says why). */
+  supportsAppSlug?: Maybe<Scalars['Boolean']['output']>;
+  templateRepo: Scalars['String']['output'];
+  version?: Maybe<Scalars['String']['output']>;
+};
+
 export type AstroliftBrainEnvironment = {
   name: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+};
+
+export type AstroliftBrainEnvironmentState = {
+  deployedAt?: Maybe<Scalars['String']['output']>;
+  /** The environment's latest deployment's status; null when it has none. */
+  deploymentStatus?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  /** Whether its ingress is paused (the edge answers 503). */
+  paused: Scalars['Boolean']['output'];
+  /** Whether the environment has a URL. */
+  served: Scalars['Boolean']['output'];
   url: Scalars['String']['output'];
 };
 
@@ -1902,6 +1959,19 @@ export type AstroliftBrainMutationResult = {
   data?: Maybe<AstroliftBrain>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftBrainPage = {
+  items: Array<AstroliftBrain>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftBrainRebuild = {
@@ -1932,6 +2002,12 @@ export type AstroliftBrainShare = {
   access: Scalars['String']['output'];
   team: Scalars['String']['output'];
 };
+
+export type AstroliftBrainSort =
+  | 'NAME_ASC'
+  | 'NAME_DESC'
+  | 'NEWEST'
+  | 'OLDEST';
 
 export type AstroliftBrainSourceHead = {
   branch: Scalars['String']['output'];
@@ -1973,9 +2049,21 @@ export type AstroliftBrainSubstrate = {
   graph: Scalars['String']['output'];
   image: Scalars['String']['output'];
   persistence: Array<Scalars['String']['output']>;
+  /** The port the brain serves on (#2444). */
+  port: Scalars['Int']['output'];
   replicas: Scalars['Int']['output'];
   resources: Array<AstroliftBrainResource>;
   vectors: Scalars['String']['output'];
+};
+
+export type AstroliftBrainSummary = {
+  behind?: Maybe<Scalars['Boolean']['output']>;
+  /** When compiledAt, behind and lastIngest were read from the source host; null when they never were (or the reading expired), and they are null too. */
+  checkedAt?: Maybe<Scalars['String']['output']>;
+  compiledAt?: Maybe<Scalars['String']['output']>;
+  deployment?: Maybe<AstroliftBrainDeploymentState>;
+  environmentName: Scalars['String']['output'];
+  lastIngest?: Maybe<AstroliftBrainIngestRun>;
 };
 
 export type AstroliftBrief = {
@@ -12650,11 +12738,17 @@ export type Query = {
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   /** One semantic layer the caller can read, by app slug (#2424), with the apps hosted on it. Null when it is not visible, archived or not a brain. */
   astroliftBrain?: Maybe<AstroliftBrain>;
+  /** Every cell of Mimwell's substrate matrix with its status and reason (#2444): what createBrain and updateBrainSubstrate accept. Follows the Mimwell commit this install's port is held to. */
+  astroliftBrainCells: Array<AstroliftBrainCell>;
   /** The progress of one createBrain request (#2424). Visible to the person who asked for it and to readers of the brain it created. */
   astroliftBrainCreation?: Maybe<AstroliftBrainCreation>;
+  /** The Mimwell edition a new semantic layer starts from (#2444): at templateRef, or the ref this install pins; whether it has deploy.app_slug (a slug not ending in -brain needs it) and ships the portal container. The edition is read once per ref and kept 10 minutes. */
+  astroliftBrainEdition: AstroliftBrainEdition;
   /** How fresh a semantic layer is in one environment (#2424): its latest deployment, the running commit against the deploy branch head, when it was compiled and its last ingest run. */
   astroliftBrainStatus?: Maybe<AstroliftBrainStatus>;
   astroliftBrains: Array<AstroliftBrain>;
+  /** Semantic layers the caller can read, one page at a time (#2444): search over name and slug, the home team's slug, a sort, and archived ones too with includeArchived. totalCount counts every match; nextCursor reaches the next page under the same sort. */
+  astroliftBrainsPage: AstroliftBrainPage;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftCluster?: Maybe<AstroliftTenantCluster>;
   astroliftClusterAgentInstall: AstroliftClusterAgentInstall;
@@ -13675,6 +13769,11 @@ export type QueryAstroliftBrainCreationArgs = {
 };
 
 
+export type QueryAstroliftBrainEditionArgs = {
+  templateRef?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftBrainStatusArgs = {
   environmentName?: Scalars['String']['input'];
   slug: Scalars['String']['input'];
@@ -13683,6 +13782,16 @@ export type QueryAstroliftBrainStatusArgs = {
 
 export type QueryAstroliftBrainsArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftBrainsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  includeArchived?: Scalars['Boolean']['input'];
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+  sort?: AstroliftBrainSort;
+  team?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -16203,8 +16312,9 @@ export type SetZentinelleGatewayUrlInput = {
 
 export type ShareBrainInput = {
   access: BrainShareAccess;
+  agentSlug: InputMaybe<Scalars['String']['input']>;
   slug: Scalars['String']['input'];
-  teamSlug: Scalars['String']['input'];
+  teamSlug: InputMaybe<Scalars['String']['input']>;
 };
 
 export type SharedDirectoryType = {
@@ -16491,8 +16601,9 @@ export type UnregisterTenantClusterInput = {
 };
 
 export type UnshareBrainInput = {
+  agentSlug: InputMaybe<Scalars['String']['input']>;
   slug: Scalars['String']['input'];
-  teamSlug: Scalars['String']['input'];
+  teamSlug: InputMaybe<Scalars['String']['input']>;
 };
 
 export type UpdateAgentEnvironmentSpecInput = {

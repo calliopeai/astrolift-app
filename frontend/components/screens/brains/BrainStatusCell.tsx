@@ -1,28 +1,20 @@
 "use client";
 
-import { AlertTriangleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useRelativeAge } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import {
-  type BrainStatus,
+  type BrainSummary,
   freshnessOf,
   healthOf,
   INGEST_TONE,
   shortSha,
 } from "./brain-status-model";
-
-/** One row's status read: in flight, refused or failed, or the answer (null: no such environment). */
-export type BrainStatusResult =
-  | { state: "loading" }
-  | { state: "error"; message: string }
-  | { state: "ready"; status: BrainStatus | null };
 
 export type BrainStatusPart = "health" | "rebuilt" | "freshness";
 
@@ -34,39 +26,22 @@ const ABOVE_ROW_LINK = "relative z-10";
  * The list's status columns for one semantic layer (#2427): Health (the
  * environment's latest deployment), Last rebuild (when it started, at which
  * commit) and Freshness (compiled when, at the branch head or behind, the
- * last ingest). Pure: the row's status read comes in.
+ * last ingest). Pure: the row's cached summary comes in (#2444), so no row
+ * reads the source host; freshness is unknown until a status read has run.
  */
 export function BrainStatusCell({
   part,
-  result,
-  environment,
+  summary,
 }: {
   part: BrainStatusPart;
-  result: BrainStatusResult;
-  /** The environment the status was read in. */
-  environment: string;
+  /** Null when the layer has no environment yet. */
+  summary: BrainSummary | null;
 }) {
   const t = useTranslations("brains.status");
   const overview = useTranslations("brains.overview");
   const age = useRelativeAge();
-  if (result.state === "loading") return <Skeleton className="h-4 w-20" />;
-  if (result.state === "error")
-    return part === "health" ? (
-      <span
-        className={cn(
-          "text-muted-foreground inline-flex items-center gap-1 text-xs",
-          ABOVE_ROW_LINK
-        )}
-        title={result.message}
-      >
-        <AlertTriangleIcon className="text-warning size-3.5" aria-hidden />
-        {t("unavailable")}
-      </span>
-    ) : (
-      <span className="text-muted-foreground text-xs">{t("unknown")}</span>
-    );
-  const status = result.status;
-  if (part === "health") return <Health status={status} environment={environment} />;
+  const status = summary;
+  if (part === "health") return <Health status={status} />;
   if (!status)
     return part === "rebuilt" ? (
       <span className="text-muted-foreground text-xs">{t("never")}</span>
@@ -90,6 +65,12 @@ export function BrainStatusCell({
       </span>
     );
   }
+  if (!status.checkedAt)
+    return (
+      <span className={cn("text-muted-foreground text-xs", ABOVE_ROW_LINK)} title={t("notChecked")}>
+        {t("unknown")}
+      </span>
+    );
   const fresh = freshnessOf(status);
   return (
     <span className="flex min-w-0 flex-col gap-1">
@@ -97,7 +78,7 @@ export function BrainStatusCell({
         <span className={cn("text-xs", ABOVE_ROW_LINK)} title={fresh.compiledAt}>
           {t("compiled", { age: age(fresh.compiledAt) })}
         </span>
-      ) : status.deployedCommit ? (
+      ) : status.deployment?.status === "running" ? (
         <span className="text-warning-fg text-xs">{t("notCompiled")}</span>
       ) : (
         // The compile is read at the running commit: with nothing running
@@ -124,21 +105,12 @@ export function BrainStatusCell({
             {t(`ingest.${fresh.ingest.state}`)}
           </span>
         )}
-        {fresh.warnings.length > 0 && (
-          <span
-            className={cn("text-warning-fg inline-flex items-center gap-1 text-xs", ABOVE_ROW_LINK)}
-            title={fresh.warnings.join("\n")}
-          >
-            <AlertTriangleIcon className="size-3.5" aria-hidden />
-            {t("warnings", { count: fresh.warnings.length })}
-          </span>
-        )}
       </span>
     </span>
   );
 }
 
-function Health({ status, environment }: { status: BrainStatus | null; environment: string }) {
+function Health({ status }: { status: BrainSummary | null }) {
   const t = useTranslations("brains.status");
   const health = healthOf(status);
   return (
@@ -151,7 +123,9 @@ function Health({ status, environment }: { status: BrainStatus | null; environme
         </Badge>
       ) : (
         <span className="text-muted-foreground text-xs">
-          {health.kind === "noEnvironment" ? t("noEnvironment", { environment }) : t("notDeployed")}
+          {health.kind === "noEnvironment"
+            ? t("noEnvironment", { environment: "production" })
+            : t("notDeployed")}
         </span>
       )}
       {status && (

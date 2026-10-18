@@ -1,16 +1,17 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
-import type { BrainStatus } from "./brain-status-model";
+import type { BrainSummary } from "./brain-status-model";
 import {
   BEHIND,
   DEPLOY_FAILED,
   DEPLOYING,
   HEALTHY,
   NOT_DEPLOYED,
+  summaryOf,
   UNKNOWN_VALUES,
 } from "./brain-status.fixtures";
-import { type BrainStatusResult, BrainStatusCell } from "./BrainStatusCell";
+import { BrainStatusCell } from "./BrainStatusCell";
 
 const meta: Meta<typeof BrainStatusCell> = {
   title: "Screens/Brains/BrainStatusCell",
@@ -21,10 +22,8 @@ export default meta;
 
 type Story = StoryObj<typeof BrainStatusCell>;
 
-const ready = (status: BrainStatus | null): BrainStatusResult => ({ state: "ready", status });
-
-/** The three columns side by side for one read. */
-function Row({ label, result }: { label: string; result: BrainStatusResult }) {
+/** The three columns side by side for one row's summary. */
+function Row({ label, summary }: { label: string; summary: BrainSummary | null }) {
   return (
     <tr className="border-b align-top">
       <th scope="row" className="text-muted-foreground py-2 pr-6 text-left text-xs font-normal">
@@ -32,14 +31,14 @@ function Row({ label, result }: { label: string; result: BrainStatusResult }) {
       </th>
       {(["health", "rebuilt", "freshness"] as const).map((part) => (
         <td key={part} className="py-2 pr-6">
-          <BrainStatusCell part={part} result={result} environment="production" />
+          <BrainStatusCell part={part} summary={summary} />
         </td>
       ))}
     </tr>
   );
 }
 
-/** Every state a row's status columns can be in. */
+/** Every state a row's status columns can be in, from its cached summary (#2444). */
 export const AllStates: Story = {
   render: () => (
     <table className="text-sm">
@@ -52,15 +51,14 @@ export const AllStates: Story = {
         </tr>
       </thead>
       <tbody>
-        <Row label="Healthy" result={ready(HEALTHY)} />
-        <Row label="Behind, ingest failed" result={ready(BEHIND)} />
-        <Row label="Deploy failed" result={ready(DEPLOY_FAILED)} />
-        <Row label="Deploying" result={ready(DEPLOYING)} />
-        <Row label="Not deployed" result={ready(NOT_DEPLOYED)} />
-        <Row label="No such environment" result={ready(null)} />
-        <Row label="Unknown values" result={ready(UNKNOWN_VALUES)} />
-        <Row label="Loading" result={{ state: "loading" }} />
-        <Row label="Failed" result={{ state: "error", message: "source head: HTTP 502" }} />
+        <Row label="Healthy" summary={summaryOf(HEALTHY)} />
+        <Row label="Behind, ingest failed" summary={summaryOf(BEHIND)} />
+        <Row label="Deploy failed" summary={summaryOf(DEPLOY_FAILED)} />
+        <Row label="Deploying" summary={summaryOf(DEPLOYING)} />
+        <Row label="Not deployed" summary={summaryOf(NOT_DEPLOYED)} />
+        <Row label="Not checked yet" summary={summaryOf(HEALTHY, false)} />
+        <Row label="No environment" summary={null} />
+        <Row label="Unknown values" summary={summaryOf(UNKNOWN_VALUES)} />
       </tbody>
     </table>
   ),
@@ -70,19 +68,21 @@ export const AllStates: Story = {
     await expect(canvas.getByText("Ingest failed")).toBeInTheDocument();
     await expect(canvas.getByText("No production environment")).toBeInTheDocument();
     await expect(canvas.getByText("paused_by_operator")).toBeInTheDocument();
-    await expect(canvas.getByTitle("source head: HTTP 502")).toBeInTheDocument();
+    await expect(
+      canvas.getByTitle("Not read from the source host yet; open the layer to check.")
+    ).toBeInTheDocument();
   },
 };
 
 export const Health: Story = {
-  args: { part: "health", result: ready(HEALTHY), environment: "production" },
+  args: { part: "health", summary: summaryOf(HEALTHY) },
 };
 export const Rebuilt: Story = {
-  args: { part: "rebuilt", result: ready(HEALTHY), environment: "production" },
+  args: { part: "rebuilt", summary: summaryOf(HEALTHY) },
 };
 export const Freshness: Story = {
-  args: { part: "freshness", result: ready(BEHIND), environment: "production" },
+  args: { part: "freshness", summary: summaryOf(BEHIND) },
 };
-export const Loading: Story = {
-  args: { part: "health", result: { state: "loading" }, environment: "production" },
+export const NotChecked: Story = {
+  args: { part: "freshness", summary: summaryOf(HEALTHY, false) },
 };

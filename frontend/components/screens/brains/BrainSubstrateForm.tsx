@@ -20,6 +20,7 @@ import {
   type Axis,
   AXES,
   AXIS_ORDER,
+  type CellMatrix,
   cellStatus,
   MAX_REPLICAS,
   optionStatus,
@@ -39,6 +40,8 @@ export interface SubstrateServerError {
 export interface BrainSubstrateFormProps {
   draft: SubstrateDraft;
   onChange: (next: SubstrateDraft) => void;
+  /** Mimwell's matrix (`astroliftBrainCells`); null until it arrives, when nothing is refused here. */
+  matrix: CellMatrix | null;
   /** Create may name an image; graduation keeps the one the brain runs. */
   mode: "create" | "graduate";
   /** Persistence that must stay attached: what the brain already holds data on. */
@@ -51,13 +54,14 @@ export interface BrainSubstrateFormProps {
 /**
  * Mimwell's substrate as a form (#2424, #2427): the cell's four placements,
  * each option that would make an unsupported cell disabled with Mimwell's
- * reason; the persistence the host attaches, with what the cell needs
+ * reason as the server gives it (#2444); the persistence the host attaches, with what the cell needs
  * checked and held; replicas, and the image and port. Shared by the create
  * wizard and graduation. Pure.
  */
 export function BrainSubstrateForm({
   draft,
   onChange,
+  matrix,
   mode,
   locked = [],
   serverError,
@@ -65,8 +69,8 @@ export function BrainSubstrateForm({
 }: BrainSubstrateFormProps) {
   const t = useTranslations("brains.substrate");
   const required = requiredPersistence(draft.cell);
-  const verdict = cellStatus(draft.cell);
-  const problems = substrateProblems(draft);
+  const verdict = cellStatus(draft.cell, matrix);
+  const problems = substrateProblems(draft, matrix);
   const named = serverError?.field ?? null;
   const fieldError = (field: string) => (named === field ? serverError!.message : null);
   // A refusal about one of the lower fields sits on that field; one about
@@ -106,15 +110,14 @@ export function BrainSubstrateForm({
                 </SelectTrigger>
                 <SelectContent>
                   {(AXES[axis] as readonly string[]).map((value) => {
-                    const option = optionStatus(draft.cell, axis, value as never);
+                    const option = optionStatus(draft.cell, axis, value as never, matrix);
+                    const refused = option?.supported === false ? option : null;
                     return (
-                      <SelectItem key={value} value={value} disabled={!option.supported}>
+                      <SelectItem key={value} value={value} disabled={Boolean(refused)}>
                         <span className="flex min-w-0 flex-col">
                           <span className="font-mono">{value}</span>
-                          {!option.supported && (
-                            <span className="text-muted-foreground text-xs">
-                              {t(`reasons.${option.reason}`)}
-                            </span>
+                          {refused?.reason && (
+                            <span className="text-muted-foreground text-xs">{refused.reason}</span>
                           )}
                         </span>
                       </SelectItem>
@@ -129,16 +132,18 @@ export function BrainSubstrateForm({
         <p
           className={cn(
             "flex min-w-0 items-start gap-2 rounded-md border px-3 py-2 text-xs",
-            verdict.supported
-              ? "border-success-border bg-success/10 text-success-fg"
-              : "border-danger-border bg-danger/5 text-danger-fg"
+            !verdict
+              ? "text-muted-foreground"
+              : verdict.supported
+                ? "border-success-border bg-success/10 text-success-fg"
+                : "border-danger-border bg-danger/5 text-danger-fg"
           )}
         >
-          {verdict.supported && (
+          {verdict?.supported && (
             <CheckCircle2Icon className="mt-px size-3.5 shrink-0" aria-hidden />
           )}
           <span className="min-w-0 [overflow-wrap:anywhere]">
-            {verdict.supported ? t("supported") : t(`reasons.${verdict.reason}`)}{" "}
+            {verdict && (verdict.supported ? t("supported") : verdict.reason)}{" "}
             <span className="font-mono">
               {AXIS_ORDER.map((axis) => `${axis}=${draft.cell[axis]}`).join(", ")}
             </span>
@@ -241,7 +246,6 @@ export function BrainSubstrateForm({
         <WizardField
           id={`${idPrefix}-port`}
           label={t("port")}
-          help={mode === "graduate" ? t("portGraduate") : undefined}
           problem={problems.includes("port") ? t("portRange") : null}
           serverError={fieldError("port")}
         >

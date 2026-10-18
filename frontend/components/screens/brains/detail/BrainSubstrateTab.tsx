@@ -20,10 +20,14 @@ import {
 import { PILL_TONE } from "@/lib/status-tones";
 import { cn } from "@/lib/utils";
 
-import { resourceInFlight, resourceTone } from "../brain-status-model";
-import type { BrainStatusResult } from "../BrainStatusCell";
+import { type BrainStatusResult, resourceInFlight, resourceTone } from "../brain-status-model";
 import { BrainSubstrateForm, type SubstrateServerError } from "../BrainSubstrateForm";
-import { substrateProblems, type Persistence, type SubstrateDraft } from "../substrate-cells";
+import {
+  type CellMatrix,
+  substrateProblems,
+  type Persistence,
+  type SubstrateDraft,
+} from "../substrate-cells";
 import type { BrainSubstrate } from "./brain-detail-model";
 import { type EnvironmentChoice, EnvironmentPicker } from "./EnvironmentPicker";
 
@@ -48,6 +52,8 @@ export interface BrainSubstrateTabProps {
     onChange: (next: SubstrateDraft) => void;
     /** Persistence the layer holds data on: it stays attached. */
     locked: Persistence[];
+    /** Mimwell's matrix, read when the form opens; null until it arrives. */
+    matrix: CellMatrix | null;
     submitting: boolean;
     onSubmit: () => void;
     error: SubstrateServerError | null;
@@ -79,7 +85,7 @@ export function BrainSubstrateTab({
   const substrate = read?.substrate ?? local;
   const statusError = status.state === "error" ? status.message : null;
   const graduationNeeded = read?.substrate.graduationNeeded === true;
-  const blocked = substrateProblems(graduation.draft).length > 0;
+  const blocked = substrateProblems(graduation.draft, graduation.matrix).length > 0;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -260,6 +266,7 @@ export function BrainSubstrateTab({
             draft={graduation.draft}
             onChange={graduation.onChange}
             locked={graduation.locked}
+            matrix={graduation.matrix}
             serverError={graduation.error}
           />
           <DialogFooter>

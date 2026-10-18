@@ -1,0 +1,1538 @@
+[
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "in-db vectors live in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "in-db vectors live in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "db-blob keeps blobs in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "in-db vectors live in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "in-db vectors live in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "in-db vectors live in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "in-db vectors live in the authority database and files has none"
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "files",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "sqlite",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "postgres",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mysql",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "supported",
+    "reason": ""
+  },
+  {
+    "authority": "mongo",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "age is a Postgres extension"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "fs",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "db-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "s3",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "local",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "in-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "edge-db",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "edges-table",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  },
+  {
+    "authority": "d1",
+    "blobs": "azure-blob",
+    "vectors": "external",
+    "graph": "age",
+    "status": "unsupported",
+    "reason": "d1 is a projection target, never an authority"
+  }
+]
