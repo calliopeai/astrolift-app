@@ -22,9 +22,9 @@ does not claim to identify the exact response that failed.
 | IBM Plex Mono | `ofl/ibmplexmono/IBMPlexMono-SemiBold.ttf` | `ibm-plex-mono/IBMPlexMono-SemiBold.ttf` | `d3c38e55c78f5b0f28009fddba4834ec503278936a5986032424c9bd2d23aa46` |
 
 The three upstream `OFL.txt` files are retained beside their family assets.
-The complete asset directory is about 1.2 MiB. This removes Google Fonts
-network access from the production build; it does not promise pixel-identical
-rendering across browsers or operating systems.
+The font binaries total 1.19 MB (1.14 MiB), plus small license files. This
+removes Google Fonts network access from the production build; it does not
+promise pixel-identical rendering across browsers or operating systems.
 
 All three licenses are SIL Open Font License 1.1. The Git-blob SHA-256 values
 are `dm-sans/OFL.txt` `2af94f4fb533be8fa23282eb33e08ca311ddf47c2f32777e2040b282deeec65c`,
