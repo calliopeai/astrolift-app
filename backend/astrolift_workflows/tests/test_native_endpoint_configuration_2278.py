@@ -56,7 +56,6 @@ from astrolift_workflows.tests.test_native_execution_checkpoint_2278 import worl
 from providers.tests.gcp.test_gke_app_apply_2278 import native as tls_fixture
 from providers.tests.gcp.test_identity_submission_2278 import SubmissionWire
 
-
 _HISTORY_SCAN_LIMIT = 2048
 _HISTORY_ROW_LIMIT = 8
 _HISTORY_COUNT_LIMIT = 1_000_000
@@ -86,17 +85,17 @@ def _safe_temporal_history_summary(history):
     except (TypeError, OverflowError):
         available = 0
     available = min(max(available, 0), _HISTORY_COUNT_LIMIT)
-    timeout_counts = {name: 0 for name in sorted(_SAFE_TIMEOUT_NAMES)}
-    event_type_counts = {
-        name: 0
-        for name in (
+    timeout_counts = dict.fromkeys(sorted(_SAFE_TIMEOUT_NAMES), 0)
+    event_type_counts = dict.fromkeys(
+        (
             "EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT",
             "EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED",
             "EVENT_TYPE_ACTIVITY_TASK_CANCELED",
             "EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED",
             *_SAFE_TERMINAL_EVENT_NAMES,
-        )
-    }
+        ),
+        0,
+    )
     timeout_rows = []
     activity_cancel_request_rows = []
     cancellation_ids = []
