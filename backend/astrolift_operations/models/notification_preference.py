@@ -53,6 +53,8 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     # ---- certs (#155): a lapsing cert breaks TLS for everyone ------
     ("push", "domain.cert_expiring"): True,
     ("push", "domain.cert_renewal_failed"): True,
+    # ---- temporary apps (#2433): the app is about to be torn down ----
+    ("push", "app.expiring"): True,
     # ---- #499 new-session ------------------------------------------
     # Mobile/web new sessions are security-critical → ON.
     # CLI sessions are a noisy bootstrap signal → OFF by default so
@@ -82,6 +84,7 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     ("email", "secret.revealed"): True,
     ("email", "app.deregister_pending"): True,
     ("email", "agent.message.sent"): True,
+    ("email", "app.expiring"): True,
 }
 
 

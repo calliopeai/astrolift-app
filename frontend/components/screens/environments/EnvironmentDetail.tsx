@@ -10,6 +10,8 @@ import {
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
+import { ExpiryBadge } from "../apps/ExpiryBadge";
+
 import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
 import { Identifier } from "@/components/Identifier";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
@@ -65,6 +67,7 @@ export function EnvironmentDetail({
   environment: e,
   error,
   onRetry,
+  appExpiresAt,
 }: EnvironmentDetailProps) {
   const t = useTranslations("lists.environments.detail");
   const fallback = t("environmentLabel", { id: id.slice(0, 8) });
@@ -111,6 +114,7 @@ export function EnvironmentDetail({
           <span className="inline-flex shrink-0 items-center gap-1.5 text-sm">
             <StatusDot status={e.deploysPaused ? "warn" : "ok"} />
             {e.deploysPaused ? t("deploysPaused") : t("deploysActive")}
+            <ExpiryBadge expiresAt={appExpiresAt} />
           </span>
         }
         context={

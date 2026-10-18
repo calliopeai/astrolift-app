@@ -126,6 +126,10 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # no known expiry is skipped. Reminders are watermarked per domain,
         # so it pages once per threshold rather than every day.
         ScheduleKind.CERT_EXPIRY,
+        # The temporary-app timer safety net ships active (#2433): held, an
+        # app whose timer was lost would outlive its expiry. It only starts
+        # timers that are not running; the timer itself does the teardown.
+        ScheduleKind.APP_EXPIRY_SWEEP,
         # NB: ScheduleKind.CI_WORKFLOW_RESYNC is INTENTIONALLY absent here
         # (#1211, Phase 3). Unlike the read-mostly / idempotent-SSA kinds
         # above, it does OUTBOUND writes to tenant source repos (pushes the

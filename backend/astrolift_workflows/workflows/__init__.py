@@ -15,6 +15,7 @@ from astrolift_workflows.workflows.agent_loop_tick import AgentLoopTickWorkflow
 from astrolift_workflows.workflows.agent_reconcile_tick import AgentReconcileTickWorkflow
 from astrolift_workflows.workflows.agent_scale_tick import AgentScaleTickWorkflow
 from astrolift_workflows.workflows.alert_eval_tick import AlertEvalTickWorkflow
+from astrolift_workflows.workflows.app_expiry import AppExpirySweepWorkflow, AppExpiryWorkflow
 from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
@@ -123,6 +124,8 @@ __all__ = [
     "AgentReconcileTickWorkflow",
     "AgentScaleTickWorkflow",
     "AlertEvalTickWorkflow",
+    "AppExpirySweepWorkflow",
+    "AppExpiryWorkflow",
     "BringClusterIntoManagementWorkflow",
     "BuildPreviewWorkflow",
     "CapturePlatformCostSnapshotWorkflow",

@@ -33,6 +33,8 @@ import { Label } from "@/components/ui/label";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
+import { ExpiryBadge } from "../ExpiryBadge";
+
 import { AppFreshnessRow } from "./AppFreshnessRow";
 import { AppKindGlyph } from "./AppKindGlyph";
 import { type AppRow, type AppStatusKey, appStatusKey, appsCrumbs } from "./apps-list";
@@ -115,6 +117,7 @@ function AppStatus({ app }: { app: AppRow }) {
     <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
       <StatusDot status={DOT[key]} />
       <span className="truncate">{t(`status.${key}`)}</span>
+      <ExpiryBadge expiresAt={app.expiresAt} />
     </span>
   );
 }

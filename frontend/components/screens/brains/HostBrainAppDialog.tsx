@@ -3,6 +3,13 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { TemporaryAppFields } from "../apps/TemporaryAppFields";
+import {
+  temporaryAppValid,
+  type TemporaryAppValues,
+  type TemporaryAppPolicyState,
+} from "../apps/temporary-app-model";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export interface HostBrainAppValues {
+export interface HostBrainAppValues extends TemporaryAppValues {
   projectId: string;
   image: string;
   name: string;
@@ -42,12 +49,14 @@ function HostBrainAppForm({
   submitting,
   onSubmit,
   onDismiss,
+  temporary,
 }: {
   brainSlug: string;
   projects: HostBrainAppProject[];
   submitting: boolean;
   onSubmit: (values: HostBrainAppValues) => void;
   onDismiss: () => void;
+  temporary?: TemporaryAppPolicyState;
 }) {
   const t = useTranslations("brains.hostDialog");
   const [picked, setProjectId] = React.useState("");
@@ -56,17 +65,32 @@ function HostBrainAppForm({
   const [image, setImage] = React.useState("");
   const [name, setName] = React.useState("");
   const [port, setPort] = React.useState(String(DEFAULT_PORT));
+  const [lifetime, setLifetime] = React.useState<TemporaryAppValues>({
+    expiresIn: "",
+    deleteDataOnExpiry: false,
+  });
+  const lifetimeValid =
+    !temporary?.loading &&
+    !temporary?.failed &&
+    temporaryAppValid(lifetime, temporary?.rules ?? null);
   const portNumber = Number(port);
   const portValid = Number.isInteger(portNumber) && portNumber >= 1 && portNumber <= 65535;
   const imageValid = image.trim() !== "" && !/\s/.test(image.trim());
-  const valid = projects.some((p) => p.id === projectId) && imageValid && portValid;
+  const valid =
+    projects.some((p) => p.id === projectId) && imageValid && portValid && lifetimeValid;
   return (
     <form
       className="space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
         if (valid)
-          onSubmit({ projectId, image: image.trim(), name: name.trim(), port: portNumber });
+          onSubmit({
+            projectId,
+            image: image.trim(),
+            name: name.trim(),
+            port: portNumber,
+            ...lifetime,
+          });
       }}
     >
       <DialogHeader>
@@ -121,6 +145,15 @@ function HostBrainAppForm({
           />
         </div>
       </div>
+      <TemporaryAppFields
+        value={lifetime}
+        onChange={setLifetime}
+        rules={temporary?.rules ?? null}
+        loading={temporary?.loading}
+        failed={temporary?.failed}
+        disabled={submitting}
+        onRetry={temporary?.onRetry}
+      />
       <p className="text-muted-foreground text-xs">{t("envHelp")}</p>
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onDismiss}>
@@ -146,12 +179,14 @@ export function HostBrainAppDialog({
   submitting,
   onSubmit,
   onDismiss,
+  temporary,
 }: {
   brainSlug: string | null;
   projects: HostBrainAppProject[];
   submitting: boolean;
   onSubmit: (values: HostBrainAppValues) => void;
   onDismiss: () => void;
+  temporary?: TemporaryAppPolicyState;
 }) {
   return (
     <Dialog open={brainSlug !== null} onOpenChange={(o) => !o && onDismiss()}>
@@ -164,6 +199,7 @@ export function HostBrainAppDialog({
             submitting={submitting}
             onSubmit={onSubmit}
             onDismiss={onDismiss}
+            temporary={temporary}
           />
         )}
       </DialogContent>

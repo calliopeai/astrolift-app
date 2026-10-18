@@ -19,6 +19,15 @@ from astrolift_workflows.activities.app_domain_sync import (
     revert_app_subdomain,
     verify_app_hostnames,
 )
+from astrolift_workflows.activities.app_expiry import (
+    app_expiry_next_step,
+    fire_app_expiry,
+    purge_expired_app_namespaces,
+    record_app_expiry_purge,
+    record_app_expiry_teardown,
+    retire_expired_app_runtime,
+    sweep_app_expiry,
+)
 from astrolift_workflows.activities.app_lifecycle import (
     apply_manifests,
     cleanup_preview_managed_services_activity,
@@ -237,6 +246,13 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "app_expiry_next_step",
+    "fire_app_expiry",
+    "purge_expired_app_namespaces",
+    "record_app_expiry_purge",
+    "record_app_expiry_teardown",
+    "retire_expired_app_runtime",
+    "sweep_app_expiry",
     "apply_native_model_connection",
     "finish_native_model_connection",
     "fail_native_model_connection",

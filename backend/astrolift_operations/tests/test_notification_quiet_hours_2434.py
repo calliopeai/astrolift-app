@@ -181,6 +181,56 @@ def test_external_agent_message_delivery_rechecks_current_audience(world):
     assert _template_agent_message(envelope) is None
 
 
+def test_expiry_warning_remains_deliverable_during_agent_message_quiet_hours(
+    world, monkeypatch, django_capture_on_commit_callbacks
+):
+    from datetime import timedelta
+
+    from astrolift_operations.models import DeviceRegistration, Event, Notification
+    from astrolift_operations.notification_dispatch import (
+        set_driver_override_for_tests,
+        unset_driver_override_for_tests,
+    )
+    from astrolift_operations.tests.fixtures.notification_driver import MemoryNotificationDriver
+    from astrolift_registry import expiry
+
+    instant = datetime(2026, 10, 18, 5, tzinfo=UTC)
+    monkeypatch.setattr(timezone, "now", lambda: instant)
+    NotificationQuietHours.objects.create(
+        user=world.user, enabled=True, timezone="America/Costa_Rica", start_minute=1320, end_minute=480
+    )
+    DeviceRegistration.objects.create(
+        user=world.user,
+        organization=world.org,
+        device_token="quiet-expiry-owner",
+        platform="ios",
+        driver="memory",
+    )
+    app = world.agent.registered_app
+    app.created_by_id = world.user.pk
+    app.expires_at = instant + timedelta(hours=1)
+    app.save(update_fields=["created_by", "expires_at", "updated_at", "version"])
+    emails = []
+    monkeypatch.setattr("astrolift_operations.notification_email.notifications_email_enabled", lambda: True)
+    monkeypatch.setattr(
+        "astrolift_operations.notification_email.send_notice_email",
+        lambda **kwargs: emails.append(kwargs) or 1,
+    )
+    driver = MemoryNotificationDriver()
+    set_driver_override_for_tests(driver)
+    try:
+        with django_capture_on_commit_callbacks(execute=True):
+            expiry.warn(app, "1h")
+        assert any(token == "quiet-expiry-owner" for token, *_ in driver.sent)
+        assert any(world.user.email in row["to"] for row in emails)
+        assert Notification.objects.filter(
+            organization=world.org, user=world.user, kind="app_expiring", link=f"/apps/{app.slug}"
+        ).exists()
+        assert Event.objects.filter(event_type="app.expiring", registered_app=app).exists()
+    finally:
+        unset_driver_override_for_tests()
+
+
 def test_quiet_hours_capability_is_advertised():
     from config.schema_public import schema_public
 

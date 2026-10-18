@@ -1463,6 +1463,7 @@
         "mine": "Meus",
         "failing": "Com falha",
         "archived": "Arquivados",
+        "temporary": "Temporários",
         "mineNote": "Meus inclui os aplicativos nos quais você tem uma função, diretamente ou pelo projeto, equipe ou organização, enquanto os aplicativos ainda não registram seus proprietários."
       },
       "bulk": {
@@ -4058,6 +4059,36 @@
       "legendDescription": "Tipos de nó e o que representam.",
       "legendTitle": "Legenda",
       "title": "{name} · Topologia"
+    },
+    "expiry": {
+      "expiresIn": "Expira em {remaining}",
+      "expired": "Expirado",
+      "remaining": {
+        "days": "{days} d {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporário: removido em {when}",
+      "extend": "+1 dia",
+      "extendLabel": "Estender por um dia",
+      "extended": "Estendido até {when}",
+      "extendFailed": "Não foi possível estender o app"
+    },
+    "temporaryCreation": {
+      "ttl": "Tempo de vida do aplicativo",
+      "help": "Deixe em branco para manter a expiração do manifesto ou tornar o aplicativo permanente quando a política permitir. Os meses têm 30 dias.",
+      "inherited": "O manifesto faz este aplicativo expirar após {ttl}. Informe uma duração para substituí-la.",
+      "bounds": "Duração permitida: de {min} a {max} minutos.",
+      "required": "Sua organização exige que este aplicativo expire.",
+      "invalid": "Informe uma duração dentro dos limites da organização: 30m, 4h, 7d, 6w ou 3mo.",
+      "deleteData": "Excluir dados gerenciados quando o aplicativo expirar",
+      "deleteWarning": "A expiração também exclui os bancos de dados, buckets e volumes do aplicativo. Esta ação não pode ser desfeita.",
+      "keepData": "Os dados gerenciados são mantidos por {days} dias após a expiração e depois excluídos.",
+      "loading": "Carregando a política de duração…",
+      "unavailable": "Não foi possível ler a política de duração. Tente novamente antes de criar o aplicativo.",
+      "unsupported": "Este servidor não oferece suporte a aplicativos temporários.",
+      "retry": "Tentar novamente",
+      "reviewKeep": "Aplica-se a política de retenção de dados da organização."
     }
   },
   "sourceProviders": {
@@ -4672,7 +4703,8 @@
         "deploy_failure": "Falha no deploy",
         "error_spike": "Pico de erros",
         "preview_created": "Preview criado",
-        "preview_destroyed": "Preview removido"
+        "preview_destroyed": "Preview removido",
+        "app_expiring": "App temporário expirando"
       },
       "toggleLabel": "{kind} para {app}",
       "unsubscribeAll": "Cancelar todas",

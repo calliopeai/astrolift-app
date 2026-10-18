@@ -810,6 +810,31 @@ def _template_agent_message(envelope: EventEnvelope) -> NotificationTemplate | N
     )
 
 
+def _template_app_expiring(envelope: EventEnvelope) -> NotificationTemplate | None:
+    """A temporary app's 24 h or 1 h warning (#2433). Recipients come from the
+    payload: the app's creator and team, less anyone who muted the app's
+    ``app_expiring`` alert (``astrolift_registry.expiry.warning_recipients``)."""
+    payload = envelope.payload or {}
+    recipients = _coerce_id_list(payload.get("recipient_user_ids"))
+    if not recipients:
+        return None
+    app_slug = str(payload.get("app_slug", "") or "")
+    app_name = str(payload.get("app_name", "") or app_slug)
+    when = "in 1 hour" if payload.get("warning") == "1h" else "in 24 hours"
+    return NotificationTemplate(
+        title=_truncate(f"{app_name} expires {when}", PUSH_TITLE_MAX),
+        body=_truncate(
+            f"The temporary app {app_slug} will be torn down {when}. Extend it to keep it.", PUSH_BODY_MAX
+        ),
+        action_url=_truncate(f"astrolift://apps/{app_slug}", PUSH_DATA_VALUE_MAX),
+        recipient_user_ids=tuple(sorted(set(recipients))),
+        extra_data={
+            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
+            "expires_at": _truncate(str(payload.get("expires_at", "") or ""), PUSH_DATA_VALUE_MAX),
+        },
+    )
+
+
 NOTIFICATION_TEMPLATES = {
     "agent.message.sent": _template_agent_message,
     "deploy.approved": lambda env: _template_deploy_event(env, "approved"),
@@ -820,6 +845,7 @@ NOTIFICATION_TEMPLATES = {
     "alert.resolved": _template_alert_resolved,
     "cluster.bootstrap_failed": _template_cluster_bootstrap_failed,
     "app.deregister_pending": _template_app_deregister_pending,
+    "app.expiring": _template_app_expiring,
     "app.down": lambda env: _template_app_uptime_event(env, "down"),
     "domain.cert_expiring": lambda env: _template_cert_event(env, renewal_failed=False),
     "domain.cert_renewal_failed": lambda env: _template_cert_event(env, renewal_failed=True),

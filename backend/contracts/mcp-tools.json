@@ -1187,6 +1187,17 @@
           "brain_slug": {
             "type": "string"
           },
+          "delete_data_on_expiry": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_in": {
+            "description": "Temporary app: 30m, 4h, 7d, 6w or 3mo.",
+            "type": "string"
+          },
           "image": {
             "type": "string"
           },
@@ -1216,6 +1227,47 @@
       "name": "astrolift_host_app_on_brain",
       "required_permissions": [
         "app.create"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps"
+      ]
+    },
+    {
+      "description": "Set, extend (extend_by from the current expiry), shorten or clear a temporary app's expiry (#2433); give exactly one. clear makes the app permanent and is refused for agents unless the organization's app.expiry.clear rule allows agents.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clear": {
+            "type": "boolean"
+          },
+          "delete_data_on_expiry": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_in": {
+            "description": "From now: 30m, 4h, 7d, 6w or 3mo.",
+            "type": "string"
+          },
+          "extend_by": {
+            "description": "Added to the current expiry.",
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_set_app_expiry",
+      "required_permissions": [
+        "app.update"
       ],
       "required_scopes": [
         "mcp:write",

@@ -54,12 +54,13 @@ ACTIONS: dict[str, str] = {
     "rollback.production": "Roll back production",
     "brain.share": "Share a semantic layer",
     "brain.delete": "Delete a semantic layer",
+    "app.expiry.clear": "Make a temporary app permanent",
 }
 
 #: The actions an agent on the MCP surface is refused unless the organization
 #: allows agents (#2424). Agents cannot step up, so the person who would have
 #: been asked is the organization's rule.
-AGENT_GATED: frozenset[str] = frozenset({"brain.share", "brain.delete"})
+AGENT_GATED: frozenset[str] = frozenset({"brain.share", "brain.delete", "app.expiry.clear"})
 
 #: The actions a rule can add approval to, and the kind of target each binds to.
 APPROVABLE: dict[str, str] = {
@@ -169,8 +170,12 @@ def agent_refusal(action: str, *, app: Any = None) -> str | None:
     )
     if requirements.allow_agents:
         return None
-    command = {"brain.share": "astro brain share", "brain.delete": "astro brain delete"}[action]
-    return f"this action needs a person: run `{command}` or use the Brains screen"
+    command, screen = {
+        "brain.share": ("astro brain share", "the Brains screen"),
+        "brain.delete": ("astro brain delete", "the Brains screen"),
+        "app.expiry.clear": ("astro app expiry --clear", "the app's page"),
+    }[action]
+    return f"this action needs a person: run `{command}` or use {screen}"
 
 
 def session_needs_step_up(

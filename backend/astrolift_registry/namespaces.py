@@ -48,14 +48,22 @@ def namespace_refusal(namespace: str, *, organization_id: int) -> str | None:
         return f"namespace {namespace!r} is reserved for the platform; choose another app slug"
     taken = (
         RegisteredApp.all_objects.filter(k8s_namespace=namespace)
-        .filter(Q(deleted_at__isnull=True) | ~Q(organization_id=organization_id))
+        .filter(
+            Q(deleted_at__isnull=True)
+            | Q(data_retained_until__isnull=False)
+            | ~Q(organization_id=organization_id)
+        )
         .exists()
     )
     if taken:
         return f"namespace {namespace!r} is already used by another app; choose another app slug"
     held_by_environment = (
         AppEnvironment.all_objects.filter(k8s_namespace=namespace)
-        .filter(Q(deleted_at__isnull=True) | ~Q(registered_app__organization_id=organization_id))
+        .filter(
+            Q(deleted_at__isnull=True)
+            | Q(registered_app__data_retained_until__isnull=False)
+            | ~Q(registered_app__organization_id=organization_id)
+        )
         .exists()
         or PreviewEnvironment.objects.filter(namespace=namespace).exists()
     )

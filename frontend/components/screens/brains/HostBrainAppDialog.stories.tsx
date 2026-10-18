@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
+import { TEMPORARY_RULES } from "../apps/temporary-app.fixtures";
+
 import { HOST_PROJECTS } from "./brains.fixtures";
 import { HostBrainAppDialog } from "./HostBrainAppDialog";
 
@@ -11,6 +13,7 @@ const meta: Meta<typeof HostBrainAppDialog> = {
     brainSlug: "leo-brain",
     projects: HOST_PROJECTS,
     submitting: false,
+    temporary: { rules: TEMPORARY_RULES, loading: false, failed: false },
     onSubmit: fn(),
     onDismiss: fn(),
   },
@@ -32,6 +35,8 @@ export const Create: Story = {
       image: "ghcr.io/acme/brain-chat:1.0",
       name: "",
       port: 8080,
+      expiresIn: "",
+      deleteDataOnExpiry: false,
     });
   },
 };
@@ -66,3 +71,23 @@ export const LongSlug: Story = {
 };
 
 export const Closed: Story = { args: { brainSlug: null } };
+
+export const Temporary: Story = {
+  play: async () => {
+    const body = within(document.body);
+    await userEvent.type(await body.findByLabelText("App lifetime"), "7d");
+    await expect(body.getByLabelText("Delete managed data when the app expires")).toBeVisible();
+  },
+};
+export const TemporaryRequired: Story = {
+  args: {
+    temporary: {
+      rules: { ...TEMPORARY_RULES, permanentAllowed: false },
+      loading: false,
+      failed: false,
+    },
+  },
+};
+export const PolicyUnavailable: Story = {
+  args: { temporary: { rules: null, loading: false, failed: true, onRetry: fn() } },
+};

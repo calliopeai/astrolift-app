@@ -1869,6 +1869,9 @@ input AstroliftAppsListFilter {
 
   """Team slugs."""
   team: [String!] = null
+
+  """true: temporary apps only (with an expiry). false: permanent only."""
+  temporary: Boolean = null
 }
 
 type AstroliftAssembleBriefResult {
@@ -5346,6 +5349,8 @@ type AstroliftRegisteredApp {
   isArchived: Boolean!
   archivedAt: DateTime
   archivedByEmail: String
+  expiresAt: DateTime
+  deleteDataOnExpiry: Boolean!
   webhookDeploysPaused: Boolean!
   webhookDeploysPausedAt: DateTime
   webhookDeploysPausedByEmail: String
@@ -6550,6 +6555,20 @@ type AstroliftTemplateSendStatPoint {
   deliveries: Int!
   bounces: Int!
   complaints: Int!
+}
+
+type AstroliftTemporaryAppPolicy {
+  maxTtlSeconds: Int!
+  minTtlSeconds: Int!
+  temporaryOnlyForMembers: Boolean!
+  ttlRequiredSurfaces: [String!]!
+  dataGraceDays: Int!
+}
+
+type AstroliftTemporaryAppPolicyMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftTemporaryAppPolicy
 }
 
 type AstroliftTenantCluster {
@@ -8726,6 +8745,15 @@ input HostAppOnBrainInput {
   name: String = null
   slug: String = null
   port: Int = null
+
+  """
+  Make the app temporary: torn down this long after creation (30m, 4h, 7d, 6w, 3mo).
+  """
+  expiresIn: String = null
+
+  """Make the app temporary: torn down at this time."""
+  expiresAt: DateTime = null
+  deleteDataOnExpiry: Boolean! = false
 }
 
 type HuggingFaceConnectionType {
@@ -10215,6 +10243,16 @@ type Mutation {
   Delete a semantic layer (#2424): archive it (scale to zero, stop deploys), drop it from the register and revoke every hosted app's binding and token. The repository is never touched; restoreApp brings the brain back, hosted apps are re-hosted. Asks for confirmation, a fresh verification and any approval rule (brain.delete).
   """
   archiveBrain(input: ArchiveBrainInput!): AstroliftBrainMutationResult!
+
+  """
+  Set, extend, shorten or clear a temporary app's expiry (#2433). The timer moves at once and the 24 h and 1 h warnings are sent again for the new time. Audited as app.expiry.set, app.expiry.extend or app.expiry.clear.
+  """
+  setAppExpiry(input: SetAppExpiryInput!): AstroliftRegisteredAppMutationResult!
+
+  """
+  The organization's policy for temporary apps (#2433): the longest an app may live, whether members may create temporary apps only, which surfaces require an expiry and how long an expired app's data is kept.
+  """
+  setTemporaryAppPolicy(input: TemporaryAppPolicyInput!): AstroliftTemporaryAppPolicyMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   setNotificationQuietHours(input: SetNotificationQuietHoursInput!): AstroliftNotificationQuietHoursMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
@@ -11237,6 +11275,11 @@ type Query {
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100, appSlug: String = null): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
   astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertEventPage!
+
+  """
+  The organization's rules for temporary apps (#2433): limits a create form or client applies.
+  """
+  astroliftTemporaryAppPolicy: AstroliftTemporaryAppPolicy!
   astroliftAppKinds: [AstroliftAppKind!]!
   astroliftBrains(search: String = null): [AstroliftBrain!]!
 
@@ -11739,6 +11782,19 @@ input RegisterAppInput {
   approverUserIds: [String!] = null
   minimumApprovals: Int = null
   manifestRaw: String = null
+
+  """
+  Make the app temporary: it is torn down this long after registration (30m, 4h, 7d, 6w, 3mo). At least 15 minutes, at most the organization's limit.
+  """
+  expiresIn: String = null
+
+  """Make the app temporary: it is torn down at this time."""
+  expiresAt: DateTime = null
+
+  """
+  Delete the app's managed services (databases, buckets, volumes) with it on expiry, instead of keeping them for the organization's grace period.
+  """
+  deleteDataOnExpiry: Boolean! = false
 }
 
 input RegisterAppRepoInput {
@@ -12215,6 +12271,23 @@ input SetAppAccessInput {
   users: [String!]! = []
 }
 
+input SetAppExpiryInput {
+  appSlug: String!
+
+  """30m, 4h, 7d, 6w or 3mo from now."""
+  expiresIn: String = null
+  expiresAt: DateTime = null
+
+  """Move the current expiry later by this long (30m, 4h, 7d, 6w, 3mo)."""
+  extendBy: String = null
+
+  """
+  Make the app permanent. Needs app.update, the organization's rules for app.expiry.clear (a fresh verification by default), and is refused where the organization requires temporary apps. Agents are refused unless the organization allows them.
+  """
+  clear: Boolean! = false
+  deleteDataOnExpiry: Boolean = null
+}
+
 input SetAppSecretInput {
   appSlug: String!
   key: String!
@@ -12489,6 +12562,22 @@ input TearDownAppInput {
 
 input TearDownPreviewInputGql {
   id: GUID!
+}
+
+input TemporaryAppPolicyInput {
+  """The longest an app may live (15m to 366d)."""
+  maxTtl: String! = "90d"
+
+  """Members without org.update may create temporary apps only."""
+  temporaryOnlyForMembers: Boolean! = false
+
+  """Surfaces whose new apps must expire: chat_studio, mcp, api_token."""
+  ttlRequiredSurfaces: [String!]! = []
+
+  """
+  Days an expired app's managed services are kept before they are deleted (0 to 90).
+  """
+  dataGraceDays: Int! = 7
 }
 
 input TestModelEndpointInput {

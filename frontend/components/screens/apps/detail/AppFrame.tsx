@@ -33,6 +33,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ProvisioningStatus } from "@/graphql/registry/registry.types";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
+import { ExpiryBadge } from "../ExpiryBadge";
+
 import { appTabHref, appTabs, sectionHref, APP_TAB_SECTIONS } from "./app-tabs-model";
 
 /** What the frame's header shows about the app. */
@@ -53,6 +55,8 @@ export interface AppFrameApp {
   /** The app's public URL, when it has one. */
   appUrl?: string | null;
   repoUrl?: string | null;
+  /** A temporary app's expiry (#2433); null for a permanent app. */
+  expiresAt?: string | null;
 }
 
 /** The deployment the header's Deploy re-runs. */
@@ -86,6 +90,9 @@ export interface AppFrameProps {
   /** Reports its own outcome (toast); the confirm closes either way. */
   onArchive: () => Promise<unknown> | unknown;
   onRestore: () => Promise<unknown> | unknown;
+  /** Extend a temporary app by a day; offered with `app.update`. */
+  onExtend?: () => Promise<unknown> | unknown;
+  extending?: boolean;
   /** `app.delete`. */
   canDelete: boolean;
   deleting?: boolean;
@@ -143,6 +150,8 @@ export function AppFrame({
   archiving = false,
   onArchive,
   onRestore,
+  onExtend,
+  extending = false,
   canDelete,
   deleting = false,
   onDelete,
@@ -339,6 +348,11 @@ export function AppFrame({
           <span className="inline-flex shrink-0 items-center gap-1.5 text-sm">
             <StatusDot status={dot} />
             {t(`status.${statusKey}`)}
+            <ExpiryBadge
+              expiresAt={app.expiresAt}
+              onExtend={canUpdate ? onExtend : undefined}
+              extending={extending}
+            />
           </span>
         }
         context={context}

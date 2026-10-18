@@ -1457,6 +1457,7 @@
         "mine": "Les miennes",
         "failing": "En échec",
         "archived": "Archivées",
+        "temporary": "Temporaires",
         "mineNote": "Les miennes regroupe les applications sur lesquelles vous avez un rôle, directement ou via leur projet, équipe ou organisation, tant que les applications ne consignent pas leur propriétaire."
       },
       "bulk": {
@@ -4052,6 +4053,36 @@
       "legendDescription": "Types de nœuds et ce qu’ils représentent.",
       "legendTitle": "Légende",
       "title": "{name} · Topologie"
+    },
+    "expiry": {
+      "expiresIn": "Expire dans {remaining}",
+      "expired": "Expirée",
+      "remaining": {
+        "days": "{days} j {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporaire : supprimée le {when}",
+      "extend": "+1 jour",
+      "extendLabel": "Prolonger d’un jour",
+      "extended": "Prolongée jusqu’au {when}",
+      "extendFailed": "Impossible de prolonger l’app"
+    },
+    "temporaryCreation": {
+      "ttl": "Durée de vie de l’application",
+      "help": "Laissez vide pour conserver l’expiration du manifeste, ou rendre l’application permanente si la politique le permet. Les mois comptent 30 jours.",
+      "inherited": "Le manifeste fait expirer cette application après {ttl}. Saisissez une durée pour la remplacer.",
+      "bounds": "Durée autorisée : de {min} à {max} minutes.",
+      "required": "Votre organisation impose une expiration à cette application.",
+      "invalid": "Saisissez une durée respectant les limites de l’organisation : 30m, 4h, 7d, 6w ou 3mo.",
+      "deleteData": "Supprimer les données gérées à l’expiration de l’application",
+      "deleteWarning": "L’expiration supprime aussi les bases de données, les compartiments et les volumes de l’application. Cette action est irréversible.",
+      "keepData": "Les données gérées sont conservées {days} jours après l’expiration, puis supprimées.",
+      "loading": "Chargement de la politique de durée…",
+      "unavailable": "Impossible de lire la politique de durée. Réessayez avant de créer l’application.",
+      "unsupported": "Ce serveur ne prend pas en charge les applications temporaires.",
+      "retry": "Réessayer",
+      "reviewKeep": "La politique de conservation des données de l’organisation s’applique."
     }
   },
   "sourceProviders": {
@@ -4666,7 +4697,8 @@
         "deploy_failure": "Échec du déploiement",
         "error_spike": "Pic d’erreurs",
         "preview_created": "Aperçu créé",
-        "preview_destroyed": "Aperçu supprimé"
+        "preview_destroyed": "Aperçu supprimé",
+        "app_expiring": "App temporaire bientôt expirée"
       },
       "toggleLabel": "{kind} pour {app}",
       "unsubscribeAll": "Tout désabonner",
