@@ -380,7 +380,8 @@ def _safe_pg_wait_summary(value, expected_pid):
     status = value.get("status")
     if status == "pid-not-visible":
         return {"status": status, "backendPID": expected_pid}
-    if status != "observed" or value.get("backendPID") != expected_pid:
+    observed_pid = value.get("backendPID")
+    if status != "observed" or type(observed_pid) is not int or observed_pid != expected_pid:
         return unavailable
     states = {
         "active",
@@ -453,6 +454,68 @@ def _safe_activity_connection_summary(value):
     }
 
 
+def _safe_observer_request(value):
+    """Validate a worker-captured test-DB target before opening an observer."""
+    if not isinstance(value, dict) or value.get("testDatabase") is not True:
+        return None
+    pid = value.get("backendPID")
+    connect = value.get("observerConnect")
+    if type(pid) is not int or not 0 < pid <= 2**31 - 1 or not isinstance(connect, dict):
+        return None
+    database = connect.get("dbname")
+    configured_database = value.get("configuredDatabase")
+    test_database_name = value.get("testDatabaseName")
+    host = connect.get("host")
+    port = connect.get("port")
+    user = connect.get("user")
+    password = connect.get("password")
+    if (
+        not isinstance(database, str)
+        or not database
+        or len(database) > 256
+        or not isinstance(configured_database, str)
+        or database != configured_database
+        or (
+            database != test_database_name
+            if isinstance(test_database_name, str) and test_database_name
+            else not database.startswith("test_")
+        )
+        or not isinstance(host, str)
+        or len(host) > 512
+        or "," in host
+        or not isinstance(port, str)
+        or len(port) > 5
+        or not port.isdecimal()
+        or not 1 <= int(port) <= 65535
+        or not isinstance(user, str)
+        or not user
+        or len(user) > 512
+        or (password is not None and (not isinstance(password, str) or len(password) > 512))
+    ):
+        return None
+    result = {
+        "dbname": database,
+        "host": host,
+        "port": port,
+        "user": user,
+        "passfile": os.devnull,
+    }
+    hostaddr = connect.get("hostaddr")
+    if hostaddr is not None:
+        if not isinstance(hostaddr, str) or not hostaddr or len(hostaddr) > 512 or "," in hostaddr:
+            return None
+        result["hostaddr"] = hostaddr
+    if password is not None:
+        result["password"] = password
+    for key in ("sslmode", "sslcert", "sslkey", "sslrootcert", "sslcrl"):
+        option = connect.get(key)
+        if option is not None:
+            if not isinstance(option, str) or not option or len(option) > 512:
+                return None
+            result[key] = option
+    return {"pid": pid, "connect": result}
+
+
 _PG_WAIT_OBSERVER = r"""
 import json
 import sys
@@ -505,42 +568,13 @@ finally:
 """
 
 
-def _observe_owned_pg_wait(backend_pid):
+def _observe_owned_pg_wait(activity_connection):
     """Observe one captured backend through a read-only child with hard bounds."""
-    if type(backend_pid) is not int or not 0 < backend_pid <= 2**31 - 1:
+    request = _safe_observer_request(activity_connection)
+    if request is None:
         return {"status": "unavailable"}
     try:
-        from django.db import connection
-
-        if connection.vendor != "postgresql":
-            return {"status": "unavailable"}
-        settings = connection.settings_dict
-        options = settings.get("OPTIONS", {})
-        connect = {"dbname": settings.get("NAME"), "passfile": os.devnull}
-        for source, target in (
-            ("USER", "user"),
-            ("PASSWORD", "password"),
-            ("HOST", "host"),
-            ("PORT", "port"),
-        ):
-            value = settings.get(source)
-            if value not in (None, ""):
-                if source == "PORT":
-                    if type(value) is int:
-                        if not 1 <= value <= 65535:
-                            return {"status": "unavailable"}
-                    elif not isinstance(value, str) or not value.isdecimal() or not 1 <= int(value) <= 65535:
-                        return {"status": "unavailable"}
-                elif not isinstance(value, str) or len(value) > 512:
-                    return {"status": "unavailable"}
-                connect[target] = value
-        for key in ("sslmode", "sslcert", "sslkey", "sslrootcert", "sslcrl", "service"):
-            value = options.get(key)
-            if isinstance(value, str) and value and len(value) <= 512:
-                connect[key] = value
-        if not isinstance(connect["dbname"], str) or not connect["dbname"] or len(connect["dbname"]) > 256:
-            return {"status": "unavailable"}
-        payload = json.dumps({"pid": backend_pid, "connect": connect}, separators=(",", ":"))
+        payload = json.dumps(request, separators=(",", ":"))
         observer = _PG_WAIT_OBSERVER.replace("__CONNECT_TIMEOUT__", str(_PG_WAIT_CONNECT_SECONDS)).replace(
             "__STATEMENT_TIMEOUT__", str(_PG_WAIT_STATEMENT_MS)
         )
@@ -557,7 +591,7 @@ def _observe_owned_pg_wait(backend_pid):
         )
         if result.returncode != 0 or len(result.stdout.encode("utf-8")) > 2048:
             return {"status": "unavailable"}
-        return _safe_pg_wait_summary(json.loads(result.stdout), backend_pid)
+        return _safe_pg_wait_summary(json.loads(result.stdout), request["pid"])
     except BaseException:
         return {"status": "unavailable"}
 
@@ -572,13 +606,79 @@ def _safe_activity_connection_state():
         pid = getter() if connection.vendor == "postgresql" and callable(getter) else None
         if type(pid) is not int or not 0 < pid <= 2**31 - 1:
             return None
+        if connection.alias != "default":
+            return None
+        settings = connection.settings_dict
+        dsn_getter = getattr(raw, "get_dsn_parameters", None)
+        dsn = dsn_getter() if callable(dsn_getter) else None
+        if not isinstance(dsn, dict):
+            return None
+        database = dsn.get("dbname")
+        configured_database = settings.get("NAME")
+        test_settings = settings.get("TEST") or {}
+        if not isinstance(test_settings, dict):
+            return None
+        test_name = test_settings.get("NAME")
+        is_test_database = (
+            database == test_name if test_name else isinstance(database, str) and database.startswith("test_")
+        )
+        if (
+            not isinstance(database, str)
+            or database != configured_database
+            or not is_test_database
+            or len(database) > 256
+        ):
+            return None
+        host = dsn.get("host")
+        port = dsn.get("port")
+        user = dsn.get("user")
+        password = settings.get("PASSWORD")
+        if (
+            not isinstance(host, str)
+            or len(host) > 512
+            or not isinstance(port, str)
+            or len(port) > 5
+            or not port.isdecimal()
+            or not 1 <= int(port) <= 65535
+            or not isinstance(user, str)
+            or not user
+            or len(user) > 512
+            or (password is not None and (not isinstance(password, str) or len(password) > 512))
+        ):
+            return None
+        observer_connect = {
+            "dbname": database,
+            "host": host,
+            "port": port,
+            "user": user,
+            "password": password,
+        }
+        hostaddr = dsn.get("hostaddr")
+        if hostaddr is not None:
+            observer_connect["hostaddr"] = hostaddr
+        for key in ("sslmode", "sslcert", "sslkey", "sslrootcert", "sslcrl"):
+            value = dsn.get(key)
+            if value is not None:
+                observer_connect[key] = value
         return {
             "backendPID": pid,
+            "testDatabase": True,
+            "configuredDatabase": configured_database,
+            "testDatabaseName": test_name or None,
+            "observerConnect": observer_connect,
             "autocommit": connection.get_autocommit(),
             "inAtomicBlock": connection.in_atomic_block,
         }
     except BaseException:
         return None
+
+
+def _capture_owned_activity_connection_state(world):
+    if get_ident() != getattr(world, "activity_thread_id", None):
+        return
+    activity_db_state = _safe_activity_connection_state()
+    if activity_db_state is not None:
+        world.activity_db_state = activity_db_state
 
 
 def _failure_diagnostic_line(
@@ -661,6 +761,22 @@ def test_failure_diagnostic_is_bounded_and_redacts_callback_and_history_payloads
         checkpoints={"calls": 3, "stages": {"apply": 1}},
         history=history,
         history_error=ValueError("private-history-message-canary"),
+        activity_connection={
+            "backendPID": 41,
+            "testDatabase": True,
+            "observerConnect": {"password": "private-database-password-canary"},
+            "autocommit": True,
+            "inAtomicBlock": False,
+        },
+        database_wait={
+            "status": "observed",
+            "backendPID": 41,
+            "state": "active",
+            "waitEventType": "Lock",
+            "waitEvent": "transactionid",
+            "query": "private SQL canary",
+            "password": "private credential canary",
+        },
     )
     parsed = json.loads(line)
 
@@ -708,6 +824,7 @@ def test_pg_wait_summary_is_allowlisted_bounded_and_pid_pinned():
     assert summary["queryAgeBucketSeconds"] == 15
     assert "query" not in summary and "password" not in summary
     assert _safe_pg_wait_summary({"status": "observed", "backendPID": 42}, 41) == {"status": "unavailable"}
+    assert _safe_pg_wait_summary({"status": "observed", "backendPID": True}, 1) == {"status": "unavailable"}
     assert (
         _safe_pg_wait_summary({"status": "observed", "backendPID": 41, "queryAgeBucketSeconds": 16}, 41)[
             "queryAgeBucketSeconds"
@@ -734,6 +851,50 @@ def test_activity_connection_summary_keeps_only_pid_and_boolean_state():
         "inAtomicBlock": False,
     }
     assert _safe_activity_connection_summary({"backendPID": True}) == {"status": "unavailable"}
+
+
+def test_pg_observer_request_requires_worker_captured_test_database():
+    state = {
+        "backendPID": 41,
+        "testDatabase": True,
+        "configuredDatabase": "custom_ci_db",
+        "testDatabaseName": "custom_ci_db",
+        "observerConnect": {
+            "dbname": "custom_ci_db",
+            "host": "/var/run/postgresql",
+            "hostaddr": "127.0.0.1",
+            "port": "5432",
+            "user": "test_user",
+            "password": "private credential canary",
+        },
+    }
+    request = _safe_observer_request(state)
+
+    assert request["pid"] == 41
+    assert request["connect"]["dbname"] == "custom_ci_db"
+    assert request["connect"]["hostaddr"] == "127.0.0.1"
+    assert request["connect"]["passfile"] == os.devnull
+    assert request["connect"]["password"] == "private credential canary"
+    assert _safe_observer_request({**state, "testDatabase": False}) is None
+    assert _safe_observer_request({**state, "configuredDatabase": "production_db"}) is None
+    assert (
+        _safe_observer_request({**state, "observerConnect": {**state["observerConnect"], "port": "999999"}})
+        is None
+    )
+
+
+def test_activity_db_snapshot_cannot_be_overwritten_by_unregistered_thread(monkeypatch):
+    world = SimpleNamespace(activity_thread_id=41, activity_db_state={"backendPID": 7})
+    monkeypatch.setattr(sys.modules[__name__], "get_ident", lambda: 42)
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "_safe_activity_connection_state",
+        lambda: {"backendPID": 99},
+    )
+
+    _capture_owned_activity_connection_state(world)
+
+    assert world.activity_db_state == {"backendPID": 7}
 
 
 def test_owned_thread_stack_reads_only_registered_thread_and_caps_frames(monkeypatch):
@@ -980,9 +1141,7 @@ def native_world(monkeypatch, client, tmp_path):
             frame = frame.f_back
         w.checkpoint_stages[stage] = w.checkpoint_stages.get(stage, 0) + 1
         result = original_admitted(self)
-        activity_db_state = _safe_activity_connection_state()
-        if activity_db_state is not None:
-            w.activity_db_state = activity_db_state
+        _capture_owned_activity_connection_state(w)
         return result
 
     monkeypatch.setattr(_ScopedDeploymentExecutionCheckpoint, "_admitted", measured_admitted)
@@ -1223,7 +1382,7 @@ async def run(
                         activity_connection = {"status": "unavailable"}
                     released.set()
                     try:
-                        database_wait = _observe_owned_pg_wait(activity_connection.get("backendPID"))
+                        database_wait = _observe_owned_pg_wait(getattr(w, "activity_db_state", None))
                     except BaseException:
                         database_wait = {"status": "unavailable"}
                     history_summary = None
