@@ -545,6 +545,14 @@ class WebhookSubscriptionType:
     detect a concurrent edit."""
 
 
+@strawberry.type(name="AstroliftAppExpiryWarning")
+class AppExpiryWarningType:
+    app_id: GUID
+    app_slug: str
+    expires_at: dt.datetime
+    warning_window: str
+
+
 @strawberry.type(name="AstroliftNotification")
 class NotificationType:
     id: GUID
@@ -555,6 +563,7 @@ class NotificationType:
     link: str
     read_at: dt.datetime | None
     created_at: dt.datetime
+    expiry_warning: AppExpiryWarningType | None = None
 
 
 def webhook_to_type(w) -> WebhookSubscriptionType:
@@ -574,6 +583,9 @@ def webhook_to_type(w) -> WebhookSubscriptionType:
 
 
 def notification_to_type(n) -> NotificationType:
+    from astrolift_operations.notification_inbox import expiry_provenance
+
+    warning = expiry_provenance(n)
     return NotificationType(
         id=GUID(str(n.guid)),
         user_id=str(n.user_id) if n.user_id else "",
@@ -583,6 +595,7 @@ def notification_to_type(n) -> NotificationType:
         link=n.link or "",
         read_at=n.read_at,
         created_at=n.created_at,
+        expiry_warning=AppExpiryWarningType(**warning) if warning is not None else None,
     )
 
 

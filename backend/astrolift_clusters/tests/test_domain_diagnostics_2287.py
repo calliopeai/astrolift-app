@@ -4,6 +4,7 @@ import datetime as dt
 import ipaddress
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from types import SimpleNamespace
 from uuid import uuid4
 
 import boto3
@@ -474,7 +475,11 @@ def test_routes_are_own_live_suffix_scoped_and_recorded_not_native(world, client
     assert rows[0]["recordedUrl"] == "https://app.example.test/" and rows[0]["observedState"] == "UNKNOWN"
 
 
-def test_actual_graphql_aliases_are_throttled_before_extra_dns(world, client, dns_wire):
+def test_actual_graphql_aliases_are_throttled_before_extra_dns(world, client, dns_wire, monkeypatch):
+    # Keep all aliases in one quota window even when CI crosses a minute boundary.
+    monkeypatch.setattr(
+        service, "time", SimpleNamespace(time=lambda: 1800000000, monotonic=service.time.monotonic)
+    )
     dns_wire["answers"] = []
     selection = " ".join(
         f'p{n}:astroliftManagedDomainProbe(domainId:"{world.domain.guid}",expectedVersion:{world.domain.version},hostname:"example.test",tool:LOOKUP){{state}}'

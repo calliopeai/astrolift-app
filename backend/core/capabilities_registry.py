@@ -120,6 +120,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "agents.messages",
     # Notifications.
     "notifications.in_app",
+    "notifications.structured_inbox",
     "notifications.email",
     "notifications.quiet_hours",
     # File uploads.
