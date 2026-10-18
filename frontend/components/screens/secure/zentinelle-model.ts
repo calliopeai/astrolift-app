@@ -54,6 +54,14 @@ export function hasAnyAccess(access: ZentinelleAccess): boolean {
 }
 
 /**
+ * Whether the shell links to the screen: only once the organization's
+ * connection is live, and only for a viewer with some zentinelle.* grant.
+ */
+export function zentinelleInNav(access: ZentinelleAccess, connected: boolean): boolean {
+  return connected && hasAnyAccess(access);
+}
+
+/**
  * The tabs a viewer gets. Before the organization is connected only the
  * overview exists (it holds the connect form); after, each section needs
  * its own read.
