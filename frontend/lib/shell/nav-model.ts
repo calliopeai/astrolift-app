@@ -36,6 +36,7 @@ import {
   ScrollTextIcon,
   ServerIcon,
   SettingsIcon,
+  ShieldCheckIcon,
   SlidersHorizontalIcon,
   UsersIcon,
   WebhookIcon,
@@ -44,6 +45,9 @@ import {
 } from "lucide-react";
 
 export type ModuleKey = "apps" | "agents" | "workflows" | "models" | "admin" | "team_access";
+
+/** An integration a row needs live for this viewer; the shell says which are. */
+export type NavRequirement = "zentinelle";
 
 export interface NavFunction {
   key: string;
@@ -54,6 +58,8 @@ export interface NavFunction {
   module?: ModuleKey;
   /** A second server-derived capability for this function alone. */
   alternativeModule?: ModuleKey;
+  /** Shown only while this integration is live for the viewer. */
+  requires?: NavRequirement;
   /** Anchor for the first-run spotlight tour (`data-onboarding-tour`). */
   tourTarget?: string;
   /** Other path prefixes this row owns (a function whose pages sit under several routes). */
@@ -68,7 +74,7 @@ export interface NavGroup {
 }
 
 export interface NavArea {
-  key: "home" | "agents" | "apps" | "admin";
+  key: "home" | "agents" | "apps" | "secure" | "admin";
   label: string;
   icon: LucideIcon;
   groups: NavGroup[];
@@ -221,6 +227,26 @@ export const NAV: NavArea[] = [
     ],
   },
   {
+    key: "secure",
+    label: "Secure",
+    icon: ShieldCheckIcon,
+    groups: [
+      {
+        functions: [
+          {
+            // Gated by the viewer's zentinelle.* grants and the organization's
+            // live connection, as the screen itself is (#1888).
+            key: "zentinelle",
+            label: "Zentinelle",
+            href: "/secure/zentinelle",
+            icon: ShieldCheckIcon,
+            requires: "zentinelle",
+          },
+        ],
+      },
+    ],
+  },
+  {
     key: "admin",
     label: "Admin",
     icon: SettingsIcon,
@@ -362,8 +388,16 @@ export const NAV: NavArea[] = [
   },
 ];
 
-/** The model with every function the viewer may not see removed, and empty areas dropped. */
-export function visibleNav(nav: NavArea[], canView: (module: ModuleKey) => boolean): NavArea[] {
+/**
+ * The model with every function the viewer may not see removed, and empty
+ * areas dropped. A function that `requires` an integration shows only when
+ * `live` holds it.
+ */
+export function visibleNav(
+  nav: NavArea[],
+  canView: (module: ModuleKey) => boolean,
+  live: ReadonlySet<NavRequirement> = new Set()
+): NavArea[] {
   return nav
     .map((area) => ({
       ...area,
@@ -372,9 +406,10 @@ export function visibleNav(nav: NavArea[], canView: (module: ModuleKey) => boole
           ...g,
           functions: g.functions.filter(
             (f) =>
-              !f.module ||
-              canView(f.module) ||
-              Boolean(f.alternativeModule && canView(f.alternativeModule))
+              (!f.requires || live.has(f.requires)) &&
+              (!f.module ||
+                canView(f.module) ||
+                Boolean(f.alternativeModule && canView(f.alternativeModule)))
           ),
         }))
         .filter((g) => g.functions.length > 0),

@@ -369,6 +369,7 @@
       "apps": "アプリ",
       "agents": "エージェント",
       "workflows": "ワークフロー",
+      "zentinelle": "Zentinelle",
       "clusters": "クラスター",
       "domains": "ドメイン",
       "providers": "プロバイダー",
@@ -16210,12 +16211,14 @@
       "deployment-approvals": "デプロイの承認",
       "jobs": "スケジュール済みジョブ",
       "environments": "環境",
-      "previews": "プレビュー"
+      "previews": "プレビュー",
+      "zentinelle": "Zentinelle"
     },
     "areas": {
       "home": "ホーム",
       "agents": "エージェント",
       "apps": "アプリ",
+      "secure": "保護",
       "admin": "管理"
     },
     "groups": {

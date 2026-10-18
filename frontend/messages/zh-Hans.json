@@ -369,6 +369,7 @@
       "apps": "应用",
       "agents": "代理",
       "workflows": "工作流",
+      "zentinelle": "Zentinelle",
       "clusters": "集群",
       "domains": "域名",
       "providers": "提供方",
@@ -16210,12 +16211,14 @@
       "deployment-approvals": "部署审批",
       "jobs": "计划作业",
       "environments": "环境",
-      "previews": "预览"
+      "previews": "预览",
+      "zentinelle": "Zentinelle"
     },
     "areas": {
       "home": "首页",
       "agents": "智能体",
       "apps": "应用",
+      "secure": "防护",
       "admin": "管理"
     },
     "groups": {
