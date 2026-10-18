@@ -118,6 +118,16 @@ export const APPS: AppRow[] = [
     healthPulse: { status: "NEVER", message: "no deploys yet", ageSeconds: null },
   }),
   app({
+    id: "a0000000-0000-4000-8000-000000000006",
+    slug: "pr-482-review",
+    name: "PR 482 review",
+    description: "A review build that tears itself down (#2433).",
+    projectSlug: "web",
+    // Inside its last day, relative to whenever the story renders.
+    expiresAt: new Date(Date.now() + 5 * 3_600_000).toISOString(),
+    clusters: ["stg-us-west-2"],
+  }),
+  app({
     id: "a0000000-0000-4000-8000-000000000005",
     slug: "nightly-reports",
     name: "Nightly Reports",

@@ -246,6 +246,24 @@ def test_app_teardown_deletes_each_environments_namespace(app, env, staging, dri
     assert sorted(driver.namespaces("delete_namespace")) == [APP_NS, STAGING_NS]
 
 
+def test_app_teardown_propagates_failure_after_attempting_other_namespaces(
+    app, env, staging, driver, monkeypatch
+):
+    from astrolift_workflows.activities.app_teardown import _delete_app_namespaces_sync
+
+    delete = driver.delete_namespace
+
+    def partial(cluster_slug, namespace, wait=False):
+        delete(cluster_slug, namespace, wait=wait)
+        if namespace == APP_NS:
+            raise RuntimeError("cluster unavailable")
+
+    monkeypatch.setattr(driver, "delete_namespace", partial)
+    with pytest.raises(RuntimeError, match="namespace teardown incomplete"):
+        _delete_app_namespaces_sync(app.pk)
+    assert sorted(driver.namespaces("delete_namespace")) == [APP_NS, STAGING_NS]
+
+
 def test_force_redeploy_deletes_the_environments_own_objects(app, env, staging, driver):
     from astrolift_workflows.activities.force_redeploy import _delete_app_k8s_objects_sync
 

@@ -1,5 +1,7 @@
 "use client";
 
+import type { TemporaryAppPolicyState } from "../../apps/temporary-app-model";
+
 import { AppWindowIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -32,6 +34,7 @@ export interface BrainAppsTabProps {
   onDismissHost: () => void;
   hostProjects: HostBrainAppProject[];
   hostSubmitting: boolean;
+  temporary?: TemporaryAppPolicyState;
   onSubmitHost: (values: HostBrainAppValues) => void;
 }
 
@@ -57,6 +60,7 @@ export function BrainAppsTab({
   onDismissHost,
   hostProjects,
   hostSubmitting,
+  temporary,
   onSubmitHost,
 }: BrainAppsTabProps) {
   const t = useTranslations("brains.apps");
@@ -135,6 +139,7 @@ export function BrainAppsTab({
         brainSlug={hosting ? slug : null}
         projects={hostProjects}
         submitting={hostSubmitting}
+        temporary={temporary}
         onSubmit={onSubmitHost}
         onDismiss={onDismissHost}
       />

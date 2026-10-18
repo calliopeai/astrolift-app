@@ -1457,6 +1457,7 @@
         "mine": "Meine",
         "failing": "Fehlerhaft",
         "archived": "Archiviert",
+        "temporary": "Temporär",
         "mineNote": "Meine umfasst Apps, für die Sie direkt oder über Projekt, Team oder Organisation eine Rolle besitzen, solange Apps ihre Eigentümer noch nicht erfassen."
       },
       "bulk": {
@@ -4052,6 +4053,36 @@
       "legendDescription": "Knotentypen und ihre Bedeutung.",
       "legendTitle": "Legende",
       "title": "{name} · Topologie"
+    },
+    "expiry": {
+      "expiresIn": "Läuft ab in {remaining}",
+      "expired": "Abgelaufen",
+      "remaining": {
+        "days": "{days} T {hours} Std.",
+        "hours": "{hours} Std. {minutes} Min.",
+        "minutes": "{minutes} Min."
+      },
+      "title": "Temporäre App: wird am {when} abgebaut",
+      "extend": "+1 Tag",
+      "extendLabel": "Um einen Tag verlängern",
+      "extended": "Verlängert bis {when}",
+      "extendFailed": "Die App konnte nicht verlängert werden"
+    },
+    "temporaryCreation": {
+      "ttl": "Lebensdauer der Anwendung",
+      "help": "Leer lassen, um den Ablauf aus dem Manifest zu übernehmen oder eine dauerhafte Anwendung zu erstellen, sofern die Richtlinie dies erlaubt. Monate haben 30 Tage.",
+      "inherited": "Laut Manifest läuft diese Anwendung nach {ttl} ab. Geben Sie eine Dauer ein, um dies zu überschreiben.",
+      "bounds": "Zulässige Lebensdauer: {min} bis {max} Minuten.",
+      "required": "Ihre Organisation verlangt für diese Anwendung ein Ablaufdatum.",
+      "invalid": "Geben Sie eine Dauer innerhalb der Organisationsgrenzen ein: 30m, 4h, 7d, 6w oder 3mo.",
+      "deleteData": "Verwaltete Daten beim Ablauf der Anwendung löschen",
+      "deleteWarning": "Beim Ablauf werden auch Datenbanken, Buckets und Volumes der Anwendung gelöscht. Dies kann nicht rückgängig gemacht werden.",
+      "keepData": "Verwaltete Daten werden nach Ablauf {days} Tage aufbewahrt und dann gelöscht.",
+      "loading": "Richtlinie zur Lebensdauer wird geladen…",
+      "unavailable": "Die Richtlinie konnte nicht gelesen werden. Versuchen Sie es vor dem Erstellen erneut.",
+      "unsupported": "Dieser Server unterstützt keine temporären Anwendungen.",
+      "retry": "Erneut versuchen",
+      "reviewKeep": "Es gilt die Datenaufbewahrungsrichtlinie der Organisation."
     }
   },
   "sourceProviders": {
@@ -4666,7 +4697,8 @@
         "deploy_failure": "Deploy fehlgeschlagen",
         "error_spike": "Fehlerspitze",
         "preview_created": "Vorschau erstellt",
-        "preview_destroyed": "Vorschau entfernt"
+        "preview_destroyed": "Vorschau entfernt",
+        "app_expiring": "Temporäre App läuft ab"
       },
       "toggleLabel": "{kind} für {app}",
       "unsubscribeAll": "Alle abbestellen",

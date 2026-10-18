@@ -71,6 +71,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "clusters.reviewed_log_collector_install",
     "domains.cloudflare_connections",
     "apps.dependency_context",
+    "apps.temporary_expiry",
     "providers.reference_read",
     "domains.managed_diagnostics",
     "workloads.environment_targets",

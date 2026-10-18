@@ -34,6 +34,7 @@ export const FRAME: Omit<AppFrameProps, "children"> = {
   archiving: false,
   onArchive: noop,
   onRestore: noop,
+  onExtend: noop,
   canDelete: true,
   deleting: false,
   onDelete: noop,

@@ -268,6 +268,11 @@ class ScheduleKind(StrEnum):
     (a config change, no code) or fired on demand by the platform-admin
     ``resyncAllAstroliftCiWorkflows`` mutation."""
 
+    APP_EXPIRY_SWEEP = "app_expiry_sweep"
+    """Every 15 min — safety net for temporary apps (#2433): start the
+    ``AppExpiryWorkflow`` of any app with an expiry whose timer is not
+    running. The timer does the teardown; the sweep only re-arms it."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ScheduleDefinition:
@@ -568,6 +573,13 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.CI_WORKFLOW_RESYNC,
         ),
         description="Resync managed CI workflow files across the fleet (held; #1211)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.APP_EXPIRY_SWEEP,
+        workflow_name="AppExpirySweepWorkflow",
+        interval_seconds=15 * 60,
+        schedule_id=schedule_id_for(kind=ScheduleKind.APP_EXPIRY_SWEEP),
+        description="Re-arm the expiry timer of any temporary app that lost it (#2433)",
     ),
 )
 

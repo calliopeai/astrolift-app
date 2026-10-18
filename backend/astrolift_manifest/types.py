@@ -325,6 +325,9 @@ class RawManifest:
     ingress_max_body_size: str = ""
     # ``[app] kind`` (#2332): a registered app kind, ``""`` for a generic app.
     app_kind: str = ""
+    # ``[app] expires_in`` (#2433): how long a temporary app lives, ``""`` for
+    # a permanent one. Applied at registration.
+    app_expires_in: str = ""
     # ``[brain] slug`` (#2243): the hosted brain this app reads, ``""`` for none.
     brain: str = ""
     raw: dict[str, Any] = dataclasses.field(default_factory=dict)

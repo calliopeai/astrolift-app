@@ -114,8 +114,9 @@ def test_default_schedules_complete():
     #1797 adds the exact Temporal execution reconciliation sweep.
     #2234 adds durable agent completion callback recovery.
     #1971 adds the moved-conversation admission expiry sweep.
+    #2433 adds the temporary-app expiry timer sweep.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 29
+    assert len(DEFAULT_SCHEDULES) == 30
 
 
 def test_default_schedules_include_all_kinds():

@@ -101,6 +101,11 @@ export const Archived: Story = {
   render: () => <Apps apps={APPS.filter((a) => a.isArchived)} initial={{ view: "archived" }} />,
 };
 
+/** Temporary (#2433): apps with an expiry, each with its countdown. */
+export const Temporary: Story = {
+  render: () => <Apps apps={APPS.filter((a) => a.expiresAt)} initial={{ view: "temporary" }} />,
+};
+
 /** Project, kind and cluster chips. */
 export const Filtered: Story = {
   render: () => (

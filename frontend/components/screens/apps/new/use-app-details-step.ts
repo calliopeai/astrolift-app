@@ -1,5 +1,8 @@
 "use client";
 
+import { manifestExpiry, temporaryAppValid, type TemporaryAppValues } from "../temporary-app-model";
+import { useTemporaryAppRules } from "../use-temporary-app-rules";
+
 import { useWizardProjects } from "@/components/wizard/use-wizard-projects";
 
 import { useQuery } from "@apollo/client/react";
@@ -14,7 +17,9 @@ interface TeamsResp {
 }
 
 /** The slice of the register-app wizard state the details step reads and writes. */
-export interface AppDetailsFields {
+export interface AppDetailsFields extends TemporaryAppValues {
+  manifestRaw?: string;
+  manifestLater?: boolean;
   name: string;
   slug: string;
   slugTouched: boolean;
@@ -72,12 +77,16 @@ export function useAppDetailsStep<S extends AppDetailsFields>(
     });
   }, [setState]);
 
+  const temporary = useTemporaryAppRules();
+  const inherited = state.manifestLater ? "" : manifestExpiry(state.manifestRaw ?? "");
+  const lifetimeValid =
+    !temporary.loading && !temporary.failed && temporaryAppValid(state, temporary.rules, inherited);
   const slugValid = SLUG_RE.test(state.slug);
   const nameValid = state.name.trim().length > 0;
 
   React.useEffect(() => {
-    setValid(nameValid && slugValid && projectValid);
-  }, [nameValid, slugValid, projectValid, setValid]);
+    setValid(nameValid && slugValid && projectValid && lifetimeValid);
+  }, [nameValid, slugValid, projectValid, lifetimeValid, setValid]);
 
-  return { allTeams, allProjects, slugValid, projectsLoading };
+  return { allTeams, allProjects, slugValid, projectsLoading, temporary };
 }

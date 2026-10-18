@@ -6,6 +6,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useTemporaryAppRules } from "../apps/use-temporary-app-rules";
+import {
+  temporaryAppInput,
+  temporaryAppValid,
+  type TemporaryAppPolicyState,
+} from "../apps/temporary-app-model";
+
 import { parseListState, useListState } from "@/components/list/use-list-state";
 import { useLocalizedList } from "@/components/list/use-localized-list";
 import { selectRows } from "@/components/list/select-rows";
@@ -79,6 +86,7 @@ export function useBrains() {
   const router = useRouter();
   const { allProjects } = useWizardProjects();
   const [hostingSlug, setHostingSlug] = React.useState<string | null>(null);
+  const temporary = useTemporaryAppRules({ skip: !hostingSlug });
   const [host, hostState] = useMutation<HostAppOnBrainMutation, HostAppOnBrainMutationVariables>(
     HOST_APP_ON_BRAIN
   );
@@ -106,10 +114,17 @@ export function useBrains() {
     hostingSlug,
     hostProjects: allProjects.map((p) => ({ id: p.id, label: `${p.team.slug}/${p.slug}` })),
     hostSubmitting: hostState.loading,
+    temporary,
     onHost: (slug: string) => setHostingSlug(slug),
     onDismissHost: () => setHostingSlug(null),
     onSubmitHost: async (values: HostBrainAppValues) => {
-      if (!hostingSlug) return;
+      if (
+        !hostingSlug ||
+        temporary.loading ||
+        temporary.failed ||
+        !temporaryAppValid(values, temporary.rules)
+      )
+        return;
       const { data: hosted } = await host({
         variables: {
           input: {
@@ -119,6 +134,7 @@ export function useBrains() {
             name: values.name || null,
             slug: null,
             port: values.port,
+            ...temporaryAppInput(values),
           },
         },
       }).catch(() => ({ data: null }));
@@ -132,4 +148,6 @@ export function useBrains() {
   };
 }
 
-export type BrainsState = ReturnType<typeof useBrains>;
+export type BrainsState = Omit<ReturnType<typeof useBrains>, "temporary"> & {
+  temporary?: TemporaryAppPolicyState;
+};
