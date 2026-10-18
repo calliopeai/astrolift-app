@@ -116,6 +116,7 @@ def test_github_managed_workflows_use_node24_actions(settings):
     assert "actions/checkout@v6" in agent_workflow
     assert "actions/checkout@v4" not in agent_workflow
 
+
 _BUMP_HINT = (
     "A managed CI-workflow body changed. If that's intentional, bump "
     "TEMPLATE_VERSION in astrolift_scm/ci_templates.py, set "
