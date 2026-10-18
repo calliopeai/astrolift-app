@@ -105,6 +105,71 @@ def _production_gate(info: Info, action: str, app, env, resolver_name: str):
     return gate(info, action, app=app, resolver_name=resolver_name)
 
 
+def _start_native_rollback(info, deployment, prior, actor, tenant):
+    """A native GKE rollback is the prior image through the ordinary native pipeline (#2278).
+
+    The legacy RollbackDeploymentWorkflow renders and applies without the
+    original-caller, journal and receipt fences, so a native app never takes
+    it. The rollback row carries a fresh protected origin, honours the
+    environment's approval quorum like any native Deployment, and runs as the
+    canonical DeployAppWorkflow. The current Deployment stays RUNNING until the
+    rollback is observed live; completion then marks it ROLLED_BACK.
+    """
+    app, env = deployment.registered_app, deployment.app_environment
+    try:
+        origin = capture_deployment_origin(getattr(info.context, "request", None), app, env)
+    except DeploymentOriginError as exc:
+        return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+    if origin is None:
+        return gql_failure(ErrorCode.PRECONDITION.value, "NATIVE_HUMAN_ORIGIN_REQUIRED")
+    if env.deploys_paused:
+        return gql_failure(ErrorCode.PRECONDITION.value, f"environment {env.name!r} has deploys paused")
+    approvals_required = _required_approvals_for(app, env)
+    initial_status = (
+        Deployment.Status.PENDING_APPROVAL if approvals_required > 0 else Deployment.Status.PENDING
+    )
+    with transaction.atomic():
+        new_deploy = Deployment.objects.create(
+            registered_app_id=deployment.registered_app_id,
+            app_environment_id=deployment.app_environment_id,
+            workload_id=deployment.workload_id,
+            triggered_by_user_id=actor.user_id,
+            trigger_kind=Deployment.TriggerKind.ROLLBACK.value,
+            strategy=(prior.strategy or "rolling"),
+            status=initial_status.value,
+            image_tag=prior.image_tag,
+            image_digest=prior.image_digest,
+            config_snapshot=prior.config_snapshot,
+            approvals_required=approvals_required,
+            approvals_received=0,
+            promoted_from=prior,
+            commit_sha=prior.commit_sha,
+        )
+        persist_deployment_origin(new_deploy, origin)
+        if initial_status is Deployment.Status.PENDING:
+            _start_deploy_workflow_on_commit(
+                deployment=new_deploy,
+                workflow_kind="DeployAppWorkflow",
+                workflow_id=_deploy_workflow_id(str(app.guid), str(env.guid)),
+                args=[
+                    DeployAppInput(
+                        registered_app_id=new_deploy.registered_app_id,
+                        app_environment_id=new_deploy.app_environment_id,
+                        deployment_id=new_deploy.pk,
+                        image_tags={"app": prior.image_tag} if prior.image_tag else {},
+                        trigger_kind=Deployment.TriggerKind.ROLLBACK.value,
+                        actor=actor,
+                        commit_sha=prior.commit_sha,
+                    )
+                ],
+                organization_id=tenant.organization_id if tenant else None,
+                registered_app_id=new_deploy.registered_app_id,
+                app_environment_id=new_deploy.app_environment_id,
+                actor=actor,
+            )
+    return gql_success(deployment_to_type(new_deploy))
+
+
 @strawberry.type
 class DeploymentMutations:
     @strawberry.field
@@ -829,8 +894,7 @@ class DeploymentMutations:
                 return deny
             from astrolift_lifecycle.deployment_identity_origin import native_origin_required
 
-            if native_origin_required(deployment.registered_app, deployment.app_environment):
-                return gql_failure(ErrorCode.PRECONDITION.value, "NATIVE_HUMAN_ORIGIN_REQUIRED")
+            native = native_origin_required(deployment.registered_app, deployment.app_environment)
 
             if deployment.status != Deployment.Status.RUNNING.value:
                 return gql_failure(
@@ -876,6 +940,8 @@ class DeploymentMutations:
                 )
 
             actor = _actor_from_request(info)
+            if native:
+                return _start_native_rollback(info, deployment, prior, actor, tenant)
 
             with transaction.atomic():
                 deployment.transition_to(Deployment.Status.ROLLED_BACK)

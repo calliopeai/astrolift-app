@@ -6,7 +6,7 @@ from contextlib import ExitStack
 from dataclasses import asdict, dataclass, replace
 from threading import Event
 
-from django.db import connection
+from django.db import connection, transaction
 from django.db.models import Q
 from gcp.gke_app_apply import ExecutionBinding, GKEAppApply, compile_app_plan
 from gcp.gke_app_runtime_handoff import observe_handoff_runtime
@@ -303,9 +303,9 @@ def _refuse_unresolved_prior(authority, operation_id):
     """
     owned = {"registered_app__guid": authority.app_guid, "tenant_cluster__guid": authority.cluster_guid}
     for model, resolved in (
-        (GCPGKEPreparationJournal, ("OBSERVED",)),
-        (GCPWorkloadIdentityJournal, ("OBSERVED",)),
-        (GCPGKEAppApplyJournal, ("OBSERVED", "REJECTED")),
+        (GCPGKEPreparationJournal, ("OBSERVED", "RESOLVED")),
+        (GCPWorkloadIdentityJournal, ("OBSERVED", "RESOLVED")),
+        (GCPGKEAppApplyJournal, ("OBSERVED", "REJECTED", "RESOLVED")),
     ):
         for row in model.all_objects.filter(**owned)[:65]:
             if str(row.operation_id) == operation_id:
@@ -441,18 +441,29 @@ def execute_native_endpoint_configuration(input, *, ports=None):
             ports.preparation(target.context) as preparer,
             ExitStack() as mutexes,
         ):
-            iam_store = previous_iam = None
+            iam_store = previous_iam = previous_iam_row = None
             if next_generation:
+                previous_iam_row = GCPWorkloadIdentityJournal.all_objects.filter(
+                    registered_app__guid=original.identity.app_id,
+                    tenant_cluster__guid=original.identity.cluster_id,
+                ).first()
+            if next_generation and previous_iam_row is None and prior.state == "RESOLVED":
+                # An operator-settled operation that never reached IAM: the
+                # IAM journal is created fresh below, as in the first generation.
+                reservation = prep.reserve(operation, checkpoint=admitted, expected_version=prior.version)
+            elif next_generation:
                 # IAM follows preparation in mutex order; the same IAM mutex
                 # then serves this generation, never a second competing one.
                 retained = PreparationStore._reservation(prior)
                 iam_store = mutexes.enter_context(
                     journal_mutex(prep.iam_target(retained, checkpoint=prior_admitted))
                 )
-                previous_iam_row = GCPWorkloadIdentityJournal.all_objects.get(
+                previous_iam_row = GCPWorkloadIdentityJournal.all_objects.filter(
                     registered_app__guid=original.identity.app_id,
                     tenant_cluster__guid=original.identity.cluster_id,
-                )
+                ).first()
+                if previous_iam_row is None:
+                    raise NativeConfigurationError("PREVIOUS_IAM_UNAVAILABLE")
                 previous_iam = (iam_store, JournalStore._reservation(previous_iam_row))
                 reservation = prep.reserve(
                     operation, checkpoint=admitted, expected_version=prior.version, previous_iam=previous_iam
@@ -512,7 +523,7 @@ def execute_native_endpoint_configuration(input, *, ports=None):
                 iam_reservation = iam_store.reserve(
                     iam_operation,
                     checkpoint=iam_admitted,
-                    expected_version=previous_iam_row.version if next_generation else None,
+                    expected_version=previous_iam_row.version if previous_iam_row is not None else None,
                 )
                 iam = (iam_store, iam_reservation)
                 iam_current = checked(
@@ -751,4 +762,27 @@ def complete_native_endpoint_configuration(input, receipt):
             deleted_at__isnull=True,
         ).exists():
             raise NativeConfigurationError("NATIVE_RECEIPT_UNCONFIRMED")
+        _retire_rolled_back(input.deployment_id)
         _mark_running_sync(input.deployment_id)
+
+
+def _retire_rolled_back(deployment_id):
+    """A native rollback, once observed live, marks what it replaced ROLLED_BACK.
+
+    Ordinary completion would mark it SUPERSEDED. Idempotent on a retried
+    completion: rows already rolled back are no longer RUNNING.
+    """
+    with transaction.atomic():
+        row = Deployment.all_objects.select_for_update().get(pk=deployment_id)
+        if row.trigger_kind != Deployment.TriggerKind.ROLLBACK.value:
+            return
+        for live in (
+            Deployment.all_objects.select_for_update()
+            .filter(
+                registered_app_id=row.registered_app_id,
+                app_environment_id=row.app_environment_id,
+                status=Deployment.Status.RUNNING.value,
+            )
+            .exclude(pk=row.pk)
+        ):
+            live.transition_to(Deployment.Status.ROLLED_BACK)
