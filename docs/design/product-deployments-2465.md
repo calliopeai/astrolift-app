@@ -127,7 +127,7 @@ What it costs, and the answer:
 | Cost | Answer |
 |---|---|
 | Latency up to one scan interval | A 2-minute product scan (section 5) and a `refreshClusterProductDeployments` mutation for the operator who just applied. |
-| Anyone who can create a namespace can forge the labels | Only the cluster owner can: tenants reach the cluster through Astrolift, whose namespaces carry `control-plane-scope` and are ignored. Labels drive display only. The one action they feed (Zentinelle connect, section 7) still needs Zentinelle's own enrollment handshake, which a forged namespace cannot pass. |
+| Anyone who can create a namespace can forge the labels | Only the cluster owner can: tenants reach the cluster through Astrolift. Under the minimal RBAC contract Astrolift's namespaces carry `control-plane-scope` and are ignored; under the full ClusterRole they do not (the label is added only when the contract is enforced, `core/control_plane_rbac.py`), so the guarantee there is that Astrolift never writes a `calliope.ai/` key on a namespace it creates, which a test pins. Labels drive display only. The one action they feed (Zentinelle connect, section 7) still needs Zentinelle's own enrollment handshake, which a forged namespace cannot pass. |
 | A label contract to keep in step across two repos | Versioned by `calliope.ai/product-contract`; canonical copy in calliope-installer; N and N-1 read here (section 4). |
 | Unmanaged clusters are never seen | Correct: only `lifecycle = managed` clusters are scanned, as for capabilities. |
 
@@ -185,7 +185,7 @@ Canonical: `calliope-installer/docs/contracts/astrolift-product-deployments.md`.
   `calliope.ai/workloads` (JSON or comma lists); on Zentinelle,
   `calliope.ai/integrations` (comma list of enabled flags, absent when none).
 - Reserved, not yet written: `calliope.ai/version`,
-  `calliope.ai/astrolift-project`, `endpoints.api_internal`.
+  `calliope.ai/astrolift-project`, `endpoints.internal`.
 - Never: `astrolift.io/control-plane-scope`, secrets.
 
 Reader rules here:
@@ -252,8 +252,8 @@ Per discovered Zentinelle deployment, the link step decides one state:
 
 | State | When | What happens |
 |---|---|---|
-| `connected` | the owning connection's `base_url` matches `endpoints.api` (normalized) | link the row; the deployment view shows "Integrated with Astrolift"; Secure › Zentinelle links to the deployment |
-| `available` | no live connection for the owner | the deployment view (cluster card, project section, sheet) offers Connect prefilled: URL from `endpoints`, gateway URL from `endpoints.api_internal` once the contract carries it. The admin pastes the enrollment code and passes step-up. Secure › Zentinelle stays hidden until the connection is live. |
+| `connected` | the owning connection's `base_url` matches `endpoints.console` (both normalized by `normalize_base_url`; `base_url` is Zentinelle's root URL, never the API path) | link the row; the deployment view shows "Integrated with Astrolift"; Secure › Zentinelle links to the deployment |
+| `available` | no live connection for the owner | the deployment view (cluster card, project section, sheet) offers Connect prefilled: URL from `endpoints.console`, gateway URL from `endpoints.internal` once the contract carries it. The admin pastes the enrollment code and passes step-up. Secure › Zentinelle stays hidden until the connection is live. |
 | `other_connection` | the owner is connected to a different Zentinelle | the deployment shows as not integrated with Astrolift; Secure › Zentinelle shows the connected one, with no deployment link. Never rewire on our own. |
 
 On a self-contained install the installer's Enable integration
@@ -263,9 +263,12 @@ scan finds `connected` and offers nothing.
 **Integrated with, read-only.** A hosted Zentinelle's view lists the products it
 is integrated with, as information, never as a control:
 
-The source of truth is the integration flags in the install record, which the
-installer writes on the Zentinelle namespace as `calliope.ai/integrations`
-(contract version 1, section 4).
+The source of truth is the integration flags in the install record. The
+installer copies them onto the Zentinelle namespace as `calliope.ai/integrations`
+(contract version 1, section 4) when it applies Zentinelle, and enabling a flag
+does not re-apply Zentinelle, so the copy is as of Zentinelle's last apply and
+can lag the record. The view says so ("as of the last apply") and never treats
+the annotation as live state.
 
 - Astrolift (primary): the `zentinelle-astrolift` flag, and Astrolift's own
   connection (the link state above). When they disagree the view shows both,
@@ -345,6 +348,14 @@ Tenancy, fail closed as `_clusters_qs` does (null org returns nothing):
 - Shared cluster: visible to the platform operator (`check_platform_operator`),
   and to an organization only once assigned to one of its projects. A shared
   cluster is visible to every org; its products' hub URLs are not.
+- So cluster visibility is not row visibility. `_clusters_qs` returns shared
+  clusters to every org, so every resolver above (cluster list, single row,
+  page, the MCP tool, and `AstroliftZentinelleConnection.productDeployment`)
+  filters rows through one `_product_deployments_qs`: rows on the caller's
+  org-owned clusters, plus rows on shared clusters whose `project` belongs to
+  the caller's org; every row for the platform operator. Tenancy tests cover a
+  second org reading an unassigned and another org's assigned row on a shared
+  cluster, through each resolver.
 
 Reads reuse `cluster.read` and `project.read`: a product deployment is a fact
 about a cluster, and a new permission would change every role matrix for no new
@@ -354,7 +365,7 @@ boundary. Q5 records the alternative.
 
 | Mutation | Permission | Effect |
 |---|---|---|
-| `assignProductDeploymentProject(input: {id, projectId})` (`projectId` null clears) | `project.update` on the target project and `cluster.update` on the cluster; platform operator on a shared cluster; step-up, as it widens who sees the deployment | sets `project`; audit row |
+| `assignProductDeploymentProject(input: {id, projectId})` (`projectId` null clears) | `project.update` on the target project and `cluster.update` on the cluster; platform operator on a shared cluster; step-up, as it widens who sees the deployment. On an org-owned cluster the project must be in the cluster's organization | sets `project`; audit row |
 | `refreshClusterProductDeployments(clusterId)` | `cluster.update`, `cluster_org_scope` | runs the scan for one cluster now |
 
 Neither reaches the cluster.
@@ -403,7 +414,8 @@ with six rows ("View all").
 4. **In-cluster gateway URL.** Gateways in `astrolift-system` would reach
    Zentinelle at `zentinelle-backend.<ns>.svc.cluster.local`; the backend's
    `ALLOWED_HOSTS` does not admit that name today. Zentinelle or the installer
-   adds it, then the contract publishes `endpoints.api_internal` (additive).
+   adds it, then the contract publishes `endpoints.internal` (additive), a root URL
+   like `gateway_url`.
 5. **Permissions.** Reuse `cluster.read` / `project.read` (recommended), or add
    `product_deployment.read` if hub URLs should be narrower than cluster
    visibility.
