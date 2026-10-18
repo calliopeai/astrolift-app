@@ -169,15 +169,25 @@ def test_a_new_brain_builds_the_template_owned_container_with_more_memory():
     assert (workload["memory_request"], workload["memory_limit"]) == ("128Mi", "512Mi")
 
 
-def test_graduation_keeps_a_bigger_brains_memory_and_its_own_dockerfile():
-    own = """
+@pytest.mark.parametrize(
+    "memory_request,memory_limit,expected",
+    [
+        ("256Mi", "64Mi", ("256Mi", "512Mi")),
+        ("1Gi", "2Gi", ("1Gi", "2Gi")),
+        ("64Mi", "256Mi", ("128Mi", "512Mi")),
+    ],
+)
+def test_graduation_keeps_a_bigger_brains_memory_and_its_own_dockerfile(
+    memory_request, memory_limit, expected
+):
+    own = f"""
 name = "kb"
 
 [[workloads]]
 name = "brain"
 kind = "deployment"
-memory_request = "256Mi"
-memory_limit = "64Mi"
+memory_request = "{memory_request}"
+memory_limit = "{memory_limit}"
 
 [[workloads.containers]]
 name = "brain"
@@ -190,8 +200,9 @@ build_context = "."
 
     [workload] = merged["workloads"]
     # More than the default stays; less is raised to it.
-    assert (workload["memory_request"], workload["memory_limit"]) == ("256Mi", "512Mi")
+    assert (workload["memory_request"], workload["memory_limit"]) == expected
     assert workload["containers"][0]["dockerfile_path"] == "extensions/portal-container/Dockerfile"
+    assert workload["containers"][0]["build_context"] == "."
 
 
 # ---------------------------------------------------------------------------

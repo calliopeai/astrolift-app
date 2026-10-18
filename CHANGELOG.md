@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve existing brain memory and build settings when merging manifests after the monetary parser module is retired (#2464), and correct the operator guide to describe the retained quota APIs and coordinated worker retirement.
+
 - Remove the remaining `billableWindowDays` retention API field and its unused billing helper (#2464); effective retention days, warning windows, policy controls and eviction remain operational.
 
 - Retire Astrolift application/task/model monetary APIs, estimates, budgets, forecasts and spend emission (#2464), retaining resource quotas and canonical Zentinelle token reads. Preview runtime enrichment is explicitly resource-only (`includeRuntimeResources`, `previews.explicit_runtime_resources`). Historical rows/outboxes remain; old cost histories complete through no-op activities and exact retired spend webhooks stop before HTTP. See [operator rollout and schedule retirement](docs/operators/retire-costing.md).

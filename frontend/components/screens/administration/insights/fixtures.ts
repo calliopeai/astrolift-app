@@ -491,7 +491,7 @@ export const FEATURES: FeaturesScreenProps = {
     {
       key: "admin.quotas_enabled",
       enabled: false,
-      description: "Expose the cost explorer to organization admins.",
+      description: "Expose resource quotas to organization admins.",
     },
     { key: "workflows.graph_view", enabled: true, description: null },
   ],

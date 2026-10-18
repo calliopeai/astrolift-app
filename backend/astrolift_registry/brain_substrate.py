@@ -435,7 +435,7 @@ def _keep_own(rendered: dict[str, Any], current: dict[str, Any]) -> None:
     """What the brain's own ``brain`` workload keeps over the rendered one:
     more memory than the defaults, and the Dockerfile it builds from (a brain
     created before the template owned the container builds from its own)."""
-    from astrolift_lifecycle.preview_cost import parse_memory_bytes
+    from astrolift_lifecycle.preview_resources import parse_memory_bytes
 
     for key in ("memory_request", "memory_limit"):
         try:
