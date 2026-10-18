@@ -205,6 +205,9 @@ EXEMPT: dict[str, str] = {
     "OperationsQuery.astrolift_my_notification_preferences": (
         "self-service: caller's own notification preferences, filtered by viewer pk"
     ),
+    "NotificationQuietHoursQuery.astrolift_my_notification_quiet_hours": (
+        "self-service: authenticated caller's own quiet hours, filtered by viewer pk"
+    ),
     "OperationsQuery.astrolift_my_devices": (
         "self-service: caller's own registered push devices, filtered by tenant.actor_user_id"
     ),
@@ -257,6 +260,9 @@ EXEMPT: dict[str, str] = {
     ),
     "OperationsMutation.set_notification_preference": (
         "self-service: upserts one notification preference row for the caller (viewer.pk)"
+    ),
+    "NotificationQuietHoursMutation.set_notification_quiet_hours": (
+        "self-service: updates only the authenticated caller's quiet hours (viewer.pk)"
     ),
     "OperationsMutation.set_alert_subscription": (
         "self-service: upserts the caller's own per-app alert subscription (tenant.actor_user_id)"

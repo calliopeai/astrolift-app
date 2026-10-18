@@ -66,6 +66,8 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     ("push", "auth.session.created.browser_extension"): True,
     # Fallback when the dispatcher can't infer client_kind.
     ("push", "auth.session.created"): True,
+    # ---- agent messages (#2434): a person was addressed by name ----
+    ("push", "agent.message.sent"): True,
     # ---- email channel --------------------------------------------
     # Mirrors the page-me operational events onto email for an
     # out-of-band notice. The whole email leg is master-gated by the
@@ -81,6 +83,7 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     ("email", "cluster.bootstrap_failed"): True,
     ("email", "secret.revealed"): True,
     ("email", "app.deregister_pending"): True,
+    ("email", "agent.message.sent"): True,
     ("email", "app.expiring"): True,
 }
 

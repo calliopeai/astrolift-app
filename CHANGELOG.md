@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Task usage provenance (#2458): `agentTaskUsageSnapshot(id)` checks scoped `app.read` and `agent.read`, current bearer ceilings and revocation. Typed token counts, duration and runner-reported USD cost carry source, timestamps and completeness; exact task/linked-run observations are selected without summing retries. Actual billing remains explicitly unknown (`NO_TASK_BILLING_SOURCE`). Capability: `agents.task_usage_snapshot`. See `docs/agent-task-usage.md`.
+- Personal notification quiet hours (#2434) are available in Settings → Notifications → Quiet hours and through `astroliftMyNotificationQuietHours` / `setNotificationQuietHours`. The daily window uses an IANA time zone and excludes its ending minute; the API reports whether it is active now. During that window, personal agent-message push and email are suppressed and audited. Inbox messages, subscriptions, audit events and organization webhooks remain available. Suppressed notifications are not deferred or digested. Clients can discover `notifications.quiet_hours` through the public handshake. Operations migration 0035 adds the personal settings table.
+
+- Agent runs can send messages to their authorized audience, and recipients can answer through the inbox or GraphQL (#2434). Approval replies respect the caller's API token limits. Replies persist atomically with their gate answer or live-run input, redact credentials before delivery, and start wake-up workflows after commit. Concurrent runs share the agent's message rate allowance; thread pages load only the latest message per thread.
 
 - Temporary-app expiry removes the exact app-owned brain credential Secrets during runtime retirement, with native ownership and original UID checks; the data namespace and managed services remain through grace (#2433).
 

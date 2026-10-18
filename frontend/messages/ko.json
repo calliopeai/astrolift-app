@@ -4726,6 +4726,25 @@
       "subscribeFailed": "구독하지 못했습니다",
       "unsubscribed": "{app} 구독을 해제했습니다",
       "unsubscribeFailed": "구독을 해제하지 못했습니다"
+    },
+    "quietHours": {
+      "title": "방해 금지 시간",
+      "description": "매일 이 시간 동안 에이전트 메시지의 개인 푸시 알림과 이메일을 일시 중지합니다. 메시지는 받은 편지함에 남으며 조직 웹훅에는 영향을 주지 않습니다.",
+      "enabled": "방해 금지 시간 사용",
+      "timezone": "시간대 (IANA)",
+      "start": "시작",
+      "end": "종료",
+      "active": "방해 금지 시간이 적용 중입니다",
+      "inactive": "방해 금지 시간이 적용되지 않습니다",
+      "save": "저장",
+      "saved": "방해 금지 시간을 저장했습니다",
+      "loading": "알림 설정을 불러오는 중…",
+      "error": "알림 설정을 불러오지 못했습니다.",
+      "retry": "다시 시도",
+      "saveError": "방해 금지 시간을 저장하지 못했습니다.",
+      "invalidTime": "올바른 시간을 입력하세요.",
+      "timezoneRequired": "IANA 시간대를 입력하세요.",
+      "differentTimes": "시작 시간과 종료 시간은 달라야 합니다."
     }
   },
   "securitySettings": {
@@ -17105,7 +17124,8 @@
     "semanticLayer": "시맨틱 레이어",
     "substrate": "기반",
     "sharing": "공유",
-    "connect": "연결"
+    "connect": "연결",
+    "agentInbox": "받은 편지함"
   },
   "support": {
     "title": "지원",
@@ -17208,5 +17228,42 @@
     "reasonPermission": "이 작업에 대한 권한이 없습니다.",
     "reasonStepUp": "다시 로그인해야 합니다.",
     "reasonRateLimited": "시도 횟수가 너무 많습니다. 1분 후 다시 시도하세요."
+  },
+  "agentInbox": {
+    "title": "받은 편지함",
+    "description": "{count, plural, =0 {에이전트가 보낸 메시지. 읽지 않은 메시지가 없습니다.} other {에이전트가 보낸 메시지. 읽지 않음 #개.}}",
+    "buttonUnread": "받은 편지함, 읽지 않음 {count}개",
+    "unreadOnly": "읽지 않은 메시지만",
+    "emptyTitle": "아직 메시지가 없습니다",
+    "emptyUnreadTitle": "읽지 않은 메시지가 없습니다",
+    "emptyDescription": "에이전트가 업데이트, 질문 또는 결과를 보내면 여기에 표시됩니다.",
+    "pickThread": "읽을 대화를 선택하세요.",
+    "threads": "대화",
+    "thread": "대화",
+    "unknownAgent": "삭제된 에이전트",
+    "more": "더 불러오기",
+    "earlier": "이전 메시지 불러오기",
+    "openRun": "실행 열기",
+    "markRead": "읽음으로 표시",
+    "replyToAgent": "에이전트에게 답장",
+    "answer": "답변",
+    "reason": "사유 (선택)",
+    "allow": "허용",
+    "deny": "거부",
+    "send": "보내기",
+    "expires": "만료 {when}",
+    "kind": {
+      "update": "업데이트",
+      "question": "질문",
+      "approval": "승인",
+      "result": "결과",
+      "alert": "알림"
+    },
+    "route": {
+      "live_run": "실행 중인 에이전트에 전송됨",
+      "gate": "에이전트의 요청에 답변함",
+      "woke": "에이전트를 시작함",
+      "queued": "에이전트의 다음 실행을 기다리는 중"
+    }
   }
 }

@@ -648,6 +648,96 @@ export type AstroliftAgentLiveStatus = {
   workloadSlug: Scalars['String']['output'];
 };
 
+export type AstroliftAgentMessage = {
+  agentName?: Maybe<Scalars['String']['output']>;
+  agentSlug?: Maybe<Scalars['String']['output']>;
+  /** A question or approval this person may still answer: not expired and not answered by them. */
+  answerable: Scalars['Boolean']['output'];
+  attachments: Array<AstroliftAgentMessageAttachment>;
+  body: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deliveredAt?: Maybe<Scalars['DateTime']['output']>;
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  options: Array<AstroliftAgentMessageOption>;
+  readAt?: Maybe<Scalars['DateTime']['output']>;
+  replies: Array<AstroliftAgentMessageReply>;
+  replyToId?: Maybe<Scalars['GUID']['output']>;
+  requestSequence?: Maybe<Scalars['Int']['output']>;
+  source: Scalars['String']['output'];
+  taskId?: Maybe<Scalars['GUID']['output']>;
+  taskStatus?: Maybe<Scalars['String']['output']>;
+  threadId: Scalars['GUID']['output'];
+  title: Scalars['String']['output'];
+};
+
+export type AstroliftAgentMessageAttachment = {
+  kind: Scalars['String']['output'];
+  label?: Maybe<Scalars['String']['output']>;
+  ref: Scalars['String']['output'];
+};
+
+export type AstroliftAgentMessageOption = {
+  description?: Maybe<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
+export type AstroliftAgentMessagePage = {
+  items: Array<AstroliftAgentMessage>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount?: Maybe<Scalars['Int']['output']>;
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessageReply = {
+  authorLabel: Scalars['String']['output'];
+  body: Scalars['String']['output'];
+  choices: Array<Scalars['String']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  decision?: Maybe<Scalars['String']['output']>;
+  deliveredAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  messageId: Scalars['GUID']['output'];
+  route: Scalars['String']['output'];
+  wakeTaskId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftAgentMessageReplyMutationResult = {
+  data?: Maybe<AstroliftAgentMessageReply>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftAgentMessageThread = {
+  agentName?: Maybe<Scalars['String']['output']>;
+  agentSlug?: Maybe<Scalars['String']['output']>;
+  lastMessage: AstroliftAgentMessage;
+  lastMessageAt: Scalars['DateTime']['output'];
+  messageCount: Scalars['Int']['output'];
+  taskId?: Maybe<Scalars['GUID']['output']>;
+  taskStatus?: Maybe<Scalars['String']['output']>;
+  threadId: Scalars['GUID']['output'];
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessageThreadPage = {
+  items: Array<AstroliftAgentMessageThread>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  unreadCount: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessagesMarked = {
+  marked: Scalars['Int']['output'];
+};
+
+export type AstroliftAgentMessagesMarkedMutationResult = {
+  data?: Maybe<AstroliftAgentMessagesMarked>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAgentQuarantine = {
   createdAt: Scalars['DateTime']['output'];
   evidenceUrl: Scalars['String']['output'];
@@ -4215,6 +4305,20 @@ export type AstroliftNotificationProfileMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftNotificationQuietHours = {
+  active: Scalars['Boolean']['output'];
+  enabled: Scalars['Boolean']['output'];
+  endMinute: Scalars['Int']['output'];
+  startMinute: Scalars['Int']['output'];
+  timezone: Scalars['String']['output'];
+};
+
+export type AstroliftNotificationQuietHoursMutationResult = {
+  data?: Maybe<AstroliftNotificationQuietHours>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftObservabilityPanelReason =
   | 'ERROR'
   | 'NOT_CONFIGURED'
@@ -5105,6 +5209,15 @@ export type AstroliftRenderedManifest = {
   imageTag: Scalars['String']['output'];
   namespace: Scalars['String']['output'];
   resources: Scalars['JSON']['output'];
+};
+
+export type AstroliftReplyToAgentMessageInput = {
+  body: InputMaybe<Scalars['String']['input']>;
+  choices: InputMaybe<Array<Scalars['String']['input']>>;
+  clientRequestId: InputMaybe<Scalars['String']['input']>;
+  /** allow or deny, for an approval. */
+  decision: InputMaybe<Scalars['String']['input']>;
+  messageId: Scalars['GUID']['input'];
 };
 
 export type AstroliftRerunOnboardingPayload = {
@@ -9525,6 +9638,7 @@ export type Mutation = {
   /** Logout the current user. */
   logout: Scalars['Boolean']['output'];
   logoutAllSessions: AstroliftLogoutAllSessionsPayloadMutationResult;
+  markAgentMessagesRead: AstroliftAgentMessagesMarkedMutationResult;
   markAllNotificationsRead: MarkallreadpayloadMutationResult;
   markNotificationRead: AstroliftNotificationMutationResult;
   markOnboardingComplete: AstroliftMarkOnboardingCompletePayloadMutationResult;
@@ -9615,6 +9729,7 @@ export type Mutation = {
   /** Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order. */
   reorderWorkflowStages: MutationResult;
   replyAgentTaskInput: AstroliftAgentTaskInputReplyMutationResult;
+  replyToAgentMessage: AstroliftAgentMessageReplyMutationResult;
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
@@ -9695,6 +9810,7 @@ export type Mutation = {
   setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
+  setNotificationQuietHours: AstroliftNotificationQuietHoursMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
@@ -10834,6 +10950,12 @@ export type MutationLogoutAllSessionsArgs = {
 };
 
 
+export type MutationMarkAgentMessagesReadArgs = {
+  ids?: InputMaybe<Array<Scalars['GUID']['input']>>;
+  threadId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
 export type MutationMarkNotificationReadArgs = {
   input: MarkNotificationReadInput;
 };
@@ -11230,6 +11352,11 @@ export type MutationReplyAgentTaskInputArgs = {
 };
 
 
+export type MutationReplyToAgentMessageArgs = {
+  input: AstroliftReplyToAgentMessageInput;
+};
+
+
 export type MutationReprovisionManagedServiceArgs = {
   input: ReprovisionManagedServiceInput;
 };
@@ -11623,6 +11750,11 @@ export type MutationSetNotificationPreferenceArgs = {
 
 export type MutationSetNotificationProfileArgs = {
   input: SetNotificationProfileInput;
+};
+
+
+export type MutationSetNotificationQuietHoursArgs = {
+  input: SetNotificationQuietHoursInput;
 };
 
 
@@ -12665,6 +12797,8 @@ export type Query = {
   astroliftActionSafetyRules: Array<AstroliftActionSafetyRule>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
+  astroliftAgentMessageThreads: AstroliftAgentMessageThreadPage;
+  astroliftAgentMessages: AstroliftAgentMessagePage;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
   astroliftAgentRuns: Array<AstroliftAgentRun>;
   astroliftAgentRunsPage: AstroliftAgentRunPage;
@@ -12839,6 +12973,7 @@ export type Query = {
   astroliftMyDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyMobileDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyNotificationPreferences: Array<AstroliftNotificationPreference>;
+  astroliftMyNotificationQuietHours: AstroliftNotificationQuietHours;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
@@ -13357,6 +13492,21 @@ export type QueryAstroliftActionApprovalRequestsArgs = {
 
 export type QueryAstroliftActionSafetyArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAgentMessageThreadsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: Scalars['Int']['input'];
+  unreadOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftAgentMessagesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  first?: Scalars['Int']['input'];
+  threadId?: InputMaybe<Scalars['GUID']['input']>;
+  unreadOnly?: Scalars['Boolean']['input'];
 };
 
 
@@ -16268,6 +16418,13 @@ export type SetNotificationProfileInput = {
   retentionDeliveryDays: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type SetNotificationQuietHoursInput = {
+  enabled: Scalars['Boolean']['input'];
+  endMinute: Scalars['Int']['input'];
+  startMinute: Scalars['Int']['input'];
+  timezone: Scalars['String']['input'];
+};
+
 export type SetOrganizationModuleInput = {
   enabled: Scalars['Boolean']['input'];
   key: Scalars['String']['input'];
@@ -16410,6 +16567,7 @@ export type SubscribeClusterModelInput = {
 };
 
 export type Subscription = {
+  astroliftAgentMessageReceived: AstroliftAgentMessage;
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
   astroliftOnAppLog: AstroliftAppLogLine;
   astroliftOnAppLogs: AstroliftAppLogLine;

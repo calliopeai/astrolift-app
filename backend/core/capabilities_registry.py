@@ -118,9 +118,11 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "agents.task_usage_snapshot",
     "agents.completion_callbacks",
     "agents.completion_callback_redelivery",
+    "agents.messages",
     # Notifications.
     "notifications.in_app",
     "notifications.email",
+    "notifications.quiet_hours",
     # File uploads.
     "uploads.presigned",
     "models.admin_hosting",

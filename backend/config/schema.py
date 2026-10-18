@@ -100,6 +100,10 @@ if is_enabled(Feature.AGENTS):
 
     _query_bases.append(AstroliftAgentsSchema.AgentsQuery)
     _mutation_bases.append(AstroliftAgentsSchema.AgentsMutation)
+    from astrolift_agents.message_schema import AgentMessagesMutation, AgentMessagesQuery
+
+    _query_bases.append(AgentMessagesQuery)
+    _mutation_bases.append(AgentMessagesMutation)
 
 if is_enabled(Feature.WORKFLOWS):
     import workflows.schema as WorkflowsSchema
