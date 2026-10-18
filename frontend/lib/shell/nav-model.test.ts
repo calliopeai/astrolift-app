@@ -65,6 +65,18 @@ describe("visibleNav", () => {
         .some((fn) => fn.key === "models")
     ).toBe(false);
   });
+
+  it("shows Secure › Zentinelle only while the integration is live", () => {
+    const keys = (nav: ReturnType<typeof visibleNav>) => nav.map((a) => a.key);
+    expect(keys(visibleNav(NAV, only("admin")))).not.toContain("secure");
+    expect(keys(visibleNav(NAV, only(), new Set()))).toEqual(["home"]);
+    const live = visibleNav(NAV, only(), new Set(["zentinelle"] as const));
+    expect(keys(live)).toEqual(["home", "secure"]);
+    expect(live.find((a) => a.key === "secure")?.groups[0].functions[0].href).toBe(
+      "/secure/zentinelle"
+    );
+    expect(activeFor(NAV, "/secure/zentinelle")).toEqual({ area: "secure", fn: "zentinelle" });
+  });
 });
 
 describe("activeFor", () => {
