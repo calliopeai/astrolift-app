@@ -2,7 +2,8 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
-import type { BrainStatus } from "../brain-status-model";
+import { CELLS } from "../brain-cells.fixtures";
+import type { BrainStatus, BrainStatusResult } from "../brain-status-model";
 import {
   GRADUATION_NEEDED,
   HEALTHY,
@@ -11,7 +12,6 @@ import {
   UNKNOWN_VALUES,
   WITH_SQLITE,
 } from "../brain-status.fixtures";
-import type { BrainStatusResult } from "../BrainStatusCell";
 import { draftFromSubstrate, heldPersistence, type SubstrateDraft } from "../substrate-cells";
 import { BRAIN, ON_POSTGRES as POSTGRES_LAYER } from "./brain-detail.fixtures";
 import { BrainSubstrateTab, type BrainSubstrateTabProps } from "./BrainSubstrateTab";
@@ -25,6 +25,7 @@ const GRADUATION: BrainSubstrateTabProps["graduation"] = {
   draft: draftFromSubstrate(HEALTHY.substrate),
   onChange: fn(),
   locked: [],
+  matrix: CELLS,
   submitting: false,
   onSubmit: fn(),
   error: null,

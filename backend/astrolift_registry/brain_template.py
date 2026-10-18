@@ -30,7 +30,7 @@ import zipfile
 
 from astrolift_scm.providers.repo_writes import TreeFile
 
-DOCKERFILE = "extensions/portal-container/Dockerfile"
+DOCKERFILE = "runtime/portal-container/Dockerfile"
 CONFIG = "client.config.json"
 CONFIG_SCHEMA = "schemas/client.config.schema.json"
 MANIFEST = "astrolift.toml"
@@ -246,3 +246,30 @@ def scaffold(
     manifest = render_manifest(selection, slug=slug, display_name=name, environment_name=environment_name)
     out.append(TreeFile(path=MANIFEST, content=manifest.encode("utf-8")))
     return out
+
+
+#: How long what an edition offers is kept per ref (a branch ref can move).
+EDITION_INFO_TTL = 600
+
+
+def edition_info(ref: str) -> dict:
+    """What the edition at ``ref`` offers a new semantic layer (#2444): its
+    version, whether its schema has ``deploy.app_slug`` (a slug not ending in
+    ``-brain`` needs it) and whether it ships the portal container (a brain
+    with no image builds it). Downloaded and verified once per ref and kept
+    ``EDITION_INFO_TTL``; raises ``TemplateError`` like ``createBrain``."""
+    from django.core.cache import cache
+
+    from astrolift_registry.brain_substrate import declares_app_slug
+
+    key = f"astrolift:brain-edition:{template_repo()}:{ref}"
+    info = cache.get(key)
+    if info is None:
+        edition = read_edition(download(ref), ref=ref)
+        info = {
+            "version": edition.version,
+            "supports_app_slug": declares_app_slug(_schema(edition)),
+            "ships_portal_container": DOCKERFILE in {f.path for f in edition.files},
+        }
+        cache.set(key, info, EDITION_INFO_TTL)
+    return info

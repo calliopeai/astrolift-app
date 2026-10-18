@@ -1423,6 +1423,10 @@ def render_resources_for_deployment(
 
     stamp_brain_key(resources, deployment)
 
+    from astrolift_registry.brain_tokens import stamp_mcp_verification_env
+
+    stamp_mcp_verification_env(resources, app)
+
     if prepared_gcp_identity is not None:
         from core.gcp_prepared_identity_render import (
             inject_prepared_identity,
@@ -1777,6 +1781,7 @@ def envoy_edge_routes(
     an app's authentication must not depend on which path ran.
     """
     from astrolift_clusters.edge_install import edge_support_refusal
+    from astrolift_manifest.app_kinds import BRAIN_KINDS
     from core.ingress_reconcile import _edge_config
     from providers.k8s_native.edge_gateway import render_app_routes
 
@@ -1802,6 +1807,7 @@ def envoy_edge_routes(
         paused=paused,
         gateway_secret=oidc_auth.gateway_secret if oidc_auth is not None else "",
         gateway_secret_header=str(edge.get("gateway_secret_header") or ""),
+        brain=getattr(app, "app_kind", "") in BRAIN_KINDS,
     )
     front = _edge_alb_front_for_app(app, namespace=namespace, workloads=workloads, cluster=cluster)
     return [*out, front] if front else out

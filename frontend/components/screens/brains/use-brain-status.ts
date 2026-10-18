@@ -8,14 +8,14 @@ import type {
 } from "@/graphql/__generated__/operations";
 import { GET_BRAIN_STATUS } from "@/graphql/registry/brains.queries";
 
-import type { BrainStatusResult } from "./BrainStatusCell";
+import type { BrainStatusResult } from "./brain-status-model";
 
 /**
  * One layer's status in one environment (#2424 `astroliftBrainStatus`). It
- * reads the source host (branch head, the compile, the last ingest), so the
- * list asks once per visible row and keeps the answer (`cache-first`); a
- * detail tab asks again on arrival. The overview, the substrate tab and the
- * list rows share the one cache entry per slug and environment.
+ * reads the source host (branch head, the compile, the last ingest), so only
+ * the layer's own tabs ask, again on arrival; the list reads the summary each
+ * read leaves behind (#2444). The overview and the substrate tab share the
+ * one cache entry per slug and environment.
  */
 export function useBrainStatus(
   slug: string,

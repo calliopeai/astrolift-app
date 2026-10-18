@@ -9,8 +9,7 @@ import type { FramedBrainValue } from "./use-brain-frame";
 
 /**
  * The status the Overview and Substrate tabs read: one environment's,
- * picked by `?env=` (production by default), read again on arrival and
- * shared with the list row through the cache.
+ * picked by `?env=` (production by default), read again on arrival.
  */
 export function useBrainEnvironmentStatus(framed: FramedBrainValue) {
   const pathname = usePathname() ?? "";

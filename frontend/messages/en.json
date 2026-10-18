@@ -15655,6 +15655,7 @@
     "none": "none",
     "notServed": "Not served yet",
     "notShared": "Owning team only",
+    "archived": "Archived",
     "shareTitle": "{team}: {access}",
     "emptyTitle": "No semantic layers",
     "emptyDescription": "Apps declared with [app] kind = \"mimwell\" that you can read appear here.",
@@ -15696,8 +15697,8 @@
     "columnFreshness": "Freshness",
     "new": "New semantic layer",
     "status": {
-      "unavailable": "Unavailable",
       "unknown": "Unknown",
+      "notChecked": "Not read from the source host yet; open the layer to check.",
       "never": "Never",
       "noEnvironment": "No {environment} environment",
       "notDeployed": "Not deployed",
@@ -15760,6 +15761,7 @@
       "templateRef": "Template ref",
       "templateRefHelp": "A tag, branch or commit of the Mimwell edition. Leave it blank for the edition this install pins.",
       "pinnedEdition": "The edition this install pins",
+      "pinnedEditionRef": "The edition this install pins ({ref})",
       "name": "Name",
       "nameHelp": "Shown in lists. The slug when blank.",
       "namePlaceholder": "Platform knowledge",
@@ -15801,6 +15803,7 @@
         "repoFormat": "Use owner/name, letters, digits, dots, dashes and underscores.",
         "refFormat": "A tag, branch or commit name, without spaces or two dots in a row.",
         "slugFormat": "Lowercase letters, digits and dashes, starting with a letter and ending with a letter or digit, up to 63 characters.",
+        "needsAppSlug": "This edition has no deploy.app_slug, so the slug has to end in -brain.",
         "envFormat": "A short lowercase name: letters, digits and dashes, up to 32 characters.",
         "long": "Up to 255 characters."
       }
@@ -15821,13 +15824,6 @@
         "graph": "Where the graph projection lives."
       },
       "supported": "Supported by Mimwell:",
-      "reasons": {
-        "d1Authority": "d1 is a projection target, never an authority.",
-        "dbBlobNeedsDatabase": "db-blob keeps blobs in the authority database, and this authority has none.",
-        "inDbVectorsMongo": "in-db vectors are SQL vector columns, and mongo has none.",
-        "inDbVectorsNeedSql": "in-db vectors live in the authority database, and this authority has none.",
-        "ageNeedsPostgres": "age is a Postgres extension, so it needs the postgres authority."
-      },
       "persistence": "Persistence",
       "persistenceHelp": "What Astrolift attaches to the layer. The repository is always there.",
       "persistenceKinds": {
@@ -15848,8 +15844,7 @@
       "imageFormat": "An image reference has no spaces.",
       "imageKept": "The layer keeps the image it runs.",
       "port": "Port",
-      "portRange": "1 to 65535.",
-      "portGraduate": "The API does not report the current port: keep the one the layer serves on."
+      "portRange": "1 to 65535."
     },
     "creation": {
       "listCrumb": "Semantic layers",
@@ -16378,7 +16373,8 @@
     "brains": {
       "search": "Search names and slugs…",
       "views": {
-        "all": "All"
+        "all": "All",
+        "archived": "With archived"
       },
       "fields": {
         "team": "Team"

@@ -66,6 +66,9 @@ def test_the_manifest_follows_gen_astrolift(name, case):
     ours = bs.render_manifest(selection, slug=bs.app_slug(fixture["config"]), display_name="Acme")
     theirs = tomllib.loads(fixture["toml"])
     mine = tomllib.loads(ours)
+    # Memory is Astrolift's own (#2441); gen-astrolift.py leaves it to the host.
+    for workload in mine["workloads"]:
+        assert (workload.pop("memory_request"), workload.pop("memory_limit")) == ("128Mi", "512Mi")
     for key in ("astrolift_version", "name", "environments", "workloads"):
         assert mine[key] == theirs[key], key
     assert mine.get("managed_services") == theirs.get("managed_services")

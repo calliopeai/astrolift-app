@@ -557,18 +557,24 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
         ),
     },
     "astrolift_unshare_brain": {
-        "description": "Stop sharing a semantic layer with a team. Never removes the home team or an owner.",
+        "description": (
+            "Stop sharing a semantic layer with a team (team_slug) or an agent (agent_slug); name one. "
+            "Never removes the home team or an owner. Unsharing with an agent revokes its runs' tokens."
+        ),
         "scope": SCOPE_MCP_WRITE,
         "additional_scopes": (SCOPE_WRITE_APPS, SCOPE_WRITE_APP_ACCESS),
         "permission": Permission.APP_UPDATE,
         "inputSchema": _schema(
-            {"slug": {"type": "string"}, "team_slug": {"type": "string"}}, required=("slug", "team_slug")
+            {"slug": {"type": "string"}, "team_slug": {"type": "string"}, "agent_slug": {"type": "string"}},
+            required=("slug",),
         ),
     },
     "astrolift_share_brain": {
         "description": (
-            "Share a semantic layer with a team as viewer or deployer. Refused for agents unless the "
-            "organization's brain.share rule allows agents; then approval rules still apply."
+            "Share a semantic layer with a team (team_slug) as viewer or deployer, or with an agent "
+            "(agent_slug) as viewer, whose runs nobody launched then read it as the agent; name one. "
+            "Refused for agents unless the organization's brain.share rule allows agents; then "
+            "approval rules still apply."
         ),
         "scope": SCOPE_MCP_WRITE,
         "additional_scopes": (SCOPE_WRITE_APPS, SCOPE_WRITE_APP_ACCESS),
@@ -577,9 +583,10 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
             {
                 "slug": {"type": "string"},
                 "team_slug": {"type": "string"},
+                "agent_slug": {"type": "string"},
                 "access": {"type": "string", "enum": ["viewer", "deployer"]},
             },
-            required=("slug", "team_slug", "access"),
+            required=("slug", "access"),
         ),
     },
     "astrolift_delete_brain": {

@@ -23,6 +23,30 @@ class BrainShareType:
     access: str
 
 
+@strawberry.type(name="AstroliftBrainEnvironmentState")
+class BrainEnvironmentStateType:
+    """One environment of a brain, served or not (#2444)."""
+
+    name: str
+    url: str
+    served: bool = strawberry.field(description="Whether the environment has a URL.")
+    paused: bool = strawberry.field(description="Whether its ingress is paused (the edge answers 503).")
+    deployment_status: str | None = strawberry.field(
+        description="The environment's latest deployment's status; null when it has none."
+    )
+    deployed_at: str | None
+
+
+@strawberry.type(name="AstroliftBrainAgentShare")
+class BrainAgentShareType:
+    """An agent the brain is shared with (#2449), viewer only: its runs
+    nobody launched read the brain as the agent when it also lists it."""
+
+    agent: str
+    app: str
+    granted_at: str
+
+
 @strawberry.type(name="AstroliftBrainHostedApp")
 class BrainHostedAppType:
     """An app hosted on the brain (#2243), one row per environment of it."""
@@ -145,18 +169,48 @@ class BrainSubstrateType:
         description="app/brain-manifest.json substrate.graduation.needed at the running commit."
     )
     resources: list[BrainResourceType]
+    port: int = strawberry.field(description="The port the brain serves on (#2444).")
 
 
 def substrate_to_type(row: dict) -> BrainSubstrateType:
     return BrainSubstrateType(
         **{
             k: row[k]
-            for k in ("authority", "blobs", "vectors", "graph", "cell", "replicas", "image", "adopted")
+            for k in (
+                "authority",
+                "blobs",
+                "vectors",
+                "graph",
+                "cell",
+                "replicas",
+                "image",
+                "adopted",
+                "port",
+            )
         },
         persistence=list(row["persistence"]),
         adopted_store=row["adopted_store"],
         graduation_needed=row["graduation_needed"],
         resources=[BrainResourceType(**r) for r in row["resources"]],
+    )
+
+
+@strawberry.type(name="AstroliftBrainSummary")
+class BrainSummaryType:
+    """A brain's health and freshness without reading its source host
+    (#2444): the latest deployment in ``environmentName`` now, and what the
+    last ``astroliftBrainStatus`` read there found."""
+
+    environment_name: str
+    deployment: BrainDeploymentStateType | None
+    compiled_at: str | None
+    behind: bool | None
+    last_ingest: BrainIngestRunType | None
+    checked_at: str | None = strawberry.field(
+        description=(
+            "When compiledAt, behind and lastIngest were read from the source host; null when they "
+            "never were (or the reading expired), and they are null too."
+        )
     )
 
 
@@ -170,8 +224,17 @@ class BrainType:
     kind: str
     team: str
     project: str
-    environments: list[BrainEnvironmentType]
+    environments: list[BrainEnvironmentType] = strawberry.field(
+        description="Served environments (with a URL), the ones a client connects to."
+    )
     shared_with: list[BrainShareType]
+    archived: bool = strawberry.field(description="Archived: listed only with includeArchived; restoreApp.")
+    all_environments: list[BrainEnvironmentStateType] = strawberry.field(
+        description="Every environment, served or not, with its state (#2444)."
+    )
+    summary: BrainSummaryType | None = strawberry.field(
+        description="Health and freshness for lists, without host reads (#2444); null with no environment."
+    )
     hosted_apps: list[BrainHostedAppType] | None = strawberry.field(
         default=None,
         description=(
@@ -185,12 +248,21 @@ class BrainType:
             "graduationNeeded are null here; astroliftBrainStatus reads them). Null in lists."
         ),
     )
+    agent_shares: list[BrainAgentShareType] | None = strawberry.field(
+        default=None,
+        description="Agents the brain is shared with that the caller can read (#2449). Null in lists.",
+    )
 
 
-def brain_to_type(app, *, hosted: bool = False) -> BrainType:
+def brain_to_type(app, *, hosted: bool = False, overview: dict | None = None) -> BrainType:
+    """``overview`` is the brain's entry of ``brain_manage.overviews``; a
+    list passes it, so its rows share three queries."""
+    from astrolift_registry.brain_manage import overviews
     from astrolift_registry.brains import describe_brain
 
     row = describe_brain(app)
+    overview = overview if overview is not None else overviews([app])[app.pk]
+    summary = overview["summary"]
     return BrainType(
         id=GUID(row["id"]),
         slug=row["slug"],
@@ -200,9 +272,59 @@ def brain_to_type(app, *, hosted: bool = False) -> BrainType:
         project=row["project"],
         environments=[BrainEnvironmentType(**e) for e in row["environments"]],
         shared_with=[BrainShareType(**x) for x in row["shared_with"]],
+        archived=app.archived_at is not None,
+        all_environments=[BrainEnvironmentStateType(**e) for e in overview["environments"]],
+        summary=_summary_to_type(summary) if summary is not None else None,
         hosted_apps=hosted_apps(app) if hosted else None,
         substrate=_local_substrate(app) if hosted else None,
+        agent_shares=agent_shares(app) if hosted else None,
     )
+
+
+def brains_to_types(apps) -> list[BrainType]:
+    from astrolift_registry.brain_manage import overviews
+
+    apps = list(apps)
+    found = overviews(apps)
+    return [brain_to_type(app, overview=found[app.pk]) for app in apps]
+
+
+def _summary_to_type(row: dict) -> BrainSummaryType:
+    deployment = row["deployment"]
+    ingest = row["last_ingest"]
+    return BrainSummaryType(
+        environment_name=row["environment_name"],
+        deployment=BrainDeploymentStateType(**{**deployment, "id": GUID(deployment["id"])})
+        if deployment
+        else None,
+        compiled_at=row["compiled_at"],
+        behind=row["behind"],
+        last_ingest=BrainIngestRunType(**ingest) if ingest else None,
+        checked_at=row["checked_at"],
+    )
+
+
+def agent_shares(brain) -> list[BrainAgentShareType]:
+    """Live shares of ``brain`` with agents the caller can read."""
+    from astrolift_agents.visibility import agent_workloads
+    from astrolift_registry.models import BrainAgentGrant
+
+    rows = (
+        BrainAgentGrant.objects.filter(
+            brain=brain,
+            organization_id=brain.organization_id,
+            deleted_at__isnull=True,
+            agent__in=agent_workloads(brain.organization_id).values("pk"),
+        )
+        .select_related("agent__registered_app")
+        .order_by("agent__slug", "pk")
+    )
+    return [
+        BrainAgentShareType(
+            agent=row.agent.slug, app=row.agent.registered_app.slug, granted_at=row.created_at.isoformat()
+        )
+        for row in rows
+    ]
 
 
 def _local_substrate(app) -> BrainSubstrateType:
@@ -392,3 +514,73 @@ class BrainRebuildType:
     rebuilds: list[str] = strawberry.field(
         default_factory=list, description="What the deploy rebuilds, from the brain's substrate."
     )
+
+
+@strawberry.enum(name="AstroliftBrainSort")
+class BrainSort(enum.Enum):
+    NEWEST = "newest"
+    OLDEST = "oldest"
+    NAME_ASC = "name_asc"
+    NAME_DESC = "name_desc"
+
+
+@strawberry.type(name="AstroliftBrainCell")
+class BrainCellType:
+    """One cell of Mimwell's substrate matrix and whether Astrolift can host it."""
+
+    authority: str
+    blobs: str
+    vectors: str
+    graph: str
+    status: str = strawberry.field(description="supported, planned or unsupported.")
+    reason: str
+
+
+@strawberry.type(name="AstroliftBrainEdition")
+class BrainEditionType:
+    """What the Mimwell edition a new semantic layer starts from offers (#2444)."""
+
+    template_repo: str
+    ref: str = strawberry.field(description="The ref asked for, or the one this install pins.")
+    version: str | None
+    supports_app_slug: bool | None = strawberry.field(
+        description=(
+            "Whether the edition has deploy.app_slug, which a slug not ending in -brain needs; null "
+            "when the edition could not be read (error says why)."
+        )
+    )
+    ships_portal_container: bool | None = strawberry.field(
+        description="Whether the edition ships the portal container a brain with no image builds."
+    )
+    error: str | None
+
+
+def edition_to_type(ref: str) -> BrainEditionType:
+    from astrolift_registry import brain_template
+
+    try:
+        info, error = brain_template.edition_info(brain_template.validate_ref(ref)), None
+    except brain_template.TemplateError as exc:
+        info, error = {}, exc.message
+    return BrainEditionType(
+        template_repo=brain_template.template_repo(),
+        ref=ref,
+        version=info.get("version") or None,
+        supports_app_slug=info.get("supports_app_slug"),
+        ships_portal_container=info.get("ships_portal_container"),
+        error=error,
+    )
+
+
+def cells_to_types() -> list[BrainCellType]:
+    """Every cell of Mimwell's matrix with its status, in axis order."""
+    import itertools
+
+    from astrolift_registry import brain_substrate
+
+    out = []
+    for values in itertools.product(*brain_substrate.AXES.values()):
+        cell = dict(zip(brain_substrate.AXES, values, strict=True))
+        status, reason = brain_substrate.cell_status(cell)
+        out.append(BrainCellType(**cell, status=status, reason=reason))
+    return out

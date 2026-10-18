@@ -449,6 +449,12 @@ type AstroliftAgentBoxMutationResult {
   data: AstroliftAgentBox
 }
 
+type AstroliftAgentBrainGrant {
+  brainSlug: String!
+  brainName: String!
+  grantedAt: String!
+}
+
 type AstroliftAgentDetail {
   id: GUID!
   name: String!
@@ -477,6 +483,11 @@ type AstroliftAgentDetail {
   Brains a launch may add with brainSlugs (#2432). Null accepts any brain the launcher can read; empty accepts none.
   """
   brainsAllowed: [String!]
+
+  """
+  Semantic layers shared with the agent that the caller can read (#2449). A run nobody launched reads those the agent also lists in brains or brainsAllowed.
+  """
+  brainGrants: [AstroliftAgentBrainGrant!]!
 }
 
 type AstroliftAgentEnvironmentSpec {
@@ -2000,8 +2011,21 @@ type AstroliftBrain {
   kind: String!
   team: String!
   project: String!
+
+  """Served environments (with a URL), the ones a client connects to."""
   environments: [AstroliftBrainEnvironment!]!
   sharedWith: [AstroliftBrainShare!]!
+
+  """Archived: listed only with includeArchived; restoreApp."""
+  archived: Boolean!
+
+  """Every environment, served or not, with its state (#2444)."""
+  allEnvironments: [AstroliftBrainEnvironmentState!]!
+
+  """
+  Health and freshness for lists, without host reads (#2444); null with no environment.
+  """
+  summary: AstroliftBrainSummary
 
   """
   Apps hosted on this brain that the caller can read. Filled by astroliftBrain; null in lists.
@@ -2012,6 +2036,17 @@ type AstroliftBrain {
   The cell last applied and the resources it needs, without host reads (adopted and graduationNeeded are null here; astroliftBrainStatus reads them). Null in lists.
   """
   substrate: AstroliftBrainSubstrate
+
+  """
+  Agents the brain is shared with that the caller can read (#2449). Null in lists.
+  """
+  agentShares: [AstroliftBrainAgentShare!]
+}
+
+type AstroliftBrainAgentShare {
+  agent: String!
+  app: String!
+  grantedAt: String!
 }
 
 type AstroliftBrainApp {
@@ -2026,6 +2061,17 @@ type AstroliftBrainAppMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftBrainApp
+}
+
+type AstroliftBrainCell {
+  authority: String!
+  blobs: String!
+  vectors: String!
+  graph: String!
+
+  """supported, planned or unsupported."""
+  status: String!
+  reason: String!
 }
 
 type AstroliftBrainConnection {
@@ -2071,9 +2117,43 @@ type AstroliftBrainDeploymentState {
   createdAt: String
 }
 
+type AstroliftBrainEdition {
+  templateRepo: String!
+
+  """The ref asked for, or the one this install pins."""
+  ref: String!
+  version: String
+
+  """
+  Whether the edition has deploy.app_slug, which a slug not ending in -brain needs; null when the edition could not be read (error says why).
+  """
+  supportsAppSlug: Boolean
+
+  """
+  Whether the edition ships the portal container a brain with no image builds.
+  """
+  shipsPortalContainer: Boolean
+  error: String
+}
+
 type AstroliftBrainEnvironment {
   name: String!
   url: String!
+}
+
+type AstroliftBrainEnvironmentState {
+  name: String!
+  url: String!
+
+  """Whether the environment has a URL."""
+  served: Boolean!
+
+  """Whether its ingress is paused (the edge answers 503)."""
+  paused: Boolean!
+
+  """The environment's latest deployment's status; null when it has none."""
+  deploymentStatus: String
+  deployedAt: String
 }
 
 type AstroliftBrainHostedApp {
@@ -2092,6 +2172,23 @@ type AstroliftBrainMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftBrain
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftBrainPage {
+  items: [AstroliftBrain!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 type AstroliftBrainRebuild {
@@ -2122,6 +2219,13 @@ type AstroliftBrainResource {
 type AstroliftBrainShare {
   team: String!
   access: String!
+}
+
+enum AstroliftBrainSort {
+  NEWEST
+  OLDEST
+  NAME_ASC
+  NAME_DESC
 }
 
 type AstroliftBrainSourceHead {
@@ -2188,6 +2292,22 @@ type AstroliftBrainSubstrate {
   """
   graduationNeeded: Boolean
   resources: [AstroliftBrainResource!]!
+
+  """The port the brain serves on (#2444)."""
+  port: Int!
+}
+
+type AstroliftBrainSummary {
+  environmentName: String!
+  deployment: AstroliftBrainDeploymentState
+  compiledAt: String
+  behind: Boolean
+  lastIngest: AstroliftBrainIngestRun
+
+  """
+  When compiledAt, behind and lastIngest were read from the source host; null when they never were (or the reading expired), and they are null too.
+  """
+  checkedAt: String
 }
 
 type AstroliftBrief {
@@ -11222,6 +11342,21 @@ type Query {
   astroliftBrains(search: String = null): [AstroliftBrain!]!
 
   """
+  Semantic layers the caller can read, one page at a time (#2444): search over name and slug, the home team's slug, a sort, and archived ones too with includeArchived. totalCount counts every match; nextCursor reaches the next page under the same sort.
+  """
+  astroliftBrainsPage(search: String = null, team: String = null, sort: AstroliftBrainSort! = NEWEST, includeArchived: Boolean! = false, limit: Int = null, after: String = null): AstroliftBrainPage!
+
+  """
+  Every cell of Mimwell's substrate matrix with its status and reason (#2444): what createBrain and updateBrainSubstrate accept. Follows the Mimwell commit this install's port is held to.
+  """
+  astroliftBrainCells: [AstroliftBrainCell!]!
+
+  """
+  The Mimwell edition a new semantic layer starts from (#2444): at templateRef, or the ref this install pins; whether it has deploy.app_slug (a slug not ending in -brain needs it) and ships the portal container. The edition is read once per ref and kept 10 minutes.
+  """
+  astroliftBrainEdition(templateRef: String = null): AstroliftBrainEdition!
+
+  """
   One semantic layer the caller can read, by app slug (#2424), with the apps hosted on it. Null when it is not visible, archived or not a brain.
   """
   astroliftBrain(slug: String!): AstroliftBrain
@@ -12361,8 +12496,9 @@ input SetZentinelleGatewayUrlInput {
 
 input ShareBrainInput {
   slug: String!
-  teamSlug: String!
   access: BrainShareAccess!
+  teamSlug: String = null
+  agentSlug: String = null
 }
 
 type SharedDirectoryType {
@@ -12634,7 +12770,8 @@ input UnregisterTenantClusterInput {
 
 input UnshareBrainInput {
   slug: String!
-  teamSlug: String!
+  teamSlug: String = null
+  agentSlug: String = null
 }
 
 input UpdateAgentEnvironmentSpecInput {

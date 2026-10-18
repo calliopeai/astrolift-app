@@ -15658,6 +15658,7 @@
     "none": "aucun",
     "notServed": "Pas encore servie",
     "notShared": "Équipe propriétaire uniquement",
+    "archived": "Archivée",
     "shareTitle": "{team} : {access}",
     "emptyTitle": "Aucune couche sémantique",
     "emptyDescription": "Les applications déclarées avec [app] kind = \"mimwell\" que vous pouvez lire apparaissent ici.",
@@ -15699,8 +15700,8 @@
     "columnFreshness": "Fraîcheur",
     "new": "Nouvelle couche sémantique",
     "status": {
-      "unavailable": "Indisponible",
       "unknown": "Inconnu",
+      "notChecked": "Pas encore lu sur l’hôte source ; ouvrez la couche pour vérifier.",
       "never": "Jamais",
       "noEnvironment": "Aucun environnement {environment}",
       "notDeployed": "Non déployée",
@@ -15763,6 +15764,7 @@
       "templateRef": "Référence du modèle",
       "templateRefHelp": "Un tag, une branche ou un commit de l’édition Mimwell. Laissez vide pour l’édition épinglée par cette installation.",
       "pinnedEdition": "L’édition épinglée par cette installation",
+      "pinnedEditionRef": "L’édition épinglée par cette installation ({ref})",
       "name": "Nom",
       "nameHelp": "Affiché dans les listes. Si vide, l’identifiant est utilisé.",
       "namePlaceholder": "Connaissances de la plateforme",
@@ -15804,6 +15806,7 @@
         "repoFormat": "Utilisez owner/name : lettres, chiffres, points, tirets et traits de soulignement.",
         "refFormat": "Un nom de tag, de branche ou de commit, sans espaces ni points consécutifs.",
         "slugFormat": "Lettres minuscules, chiffres et tirets, commençant par une lettre et finissant par une lettre ou un chiffre, 63 caractères au maximum.",
+        "needsAppSlug": "Cette édition n’a pas deploy.app_slug, le slug doit donc se terminer par -brain.",
         "envFormat": "Un nom court en minuscules : lettres, chiffres et tirets, 32 caractères au maximum.",
         "long": "255 caractères au maximum."
       }
@@ -15824,13 +15827,6 @@
         "graph": "Où se trouve la projection du graphe."
       },
       "supported": "Pris en charge par Mimwell :",
-      "reasons": {
-        "d1Authority": "d1 est une cible de projection, jamais une autorité.",
-        "dbBlobNeedsDatabase": "db-blob conserve les objets binaires dans la base de données de l’autorité, et cette autorité n’en a pas.",
-        "inDbVectorsMongo": "Les vecteurs in-db sont des colonnes vectorielles SQL, et mongo n’en a pas.",
-        "inDbVectorsNeedSql": "Les vecteurs in-db résident dans la base de données de l’autorité, et cette autorité n’en a pas.",
-        "ageNeedsPostgres": "age est une extension Postgres : elle nécessite donc l’autorité postgres."
-      },
       "persistence": "Persistance",
       "persistenceHelp": "Ce qu’Astrolift attache à la couche. Le dépôt est toujours présent.",
       "persistenceKinds": {
@@ -15851,8 +15847,7 @@
       "imageFormat": "Une référence d’image ne contient pas d’espaces.",
       "imageKept": "La couche conserve l’image qu’elle exécute.",
       "port": "Port",
-      "portRange": "De 1 à 65535.",
-      "portGraduate": "L’API n’indique pas le port actuel : conservez celui sur lequel la couche est servie."
+      "portRange": "De 1 à 65535."
     },
     "creation": {
       "listCrumb": "Couches sémantiques",
@@ -16583,7 +16578,8 @@
     "brains": {
       "search": "Rechercher des noms et identifiants…",
       "views": {
-        "all": "Toutes"
+        "all": "Toutes",
+        "archived": "Avec les archivées"
       },
       "fields": {
         "team": "Équipe"

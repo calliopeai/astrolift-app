@@ -4,6 +4,7 @@ Managing semantic layers (#2424): create, share, rebuild and delete them."""
 
 from __future__ import annotations
 
+import contextvars
 import datetime as dt
 import inspect
 import re
@@ -282,15 +283,26 @@ class UpdateBrainSubstrateInput:
 
 @strawberry.input(name="ShareBrainInput")
 class ShareBrainInput:
+    """Share with a team (``teamSlug``) or an agent (``agentSlug``, VIEWER
+    only: runs nobody launched read it as the agent, #2449); name one."""
+
     slug: str
-    team_slug: str
     access: BrainShareAccess
+    team_slug: str | None = None
+    agent_slug: str | None = None
 
 
 @strawberry.input(name="UnshareBrainInput")
 class UnshareBrainInput:
+    """Stop sharing with a team (``teamSlug``) or an agent (``agentSlug``); name one."""
+
     slug: str
-    team_slug: str
+    team_slug: str | None = None
+    agent_slug: str | None = None
+
+
+# What a share or unshare asked for, for its audit row (the hook sees only the result).
+_share_request: contextvars.ContextVar[dict] = contextvars.ContextVar("astrolift_brain_share", default={})
 
 
 @strawberry.input(name="RebuildBrainInput")
@@ -330,6 +342,42 @@ def _also_requires(permission: Permission, scope_factory, args: dict, why: str):
     except PermissionDenied:
         return gql_failure(ErrorCode.PERMISSION_DENIED.value, why)
     return None
+
+
+def _target_refusal(input) -> MutationResultType | None:
+    """Record what ``input`` asks for the audit row; refuse naming neither or both targets."""
+    access = getattr(input, "access", None)
+    _share_request.set(
+        {
+            "team": (input.team_slug or "").strip(),
+            "agent": (input.agent_slug or "").strip(),
+            **({"access": access.value} if access is not None else {}),
+        }
+    )
+    if bool((input.team_slug or "").strip()) == bool((input.agent_slug or "").strip()):
+        return gql_failure(ErrorCode.VALIDATION.value, "name a team or an agent", field="teamSlug")
+    return None
+
+
+def _agent_in_org(org_id: int, agent_slug: str):
+    """The agent ``agent_slug`` the caller can read in the org, or a failure."""
+    from astrolift_agents.visibility import agent_workloads
+
+    # tenancy: agent_workloads(org_id) is already confined to the caller's org.
+    matches = list(
+        agent_workloads(org_id)
+        .filter(slug=agent_slug.strip(), registered_app__deleted_at__isnull=True)
+        .select_related("registered_app")[:2]
+    )
+    if not matches:
+        return None, gql_failure(ErrorCode.NOT_FOUND.value, "agent not found", field="agentSlug")
+    if len(matches) > 1:
+        return None, gql_failure(
+            ErrorCode.CONFLICT.value,
+            f"agent slug {agent_slug!r} is ambiguous; make agent workload slugs unique",
+            field="agentSlug",
+        )
+    return matches[0], None
 
 
 def _team_in_org(org_id: int, team_slug: str):
@@ -552,9 +600,14 @@ class BrainManagementMutations:
         from astrolift_registry.schema.mutations.team_access import TeamAccessMutations
         from astrolift_registry.schema.mutations.types import GrantTeamAccessInput
 
+        refused = _target_refusal(input)
+        if refused is not None:
+            return refused
         brain = find_brain(input.slug)
         if brain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "brain not found", field="slug")
+        if (input.agent_slug or "").strip():
+            return _share_with_agent(info, brain, input.agent_slug, input.access)
         team = _team_in_org(brain.organization_id, input.team_slug)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug")
@@ -615,9 +668,14 @@ class BrainManagementMutations:
         from astrolift_registry.schema.mutations.team_access import TeamAccessMutations
         from astrolift_registry.schema.mutations.types import RevokeTeamAccessInput
 
+        refused = _target_refusal(input)
+        if refused is not None:
+            return refused
         brain = find_brain(input.slug)
         if brain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "brain not found", field="slug")
+        if (input.agent_slug or "").strip():
+            return _unshare_with_agent(brain, input.agent_slug)
         team = _team_in_org(brain.organization_id, input.team_slug)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamSlug")
@@ -858,6 +916,44 @@ class BrainManagementMutations:
         return gql_success(brain_to_type(brain))
 
 
+def _share_with_agent(info: Info, brain, agent_slug: str, access: BrainShareAccess):
+    from astrolift_identity.action_safety import gate
+    from astrolift_registry.models import BrainAgentGrant
+
+    if access != BrainShareAccess.VIEWER:
+        return gql_failure(
+            ErrorCode.VALIDATION.value, "an agent reads a semantic layer; share it as viewer", field="access"
+        )
+    agent, failure = _agent_in_org(brain.organization_id, agent_slug)
+    if failure is not None:
+        return failure
+    deny = gate(info, "brain.share", app=brain, resolver_name="share_brain")
+    if deny is not None:
+        return deny
+    if not BrainAgentGrant.objects.filter(brain=brain, agent=agent, deleted_at__isnull=True).exists():
+        BrainAgentGrant.objects.create(
+            organization_id=brain.organization_id, brain=brain, agent=agent, granted_by=_actor()
+        )
+    return gql_success(brain_to_type(brain, hosted=True))
+
+
+def _unshare_with_agent(brain, agent_slug: str):
+    from astrolift_registry.brain_runs import revoke_grant
+    from astrolift_registry.models import BrainAgentGrant
+
+    agent, failure = _agent_in_org(brain.organization_id, agent_slug)
+    if failure is not None:
+        return failure
+    grant = BrainAgentGrant.objects.filter(brain=brain, agent=agent, deleted_at__isnull=True).first()
+    if grant is None:
+        return gql_failure(
+            ErrorCode.NOT_FOUND.value, "the brain is not shared with this agent", field="agentSlug"
+        )
+    grant.soft_delete(by=_actor())
+    revoke_grant(grant)
+    return gql_success(brain_to_type(brain, hosted=True))
+
+
 def _audit_base() -> dict:
     from astrolift_registry.brain_manage import audit_context
 
@@ -877,7 +973,8 @@ def _substrate_extras(result) -> dict:
 
 
 def _share_extras(result) -> dict:
-    out = _audit_base()
+    """The team or agent and the level asked for (#2444), then the shares after."""
+    out = {**_audit_base(), **{k: v for k, v in _share_request.get().items() if v}}
     data = getattr(result, "data", None)
     if data is not None:
         out["shared_with"] = [{"team": s.team, "access": s.access} for s in data.shared_with]
