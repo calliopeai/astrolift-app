@@ -39,10 +39,19 @@ integrated with are independent.
   (`terraform/k8s/zentinelle-serving`; Zentinelle in Astrolift) or elsewhere (its
   own ECS stack, as on CONFLICT, or another account; Standalone). Each choice is
   independent; both can run side by side in the same Astrolift.
-- **Zentinelle integration, per target.** Zentinelle is integrated with
-  Astrolift (this organization's `ZentinelleConnection` is live), with the
-  Workbench, with both, or with neither, wherever each product is hosted.
-  Integration is what closes the loop.
+- **Zentinelle integration, per target, one flag each.** Each integration is a
+  flag in the install record that turns things on at both ends: enabling it
+  wires both sides.
+  - **Zentinelle with Astrolift** (`zentinelle-astrolift`), the primary
+    integration: Astrolift's use cases (running agents) are where Zentinelle
+    matters most. On the Astrolift side it is this organization's live
+    `ZentinelleConnection`.
+  - **Zentinelle with the Workbench** (`zentinelle-workbench`), secondary and
+    limited.
+
+  Either, both or neither, wherever each product is hosted. Integration is what
+  closes the loop. An integration with a Zentinelle not hosted in this Astrolift
+  is still visible from the Astrolift side, through its connection.
 - **The Workbench has no Astrolift integration.** Beyond being deployed on
   Astrolift it has few ties to it. Astrolift shows a hosted Workbench deployment
   (version, health, hub URL) and nothing more; this design models no
@@ -50,11 +59,15 @@ integrated with are independent.
 
 Common combinations, in the Blueprint's pattern names:
 
-| Install | Blueprint pattern | Workbench hosted | Zentinelle hosted | Zentinelle integrated with |
-|---|---|---|---|---|
-| Self-contained | The Full Loop | in this Astrolift | in this Astrolift | Astrolift and the Workbench |
-| CONFLICT today | Standalone, per product | elsewhere | elsewhere (ECS) | Astrolift and the Workbench |
-| Zentinelle for the Workbench only | Zentinelle in Astrolift | elsewhere | in this Astrolift | the Workbench only |
+| Install | Blueprint pattern | Workbench hosted | Zentinelle hosted | Zentinelle with Astrolift | Zentinelle with the Workbench |
+|---|---|---|---|---|---|
+| Self-contained | The Full Loop | in this Astrolift | in this Astrolift | yes | yes |
+| CONFLICT today | Standalone, side by side (the standard pattern): three standalone deployments together | elsewhere | elsewhere (ECS) | yes | yes |
+| Workbench standalone, Zentinelle in Astrolift | Standalone (the Workbench) and Zentinelle in Astrolift | elsewhere | in this Astrolift | yes | no; needs its own wiring (the flag) |
+
+Design note: every service tier in every pattern ships with autoscaling
+configured from the start. A separate installer change makes that true; this
+design assumes it and adds no scaling surface.
 
 Each surface follows one axis:
 
@@ -136,6 +149,7 @@ an Astrolift cluster: one namespace, one product kind. It is the hosting axis
 | `version` | annotation `calliope.ai/version` | reserved in contract 1; null until written |
 | `endpoints` | annotation `calliope.ai/endpoints` | hub URL; Zentinelle console and API |
 | `workloads` | annotation `calliope.ai/workloads` | Deployments health is read from |
+| `integrations` | annotation `calliope.ai/integrations` | Zentinelle only: the install record's enabled integration flags; informational |
 | `health` | derived | `healthy` (every workload ready = desired), `degraded` (some ready), `down` (a workload at zero ready), `unknown` (cluster offline, scan failed) |
 | `project` | **Astrolift-owned** | section 6 |
 | `zentinelle_connection` | **Astrolift-owned** | Zentinelle only: optional link to a separate `ZentinelleConnection`, matched by URL; section 7 |
@@ -168,7 +182,8 @@ Canonical: `calliope-installer/docs/contracts/astrolift-product-deployments.md`.
 - Labels: `calliope.ai/product-contract` (`"1"`), `calliope.ai/product`,
   `calliope.ai/deployment`, `calliope.ai/managed-by`.
 - Annotations: `calliope.ai/images`, `calliope.ai/endpoints`,
-  `calliope.ai/workloads` (JSON or comma lists).
+  `calliope.ai/workloads` (JSON or comma lists); on Zentinelle,
+  `calliope.ai/integrations` (comma list of enabled flags, absent when none).
 - Reserved, not yet written: `calliope.ai/version`,
   `calliope.ai/astrolift-project`, `endpoints.api_internal`.
 - Never: `astrolift.io/control-plane-scope`, secrets.
@@ -248,10 +263,16 @@ scan finds `connected` and offers nothing.
 **Integrated with, read-only.** A hosted Zentinelle's view lists the products it
 is integrated with, as information, never as a control:
 
-- Astrolift: from the link state above.
-- The Workbench: from the install record (`zentinelle-workbench`) or
-  Zentinelle's `agent_host` endpoint. How Astrolift reads either is open
-  (section 10, Q9); until then the view shows the Astrolift line only.
+The source of truth is the integration flags in the install record, which the
+installer writes on the Zentinelle namespace as `calliope.ai/integrations`
+(contract version 1, section 4).
+
+- Astrolift (primary): the `zentinelle-astrolift` flag, and Astrolift's own
+  connection (the link state above). When they disagree the view shows both,
+  for example "flag enabled, not connected".
+- The Workbench (secondary, limited): the `zentinelle-workbench` flag,
+  informational only. Astrolift builds nothing Workbench-specific beyond
+  showing it.
 
 A hosted Workbench gets no equivalent: there is no Workbench-to-Astrolift
 integration to show.
@@ -295,6 +316,7 @@ type AstroliftProductDeployment {
   health: AstroliftProductHealth!
   workloads: [AstroliftProductWorkload!]!          # name, desiredReplicas, readyReplicas, restartCount24h
   zentinelleLink: AstroliftProductZentinelleLink   # Zentinelle only: state, connection base URL
+  integrations: [String!]!                         # Zentinelle only: enabled flags; empty otherwise
   firstSeenAt: DateTime!
   lastSeenAt: DateTime
   goneAt: DateTime
@@ -393,11 +415,6 @@ with six rows ("View all").
 8. **Today's display.** Confirm with calliope-installer#389 (`conflict-two`)
    what the UI and API show for these namespaces now, and whether anything is
    misleading enough to fix before this lands.
-9. **Zentinelle-to-Workbench integration source.** The "Integrated with" line
-   for the Workbench needs a read Astrolift can make: the install record's
-   `zentinelle-workbench` integration (not in the namespace contract, which
-   carries hosting only), or Zentinelle's `agent_host` endpoint (needs a
-   Zentinelle-side read). Pick one before the line ships.
 
 ## 11. Delivery order
 
