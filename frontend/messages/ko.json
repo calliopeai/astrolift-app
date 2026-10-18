@@ -369,6 +369,7 @@
       "apps": "앱",
       "agents": "에이전트",
       "workflows": "워크플로",
+      "zentinelle": "Zentinelle",
       "clusters": "클러스터",
       "domains": "도메인",
       "providers": "공급자",
@@ -16162,12 +16163,14 @@
       "deployment-approvals": "배포 승인",
       "jobs": "예약된 작업",
       "environments": "환경",
-      "previews": "미리보기"
+      "previews": "미리보기",
+      "zentinelle": "Zentinelle"
     },
     "areas": {
       "home": "홈",
       "agents": "에이전트",
       "apps": "앱",
+      "secure": "보호",
       "admin": "관리"
     },
     "groups": {

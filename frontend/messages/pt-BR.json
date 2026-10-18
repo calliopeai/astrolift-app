@@ -369,6 +369,7 @@
       "apps": "Aplicativos",
       "agents": "Agentes",
       "workflows": "Fluxos de trabalho",
+      "zentinelle": "Zentinelle",
       "clusters": "Clusters",
       "domains": "Domínios",
       "providers": "Provedores",
@@ -16162,12 +16163,14 @@
       "deployment-approvals": "Aprovações de implantação",
       "jobs": "Jobs agendados",
       "environments": "Ambientes",
-      "previews": "Prévias"
+      "previews": "Prévias",
+      "zentinelle": "Zentinelle"
     },
     "areas": {
       "home": "Início",
       "agents": "Agentes",
       "apps": "Aplicativos",
+      "secure": "Proteger",
       "admin": "Administração"
     },
     "groups": {

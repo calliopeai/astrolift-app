@@ -369,6 +369,7 @@
       "apps": "Apps",
       "agents": "Agents",
       "workflows": "Workflows",
+      "zentinelle": "Zentinelle",
       "clusters": "Clusters",
       "domains": "Domains",
       "providers": "Providers",
@@ -16892,6 +16893,7 @@
       "home": "Home",
       "agents": "Agents",
       "apps": "Apps",
+      "secure": "Secure",
       "admin": "Admin"
     },
     "groups": {
@@ -16921,6 +16923,7 @@
       "jobs": "Scheduled jobs",
       "environments": "Environments",
       "previews": "Previews",
+      "zentinelle": "Zentinelle",
       "organization": "Organization",
       "access": "Access",
       "projects": "Projects",
