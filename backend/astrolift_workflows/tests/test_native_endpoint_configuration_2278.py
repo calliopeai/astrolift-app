@@ -3,7 +3,9 @@
 import asyncio
 import base64
 import json
+import os
 import re
+import subprocess
 import sys
 import time
 import traceback
@@ -61,6 +63,10 @@ _HISTORY_ROW_LIMIT = 8
 _HISTORY_COUNT_LIMIT = 1_000_000
 _FAILURE_DIAGNOSTIC_BYTES = 16 * 1024
 _FAILURE_HISTORY_SECONDS = 3
+_PG_WAIT_OBSERVER_SECONDS = 2.0
+_PG_WAIT_CONNECT_SECONDS = 1
+_PG_WAIT_STATEMENT_MS = 500
+_PG_WAIT_BLOCKER_LIMIT = 8
 _OWNED_THREAD_FRAME_LIMIT = 12
 _SAFE_TIMEOUT_NAMES = {
     "TIMEOUT_TYPE_START_TO_CLOSE",
@@ -366,7 +372,225 @@ def _safe_checkpoint_summary(world):
     }
 
 
-def _failure_diagnostic_line(*, callback_error, thread_frames, checkpoints, history=None, history_error=None):
+def _safe_pg_wait_summary(value, expected_pid):
+    """Keep only bounded, allowlisted wait metadata from the isolated observer."""
+    unavailable = {"status": "unavailable"}
+    if not isinstance(value, dict) or type(expected_pid) is not int or not 0 < expected_pid <= 2**31 - 1:
+        return unavailable
+    status = value.get("status")
+    if status == "pid-not-visible":
+        return {"status": status, "backendPID": expected_pid}
+    if status != "observed" or value.get("backendPID") != expected_pid:
+        return unavailable
+    states = {
+        "active",
+        "idle",
+        "idle in transaction",
+        "idle in transaction (aborted)",
+        "fastpath function call",
+        "disabled",
+    }
+    wait_types = {
+        "Activity",
+        "BufferPin",
+        "Client",
+        "Extension",
+        "IO",
+        "IPC",
+        "Lock",
+        "LWLock",
+        "SLRU",
+        "Timeout",
+    }
+
+    def text_field(name, allowed=None):
+        item = value.get(name)
+        if item is None:
+            return None
+        if type(item) is not str or (allowed is not None and item not in allowed):
+            return None
+        if len(item) > 64 or not re.fullmatch(r"[A-Za-z0-9_ ()-]{1,64}", item):
+            return None
+        return item
+
+    def age_bucket(name):
+        item = value.get(name)
+        if item is None:
+            return None
+        if type(item) is not int or item < 0 or item > 86400 or item % 5:
+            return None
+        return item
+
+    raw_blockers = value.get("blockingPids")
+    blockers = []
+    if isinstance(raw_blockers, list):
+        for item in raw_blockers[:_PG_WAIT_BLOCKER_LIMIT]:
+            if type(item) is int and 0 < item <= 2**31 - 1 and item != expected_pid and item not in blockers:
+                blockers.append(item)
+    return {
+        "status": "observed",
+        "backendPID": expected_pid,
+        "state": text_field("state", states),
+        "waitEventType": text_field("waitEventType", wait_types),
+        "waitEvent": text_field("waitEvent"),
+        "queryAgeBucketSeconds": age_bucket("queryAgeBucketSeconds"),
+        "transactionAgeBucketSeconds": age_bucket("transactionAgeBucketSeconds"),
+        "blockingPids": blockers,
+    }
+
+
+def _safe_activity_connection_summary(value):
+    if not isinstance(value, dict):
+        return {"status": "unavailable"}
+    pid = value.get("backendPID")
+    if type(pid) is not int or not 0 < pid <= 2**31 - 1:
+        return {"status": "unavailable"}
+    return {
+        "status": "last-checkpoint",
+        "backendPID": pid,
+        "autocommit": value["autocommit"] if type(value.get("autocommit")) is bool else None,
+        "inAtomicBlock": value["inAtomicBlock"] if type(value.get("inAtomicBlock")) is bool else None,
+    }
+
+
+_PG_WAIT_OBSERVER = r"""
+import json
+import sys
+
+connection = None
+try:
+    request = json.load(sys.stdin)
+    import psycopg2
+
+    connection = psycopg2.connect(
+        **request["connect"],
+        connect_timeout=__CONNECT_TIMEOUT__,
+        options="-c default_transaction_read_only=on -c statement_timeout=__STATEMENT_TIMEOUT__ -c lock_timeout=250",
+    )
+    connection.set_session(readonly=True, autocommit=True)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pid, state, wait_event_type, wait_event, "
+            "CASE WHEN query_start IS NULL THEN NULL ELSE "
+            "GREATEST(0, LEAST(86400, floor(EXTRACT(EPOCH FROM clock_timestamp() - query_start) / 5) * 5))::integer END, "
+            "CASE WHEN xact_start IS NULL THEN NULL ELSE "
+            "GREATEST(0, LEAST(86400, floor(EXTRACT(EPOCH FROM clock_timestamp() - xact_start) / 5) * 5))::integer END, "
+            "(pg_blocking_pids(pid))[1:8] "
+            "FROM pg_catalog.pg_stat_activity WHERE pid = %s",
+            (request["pid"],),
+        )
+        row = cursor.fetchone()
+    if row is None:
+        result = {"status": "pid-not-visible"}
+    else:
+        result = {
+            "status": "observed",
+            "backendPID": row[0],
+            "state": row[1],
+            "waitEventType": row[2],
+            "waitEvent": row[3],
+            "queryAgeBucketSeconds": row[4],
+            "transactionAgeBucketSeconds": row[5],
+            "blockingPids": row[6] or [],
+        }
+    print(json.dumps(result, separators=(",", ":")))
+except BaseException:
+    print('{"status":"unavailable"}')
+finally:
+    if connection is not None:
+        try:
+            connection.close()
+        except BaseException:
+            pass
+"""
+
+
+def _observe_owned_pg_wait(backend_pid):
+    """Observe one captured backend through a read-only child with hard bounds."""
+    if type(backend_pid) is not int or not 0 < backend_pid <= 2**31 - 1:
+        return {"status": "unavailable"}
+    try:
+        from django.db import connection
+
+        if connection.vendor != "postgresql":
+            return {"status": "unavailable"}
+        settings = connection.settings_dict
+        options = settings.get("OPTIONS", {})
+        connect = {"dbname": settings.get("NAME"), "passfile": os.devnull}
+        for source, target in (
+            ("USER", "user"),
+            ("PASSWORD", "password"),
+            ("HOST", "host"),
+            ("PORT", "port"),
+        ):
+            value = settings.get(source)
+            if value not in (None, ""):
+                if source == "PORT":
+                    if type(value) is int:
+                        if not 1 <= value <= 65535:
+                            return {"status": "unavailable"}
+                    elif not isinstance(value, str) or not value.isdecimal() or not 1 <= int(value) <= 65535:
+                        return {"status": "unavailable"}
+                elif not isinstance(value, str) or len(value) > 512:
+                    return {"status": "unavailable"}
+                connect[target] = value
+        for key in ("sslmode", "sslcert", "sslkey", "sslrootcert", "sslcrl", "service"):
+            value = options.get(key)
+            if isinstance(value, str) and value and len(value) <= 512:
+                connect[key] = value
+        if not isinstance(connect["dbname"], str) or not connect["dbname"] or len(connect["dbname"]) > 256:
+            return {"status": "unavailable"}
+        payload = json.dumps({"pid": backend_pid, "connect": connect}, separators=(",", ":"))
+        observer = _PG_WAIT_OBSERVER.replace("__CONNECT_TIMEOUT__", str(_PG_WAIT_CONNECT_SECONDS)).replace(
+            "__STATEMENT_TIMEOUT__", str(_PG_WAIT_STATEMENT_MS)
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", observer],
+            input=payload,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            env={"PATH": os.defpath, "LANG": "C"},
+            timeout=_PG_WAIT_OBSERVER_SECONDS,
+            check=False,
+        )
+        if result.returncode != 0 or len(result.stdout.encode("utf-8")) > 2048:
+            return {"status": "unavailable"}
+        return _safe_pg_wait_summary(json.loads(result.stdout), backend_pid)
+    except BaseException:
+        return {"status": "unavailable"}
+
+
+def _safe_activity_connection_state():
+    """Snapshot current thread connection facts without opening it or issuing SQL."""
+    try:
+        from django.db import connection
+
+        raw = connection.connection
+        getter = getattr(raw, "get_backend_pid", None)
+        pid = getter() if connection.vendor == "postgresql" and callable(getter) else None
+        if type(pid) is not int or not 0 < pid <= 2**31 - 1:
+            return None
+        return {
+            "backendPID": pid,
+            "autocommit": connection.get_autocommit(),
+            "inAtomicBlock": connection.in_atomic_block,
+        }
+    except BaseException:
+        return None
+
+
+def _failure_diagnostic_line(
+    *,
+    callback_error,
+    thread_frames,
+    checkpoints,
+    history=None,
+    history_error=None,
+    activity_connection=None,
+    database_wait=None,
+):
     callback_chain = _safe_exception_chain(callback_error)
     history_error_chain = (
         _safe_exception_chain(history_error) if isinstance(history_error, BaseException) else []
@@ -389,12 +613,21 @@ def _failure_diagnostic_line(*, callback_error, thread_frames, checkpoints, hist
                 "line": line if type(line) is int and 0 < line < 10**7 else 0,
             }
         )
+    safe_activity_connection = _safe_activity_connection_summary(activity_connection)
+    expected_backend_pid = safe_activity_connection.get("backendPID")
+    safe_database_wait = (
+        _safe_pg_wait_summary(database_wait, expected_backend_pid)
+        if isinstance(database_wait, dict)
+        else {"status": "unavailable"}
+    )
     value = {
         "callbackError": callback_chain,
         "activityThreadFrames": safe_frames,
         "checkpoints": checkpoints,
         "history": history,
         "historyDiagnosticError": history_error_chain,
+        "activityConnection": safe_activity_connection,
+        "databaseWait": safe_database_wait,
     }
     try:
         encoded = json.dumps(value, sort_keys=True, separators=(",", ":"))
@@ -451,6 +684,56 @@ def test_failure_diagnostic_formatter_failure_has_constant_safe_fallback(monkeyp
     )
 
     assert line == '{"diagnostic":"bounded_failure_diagnostic_unavailable"}'
+
+
+def test_pg_wait_summary_is_allowlisted_bounded_and_pid_pinned():
+    summary = _safe_pg_wait_summary(
+        {
+            "status": "observed",
+            "backendPID": 41,
+            "state": "active",
+            "waitEventType": "Lock",
+            "waitEvent": "transactionid",
+            "queryAgeBucketSeconds": 15,
+            "transactionAgeBucketSeconds": 30,
+            "blockingPids": list(range(42, 60)),
+            "query": "private SQL canary",
+            "password": "private credential canary",
+        },
+        41,
+    )
+
+    assert summary["status"] == "observed"
+    assert summary["blockingPids"] == list(range(42, 50))
+    assert summary["queryAgeBucketSeconds"] == 15
+    assert "query" not in summary and "password" not in summary
+    assert _safe_pg_wait_summary({"status": "observed", "backendPID": 42}, 41) == {"status": "unavailable"}
+    assert (
+        _safe_pg_wait_summary({"status": "observed", "backendPID": 41, "queryAgeBucketSeconds": 16}, 41)[
+            "queryAgeBucketSeconds"
+        ]
+        is None
+    )
+
+
+def test_activity_connection_summary_keeps_only_pid_and_boolean_state():
+    summary = _safe_activity_connection_summary(
+        {
+            "backendPID": 41,
+            "autocommit": True,
+            "inAtomicBlock": False,
+            "database": "private-name",
+            "query": "private SQL canary",
+        }
+    )
+
+    assert summary == {
+        "status": "last-checkpoint",
+        "backendPID": 41,
+        "autocommit": True,
+        "inAtomicBlock": False,
+    }
+    assert _safe_activity_connection_summary({"backendPID": True}) == {"status": "unavailable"}
 
 
 def test_owned_thread_stack_reads_only_registered_thread_and_caps_frames(monkeypatch):
@@ -696,7 +979,11 @@ def native_world(monkeypatch, client, tmp_path):
                 break
             frame = frame.f_back
         w.checkpoint_stages[stage] = w.checkpoint_stages.get(stage, 0) + 1
-        return original_admitted(self)
+        result = original_admitted(self)
+        activity_db_state = _safe_activity_connection_state()
+        if activity_db_state is not None:
+            w.activity_db_state = activity_db_state
+        return result
 
     monkeypatch.setattr(_ScopedDeploymentExecutionCheckpoint, "_admitted", measured_admitted)
 
@@ -928,7 +1215,17 @@ async def run(
                         checkpoints = _safe_checkpoint_summary(w)
                     except BaseException:
                         checkpoints = {"calls": 0, "stages": {}}
+                    try:
+                        activity_connection = _safe_activity_connection_summary(
+                            getattr(w, "activity_db_state", None)
+                        )
+                    except BaseException:
+                        activity_connection = {"status": "unavailable"}
                     released.set()
+                    try:
+                        database_wait = _observe_owned_pg_wait(activity_connection.get("backendPID"))
+                    except BaseException:
+                        database_wait = {"status": "unavailable"}
                     history_summary = None
                     history_error = None
                     try:
@@ -946,6 +1243,8 @@ async def run(
                                 checkpoints=checkpoints,
                                 history=history_summary,
                                 history_error=history_error,
+                                activity_connection=activity_connection,
+                                database_wait=database_wait,
                             )
                         )
                     except BaseException:
