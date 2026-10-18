@@ -1748,7 +1748,7 @@
         "hoursMinutes": "{hours, number}時間 {minutes, number}分",
         "minutes": "{minutes, number}分"
       },
-      "resourceTooltip": "{pods} 個の Pod"
+      "resourceTooltip": "リソース：{pods, plural, one {# 個の Pod} other {# 個の Pod}}"
     },
     "observability": {
       "scope": {

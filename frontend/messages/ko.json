@@ -1748,7 +1748,7 @@
         "hoursMinutes": "{hours, number}시간 {minutes, number}분",
         "minutes": "{minutes, number}분"
       },
-      "resourceTooltip": "Pod {pods}개"
+      "resourceTooltip": "리소스: {pods, plural, one {파드 #개} other {파드 #개}}"
     },
     "observability": {
       "scope": {

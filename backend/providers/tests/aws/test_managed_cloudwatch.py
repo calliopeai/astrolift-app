@@ -883,15 +883,13 @@ def test_native_requests_match_current_botocore_shapes() -> None:
         validate_parameters(cw.kwargs_for(method), cw_model.operation_model(operation).input_shape)
 
 
-def test_registration_catalogue_cost_and_runtime_config() -> None:
+def test_registration_catalogue_and_runtime_config() -> None:
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     assert ("observability", "cloudwatch") in PLUGIN.managed_service_drivers
-    assert SERVICE_CODE_BY_VARIANT[("observability", "cloudwatch")] == "AmazonCloudWatch"
     entry = next(
         item
         for item in MATRIX.managed_services

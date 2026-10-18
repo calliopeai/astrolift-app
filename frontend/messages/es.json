@@ -1742,7 +1742,7 @@
         "hoursMinutes": "{hours, number}h {minutes, number}min",
         "minutes": "{minutes, number}min"
       },
-      "resourceTooltip": "{pods, plural, one {# pod} other {# pods}}"
+      "resourceTooltip": "Recursos: {pods, plural, one {# pod} other {# pods}}"
     },
     "observability": {
       "scope": {

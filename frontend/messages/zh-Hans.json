@@ -1748,7 +1748,7 @@
         "hoursMinutes": "{hours, number}小时 {minutes, number}分钟",
         "minutes": "{minutes, number}分钟"
       },
-      "resourceTooltip": "{pods} 个 Pod"
+      "resourceTooltip": "资源：{pods, plural, one {# 个 Pod} other {# 个 Pod}}"
     },
     "observability": {
       "scope": {

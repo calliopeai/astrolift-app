@@ -2431,7 +2431,7 @@
         "hoursMinutes": "{hours, number}h {minutes, number}m",
         "minutes": "{minutes, number}m"
       },
-      "resourceTooltip": "{pods, plural, one {# pod} other {# pods}}"
+      "resourceTooltip": "Resources: {pods, plural, one {# pod} other {# pods}}"
     },
     "domains": {
       "title": "Custom domains",
