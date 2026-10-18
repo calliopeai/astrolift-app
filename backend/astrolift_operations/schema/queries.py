@@ -992,7 +992,6 @@ class OperationsQuery(
         from astrolift_identity.models import Organization
         from astrolift_operations.observability_retention import (
             ALL_STREAMS,
-            billable_window_days,
             effective_for,
             warn_threshold_for,
         )
@@ -1017,7 +1016,6 @@ class OperationsQuery(
                     stream=stream,
                     days=retention.days,
                     source=retention.source,
-                    billable_window_days=billable_window_days(retention),
                     warn_threshold_days=warn_threshold_for(retention),
                 )
             )

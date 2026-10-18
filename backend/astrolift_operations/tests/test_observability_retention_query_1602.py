@@ -1,9 +1,8 @@
 """The read surface the four retention columns never had (#1602 step 7).
 
 An operator could set `metrics_retention_days_default` and had no way to
-see what the platform would do with it. This is also the step that finally
-gives `billable_window_days` and `warn_threshold_for` production callers --
-the last two of the policy module's five public functions.
+see what the platform would do with it. Effective days and warning windows
+remain operational policy observations without billing fields.
 """
 
 from __future__ import annotations
@@ -115,15 +114,40 @@ def test_the_surface_reads_the_same_column_map_as_the_sweep(org, actor, fake_inf
     assert rows["metric_raw"].days == 123
 
 
-def test_the_last_two_policy_functions_now_have_a_caller(org, actor, fake_info, permission_resolver):
-    """`billable_window_days` and `warn_threshold_for` were the two of five
-    public functions still without a production call site after step 5."""
+def test_effective_days_and_warning_windows_remain_operational(org, actor, fake_info, permission_resolver):
     permission_resolver.grant(Permission.ORG_READ)
 
     rows = _query(org, actor, fake_info)
 
-    assert all(r.billable_window_days >= 1 for r in rows)
+    assert all(r.days >= 1 for r in rows)
     assert all(r.warn_threshold_days >= 0 for r in rows)
+
+
+def test_graphql_rejects_billing_field_and_keeps_scoped_retention_days(
+    org, actor, fake_info, permission_resolver
+):
+    from config.schema import schema
+
+    permission_resolver.grant(Permission.ORG_READ)
+    org.log_retention_days_default = 45
+    org.save()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id)):
+        rejected = schema.execute_sync(
+            "{ astroliftObservabilityRetention { billableWindowDays } }",
+            context_value=fake_info.context,
+        )
+        actual = schema.execute_sync(
+            "{ astroliftObservabilityRetention { stream days source warnThresholdDays } }",
+            context_value=fake_info.context,
+        )
+
+    assert rejected.errors and rejected.data is None
+    assert any("billableWindowDays" in error.message for error in rejected.errors)
+    assert actual.errors is None, actual.errors
+    rows = {row["stream"]: row for row in actual.data["astroliftObservabilityRetention"]}
+    assert set(rows) == set(ALL_STREAMS)
+    assert rows["log"]["days"] == 45 and rows["log"]["source"] == "org_override"
+    assert all(row["warnThresholdDays"] >= 0 for row in rows.values())
 
 
 def test_no_tenant_is_refused_by_the_decorator_before_the_resolver_runs(

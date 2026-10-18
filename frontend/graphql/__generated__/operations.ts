@@ -12417,7 +12417,6 @@ export type ObservabilityRetentionHoldTypeMutationResult = {
 };
 
 export type ObservabilityRetentionType = {
-  billableWindowDays: Scalars['Int']['output'];
   days: Scalars['Int']['output'];
   source: Scalars['String']['output'];
   stream: Scalars['String']['output'];

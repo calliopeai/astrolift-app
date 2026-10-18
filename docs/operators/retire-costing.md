@@ -19,6 +19,8 @@ queries are `astroliftBudgets`, `astroliftCostSnapshots`, `astroliftCostTrend`,
 `astroliftManagedServiceCostPreview`. Zentinelle usage no longer exposes
 `costUsd`. Health no longer exposes `budgets` or the `AstroliftZentinelleBudget`
 type; availability, block/approval counts and gateway/server observations remain.
+Observability retention also drops the duplicate `billableWindowDays` field;
+effective `days`, policy `source` and `warnThresholdDays` remain available.
 Only the typed operational health projection is cached under a new cache key;
 earlier raw-response entries are ignored and expire normally. Preview detail no
 longer exposes monetary estimate fields.

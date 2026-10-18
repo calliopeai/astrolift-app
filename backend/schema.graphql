@@ -10821,7 +10821,6 @@ type ObservabilityRetentionType {
   stream: String!
   days: Int!
   source: String!
-  billableWindowDays: Int!
   warnThresholdDays: Int!
 }
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove the remaining `billableWindowDays` retention API field and its unused billing helper (#2464); effective retention days, warning windows, policy controls and eviction remain operational.
+
 - Retire Astrolift application/task/model monetary APIs, estimates, budgets, forecasts and spend emission (#2464), retaining resource quotas and canonical Zentinelle token reads. Preview runtime enrichment is explicitly resource-only (`includeRuntimeResources`, `previews.explicit_runtime_resources`). Historical rows/outboxes remain; old cost histories complete through no-op activities and exact retired spend webhooks stop before HTTP. See [operator rollout and schedule retirement](docs/operators/retire-costing.md).
 
 - A semantic layer's container verifies its read tokens itself (#2441). The edge keeps `X-Astrolift-Brain-Token` on the routes of a brain app (stripped everywhere else, as before), and every container of a brain's workloads gets `BRAIN_MCP_JWKS_URL`, `BRAIN_MCP_ISSUER` and `BRAIN_MCP_AUDIENCE` (the brain's guid) from the install, over any value its manifest sets. A new layer builds the template-owned `runtime/portal-container/Dockerfile` (mimwell-pvt#479) and asks for 128Mi of memory, limit 512Mi; graduation keeps more if the layer's manifest asks for it, and an older layer's own Dockerfile.
