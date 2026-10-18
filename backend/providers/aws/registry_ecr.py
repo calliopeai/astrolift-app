@@ -23,7 +23,7 @@ from typing import Any
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
-from _sdk.registry import CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
+from _sdk.registry import BuildRepositoryObservation, CiPushRole, ImageRegistryDriver, Repo, SecretSpec, Tag
 from aws._errors import NotFoundError, ProviderError, map_client_error
 from aws.session import aws_client
 
@@ -91,6 +91,23 @@ class ECRDriver(ImageRegistryDriver):
             self._client = client
         else:
             self._client = aws_client("ecr", region=config.region, credential=config.credential)
+
+    @driver_op(cloud="aws", driver="registry")
+    def observe_build_repository(self, name: str) -> BuildRepositoryObservation:
+        """Never create/adopt/mutate a source-build target or infer its IAM policy."""
+        try:
+            rows = self._client.describe_repositories(repositoryNames=[name]).get("repositories", [])
+            if len(rows) != 1 or rows[0].get("repositoryName") != name:
+                raise ValueError("configured build repository identity is unavailable")
+            row = rows[0]
+            return BuildRepositoryObservation(
+                name=name,
+                uri=row["repositoryUri"],
+                immutable_tags=row.get("imageTagMutability") == "IMMUTABLE"
+                and not row.get("imageTagMutabilityExclusionFilters"),
+            )
+        except Exception as exc:
+            raise map_client_error(exc) from exc
 
     @driver_op(cloud="aws", driver="registry")
     def ensure_repo(self, name: str) -> Repo:

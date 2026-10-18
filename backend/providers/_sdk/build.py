@@ -16,6 +16,23 @@ from typing import Protocol
 
 
 @dataclass(frozen=True)
+class BuildContextArchive:
+    """Server-admitted private ZIP; credentials are never a workflow payload.
+
+    Only app/* and data/* are extracted. The recipe and entrypoint are
+    trusted server-generated text, separate from caller-controlled files.
+    """
+
+    url: str
+    token: str = field(repr=False)
+    sha256: str
+    size_bytes: int
+    expanded_bytes: int
+    dockerfile: str
+    entrypoint: str
+
+
+@dataclass(frozen=True)
 class BuildSpec:
     source_uri: str
     """git+https://... | tar+s3://... | local path."""
@@ -30,6 +47,8 @@ class BuildSpec:
 
     cache_from: list[str] = field(default_factory=list)
     """Image refs to use as build cache."""
+
+    context_archive: BuildContextArchive | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True)
