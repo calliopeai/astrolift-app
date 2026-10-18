@@ -469,6 +469,12 @@ def warn(app, key: str) -> None:
             title=title,
             body=body,
             link=f"/apps/{app.slug}",
+            expiry_warning={
+                "app_guid": str(app.guid),
+                "app_slug": app.slug,
+                "expires_at": _iso(app.expires_at),
+                "warning": key,
+            },
         )
     Event.emit(
         "app.expiring",

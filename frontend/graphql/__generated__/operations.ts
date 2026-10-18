@@ -1368,6 +1368,13 @@ export type AstroliftAppExecTarget = {
   workloadVersion: Scalars['Int']['output'];
 };
 
+export type AstroliftAppExpiryWarning = {
+  appId: Scalars['GUID']['output'];
+  appSlug: Scalars['String']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  warningWindow: Scalars['String']['output'];
+};
+
 export type AstroliftAppGoldenSignal = {
   measurement?: Maybe<AstroliftGoldenSignalMeasurement>;
   name: GoldenSignalKind;
@@ -4136,6 +4143,7 @@ export type AstroliftNavTreeWorkflow = {
 export type AstroliftNotification = {
   body: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
+  expiryWarning?: Maybe<AstroliftAppExpiryWarning>;
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
   link: Scalars['String']['output'];
@@ -4148,6 +4156,12 @@ export type AstroliftNotificationMutationResult = {
   data?: Maybe<AstroliftNotification>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftNotificationPage = {
+  endCursor: Scalars['String']['output'];
+  hasMore: Scalars['Boolean']['output'];
+  items: Array<AstroliftNotification>;
 };
 
 export type AstroliftNotificationPreference = {
@@ -12799,6 +12813,7 @@ export type Query = {
   astroliftMyMobileDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyNotificationPreferences: Array<AstroliftNotificationPreference>;
   astroliftMyNotifications: Array<AstroliftNotification>;
+  astroliftMyNotificationsPage: AstroliftNotificationPage;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
@@ -14315,6 +14330,12 @@ export type QueryAstroliftMyNotificationPreferencesArgs = {
 export type QueryAstroliftMyNotificationsArgs = {
   limit?: Scalars['Int']['input'];
   unreadOnly?: Scalars['Boolean']['input'];
+};
+
+
+export type QueryAstroliftMyNotificationsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -16365,6 +16386,7 @@ export type SubscribeClusterModelInput = {
 
 export type Subscription = {
   astroliftDeploymentLifecycleStream: AstroliftDeploymentLifecycleEvent;
+  astroliftMyNotificationStream: AstroliftNotificationPage;
   astroliftOnAppLog: AstroliftAppLogLine;
   astroliftOnAppLogs: AstroliftAppLogLine;
   formSubmissionReceived: Scalars['String']['output'];
@@ -16374,6 +16396,11 @@ export type Subscription = {
 
 export type SubscriptionAstroliftDeploymentLifecycleStreamArgs = {
   appSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type SubscriptionAstroliftMyNotificationStreamArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -19781,6 +19808,21 @@ export type SendInstallAlertMailTestMutationVariables = Exact<{
 
 
 export type SendInstallAlertMailTestMutation = { sendInstallAlertMailTest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null }>, data?: { id: string, requestId: string, version: number, eventKind: string, transport: string, sender: string, recipient: string, status: string, reasonCode?: string | null, createdAt: string, acceptedAt?: string | null, deliveryObserved: boolean } | null } };
+
+export type GetMyNotificationInboxQueryVariables = Exact<{
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type GetMyNotificationInboxQuery = { astroliftMyNotificationsPage: { endCursor: string, hasMore: boolean, items: Array<{ id: string, kind: string, title: string, body: string, link: string, readAt?: string | null, createdAt: string, expiryWarning?: { appId: string, appSlug: string, expiresAt: string, warningWindow: string } | null }> } };
+
+export type MyNotificationInboxStreamSubscriptionVariables = Exact<{
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type MyNotificationInboxStreamSubscription = { astroliftMyNotificationStream: { endCursor: string, hasMore: boolean, items: Array<{ id: string, kind: string, title: string, body: string, link: string, readAt?: string | null, createdAt: string, expiryWarning?: { appId: string, appSlug: string, expiresAt: string, warningWindow: string } | null }> } };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

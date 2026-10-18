@@ -8,7 +8,7 @@ from astrolift_operations.models.audit_export import AuditExport
 from astrolift_operations.models.device_registration import DeviceRegistration
 from astrolift_operations.models.event import Event
 from astrolift_operations.models.install_alert_mail_test import InstallAlertMailTest
-from astrolift_operations.models.notification import Notification
+from astrolift_operations.models.notification import Notification, NotificationInboxCounter
 from astrolift_operations.models.notification_delivery import NotificationDelivery
 from astrolift_operations.models.notification_preference import (
     DEFAULT_PREFERENCES,
@@ -46,6 +46,7 @@ __all__ = [
     "DeviceRegistration",
     "Event",
     "Notification",
+    "NotificationInboxCounter",
     "InstallAlertMailTest",
     "NotificationChannel",
     "NotificationPreference",

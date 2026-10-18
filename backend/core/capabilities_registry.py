@@ -119,6 +119,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "agents.completion_callback_redelivery",
     # Notifications.
     "notifications.in_app",
+    "notifications.structured_inbox",
     "notifications.email",
     # File uploads.
     "uploads.presigned",

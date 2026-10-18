@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Operations notifications expose caller-only cursor catch-up and a database-backed stream (`astroliftMyNotificationsPage`, `astroliftMyNotificationStream`, capability `notifications.structured_inbox`, #2457). Actual expiry warning rows include app GUID/slug, expiry timestamp and emitted window; each read/poll rechecks membership, token ceiling, app visibility, recipient eligibility and app mute. A per-inbox database admission ledger preserves committed ordering across concurrent and rolling writers. Existing inbox/read operations share the authorization rules. This does not create agent messages or change external notification preferences. See [notification inbox](docs/notification-inbox.md); migration operations 0037.
+
 - Temporary-app expiry removes the exact app-owned brain credential Secrets during runtime retirement, with native ownership and original UID checks; the data namespace and managed services remain through grace (#2433).
 
 - Chat Studio promotion records the app creator for expiry warnings and accepts only an explicit JSON boolean for `delete_data_on_expiry`; strings such as `"false"` cannot accidentally select immediate data deletion. Re-promoting preserves the existing app expiry and data choice (#2433).

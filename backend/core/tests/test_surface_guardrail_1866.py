@@ -155,6 +155,12 @@ ALLOWED: dict[str, str] = {
     "Query.astroliftElevationStatus": "self-service: the caller's own step-up state",
     "Query.myStepUpPin": "self-service: the caller's own step-up PIN state",
     "Query.astroliftMyNotifications": "self-service: the caller's own notifications",
+    "Query.astroliftMyNotificationsPage": (
+        "#2457 self-only current tenant/person inbox, rechecking membership, token ceiling and app audience"
+    ),
+    "Subscription.astroliftMyNotificationStream": (
+        "#2457 same current-viewer checks on every database poll; explicit errors on revoked or absent identity"
+    ),
     "Query.astroliftMyMobileDevices": "self-service: the caller's own push registrations",
     "Query.astroliftMyNotificationPreferences": "self-service: the caller's own notification preferences",
     "Query.astroliftMyDevices": "self-service: the caller's own push devices",
