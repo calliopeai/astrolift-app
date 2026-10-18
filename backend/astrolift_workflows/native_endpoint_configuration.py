@@ -762,8 +762,9 @@ def complete_native_endpoint_configuration(input, receipt):
             deleted_at__isnull=True,
         ).exists():
             raise NativeConfigurationError("NATIVE_RECEIPT_UNCONFIRMED")
-        _retire_rolled_back(input.deployment_id)
-        _mark_running_sync(input.deployment_id)
+        with transaction.atomic():
+            _retire_rolled_back(input.deployment_id)
+            _mark_running_sync(input.deployment_id)
 
 
 def _retire_rolled_back(deployment_id):
