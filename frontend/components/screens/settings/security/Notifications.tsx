@@ -17,6 +17,7 @@ export interface NotificationsScreenProps {
   installAlertMail?: React.ReactNode;
   /** The org's workflow result delivery channels (#2244); org admins only. */
   workflowDelivery?: React.ReactNode;
+  quietHours?: React.ReactNode;
 }
 
 /**
@@ -30,6 +31,7 @@ export function NotificationsScreen({
   alertSubscriptions,
   installAlertMail,
   workflowDelivery,
+  quietHours,
 }: NotificationsScreenProps) {
   const t = useTranslations("installAlertMail");
   const tn = useTranslations("notificationSettings");
@@ -41,6 +43,9 @@ export function NotificationsScreen({
         sections={[
           { id: "inbox", title: tn("inboxTitle"), content: inbox },
           { id: "alerts", title: tn("alerts.title"), content: alertSubscriptions },
+          ...(quietHours
+            ? [{ id: "quiet-hours", title: tn("quietHours.title"), content: quietHours }]
+            : []),
           ...(installAlertMail
             ? [{ id: "install-email", title: t("title"), content: installAlertMail }]
             : []),

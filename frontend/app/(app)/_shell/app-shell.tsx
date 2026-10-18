@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import { usePathname } from "next/navigation";
 import * as React from "react";
 
+import { AgentInboxButton } from "@/components/AgentInboxButton";
 import { CommandPalette } from "@/components/CommandPalette";
 import { ElevationIndicator } from "@/components/ElevationIndicator";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
@@ -25,6 +26,7 @@ import { FEATURE_FLAG_SUPPORT, useFeatureFlag } from "@/graphql/server/server.ho
 import { GET_MY_PROFILE, LIST_NAV_TREE } from "@/graphql/identity/identity.queries";
 import type { AstroliftMyProfile, AstroliftNavTree } from "@/graphql/identity/identity.types";
 import { useMe, useModules } from "@/graphql/user/user.hooks";
+import { useAgentInboxUnread } from "@/hooks/use-agent-inbox-unread";
 import { useElevation } from "@/hooks/use-elevation";
 import { useMyNotifications } from "@/hooks/use-my-notifications";
 import { clearToken } from "@/lib/auth/token-store";
@@ -52,6 +54,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
     astroliftNavTree: AstroliftNavTree | null;
   }>(LIST_NAV_TREE, { fetchPolicy: "cache-and-network" });
   const notifications = useMyNotifications();
+  const agentInbox = useAgentInboxUnread();
   const elevation = useElevation();
   const support = useFeatureFlag(FEATURE_FLAG_SUPPORT);
   const shortcuts = useKeyboardShortcuts();
@@ -103,6 +106,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
           footer={
             <>
               <ElevationIndicator {...elevation} />
+              <AgentInboxButton {...agentInbox} />
               <NotificationsBell {...notifications} />
               <UserMenu
                 fullName={fullName}

@@ -464,6 +464,7 @@ def _alert(target, body):
     from core.tenancy import TenantContext, tenant_context
 
     owner = target.triggered_by_user_id if isinstance(target, AgentTask) else target.owner_id
+    alerted = []
     members = Member.objects.filter(
         scope_kind="ORG",
         scope_id=target.organization_id,
@@ -506,6 +507,7 @@ def _alert(target, body):
                     controller = _allowed(Permission.AGENT_DISPATCH, scope)
                     readable = _allowed(Permission.AGENT_READ, scope)
                 if controller or (member.user_id == owner and readable):
+                    alerted.append(member.user_id)
                     Notification.objects.create(
                         organization_id=target.organization_id,
                         user=member.user,
@@ -518,6 +520,18 @@ def _alert(target, body):
                     )
     finally:
         reset_current_api_token(marker)
+    if isinstance(target, AgentTask) and alerted:
+        # Policy outcomes (budget caps among them) reach the same people as agent messages (#2434).
+        from astrolift_agents.services.agent_messages import send_platform_message
+
+        send_platform_message(
+            target,
+            kind="alert",
+            title=f'Agent policy alert: {body["policy_name"]}',
+            body=f'{body["message"] or body["reason"]} Evidence: {body["evidence_url"]}',
+            signal_key=f'policy:{target.guid}:{body.get("action_id") or body["policy_name"]}',
+            user_ids=alerted,
+        )
 
 
 def poll_enforcements(target):
