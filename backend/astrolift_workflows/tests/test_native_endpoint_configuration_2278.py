@@ -46,6 +46,62 @@ from astrolift_workflows.tests.test_native_execution_checkpoint_2278 import worl
 from providers.tests.gcp.test_gke_app_apply_2278 import native as tls_fixture
 from providers.tests.gcp.test_identity_submission_2278 import SubmissionWire
 
+
+def _safe_exception_chain(error):
+    rows = []
+    seen = set()
+    current = error
+    while isinstance(current, BaseException) and id(current) not in seen and len(rows) < 8:
+        seen.add(id(current))
+        exception_type = type(current).__name__
+        if not re.fullmatch(r"[A-Za-z0-9_]{1,96}", exception_type):
+            exception_type = "UnknownException"
+        frame = current.__traceback__
+        source_file, source_line = "unknown", 0
+        for _ in range(128):
+            if frame is None:
+                break
+            if frame.tb_next is None:
+                candidate = frame.tb_frame.f_code.co_filename.rsplit("/", 1)[-1]
+                if re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", candidate):
+                    source_file = candidate
+                source_line = frame.tb_lineno
+                break
+            frame = frame.tb_next
+        else:
+            source_file = "truncated"
+        rows.append({"exceptionType": exception_type, "sourceFile": source_file, "sourceLine": source_line})
+        current = current.__cause__ if current.__cause__ is not None else current.__context__
+    return rows
+
+
+def test_safe_exception_chain_includes_suppressed_context_without_text():
+    try:
+        try:
+            raise RuntimeError("private-inner-error-canary")
+        except RuntimeError:
+            raise ValueError("private-outer-error-canary") from None
+    except ValueError as error:
+        rows = _safe_exception_chain(error)
+
+    assert [row["exceptionType"] for row in rows] == ["ValueError", "RuntimeError"]
+    assert all(set(row) == {"exceptionType", "sourceFile", "sourceLine"} for row in rows)
+    assert all(row["sourceLine"] > 0 for row in rows)
+    assert "private-" not in json.dumps(rows)
+
+    chain = RuntimeError("private-cycle-canary")
+    chain.__context__ = chain
+    cycle_rows = _safe_exception_chain(chain)
+    assert len(cycle_rows) == 1 and cycle_rows[0]["exceptionType"] == "RuntimeError"
+
+    deep = [RuntimeError(f"private-depth-{index}") for index in range(10)]
+    for current, following in zip(deep[:-1], deep[1:], strict=True):
+        current.__context__ = following
+    deep_rows = _safe_exception_chain(deep[0])
+    assert len(deep_rows) == 8
+    assert "private-depth" not in json.dumps(deep_rows)
+
+
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
@@ -221,6 +277,7 @@ def native_world(monkeypatch, client, tmp_path):
         except Exception as error:
             reason = str(error)
             w.frames = [(row.name, row.lineno) for row in traceback.extract_tb(error.__traceback__)]
+            w.failure_causes = _safe_exception_chain(error)
             w.failures.append(
                 (
                     type(error).__name__,
@@ -434,7 +491,15 @@ async def run(
             try:
                 result = await handle.result()
             except Exception:
-                print(json.dumps({"safe_failures": w.failures, "safe_frames": getattr(w, "frames", [])}))
+                print(
+                    json.dumps(
+                        {
+                            "safe_failures": w.failures,
+                            "safe_frames": getattr(w, "frames", []),
+                            "safe_failure_causes": getattr(w, "failure_causes", []),
+                        }
+                    )
+                )
                 raise
             history = await handle.fetch_history()
     await Replayer(workflows=[workflow_type], workflow_runner=UnsandboxedWorkflowRunner()).replay_workflow(
@@ -879,7 +944,7 @@ async def test_runtime_db_boundary_rechecks_render_and_original_caller_after_jou
     monkeypatch.setattr(AppApplyStore, "validate_runtime_handoff", withdraw_after_current_read)
     result, _ = await run(w, client, temporal_env)
     assert result == {"refused": True}
-    assert len(changed) == 1 and len(w.http["requests"]) == changed[0]
+    assert len(changed) == 1 and len(w.http["requests"]) == changed[0], getattr(w, "failure_causes", [])
     assert not any(path.endswith("/pods?limit=257") for _, path, _ in w.http["requests"])
     assert await sync_to_async(lambda: GCPGKEAppApplyJournal.objects.get().state)() == "OBSERVED"
     if withdrawal == "render":
