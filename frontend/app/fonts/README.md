@@ -16,7 +16,7 @@ does not claim to identify the exact response that failed.
 | Family        | Upstream path                                | Local file                               | SHA-256                                                            |
 | ------------- | -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------ |
 | DM Sans       | `ofl/dmsans/DMSans[opsz,wght].ttf`           | `dm-sans/DMSans-VF.ttf`                  | `8cd08d97e89c24d0aa92edd2f0f4c8ee6195eee9b7c9f154865a58b02f0c1c0d` |
-| IBM Plex Sans | `ofl/ibmplexsans/IBMPlexSans[wdth,wght].ttf` | `ibm-plex-sans/IBMPlexSans-VF.ttf`       | `3b031aa4216174205bd8471f88a49b91f093169e9e87bd5262242bc5967fe2e3`  |
+| IBM Plex Sans | `ofl/ibmplexsans/IBMPlexSans[wdth,wght].ttf` | `ibm-plex-sans/IBMPlexSans-VF.ttf`       | `3b031aa4216174205bd8471f88a49b91f093169e9e87bd5262242bc5967fe2e3` |
 | IBM Plex Mono | `ofl/ibmplexmono/IBMPlexMono-Regular.ttf`    | `ibm-plex-mono/IBMPlexMono-Regular.ttf`  | `6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46` |
 | IBM Plex Mono | `ofl/ibmplexmono/IBMPlexMono-Medium.ttf`     | `ibm-plex-mono/IBMPlexMono-Medium.ttf`   | `a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755` |
 | IBM Plex Mono | `ofl/ibmplexmono/IBMPlexMono-SemiBold.ttf`   | `ibm-plex-mono/IBMPlexMono-SemiBold.ttf` | `d3c38e55c78f5b0f28009fddba4834ec503278936a5986032424c9bd2d23aa46` |
