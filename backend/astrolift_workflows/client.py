@@ -186,6 +186,31 @@ def start_workflow(
     return WorkflowHandle(workflow_id=wf_id, run_id=run_id, enqueued=True)
 
 
+@async_to_sync
+async def _signal_or_start(workflow_name, args, workflow_id, signal_name, task_queue):
+    from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
+
+    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+    handle = await client.start_workflow(
+        workflow_name,
+        args=args,
+        id=workflow_id,
+        task_queue=task_queue,
+        start_signal=signal_name,
+        id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+        id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+        rpc_timeout=timedelta(seconds=3),
+    )
+    return WorkflowHandle(workflow_id, handle.result_run_id or handle.first_execution_run_id or "", True)
+
+
+def signal_or_start_workflow(workflow_name, args, *, workflow_id, signal_name, task_queue=None):
+    """Atomically wake durable work, starting a run only when none is running."""
+    if not _temporal_enabled():
+        return WorkflowHandle(workflow_id, "", False)
+    return _signal_or_start(workflow_name, args, workflow_id, signal_name, task_queue or _task_queue())
+
+
 async def _verify_existing_start(client, workflow_name, args, workflow_id, run_id):
     handle = client.get_workflow_handle(workflow_id, run_id=run_id)
     description = await handle.describe(rpc_timeout=timedelta(seconds=3))

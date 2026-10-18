@@ -6,6 +6,8 @@ import { InstallAlertMailClient } from "@/components/screens/settings/install-al
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { NotificationsScreen } from "@/components/screens/settings/security/Notifications";
 import { NotificationsInbox } from "@/components/screens/settings/security/NotificationsInbox";
+import { NotificationQuietHoursPanel } from "@/components/screens/settings/security/NotificationQuietHoursPanel";
+import { useNotificationQuietHours } from "@/components/screens/settings/security/use-notification-quiet-hours";
 import { useNotifications } from "@/components/screens/settings/security/use-notifications";
 import { useSettingsSection } from "@/components/settings/use-settings-section";
 
@@ -29,6 +31,7 @@ export function NotificationsClient() {
       }
       inbox={<InboxCard />}
       alertSubscriptions={<AlertSubscriptionsCard />}
+      quietHours={<QuietHoursCard />}
     />
   );
 }
@@ -39,4 +42,8 @@ function DeliveryChannelsCard() {
 
 function InboxCard() {
   return <NotificationsInbox {...useNotifications()} />;
+}
+
+function QuietHoursCard() {
+  return <NotificationQuietHoursPanel {...useNotificationQuietHours()} />;
 }

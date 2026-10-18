@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import datetime as dt
+
 import strawberry
 
 from astrolift_graphql import GUID
@@ -75,6 +77,25 @@ class RegisterAppInput:
     # just the seed that lets ManifestParse activities run before the
     # first GitHub/GitLab API call lands.
     manifest_raw: str | None = None
+    # Temporary apps (#2433). Either a duration or a time; neither makes a
+    # permanent app, unless the manifest's ``[app] expires_in`` says otherwise.
+    expires_in: str | None = strawberry.field(
+        default=None,
+        description=(
+            "Make the app temporary: it is torn down this long after registration "
+            "(30m, 4h, 7d, 6w, 3mo). At least 15 minutes, at most the organization's limit."
+        ),
+    )
+    expires_at: dt.datetime | None = strawberry.field(
+        default=None, description="Make the app temporary: it is torn down at this time."
+    )
+    delete_data_on_expiry: bool = strawberry.field(
+        default=False,
+        description=(
+            "Delete the app's managed services (databases, buckets, volumes) with it on expiry, "
+            "instead of keeping them for the organization's grace period."
+        ),
+    )
 
 
 @strawberry.input

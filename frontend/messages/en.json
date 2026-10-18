@@ -1400,6 +1400,7 @@
         "mine": "Mine",
         "failing": "Failing",
         "archived": "Archived",
+        "temporary": "Temporary",
         "mineNote": "Mine means apps you hold a role on, directly or through their project, team or organization, until apps record who owns them."
       },
       "bulk": {
@@ -3995,6 +3996,36 @@
         "failed": "Failed",
         "deleted": "Deleted"
       }
+    },
+    "expiry": {
+      "expiresIn": "Expires in {remaining}",
+      "expired": "Expired",
+      "remaining": {
+        "days": "{days}d {hours}h",
+        "hours": "{hours}h {minutes}m",
+        "minutes": "{minutes}m"
+      },
+      "title": "Temporary app: torn down at {when}",
+      "extend": "+1 day",
+      "extendLabel": "Extend by one day",
+      "extended": "Extended to {when}",
+      "extendFailed": "Could not extend the app"
+    },
+    "temporaryCreation": {
+      "ttl": "App lifetime",
+      "help": "Leave blank to keep the manifest expiry, or make the app permanent when policy permits. Months are 30 days.",
+      "inherited": "The manifest expires this app after {ttl}. Enter a duration to override it.",
+      "bounds": "Allowed lifetime: {min} to {max} minutes.",
+      "required": "Your organization requires this app to expire.",
+      "invalid": "Enter a duration within the organization’s limits: 30m, 4h, 7d, 6w or 3mo.",
+      "deleteData": "Delete managed data when the app expires",
+      "deleteWarning": "Expiry also deletes the app’s databases, buckets and volumes. This cannot be undone.",
+      "keepData": "Managed data is kept for {days} days after expiry, then deleted.",
+      "loading": "Loading app lifetime policy…",
+      "unavailable": "The app lifetime policy could not be read. Try again before creating the app.",
+      "unsupported": "This server does not support temporary apps.",
+      "retry": "Try again",
+      "reviewKeep": "The organization’s data retention policy applies."
     }
   },
   "lists": {
@@ -5388,7 +5419,8 @@
         "deploy_failure": "Deploy failure",
         "error_spike": "Error spike",
         "preview_created": "Preview created",
-        "preview_destroyed": "Preview destroyed"
+        "preview_destroyed": "Preview destroyed",
+        "app_expiring": "Temporary app expiring"
       },
       "toggleLabel": "{kind} for {app}",
       "unsubscribeAll": "Unsubscribe all",
@@ -5410,6 +5442,25 @@
       "subscribeFailed": "Subscribe failed",
       "unsubscribed": "Unsubscribed from {app}",
       "unsubscribeFailed": "Unsubscribe failed"
+    },
+    "quietHours": {
+      "title": "Quiet hours",
+      "description": "Pause personal push and email for agent messages during this daily window. Messages stay in your inbox. Organization webhooks are unaffected.",
+      "enabled": "Enable quiet hours",
+      "timezone": "Time zone (IANA)",
+      "start": "Starts",
+      "end": "Ends",
+      "active": "Quiet hours are active",
+      "inactive": "Quiet hours are inactive",
+      "save": "Save",
+      "saved": "Quiet hours saved",
+      "loading": "Loading notification preferences…",
+      "error": "Notification preferences could not be loaded.",
+      "retry": "Try again",
+      "saveError": "Quiet hours could not be saved.",
+      "invalidTime": "Enter a valid time.",
+      "timezoneRequired": "Enter an IANA time zone.",
+      "differentTimes": "Start and end times must be different."
     }
   },
   "securitySettings": {
@@ -17069,7 +17120,8 @@
     "semanticLayer": "Semantic layer",
     "substrate": "Substrate",
     "sharing": "Sharing",
-    "connect": "Connect"
+    "connect": "Connect",
+    "agentInbox": "Inbox"
   },
   "support": {
     "title": "Support",
@@ -17172,5 +17224,42 @@
     "reasonPermission": "You do not have permission for this.",
     "reasonStepUp": "This needs a fresh sign-in.",
     "reasonRateLimited": "Too many attempts. Wait a minute and try again."
+  },
+  "agentInbox": {
+    "title": "Inbox",
+    "description": "{count, plural, =0 {Messages from your agents. Nothing unread.} one {Messages from your agents. # unread.} other {Messages from your agents. # unread.}}",
+    "buttonUnread": "Inbox, {count} unread",
+    "unreadOnly": "Unread only",
+    "emptyTitle": "No messages yet",
+    "emptyUnreadTitle": "Nothing unread",
+    "emptyDescription": "When an agent sends you an update, a question or a result, it lands here.",
+    "pickThread": "Pick a conversation to read it.",
+    "threads": "Conversations",
+    "thread": "Conversation",
+    "unknownAgent": "Removed agent",
+    "more": "Load more",
+    "earlier": "Load earlier messages",
+    "openRun": "Open the run",
+    "markRead": "Mark read",
+    "replyToAgent": "Reply to the agent",
+    "answer": "Your answer",
+    "reason": "Reason (optional)",
+    "allow": "Allow",
+    "deny": "Deny",
+    "send": "Send",
+    "expires": "Expires {when}",
+    "kind": {
+      "update": "Update",
+      "question": "Question",
+      "approval": "Approval",
+      "result": "Result",
+      "alert": "Alert"
+    },
+    "route": {
+      "live_run": "sent to the running agent",
+      "gate": "answered the agent's request",
+      "woke": "started the agent",
+      "queued": "waits for the agent's next run"
+    }
   }
 }

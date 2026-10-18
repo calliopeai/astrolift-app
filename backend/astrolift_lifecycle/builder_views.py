@@ -933,6 +933,43 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
 
     storage_class = _persistent_storage_class(cluster) if dev.data_file_path else ""
 
+    # Temporary apps (#2433): a new app may expire. The organization can
+    # require it for apps Chat Studio creates.
+    expires_at = None
+    if not is_update:
+        import datetime as dt
+
+        from astrolift_registry import expiry
+        from astrolift_registry.brain_manage import surface
+
+        delete_data_on_expiry = body.get("delete_data_on_expiry", False)
+        if not isinstance(delete_data_on_expiry, bool):
+            return JsonResponse(
+                {"detail": "delete_data_on_expiry must be a boolean", "field": "delete_data_on_expiry"},
+                status=400,
+            )
+        try:
+            raw_at = body.get("expires_at")
+            expires_at = expiry.resolve(
+                org,
+                expires_in=str(body.get("expires_in") or "") or None,
+                expires_at=dt.datetime.fromisoformat(str(raw_at)) if raw_at else None,
+            )
+        except (expiry.ExpiryError, ValueError) as exc:
+            return JsonResponse(
+                {"detail": str(exc), "field": getattr(exc, "field", None) or "expires_at"}, status=400
+            )
+        if expires_at is None:
+            with (
+                tenant_context(TenantContext(organization_id=org.pk, actor_user_id=token.user_id)),
+                surface("chat_studio"),
+            ):
+                refusal = expiry.permanent_refusal(org)
+            if refusal is not None:
+                return JsonResponse(
+                    {"code": "PERMISSION_DENIED", "detail": refusal, "reason": "ttl_required"}, status=403
+                )
+
     if is_update:
         # Re-promoting the same dev env into the app it already promoted to
         # (#1875). ``namespace_refusal``/``hostname_label_refusal`` are
@@ -975,12 +1012,20 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
         app = RegisteredApp.objects.create(
             organization=org,
             team=team,
+            created_by_id=token.user_id,
             name=app_name,
             slug=app_slug,
             source_kind=RegisteredApp.SourceKind.DIRECT_UPLOAD,
             provisioning_status=RegisteredApp.ProvisioningStatus.PENDING,
             default_tenant_cluster=cluster,
+            expires_at=expires_at,
+            delete_data_on_expiry=delete_data_on_expiry,
         )
+        if expires_at is not None:
+            from astrolift_registry import expiry
+
+            with surface("chat_studio"):
+                expiry.started(app, actor_user_id=token.user_id)
 
         from astrolift_lifecycle.models import AppEnvironment
         from astrolift_registry.namespaces import namespace_for_new_environment
@@ -1070,6 +1115,7 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
             "app_slug": app.slug,
             "app_url": f"https://{promoted_app_hostname(app)}",
             "data_persistent": bool(storage_class) if dev.data_file_path else None,
+            "expires_at": app.expires_at.isoformat() if app.expires_at else None,
         },
         status=202,
     )

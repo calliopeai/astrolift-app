@@ -48,6 +48,7 @@ export function BrainsScreen({
   hostingSlug,
   hostProjects,
   hostSubmitting,
+  temporary,
   onHost,
   onDismissHost,
   onSubmitHost,
@@ -198,6 +199,7 @@ export function BrainsScreen({
         brainSlug={hostingSlug}
         projects={hostProjects}
         submitting={hostSubmitting}
+        temporary={temporary}
         onSubmit={(values) => void onSubmitHost(values)}
         onDismiss={onDismissHost}
       />

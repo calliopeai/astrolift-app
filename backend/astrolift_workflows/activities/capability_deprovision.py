@@ -397,6 +397,22 @@ def _deprovision_registry_repo_sync(
         "default_tenant_cluster__provider_plugin",
         "organization",
     ).get(pk=registered_app_id)
+    repo_uri = (app.registry_repo_uri or "").strip()
+    if app.expiry_fired_at is not None:
+        if not repo_uri:
+            return {
+                "cluster_slug": getattr(app.default_tenant_cluster, "slug", ""),
+                "registered_app_id": registered_app_id,
+                "repo": "",
+                "archived": bool(archive),
+                "skipped": True,
+            }
+        if (
+            RegisteredApp.all_objects.exclude(pk=app.pk)
+            .filter(registry_repo_uri=repo_uri, deleted_at__isnull=True)
+            .exists()
+        ):
+            raise CapabilityDeprovisionError("expiry cannot delete a registry repository another app uses")
     cluster = _cluster_for_app(app)
     registry_driver = _resolve_capability_driver(cluster, "registry")
     delete_repo = getattr(registry_driver, "delete_repo", None)
@@ -404,7 +420,6 @@ def _deprovision_registry_repo_sync(
         raise CapabilityDeprovisionError(
             f"registry driver for cluster {cluster.slug!r} does not support delete_repo",
         )
-    repo_uri = (app.registry_repo_uri or "").strip()
     # The driver speaks repo *names*, not full URIs — the URI is the
     # registry endpoint + repo path (e.g.,
     # ``123.dkr.ecr.us-west-2.amazonaws.com/astrolift/acme-hello``).

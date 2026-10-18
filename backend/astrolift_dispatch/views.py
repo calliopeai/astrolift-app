@@ -865,6 +865,100 @@ def agent_brains(request: HttpRequest, task_id: str) -> JsonResponse:
     return JsonResponse(payload)
 
 
+_MAX_MESSAGE_BODY_BYTES = 64 * 1024
+
+
+def _run_task_for_messages(request: HttpRequest, task_id: str):
+    """The run itself, by its own callback key; a dispatcher key is not the run."""
+    callback_hash = getattr(request, "agent_callback_token_hash", "")
+    if not callback_hash:
+        return None, JsonResponse(
+            {"error": "messages go to and from the run itself, with its callback key"}, status=403
+        )
+    task = (
+        AgentTask.objects.filter(guid=task_id, callback_token_hash=callback_hash, deleted_at__isnull=True)
+        .select_related("agent_definition", "environment_spec")
+        .first()
+    )
+    if task is None:
+        return None, JsonResponse({"error": "task not found or callback token expired"}, status=404)
+    return task, None
+
+
+def send_run_message(task: AgentTask, body) -> tuple[dict, int]:
+    """Send one message as the run; ``(payload, status)``. Shared by the REST
+    endpoint and the run's MCP tool."""
+    from astrolift_agents.services.agent_messages import AgentMessageError, send_agent_message
+
+    try:
+        message, created = send_agent_message(task, body)
+    except AgentMessageError as exc:
+        return {"error": exc.message, "code": exc.code, "field": exc.field}, exc.status
+    record_interaction(
+        task,
+        kind=AgentInteraction.Kind.CONTROL_API,
+        name="message",
+        detail={"message_id": str(message.guid), "kind": message.kind, "created": created},
+    )
+    return {
+        "id": str(message.guid),
+        "thread_id": str(message.thread_id),
+        "kind": message.kind,
+        "recipients": message.recipients.count(),
+        "created": created,
+    }, 201 if created else 200
+
+
+def collect_run_replies(task: AgentTask) -> dict:
+    """Queued answers for the run's agent, handed to this run once."""
+    from astrolift_agents.services.agent_messages import claim_queued_replies, reply_payload
+
+    rows = claim_queued_replies(task)
+    if rows:
+        record_interaction(
+            task,
+            kind=AgentInteraction.Kind.SIGNAL,
+            name="message_replies",
+            detail={"reply_ids": [str(row.guid) for row in rows]},
+        )
+    return {"replies": [reply_payload(row) for row in rows]}
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+@_require_agent_callback_auth
+def agent_messages(request: HttpRequest, task_id: str) -> JsonResponse:
+    """The run talks to people (#2434).
+
+    ``POST`` sends one message as the run: ``{kind, body, title?, to?,
+    teams?, options?, attachments?, thread_id?, reply_to?, request_sequence?,
+    expires_in_seconds?, client_request_id?}``. Only people who can read the
+    agent may be addressed; anyone else refuses the whole send (403). Rate
+    limited per agent (429).
+
+    ``GET`` hands the run the answers queued for its agent (answers to
+    messages whose run had ended), each once. Answers to a running run arrive
+    on its input channel (``input_intent: consume`` on the callback) instead.
+    """
+    task, refusal = _run_task_for_messages(request, task_id)
+    if refusal is not None:
+        return refusal
+    if request.method == "GET":
+        return JsonResponse(collect_run_replies(task))
+    try:
+        content_length = int(request.META.get("CONTENT_LENGTH") or 0)
+    except (TypeError, ValueError):
+        content_length = 0
+    if content_length > _MAX_MESSAGE_BODY_BYTES:
+        return JsonResponse({"error": "message body is too large"}, status=413)
+    try:
+        body = json.loads(request.body, parse_constant=_reject_nonfinite_json)
+    except (RequestDataTooBig, json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid JSON"}, status=400)
+    payload, status = send_run_message(task, body)
+    return JsonResponse(payload, status=status)
+
+
 _MAX_TRANSFER_PROGRESS_BYTES = 512 * 1024
 
 

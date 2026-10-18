@@ -100,6 +100,7 @@ with workflow.unsafe.imports_passed_through():
         list_app_secret_targets,
         mark_app_deregistered,
         mark_app_tearing_down,
+        retire_expired_app_runtime,
         revoke_app_deploy_tokens,
         revoke_app_secret_bundle_refs,
         soft_delete_app_records,
@@ -207,7 +208,7 @@ class DeregisterAppWorkflow:
         # forever and the stuck rows would never finalize. A resume has no
         # accidental first click to undo, so it proceeds straight to the
         # idempotent fan-out.
-        if not already_tearing_down:
+        if not already_tearing_down and not input.skip_grace:
             try:
                 await workflow.wait_condition(
                     lambda: self._cancel_requested,
@@ -265,14 +266,18 @@ class DeregisterAppWorkflow:
         #    comes up while subsequent steps run.
         try:
             namespaces_deleted = await workflow.execute_activity(
-                delete_app_namespaces,
+                retire_expired_app_runtime if input.keep_managed_services else delete_app_namespaces,
                 app_id,
                 start_to_close_timeout=_NAMESPACE_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["deployments_cancelled"] = _step_result(
                 ok=True,
-                detail=f"deleted {len(namespaces_deleted)} namespace(s)",
+                detail=(
+                    f"removed {len(namespaces_deleted)} app runtime object(s); data namespaces retained"
+                    if input.keep_managed_services
+                    else f"deleted {len(namespaces_deleted)} namespace(s)"
+                ),
                 data=namespaces_deleted,
             )
         except Exception as exc:  # noqa: BLE001
@@ -298,6 +303,10 @@ class DeregisterAppWorkflow:
             ms_ids = []
             ms_failed = True
             ms_results.append({"ok": False, "message": str(exc)})
+        if input.keep_managed_services:
+            # Kept for the expiry's grace period (#2433); its timer deletes them.
+            ms_results = [{"ok": True, "managed_service_id": ms_id, "message": "kept"} for ms_id in ms_ids]
+            ms_ids = []
 
         for ms_id in ms_ids:
             # ``list_app_managed_service_ids`` returns EVERY non-soft-deleted
@@ -392,14 +401,18 @@ class DeregisterAppWorkflow:
         #    Idempotent.
         try:
             namespaces_deleted_2 = await workflow.execute_activity(
-                delete_app_namespaces,
+                retire_expired_app_runtime if input.keep_managed_services else delete_app_namespaces,
                 app_id,
                 start_to_close_timeout=_NAMESPACE_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["namespaces"] = _step_result(
                 ok=True,
-                detail=f"second pass: {len(namespaces_deleted_2)} namespace(s)",
+                detail=(
+                    "app runtime rechecked; data namespaces retained"
+                    if input.keep_managed_services
+                    else f"second pass: {len(namespaces_deleted_2)} namespace(s)"
+                ),
                 data=namespaces_deleted_2,
             )
         except Exception as exc:  # noqa: BLE001
@@ -412,7 +425,7 @@ class DeregisterAppWorkflow:
         # 4. Registry repo deprovision + URI clear. Archive on a safe teardown
         #    so the image history survives a re-register; hard-delete only when
         #    the operator opted into force_destroy (the full wipe corner; #1000).
-        archive_repo = not force_destroy
+        archive_repo = not force_destroy and not input.skip_grace
         try:
             repo_summary = await workflow.execute_activity(
                 deprovision_app_registry_repo,

@@ -69,6 +69,8 @@ const APP_FIELDS = gql`
     sourceWebhookInstalledAt
     isArchived
     archivedAt
+    expiresAt
+    deleteDataOnExpiry
     webhookDeploysPaused
     webhookDeploysPausedAt
     webhookDeploysPausedByEmail

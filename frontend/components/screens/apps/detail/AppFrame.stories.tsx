@@ -109,6 +109,31 @@ export const Archived: Story = {
   args: { app: { ...FRAME.app!, archived: true } },
 };
 
+/** A temporary app (#2433) inside its last day: the countdown and one-click extend. */
+export const Temporary: Story = {
+  args: {
+    app: { ...FRAME.app!, expiresAt: new Date(Date.now() + 20 * 3_600_000).toISOString() },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/^Expires in 19h|^Expires in 20h/)).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Extend by one day" })).toBeEnabled();
+  },
+};
+
+/** Without `app.update` the countdown shows and the extend does not. */
+export const TemporaryReadOnly: Story = {
+  args: {
+    ...Temporary.args,
+    canUpdate: false,
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).queryByRole("button", { name: "Extend by one day" })
+    ).toBeNull();
+  },
+};
+
 export const Provisioning: Story = {
   args: { app: { ...FRAME.app!, status: "provisioning", live: false } },
 };

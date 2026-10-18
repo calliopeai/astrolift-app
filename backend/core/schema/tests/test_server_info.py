@@ -147,6 +147,8 @@ class AstroliftServerInfoTest(TestCase):
         # The handshake itself advertises that it exists — clients on
         # old installs can detect handshake-absence by introspection.
         self.assertIn("server_info.handshake", caps)
+        self.assertIn("apps.temporary_expiry", caps)
+        self.assertIn("notifications.structured_inbox", caps)
         # Sorted for stable client-side diffing.
         self.assertEqual(caps, sorted(caps))
         self.assertEqual(set(caps), set(shipped_capabilities()))

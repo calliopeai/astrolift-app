@@ -112,6 +112,15 @@ the caps allow (checked before it is read).
 | `team_slug` | the org's first team | the permission check runs on this team |
 | `environment_name` | `production` | |
 | `domain` | none | a managed domain zone bound to the environment: one of the org's zones or a shared one; any other answers `404` |
+| `expires_in` | none | a new app is temporary and torn down this long after promote: `30m`, `4h`, `7d`, `6w`, `3mo` (#2433) |
+| `expires_at` | none | the same as a time (RFC 3339); give one or the other |
+| `delete_data_on_expiry` | `false` | delete the app's managed services with it instead of keeping them for the organization's grace period |
+
+An expiry under 15 minutes or over the organization's limit (90 days by
+default) answers `400` with the field. When the organization requires an
+expiry for apps Chat Studio creates, a promote without one answers `403`
+with `reason: "ttl_required"`. Re-promoting into an existing app leaves its
+expiry alone; `setAppExpiry` changes it.
 
 Returns `202`:
 
@@ -122,7 +131,8 @@ Returns `202`:
   "app_guid": "<app guid>",
   "app_slug": "sales",
   "app_url": "https://acme-sales.acme.dev.astrolift.io",
-  "data_persistent": false
+  "data_persistent": false,
+  "expires_at": null
 }
 ```
 

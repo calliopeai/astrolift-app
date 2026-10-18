@@ -58,6 +58,8 @@ def describe_brain(app: RegisteredApp) -> dict[str, Any]:
         "slug": app.slug,
         "name": app.name,
         "kind": app.app_kind,
+        "expires_at": app.expires_at.isoformat() if app.expires_at else None,
+        "delete_data_on_expiry": app.delete_data_on_expiry,
         "team": app.team.slug if app.team_id else "",
         "project": app.project.slug if app.project_id else "",
         "environments": environments,

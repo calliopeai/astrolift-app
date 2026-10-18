@@ -240,6 +240,8 @@ describe("semantic layers list (#2320, #2427)", () => {
       image: "ghcr.io/acme/brain-chat:1.0",
       name: "",
       port: 3000,
+      expiresIn: "",
+      deleteDataOnExpiry: false,
     });
   });
 

@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { useTemporaryAppRules } from "../../apps/use-temporary-app-rules";
+import { temporaryAppInput, temporaryAppValid } from "../../apps/temporary-app-model";
+
 import { selectRows } from "@/components/list/select-rows";
 import { useListState } from "@/components/list/use-list-state";
 import { useLocalizedList } from "@/components/list/use-localized-list";
@@ -58,6 +61,7 @@ export function useBrainApps(framed: FramedBrainValue): BrainAppsTabProps {
   );
 
   const [hosting, setHosting] = React.useState(false);
+  const temporary = useTemporaryAppRules({ skip: !hosting });
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
   const projects = useQuery<ProjectsResp>(LIST_PROJECTS, {
@@ -83,7 +87,10 @@ export function useBrainApps(framed: FramedBrainValue): BrainAppsTabProps {
     onDismissHost: () => setHosting(false),
     hostProjects,
     hostSubmitting: hostState.loading,
+    temporary,
     onSubmitHost: async (values: HostBrainAppValues) => {
+      if (temporary.loading || temporary.failed || !temporaryAppValid(values, temporary.rules))
+        return;
       const { data } = await host({
         variables: {
           input: {
@@ -93,6 +100,7 @@ export function useBrainApps(framed: FramedBrainValue): BrainAppsTabProps {
             name: values.name || null,
             slug: null,
             port: values.port,
+            ...temporaryAppInput(values),
           },
         },
       }).catch(() => ({ data: null }));

@@ -72,11 +72,13 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
 )
 from astrolift_operations.schema.mutations.webhooks import WebhookMutations
 from astrolift_operations.schema.mutations.zentinelle import ZentinelleInstallMutations, ZentinelleMutations
+from astrolift_operations.schema.notification_quiet_hours import NotificationQuietHoursMutation
 from astrolift_operations.schema.zentinelle_reads import ZentinelleReadsMutations
 
 
 @strawberry.type
 class OperationsMutation(
+    NotificationQuietHoursMutation,
     InstallAlertMailMutation,
     WebhookMutations,
     NotificationMutations,

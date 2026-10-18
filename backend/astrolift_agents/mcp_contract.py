@@ -528,8 +528,32 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
                 "name": {"type": "string"},
                 "slug": {"type": "string"},
                 "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+                "expires_in": {"type": "string", "description": "Temporary app: 30m, 4h, 7d, 6w or 3mo."},
+                "expires_at": {"type": "string", "format": "date-time"},
+                "delete_data_on_expiry": {"type": "boolean"},
             },
             required=("brain_slug", "project_id", "image"),
+        ),
+    },
+    "astrolift_set_app_expiry": {
+        "description": (
+            "Set, extend (extend_by from the current expiry), shorten or clear a temporary app's expiry "
+            "(#2433); give exactly one. clear makes the app permanent and is refused for agents unless "
+            "the organization's app.expiry.clear rule allows agents."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS,),
+        "permission": Permission.APP_UPDATE,
+        "inputSchema": _schema(
+            {
+                "slug": {"type": "string"},
+                "expires_in": {"type": "string", "description": "From now: 30m, 4h, 7d, 6w or 3mo."},
+                "expires_at": {"type": "string", "format": "date-time"},
+                "extend_by": {"type": "string", "description": "Added to the current expiry."},
+                "clear": {"type": "boolean"},
+                "delete_data_on_expiry": {"type": "boolean"},
+            },
+            required=("slug",),
         ),
     },
     "astrolift_unshare_brain": {

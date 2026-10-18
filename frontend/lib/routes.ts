@@ -8,6 +8,7 @@ export const routeLabels: Record<string, string> = {
   deployments: "Deployments",
   workflows: "Workflows",
   approvals: "Approvals",
+  inbox: "Inbox",
   ops: "Operations",
   downloads: "Downloads",
   logs: "Logs",

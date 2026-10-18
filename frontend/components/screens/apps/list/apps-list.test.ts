@@ -17,8 +17,14 @@ function varsFor(qs: string) {
 }
 
 describe("APPS_LIST", () => {
-  it("leads with All and Mine, then Failing and Archived, on numbered pages", () => {
-    expect(APPS_LIST.views.map((v) => v.label)).toEqual(["All", "Mine", "Failing", "Archived"]);
+  it("leads with All and Mine, then Failing, Archived and Temporary, on numbered pages", () => {
+    expect(APPS_LIST.views.map((v) => v.label)).toEqual([
+      "All",
+      "Mine",
+      "Failing",
+      "Archived",
+      "Temporary",
+    ]);
     expect(APPS_LIST.paging).toBe("numbered");
     expect(APPS_LIST.views.find((v) => v.key === "mine")?.note).toMatch(/until apps record/);
   });
@@ -43,6 +49,18 @@ describe("APPS_LIST", () => {
       pageSize: 25,
     });
     expect(vars.filter).toEqual({ appKind: ["mimwell"] });
+  });
+
+  it("sends the Temporary view as the temporary filter (#2433)", () => {
+    const view = APPS_LIST.views.find((v) => v.key === "temporary");
+    const vars = appsPageVariables({
+      q: "",
+      filters: { ...view?.filters },
+      sort: [],
+      page: 1,
+      pageSize: 25,
+    });
+    expect(vars.filter).toEqual({ temporary: true });
   });
 });
 

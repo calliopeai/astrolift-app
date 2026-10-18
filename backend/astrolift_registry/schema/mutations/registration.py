@@ -240,6 +240,32 @@ class RegistrationMutations:
                 field="manifestRaw",
             )
 
+        # Temporary apps (#2433): the expiry from the input, else the inline
+        # manifest's ``[app] expires_in``, inside the organization's policy.
+        from astrolift_registry import expiry
+
+        try:
+            expires_at = expiry.resolve(
+                project.organization, expires_in=input.expires_in, expires_at=input.expires_at
+            )
+        except expiry.ExpiryError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
+        if expires_at is None:
+            try:
+                expires_at = expiry.resolve(
+                    project.organization,
+                    expires_in=expiry.manifest_expires_in(eff_manifest_raw),
+                    expires_at=None,
+                )
+            except expiry.ExpiryError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value, f"[app] expires_in: {exc}", field="manifestRaw"
+                )
+        if expires_at is None:
+            refusal = expiry.permanent_refusal(project.organization)
+            if refusal is not None:
+                return gql_failure(ErrorCode.PERMISSION_DENIED.value, refusal, field="expiresIn")
+
         from astrolift_registry.namespaces import namespace_refusal
 
         _ns_refusal = namespace_refusal(
@@ -255,6 +281,7 @@ class RegistrationMutations:
             return gql_failure(ErrorCode.CONFLICT.value, _host_refusal, field="slug")
         app = RegisteredApp.objects.create(
             organization=project.organization,
+            created_by_id=tenant.actor_user_id,
             team=project.team,
             project=project,
             name=eff_name,
@@ -274,6 +301,8 @@ class RegistrationMutations:
             build_args=build_args,
             trigger_mode=trigger_mode,
             cron_expression=cron_expression,
+            expires_at=expires_at,
+            delete_data_on_expiry=bool(input.delete_data_on_expiry),
             k8s_namespace=app_namespace(
                 organization_slug=project.organization.slug,
                 app_slug=eff_slug,
@@ -397,6 +426,8 @@ class RegistrationMutations:
             )
             bootstrap_fields.append("build_context")
         app.save(update_fields=bootstrap_fields)
+        # A manifest fetched from the repo can still make it temporary (#2433).
+        expiry.started(app, actor_user_id=tenant.actor_user_id if tenant else None)
 
         with allow_project_attach(actor_may_attach_project_services(app)):
             _bootstrap_app_environments(app, [])

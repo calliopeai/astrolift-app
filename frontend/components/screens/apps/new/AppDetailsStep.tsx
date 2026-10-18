@@ -13,6 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { TemporaryAppFields } from "../TemporaryAppFields";
+import type { TemporaryAppPolicyState } from "../temporary-app-model";
+import { manifestExpiry } from "../temporary-app-model";
+
 import { cn } from "@/lib/utils";
 
 import type { AppDetailsFields, useAppDetailsStep } from "./use-app-details-step";
@@ -26,9 +30,11 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-export type AppDetailsStepViewProps<S extends AppDetailsFields> = ReturnType<
-  typeof useAppDetailsStep
+export type AppDetailsStepViewProps<S extends AppDetailsFields> = Omit<
+  ReturnType<typeof useAppDetailsStep>,
+  "temporary"
 > & {
+  temporary?: TemporaryAppPolicyState;
   state: S;
   setState: React.Dispatch<React.SetStateAction<S>>;
 };
@@ -41,6 +47,7 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
   allProjects,
   slugValid,
   projectsLoading = false,
+  temporary,
 }: AppDetailsStepViewProps<S>) {
   // Local "team" selection is informational — it filters the project
   // list. The mutation takes a `projectId`, not a `teamId`. We default
@@ -55,6 +62,15 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
 
   return (
     <div className="flex flex-col gap-5">
+      <TemporaryAppFields
+        value={state}
+        onChange={(value) => setState((s) => ({ ...s, ...value }))}
+        rules={temporary?.rules ?? null}
+        loading={temporary?.loading}
+        failed={temporary?.failed}
+        onRetry={temporary?.onRetry}
+        inherited={state.manifestLater ? "" : manifestExpiry(state.manifestRaw ?? "")}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="name">
