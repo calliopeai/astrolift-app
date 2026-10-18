@@ -25,6 +25,55 @@ The only Zentinelle concept is `ZentinelleConnection`
 (`astrolift_operations/models/zentinelle_connection.py`), a link to a Zentinelle
 reached by URL and an enrollment code. Nothing models the Workbench.
 
+### Hosting and integration are separate axes
+
+Product decision (Leo, 2026-10-18). Source of the topology model: the public
+Deployment Blueprint (https://calliope.ai/blueprint/), sheet 03, "Deployment
+topologies", whose five patterns are Standalone, Workbench on Astrolift, Zentinelle
+in Astrolift, The Full Loop and Mesh. Where a product runs and what it is
+integrated with are independent.
+
+- **Hosting, per product.** The Workbench is hosted inside this Astrolift
+  (`terraform/k8s/workbench-serving`; the Blueprint's Workbench on Astrolift) or
+  elsewhere; Zentinelle is hosted inside this Astrolift
+  (`terraform/k8s/zentinelle-serving`; Zentinelle in Astrolift) or elsewhere (its
+  own ECS stack, as on CONFLICT, or another account; Standalone). Each choice is
+  independent; both can run side by side in the same Astrolift.
+- **Zentinelle integration, per target.** Zentinelle is integrated with
+  Astrolift (this organization's `ZentinelleConnection` is live), with the
+  Workbench, with both, or with neither, wherever each product is hosted.
+  Integration is what closes the loop.
+- **The Workbench has no Astrolift integration.** Beyond being deployed on
+  Astrolift it has few ties to it. Astrolift shows a hosted Workbench deployment
+  (version, health, hub URL) and nothing more; this design models no
+  Workbench-to-Astrolift link.
+
+Common combinations, in the Blueprint's pattern names:
+
+| Install | Blueprint pattern | Workbench hosted | Zentinelle hosted | Zentinelle integrated with |
+|---|---|---|---|---|
+| Self-contained | The Full Loop | in this Astrolift | in this Astrolift | Astrolift and the Workbench |
+| CONFLICT today | Standalone, per product | elsewhere | elsewhere (ECS) | Astrolift and the Workbench |
+| Zentinelle for the Workbench only | Zentinelle in Astrolift | elsewhere | in this Astrolift | the Workbench only |
+
+Each surface follows one axis:
+
+1. **Secure › Zentinelle** (nav item and page) follows only the
+   Zentinelle-to-Astrolift integration: shown when the connection is live,
+   wherever Zentinelle runs. When the connected Zentinelle is also a product
+   deployment on this Astrolift (matched by URL), the page links to that
+   deployment. A separate PR adds the integration-gated nav item.
+2. **Product deployments** (this design) follow only hosting, per product. A
+   hosted Zentinelle shows in cluster and project views whether or not it is
+   connected; not connected, the view offers Connect with its URL prefilled
+   (enrollment code and step-up unchanged). A hosted Zentinelle's view also says,
+   read-only, which products it is integrated with (section 7). On a
+   self-contained install the installer's Enable integration
+   (`zentinelle-astrolift`) already connects it.
+3. **The data model keeps them apart.** `ProductDeployment` and
+   `ZentinelleConnection` stay separate objects with an optional link matched by
+   URL. Neither creates, changes or deletes the other.
+
 ## 2. Decision: how Astrolift learns of them
 
 **Recommended: Astrolift discovers labelled namespaces.** The installer writes a
@@ -72,7 +121,8 @@ What it costs, and the answer:
 ## 3. The Deployment primitive
 
 A **product deployment** is a Calliope AI product the Deployment Manager runs on
-an Astrolift cluster: one namespace, one product kind.
+an Astrolift cluster: one namespace, one product kind. It is the hosting axis
+(section 1) and says nothing about integration.
 
 | Field | Source | Notes |
 |---|---|---|
@@ -88,7 +138,7 @@ an Astrolift cluster: one namespace, one product kind.
 | `workloads` | annotation `calliope.ai/workloads` | Deployments health is read from |
 | `health` | derived | `healthy` (every workload ready = desired), `degraded` (some ready), `down` (a workload at zero ready), `unknown` (cluster offline, scan failed) |
 | `project` | **Astrolift-owned** | section 6 |
-| `zentinelle_connection` | **Astrolift-owned** | section 7 |
+| `zentinelle_connection` | **Astrolift-owned** | Zentinelle only: optional link to a separate `ZentinelleConnection`, matched by URL; section 7 |
 | `first_seen_at`, `last_seen_at`, `gone_at` | the scan | `gone_at` set when a successful scan no longer finds the namespace |
 
 Read-only from Astrolift: no field the cluster supplies is editable here; no
@@ -100,7 +150,9 @@ records about the deployment, not changes to it.
 `ProductDeployment(BaseCoreModel)` in `astrolift_clusters/models/product_deployment.py`:
 `cluster` (FK `TenantCluster`, cascade), the fields above, `project` (FK
 `astrolift_identity.Project`, null, `SET_NULL`), `zentinelle_connection` (FK
-`astrolift_operations.ZentinelleConnection`, null, `SET_NULL`), `last_scan_error`.
+`astrolift_operations.ZentinelleConnection`, null, `SET_NULL`; set only by the
+URL match in section 7, never by creating or editing a connection),
+`last_scan_error`.
 Unique live row per `(cluster, namespace)`. A namespace recreated under the same
 name (new uid, same kind and deployment) keeps its row, so a reinstall keeps its
 project link.
@@ -173,9 +225,11 @@ access to the product itself; the hub and Zentinelle keep their own sign-in.
 
 ## 7. Wiring Zentinelle
 
-An in-cluster Zentinelle should satisfy the organization's `ZentinelleConnection`
-without the operator typing its URL. Connecting today
-(`zentinelle_connect.connect`) exchanges a one-time enrollment code for the
+A hosted Zentinelle and the organization's `ZentinelleConnection` are separate
+objects (section 1). Discovery never creates, satisfies or replaces a
+connection; it records whether the live connection points at this deployment
+and, when none does, saves the operator typing the URL. Connecting stays
+`zentinelle_connect.connect`: it exchanges a one-time enrollment code for the
 install credential and is behind `zentinelle.connect` and step-up elevation. The
 labels can say where Zentinelle is; they cannot carry the code, and should not.
 
@@ -183,9 +237,24 @@ Per discovered Zentinelle deployment, the link step decides one state:
 
 | State | When | What happens |
 |---|---|---|
-| `connected` | the owning connection's `base_url` matches `endpoints.api` (normalized) | link the row; the Zentinelle screen says "in-cluster, on <cluster>" |
-| `available` | no connection exists for the owner | the Zentinelle screen shows "Zentinelle found on <cluster>" with Connect prefilled: URL from `endpoints`, gateway URL from `endpoints.api_internal` once the contract carries it. The admin pastes the enrollment code and passes step-up. |
-| `other_connection` | a connection exists to a different Zentinelle | show both; never rewire on our own |
+| `connected` | the owning connection's `base_url` matches `endpoints.api` (normalized) | link the row; the deployment view shows "Integrated with Astrolift"; Secure › Zentinelle links to the deployment |
+| `available` | no live connection for the owner | the deployment view (cluster card, project section, sheet) offers Connect prefilled: URL from `endpoints`, gateway URL from `endpoints.api_internal` once the contract carries it. The admin pastes the enrollment code and passes step-up. Secure › Zentinelle stays hidden until the connection is live. |
+| `other_connection` | the owner is connected to a different Zentinelle | the deployment shows as not integrated with Astrolift; Secure › Zentinelle shows the connected one, with no deployment link. Never rewire on our own. |
+
+On a self-contained install the installer's Enable integration
+(`zentinelle-astrolift`) connects Zentinelle during the install, so the first
+scan finds `connected` and offers nothing.
+
+**Integrated with, read-only.** A hosted Zentinelle's view lists the products it
+is integrated with, as information, never as a control:
+
+- Astrolift: from the link state above.
+- The Workbench: from the install record (`zentinelle-workbench`) or
+  Zentinelle's `agent_host` endpoint. How Astrolift reads either is open
+  (section 10, Q9); until then the view shows the Astrolift line only.
+
+A hosted Workbench gets no equivalent: there is no Workbench-to-Astrolift
+integration to show.
 
 The owner is the cluster's organization; for a shared cluster it is the install
 connection (`organization` null), which only the platform operator connects
@@ -234,6 +303,11 @@ type AstroliftProductDeployment {
 
 No field carries a secret; endpoints are the URLs the products already publish.
 
+The link is readable from both sides and stored once:
+`AstroliftZentinelleConnection` gains `productDeployment:
+AstroliftProductDeployment` (null when the connected Zentinelle is hosted
+elsewhere), so Secure › Zentinelle can link to the deployment.
+
 ### Queries
 
 | Field | Permission and scope | Rows |
@@ -278,13 +352,15 @@ pages, each view fits about two screens and fetches only what is visible.
 |---|---|---|
 | Cluster detail, Status tab | A **Calliope AI products** card above the workload table: up to five rows (kind mark, deployment name, health dot, version or short digest, Open hub / Open console), "View all" past five. Distinct from user apps: own card, a "Managed by the Deployment Manager" tag, no deploy, scale or delete actions. Workload table rows in product namespaces carry the product tag. | `components/screens/clusters/products/ClusterProductsCard.tsx` |
 | Project detail | A **Calliope AI products** section between agents and apps, rendered only when the project has one. Same row component. | `components/screens/projects/ProjectProductDeployments.tsx` |
-| Detail | A side sheet, not a page: images declared and running (drift flagged), workloads with ready counts, endpoints, contract version, Zentinelle link state, project assignment (when permitted), first and last seen. | `components/screens/clusters/products/ProductDeploymentSheet.tsx` |
-| Zentinelle screen | "Zentinelle found on <cluster>" banner with prefilled Connect, or "in-cluster, on <cluster>" on a matched connection. | `components/screens/secure/ZentinelleConnection.tsx` |
+| Detail | A side sheet, not a page: images declared and running (drift flagged), workloads with ready counts, endpoints, contract version, project assignment (when permitted), first and last seen. Zentinelle only: "Integrated with" (read-only) and, when not connected, prefilled Connect. | `components/screens/clusters/products/ProductDeploymentSheet.tsx` |
+| Secure › Zentinelle | Shown only with a live connection (separate PR). On a URL match, a "Hosted on <cluster>" line that opens the deployment sheet. No banner for an unconnected hosted Zentinelle; that offer lives on the deployment. | `components/screens/secure/ZentinelleConnection.tsx` |
 
 Stories, written before the screens are wired: healthy, degraded, down, unknown
 (cluster offline), unsupported contract, gone, no endpoints, shared cluster
 unassigned (operator view), Zentinelle connected / available / other connection,
-drift between declared and running image, the card with six rows ("View all").
+Workbench and Zentinelle side by side on one cluster, Secure › Zentinelle with and
+without a hosted deployment, drift between declared and running image, the card
+with six rows ("View all").
 
 ## 10. Open questions
 
@@ -317,11 +393,17 @@ drift between declared and running image, the card with six rows ("View all").
 8. **Today's display.** Confirm with calliope-installer#389 (`conflict-two`)
    what the UI and API show for these namespaces now, and whether anything is
    misleading enough to fix before this lands.
+9. **Zentinelle-to-Workbench integration source.** The "Integrated with" line
+   for the Workbench needs a read Astrolift can make: the install record's
+   `zentinelle-workbench` integration (not in the namespace contract, which
+   carries hosting only), or Zentinelle's `agent_host` endpoint (needs a
+   Zentinelle-side read). Pick one before the line ships.
 
 ## 11. Delivery order
 
 1. Contract version 1 in calliope-installer (drafted with this document).
-2. Storybook: row, card, sheet, project section, Zentinelle banner, every state.
+2. Storybook: row, card, sheet, project section, Connect offer, Secure ›
+   Zentinelle deployment link, every state.
 3. Model, driver `list_namespaces`, scan activity and schedule, tests (RBAC
    contract test, tenancy tests for shared clusters).
 4. GraphQL types, queries, mutations; schema regeneration; MCP read tool.
