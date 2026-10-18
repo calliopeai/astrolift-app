@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from pathlib import Path
-import re
-
 
 _WORKFLOWS = Path(__file__).resolve().parents[3] / ".github" / "workflows"
 _USES = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)")
