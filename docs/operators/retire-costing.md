@@ -17,7 +17,11 @@ Publish the backend and clients as one reviewed release. The removed GraphQL
 queries are `astroliftBudgets`, `astroliftCostSnapshots`, `astroliftCostTrend`,
 `astroliftCostForecast`, `astroliftCostByBinding` and
 `astroliftManagedServiceCostPreview`. Zentinelle usage no longer exposes
-`costUsd`; preview detail no longer exposes monetary estimate fields.
+`costUsd`. Health no longer exposes `budgets` or the `AstroliftZentinelleBudget`
+type; availability, block/approval counts and gateway/server observations remain.
+Only the typed operational health projection is cached under a new cache key;
+earlier raw-response entries are ignored and expire normally. Preview detail no
+longer exposes monetary estimate fields.
 `includeRuntimeResources` replaces `includeRuntimeCost` on the existing exact
 preview read, with capability `previews.explicit_runtime_resources`. Its
 CPU/memory/pod observations and explicit runtime status remain; list reads do
