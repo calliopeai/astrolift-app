@@ -489,7 +489,7 @@ export const FEATURES: FeaturesScreenProps = {
       description: "Show Zentinelle governance surfaces and route agents through its gateway.",
     },
     {
-      key: "admin.cost_enabled",
+      key: "admin.quotas_enabled",
       enabled: false,
       description: "Expose the cost explorer to organization admins.",
     },

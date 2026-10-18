@@ -183,7 +183,7 @@ Astrolift's built-in roles cover most teams. Reach for policies when you need so
 - Only senior engineers can deploy to apps named prod-* .
 - Nobody can write secrets between 22:00 and 06:00 UTC unless they're paged.
 - Pre-production deploys require an MFA factor that's less than 60 minutes old.
-- Contractors can read everything in a project but can't mutate anything that touches billing.
+- Contractors can read everything in a project but cannot change resource quotas.
 ## Prerequisites
 - Permission. policy.create (Owner and Admin have it).
 - Mental model of ABAC vs RBAC. RBAC asks “does this user's role include this permission?” ABAC asks “given the attributes of this request (who, what, when, where), does any policy say deny ?” A request only succeeds if RBAC allows it and no policy denies it.

@@ -130,7 +130,7 @@
     "slug": "标识符",
     "team": "团队",
     "created": "创建时间",
-    "renameNote": "项目重命名将在后端变更上线后提供；标识符特意设为不可更改，以便重命名后下游成本分摊保持稳定。",
+    "renameNote": "后端变更操作实现后将支持项目重命名；为保持现有资源引用稳定，标识符不可更改。",
     "dangerZone": "危险操作",
     "dangerZoneDescription": "软删除会将此项目从列表中移除。关联的工作负载在重新分配前仍然可见。",
     "deleteProject": "删除项目",
@@ -188,13 +188,13 @@
     "team": "团队",
     "created": "创建时间",
     "title": "项目",
-    "context": "将部署节奏、域名或技术栈相同的应用归为一组。成本报告在此层级汇总。",
+    "context": "将部署节奏、域名或技术栈相同的应用归为一组。",
     "newProject": "新建项目",
     "edit": "编辑",
     "delete": "删除",
     "empty": "暂无项目",
     "emptyNoTeams": "请先创建团队；项目隶属于团队。",
-    "emptyDescription": "将应用归入项目，便于汇总成本和配额。",
+    "emptyDescription": "将相关应用归入项目并管理共享访问权限。",
     "manageTeams": "管理团队",
     "deleteTitle": "删除项目 {team}/{project}？",
     "deleteTitleGeneric": "删除项目？",
@@ -877,7 +877,7 @@
     "exampleSenior": "只有高级工程师可以部署名为 <code>prod-*</code> 的应用。",
     "exampleNight": "除非被告警呼叫，否则 UTC 22:00 至 06:00 之间任何人都不能写入密钥。",
     "exampleMfa": "预生产部署要求 60 分钟内完成的 MFA 验证。",
-    "exampleContractors": "外包人员可以读取项目中的所有内容，但不能修改任何涉及计费的内容。",
+    "exampleContractors": "外部承包人员可以读取项目中的所有内容，但不能更改资源配额。",
     "prerequisitesTitle": "先决条件",
     "prereqPermission": "<strong>权限。</strong><code>policy.create</code>(Owner 和 Admin 拥有)。",
     "prereqModel": "<strong>理解 ABAC 与 RBAC。</strong>RBAC 问的是“该用户的角色是否包含此权限？”ABAC 问的是“根据此请求的属性(谁、做什么、何时、何地)，是否有任何策略判定为<em>拒绝</em>？”只有 RBAC 允许且没有策略拒绝时，请求才会成功。",
@@ -1679,10 +1679,6 @@
         "1d": "+1 天",
         "7d": "+7 天"
       },
-      "costPerDay": "{cost}/天",
-      "costUnavailable": "费用不可用",
-      "costTooltip": "{pods, plural, one {# 个 Pod} other {# 个 Pod}} · 根据实时云价格计算为 {cost}/天",
-      "costTooltipUnavailable": "{pods, plural, one {# 个 Pod} other {# 个 Pod}} · 此集群的费用 API 不可用",
       "staleBadge": "过期",
       "tearDown": "销毁",
       "footer": "每个应用保留 {count, plural, one {# 个活跃预览环境} other {# 个活跃预览环境}} · 过期阈值为 {days, number} 天。",
@@ -1752,14 +1748,7 @@
         "hoursMinutes": "{hours, number}小时 {minutes, number}分钟",
         "minutes": "{minutes, number}分钟"
       },
-      "spend": {
-        "daily": "每日费用",
-        "monthly": "本月（预计）",
-        "approximate": "近似值",
-        "priced": "{total, number} 个预览中有 {priced, number} 个已定价",
-        "unpriced": "此集群的驱动未为 {count, number} 个预览定价",
-        "overcount": "{count, number} 个预览按服务内全部 SKU 汇总定价，因此总额偏高"
-      }
+      "resourceTooltip": "{pods} 个 Pod"
     },
     "observability": {
       "scope": {
@@ -5542,12 +5531,10 @@
         "cpu": "vCPU（总计）",
         "memory": "内存（总计）",
         "pods": "Pod 数",
-        "dailyCost": "预估每日费用",
-        "approximate": "近似值",
         "environment": "环境",
-        "loadResources": "加载资源和费用",
-        "resourcesUnavailable": "当前资源用量和预估费用不可用。",
-        "resourcesNotRequested": "需要时可加载当前资源用量和预估费用。",
+        "loadResources": "加载资源",
+        "resourcesUnavailable": "当前资源使用情况不可用。",
+        "resourcesNotRequested": "需要时加载当前资源使用情况。",
         "previewLogs": "预览日志",
         "loadLogs": "加载日志",
         "logsEmpty": "此时间段内没有日志。",
@@ -7379,12 +7366,6 @@
       "recipeSlug": "代理配置方案标识",
       "consumerContext": "使用方必须与此资源属于同一项目和集群。",
       "attach": "关联",
-      "costUnavailable": "价格信息不可用。",
-      "costMonthly": "每月 {amount}",
-      "costApproximate": "每月约 {amount}",
-      "costFetched": "价格获取时间：{at}",
-      "costSource": "价格来源",
-      "costPreview": "预览费用",
       "reprovision": "重新预配",
       "deprovision": "取消预配",
       "actionRefused": "操作被拒绝。请核对资源及您当前的权限。",
@@ -7579,14 +7560,6 @@
       "sentToday": "今日已发送",
       "ofQuota": "24 小时配额的 {pct}%",
       "nearCeiling": "24 小时配额的 {pct}%，接近每日上限"
-    },
-    "cost": {
-      "title": "成本",
-      "empty": "此服务尚无归属的成本数据。成本驱动程序执行下一次对账后将显示成本。",
-      "thisMonth": "本月",
-      "monthToDate": "本月至今",
-      "last30": "过去 30 天",
-      "trailing30": "近 30 天支出"
     },
     "identity": {
       "title": "身份验证",
@@ -8351,7 +8324,7 @@
           "provider_plugin": "提供商",
           "scm": "源码管理",
           "audit_log": "审计日志",
-          "billing": "账单",
+          "billing": "资源配额",
           "zentinelle": "Zentinelle",
           "admin": "管理"
         }
@@ -9406,7 +9379,6 @@
         "metricsReadUnavailable": "无法读取用量数据。",
         "metricsScope": "跨所有使用方的部署汇总，并非各应用流量。",
         "metricsSetup": "指标配置",
-        "costUnavailable": "没有实测用量和定价信息，无法获取费用。",
         "selectApp": "选择应用",
         "appSearch": "搜索应用",
         "appsEmpty": "没有符合条件的应用",
@@ -9439,7 +9411,7 @@
         "empty": "此时间范围内没有流量样本。",
         "unconfigured": "尚未配置此订阅的流量采集。",
         "bytes": "提供模型的应用已接受的响应字节数；不是模型令牌数，也不代表网络交付已确认。",
-        "unsupported": "不支持输入/输出令牌数及费用。",
+        "unsupported": "此处不支持输入和输出令牌观测。",
         "boundary": "即使 HTTP 状态为 200，失败的流也可能计为错误。",
         "requests": "每秒请求数",
         "errors": "每秒错误请求数",
@@ -9608,8 +9580,8 @@
         "inferenceUnknown": "尚未验证推理访问权限。",
         "traffic": "应用流量和延迟",
         "trafficUnsupported": "此处不支持原生模型的流量和延迟观测。缺少观测并不表示流量为零。",
-        "tokensCost": "令牌和费用",
-        "tokensCostUnsupported": "此处不支持令牌用量和费用观测。"
+        "tokens": "令牌",
+        "tokensUnsupported": "此处不支持令牌使用量观测。"
       },
       "bindingHelp": "原生应用绑定使用云身份。已应用的绑定修订并不验证模型的推理访问权限。",
       "connect": {
@@ -10529,7 +10501,7 @@
       },
       "agents": {
         "title": "智能体",
-        "description": "用于构建和运行智能体：失败和进行中的运行、您的智能体及费用。"
+        "description": "用于构建和运行智能体：失败和正在进行的运行，以及你的智能体。"
       },
       "builder": {
         "title": "开发",
@@ -10537,7 +10509,7 @@
       },
       "operator": {
         "title": "运维",
-        "description": "用于维护平台：告警、集群、平台活动和配额。"
+        "description": "用于平台运维：告警、集群和平台活动。"
       }
     },
     "panels": {
@@ -10549,15 +10521,14 @@
       "failed-runs": "失败的运行",
       "running-now": "正在运行",
       "my-agents": "我的智能体",
-      "runs-spend": "运行与费用",
+      "runs-spend": "运行历史",
       "activity": "活动",
       "kpis": "关键指标",
       "deployments": "部署",
       "agent-runs": "智能体运行",
       "alerts": "告警",
       "clusters": "集群",
-      "platform-activity": "平台活动",
-      "spend-quota": "费用与配额"
+      "platform-activity": "平台活动"
     },
     "copy": {
       "auditLog": "审计日志",
@@ -10617,16 +10588,7 @@
       "noRunReason": "未记录此运行的原因。",
       "timedOut": "已超时。",
       "noReason": "未记录原因。",
-      "monthToDate": "本月至今",
-      "ofBudget": "预算 {amount} · {percentage}",
-      "spent": "已花费",
-      "projected": "预计",
-      "budget": "预算",
       "legend": "图例",
-      "budgetReadFailed": "无法加载预算：{message}",
-      "noBudget": "未设置组织预算，因此没有可用于比较费用的配额。",
-      "spendAgainstBudget": "{panel}：预算使用情况",
-      "spendBudgetValue": "预算 {budget} 中已花费 {spent}",
       "last24Hours": "过去24小时",
       "app": "应用",
       "pickApp": "选择应用",
@@ -10647,14 +10609,12 @@
       "last7Days": "过去7天",
       "runsPerDay": "每天的智能体运行数",
       "failedPerDay": "每天失败的运行数",
-      "spendPerDay": "每天的组织费用",
       "sevenDays": "7天",
-      "spendReadFailed": "无法加载费用：{message}",
       "cappedRuns": "根据最近的运行统计；本周还有更多运行。",
-      "kpiWindow": "过去 {count, number} 天 · 本月至今的费用",
+      "kpiWindow": "过去 {count, number} 天",
       "kpiAria": "{panel}，过去 {count, number} 天",
       "noKpisTitle": "没有您可访问的指标",
-      "noKpisDescription": "您可查看的区域将显示部署、运行和费用指标。",
+      "noKpisDescription": "显示你有权访问的区域的部署和运行指标。",
       "noProject": "无项目"
     },
     "health": {
@@ -10703,11 +10663,9 @@
       "runs": "运行",
       "success": "成功率",
       "p95": "p95",
-      "spend": "费用",
       "runsHint": "智能体运行",
       "successHint": "部署占比",
-      "p95Hint": "部署时间",
-      "spendHint": "本月至今"
+      "p95Hint": "部署时间"
     },
     "period": {
       "monthly": "每月",
@@ -14665,7 +14623,7 @@
   },
   "zentinelleScreen": {
     "title": "安全 · Zentinelle",
-    "description": "将此组织连接到 Zentinelle,用于智能体治理、用量与成本、策略和审计。",
+    "description": "将此组织连接到 Zentinelle，以管理智能体治理、令牌使用情况、策略和审计。",
     "noAccess": "无 Zentinelle 访问权限",
     "noAccessBody": "你的角色在这里没有任何 Zentinelle 权限。请向组织管理员申请 Zentinelle 权限。",
     "error": "无法读取 Zentinelle 连接",
@@ -14676,7 +14634,7 @@
     "tabs": {
       "overview": "概览",
       "clusters": "集群",
-      "usage": "用量与成本",
+      "usage": "使用情况",
       "policies": "策略",
       "audit": "审计"
     },
@@ -14727,7 +14685,6 @@
       "gatewaysValue": "{healthy} / {total} 个",
       "agents": "本月观测到的智能体",
       "requests": "模型请求(最近 24 小时)",
-      "spend": "本月支出",
       "usageError": "无法从 Zentinelle 读取用量",
       "clustersTitle": "各集群的网关状况",
       "clustersDescription": "每个已注册集群的 Zentinelle 网关。",
@@ -14772,7 +14729,6 @@
       "error": "无法从 Zentinelle 读取用量",
       "requests": "模型请求",
       "tokens": "已用令牌",
-      "cost": "模型成本",
       "title": "按智能体和模型",
       "empty": "此时间范围内没有模型用量。",
       "noAgent": "(无智能体)",

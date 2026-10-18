@@ -20,9 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 import type { ListProjectResourceAttachmentsPageQuery } from "@/graphql/__generated__/operations";
-import type { ManagedServiceCostPreview } from "./use-project-resources";
 import type { ProjectManagedResource } from "./ProjectManagedResourceList";
-import { ManagedResourceCost } from "./ManagedResourceCost";
 
 export type ManagedResourceAttachment = NonNullable<
   ListProjectResourceAttachmentsPageQuery["astroliftProjectManagedServiceAttachmentsPage"]
@@ -37,11 +35,6 @@ export interface ManagedResourceDetailProps {
   onRefresh: () => void;
   attachments: CursorTableController<ManagedResourceAttachment>;
   canUpdate: boolean;
-  canPreview: boolean;
-  cost?: ManagedServiceCostPreview;
-  costLoading: boolean;
-  costError: boolean;
-  onCost: () => void;
   mutationLoading: boolean;
   onReprovision: () => void;
   onDeprovision: () => void;
@@ -184,11 +177,6 @@ export function ManagedResourceDetail(props: ManagedResourceDetailProps) {
                   <RefreshCwIcon className="size-4" />
                   {copy("refresh")}
                 </Button>
-                {props.canPreview && (
-                  <Button variant="outline" disabled={props.costLoading} onClick={props.onCost}>
-                    {copy("costPreview")}
-                  </Button>
-                )}
                 {props.canUpdate && (
                   <>
                     <Button variant="outline" disabled={busy} onClick={props.onReprovision}>
@@ -200,12 +188,6 @@ export function ManagedResourceDetail(props: ManagedResourceDetailProps) {
                   </>
                 )}
               </div>
-              {props.costError && (
-                <p role="alert" className="text-muted-foreground text-sm">
-                  {copy("costUnavailable")}
-                </p>
-              )}
-              {props.cost && <ManagedResourceCost preview={props.cost} />}
               <ListPage
                 embedded
                 list={attachmentList}

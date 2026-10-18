@@ -114,7 +114,6 @@ export const USAGE_ROWS: ZentinelleUsageRow[] = [
     requests: 1842,
     inputTokens: 3_120_400,
     outputTokens: 412_900,
-    costUsd: 15.56,
   },
   {
     agentSlug: "release-notes",
@@ -123,7 +122,6 @@ export const USAGE_ROWS: ZentinelleUsageRow[] = [
     requests: 214,
     inputTokens: 402_000,
     outputTokens: 96_500,
-    costUsd: 0.83,
   },
   {
     agentSlug: "a-very-long-agent-slug-that-belongs-to-the-platform-reliability-team",
@@ -132,7 +130,6 @@ export const USAGE_ROWS: ZentinelleUsageRow[] = [
     requests: 9,
     inputTokens: 18_000,
     outputTokens: 2_100,
-    costUsd: 0.02,
   },
 ];
 
@@ -148,8 +145,8 @@ export const POLICIES: ZentinellePolicy[] = [
   },
   {
     id: "pol_2",
-    name: "Monthly model budget",
-    policyType: "budget",
+    name: "Human oversight",
+    policyType: "human_oversight",
     enforcement: "warn",
     scope: "tenant",
     priority: 50,

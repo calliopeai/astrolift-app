@@ -33,7 +33,7 @@ describe("home registry", () => {
       "Failed runs",
       "Running now",
       "My agents",
-      "Runs & spend",
+      "Run history",
     ]);
     expect(titles("builder")).toEqual([
       "Waiting on you",
@@ -48,7 +48,6 @@ describe("home registry", () => {
       "Clusters",
       "Waiting on you",
       "Platform activity",
-      "Spend & quota",
     ]);
   });
 

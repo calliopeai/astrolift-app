@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  ActivityIcon,
-  BotIcon,
-  CircleDollarSignIcon,
-  NetworkIcon,
-  ServerIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { ActivityIcon, BotIcon, NetworkIcon, ServerIcon, TriangleAlertIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { QueryError } from "@/components/QueryError";
@@ -37,8 +30,7 @@ export interface ZentinelleOverviewProps extends ZentinelleHealth {
 }
 
 /**
- * The health card: agents observed, requests in the last 24 hours, spend
- * this month, and each registered cluster's gateway.
+ * Agents observed, requests in the last 24 hours, and each cluster's gateway.
  */
 export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProps) {
   const t = useTranslations("zentinelleScreen.overview");
@@ -82,16 +74,6 @@ export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProp
                 label={t("requests")}
                 value={day ? format.number(day.requests) : null}
                 icon={ActivityIcon}
-                loading={usage.loading}
-              />
-              <StatTile
-                label={t("spend")}
-                value={
-                  month
-                    ? format.number(month.costUsd, { style: "currency", currency: "USD" })
-                    : null
-                }
-                icon={CircleDollarSignIcon}
                 loading={usage.loading}
               />
             </>

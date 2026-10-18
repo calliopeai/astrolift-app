@@ -97,24 +97,6 @@ async function fixture() {
             : (rows.find((row) => row.id === variables.id) ?? null),
         },
       };
-    if (request.name === "PreviewManagedServiceCost")
-      return {
-        data: {
-          astroliftManagedServiceCostPreview: {
-            managedServiceId: variables.managedServiceId,
-            available: true,
-            reason: "",
-            message: "",
-            monthlyTotal: 42.5,
-            currency: "USD",
-            pricingSourceUrl: "https://prices.example.test/redis",
-            pricingFetchedAt: "2026-10-02T00:00:00Z",
-            notes: [],
-            approximate: false,
-            lineItems: [],
-          },
-        },
-      };
     const fields: Record<string, string> = {
       ReprovisionProjectManagedService: "reprovisionProjectManagedService",
       DeprovisionProjectManagedService: "deprovisionProjectManagedService",
@@ -191,7 +173,7 @@ async function openFirst(result: { current: ReturnType<typeof useManagedResource
 describe("actor-bound managed resource HTTP reads", () => {
   it("walks all 251 resources and consumers using only server cursors and metadata", async () => {
     const api = await fixture();
-    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true, true), {
+    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true), {
       wrapper: api.wrapper,
     });
     const seen = new Set<string>();
@@ -251,7 +233,7 @@ describe("actor-bound managed resource HTTP reads", () => {
   });
   it("shows stale continuation as refusal and retries from the first server page", async () => {
     const api = await fixture();
-    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true, true), {
+    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true), {
       wrapper: api.wrapper,
     });
     await waitFor(() => expect(result.current.resourceTable.state).toBe("ready"));
@@ -268,7 +250,7 @@ describe("actor-bound managed resource HTTP reads", () => {
     api.held.add("GetProjectResource:actor-a");
     api.denied.add("GetProjectResource:actor-b");
     const { result, rerender } = renderHook(
-      () => useManagedResourceReads(RESOURCE.projectId!, true, true),
+      () => useManagedResourceReads(RESOURCE.projectId!, true),
       { wrapper: api.wrapper }
     );
     await waitFor(() => expect(result.current.resourceTable.state).toBe("ready"));
@@ -291,48 +273,48 @@ describe("actor-bound managed resource HTTP reads", () => {
     expect(result.current.resourceDetail.current).toBeNull();
     expect(result.current.resourceDetail.refused).toBe(true);
   });
-  it("discards late price and old write/review handlers after an actor switch", async () => {
+  it("discards late metadata and old write/review handlers after an actor A/B/A switch", async () => {
     const api = await fixture();
     const { result, rerender } = renderHook(
-      () => useManagedResourceReads(RESOURCE.projectId!, true, true),
+      () => useManagedResourceReads(RESOURCE.projectId!, true),
       { wrapper: api.wrapper }
     );
     await openFirst(result);
     const oldWrite = result.current.resourceDetail.onReprovision;
     const oldReview = result.current.resourceDetail.onRefresh;
-    api.held.add("PreviewManagedServiceCost:actor-a");
+    api.held.add("GetProjectResource:actor-a");
     act(() => {
-      void result.current.resourceDetail.onCost();
+      void oldReview();
     });
     await waitFor(() => expect(api.pending.length).toBe(1));
+    api.held.clear();
+    api.rows[0] = { ...api.rows[0], name: "Actor B metadata" };
     identity.userId = "actor-b";
     rerender();
     await openFirst(result);
+    expect(result.current.resourceDetail.current?.name).toBe("Actor B metadata");
+    api.rows[0] = { ...api.rows[0], name: "Current actor A metadata" };
+    identity.userId = "actor-a";
+    rerender();
+    await openFirst(result);
+    expect(result.current.resourceDetail.current?.name).toBe("Current actor A metadata");
+    const requestCount = api.requests.length;
     await act(async () => {
       await oldWrite();
       await oldReview();
     });
+    expect(api.requests).toHaveLength(requestCount);
     expect(
       api.requests.some((request) => request.name === "ReprovisionProjectManagedService")
     ).toBe(false);
-    api.denied.add("PreviewManagedServiceCost:actor-b");
-    act(() => {
-      void result.current.resourceDetail.onCost();
-    });
-    await waitFor(() => expect(result.current.resourceDetail.costError).toBe(true));
-    expect(
-      api.requests
-        .filter((request) => request.name === "PreviewManagedServiceCost")
-        .map((request) => request.actor)
-    ).toEqual(["actor-a", "actor-b"]);
     act(() => api.pending[0].finish());
     await new Promise((resolve) => setTimeout(resolve, 25));
-    expect(result.current.resourceDetail.cost).toBeUndefined();
-    expect(result.current.resourceDetail.costError).toBe(true);
+    expect(result.current.resourceDetail.current?.name).toBe("Current actor A metadata");
+    expect(result.current.resourceDetail.refused).toBe(false);
   });
   it("pins action inputs to the independently observed exact context", async () => {
     const api = await fixture();
-    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true, true), {
+    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true), {
       wrapper: api.wrapper,
     });
     await openFirst(result);
@@ -362,7 +344,7 @@ describe("actor-bound managed resource HTTP reads", () => {
     const api = await fixture();
     api.held.add("ListProjectResourcePage:actor-a");
     const { result, rerender } = renderHook(
-      () => useManagedResourceReads(RESOURCE.projectId!, true, true),
+      () => useManagedResourceReads(RESOURCE.projectId!, true),
       { wrapper: api.wrapper }
     );
     await waitFor(() => expect(api.pending.length).toBe(1));
@@ -380,29 +362,41 @@ describe("actor-bound managed resource HTTP reads", () => {
     expect(result.current.resourceTable.rows).toEqual([]);
     expect(result.current.resourceTable.state).toBe("error");
   });
-  it("does not reuse an old selected-target price after an A/B/A selection", async () => {
+  it("discards stale metadata and action handlers after an A/B/A selection", async () => {
     const api = await fixture();
-    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true, true), {
+    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true), {
       wrapper: api.wrapper,
     });
     await openFirst(result);
-    api.held.add("PreviewManagedServiceCost:actor-a");
+    const oldWrite = result.current.resourceDetail.onReprovision;
+    const oldReview = result.current.resourceDetail.onRefresh;
+    api.held.add("GetProjectResource:actor-a");
     act(() => {
-      void result.current.resourceDetail.onCost();
+      void oldReview();
     });
     await waitFor(() => expect(api.pending.length).toBe(1));
+    api.held.clear();
     act(() => result.current.onOpenResource(result.current.resourceTable.rows[1]));
     await waitFor(() => expect(result.current.resourceDetail.current?.id).toBe(api.rows[1].id));
+    api.rows[0] = { ...api.rows[0], name: "Reselected current metadata" };
     act(() => result.current.onOpenResource(result.current.resourceTable.rows[0]));
-    await waitFor(() => expect(result.current.resourceDetail.current?.id).toBe(RESOURCE.id));
-    expect(result.current.resourceDetail.costLoading).toBe(false);
+    await waitFor(() =>
+      expect(result.current.resourceDetail.current?.name).toBe("Reselected current metadata")
+    );
+    const requestCount = api.requests.length;
+    await act(async () => {
+      await oldWrite();
+      await oldReview();
+    });
+    expect(api.requests).toHaveLength(requestCount);
     act(() => api.pending[0].finish());
     await new Promise((resolve) => setTimeout(resolve, 25));
-    expect(result.current.resourceDetail.cost).toBeUndefined();
+    expect(result.current.resourceDetail.current?.name).toBe("Reselected current metadata");
+    expect(result.current.resourceDetail.target?.id).toBe(RESOURCE.id);
   });
   it("never rebinds a deleted target to a replacement or dispatches from a refused review", async () => {
     const api = await fixture();
-    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true, true), {
+    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, true), {
       wrapper: api.wrapper,
     });
     await openFirst(result);
@@ -423,15 +417,13 @@ describe("actor-bound managed resource HTTP reads", () => {
       api.requests.some((request) => request.name === "ReprovisionProjectManagedService")
     ).toBe(false);
   });
-  it("keeps read-only triage independent of price and write permissions", async () => {
+  it("keeps read-only triage independent of write permissions", async () => {
     const api = await fixture();
-    const { result } = renderHook(
-      () => useManagedResourceReads(RESOURCE.projectId!, false, false),
-      { wrapper: api.wrapper }
-    );
+    const { result } = renderHook(() => useManagedResourceReads(RESOURCE.projectId!, false), {
+      wrapper: api.wrapper,
+    });
     await openFirst(result);
     await act(async () => {
-      await result.current.resourceDetail.onCost();
       await result.current.resourceDetail.onReprovision();
     });
     expect(new Set(api.requests.map((request) => request.name))).toEqual(

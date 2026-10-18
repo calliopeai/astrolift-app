@@ -26,21 +26,15 @@ import {
   REPROVISION_PROJECT_MANAGED_SERVICE,
   DEPROVISION_PROJECT_MANAGED_SERVICE,
 } from "@/graphql/services/services.mutations";
-import { PREVIEW_MANAGED_SERVICE_COST } from "@/graphql/services/services.queries";
 import { useConfirm } from "@/hooks/use-confirm";
 import type {
   ManagedResourceAttachment,
   ManagedResourceDetailProps,
 } from "./ManagedResourceDetail";
 import type { ProjectManagedResource } from "./ProjectManagedResourceList";
-import type { ManagedServiceCostPreview } from "./use-project-resources";
 
-/** Basic triage uses only scoped metadata. Price and writes remain explicit independent gates. */
-export function useManagedResourceReads(
-  projectId: string,
-  canUpdate: boolean,
-  canPreview: boolean
-) {
+/** Basic triage uses scoped metadata; writes retain their own explicit gate. */
+export function useManagedResourceReads(projectId: string, canUpdate: boolean) {
   const copy = useTranslations("projectResources.reads");
   const confirm = useConfirm();
   const { org } = useActiveOrg();
@@ -61,20 +55,13 @@ export function useManagedResourceReads(
     data: ProjectManagedResource | null;
     refused: boolean;
   } | null>(null);
-  const [costs, setCosts] = React.useState<Record<string, ManagedServiceCostPreview>>({});
-  const [costFailedKey, setCostFailedKey] = React.useState("");
-  const [costBusyKey, setCostBusyKey] = React.useState("");
   const generation = React.useRef(0);
   const selectionGeneration = React.useRef(0);
-  const costGeneration = React.useRef(0);
   if (identityState.key !== identityKey) {
     // Reset before children render under another identity, including A/B/A.
     setIdentityState({ key: identityKey, epoch: identityState.epoch + 1 });
     setSelection(null);
     setMetadata(null);
-    setCosts({});
-    setCostBusyKey("");
-    setCostFailedKey("");
   }
   const scopeKey =
     identityKey && identityState.key === identityKey ? `${identityKey}:${identityState.epoch}` : "";
@@ -186,10 +173,6 @@ export function useManagedResourceReads(
     setAttachmentEpoch((epoch) => epoch + 1);
     if (attachments.pageIndex === 0) attachments.refetch();
   };
-  const [loadCost] = useLazyQuery<{
-    astroliftManagedServiceCostPreview: ManagedServiceCostPreview | null;
-  }>(PREVIEW_MANAGED_SERVICE_COST, { fetchPolicy: "no-cache" });
-  const costKey = current ? targetKey : "";
   const [attach, attachState] = useMutation<{
     attachProjectManagedService: MutationResult<unknown>;
   }>(ATTACH_PROJECT_MANAGED_SERVICE);
@@ -239,33 +222,6 @@ export function useManagedResourceReads(
       if (!isCurrent() || generation.current !== serial) return;
       setMetadata({ key: targetKey, data: null, refused: true });
       toast.error(copy("actionRefused"));
-    }
-  }
-  async function onCost() {
-    if (!current || !canPreview || !isCurrent()) return;
-    const key = costKey;
-    const serial = ++costGeneration.current;
-    setCostBusyKey(key);
-    try {
-      const response = await loadCost({
-        context: { queryDeduplication: false },
-        variables: {
-          managedServiceId: current.id,
-          expectedContextRevision: current.contextRevision,
-        },
-      });
-      if (!isCurrent() || serial !== costGeneration.current) return;
-      const preview = response.data?.astroliftManagedServiceCostPreview;
-      if (response.error || !preview || preview.managedServiceId !== current.id)
-        throw new Error("unavailable");
-      setCosts({ [key]: preview });
-      setCostFailedKey("");
-      setCostBusyKey("");
-    } catch {
-      if (isCurrent() && serial === costGeneration.current) {
-        setCostFailedKey(key);
-        setCostBusyKey("");
-      }
     }
   }
   function changed() {
@@ -372,16 +328,11 @@ export function useManagedResourceReads(
     onRefresh,
     attachments: { ...attachments, retry: restartAttachments, refetch: restartAttachments },
     canUpdate,
-    canPreview,
     mutationLoading,
     onReprovision,
     onDeprovision,
     onDetach,
     onAttach,
-    cost: costs[costKey],
-    costLoading: Boolean(costKey && costBusyKey === costKey),
-    costError: costFailedKey === costKey && Boolean(costKey),
-    onCost,
   };
   return {
     resourceTable,

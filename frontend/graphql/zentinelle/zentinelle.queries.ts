@@ -73,7 +73,6 @@ export const ZENTINELLE_USAGE = gql`
         requests
         inputTokens
         outputTokens
-        costUsd
       }
     }
   }

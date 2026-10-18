@@ -150,7 +150,6 @@ export interface UsageTotals {
   requests: number;
   inputTokens: number;
   outputTokens: number;
-  costUsd: number;
   agents: number;
 }
 
@@ -159,7 +158,6 @@ export function usageTotals(rows: ZentinelleUsageRow[]): UsageTotals {
     requests: rows.reduce((n, r) => n + r.requests, 0),
     inputTokens: rows.reduce((n, r) => n + r.inputTokens, 0),
     outputTokens: rows.reduce((n, r) => n + r.outputTokens, 0),
-    costUsd: rows.reduce((n, r) => n + r.costUsd, 0),
     agents: new Set(rows.map((r) => r.agentSlug).filter(Boolean)).size,
   };
 }

@@ -22,11 +22,7 @@ import type {
   ProjectDetailMember,
   ProjectDetailProject,
 } from "./use-project-detail";
-import type {
-  ManagedServiceCostPreview,
-  ProjectAppEnvironment,
-  ProjectResourceCluster,
-} from "./use-project-resources";
+import type { ProjectAppEnvironment, ProjectResourceCluster } from "./use-project-resources";
 
 /** Hand-typed fixtures for the project overview and project resources screens. */
 
@@ -455,33 +451,6 @@ export const SERVICES: AstroliftManagedService[] = [
     operationWorkflowId: "managed-service-provision-service-3",
   }),
 ];
-
-export const COST_PREVIEWS: Record<string, ManagedServiceCostPreview> = {
-  "service-1": {
-    managedServiceId: "service-1",
-    available: true,
-    reason: "",
-    message: "",
-    monthlyTotal: 47.45,
-    currency: "USD",
-    pricingSourceUrl: "https://aws.amazon.com/rds/postgresql/pricing/",
-    pricingFetchedAt: "2026-09-27T00:00:00Z",
-    notes: ["On-demand pricing for db.t4g.medium, single AZ, 20 GB gp3."],
-    approximate: true,
-  },
-  "service-3": {
-    managedServiceId: "service-3",
-    available: false,
-    reason: "unsupported_kind",
-    message: "No pricing source for ElastiCache yet.",
-    monthlyTotal: null,
-    currency: "USD",
-    pricingSourceUrl: "",
-    pricingFetchedAt: "",
-    notes: [],
-    approximate: false,
-  },
-};
 
 export const BUNDLES: AstroliftProjectSecretBundle[] = [
   {

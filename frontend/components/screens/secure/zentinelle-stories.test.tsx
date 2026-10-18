@@ -103,7 +103,7 @@ describe("Zentinelle screen states (#1888)", () => {
         within(tabs)
           .getAllByRole("link")
           .map((l) => l.textContent)
-      ).toEqual(["Overview", "Usage and cost", "Policies"]);
+      ).toEqual(["Overview", "Usage", "Policies"]);
       expect(page.queryByRole("button", { name: "Disconnect" })).toBeNull();
     });
   });
