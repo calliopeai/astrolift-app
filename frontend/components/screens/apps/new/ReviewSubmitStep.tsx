@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import type { SourceKind, TriggerMode } from "@/graphql/registry/registry.types";
 import { detectBuildPaths } from "@/lib/manifest/build-paths";
 
+import { manifestExpiry, type TemporaryAppValues } from "../temporary-app-model";
+
 import { deployPreview } from "./deploy-preview";
 
 import {
@@ -21,7 +23,7 @@ import type { SideEffectStep } from "@/components/wizard/ReviewParts";
 export type { SideEffectStep, StepStatus } from "@/components/wizard/ReviewParts";
 
 /** The wizard-state fields the review step reads. */
-export interface ReviewSubmitFields {
+export interface ReviewSubmitFields extends TemporaryAppValues {
   sourceRepo: string;
   defaultBranch: string;
   sourceKind: SourceKind;
@@ -112,6 +114,9 @@ export function ReviewSubmitStepView({
   );
   // A manifest that sets its own build paths decides them, unless typed over.
   const detected = detectBuildPaths(state.manifestPath, state.manifestRaw);
+  const lifetimeCopy = useTranslations("apps.temporaryCreation");
+  const lifetime =
+    state.expiresIn?.trim() || (state.manifestLater ? "" : manifestExpiry(state.manifestRaw));
   const fromManifest = detected.source === "manifestPaths";
   const buildRow = (label: string, typed: string | null, value: string) => {
     const own = typed?.trim();
@@ -151,6 +156,17 @@ export function ReviewSubmitStepView({
           rows={[
             { label: t("name"), value: state.name },
             { label: t("slug"), value: state.slug, mono: true },
+            ...(lifetime
+              ? [
+                  { label: lifetimeCopy("ttl"), value: lifetime },
+                  {
+                    label: lifetimeCopy("deleteData"),
+                    value: state.deleteDataOnExpiry
+                      ? lifetimeCopy("deleteWarning")
+                      : lifetimeCopy("reviewKeep"),
+                  },
+                ]
+              : []),
             ...(state.description ? [{ label: t("description"), value: state.description }] : []),
             ...(state.deployTiming === "skip"
               ? [

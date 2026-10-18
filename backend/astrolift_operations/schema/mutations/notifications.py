@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from graphql import GraphQLError
 from strawberry.types import Info
 
 from astrolift_graphql import MutationResultType
@@ -101,10 +102,12 @@ class NotificationMutations:
     ) -> MutationResultType[NotificationType]:
         from django.utils import timezone
 
-        tenant = get_current_tenant()
-        if tenant is None or tenant.actor_user_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
-        notif = Notification.objects.filter(guid=str(input.id), user_id=tenant.actor_user_id).first()
+        from astrolift_operations.notification_inbox import capture_identity, readable_notification
+
+        try:
+            notif = readable_notification(capture_identity(info), input.id)
+        except GraphQLError as exc:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, exc.message)
         if notif is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "notification not found")
         notif.read_at = timezone.now()
@@ -113,14 +116,12 @@ class NotificationMutations:
 
     @strawberry.field
     def mark_all_notifications_read(self, info: Info) -> MutationResultType[_MarkAllReadPayload]:
-        from django.utils import timezone
+        from astrolift_operations.notification_inbox import capture_identity, mark_all_read
 
-        tenant = get_current_tenant()
-        if tenant is None or tenant.actor_user_id is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
-        marked = Notification.objects.filter(user_id=tenant.actor_user_id, read_at__isnull=True).update(
-            read_at=timezone.now()
-        )
+        try:
+            marked = mark_all_read(capture_identity(info))
+        except GraphQLError as exc:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, exc.message)
         return gql_success(_MarkAllReadPayload(marked=marked))
 
     # ---- Push device registration (#476 §B) -----------------------

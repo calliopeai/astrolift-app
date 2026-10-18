@@ -108,6 +108,33 @@ class AppsListFilterInput:
         default=None, description="Project slug or name, case-insensitive."
     )
     team: list[str] | None = strawberry.field(default=None, description="Team slugs.")
+    temporary: bool | None = strawberry.field(
+        default=None, description="true: temporary apps only (with an expiry). false: permanent only."
+    )
+
+
+@strawberry.type(name="AstroliftTemporaryAppPolicy")
+class TemporaryAppPolicyType:
+    """The organization's rules for temporary apps (#2433)."""
+
+    max_ttl_seconds: int
+    min_ttl_seconds: int
+    temporary_only_for_members: bool
+    ttl_required_surfaces: list[str]
+    data_grace_days: int
+
+
+def policy_to_type(org) -> TemporaryAppPolicyType:
+    from astrolift_registry.expiry import MIN_TTL, policy_for
+
+    policy = policy_for(org)
+    return TemporaryAppPolicyType(
+        max_ttl_seconds=int(policy.max_ttl.total_seconds()),
+        min_ttl_seconds=int(MIN_TTL.total_seconds()),
+        temporary_only_for_members=policy.temporary_only_for_members,
+        ttl_required_surfaces=list(policy.ttl_required_surfaces),
+        data_grace_days=policy.data_grace_days,
+    )
 
 
 @strawberry.enum
@@ -561,6 +588,10 @@ class RegisteredAppType:
     is_archived: bool
     archived_at: dt.datetime | None
     archived_by_email: str | None
+
+    # Temporary apps (#2433): null for a permanent app.
+    expires_at: dt.datetime | None
+    delete_data_on_expiry: bool
 
     webhook_deploys_paused: bool
     webhook_deploys_paused_at: dt.datetime | None
@@ -1258,6 +1289,8 @@ def app_to_type(
         is_archived=bool(app.archived_at),
         archived_at=app.archived_at,
         archived_by_email=_archived_by_email(app),
+        expires_at=app.expires_at,
+        delete_data_on_expiry=bool(app.delete_data_on_expiry),
         webhook_deploys_paused=bool(app.webhook_deploys_paused),
         webhook_deploys_paused_at=app.webhook_deploys_paused_at,
         webhook_deploys_paused_by_email=_paused_by_email(app),

@@ -71,6 +71,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "clusters.reviewed_log_collector_install",
     "domains.cloudflare_connections",
     "apps.dependency_context",
+    "apps.temporary_expiry",
     "providers.reference_read",
     "domains.managed_diagnostics",
     "workloads.environment_targets",
@@ -116,9 +117,12 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "webhooks.secret_rotation",
     "agents.completion_callbacks",
     "agents.completion_callback_redelivery",
+    "agents.messages",
     # Notifications.
     "notifications.in_app",
+    "notifications.structured_inbox",
     "notifications.email",
+    "notifications.quiet_hours",
     # File uploads.
     "uploads.presigned",
     "models.admin_hosting",

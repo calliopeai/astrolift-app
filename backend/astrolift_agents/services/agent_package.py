@@ -49,8 +49,11 @@ RESERVED_AGENT_ENVIRONMENT_NAMES = frozenset(
         # A moved conversation's paused admission (#1971).
         "ASTROLIFT_CONVERSATION_TRANSFER_URL",
         "ASTROLIFT_MANIFEST_PATH",
+        # The run's message endpoints (#2434).
+        "ASTROLIFT_MESSAGES_URL",
         "ASTROLIFT_PAYLOAD_HASH",
         "ASTROLIFT_PAYLOAD_URL",
+        "ASTROLIFT_RUN_MCP_URL",
         "ASTROLIFT_SNAPSHOT_INTERVAL",
         "ASTROLIFT_SNAPSHOT_URL",
         "ASTROLIFT_TASK_ID",

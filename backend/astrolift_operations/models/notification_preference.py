@@ -53,6 +53,8 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     # ---- certs (#155): a lapsing cert breaks TLS for everyone ------
     ("push", "domain.cert_expiring"): True,
     ("push", "domain.cert_renewal_failed"): True,
+    # ---- temporary apps (#2433): the app is about to be torn down ----
+    ("push", "app.expiring"): True,
     # ---- #499 new-session ------------------------------------------
     # Mobile/web new sessions are security-critical → ON.
     # CLI sessions are a noisy bootstrap signal → OFF by default so
@@ -64,6 +66,8 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     ("push", "auth.session.created.browser_extension"): True,
     # Fallback when the dispatcher can't infer client_kind.
     ("push", "auth.session.created"): True,
+    # ---- agent messages (#2434): a person was addressed by name ----
+    ("push", "agent.message.sent"): True,
     # ---- email channel --------------------------------------------
     # Mirrors the page-me operational events onto email for an
     # out-of-band notice. The whole email leg is master-gated by the
@@ -79,6 +83,8 @@ DEFAULT_PREFERENCES: dict[tuple[str, str], bool] = {
     ("email", "cluster.bootstrap_failed"): True,
     ("email", "secret.revealed"): True,
     ("email", "app.deregister_pending"): True,
+    ("email", "agent.message.sent"): True,
+    ("email", "app.expiring"): True,
 }
 
 

@@ -102,15 +102,11 @@ def _normalize_login_method(raw: Any) -> str:
 
 
 def _client_ip(request: HttpRequest) -> str | None:
-    """Best-effort IP — honours X-Forwarded-For if present, falls
-    back to REMOTE_ADDR. Returns None on a malformed value so the
-    column stays NULL rather than receiving garbage."""
-    xff = request.META.get("HTTP_X_FORWARDED_FOR")
-    if xff:
-        candidate = xff.split(",")[0].strip()
-        if candidate:
-            return candidate
-    return request.META.get("REMOTE_ADDR") or None
+    """The client's IP (:func:`config.proxies.client_address`, #2440), None
+    on a malformed value so the column stays NULL rather than receiving garbage."""
+    from config.proxies import client_address
+
+    return client_address(request)
 
 
 def _client_ua(request: HttpRequest) -> str:

@@ -282,6 +282,19 @@ class DeregisterAppInput:
     actor: Actor
     delete_data: bool = False
     force_destroy: bool = False
+    # A temporary app's expiry (#2433): leave the managed services for the
+    # grace period (the expiry timer deletes them after it), and skip the
+    # 5-minute cancel window, which is for a person's click.
+    keep_managed_services: bool = False
+    skip_grace: bool = False
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class AppExpiryInput:
+    """Input for ``AppExpiryWorkflow`` (#2433), one per temporary app; every
+    decision is read from the app row (``astrolift_registry.expiry``)."""
+
+    registered_app_id: int
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

@@ -150,25 +150,15 @@ def attributes_from_request(request, actor_user_id: int | None) -> RequestAttrib
 
 
 def policy_client_ip(request) -> str | None:
-    """The client IP an allowlist may trust.
+    """The client IP an allowlist may trust (#2440).
 
-    Not the left-most ``X-Forwarded-For`` entry the audit trail records:
-    the client writes that one itself and could claim any address. The
-    right-most entry is the one the proxy in front of us appended, and
-    without a proxy it is ``REMOTE_ADDR``. Behind more than one proxy this
-    is the inner proxy's address, so an allowlist of client ranges denies
-    rather than admits.
+    ``REMOTE_ADDR``, which ``config.asgi`` sets from ``X-Forwarded-For``
+    only as the proxies in ``ASTROLIFT_TRUSTED_PROXIES`` report it. Never
+    the raw header: the client writes its left-most entries itself.
     """
+    from config.proxies import client_address
 
-    import ipaddress
-
-    meta = getattr(request, "META", None) or {}
-    xff = meta.get("HTTP_X_FORWARDED_FOR", "") or ""
-    candidate = xff.split(",")[-1].strip() if xff.strip() else (meta.get("REMOTE_ADDR") or "")
-    try:
-        return str(ipaddress.ip_address(candidate))
-    except ValueError:
-        return None
+    return client_address(request)
 
 
 def attributes_for(actor_user_id: int | None) -> RequestAttributes:

@@ -132,6 +132,7 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_update_brain_substrate": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
     "astrolift_rebuild_brain": app_scope_by_slug("slug", permission=Permission.APP_DEPLOY),
     "astrolift_host_app_on_brain": registration_project_scope("project_id", permission=Permission.APP_CREATE),
+    "astrolift_set_app_expiry": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
     "astrolift_unshare_brain": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
     "astrolift_share_brain": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
     "astrolift_delete_brain": app_scope_by_slug("slug", permission=Permission.APP_DELETE),
@@ -321,6 +322,9 @@ def _serialize_agent(workload, *, include_package: bool) -> dict[str, Any]:
         "name": workload.name,
         "slug": workload.slug,
         "project_slug": project.slug if project else "",
+        "app_slug": app.slug,
+        "expires_at": _iso(app.expires_at),
+        "delete_data_on_expiry": app.delete_data_on_expiry,
         "source": {
             "kind": app.source_kind,
             "repo": app.source_repo,
@@ -441,7 +445,12 @@ def _get_brain_status(_request: HttpRequest, args: dict[str, Any]) -> dict[str, 
     row = status(app, str(args.get("environment_name") or "production").strip())
     if row is None:
         raise McpCallError("environment not found", code="not_found")
-    return {"slug": app.slug, **row}
+    return {
+        "slug": app.slug,
+        "expires_at": _iso(app.expires_at),
+        "delete_data_on_expiry": app.delete_data_on_expiry,
+        **row,
+    }
 
 
 def _create_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
@@ -560,6 +569,9 @@ def _host_app_on_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, 
                 name=str(args["name"]) if "name" in args else None,
                 slug=str(args["slug"]) if "slug" in args else None,
                 port=int(args["port"]) if "port" in args else None,
+                expires_in=str(args["expires_in"]) if "expires_in" in args else None,
+                expires_at=_datetime_arg(args, "expires_at"),
+                delete_data_on_expiry=bool(args.get("delete_data_on_expiry", False)),
             ),
         )
     data = _unwrap_mutation(result)
@@ -569,6 +581,54 @@ def _host_app_on_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, 
         "template": data.template,
         "environment_name": data.environment_name,
         "env_keys": list(data.env_keys),
+        "expires_at": data.app.expires_at.isoformat() if data.app.expires_at else None,
+    }
+
+
+def _datetime_arg(args: dict[str, Any], name: str):
+    import datetime as dt
+
+    if args.get(name) is None:
+        return None
+    try:
+        return dt.datetime.fromisoformat(str(args[name]))
+    except ValueError as exc:
+        raise McpCallError(f"{name} must be an RFC 3339 time", code="invalid_arguments") from exc
+
+
+def _set_app_expiry(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    """Temporary apps (#2433): the setAppExpiry resolver, with making an app
+    permanent refused for agents unless the organization allows it."""
+    from astrolift_identity.action_safety import agent_refusal
+    from astrolift_registry.brain_manage import surface
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.schema.mutations.expiry import ExpiryMutations, SetAppExpiryInput
+
+    slug = str(args.get("slug") or "")
+    if args.get("clear"):
+        app = RegisteredApp.objects.filter(organization_id=_org_id(), slug=slug).first()
+        refusal = agent_refusal("app.expiry.clear", app=app)
+        if refusal is not None:
+            raise McpCallError(refusal, code="permission_denied")
+    with surface("mcp"):
+        result = ExpiryMutations().set_app_expiry(
+            _mutation_info(request),
+            input=SetAppExpiryInput(
+                app_slug=slug,
+                expires_in=str(args["expires_in"]) if args.get("expires_in") else None,
+                expires_at=_datetime_arg(args, "expires_at"),
+                extend_by=str(args["extend_by"]) if args.get("extend_by") else None,
+                clear=bool(args.get("clear", False)),
+                delete_data_on_expiry=(
+                    bool(args["delete_data_on_expiry"]) if "delete_data_on_expiry" in args else None
+                ),
+            ),
+        )
+    data = _unwrap_mutation(result)
+    return {
+        "slug": data.slug,
+        "expires_at": data.expires_at.isoformat() if data.expires_at else None,
+        "delete_data_on_expiry": data.delete_data_on_expiry,
     }
 
 
@@ -1372,6 +1432,7 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_update_brain_substrate": _update_brain_substrate,
     "astrolift_rebuild_brain": _rebuild_brain,
     "astrolift_host_app_on_brain": _host_app_on_brain,
+    "astrolift_set_app_expiry": _set_app_expiry,
     "astrolift_unshare_brain": _unshare_brain,
     "astrolift_share_brain": _share_brain,
     "astrolift_delete_brain": _delete_brain,

@@ -34,15 +34,14 @@ def _info(user=None, ip: str | None = None):
     """Build a minimal Strawberry-like Info shim.
 
     When ``user`` is given the resolver's `_actor_user` helper resolves
-    it the same way it would in prod; `ip` populates the X-Forwarded-For
-    header so reveal-disclosure audit rows capture the source."""
+    it the same way it would in prod; `ip` populates REMOTE_ADDR so reveal-disclosure audit rows capture the source."""
 
     if user is None:
         request = SimpleNamespace(user=None, META={})
     else:
         meta = {}
         if ip:
-            meta["HTTP_X_FORWARDED_FOR"] = ip
+            meta["REMOTE_ADDR"] = ip
         request = SimpleNamespace(user=user, META=meta)
     return SimpleNamespace(context=SimpleNamespace(user=user, request=request))
 

@@ -9,6 +9,7 @@ import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { useWizardProjects } from "@/components/wizard/use-wizard-projects";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { manifestExpiry, temporaryAppInput } from "@/components/screens/apps/temporary-app-model";
 import { REGISTER_APP } from "@/graphql/registry/registry.mutations";
 import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type {
@@ -105,6 +106,8 @@ export interface WizardState {
   slugTouched: boolean;
   description: string;
   projectId: string;
+  expiresIn: string;
+  deleteDataOnExpiry: boolean;
 
   // Run: deploy strategy
   deployTiming: DeployTiming;
@@ -147,6 +150,8 @@ export function initialWizardState(): WizardState {
     slugTouched: false,
     description: "",
     projectId: "",
+    expiresIn: "",
+    deleteDataOnExpiry: false,
     deployTiming: "now",
     triggerMode: "auto_on_push",
     deployBranch: "main",
@@ -307,6 +312,12 @@ function ScopedWizardClient() {
         variables: {
           input: {
             projectId: state.projectId,
+            ...(state.expiresIn.trim() || state.deleteDataOnExpiry
+              ? temporaryAppInput(
+                  state,
+                  state.manifestLater ? "" : manifestExpiry(state.manifestRaw)
+                )
+              : {}),
             name: state.name.trim(),
             slug: state.slug.trim(),
             description: state.description.trim() || null,

@@ -425,7 +425,9 @@ class _FakeWorkflowAPI:
         return fake
 
 
-def _run_workflow_with_fakes(app, fakes, *, delete_data=True, force_destroy=True):
+def _run_workflow_with_fakes(
+    app, fakes, *, delete_data=True, force_destroy=True, keep_managed_services=False, skip_grace=False
+):
     """Run ``DeregisterAppWorkflow.run`` against a fake workflow API.
 
     The grace-period cancel (#436 B) added a ``workflow.wait_condition``
@@ -445,6 +447,8 @@ def _run_workflow_with_fakes(app, fakes, *, delete_data=True, force_destroy=True
         actor=actor,
         delete_data=delete_data,
         force_destroy=force_destroy,
+        keep_managed_services=keep_managed_services,
+        skip_grace=skip_grace,
     )
 
     async def _grace_window_timeout(*_a, **_k):
@@ -465,6 +469,36 @@ def _run_workflow_with_fakes(app, fakes, *, delete_data=True, force_destroy=True
     ):
         result = asyncio.run(DeregisterAppWorkflow().run(input))
     return fake_api, result
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_expiry_teardown_preserves_data_namespaces_and_refuses_partial_cleanup(app, failed):
+    fakes = {
+        "mark_app_tearing_down": True,
+        "abort_in_flight_deploys": [],
+        "retire_expired_app_runtime": RuntimeError("native delete unconfirmed")
+        if failed
+        else ["Deployment/web"],
+        "list_app_managed_service_ids": [41],
+        "delete_static_dns_records": {"deleted": []},
+        "deprovision_app_registry_repo": {"repo": "app-owned"},
+        "deprovision_app_identity_role": {"role": "app-owned"},
+        "list_app_secret_targets": [],
+        "delete_app_source_webhook": {"status": "not_installed", "hook_id": ""},
+        "revoke_app_deploy_tokens": 0,
+        "soft_delete_app_records": {"registered_app": 1},
+    }
+    api, result = _run_workflow_with_fakes(
+        app, fakes, delete_data=False, force_destroy=False, keep_managed_services=True, skip_grace=True
+    )
+    calls = [name for name, *_ in api.calls]
+    assert "delete_app_namespaces" not in calls
+    assert "deprovision_managed_service" not in calls
+    assert calls.count("retire_expired_app_runtime") == 2
+    assert result.ok is (not failed)
+    assert ("soft_delete_app_records" in calls) is (not failed)
+    registry_args = next(args for name, args, _ in api.calls if name == "deprovision_app_registry_repo")
+    assert registry_args == (app.pk, False)
 
 
 def test_workflow_happy_path_soft_deletes_app(app):

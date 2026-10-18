@@ -1457,6 +1457,7 @@
         "mine": "Mías",
         "failing": "Con fallos",
         "archived": "Archivadas",
+        "temporary": "Temporales",
         "mineNote": "Mías incluye las aplicaciones en las que tienes un rol, directamente o a través de su proyecto, equipo u organización, hasta que las aplicaciones registren a sus propietarios."
       },
       "bulk": {
@@ -4052,6 +4053,36 @@
       "legendDescription": "Tipos de nodo y lo que representan.",
       "legendTitle": "Leyenda",
       "title": "{name} · Topología"
+    },
+    "expiry": {
+      "expiresIn": "Caduca en {remaining}",
+      "expired": "Caducada",
+      "remaining": {
+        "days": "{days} d {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporal: se desmonta el {when}",
+      "extend": "+1 día",
+      "extendLabel": "Ampliar un día",
+      "extended": "Ampliada hasta el {when}",
+      "extendFailed": "No se pudo ampliar la app"
+    },
+    "temporaryCreation": {
+      "ttl": "Duración de la aplicación",
+      "help": "Deja el campo vacío para conservar la caducidad del manifiesto o crear una aplicación permanente si la política lo permite. Los meses son de 30 días.",
+      "inherited": "El manifiesto hace que esta aplicación caduque en {ttl}. Introduce una duración para reemplazarla.",
+      "bounds": "Duración permitida: de {min} a {max} minutos.",
+      "required": "Tu organización exige que esta aplicación caduque.",
+      "invalid": "Introduce una duración dentro de los límites de la organización: 30m, 4h, 7d, 6w o 3mo.",
+      "deleteData": "Eliminar los datos administrados cuando caduque la aplicación",
+      "deleteWarning": "La caducidad también elimina las bases de datos, los depósitos y los volúmenes de la aplicación. Esta acción es irreversible.",
+      "keepData": "Los datos administrados se conservan durante {days} días después de la caducidad y luego se eliminan.",
+      "loading": "Cargando la política de duración…",
+      "unavailable": "No se pudo leer la política de duración. Inténtalo de nuevo antes de crear la aplicación.",
+      "unsupported": "Este servidor no admite aplicaciones temporales.",
+      "retry": "Intentar de nuevo",
+      "reviewKeep": "Se aplica la política de retención de datos de la organización."
     }
   },
   "sourceProviders": {
@@ -4666,7 +4697,8 @@
         "deploy_failure": "Despliegue fallido",
         "error_spike": "Pico de errores",
         "preview_created": "Vista previa creada",
-        "preview_destroyed": "Vista previa eliminada"
+        "preview_destroyed": "Vista previa eliminada",
+        "app_expiring": "App temporal a punto de caducar"
       },
       "toggleLabel": "{kind} para {app}",
       "unsubscribeAll": "Cancelar todas",
@@ -4688,6 +4720,25 @@
       "subscribeFailed": "Error al suscribirse",
       "unsubscribed": "Suscripción a {app} cancelada",
       "unsubscribeFailed": "Error al cancelar la suscripción"
+    },
+    "quietHours": {
+      "title": "Horario de silencio",
+      "description": "Pausa las notificaciones personales y el correo de mensajes de agentes durante este horario diario. Los mensajes permanecen en la bandeja de entrada. Los webhooks de la organización no se ven afectados.",
+      "enabled": "Activar horario de silencio",
+      "timezone": "Zona horaria (IANA)",
+      "start": "Inicio",
+      "end": "Fin",
+      "active": "El horario de silencio está activo",
+      "inactive": "El horario de silencio está inactivo",
+      "save": "Guardar",
+      "saved": "Horario de silencio guardado",
+      "loading": "Cargando preferencias de notificación…",
+      "error": "No se pudieron cargar las preferencias de notificación.",
+      "retry": "Reintentar",
+      "saveError": "No se pudo guardar el horario de silencio.",
+      "invalidTime": "Introduce una hora válida.",
+      "timezoneRequired": "Introduce una zona horaria IANA.",
+      "differentTimes": "Las horas de inicio y fin deben ser diferentes."
     }
   },
   "securitySettings": {
@@ -14634,6 +14685,7 @@
     },
     "health": {
       "healthy": "Pasarela en marcha",
+      "stale": "Gateway sin señal",
       "pending": "Pasarela aún no desplegada",
       "off": "Pasarela desactivada",
       "error": "Error de la pasarela"
@@ -14684,7 +14736,20 @@
       "clustersTitle": "Salud de la pasarela por clúster",
       "clustersDescription": "La pasarela de Zentinelle de cada clúster registrado.",
       "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Los clústeres registrados conservan sus credenciales; las pasarelas se despliegan cuando el operador de la plataforma las activa.",
-      "noClusters": "Todavía no hay clústeres registrados en Zentinelle."
+      "noClusters": "Todavía no hay clústeres registrados en Zentinelle.",
+      "serverVersion": "Versión de Zentinelle",
+      "blocks": "Bloqueos, últimas 24 horas",
+      "approvals": "Aprobaciones pendientes",
+      "budget": "Presupuesto de este mes",
+      "budgetValue": "{percent} % usado",
+      "budgetFooter": "{spend} de {limit} ({name})",
+      "noBudget": "Sin presupuesto definido",
+      "notAvailable": "No disponible",
+      "countsError": "No se pudo leer el estado desde Zentinelle",
+      "reportNotAvailable": "Versión y última señal no disponibles",
+      "neverReported": "Aún sin informes",
+      "versionUnknown": "versión desconocida",
+      "reported": "{version}, visto {seen}"
     },
     "clusters": {
       "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Registrar un clúster guarda su credencial; la pasarela se despliega cuando el operador de la plataforma activa las pasarelas.",
@@ -17076,7 +17141,8 @@
     "semanticLayer": "Capa semántica",
     "substrate": "Sustrato",
     "sharing": "Acceso compartido",
-    "connect": "Conectar"
+    "connect": "Conectar",
+    "agentInbox": "Bandeja de entrada"
   },
   "support": {
     "title": "Soporte",
@@ -17179,5 +17245,42 @@
     "reasonPermission": "No tiene permiso para esto.",
     "reasonStepUp": "Esto requiere volver a iniciar sesión.",
     "reasonRateLimited": "Demasiados intentos. Espere un minuto e inténtelo de nuevo."
+  },
+  "agentInbox": {
+    "title": "Bandeja de entrada",
+    "description": "{count, plural, =0 {Mensajes de tus agentes. Nada sin leer.} one {Mensajes de tus agentes. # sin leer.} other {Mensajes de tus agentes. # sin leer.}}",
+    "buttonUnread": "Bandeja de entrada, {count} sin leer",
+    "unreadOnly": "Solo sin leer",
+    "emptyTitle": "Aún no hay mensajes",
+    "emptyUnreadTitle": "Nada sin leer",
+    "emptyDescription": "Cuando un agente te envía una actualización, una pregunta o un resultado, aparece aquí.",
+    "pickThread": "Elige una conversación para leerla.",
+    "threads": "Conversaciones",
+    "thread": "Conversación",
+    "unknownAgent": "Agente eliminado",
+    "more": "Cargar más",
+    "earlier": "Cargar mensajes anteriores",
+    "openRun": "Abrir la ejecución",
+    "markRead": "Marcar como leído",
+    "replyToAgent": "Responder al agente",
+    "answer": "Tu respuesta",
+    "reason": "Motivo (opcional)",
+    "allow": "Permitir",
+    "deny": "Denegar",
+    "send": "Enviar",
+    "expires": "Vence {when}",
+    "kind": {
+      "update": "Actualización",
+      "question": "Pregunta",
+      "approval": "Aprobación",
+      "result": "Resultado",
+      "alert": "Alerta"
+    },
+    "route": {
+      "live_run": "enviado al agente en ejecución",
+      "gate": "respondió la solicitud del agente",
+      "woke": "inició el agente",
+      "queued": "espera la próxima ejecución del agente"
+    }
   }
 }
