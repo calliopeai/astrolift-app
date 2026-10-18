@@ -591,13 +591,22 @@ class PreparationStore:
                 return self._reservation(row)
             if row is not None:
                 old_ledger = self._ledger(row)
-                if row.state != row.State.OBSERVED or old_ledger.pending or accepted.observed_at is None:
+                # RESOLVED is an operator settlement (#2278), never an observation.
+                settled = row.state == row.State.RESOLVED
+                if (
+                    old_ledger.pending
+                    or not settled
+                    and (row.state != row.State.OBSERVED or accepted.observed_at is None)
+                ):
                     raise PreparationJournalError("UNRESOLVED_OPERATION")
                 if expected_version != row.version or operation.desired_revision <= row.desired_revision:
                     raise PreparationJournalError("STALE_REVISION")
-                if previous_iam is None or iam_row is None:
-                    raise PreparationJournalError("PREVIOUS_IAM_COMPLETION_REQUIRED")
-                self._verify_iam(row, accepted, previous_iam, iam_row, previous=True)
+                if settled:
+                    self._verify_settled_iam(previous_iam, iam_row)
+                else:
+                    if previous_iam is None or iam_row is None:
+                        raise PreparationJournalError("PREVIOUS_IAM_COMPLETION_REQUIRED")
+                    self._verify_iam(row, accepted, previous_iam, iam_row, previous=True)
                 row.generation += 1
                 row.submissions = {}
                 row.derived_native_union_sha256 = ""
@@ -732,6 +741,25 @@ class PreparationStore:
                 row.derived_native_union_sha256 = derived
                 self._save(row, accepted)
             return derived
+
+    def _verify_settled_iam(
+        self, binding: IAMBinding | None, iam_row: GCPWorkloadIdentityJournal | None
+    ) -> None:
+        """A settled operation has no completed IAM fence; any IAM journal must be settled too."""
+        _, app, cluster, _ = self._parents
+        if binding is None:
+            if GCPWorkloadIdentityJournal._unscoped.filter(
+                registered_app=app, tenant_cluster=cluster
+            ).exists():
+                raise PreparationJournalError("PREVIOUS_IAM_COMPLETION_REQUIRED")
+            return
+        ledger = binding[0]._ledger(iam_row)
+        if (
+            iam_row.state not in (iam_row.State.OBSERVED, iam_row.State.RESOLVED)
+            or ledger.pending
+            or ledger.removals
+        ):
+            raise PreparationJournalError("IAM_CONFIGURATION_NOT_COMPLETED")
 
     def _verify_iam(
         self,
