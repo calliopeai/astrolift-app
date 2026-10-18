@@ -76,7 +76,7 @@ def token_for(world, *, scopes=None, team=None):
         team=team,
         name="Inbox reader",
         token_hash=hashlib.sha256(str(timezone.now()).encode()).hexdigest(),
-        token_prefix="alft_inbox",
+        token_last_4="2457",
         scopes=scopes if scopes is not None else ["read:apps"],
     )
 
