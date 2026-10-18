@@ -23,7 +23,15 @@ from gcp.gke_identity_preparation import GKEIdentityPreparation
 from gcp.identity_owned import NativeGCPIdentity
 from google.iam.v1 import policy_pb2
 from temporalio import workflow
+from temporalio.api.common.v1.message_pb2 import Payload, Payloads
 from temporalio.api.enums.v1 import EventType, TimeoutType
+from temporalio.api.failure.v1.message_pb2 import Failure, TimeoutFailureInfo
+from temporalio.api.history.v1.message_pb2 import (
+    ActivityTaskCancelRequestedEventAttributes,
+    ActivityTaskTimedOutEventAttributes,
+    HistoryEvent,
+    WorkflowExecutionCancelRequestedEventAttributes,
+)
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, CancelledError
 from temporalio.worker import Replayer, UnsandboxedWorkflowRunner, Worker
@@ -83,20 +91,32 @@ def _safe_temporal_history_summary(history):
         name: 0
         for name in (
             "EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT",
+            "EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED",
             "EVENT_TYPE_ACTIVITY_TASK_CANCELED",
             "EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED",
             *_SAFE_TERMINAL_EVENT_NAMES,
         )
     }
     timeout_rows = []
+    activity_cancel_request_rows = []
     cancellation_ids = []
     cancel_request_ids = []
     terminal_rows = []
     scanned = 0
-    invalid_enum_count = 0
+    unclassified_event_count = 0
+    unknown_event_enum_count = 0
 
     def safe_id(value):
         return value if type(value) is int and 0 <= value <= (2**63 - 1) else None
+
+    def has_field(message, field_name):
+        method = getattr(message, "HasField", None)
+        if not callable(method):
+            return False
+        try:
+            return method(field_name) is True
+        except (AttributeError, TypeError, ValueError):
+            return False
 
     for event in events:
         if scanned >= _HISTORY_SCAN_LIMIT:
@@ -112,11 +132,21 @@ def _safe_temporal_history_summary(history):
             event_type_counts[name] = min(event_type_counts[name] + 1, _HISTORY_COUNT_LIMIT)
         if name == "EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT":
             attrs = getattr(event, "activity_task_timed_out_event_attributes", None)
-            timeout_type = getattr(attrs, "timeout_type", None)
-            try:
-                timeout_name = TimeoutType.Name(timeout_type) if type(timeout_type) is int else None
-            except (ValueError, TypeError):
-                timeout_name = None
+            timeout_name = None
+            if (
+                attrs is not None
+                and has_field(event, "activity_task_timed_out_event_attributes")
+                and has_field(attrs, "failure")
+            ):
+                failure = attrs.failure
+                if has_field(failure, "timeout_failure_info"):
+                    timeout_failure = failure.timeout_failure_info
+                    if has_field(timeout_failure, "timeout_type"):
+                        try:
+                            timeout_type = timeout_failure.timeout_type
+                            timeout_name = TimeoutType.Name(timeout_type) if type(timeout_type) is int else None
+                        except (ValueError, TypeError):
+                            timeout_name = None
             if timeout_name in timeout_counts:
                 timeout_counts[timeout_name] = min(timeout_counts[timeout_name] + 1, _HISTORY_COUNT_LIMIT)
                 if len(timeout_rows) < _HISTORY_ROW_LIMIT:
@@ -129,7 +159,19 @@ def _safe_temporal_history_summary(history):
                         }
                     )
             else:
-                invalid_enum_count = min(invalid_enum_count + 1, _HISTORY_COUNT_LIMIT)
+                unclassified_event_count = min(unclassified_event_count + 1, _HISTORY_COUNT_LIMIT)
+        elif name == "EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED":
+            attrs = getattr(event, "activity_task_cancel_requested_event_attributes", None)
+            if attrs is not None and has_field(event, "activity_task_cancel_requested_event_attributes"):
+                if len(activity_cancel_request_rows) < _HISTORY_ROW_LIMIT:
+                    activity_cancel_request_rows.append(
+                        {
+                            "eventId": event_id,
+                            "scheduledEventId": safe_id(getattr(attrs, "scheduled_event_id", None)),
+                        }
+                    )
+            else:
+                unclassified_event_count = min(unclassified_event_count + 1, _HISTORY_COUNT_LIMIT)
         elif name == "EVENT_TYPE_ACTIVITY_TASK_CANCELED":
             if len(cancellation_ids) < _HISTORY_ROW_LIMIT:
                 cancellation_ids.append(event_id)
@@ -139,48 +181,67 @@ def _safe_temporal_history_summary(history):
         elif name in _SAFE_TERMINAL_EVENT_NAMES and len(terminal_rows) < _HISTORY_ROW_LIMIT:
             terminal_rows.append({"eventId": event_id, "eventType": name})
         elif name is None:
-            invalid_enum_count = min(invalid_enum_count + 1, _HISTORY_COUNT_LIMIT)
+            unknown_event_enum_count = min(unknown_event_enum_count + 1, _HISTORY_COUNT_LIMIT)
 
     return {
         "eventsAvailableCapped": available,
         "eventsScanned": scanned,
         "eventsTruncated": scanned < available,
-        "invalidEnumCount": invalid_enum_count,
+        "unclassifiedEventCount": unclassified_event_count,
+        "unknownEventEnumCount": unknown_event_enum_count,
         "eventTypeCounts": event_type_counts,
         "activityTimeoutCounts": timeout_counts,
         "activityTimeouts": timeout_rows,
+        "activityCancelRequestEvents": activity_cancel_request_rows,
         "activityCancellationEventIds": cancellation_ids,
         "workflowCancelRequestEventIds": cancel_request_ids,
-        "cancellationObserved": bool(cancellation_ids or cancel_request_ids),
+        "cancellationObserved": bool(
+            activity_cancel_request_rows
+            or cancellation_ids
+            or cancel_request_ids
+            or any(row["eventType"] == "EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED" for row in terminal_rows)
+        ),
         "workflowTerminalEvents": terminal_rows,
     }
 
 
 def test_safe_temporal_history_summary_is_bounded_and_omits_payloads():
-    timeout = SimpleNamespace(
-        timeout_type=TimeoutType.TIMEOUT_TYPE_HEARTBEAT,
-        scheduled_event_id=4,
-        started_event_id=5,
-        details="private-heartbeat-details-canary",
+    timeout_event = HistoryEvent(
+        event_id=6,
+        event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
+        activity_task_timed_out_event_attributes=ActivityTaskTimedOutEventAttributes(
+            scheduled_event_id=4,
+            started_event_id=5,
+            failure=Failure(
+                message="private-failure-message-canary",
+                timeout_failure_info=TimeoutFailureInfo(
+                    timeout_type=TimeoutType.TIMEOUT_TYPE_HEARTBEAT,
+                    last_heartbeat_details=Payloads(
+                        payloads=[Payload(data=b"private-heartbeat-details-canary")]
+                    ),
+                ),
+            ),
+        ),
     )
     events = [
-        SimpleNamespace(
-            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
-            event_id=6,
-            activity_task_timed_out_event_attributes=timeout,
-            input="private-input-canary",
-            result="private-result-canary",
-            failure="private-failure-canary",
-        ),
-        SimpleNamespace(
-            event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
+        timeout_event,
+        HistoryEvent(
+            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
             event_id=7,
-            workflow_execution_cancel_requested_event_attributes=SimpleNamespace(
-                cause="private-cancel-cause-canary"
+            activity_task_cancel_requested_event_attributes=ActivityTaskCancelRequestedEventAttributes(
+                scheduled_event_id=6,
+                workflow_task_completed_event_id=8,
+            ),
+        ),
+        HistoryEvent(
+            event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
+            event_id=8,
+            workflow_execution_cancel_requested_event_attributes=WorkflowExecutionCancelRequestedEventAttributes(
+                cause="private-cancel-cause-canary",
             ),
         ),
         *(
-            SimpleNamespace(event_type=EventType.EVENT_TYPE_TIMER_STARTED, event_id=index + 8)
+            HistoryEvent(event_type=EventType.EVENT_TYPE_TIMER_STARTED, event_id=index + 9)
             for index in range(_HISTORY_SCAN_LIMIT + 2)
         ),
     ]
@@ -196,7 +257,8 @@ def test_safe_temporal_history_summary_is_bounded_and_omits_payloads():
     assert summary["activityTimeouts"] == [
         {"eventId": 6, "timeoutType": "TIMEOUT_TYPE_HEARTBEAT", "scheduledEventId": 4, "startedEventId": 5}
     ]
-    assert summary["workflowCancelRequestEventIds"] == [7]
+    assert summary["activityCancelRequestEvents"] == [{"eventId": 7, "scheduledEventId": 6}]
+    assert summary["workflowCancelRequestEventIds"] == [8]
     assert len(encoded) < 4096
     assert "private-" not in encoded
 
