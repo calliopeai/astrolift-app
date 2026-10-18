@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Personal notification quiet hours (#2434) are available in Settings → Notifications → Quiet hours and through `astroliftMyNotificationQuietHours` / `setNotificationQuietHours`. The daily window uses an IANA time zone and excludes its ending minute; the API reports whether it is active now. During that window, personal agent-message push and email are suppressed and audited. Inbox messages, subscriptions, audit events and organization webhooks remain available. Suppressed notifications are not deferred or digested. Clients can discover `notifications.quiet_hours` through the public handshake. Operations migration 0035 adds the personal settings table.
+
+- Agent runs can send messages to their authorized audience, and recipients can answer through the inbox or GraphQL (#2434). Approval replies respect the caller's API token limits. Replies persist atomically with their gate answer or live-run input, redact credentials before delivery, and start wake-up workflows after commit. Concurrent runs share the agent's message rate allowance; thread pages load only the latest message per thread.
+
 - Temporary-app expiry removes the exact app-owned brain credential Secrets during runtime retirement, with native ownership and original UID checks; the data namespace and managed services remain through grace (#2433).
 
 - Chat Studio promotion records the app creator for expiry warnings and accepts only an explicit JSON boolean for `delete_data_on_expiry`; strings such as `"false"` cannot accidentally select immediate data deletion. Re-promoting preserves the existing app expiry and data choice (#2433).
