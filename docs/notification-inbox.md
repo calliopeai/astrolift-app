@@ -88,8 +88,10 @@ emits; earlier missed windows are recorded as sent, with no invented notificatio
 for them. Extending or resetting expiry does not rewrite old warning rows. A new
 due window creates a distinct notification ID and new expiry snapshot. Display
 the snapshot's timestamp as historical warning provenance; fetch current app state
-before offering an expiry action. Quiet hours suppress personal email/push; they
-do not suppress this inbox or authorize any external delivery.
+before offering an expiry action. Quiet hours suppress personal email/push only
+for `agent.message.sent`. App-expiry warnings (`app.expiring`) retain their
+configured external fan-out. Quiet hours do not suppress this inbox or authorize
+any external delivery.
 
 Studio should present these items as platform notifications. CLI consumers can
 execute the query above using their authenticated GraphQL transport; no new CLI
