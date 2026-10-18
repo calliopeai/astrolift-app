@@ -27,6 +27,14 @@ see before it asks, so Zentinelle never sees a viewer, only the install.
 
 A Zentinelle without these endpoints, which today is every Zentinelle,
 answers 404; that is reported as an upgrade to make, not as an empty result.
+
+The health card's read (#2436) is ``GET .../astrolift/health`` answering
+``{server_version, window_hours, blocks, open_approvals, budgets: [{id, name,
+scope_type, limit_usd, spend_usd, percent, level}], clusters: [{cluster_id,
+status, health, gateway_version, last_seen_at}]}``. Its answer is cached for
+``HEALTH_CACHE_SECONDS`` (a gateway reports once a minute) and never stored.
+A Zentinelle older than that read answers 404, which reads as not available
+rather than as an error: the card shows what it has.
 """
 
 from __future__ import annotations
@@ -37,6 +45,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urlencode
 
+from django.core.cache import cache
 from django.utils.dateparse import parse_datetime
 
 from astrolift_operations.models import ZentinelleConnection
@@ -49,6 +58,7 @@ from astrolift_operations.zentinelle_connect import (
 from core.mutations import ErrorCode
 
 AUDIT_PAGE_MAX = 500
+HEALTH_CACHE_SECONDS = 60
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -84,6 +94,37 @@ class AuditEvent:
     agent_slug: str
     agent_id: str
     actor: str
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Budget:
+    id: str
+    name: str
+    scope: str
+    limit_usd: float
+    spend_usd: float
+    percent: float
+    level: str
+    """``""``, ``threshold`` (at or past its alert threshold) or ``exceeded``."""
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ClusterHealth:
+    gateway_version: str
+    last_seen_at: datetime | None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Health:
+    """The health card's counts, or ``available=False`` from a Zentinelle without the read."""
+
+    available: bool
+    server_version: str = ""
+    window_hours: int = 24
+    blocks: int = 0
+    open_approvals: int = 0
+    budgets: tuple[Budget, ...] = ()
+    clusters: dict[str, ClusterHealth] = dataclasses.field(default_factory=dict)
 
 
 def connection_for(org_id: int | None) -> ZentinelleConnection:
@@ -223,3 +264,71 @@ def audit_page(
         )
     next_cursor = body.get("next_cursor")
     return events, next_cursor if isinstance(next_cursor, str) and next_cursor else None
+
+
+def _health_body(
+    connection: ZentinelleConnection, agent_slugs: Iterable[str] | None
+) -> dict[str, Any] | None:
+    """Zentinelle's health answer, from the cache when fresh; None when it has no such read."""
+    agents = _agents(agent_slugs)
+    key = "zentinelle-health:{}:{}".format(
+        connection.guid, ",".join(slug for _, slug in agents) if agent_slugs is not None else "*"
+    )
+    cached = cache.get(key)
+    if cached is not None:
+        return cached.get("body")
+    try:
+        body: dict[str, Any] | None = _get(connection, "/health", "health", agents)
+    except ZentinelleConnectError as exc:
+        if exc.status != 404:
+            raise
+        body = None
+    cache.set(key, {"body": body}, HEALTH_CACHE_SECONDS)
+    return body
+
+
+def health(connection: ZentinelleConnection, *, agent_slugs: Iterable[str] | None = None) -> Health:
+    """Blocks in the last day, open approvals, budgets, gateways and server version."""
+    body = _health_body(connection, agent_slugs)
+    if body is None:
+        return Health(available=False)
+    clusters = {}
+    for row in _list(body, "clusters"):
+        raw = row.get("last_seen_at")
+        clusters[_str(row, "cluster_id")] = ClusterHealth(
+            gateway_version=_str(row, "gateway_version"),
+            last_seen_at=parse_datetime(raw) if isinstance(raw, str) else None,
+        )
+    return Health(
+        available=True,
+        server_version=_str(body, "server_version"),
+        window_hours=_int(body, "window_hours") or 24,
+        blocks=_int(body, "blocks"),
+        open_approvals=_int(body, "open_approvals"),
+        budgets=tuple(
+            Budget(
+                id=_str(row, "id"),
+                name=_str(row, "name"),
+                scope=_str(row, "scope_type"),
+                limit_usd=_float(row, "limit_usd"),
+                spend_usd=_float(row, "spend_usd"),
+                percent=_float(row, "percent"),
+                level=_str(row, "level"),
+            )
+            for row in _list(body, "budgets")
+        ),
+        clusters=clusters,
+    )
+
+
+def health_if_reachable(connection: ZentinelleConnection | None) -> Health | None:
+    """The install-wide health for a connection screen's extra fields, or None
+    when it cannot be had: not connected, refused, unreachable or too old."""
+    if connection is None or not connection.tenant_ids:
+        return None
+    try:
+        _require_connected(connection)
+        result = health(connection)
+    except ZentinelleConnectError:
+        return None
+    return result if result.available else None
