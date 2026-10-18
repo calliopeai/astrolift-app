@@ -112,6 +112,7 @@ def destination(token, org, project_guid, brain_slug):
         Project.objects.select_related("team", "organization")
         .filter(
             guid=project_guid,
+            deleted_at__isnull=True,
             organization_id=org.pk,
             organization__deleted_at__isnull=True,
             team__organization_id=org.pk,
@@ -419,6 +420,7 @@ def authority(row):
             403,
         )
     from astrolift_identity import abac
+    from core.permissions import _scopes_memo
 
     current = abac.current_attributes()
     # A worker can inherit a context from a prior check. Never reuse its
@@ -430,6 +432,7 @@ def authority(row):
         else abac.RequestAttributes(actor_user_id=row.actor_id)
     )
     marker = set_current_api_token(token)
+    scopes_marker = _scopes_memo.set({})
     try:
         with (
             tenant_context(TenantContext(organization_id=row.organization_id, actor_user_id=row.actor_id)),
@@ -437,6 +440,7 @@ def authority(row):
         ):
             yield token
     finally:
+        _scopes_memo.reset(scopes_marker)
         reset_current_api_token(marker)
 
 

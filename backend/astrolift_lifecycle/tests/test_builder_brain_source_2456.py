@@ -666,3 +666,47 @@ def test_background_revalidation_discards_inherited_authority_cache(world, chang
         with pytest.raises(RuntimeError):
             source.build(row.pk)
     assert not world.native.applied
+
+
+@pytest.mark.parametrize("stage", ["admission", "build"])
+def test_deleted_destination_project_refuses_before_native_build(world, stage):
+    if stage == "build":
+        assert create(world).status_code == 202
+        row = BuilderBrainBuild.objects.get()
+    world.project.soft_delete(by=world.user)
+    if stage == "admission":
+        reply = create(world)
+        assert reply.status_code == 404, reply.content
+        assert not BuilderBrainBuild.objects.exists()
+    else:
+        with pytest.raises(RuntimeError, match="NOT_FOUND"):
+            source.build(row.pk)
+    assert not world.native.applied
+
+
+def test_background_revalidation_discards_warmed_brain_visibility_memo(world):
+    from astrolift_registry import brain_apps
+    from core import permissions
+    from core.tenancy import TenantContext, tenant_context
+
+    assert create(world).status_code == 202
+    row = BuilderBrainBuild.objects.get()
+    tenant = TenantContext(organization_id=world.org.pk, actor_user_id=world.user.pk)
+    inherited = {}
+    marker = permissions._scopes_memo.set(inherited)
+    try:
+        with tenant_context(tenant):
+            assert brain_apps.readable_brain_for(world.user, world.org.pk, world.brain.slug) is not None
+            assert permissions.granted_scopes(tenant, permissions.Permission.APP_READ).org
+            assert inherited
+            role = Role.objects.get(organization=world.org, slug="builder")
+            role.permissions.remove(permissions.Permission.APP_READ.value)
+            role.save()
+            # app.create/deploy remain valid: only a fresh brain-read lookup
+            # can refuse this background build before its first native write.
+            with pytest.raises(RuntimeError, match="NOT_FOUND"):
+                source.build(row.pk)
+            assert permissions._scopes_memo.get() is inherited
+    finally:
+        permissions._scopes_memo.reset(marker)
+    assert not world.native.applied
