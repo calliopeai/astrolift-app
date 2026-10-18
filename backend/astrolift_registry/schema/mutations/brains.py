@@ -363,6 +363,7 @@ def _agent_in_org(org_id: int, agent_slug: str):
     """The agent ``agent_slug`` the caller can read in the org, or a failure."""
     from astrolift_agents.visibility import agent_workloads
 
+    # tenancy: agent_workloads(org_id) is already confined to the caller's org.
     matches = list(
         agent_workloads(org_id)
         .filter(slug=agent_slug.strip(), registered_app__deleted_at__isnull=True)
