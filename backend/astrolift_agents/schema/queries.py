@@ -1194,6 +1194,16 @@ class AgentsQuery:
     @strawberry.field(
         description="Read usage provenance for one exact task, with fresh app.read and agent.read authority."
     )
+    @require_permission(
+        Permission.APP_READ,
+        scope=agent_task_scope("id", Permission.APP_READ),
+        operation=agent_task_operation("id"),
+    )
+    @require_permission(
+        Permission.AGENT_READ,
+        scope=agent_task_scope("id", Permission.AGENT_READ),
+        operation=agent_task_operation("id"),
+    )
     @tenant_scoped()
     def agent_task_usage_snapshot(self, info: Info, id: strawberry.ID) -> TaskUsageSnapshot | None:
         guid = _valid_guid(id)
