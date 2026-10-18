@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import timedelta
-from threading import Event
+from threading import Event, get_ident
 from threading import enumerate as active_threads
 from types import SimpleNamespace
 from uuid import uuid4
@@ -59,6 +59,9 @@ from providers.tests.gcp.test_identity_submission_2278 import SubmissionWire
 _HISTORY_SCAN_LIMIT = 2048
 _HISTORY_ROW_LIMIT = 8
 _HISTORY_COUNT_LIMIT = 1_000_000
+_FAILURE_DIAGNOSTIC_BYTES = 16 * 1024
+_FAILURE_HISTORY_SECONDS = 3
+_OWNED_THREAD_FRAME_LIMIT = 12
 _SAFE_TIMEOUT_NAMES = {
     "TIMEOUT_TYPE_START_TO_CLOSE",
     "TIMEOUT_TYPE_SCHEDULE_TO_START",
@@ -318,6 +321,167 @@ def test_safe_exception_chain_includes_suppressed_context_without_text():
     assert "private-depth" not in json.dumps(deep_rows)
 
 
+def _safe_owned_thread_stack(thread_id):
+    """Read frames for one previously registered thread, never locals or other threads."""
+    if type(thread_id) is not int or thread_id <= 0:
+        return []
+    frame = sys._current_frames().get(thread_id)
+    rows = []
+    while frame is not None and len(rows) < _OWNED_THREAD_FRAME_LIMIT:
+        filename = frame.f_code.co_filename.rsplit("/", 1)[-1]
+        function = frame.f_code.co_name
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", filename):
+            filename = "unknown"
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", function):
+            function = "unknown"
+        line = frame.f_lineno
+        rows.append(
+            {"file": filename, "function": function, "line": line if type(line) is int and line > 0 else 0}
+        )
+        frame = frame.f_back
+    return rows
+
+
+def _safe_checkpoint_summary(world):
+    stage_names = {
+        "direct_db_transition",
+        "source_bootstrap",
+        "endpoint_source",
+        "endpoint_refresh",
+        "preparation",
+        "annotation",
+        "iam",
+        "placement",
+        "apply",
+        "runtime",
+    }
+    stages = {}
+    for name, count in getattr(world, "checkpoint_stages", {}).items():
+        if name in stage_names and type(count) is int and 0 <= count <= _HISTORY_COUNT_LIMIT:
+            stages[name] = count
+    calls = getattr(world, "checkpoint_calls", 0)
+    return {
+        "calls": calls if type(calls) is int and 0 <= calls <= _HISTORY_COUNT_LIMIT else 0,
+        "stages": stages,
+    }
+
+
+def _failure_diagnostic_line(*, callback_error, thread_frames, checkpoints, history=None, history_error=None):
+    callback_chain = _safe_exception_chain(callback_error)
+    history_error_chain = (
+        _safe_exception_chain(history_error) if isinstance(history_error, BaseException) else []
+    )
+    safe_frames = []
+    for row in thread_frames[:_OWNED_THREAD_FRAME_LIMIT]:
+        if not isinstance(row, dict):
+            continue
+        filename = row.get("file")
+        function = row.get("function")
+        line = row.get("line")
+        if not isinstance(filename, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", filename):
+            filename = "unknown"
+        if not isinstance(function, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", function):
+            function = "unknown"
+        safe_frames.append(
+            {
+                "file": filename,
+                "function": function,
+                "line": line if type(line) is int and 0 < line < 10**7 else 0,
+            }
+        )
+    value = {
+        "callbackError": callback_chain,
+        "activityThreadFrames": safe_frames,
+        "checkpoints": checkpoints,
+        "history": history,
+        "historyDiagnosticError": history_error_chain,
+    }
+    try:
+        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) <= _FAILURE_DIAGNOSTIC_BYTES:
+            return encoded
+    except BaseException:
+        pass
+    # Diagnostics are best-effort and must never replace the callback failure.
+    return '{"diagnostic":"bounded_failure_diagnostic_unavailable"}'
+
+
+def test_failure_diagnostic_is_bounded_and_redacts_callback_and_history_payloads():
+    callback_error = None
+    try:
+        raise RuntimeError("private-callback-message-canary")
+    except RuntimeError as error:
+        callback_error = error
+    history = _safe_temporal_history_summary(
+        SimpleNamespace(
+            events=[
+                HistoryEvent(
+                    event_id=1,
+                    event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED,
+                )
+            ]
+        )
+    )
+    line = _failure_diagnostic_line(
+        callback_error=callback_error,
+        thread_frames=[{"file": "worker.py", "function": "run", "line": 12}] * 5000,
+        checkpoints={"calls": 3, "stages": {"apply": 1}},
+        history=history,
+        history_error=ValueError("private-history-message-canary"),
+    )
+    parsed = json.loads(line)
+
+    assert len(line.encode("utf-8")) <= _FAILURE_DIAGNOSTIC_BYTES
+    assert len(parsed["activityThreadFrames"]) <= _OWNED_THREAD_FRAME_LIMIT
+    assert "private-" not in line
+    assert "callbackErrorType" not in parsed
+
+
+def test_failure_diagnostic_formatter_failure_has_constant_safe_fallback(monkeypatch):
+    try:
+        raise RuntimeError("private-callback-message-canary")
+    except RuntimeError as error:
+        callback_error = error
+
+    monkeypatch.setattr(json, "dumps", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("secret")))
+    line = _failure_diagnostic_line(
+        callback_error=callback_error,
+        thread_frames=[],
+        checkpoints={"calls": 0, "stages": {}},
+    )
+
+    assert line == '{"diagnostic":"bounded_failure_diagnostic_unavailable"}'
+
+
+def test_owned_thread_stack_reads_only_registered_thread_and_caps_frames(monkeypatch):
+    class Frame:
+        f_back = None
+        f_lineno = 7
+        f_code = SimpleNamespace(co_filename="/private/worker.py", co_name="owned")
+
+    frame = Frame()
+    monkeypatch.setattr(sys, "_current_frames", lambda: {41: frame, 42: Frame()})
+    rows = _safe_owned_thread_stack(41)
+
+    assert rows == [{"file": "worker.py", "function": "owned", "line": 7}]
+    assert _safe_owned_thread_stack(0) == []
+
+
+async def _fetch_bounded_failure_history(handle):
+    events = []
+    iterator = handle.fetch_history_events(
+        page_size=64,
+        rpc_timeout=timedelta(seconds=1),
+    ).__aiter__()
+    for _ in range(_HISTORY_SCAN_LIMIT):
+        try:
+            event = await iterator.__anext__()
+        except StopAsyncIteration:
+            break
+        events.append(event)
+    return _safe_temporal_history_summary(SimpleNamespace(events=events))
+
+
 pytestmark = pytest.mark.django_db(transaction=True)
 
 
@@ -488,6 +652,7 @@ def native_world(monkeypatch, client, tmp_path):
     monkeypatch.setattr(_ScopedDeploymentExecutionCheckpoint, "_admitted", measured_admitted)
 
     def recorded(input, *, ports):
+        w.activity_thread_id = get_ident()
         try:
             return execute_native_endpoint_configuration(input, ports=ports)
         except Exception as error:
@@ -667,6 +832,7 @@ async def run(
         return result
 
     def scheduled_ports():
+        w.activity_thread_id = get_ident()
         assert released.wait(30), "HTTP admission/controlled withdrawal must settle"
         if w.before_ports is not None:
             w.before_ports()
@@ -702,6 +868,41 @@ async def run(
             if during:
                 try:
                     await during(handle)
+                except BaseException as callback_error:
+                    # Capture the one registered activity thread while it is
+                    # still held, then release it before diagnostic I/O.
+                    try:
+                        activity_frames = _safe_owned_thread_stack(getattr(w, "activity_thread_id", None))
+                    except BaseException:
+                        activity_frames = []
+                    try:
+                        checkpoints = _safe_checkpoint_summary(w)
+                    except BaseException:
+                        checkpoints = {"calls": 0, "stages": {}}
+                    released.set()
+                    history_summary = None
+                    history_error = None
+                    try:
+                        history_summary = await asyncio.wait_for(
+                            _fetch_bounded_failure_history(handle),
+                            timeout=_FAILURE_HISTORY_SECONDS,
+                        )
+                    except BaseException as diagnostic_error:
+                        history_error = diagnostic_error
+                    try:
+                        print(
+                            _failure_diagnostic_line(
+                                callback_error=callback_error,
+                                thread_frames=activity_frames,
+                                checkpoints=checkpoints,
+                                history=history_summary,
+                                history_error=history_error,
+                            )
+                        )
+                    except BaseException:
+                        # The original callback failure remains authoritative.
+                        pass
+                    raise
                 finally:
                     released.set()
             try:
