@@ -14640,6 +14640,7 @@
     },
     "health": {
       "healthy": "网关运行中",
+      "stale": "网关未上报",
       "pending": "网关尚未部署",
       "off": "网关已关闭",
       "error": "网关出错"
@@ -14689,7 +14690,16 @@
       "clustersTitle": "各集群的网关状况",
       "clustersDescription": "每个已注册集群的 Zentinelle 网关。",
       "installOff": "此安装已关闭 Zentinelle 网关。已注册的集群保留其凭据;平台运维人员开启后会部署网关。",
-      "noClusters": "尚无集群注册到 Zentinelle。"
+      "noClusters": "尚无集群注册到 Zentinelle。",
+      "serverVersion": "Zentinelle 版本",
+      "blocks": "拦截次数(过去 24 小时)",
+      "approvals": "待处理的审批",
+      "notAvailable": "不可用",
+      "countsError": "无法从 Zentinelle 读取运行状况",
+      "reportNotAvailable": "版本和最后上报时间不可用",
+      "neverReported": "尚未上报",
+      "versionUnknown": "版本未知",
+      "reported": "{version},最后上报 {seen}"
     },
     "clusters": {
       "installOff": "此安装已关闭 Zentinelle 网关。注册集群会保存其凭据;平台运维人员开启网关后才会部署。",

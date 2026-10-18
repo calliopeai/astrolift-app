@@ -64,7 +64,9 @@ def _scheduled(history):
     ]
 
 
-async def deploy(w, client, temporal_env, *, before=None, during=None, sandboxed=True):
+async def deploy(
+    w, client, temporal_env, *, before=None, during=None, sandboxed=True, dispatch=dispatch_context
+):
     """One actual HTTP deploy request, approved, run by the ordinary workflow."""
     from astrolift_lifecycle.schema.mutations import helpers
     from astrolift_workflows import client as native_client
@@ -105,7 +107,7 @@ async def deploy(w, client, temporal_env, *, before=None, during=None, sandboxed
             activity_executor=executor,
             **runner,
         ):
-            row, _, _ = await sync_to_async(dispatch_context)(w, client)
+            row, _, _ = await sync_to_async(dispatch)(w, client)
             if before:
                 await sync_to_async(before)()
             expected = await sync_to_async(DeploymentExecutionReceipt.objects.get)(

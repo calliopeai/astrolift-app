@@ -57,9 +57,62 @@ Endpoint removes only grants no current consumer still needs.
 
 A lost reply, a dead worker or an expired heartbeat never proves an old send
 was cancelled. The configuration activity is not retried, and while any journal
-stays `SENT` or `UNKNOWN` every later Deployment refuses before it reads or
-writes anything native. Resolving it is an operator step: confirm the actual
-native state against the journal's recorded evidence, under review.
+stays `SENT` or `UNKNOWN`, or incomplete, every later Deployment refuses before
+it reads or writes anything native.
+
+### Settling a stuck journal
+
+Resolving it is an operator step, `resolve_native_gcp_journal`:
+
+```
+python manage.py resolve_native_gcp_journal --app <app guid> --cluster <cluster guid>
+python manage.py resolve_native_gcp_journal --app <app guid> --cluster <cluster guid> \
+    --operator <email> --attestation "<what you checked>" --apply
+```
+
+Without `--apply` it lists the unresolved journals. With it, every unresolved
+preparation, IAM and apply journal of the app on that cluster becomes
+`RESOLVED` in one transaction, or none does, with one append-only
+`GCPNativeJournalResolution` row each (operator, attestation, prior state and
+ledger hash, and the dropped intents). It calls no cloud or cluster API and
+never records an observation. It refuses:
+
+- `OPERATION_STILL_ACTIVE` while the Deployment that owns the operation is not
+  `failed`, `superseded` or `rolled_back`;
+- `JOURNAL_BUSY` while a worker holds the journal's mutex;
+- `RESOLUTION_GUARD_WINDOW` for a `SENT`/`UNKNOWN` send until the journal has
+  not moved for two hours, longer than the activity's 60-minute budget and
+  every bounded RPC deadline;
+- `ATTESTATION_REQUIRED` without a 20 to 500 character attestation, and
+  `OPERATOR_REQUIRED` without an active user.
+
+What settling does:
+
+- Preparation: pending intents are dropped; recorded namespace and KSA UIDs
+  stay. The next Deployment does not adopt an object a dropped create may have
+  made: it refuses `EXISTING_SUBJECT_UID_UNRECORDED`. Before applying, check
+  each dropped `POST` path and delete a stray namespace or KSA the lost create
+  left (it carries the `astrolift.io/preparation-operation` annotation of the
+  failed operation).
+- IAM: grants a pending write or an unfinished removal may have left are folded
+  into the owned set. They name the app's own GSA and KSA principals, so the
+  next reconcile removes any the current Endpoint union no longer wants, and
+  keeps foreign and conditional bindings as always.
+- Apply: the pending intent is dropped; recorded resource UIDs stay.
+
+The next Deployment takes the settled journals as its previous generation.
+
+## Rollback
+
+`rollbackDeployment` on a native app no longer refuses
+`NATIVE_HUMAN_ORIGIN_REQUIRED`. It captures a fresh protected origin
+(the caller needs `app.deploy` as well as `app.rollback`), creates a `rollback`
+Deployment of the prior superseded image, honours the environment's approval
+quorum like any native Deployment, and runs it as the canonical
+`DeployAppWorkflow`, so the native steps above apply unchanged. The legacy
+`RollbackDeploymentWorkflow` still refuses a native app. The current Deployment
+stays `running` until the rollback is observed live; completion then marks it
+`rolled_back`.
 
 ## Rollout observation
 
@@ -77,7 +130,6 @@ readback does not prove token exchange or a successful prediction.
 - Platform builds for native apps.
 - Physical subject evolution (renamed namespaces or service accounts) and
   complete resource removal.
-- Native rollback.
 - Live GKE token exchange and Vertex inference acceptance.
 
 Controlled generated-SDK, owned TLS, PostgreSQL and Temporal fixtures are local

@@ -6630,7 +6630,9 @@ export type AstroliftZentinelleClusterGateway = {
   gatewayDeployed: Scalars['Boolean']['output'];
   gatewayEnabled: Scalars['Boolean']['output'];
   gatewayName: Scalars['String']['output'];
+  gatewayVersion?: Maybe<Scalars['String']['output']>;
   lastError: Scalars['String']['output'];
+  lastSeenAt?: Maybe<Scalars['DateTime']['output']>;
   registeredAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   unregistered: Scalars['Boolean']['output'];
@@ -6652,6 +6654,7 @@ export type AstroliftZentinelleConnection = {
   gatewayUrl: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastError: Scalars['String']['output'];
+  serverVersion?: Maybe<Scalars['String']['output']>;
   status: Scalars['String']['output'];
   tenantIds: Array<Scalars['String']['output']>;
   zentinelleInstallId: Scalars['String']['output'];
@@ -6672,6 +6675,13 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   data?: Maybe<AstroliftZentinelleDisconnect>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinelleHealth = {
+  available: Scalars['Boolean']['output'];
+  blocks?: Maybe<Scalars['Int']['output']>;
+  openApprovals?: Maybe<Scalars['Int']['output']>;
+  windowHours?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftZentinellePolicy = {
@@ -12994,6 +13004,7 @@ export type Query = {
   astroliftZentinelleAuditPage: AstroliftZentinelleAuditPage;
   astroliftZentinelleCapability: AstroliftZentinelleCapability;
   astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
+  astroliftZentinelleHealth: AstroliftZentinelleHealth;
   astroliftZentinelleInstallConnection?: Maybe<AstroliftZentinelleConnection>;
   astroliftZentinellePolicies: Array<AstroliftZentinellePolicy>;
   astroliftZentinelleUsage: AstroliftZentinelleUsage;

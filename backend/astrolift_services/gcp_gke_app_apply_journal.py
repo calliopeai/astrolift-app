@@ -511,7 +511,9 @@ class AppApplyStore:
                     and previous_ledger.pending.phase == ApplyPhase.REJECTED
                     and previous_ledger.rejection is not None
                 )
-                if not definitively_rejected and (
+                # RESOLVED is an operator settlement (#2278), never an observation.
+                settled = journal.state == "RESOLVED" and previous_ledger.pending is None
+                if not (definitively_rejected or settled) and (
                     journal.state != "OBSERVED" or journal.observed_at is None or previous_ledger.pending
                 ):
                     raise AppApplyJournalError("APPLY_UNRESOLVED_NO_TAKEOVER")

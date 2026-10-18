@@ -125,6 +125,11 @@ CLI_OPERATOR_DEVICE_SCOPES: tuple[str, ...] = (
     SCOPE_WRITE_APP_ACCESS,
 )
 
+# ``astro auth login --scope admin`` (#2448): the full-power wildcard, for a
+# platform operator only. ``device_flow.approve_session`` refuses anyone else,
+# and the sign-in lasts CLI_ADMIN_SESSION_HOURS instead of the CLI's 30 days.
+CLI_ADMIN_DEVICE_SCOPES: tuple[str, ...] = (SCOPE_ADMIN,)
+
 _current_api_token: contextvars.ContextVar[object | None] = contextvars.ContextVar(
     "astrolift_api_token",
     default=None,
@@ -588,20 +593,10 @@ def touch_token(token, *, ip: str | None = None, user_agent: str | None = None) 
 
 
 def client_ip_from_request(request) -> str | None:
-    """Extract the caller's IP, honoring ``X-Forwarded-For``.
+    """The caller's IP, as :func:`config.proxies.client_address` resolves it (#2440)."""
+    from config.proxies import client_address
 
-    Behind ALB / Cloudfront we receive a comma-separated chain; the
-    left-most entry is the original client. Falls back to
-    ``REMOTE_ADDR`` (single proxy / direct connect) when no XFF is
-    present. Returns ``None`` when we can't resolve a usable IP.
-    """
-    xff = request.META.get("HTTP_X_FORWARDED_FOR", "") if hasattr(request, "META") else ""
-    if xff:
-        first = xff.split(",")[0].strip()
-        if _is_ip(first):
-            return first
-    remote = request.META.get("REMOTE_ADDR", "") if hasattr(request, "META") else ""
-    return remote if _is_ip(remote) else None
+    return client_address(request)
 
 
 def user_agent_from_request(request) -> str:

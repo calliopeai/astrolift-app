@@ -1,7 +1,17 @@
 "use client";
 
-import { ActivityIcon, BotIcon, NetworkIcon, ServerIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  BotIcon,
+  HandIcon,
+  NetworkIcon,
+  ServerIcon,
+  ShieldBanIcon,
+  TagIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
+import * as React from "react";
 
 import { QueryError } from "@/components/QueryError";
 import { StatusDot } from "@/components/StatusDot";
@@ -16,12 +26,16 @@ import {
   liveClusters,
   type ReadState,
   type UsageTotals,
+  type ZentinelleCluster,
   type ZentinelleConnection,
+  type ZentinelleHealthCounts,
 } from "./zentinelle-model";
 
 export interface ZentinelleHealth {
   /** Usage over the last 24 hours and this month; null without usage_view. */
   usage: ReadState<{ day: UsageTotals; month: UsageTotals } | null>;
+  /** Blocks and open approvals from Zentinelle; null without status_view. */
+  counts: ReadState<ZentinelleHealthCounts | null>;
 }
 
 export interface ZentinelleOverviewProps extends ZentinelleHealth {
@@ -30,17 +44,37 @@ export interface ZentinelleOverviewProps extends ZentinelleHealth {
 }
 
 /**
- * Agents observed, requests in the last 24 hours, and each cluster's gateway.
+ * The health card: gateways, Zentinelle's version, blocks in the last 24
+ * hours, open approvals, agents observed, requests in the last 24 hours,
+ * and each registered cluster's gateway. A count
+ * an older Zentinelle cannot give reads "Not available".
  */
-export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProps) {
+export function ZentinelleOverview({ connection, usage, counts }: ZentinelleOverviewProps) {
+  const [now] = React.useState(() => Date.now());
   const t = useTranslations("zentinelleScreen.overview");
   const th = useTranslations("zentinelleScreen.health");
   const format = useFormatter();
   const clusters = liveClusters(connection);
   const installEnabled = connection?.gatewayFeatureEnabled ?? false;
-  const healthy = clusters.filter((c) => gatewayHealth(c, installEnabled) === "healthy").length;
+  const healthy = clusters.filter(
+    (c) => gatewayHealth(c, installEnabled, now) === "healthy"
+  ).length;
   const day = usage.data?.day;
   const month = usage.data?.month;
+  const reported = counts.data?.available ? counts.data : null;
+  const unavailable = counts.data?.available === false;
+  const count = (value: number | null | undefined) =>
+    unavailable ? t("notAvailable") : value == null ? null : format.number(value);
+
+  function seen(cluster: ZentinelleCluster): string {
+    if (cluster.gatewayVersion == null) return t("reportNotAvailable");
+    if (!cluster.lastSeenAt) return t("neverReported");
+    const version = cluster.gatewayVersion || t("versionUnknown");
+    return t("reported", {
+      version,
+      seen: format.relativeTime(new Date(cluster.lastSeenAt), now),
+    });
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -54,7 +88,7 @@ export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProp
         </div>
       )}
       <Section title={t("title")}>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {connection && (
             <StatTile
               label={t("gateways")}
@@ -62,6 +96,29 @@ export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProp
               icon={NetworkIcon}
             />
           )}
+          {connection && (
+            <StatTile
+              label={t("serverVersion")}
+              value={connection.serverVersion ?? t("notAvailable")}
+              icon={TagIcon}
+            />
+          )}
+          {counts.data !== null || counts.loading ? (
+            <>
+              <StatTile
+                label={t("blocks")}
+                value={count(reported?.blocks)}
+                icon={ShieldBanIcon}
+                loading={counts.loading}
+              />
+              <StatTile
+                label={t("approvals")}
+                value={count(reported?.openApprovals)}
+                icon={HandIcon}
+                loading={counts.loading}
+              />
+            </>
+          ) : null}
           {usage.data !== null || usage.loading ? (
             <>
               <StatTile
@@ -84,6 +141,11 @@ export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProp
             <QueryError title={t("usageError")} error={usage.error} onRetry={usage.onRetry} />
           </div>
         )}
+        {counts.error && (
+          <div className="mt-4">
+            <QueryError title={t("countsError")} error={counts.error} onRetry={counts.onRetry} />
+          </div>
+        )}
       </Section>
 
       {connection && (
@@ -97,7 +159,7 @@ export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProp
                 <p className="text-muted-foreground py-6 text-center text-sm">{t("noClusters")}</p>
               ) : (
                 clusters.map((cluster) => {
-                  const health = gatewayHealth(cluster, installEnabled);
+                  const health = gatewayHealth(cluster, installEnabled, now);
                   return (
                     <div
                       key={cluster.clusterId}
@@ -110,6 +172,9 @@ export function ZentinelleOverview({ connection, usage }: ZentinelleOverviewProp
                       <span className="inline-flex items-center gap-2 text-sm">
                         <StatusDot status={HEALTH_DOT[health]} />
                         {th(health)}
+                      </span>
+                      <span className="text-muted-foreground w-full text-xs [overflow-wrap:anywhere] sm:w-auto">
+                        {seen(cluster)}
                       </span>
                       {cluster.lastError && (
                         <p className="text-danger-fg w-full text-xs [overflow-wrap:anywhere]">

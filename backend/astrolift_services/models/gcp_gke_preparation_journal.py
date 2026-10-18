@@ -13,6 +13,8 @@ class GCPGKEPreparationJournal(BaseCoreModel):
         UNKNOWN = "UNKNOWN"
         PREPARED = "PREPARED"
         OBSERVED = "OBSERVED"
+        # Operator-settled after an unresolved send (#2278); never an observation.
+        RESOLVED = "RESOLVED"
 
     organization = models.ForeignKey("astrolift_identity.Organization", on_delete=models.PROTECT)
     registered_app = models.ForeignKey("astrolift_registry.RegisteredApp", on_delete=models.PROTECT)

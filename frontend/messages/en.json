@@ -14640,6 +14640,7 @@
     },
     "health": {
       "healthy": "Gateway running",
+      "stale": "Gateway not heard from",
       "pending": "Gateway not deployed yet",
       "off": "Gateway off",
       "error": "Gateway error"
@@ -14689,7 +14690,16 @@
       "clustersTitle": "Gateway health per cluster",
       "clustersDescription": "Each registered cluster's Zentinelle gateway.",
       "installOff": "Zentinelle gateways are turned off for this install. Registered clusters keep their credentials; gateways deploy once the platform operator turns them on.",
-      "noClusters": "No clusters are registered with Zentinelle yet."
+      "noClusters": "No clusters are registered with Zentinelle yet.",
+      "serverVersion": "Zentinelle version",
+      "blocks": "Blocks, last 24 hours",
+      "approvals": "Open approvals",
+      "notAvailable": "Not available",
+      "countsError": "Could not read health from Zentinelle",
+      "reportNotAvailable": "Version and last seen not available",
+      "neverReported": "Not reported yet",
+      "versionUnknown": "version unknown",
+      "reported": "{version}, seen {seen}"
     },
     "clusters": {
       "installOff": "Zentinelle gateways are turned off for this install. Registering a cluster stores its credential; the gateway deploys once the platform operator turns gateways on.",

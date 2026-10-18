@@ -8,6 +8,7 @@ import type {
   ZentinelleAuditPageQuery,
   ZentinelleClusterFieldsFragment,
   ZentinelleConnectionFieldsFragment,
+  ZentinelleHealthQuery,
   ZentinellePoliciesQuery,
   ZentinelleUsageQuery,
 } from "@/graphql/__generated__/operations";
@@ -19,6 +20,7 @@ export type ZentinelleUsageRow = ZentinelleUsageQuery["astroliftZentinelleUsage"
 export type ZentinellePolicy = ZentinellePoliciesQuery["astroliftZentinellePolicies"][number];
 export type ZentinelleAuditEvent =
   ZentinelleAuditPageQuery["astroliftZentinelleAuditPage"]["events"][number];
+export type ZentinelleHealthCounts = ZentinelleHealthQuery["astroliftZentinelleHealth"];
 
 export const ZENTINELLE_TABS = ["overview", "clusters", "usage", "policies", "audit"] as const;
 export type ZentinelleTab = (typeof ZENTINELLE_TABS)[number];
@@ -73,21 +75,35 @@ export function visibleTabs(access: ZentinelleAccess, connected: boolean): Zenti
   });
 }
 
-export type GatewayHealth = "healthy" | "pending" | "off" | "error";
+export type GatewayHealth = "healthy" | "stale" | "pending" | "off" | "error";
+
+/** Zentinelle reads a gateway not heard from for this long as stale (#2436). */
+export const GATEWAY_STALE_AFTER_MS = 5 * 60_000;
 
 /**
  * One cluster's gateway at a glance: an error while the last operation's
  * failure stands, off when turned off for the cluster or the install, else
- * healthy once deployed and pending until then.
+ * healthy once deployed and pending until then. A deployed gateway Zentinelle
+ * last heard from more than five minutes ago is stale; one Zentinelle cannot
+ * say anything about (an older release) stays healthy, as before.
  */
-export function gatewayHealth(cluster: ZentinelleCluster, installEnabled: boolean): GatewayHealth {
+export function gatewayHealth(
+  cluster: ZentinelleCluster,
+  installEnabled: boolean,
+  now: number = Date.now()
+): GatewayHealth {
   if (cluster.lastError || cluster.status === "error") return "error";
   if (!cluster.gatewayEnabled || !installEnabled) return "off";
-  return cluster.gatewayDeployed ? "healthy" : "pending";
+  if (!cluster.gatewayDeployed) return "pending";
+  if (cluster.lastSeenAt && now - Date.parse(cluster.lastSeenAt) > GATEWAY_STALE_AFTER_MS) {
+    return "stale";
+  }
+  return "healthy";
 }
 
 export const HEALTH_DOT = {
   healthy: "ok",
+  stale: "warn",
   pending: "warn",
   off: "muted",
   error: "error",
@@ -103,7 +119,7 @@ export function isDegraded(connection: ZentinelleConnection | null): boolean {
   if (!connection) return false;
   return liveClusters(connection).some((c) => {
     const health = gatewayHealth(c, connection.gatewayFeatureEnabled);
-    return health === "error" || health === "pending";
+    return health === "error" || health === "pending" || health === "stale";
   });
 }
 

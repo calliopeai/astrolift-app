@@ -14640,6 +14640,7 @@
     },
     "health": {
       "healthy": "ゲートウェイ稼働中",
+      "stale": "ゲートウェイから応答がありません",
       "pending": "ゲートウェイ未デプロイ",
       "off": "ゲートウェイ停止",
       "error": "ゲートウェイのエラー"
@@ -14689,7 +14690,16 @@
       "clustersTitle": "クラスターごとのゲートウェイの状態",
       "clustersDescription": "登録済みの各クラスターの Zentinelle ゲートウェイです。",
       "installOff": "このインストールでは Zentinelle ゲートウェイがオフになっています。登録済みのクラスターは認証情報を保持し、プラットフォーム運用者がオンにするとゲートウェイがデプロイされます。",
-      "noClusters": "Zentinelle に登録されたクラスターはまだありません。"
+      "noClusters": "Zentinelle に登録されたクラスターはまだありません。",
+      "serverVersion": "Zentinelle のバージョン",
+      "blocks": "ブロック数(過去 24 時間)",
+      "approvals": "未処理の承認",
+      "notAvailable": "利用できません",
+      "countsError": "Zentinelle から稼働状況を読み取れませんでした",
+      "reportNotAvailable": "バージョンと最終確認は利用できません",
+      "neverReported": "まだ報告がありません",
+      "versionUnknown": "バージョン不明",
+      "reported": "{version}、最終確認 {seen}"
     },
     "clusters": {
       "installOff": "このインストールでは Zentinelle ゲートウェイがオフになっています。クラスターを登録すると認証情報が保存され、プラットフォーム運用者がゲートウェイをオンにするとデプロイされます。",

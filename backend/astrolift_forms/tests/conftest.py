@@ -17,7 +17,7 @@ def info():
     """A minimal Strawberry ``Info`` stand-in.
 
     The forms resolvers only ever touch ``info.context.request``
-    (for X-Forwarded-For / User-Agent capture on submit). Tests that
+    (for client address / User-Agent capture on submit). Tests that
     don't care about ip / UA can pass ``request=None``.
     """
 

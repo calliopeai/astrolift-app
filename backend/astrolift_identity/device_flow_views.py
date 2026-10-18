@@ -416,44 +416,49 @@ def device_flow_approval(request: HttpRequest, session_guid: str) -> HttpRespons
                 # User has multiple orgs and didn't pick one — re-
                 # render the picker with an error message rather
                 # than silently picking for them.
-                return render(
-                    request,
-                    "astrolift_identity/device_flow_approve.html",
-                    {
-                        "session": row,
-                        "multi_org_options": multi_org_options,
-                        "requested_scopes": device_flow.token_scopes_for_client_kind(row.client_kind),
-                        "error": "Choose the organization to authorize.",
-                    },
-                    status=400,
+                return _render_approve(
+                    request, row, multi_org_options, error="Choose the organization to authorize.", status=400
                 )
             err = device_flow.approve_session(
                 row,
                 user=request.user,
                 organization=chosen_org,
             )
+            if err == "operator_required":
+                _audit_admin_approval(request, row, chosen_org, decision="DENY")
+                return _render_approve(request, row, multi_org_options, error=_ADMIN_REFUSED, status=403)
             if err == "expired":
                 return _render_terminal(request, row, status="expired")
             if err == "already_terminal":
                 return _render_terminal(request, row, status=row.state)
+            if device_flow.is_admin_session(row):
+                _audit_admin_approval(request, row, chosen_org, decision="ALLOW")
             return _render_terminal(request, row, status="approved")
 
         # Unknown action falls through to a re-render
-        return render(
-            request,
-            "astrolift_identity/device_flow_approve.html",
-            {
-                "session": row,
-                "multi_org_options": multi_org_options,
-                "requested_scopes": device_flow.token_scopes_for_client_kind(row.client_kind),
-                "error": "Unknown action.",
-            },
-            status=400,
-        )
+        return _render_approve(request, row, multi_org_options, error="Unknown action.", status=400)
 
     # GET
     if row.state != DeviceFlowSession.STATE_PENDING:
         return _render_terminal(request, row, status=row.state)
+    return _render_approve(request, row, multi_org_options)
+
+
+_ADMIN_REFUSED = (
+    "Only the platform operator can approve full administrative access. "
+    "Ask your platform operator to approve it, or run astro auth login without --scope admin."
+)
+
+
+def _render_approve(
+    request: HttpRequest, row, multi_org_options, *, error: str = "", status: int = 200
+) -> HttpResponse:
+    """The approval page. An admin request (#2448) says plainly what it grants,
+    and only the platform operator sees an Approve button for it."""
+    from core.permissions import is_platform_operator
+
+    admin_request = device_flow.is_admin_session(row)
+    can_approve = not admin_request or is_platform_operator(request.user)
     return render(
         request,
         "astrolift_identity/device_flow_approve.html",
@@ -461,7 +466,39 @@ def device_flow_approval(request: HttpRequest, session_guid: str) -> HttpRespons
             "session": row,
             "multi_org_options": multi_org_options,
             "requested_scopes": device_flow.token_scopes_for_client_kind(row.client_kind),
+            "admin_request": admin_request,
+            "admin_hours": int(device_flow.admin_session_ttl().total_seconds() // 3600),
+            "can_approve": can_approve,
+            "error": error or ("" if can_approve else _ADMIN_REFUSED),
         },
+        status=status,
+    )
+
+
+def _audit_admin_approval(request: HttpRequest, row, organization, *, decision: str) -> None:
+    """Record who approved, or tried to approve, an admin sign-in and from where (#2448)."""
+    from core.mutations import AuditEntry, emit_audit
+
+    emit_audit(
+        AuditEntry(
+            actor_user_id=request.user.pk,
+            organization_id=getattr(organization, "pk", None),
+            action="auth.device_flow.admin_approved",
+            decision=decision,
+            target_kind="device_flow_session",
+            target_id=str(row.guid),
+            duration_ms=0,
+            permissions=(),
+            error_code=None if decision == "ALLOW" else "PERMISSION_DENIED",
+            extra={
+                "approver_ip": client_ip_from_request(request),
+                "approver_user_agent": user_agent_from_request(request),
+                "device_ip": row.client_ip,
+                "device_label": row.client_label,
+                "device_user_agent": row.user_agent,
+                "session_hours": int(device_flow.admin_session_ttl().total_seconds() // 3600),
+            },
+        )
     )
 
 

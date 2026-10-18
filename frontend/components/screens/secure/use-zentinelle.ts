@@ -12,6 +12,7 @@ import type {
   ZentinelleCapabilityQuery,
   ZentinelleClusterChoicesQuery,
   ZentinelleConnectionQuery,
+  ZentinelleHealthQuery,
   ZentinellePoliciesQuery,
   ZentinelleScopeOptionsQuery,
   ZentinelleUsageQuery,
@@ -31,6 +32,7 @@ import {
   ZENTINELLE_CAPABILITY,
   ZENTINELLE_CLUSTER_CHOICES,
   ZENTINELLE_CONNECTION,
+  ZENTINELLE_HEALTH,
   ZENTINELLE_POLICIES,
   ZENTINELLE_SCOPE_OPTIONS,
   ZENTINELLE_USAGE,
@@ -143,6 +145,11 @@ export function useZentinelle(): ZentinelleScreenProps {
     skip: healthSkip,
   });
   const healthError = day.error?.message ?? month.error?.message ?? null;
+  const countsSkip = !live || tab !== "overview" || !access.status;
+  const counts = useQuery<ZentinelleHealthQuery>(ZENTINELLE_HEALTH, {
+    fetchPolicy: "cache-and-network",
+    skip: countsSkip,
+  });
 
   // ---- usage, policies, audit --------------------------------------------
   const scopeOptions = useQuery<ZentinelleScopeOptionsQuery>(ZENTINELLE_SCOPE_OPTIONS, {
@@ -311,6 +318,12 @@ export function useZentinelle(): ZentinelleScreenProps {
           void day.refetch();
           void month.refetch();
         },
+      },
+      counts: {
+        data: access.status ? (counts.data?.astroliftZentinelleHealth ?? null) : null,
+        loading: !countsSkip && counts.loading && !counts.data,
+        error: counts.error && !counts.data ? counts.error.message : null,
+        onRetry: () => void counts.refetch(),
       },
     },
     clusters: {
