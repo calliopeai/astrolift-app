@@ -14682,6 +14682,7 @@
     },
     "health": {
       "healthy": "게이트웨이 실행 중",
+      "stale": "게이트웨이 응답 없음",
       "pending": "게이트웨이 아직 배포 안 됨",
       "off": "게이트웨이 꺼짐",
       "error": "게이트웨이 오류"
@@ -14732,7 +14733,20 @@
       "clustersTitle": "클러스터별 게이트웨이 상태",
       "clustersDescription": "등록된 각 클러스터의 Zentinelle 게이트웨이입니다.",
       "installOff": "이 설치에서는 Zentinelle 게이트웨이가 꺼져 있습니다. 등록된 클러스터는 자격 증명을 유지하며, 플랫폼 운영자가 켜면 게이트웨이가 배포됩니다.",
-      "noClusters": "아직 Zentinelle에 등록된 클러스터가 없습니다."
+      "noClusters": "아직 Zentinelle에 등록된 클러스터가 없습니다.",
+      "serverVersion": "Zentinelle 버전",
+      "blocks": "차단, 최근 24시간",
+      "approvals": "대기 중인 승인",
+      "budget": "이번 달 예산",
+      "budgetValue": "{percent}% 사용",
+      "budgetFooter": "{limit} 중 {spend} ({name})",
+      "noBudget": "설정된 예산 없음",
+      "notAvailable": "사용할 수 없음",
+      "countsError": "Zentinelle에서 상태를 읽을 수 없습니다",
+      "reportNotAvailable": "버전 및 마지막 확인 정보를 사용할 수 없음",
+      "neverReported": "아직 보고되지 않음",
+      "versionUnknown": "버전 알 수 없음",
+      "reported": "{version}, 마지막 확인 {seen}"
     },
     "clusters": {
       "installOff": "이 설치에서는 Zentinelle 게이트웨이가 꺼져 있습니다. 클러스터를 등록하면 자격 증명이 저장되고, 플랫폼 운영자가 게이트웨이를 켜면 배포됩니다.",

@@ -26,6 +26,13 @@
       </dd>
     </dl>
 
+    {% if admin_request %}
+      <div class="error">
+        <strong>{% trans "Full administrative access." %}</strong>
+        {% blocktrans with hours=admin_hours %}This device could do everything you can do as the platform operator, across the whole install, for {{ hours }} hours. Approve only if you started this sign-in yourself.{% endblocktrans %}
+      </div>
+    {% endif %}
+
     <form method="post">
       {% csrf_token %}
       {% if multi_org_options %}
@@ -38,9 +45,11 @@
         </select>
       {% endif %}
       <div class="actions">
-        <button type="submit" name="action" value="approve" class="primary">
-          {% trans "Approve" %}
-        </button>
+        {% if can_approve %}
+          <button type="submit" name="action" value="approve" class="primary">
+            {% trans "Approve" %}
+          </button>
+        {% endif %}
         <button type="submit" name="action" value="deny" class="secondary">
           {% trans "Deny" %}
         </button>

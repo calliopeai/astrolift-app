@@ -14682,6 +14682,7 @@
     },
     "health": {
       "healthy": "Gateway em execução",
+      "stale": "Gateway sem sinal",
       "pending": "Gateway ainda não implantado",
       "off": "Gateway desligado",
       "error": "Erro no gateway"
@@ -14732,7 +14733,20 @@
       "clustersTitle": "Saúde do gateway por cluster",
       "clustersDescription": "O gateway do Zentinelle de cada cluster registrado.",
       "installOff": "Os gateways do Zentinelle estão desligados nesta instalação. Os clusters registrados mantêm as credenciais; os gateways são implantados quando o operador da plataforma os liga.",
-      "noClusters": "Nenhum cluster está registrado no Zentinelle ainda."
+      "noClusters": "Nenhum cluster está registrado no Zentinelle ainda.",
+      "serverVersion": "Versão do Zentinelle",
+      "blocks": "Bloqueios, últimas 24 horas",
+      "approvals": "Aprovações pendentes",
+      "budget": "Orçamento deste mês",
+      "budgetValue": "{percent}% usado",
+      "budgetFooter": "{spend} de {limit} ({name})",
+      "noBudget": "Nenhum orçamento definido",
+      "notAvailable": "Não disponível",
+      "countsError": "Não foi possível ler o estado do Zentinelle",
+      "reportNotAvailable": "Versão e último sinal não disponíveis",
+      "neverReported": "Ainda sem relatório",
+      "versionUnknown": "versão desconhecida",
+      "reported": "{version}, visto {seen}"
     },
     "clusters": {
       "installOff": "Os gateways do Zentinelle estão desligados nesta instalação. Registrar um cluster guarda a credencial; o gateway é implantado quando o operador da plataforma liga os gateways.",
