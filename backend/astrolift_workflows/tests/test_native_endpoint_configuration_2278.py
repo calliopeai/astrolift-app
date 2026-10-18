@@ -141,12 +141,13 @@ def _safe_temporal_history_summary(history):
                 failure = attrs.failure
                 if has_field(failure, "timeout_failure_info"):
                     timeout_failure = failure.timeout_failure_info
-                    if has_field(timeout_failure, "timeout_type"):
-                        try:
-                            timeout_type = timeout_failure.timeout_type
-                            timeout_name = TimeoutType.Name(timeout_type) if type(timeout_type) is int else None
-                        except (ValueError, TypeError):
-                            timeout_name = None
+                    # timeout_type is a proto3 scalar without field presence;
+                    # an unspecified/unknown enum is rejected by the whitelist below.
+                    try:
+                        timeout_type = timeout_failure.timeout_type
+                        timeout_name = TimeoutType.Name(timeout_type) if type(timeout_type) is int else None
+                    except (ValueError, TypeError):
+                        timeout_name = None
             if timeout_name in timeout_counts:
                 timeout_counts[timeout_name] = min(timeout_counts[timeout_name] + 1, _HISTORY_COUNT_LIMIT)
                 if len(timeout_rows) < _HISTORY_ROW_LIMIT:
