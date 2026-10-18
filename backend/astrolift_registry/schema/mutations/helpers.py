@@ -500,7 +500,7 @@ def _place_app_environment(
     )
 
 
-def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> None:
+def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str], *, defer_workflow=False) -> None:
     """Create AppEnvironment rows and kick off OnboardAppWorkflow when the
     app is still in its initial ``pending`` provisioning state.
 
@@ -634,6 +634,11 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
         else "pending",
     )
     if created_any or provisioning_pending:
+        if defer_workflow:
+            from django.db import transaction
+
+            transaction.on_commit(lambda: _bootstrap_app_environments(app, env_names))
+            return
         try:
             # OnboardAppWorkflow only reads registered_app_id from its
             # input; actor / provider_plugin_id / tenant_cluster_id are

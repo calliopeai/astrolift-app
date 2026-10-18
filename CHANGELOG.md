@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add the gated `builder-brain-source-v1` REST protocol (#2456): snapshot a Builder archive by expected SHA, build it through the real Kaniko driver into an operator-configured project-isolated immutable AWS repository, then consume the verified digest in a fresh original-person brain-host request. App, binding, deployment and temporary expiry are admitted atomically using normal registration and deployment guards. Build and deployment submission retain exact payloads and once-only engine identities; uncertain delivery recovers existing history and never silently restarts a recorded attempt. Native Job/Secret cleanup requires original UIDs, and an image checkpoint requires the exact owned Job's successful completion. The server controls the runtime recipe and bounded private archive transport; SQLite seed data uses ephemeral `/data` (`data_persistent=false`). Adds lifecycle migration 0051 and `builder.brain_source_artifacts` discovery. No registry/IAM provisioning or new cloud fallback is enabled; configured-target runtime acceptance remains pending a real operator canary.
+
 - Temporary-app expiry removes the exact app-owned brain credential Secrets during runtime retirement, with native ownership and original UID checks; the data namespace and managed services remain through grace (#2433).
 
 - Chat Studio promotion records the app creator for expiry warnings and accepts only an explicit JSON boolean for `delete_data_on_expiry`; strings such as `"false"` cannot accidentally select immediate data deletion. Re-promoting preserves the existing app expiry and data choice (#2433).

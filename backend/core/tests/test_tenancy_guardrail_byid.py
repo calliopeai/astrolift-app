@@ -243,11 +243,6 @@ EXEMPT: dict[str, str] = {
         "match ``organization.id`` (the app's org) — cross-org team is a "
         "field-tagged PRECONDITION."
     ),
-    "astrolift_registry::RegistrationMutations.register_app": (
-        "post-check: ``if project.organization_id != org_id: NOT_FOUND`` — "
-        "the new app inherits project.organization, so the project gate is "
-        "the org boundary."
-    ),
     "astrolift_registry::RegistrationMutations.register_agent_repo": (
         "post-check: ``if project.organization_id != active_org_id`` — same "
         "org boundary as register_app; the repo is fetched via the org's "

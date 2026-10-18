@@ -1139,6 +1139,13 @@ def capabilities(request):
     return JsonResponse(
         {
             "artifact_transport": "private-archive-v1",
+            "brain_source": {
+                "protocol": "builder-brain-source-v1",
+                "phases": ["build", "host"],
+                "requires_project_target": True,
+                "providers": ["aws"],
+                "runtime_verified": False,
+            },
             "nested_paths": True,
             "max_files": _max_files(),
             "max_file_bytes": _file_size_limit(),

@@ -73,6 +73,7 @@ from astrolift_workflows.activities.build_image import (
     build_image,
     fetch_app_build_strategy,
 )
+from astrolift_workflows.activities.builder_brain_source import build_brain_source
 from astrolift_workflows.activities.capability_deprovision import (
     deprovision_app_certificate,
     deprovision_app_dns_record,
@@ -246,6 +247,7 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "build_brain_source",
     "app_expiry_next_step",
     "fire_app_expiry",
     "purge_expired_app_namespaces",

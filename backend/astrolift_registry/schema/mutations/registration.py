@@ -76,408 +76,7 @@ class RegistrationMutations:
     )
     @tenant_scoped()
     def register_app(self, info: Info, input: RegisterAppInput) -> MutationResultType[RegisteredAppType]:
-        # Org-scope the project lookup to the caller's tenant. Everything
-        # downstream keys the new app's organization off ``project.organization``,
-        # so an unscoped project guid would let a caller create apps inside a
-        # sibling org's project. Fails closed (NOT_FOUND) when org_id is
-        # None or the project belongs to another org (#1183).
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        project = (
-            Project.objects.select_related("organization", "team").filter(guid=str(input.project_id)).first()
-        )
-        if project is None or project.organization_id != org_id:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
-
-        # Friendly-name default (#friendly-name): a caller-supplied slug is
-        # honored verbatim (and still conflict-checked below); a blank slug is
-        # auto-generated unique within the org. A blank name is derived from
-        # the effective slug so the app is never nameless.
-        raw_slug = (input.slug or "").strip()
-        eff_slug = raw_slug or _generate_unique_app_slug(project.organization)
-        eff_name = (input.name or "").strip() or friendly_name_from_slug(eff_slug)
-
-        # An app is a deployment target — without a managed cluster
-        # the platform has nowhere to roll the workload to and the
-        # downstream deploy fails with an opaque "no cluster available"
-        # error. Reject up front instead. Soft-deleted, inactive, and
-        # not-yet-managed clusters don't count: only ``lifecycle =
-        # "managed"`` rows (#316) have platform RBAC + a passing
-        # preflight and can actually accept a deploy.
-        #
-        # TenantCluster.organization is nullable: null means shared
-        # (available to all orgs). Mirror the deploy-time cluster picker
-        # (``_resolve_app_cluster`` below + builder_views) and accept an
-        # org-scoped cluster OR a shared one — otherwise an org whose only
-        # managed cluster is shared is wrongly told "no managed cluster"
-        # even though deploy would happily use it.
-        cluster_count = TenantCluster.objects.filter(
-            Q(organization=project.organization) | Q(organization__isnull=True),
-            deleted_at__isnull=True,
-            is_active=True,
-            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
-        ).count()
-        if cluster_count == 0:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "No managed cluster connected. Visit /clusters and finish bringing a cluster into management before adding apps.",
-                field=None,
-            )
-
-        if RegisteredApp.objects.filter(organization=project.organization, slug=eff_slug).exists():
-            return gql_failure(
-                ErrorCode.CONFLICT.value,
-                f"app with slug {eff_slug!r} already exists in this organization",
-                field="slug",
-            )
-
-        # The org-only source policy, when the install has it on (#1543).
-        # Checked before the conflict lookups because a repo this install
-        # will not accept should be refused for that reason, not for
-        # colliding with something.
-        if input.source_repo:
-            refusal = rejection_reason(input.source_repo, project.organization)
-            if refusal:
-                return gql_failure(ErrorCode.VALIDATION.value, refusal, field="sourceRepo")
-
-        if input.source_repo and input.manifest_path:
-            if RegisteredApp.objects.filter(
-                organization=project.organization,
-                source_repo=input.source_repo,
-                manifest_path=input.manifest_path,
-            ).exists():
-                return gql_failure(
-                    ErrorCode.CONFLICT.value,
-                    "this repo + manifest path is already registered",
-                    field="sourceRepo",
-                )
-
-        trigger_mode = input.trigger_mode or "auto_on_push"
-        cron_expression = ""
-        if trigger_mode == RegisteredApp.TriggerMode.CRON.value:
-            raw_cron = (input.cron_expression or "").strip()
-            if not raw_cron:
-                return gql_failure(
-                    ErrorCode.VALIDATION.value,
-                    "cron expression is required when triggerMode is 'cron'",
-                    field="cronExpression",
-                )
-            try:
-                cron_expression = validate_cron_expression(raw_cron)
-            except CronValidationError as exc:
-                return gql_failure(
-                    ErrorCode.VALIDATION.value,
-                    str(exc),
-                    field="cronExpression",
-                )
-
-        approval, err = _resolve_approval_inputs(
-            organization=project.organization,
-            requires_approval=input.requires_approval,
-            approver_team_id=input.approver_team_id,
-            approver_user_ids=input.approver_user_ids,
-            minimum_approvals=input.minimum_approvals,
-        )
-        if err is not None:
-            return err
-
-        eff_requires_approval = (
-            bool(approval["requires_approval"]) if approval["requires_approval"] is not None else False
-        )
-        eff_team = approval["team"]
-        eff_user_ids = approval["user_ids"] or ()
-        eff_minimum_approvals = (
-            approval["minimum_approvals"] if approval["minimum_approvals"] is not None else 1
-        )
-        cross_err = _validate_effective_approval_policy(
-            requires_approval=eff_requires_approval,
-            effective_team=eff_team,
-            effective_user_ids=eff_user_ids,
-            effective_minimum_approvals=eff_minimum_approvals,
-        )
-        if cross_err is not None:
-            return cross_err
-
-        build_mode, build_mode_err = _validate_build_mode(input.build_mode)
-        if build_mode_err is not None:
-            return build_mode_err
-        build_strategy, build_strategy_err = _validate_build_strategy(input.build_strategy)
-        if build_strategy_err is not None:
-            return build_strategy_err
-        build_args, build_args_err = _normalize_build_args(input.build_args)
-        if build_args_err is not None:
-            return build_args_err
-        dockerfile_path, dockerfile_path_err = _validate_build_path_field(
-            input.dockerfile_path, field="dockerfilePath"
-        )
-        if dockerfile_path_err is not None:
-            return dockerfile_path_err
-        build_context, build_context_err = _validate_build_path_field(
-            input.build_context, field="buildContext"
-        )
-        if build_context_err is not None:
-            return build_context_err
-        # No context named: detect it once the manifest has been read, below.
-        detect_build_context = not (build_context or "").strip()
-        # Before the app exists: a refusal must leave nothing half-registered.
-        attach_denial = _project_service_attach_denial(input.manifest_raw or "", project)
-        if attach_denial is not None:
-            return attach_denial
-
-        # manifestRaw can be copied from a masked read of another app. A new
-        # app has no stored value to put back, so a masked placeholder would
-        # become the secret itself (#1920).
-        from astrolift_manifest.env_edit import resolve_masked_env_values
-
-        eff_manifest_raw, unresolved_keys = resolve_masked_env_values(
-            input.manifest_raw or "", fallback_text=""
-        )
-        if unresolved_keys:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                "manifestRaw contains a masked placeholder for key(s) with no value to "
-                f"restore (a new app has nothing to fall back to): {', '.join(unresolved_keys)}",
-                field="manifestRaw",
-            )
-
-        # Temporary apps (#2433): the expiry from the input, else the inline
-        # manifest's ``[app] expires_in``, inside the organization's policy.
-        from astrolift_registry import expiry
-
-        try:
-            expires_at = expiry.resolve(
-                project.organization, expires_in=input.expires_in, expires_at=input.expires_at
-            )
-        except expiry.ExpiryError as exc:
-            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
-        if expires_at is None:
-            try:
-                expires_at = expiry.resolve(
-                    project.organization,
-                    expires_in=expiry.manifest_expires_in(eff_manifest_raw),
-                    expires_at=None,
-                )
-            except expiry.ExpiryError as exc:
-                return gql_failure(
-                    ErrorCode.VALIDATION.value, f"[app] expires_in: {exc}", field="manifestRaw"
-                )
-        if expires_at is None:
-            refusal = expiry.permanent_refusal(project.organization)
-            if refusal is not None:
-                return gql_failure(ErrorCode.PERMISSION_DENIED.value, refusal, field="expiresIn")
-
-        from astrolift_registry.namespaces import namespace_refusal
-
-        _ns_refusal = namespace_refusal(
-            app_namespace(organization_slug=project.organization.slug, app_slug=eff_slug),
-            organization_id=project.organization_id,
-        )
-        if _ns_refusal is not None:
-            return gql_failure(ErrorCode.VALIDATION.value, _ns_refusal, field="slug")
-        from astrolift_registry.hostname_claims import hostname_label_refusal
-
-        _host_refusal = hostname_label_refusal(eff_slug, organization=project.organization)
-        if _host_refusal is not None:
-            return gql_failure(ErrorCode.CONFLICT.value, _host_refusal, field="slug")
-        app = RegisteredApp.objects.create(
-            organization=project.organization,
-            created_by_id=tenant.actor_user_id,
-            team=project.team,
-            project=project,
-            name=eff_name,
-            slug=eff_slug,
-            description=input.description or "",
-            source_kind=input.source_kind or "github",
-            source_repo=input.source_repo or "",
-            source_url=input.source_url or "",
-            manifest_path=input.manifest_path or "astrolift.toml",
-            manifest_raw=eff_manifest_raw,
-            default_branch=input.default_branch or "main",
-            deploy_branch=input.deploy_branch or input.default_branch or "main",
-            build_mode=build_mode or RegisteredApp.BuildMode.CI_PUSHED.value,
-            build_strategy=build_strategy or RegisteredApp.BuildStrategy.OFF.value,
-            dockerfile_path=dockerfile_path or "Dockerfile",
-            build_context=build_context or ".",
-            build_args=build_args,
-            trigger_mode=trigger_mode,
-            cron_expression=cron_expression,
-            expires_at=expires_at,
-            delete_data_on_expiry=bool(input.delete_data_on_expiry),
-            k8s_namespace=app_namespace(
-                organization_slug=project.organization.slug,
-                app_slug=eff_slug,
-            ),
-            subdomain=eff_slug,
-            requires_approval=bool(approval["requires_approval"])
-            if approval["requires_approval"] is not None
-            else False,
-            approver_team=approval["team"],
-            minimum_approvals=approval["minimum_approvals"]
-            if approval["minimum_approvals"] is not None
-            else 1,
-            # Bind to the first managed cluster so downstream activities
-            # (provision_registry_repo, provision_namespace) can resolve
-            # the registry driver without an additional lookup step.
-            # organization is nullable on TenantCluster: null = shared.
-            default_tenant_cluster=TenantCluster.objects.filter(
-                Q(organization=project.organization) | Q(organization__isnull=True),
-                deleted_at__isnull=True,
-                is_active=True,
-                lifecycle=TenantCluster.Lifecycle.MANAGED.value,
-            )
-            .order_by("pk")
-            .first(),
-        )
-        _ensure_owner_access(app, app.team_id)
-        if approval["user_ids"] is not None:
-            app.approver_users.set(approval["user_ids"])
-
-        # Bootstrap the default environment + kick off OnboardAppWorkflow
-        # straight from registration. Previously the env + onboard were only
-        # created by a later resync/scan, which re-fetches the repo — so an
-        # app registered with an inline ``manifest_raw`` (a repo the platform
-        # can't fetch) never onboarded, and resync would wipe the inline
-        # manifest on the failed fetch. ``_bootstrap_app_environments`` is
-        # fetch-free (creates AppEnvironment + starts the idempotent
-        # OnboardAppWorkflow), never touches ``manifest_raw``, and no-ops when
-        # no managed cluster is bound. The manifest declares no environments,
-        # so pass ``[]`` — ``_bootstrap`` defaults to a ``production`` env.
-        # Materialize the manifest's Workload + Container rows (#1014) so a
-        # manifest-declared workload — notably a ``kind=agent`` — is
-        # MANAGEABLE (run-spec, scale, live status, the agent fleet all key
-        # on Workload rows), not merely deployable (the renderer reads
-        # manifest_raw directly). Reuses the same persist path the SCM /
-        # registerAgentRepo flow already uses, so direct-upload apps reach
-        # parity. Best-effort + idempotent: a malformed manifest does not fail
-        # registration (the raw is stored and validated again at deploy time).
-        # #1553: record the outcome, and cover the case where there is no
-        # inline manifest at all. Previously this whole block was skipped when
-        # ``manifest_raw`` was empty, so an app registered straight from a repo
-        # got no manifest fetch, no workloads, and no signal — the operator
-        # then spent the next hour convinced the platform was caching a
-        # manifest it had in fact never read. Still best-effort: registration
-        # must survive a bad manifest. The difference is that it now says so.
-        _bootstrap_status = "no_source"
-        _bootstrap_error = ""
-        if eff_manifest_raw.strip():
-            try:
-                from astrolift_manifest.normalize import (
-                    NormalizationDefaults,
-                    normalize,
-                )
-                from astrolift_manifest.parser import ManifestError, parse_raw
-                from astrolift_manifest.persist import persist_manifest
-
-                _manifest = normalize(
-                    parse_raw(eff_manifest_raw),
-                    defaults=NormalizationDefaults(),
-                )
-                with allow_project_attach(actor_may_attach_project_services(app)):
-                    persist_manifest(app, _manifest, raw_text=eff_manifest_raw)
-                _bootstrap_status = "applied"
-            except Exception as exc:  # noqa: BLE001 — registration must survive
-                _bootstrap_status = "parse_failed"
-                # Only a ManifestError's text is known to be free of [env]
-                # values. Anything else (a database error's "Failing row
-                # contains ..." detail, say) can quote the manifest, and this
-                # string is shown to app.read callers and logged, so it keeps
-                # the exception type and no traceback (#1920).
-                if isinstance(exc, ManifestError):
-                    _bootstrap_error = str(exc) or exc.__class__.__name__
-                else:
-                    _bootstrap_error = exc.__class__.__name__
-                logging.getLogger(__name__).warning(
-                    "register_app: manifest workload persist failed for %s: %s",
-                    app.slug,
-                    _bootstrap_error,
-                )
-        elif app.source_repo:
-            # Fetch it from the repo instead of leaving the app manifest-less.
-            # ``resync_app_manifest_from_repo`` is the one blessed path: it
-            # fetches, parses, and materialises workloads via persist_manifest,
-            # and never raises.
-            try:
-                from astrolift_registry.services.manifest_sync import (
-                    resync_app_manifest_from_repo,
-                )
-
-                with allow_project_attach(actor_may_attach_project_services(app)):
-                    _resync = resync_app_manifest_from_repo(app)
-                _bootstrap_status = _resync.status
-                _bootstrap_error = _resync.error or ""
-            except Exception as exc:  # noqa: BLE001 — registration must survive
-                _bootstrap_status = "fetch_failed"
-                _bootstrap_error = str(exc) or exc.__class__.__name__
-                logging.getLogger(__name__).exception(
-                    "register_app: manifest bootstrap fetch failed for %s",
-                    app.slug,
-                )
-
-        app.manifest_bootstrap_status = _bootstrap_status
-        app.manifest_bootstrap_error = _bootstrap_error
-        bootstrap_fields = ["manifest_bootstrap_status", "manifest_bootstrap_error", "updated_at", "version"]
-        if detect_build_context:
-            # Before environments, onboarding and the CI autowire read it
-            # (astrolift-cli #159). The workloads just persisted say whether
-            # the manifest names its own build paths.
-            app.build_context = detected_build_context(
-                app.manifest_path,
-                manifest_sets_build_paths=_persisted_manifest_sets_build_paths(app),
-            )
-            bootstrap_fields.append("build_context")
-        app.save(update_fields=bootstrap_fields)
-        # A manifest fetched from the repo can still make it temporary (#2433).
-        expiry.started(app, actor_user_id=tenant.actor_user_id if tenant else None)
-
-        with allow_project_attach(actor_may_attach_project_services(app)):
-            _bootstrap_app_environments(app, [])
-
-        # Seed the default alert rule set (spec 08 §10.2) for the new app.
-        # There is no ``app.created`` platform Event to subscribe to, so we
-        # seed at the single-app registration completion point — the least
-        # invasive idempotent hook. ``seed_default_alert_rules`` is idempotent
-        # (skips rules whose org-unique name already exists) and best-effort:
-        # a seeding failure must never fail registration. Kept separate from
-        # ``_bootstrap_app_environments`` (which starts a Temporal workflow and
-        # is stubbed in tests) so seeding runs even when onboarding is stubbed.
-        try:
-            from astrolift_operations.alert_seed import seed_default_alert_rules
-
-            seed_default_alert_rules(app)
-        except Exception:
-            logging.getLogger(__name__).exception(
-                "register_app: default alert-rule seeding failed for %s",
-                app.slug,
-            )
-
-        # Complete the autowire straight from registration (#1108): push the
-        # CI workflow, install the source webhook, and push the deploy-token
-        # secret so a git push auto-deploys with zero extra clicks. Fully
-        # best-effort — a wiring failure (or no org connection yet) must never
-        # fail the registration; ``run_autowire`` records a per-step outcome
-        # on ``app.autowire_state`` and the app detail page surfaces which
-        # step, if any, still needs attention. When no org source connection
-        # exists this no-ops into the "connect for auto-deploy" state.
-        try:
-            from astrolift_scm.services.autowire import run_autowire
-
-            request = getattr(info.context, "request", None)
-            actor = getattr(request, "user", None) if request else None
-            run_autowire(app, actor=actor)
-        except Exception:
-            logging.getLogger(__name__).exception(
-                "register_app: autowire orchestration failed for %s",
-                app.slug,
-            )
-
-        result = app_to_type(app, info=info)
-        if app.source_repo:
-            from astrolift_scm.services.connection_resolver import repo_owner_connection_warning
-
-            result.source_connection_warning = repo_owner_connection_warning(
-                app.organization, app.source_repo, source_kind=app.source_kind
-            )
-        return gql_success(result)
+        return register_app_record(info, input)
 
     @strawberry.field
     @mutation_audit(
@@ -745,3 +344,430 @@ class RegistrationMutations:
                 ]
             )
         )
+
+
+def register_app_record(
+    info: Info, input: RegisterAppInput, *, cluster=None, defer_workflow=False
+) -> MutationResultType[RegisteredAppType]:
+    """Shared registration implementation; callers perform exact project admission.
+
+    An internal explicit cluster is checked before any record is created. The
+    public GraphQL resolver continues to use its existing default selection.
+    """
+    # Org-scope the project lookup to the caller's tenant. Everything
+    # downstream keys the new app's organization off ``project.organization``,
+    # so an unscoped project guid would let a caller create apps inside a
+    # sibling org's project. Fails closed (NOT_FOUND) when org_id is
+    # None or the project belongs to another org (#1183).
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    project = (
+        Project.objects.select_related("organization", "team")
+        .filter(
+            guid=str(input.project_id),
+            deleted_at__isnull=True,
+            organization_id=org_id,
+            organization__deleted_at__isnull=True,
+            team__organization_id=org_id,
+            team__deleted_at__isnull=True,
+        )
+        .first()
+    )
+    if project is None or project.organization_id != org_id:
+        return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
+
+    if (
+        cluster is not None
+        and not TenantCluster.objects.filter(
+            pk=cluster.pk,
+            deleted_at__isnull=True,
+            is_active=True,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+            provider_plugin__deleted_at__isnull=True,
+            provider_plugin__is_enabled=True,
+        )
+        .filter(Q(organization_id=project.organization_id) | Q(organization__isnull=True))
+        .exists()
+    ):
+        return gql_failure(ErrorCode.PRECONDITION.value, "configured hosting cluster is unavailable")
+
+    # Friendly-name default (#friendly-name): a caller-supplied slug is
+    # honored verbatim (and still conflict-checked below); a blank slug is
+    # auto-generated unique within the org. A blank name is derived from
+    # the effective slug so the app is never nameless.
+    raw_slug = (input.slug or "").strip()
+    eff_slug = raw_slug or _generate_unique_app_slug(project.organization)
+    eff_name = (input.name or "").strip() or friendly_name_from_slug(eff_slug)
+
+    # An app is a deployment target — without a managed cluster
+    # the platform has nowhere to roll the workload to and the
+    # downstream deploy fails with an opaque "no cluster available"
+    # error. Reject up front instead. Soft-deleted, inactive, and
+    # not-yet-managed clusters don't count: only ``lifecycle =
+    # "managed"`` rows (#316) have platform RBAC + a passing
+    # preflight and can actually accept a deploy.
+    #
+    # TenantCluster.organization is nullable: null means shared
+    # (available to all orgs). Mirror the deploy-time cluster picker
+    # (``_resolve_app_cluster`` below + builder_views) and accept an
+    # org-scoped cluster OR a shared one — otherwise an org whose only
+    # managed cluster is shared is wrongly told "no managed cluster"
+    # even though deploy would happily use it.
+    cluster_count = TenantCluster.objects.filter(
+        Q(organization=project.organization) | Q(organization__isnull=True),
+        deleted_at__isnull=True,
+        is_active=True,
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    ).count()
+    if cluster_count == 0:
+        return gql_failure(
+            ErrorCode.PRECONDITION.value,
+            "No managed cluster connected. Visit /clusters and finish bringing a cluster into management before adding apps.",
+            field=None,
+        )
+
+    if RegisteredApp.objects.filter(organization=project.organization, slug=eff_slug).exists():
+        return gql_failure(
+            ErrorCode.CONFLICT.value,
+            f"app with slug {eff_slug!r} already exists in this organization",
+            field="slug",
+        )
+
+    # The org-only source policy, when the install has it on (#1543).
+    # Checked before the conflict lookups because a repo this install
+    # will not accept should be refused for that reason, not for
+    # colliding with something.
+    if input.source_repo:
+        refusal = rejection_reason(input.source_repo, project.organization)
+        if refusal:
+            return gql_failure(ErrorCode.VALIDATION.value, refusal, field="sourceRepo")
+
+    if input.source_repo and input.manifest_path:
+        if RegisteredApp.objects.filter(
+            organization=project.organization,
+            source_repo=input.source_repo,
+            manifest_path=input.manifest_path,
+        ).exists():
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                "this repo + manifest path is already registered",
+                field="sourceRepo",
+            )
+
+    trigger_mode = input.trigger_mode or "auto_on_push"
+    cron_expression = ""
+    if trigger_mode == RegisteredApp.TriggerMode.CRON.value:
+        raw_cron = (input.cron_expression or "").strip()
+        if not raw_cron:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "cron expression is required when triggerMode is 'cron'",
+                field="cronExpression",
+            )
+        try:
+            cron_expression = validate_cron_expression(raw_cron)
+        except CronValidationError as exc:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                str(exc),
+                field="cronExpression",
+            )
+
+    approval, err = _resolve_approval_inputs(
+        organization=project.organization,
+        requires_approval=input.requires_approval,
+        approver_team_id=input.approver_team_id,
+        approver_user_ids=input.approver_user_ids,
+        minimum_approvals=input.minimum_approvals,
+    )
+    if err is not None:
+        return err
+
+    eff_requires_approval = (
+        bool(approval["requires_approval"]) if approval["requires_approval"] is not None else False
+    )
+    eff_team = approval["team"]
+    eff_user_ids = approval["user_ids"] or ()
+    eff_minimum_approvals = approval["minimum_approvals"] if approval["minimum_approvals"] is not None else 1
+    cross_err = _validate_effective_approval_policy(
+        requires_approval=eff_requires_approval,
+        effective_team=eff_team,
+        effective_user_ids=eff_user_ids,
+        effective_minimum_approvals=eff_minimum_approvals,
+    )
+    if cross_err is not None:
+        return cross_err
+
+    build_mode, build_mode_err = _validate_build_mode(input.build_mode)
+    if build_mode_err is not None:
+        return build_mode_err
+    build_strategy, build_strategy_err = _validate_build_strategy(input.build_strategy)
+    if build_strategy_err is not None:
+        return build_strategy_err
+    build_args, build_args_err = _normalize_build_args(input.build_args)
+    if build_args_err is not None:
+        return build_args_err
+    dockerfile_path, dockerfile_path_err = _validate_build_path_field(
+        input.dockerfile_path, field="dockerfilePath"
+    )
+    if dockerfile_path_err is not None:
+        return dockerfile_path_err
+    build_context, build_context_err = _validate_build_path_field(input.build_context, field="buildContext")
+    if build_context_err is not None:
+        return build_context_err
+    # No context named: detect it once the manifest has been read, below.
+    detect_build_context = not (build_context or "").strip()
+    # Before the app exists: a refusal must leave nothing half-registered.
+    attach_denial = _project_service_attach_denial(input.manifest_raw or "", project)
+    if attach_denial is not None:
+        return attach_denial
+
+    # manifestRaw can be copied from a masked read of another app. A new
+    # app has no stored value to put back, so a masked placeholder would
+    # become the secret itself (#1920).
+    from astrolift_manifest.env_edit import resolve_masked_env_values
+
+    eff_manifest_raw, unresolved_keys = resolve_masked_env_values(input.manifest_raw or "", fallback_text="")
+    if unresolved_keys:
+        return gql_failure(
+            ErrorCode.VALIDATION.value,
+            "manifestRaw contains a masked placeholder for key(s) with no value to "
+            f"restore (a new app has nothing to fall back to): {', '.join(unresolved_keys)}",
+            field="manifestRaw",
+        )
+
+    # Temporary apps (#2433): the expiry from the input, else the inline
+    # manifest's ``[app] expires_in``, inside the organization's policy.
+    from astrolift_registry import expiry
+
+    try:
+        expires_at = expiry.resolve(
+            project.organization, expires_in=input.expires_in, expires_at=input.expires_at
+        )
+    except expiry.ExpiryError as exc:
+        return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
+    if expires_at is None:
+        try:
+            expires_at = expiry.resolve(
+                project.organization,
+                expires_in=expiry.manifest_expires_in(eff_manifest_raw),
+                expires_at=None,
+            )
+        except expiry.ExpiryError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, f"[app] expires_in: {exc}", field="manifestRaw")
+    if expires_at is None:
+        refusal = expiry.permanent_refusal(project.organization)
+        if refusal is not None:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, refusal, field="expiresIn")
+
+    from astrolift_registry.namespaces import namespace_refusal
+
+    _ns_refusal = namespace_refusal(
+        app_namespace(organization_slug=project.organization.slug, app_slug=eff_slug),
+        organization_id=project.organization_id,
+    )
+    if _ns_refusal is not None:
+        return gql_failure(ErrorCode.VALIDATION.value, _ns_refusal, field="slug")
+    from astrolift_registry.hostname_claims import hostname_label_refusal
+
+    _host_refusal = hostname_label_refusal(eff_slug, organization=project.organization)
+    if _host_refusal is not None:
+        return gql_failure(ErrorCode.CONFLICT.value, _host_refusal, field="slug")
+    app = RegisteredApp.objects.create(
+        organization=project.organization,
+        created_by_id=tenant.actor_user_id,
+        team=project.team,
+        project=project,
+        name=eff_name,
+        slug=eff_slug,
+        description=input.description or "",
+        source_kind=input.source_kind or "github",
+        source_repo=input.source_repo or "",
+        source_url=input.source_url or "",
+        manifest_path=input.manifest_path or "astrolift.toml",
+        manifest_raw=eff_manifest_raw,
+        default_branch=input.default_branch or "main",
+        deploy_branch=input.deploy_branch or input.default_branch or "main",
+        build_mode=build_mode or RegisteredApp.BuildMode.CI_PUSHED.value,
+        build_strategy=build_strategy or RegisteredApp.BuildStrategy.OFF.value,
+        dockerfile_path=dockerfile_path or "Dockerfile",
+        build_context=build_context or ".",
+        build_args=build_args,
+        trigger_mode=trigger_mode,
+        cron_expression=cron_expression,
+        expires_at=expires_at,
+        delete_data_on_expiry=bool(input.delete_data_on_expiry),
+        k8s_namespace=app_namespace(
+            organization_slug=project.organization.slug,
+            app_slug=eff_slug,
+        ),
+        subdomain=eff_slug,
+        requires_approval=bool(approval["requires_approval"])
+        if approval["requires_approval"] is not None
+        else False,
+        approver_team=approval["team"],
+        minimum_approvals=approval["minimum_approvals"] if approval["minimum_approvals"] is not None else 1,
+        # Bind to the first managed cluster so downstream activities
+        # (provision_registry_repo, provision_namespace) can resolve
+        # the registry driver without an additional lookup step.
+        # organization is nullable on TenantCluster: null = shared.
+        default_tenant_cluster=cluster
+        or TenantCluster.objects.filter(
+            Q(organization=project.organization) | Q(organization__isnull=True),
+            deleted_at__isnull=True,
+            is_active=True,
+            lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+        )
+        .order_by("pk")
+        .first(),
+    )
+    _ensure_owner_access(app, app.team_id)
+    if approval["user_ids"] is not None:
+        app.approver_users.set(approval["user_ids"])
+
+    # Bootstrap the default environment + kick off OnboardAppWorkflow
+    # straight from registration. Previously the env + onboard were only
+    # created by a later resync/scan, which re-fetches the repo — so an
+    # app registered with an inline ``manifest_raw`` (a repo the platform
+    # can't fetch) never onboarded, and resync would wipe the inline
+    # manifest on the failed fetch. ``_bootstrap_app_environments`` is
+    # fetch-free (creates AppEnvironment + starts the idempotent
+    # OnboardAppWorkflow), never touches ``manifest_raw``, and no-ops when
+    # no managed cluster is bound. The manifest declares no environments,
+    # so pass ``[]`` — ``_bootstrap`` defaults to a ``production`` env.
+    # Materialize the manifest's Workload + Container rows (#1014) so a
+    # manifest-declared workload — notably a ``kind=agent`` — is
+    # MANAGEABLE (run-spec, scale, live status, the agent fleet all key
+    # on Workload rows), not merely deployable (the renderer reads
+    # manifest_raw directly). Reuses the same persist path the SCM /
+    # registerAgentRepo flow already uses, so direct-upload apps reach
+    # parity. Best-effort + idempotent: a malformed manifest does not fail
+    # registration (the raw is stored and validated again at deploy time).
+    # #1553: record the outcome, and cover the case where there is no
+    # inline manifest at all. Previously this whole block was skipped when
+    # ``manifest_raw`` was empty, so an app registered straight from a repo
+    # got no manifest fetch, no workloads, and no signal — the operator
+    # then spent the next hour convinced the platform was caching a
+    # manifest it had in fact never read. Still best-effort: registration
+    # must survive a bad manifest. The difference is that it now says so.
+    _bootstrap_status = "no_source"
+    _bootstrap_error = ""
+    if eff_manifest_raw.strip():
+        try:
+            from astrolift_manifest.normalize import (
+                NormalizationDefaults,
+                normalize,
+            )
+            from astrolift_manifest.parser import ManifestError, parse_raw
+            from astrolift_manifest.persist import persist_manifest
+
+            _manifest = normalize(
+                parse_raw(eff_manifest_raw),
+                defaults=NormalizationDefaults(),
+            )
+            with allow_project_attach(actor_may_attach_project_services(app)):
+                persist_manifest(app, _manifest, raw_text=eff_manifest_raw)
+            _bootstrap_status = "applied"
+        except Exception as exc:  # noqa: BLE001 — registration must survive
+            _bootstrap_status = "parse_failed"
+            # Only a ManifestError's text is known to be free of [env]
+            # values. Anything else (a database error's "Failing row
+            # contains ..." detail, say) can quote the manifest, and this
+            # string is shown to app.read callers and logged, so it keeps
+            # the exception type and no traceback (#1920).
+            if isinstance(exc, ManifestError):
+                _bootstrap_error = str(exc) or exc.__class__.__name__
+            else:
+                _bootstrap_error = exc.__class__.__name__
+            logging.getLogger(__name__).warning(
+                "register_app: manifest workload persist failed for %s: %s",
+                app.slug,
+                _bootstrap_error,
+            )
+    elif app.source_repo:
+        # Fetch it from the repo instead of leaving the app manifest-less.
+        # ``resync_app_manifest_from_repo`` is the one blessed path: it
+        # fetches, parses, and materialises workloads via persist_manifest,
+        # and never raises.
+        try:
+            from astrolift_registry.services.manifest_sync import (
+                resync_app_manifest_from_repo,
+            )
+
+            with allow_project_attach(actor_may_attach_project_services(app)):
+                _resync = resync_app_manifest_from_repo(app)
+            _bootstrap_status = _resync.status
+            _bootstrap_error = _resync.error or ""
+        except Exception as exc:  # noqa: BLE001 — registration must survive
+            _bootstrap_status = "fetch_failed"
+            _bootstrap_error = str(exc) or exc.__class__.__name__
+            logging.getLogger(__name__).exception(
+                "register_app: manifest bootstrap fetch failed for %s",
+                app.slug,
+            )
+
+    app.manifest_bootstrap_status = _bootstrap_status
+    app.manifest_bootstrap_error = _bootstrap_error
+    bootstrap_fields = ["manifest_bootstrap_status", "manifest_bootstrap_error", "updated_at", "version"]
+    if detect_build_context:
+        # Before environments, onboarding and the CI autowire read it
+        # (astrolift-cli #159). The workloads just persisted say whether
+        # the manifest names its own build paths.
+        app.build_context = detected_build_context(
+            app.manifest_path,
+            manifest_sets_build_paths=_persisted_manifest_sets_build_paths(app),
+        )
+        bootstrap_fields.append("build_context")
+    app.save(update_fields=bootstrap_fields)
+    # A manifest fetched from the repo can still make it temporary (#2433).
+    expiry.started(app, actor_user_id=tenant.actor_user_id if tenant else None)
+
+    with allow_project_attach(actor_may_attach_project_services(app)):
+        _bootstrap_app_environments(app, [], defer_workflow=defer_workflow)
+
+    # Seed the default alert rule set (spec 08 §10.2) for the new app.
+    # There is no ``app.created`` platform Event to subscribe to, so we
+    # seed at the single-app registration completion point — the least
+    # invasive idempotent hook. ``seed_default_alert_rules`` is idempotent
+    # (skips rules whose org-unique name already exists) and best-effort:
+    # a seeding failure must never fail registration. Kept separate from
+    # ``_bootstrap_app_environments`` (which starts a Temporal workflow and
+    # is stubbed in tests) so seeding runs even when onboarding is stubbed.
+    try:
+        from astrolift_operations.alert_seed import seed_default_alert_rules
+
+        seed_default_alert_rules(app)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "register_app: default alert-rule seeding failed for %s",
+            app.slug,
+        )
+
+    # Complete the autowire straight from registration (#1108): push the
+    # CI workflow, install the source webhook, and push the deploy-token
+    # secret so a git push auto-deploys with zero extra clicks. Fully
+    # best-effort — a wiring failure (or no org connection yet) must never
+    # fail the registration; ``run_autowire`` records a per-step outcome
+    # on ``app.autowire_state`` and the app detail page surfaces which
+    # step, if any, still needs attention. When no org source connection
+    # exists this no-ops into the "connect for auto-deploy" state.
+    try:
+        from astrolift_scm.services.autowire import run_autowire
+
+        request = getattr(info.context, "request", None)
+        actor = getattr(request, "user", None) if request else None
+        run_autowire(app, actor=actor)
+    except Exception:
+        logging.getLogger(__name__).exception(
+            "register_app: autowire orchestration failed for %s",
+            app.slug,
+        )
+
+    result = app_to_type(app, info=info)
+    if app.source_repo:
+        from astrolift_scm.services.connection_resolver import repo_owner_connection_warning
+
+        result.source_connection_warning = repo_owner_connection_warning(
+            app.organization, app.source_repo, source_kind=app.source_kind
+        )
+    return gql_success(result)
