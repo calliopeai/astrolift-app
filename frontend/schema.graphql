@@ -2198,17 +2198,6 @@ type AstroliftBrief {
   createdAt: DateTime!
 }
 
-type AstroliftBudget {
-  id: GUID!
-  scopeKind: String!
-  scopeId: String!
-  amountCents: Int!
-  currency: String!
-  period: String!
-  currentSpendCents: Int!
-  alertsAtPct: [Int!]!
-}
-
 type AstroliftBulkAssignTeamMemberRolesPayload {
   results: [AstroliftBulkOpItemResult!]!
   assignedCount: Int!
@@ -2779,52 +2768,6 @@ type AstroliftConversationTransferMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftConversationTransfer
-}
-
-type AstroliftCostAttribution {
-  attributedRows: [AstroliftCostBindingRow!]!
-  unattributedCents: Int!
-  totalCents: Int!
-  currency: String!
-}
-
-type AstroliftCostBindingRow {
-  managedServiceBindingId: String
-  managedServiceId: String
-  managedServiceName: String
-  managedServiceKind: String
-  registeredAppSlug: String
-  by: String!
-  amountCents: Int!
-  currency: String!
-}
-
-type AstroliftCostForecast {
-  mtdCents: Int!
-  previousMonthCents: Int!
-  deltaPct: Float!
-  projectedMonthlyCents: Int!
-  confidence: ForecastConfidence!
-  currency: String!
-}
-
-type AstroliftCostSnapshot {
-  id: GUID!
-  projectId: String
-  registeredAppId: String
-  managedServiceBindingId: String
-  takenAt: Date!
-  by: String!
-  amountCents: Int!
-  currency: String!
-  source: String!
-}
-
-type AstroliftCostTrendPoint {
-  date: Date!
-  amountCents: Int!
-  currency: String!
-  isAnomaly: Boolean!
 }
 
 type AstroliftCronJobLastRun {
@@ -4063,20 +4006,6 @@ type AstroliftManagedServiceContextPage {
   pageSize: Int
 }
 
-type AstroliftManagedServiceCostPreview {
-  managedServiceId: GUID!
-  available: Boolean!
-  reason: String!
-  message: String!
-  monthlyTotal: Float
-  currency: String!
-  lineItems: JSON!
-  pricingSourceUrl: String!
-  pricingFetchedAt: String!
-  notes: [String!]!
-  approximate: Boolean!
-}
-
 type AstroliftManagedServiceMetricSeries {
   name: String!
   unit: String!
@@ -5005,9 +4934,6 @@ type AstroliftPreviewEnvironment {
   sourceUrl: String!
   prUrl: String!
   aggregateResources: AstroliftPreviewAggregateResources!
-  estimatedDailyCostUsd: Float
-  estimatedCostNotes: [String!]!
-  estimatedCostApproximate: Boolean!
 
   """Version of this exact preview binding."""
   version: Int!
@@ -5017,7 +4943,7 @@ type AstroliftPreviewEnvironment {
   environment: AstroliftPreviewEnvironmentTarget
 
   """
-  not_requested, available or unavailable; basic reads do not query pods or pricing.
+  not_requested, available or unavailable; basic reads do not query pods.
   """
   runtimeStatus: String!
   openedByLogin: String!
@@ -7256,7 +7182,6 @@ type AstroliftZentinelleUsageRow {
   requests: Int!
   inputTokens: Int!
   outputTokens: Int!
-  costUsd: Float!
 }
 
 input AttachCloudflareDnsZoneInput {
@@ -7945,13 +7870,6 @@ input ConversationTransferRecordInput {
   reason: String! = ""
 }
 
-enum CostWindow {
-  H24
-  D7
-  D30
-  MTD
-}
-
 input CreateAgentEnvironmentSpecInput {
   name: String!
   slug: String!
@@ -8604,12 +8522,6 @@ input ForceRedeployInput {
   appSlug: String!
   environmentName: String = null
   confirmSlug: String!
-}
-
-enum ForecastConfidence {
-  LOW
-  MEDIUM
-  HIGH
 }
 
 input FormDefinitionInput {
@@ -11362,7 +11274,7 @@ type Query {
   astroliftCommandRunsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null, filter: AstroliftCommandRunsFilter = null): AstroliftCommandRunPage!
   astroliftCommandRun(id: String!): AstroliftCommandRun
   astroliftPreviewEnvironments(appSlug: String = null): [AstroliftPreviewEnvironment!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftPreviewEnvironmentsPage for browsing and astroliftPreviewEnvironment for exact detail.")
-  astroliftPreviewEnvironment(id: GUID!, includeRuntimeCost: Boolean! = false): AstroliftPreviewEnvironment
+  astroliftPreviewEnvironment(id: GUID!, includeRuntimeResources: Boolean! = false): AstroliftPreviewEnvironment
   astroliftPreviewDeploymentsPage(id: GUID!, expectedEnvironmentId: GUID!, ifMatchPreviewVersion: Int!, ifMatchEnvironmentVersion: Int!, limit: Int! = 50, after: String = null): AstroliftPreviewDeploymentPage!
   astroliftPreviewEnvironmentsPage(appSlug: String = null, search: String = null, statuses: [String!] = null, limit: Int! = 50, after: String = null, filter: AstroliftPreviewEnvironmentsFilter = null, sort: String = null): AstroliftPreviewEnvironmentPage!
   astroliftPreviewEnvironmentCounts(appSlug: String = null, search: String = null): AstroliftPreviewEnvironmentCounts!
@@ -11420,11 +11332,6 @@ type Query {
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
   astroliftQuotas: [AstroliftQuota!]!
   astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!
-  astroliftBudgets: [AstroliftBudget!]!
-  astroliftCostSnapshots(days: Int = null, window: CostWindow = null, limit: Int! = 200): [AstroliftCostSnapshot!]!
-  astroliftCostTrend(window: CostWindow = null, days: Int = null): [AstroliftCostTrendPoint!]!
-  astroliftCostForecast: AstroliftCostForecast!
-  astroliftCostByBinding(window: CostWindow = null, days: Int = null, registeredAppSlug: String = null): AstroliftCostAttribution!
   astroliftSourceConnections: [AstroliftSourceConnection!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage.")
   astroliftSourceConnectionsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftSourceConnectionPage!
   astroliftSshDeployKeys(appSlug: String = null): [AstroliftSshDeployKey!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSshDeployKeysPage.")
@@ -11481,7 +11388,6 @@ type Query {
   astroliftManagedServicesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServicePage!
   astroliftManagedServiceSummariesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceSummaryPage!
   astroliftAppManagedService(appSlug: String!, id: GUID!): AstroliftManagedService
-  astroliftManagedServiceCostPreview(managedServiceId: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceCostPreview
   astroliftWorkloadIdentityGrants(appSlug: String!, environmentName: String = null, unappliedOnly: Boolean! = false): [AstroliftWorkloadIdentityGrant!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects
   astroliftManagedServiceQueueDepth(managedServiceId: GUID!): AstroliftManagedServiceQueueDepth

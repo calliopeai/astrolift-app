@@ -96,11 +96,6 @@ _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
         "Pre-#449 ``alfdt_`` deploy-token prefix is still accepted alongside the canonical ``alft_dt_`` shape.",
     ),
     (
-        "ADMIN_COST_ENABLED",
-        "admin.cost_enabled",
-        "Platform-admin Cost console (/administration/cost) is enabled.",
-    ),
-    (
         "ADMIN_QUOTAS_ENABLED",
         "admin.quotas_enabled",
         "Platform-admin Quotas console (/administration/quotas) is enabled.",

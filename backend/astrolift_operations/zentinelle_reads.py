@@ -3,16 +3,16 @@
 The reads go out as the organization's install, with the credential
 ``zentinelle_connect`` holds, on the install channel
 (``/api/zentinelle/v1/astrolift/...``, ``AstroliftInstallAuthentication``).
-Zentinelle's main does not serve these three reads on that channel yet: its
-usage, policy and audit APIs take a service, platform or portal credential,
-none of which an install holds. This module is the contract Astrolift asks
-for (calliopeai/zentinelle#390), with the field names Zentinelle already uses
-for these records (``OperatorPolicyView``, ``serialize_record``). Each read
-takes ``tenant_id``, one of the tenants the enrollment code scoped the install
-to, and answers only for agents this install minted keys for:
+Compatible Zentinelle source implements these install-scoped reads. Deployed
+availability and enrollment remain separate runtime checks; this module does
+not establish that a particular installation serves them. Each read takes
+``tenant_id``, one of the tenants the enrollment code scoped the install to,
+and requests only agents this install minted keys for:
 
-* ``GET .../astrolift/usage?since=`` answers ``{"usage": [{deployment_id,
-  provider, model, requests, input_tokens, output_tokens, cost_usd}]}``.
+* ``GET .../astrolift/usage?since=``: Astrolift consumes ``deployment_id``,
+  ``provider``, ``model``, ``requests``, ``input_tokens`` and ``output_tokens``
+  from the response's ``usage`` rows. Additional fields, including monetary
+  fields returned by Zentinelle, are ignored rather than relayed.
 * ``GET .../astrolift/policies`` answers ``{"policies": [{id, name,
   policy_type, enforcement, scope_type, priority, description}]}``.
 * ``GET .../astrolift/audit?since=&until=&cursor=&limit=`` answers
@@ -25,8 +25,9 @@ agent workload's slug. Repeating it narrows a read to those agents; leaving
 it out reads the whole tenant. Astrolift decides which agents a viewer may
 see before it asks, so Zentinelle never sees a viewer, only the install.
 
-A Zentinelle without these endpoints, which today is every Zentinelle,
-answers 404; that is reported as an upgrade to make, not as an empty result.
+A deployment without these endpoints answers 404; that is reported as an
+upgrade requirement rather than an empty usage result. Source support does
+not prove deployed token telemetry.
 """
 
 from __future__ import annotations
@@ -59,7 +60,6 @@ class UsageRow:
     requests: int
     input_tokens: int
     output_tokens: int
-    cost_usd: float
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -144,17 +144,10 @@ def _int(row: dict[str, Any], key: str) -> int:
         return 0
 
 
-def _float(row: dict[str, Any], key: str) -> float:
-    try:
-        return float(row.get(key) or 0)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def usage(
     connection: ZentinelleConnection, *, since: datetime, agent_slugs: Iterable[str] | None = None
 ) -> list[UsageRow]:
-    """Model usage and cost since ``since``, per agent, provider and model."""
+    """Model token usage since ``since``, per agent, provider and model."""
     body = _get(connection, "/usage", "usage", [("since", since.isoformat()), *_agents(agent_slugs)])
     return [
         UsageRow(
@@ -164,7 +157,6 @@ def usage(
             requests=_int(row, "requests"),
             input_tokens=_int(row, "input_tokens"),
             output_tokens=_int(row, "output_tokens"),
-            cost_usd=_float(row, "cost_usd"),
         )
         for row in _list(body, "usage")
     ]

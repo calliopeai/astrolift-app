@@ -663,7 +663,7 @@ def _preview_environments_qs(
 
     Shared by the list field and its paginated sibling; ordering is
     left to ``keyset_page``. Catalog projection performs no runtime pod
-    or pricing calls; exact detail opts into enrichment separately.
+    calls; exact detail opts into enrichment separately.
     """
     # Org-scope to the caller's tenant (PreviewEnvironment reaches the
     # org via registered_app). Fails closed when org_id is None (#1183).
@@ -1606,12 +1606,12 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
     @require_app_collection_scope(Permission.APP_READ)
     @tenant_scoped()
     def astrolift_preview_environment(
-        self, info: Info, id: GUID, include_runtime_cost: bool = False
+        self, info: Info, id: GUID, include_runtime_resources: bool = False
     ) -> PreviewEnvironmentType | None:
         """One exact preview GUID, with optional runtime enrichment of one row.
 
         Missing, deleted, foreign or unauthorized previews return null. Basic
-        detail never lists pods or calls a price API. Retired owned bindings
+        detail never lists pods. Retired owned bindings
         remain readable but cannot authorize log/deployment routing.
         """
         tenant = get_current_tenant()
@@ -1620,7 +1620,7 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
         if preview is None:
             return None
         reasons = _preview_deploy_failure_reasons([preview])
-        project = _preview_with_cost if include_runtime_cost else preview_to_type
+        project = _preview_with_resources if include_runtime_resources else preview_to_type
         return project(preview, failure_reason=reasons.get(preview.pk))
 
     @strawberry.field
@@ -1694,8 +1694,8 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
 
         Replaces ``astroliftPreviewEnvironments``, whose 200-row cap hid
         older previews outright. Browsing projects stored metadata only;
-        runtime resources and pricing are explicitly requested on one exact
-        preview through ``astroliftPreviewEnvironment(includeRuntimeCost: true)``.
+        runtime resources are explicitly requested on one exact
+        preview through ``astroliftPreviewEnvironment(includeRuntimeResources: true)``.
 
         Seek key is ``(-created_at, -guid)``; ``search`` matches the app,
         branch, hostname, commit, and status.
@@ -2933,15 +2933,14 @@ def _preview_deploy_failure_reasons(previews) -> dict[int, str]:
     }
 
 
-def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnvironmentType:
-    """Opt-in runtime resources and pricing for one exact available FK target.
+def _preview_with_resources(p, *, failure_reason: str | None = None) -> PreviewEnvironmentType:
+    """Opt-in observed runtime resources for one exact available FK target.
 
     No fallback cluster or namespace is allowed. Unavailable transport is
-    reported explicitly, and a missing price remains null rather than zero.
+    reported explicitly without synthesizing resource observations.
     """
-    from astrolift_lifecycle.preview_cost import (
+    from astrolift_lifecycle.preview_resources import (
         aggregate_pod_resources,
-        estimate_daily_cost,
     )
     from astrolift_lifecycle.preview_targets import preview_binding
     from astrolift_lifecycle.schema.types import PreviewAggregateResourcesType
@@ -2951,7 +2950,6 @@ def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnviro
         return preview_to_type(
             p,
             runtime_status="unavailable",
-            estimated_cost_notes=["The preview environment is unavailable or retired."],
             failure_reason=failure_reason,
         )
     cluster = p.app_environment.tenant_cluster
@@ -2963,18 +2961,10 @@ def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnviro
         return preview_to_type(
             p,
             runtime_status="unavailable",
-            estimated_cost_notes=["Runtime resource data is unavailable."],
             failure_reason=failure_reason,
         )
 
     aggregate = aggregate_pod_resources(pods)
-    estimate = None
-    if cluster is not None and aggregate.pod_count > 0:
-        estimate = estimate_daily_cost(
-            cluster=cluster,
-            aggregate=aggregate,
-            region=getattr(cluster, "region", "") or "",
-        )
 
     return preview_to_type(
         p,
@@ -2983,9 +2973,6 @@ def _preview_with_cost(p, *, failure_reason: str | None = None) -> PreviewEnviro
             memory_bytes=aggregate.memory_bytes,
             pod_count=aggregate.pod_count,
         ),
-        estimated_daily_cost_usd=estimate.daily_usd if estimate else None,
-        estimated_cost_notes=list(estimate.notes) if estimate else [],
-        estimated_cost_approximate=bool(estimate and estimate.approximate),
         runtime_status="available",
         failure_reason=failure_reason,
     )

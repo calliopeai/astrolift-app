@@ -24,11 +24,6 @@ pytestmark = pytest.mark.django_db
 READ_ROUTES = (
     "astrolift_quotas",
     "astrolift_quota_usage_history",
-    "astrolift_budgets",
-    "astrolift_cost_snapshots",
-    "astrolift_cost_trend",
-    "astrolift_cost_forecast",
-    "astrolift_cost_by_binding",
 )
 ROUTES = (*READ_ROUTES, "request_quota_increase")
 
@@ -183,16 +178,6 @@ def test_organization_grant_reaches_org_billing_with_either_team_selected(world,
         assert {str(row.id) for row in result} == {str(quota.guid) for quota in world.quotas}
     elif name == "astrolift_quota_usage_history":
         assert [row.used for row in result] == [3]
-    elif name == "astrolift_budgets":
-        assert {str(row.id) for row in result} == {str(budget.guid) for budget in world.budgets}
-    elif name == "astrolift_cost_snapshots":
-        assert {str(row.id) for row in result} == {str(cost.guid) for cost in world.costs}
-    elif name == "astrolift_cost_trend":
-        assert sum(row.amount_cents for row in result) == 300
-    elif name == "astrolift_cost_forecast":
-        assert result.mtd_cents == 300
-    elif name == "astrolift_cost_by_binding":
-        assert result.total_cents == result.unattributed_cents == 300
     else:
         assert result.ok, result.errors
         assert QuotaIncreaseRequest.objects.get().requested_by == world.user
@@ -308,9 +293,7 @@ def test_http_billing_scope_with_selected_sibling_team(world, credential, mutati
             "variables": {"input": {"quotaId": str(world.quotas[0].guid), "factor": 2, "reason": "x"}},
         }
     else:
-        data = {
-            "query": "{ astroliftQuotas { id } astroliftBudgets { id } astroliftCostForecast { mtdCents } }"
-        }
+        data = {"query": "{ astroliftQuotas { id } }"}
     response = client.post(
         f"/{settings.BASE_URL}gql/config/", data=data, content_type="application/json", **headers
     )
@@ -331,6 +314,5 @@ def test_http_billing_scope_with_selected_sibling_team(world, credential, mutati
         assert {row["id"] for row in payload["data"]["astroliftQuotas"]} == {
             str(quota.guid) for quota in world.quotas
         }
-        assert payload["data"]["astroliftCostForecast"]["mtdCents"] == 300
     else:
         assert payload.get("errors") and payload.get("data") is None, payload

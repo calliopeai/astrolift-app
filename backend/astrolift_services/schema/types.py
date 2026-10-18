@@ -432,21 +432,6 @@ class ModelEndpointsFilterInput:
     deployed_by: list[str] | None = strawberry.field(default=None, description='User ids, or "me".')
 
 
-@strawberry.type(name="AstroliftManagedServiceCostPreview")
-class ManagedServiceCostPreviewType:
-    managed_service_id: GUID
-    available: bool
-    reason: str
-    message: str
-    monthly_total: float | None
-    currency: str
-    line_items: JSON
-    pricing_source_url: str
-    pricing_fetched_at: str
-    notes: list[str]
-    approximate: bool
-
-
 @strawberry.type(name="AstroliftManagedServiceCatalogEntry")
 class ManagedServiceCatalogEntryType:
     id: str

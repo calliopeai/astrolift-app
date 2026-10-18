@@ -81,9 +81,7 @@ def fake_constance(monkeypatch):
 def test_set_feature_flag_denied_for_non_admin(permission_resolver, fake_constance):
     """No ``admin.elevate`` grant → PERMISSION_DENIED envelope, and the
     Constance write never happens (the gate fires before the body)."""
-    result = FeatureFlagMutations().set_feature_flag(
-        _info(), key="zentinelle.enabled", enabled=True
-    )
+    result = FeatureFlagMutations().set_feature_flag(_info(), key="zentinelle.enabled", enabled=True)
     assert result.ok is False
     assert result.errors[0].code == "PERMISSION_DENIED"
     # The gate fired before any write.
@@ -95,18 +93,14 @@ def test_set_feature_flag_denied_for_non_admin(permission_resolver, fake_constan
 
 def test_set_feature_flag_rejects_unknown_key(permission_resolver, fake_constance):
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
-    result = FeatureFlagMutations().set_feature_flag(
-        _info(_operator()), key="totally.bogus", enabled=True
-    )
+    result = FeatureFlagMutations().set_feature_flag(_info(_operator()), key="totally.bogus", enabled=True)
     assert result.ok is False
     assert result.errors[0].code == "VALIDATION"
     assert result.errors[0].field == "key"
     assert vars(fake_constance) == {}
 
 
-def test_set_feature_flag_rejects_build_time_feature_key(
-    permission_resolver, fake_constance
-):
+def test_set_feature_flag_rejects_build_time_feature_key(permission_resolver, fake_constance):
     """Build-time features (``config.features.Feature``) gate app / schema
     LOADING at boot and are read-only — their keys are not in the runtime
     allow-list, so ``setFeatureFlag`` rejects them."""
@@ -120,38 +114,36 @@ def test_set_feature_flag_rejects_build_time_feature_key(
 # ---- toggle + reflection --------------------------------------------
 
 
-def test_set_feature_flag_toggles_and_reflects_in_server_info(
-    permission_resolver, fake_constance
-):
+def test_set_feature_flag_toggles_and_reflects_in_server_info(permission_resolver, fake_constance):
     permission_resolver.grant(Permission.ADMIN_ELEVATE)
 
-    # Baseline: admin.cost_enabled absent on the fake config → disabled.
+    # Baseline: admin.quotas_enabled absent on the fake config → disabled.
     flags0 = {f["key"]: f["enabled"] for f in _server_info()["featureFlags"]}
-    assert flags0["admin.cost_enabled"] is False
+    assert flags0["admin.quotas_enabled"] is False
 
     # Flip it on.
     result = FeatureFlagMutations().set_feature_flag(
-        _info(_operator()), key="admin.cost_enabled", enabled=True
+        _info(_operator()), key="admin.quotas_enabled", enabled=True
     )
     assert result.ok, result.errors
-    assert result.data.key == "admin.cost_enabled"
+    assert result.data.key == "admin.quotas_enabled"
     assert result.data.enabled is True
     assert result.data.description  # the allow-list description is echoed
     # The backing Constance key was written.
-    assert fake_constance.ADMIN_COST_ENABLED is True
+    assert fake_constance.ADMIN_QUOTAS_ENABLED is True
 
     # Next handshake reflects it.
     flags1 = {f["key"]: f["enabled"] for f in _server_info()["featureFlags"]}
-    assert flags1["admin.cost_enabled"] is True
+    assert flags1["admin.quotas_enabled"] is True
 
     # Flip back off — handshake follows.
     off = FeatureFlagMutations().set_feature_flag(
-        _info(_operator()), key="admin.cost_enabled", enabled=False
+        _info(_operator()), key="admin.quotas_enabled", enabled=False
     )
     assert off.ok and off.data.enabled is False
-    assert fake_constance.ADMIN_COST_ENABLED is False
+    assert fake_constance.ADMIN_QUOTAS_ENABLED is False
     flags2 = {f["key"]: f["enabled"] for f in _server_info()["featureFlags"]}
-    assert flags2["admin.cost_enabled"] is False
+    assert flags2["admin.quotas_enabled"] is False
 
 
 # ---- the three new admin-screen flags -------------------------------
@@ -159,7 +151,7 @@ def test_set_feature_flag_toggles_and_reflects_in_server_info(
 
 def test_new_admin_flags_present_and_default_off(fake_constance):
     flags = {f["key"]: f["enabled"] for f in _server_info()["featureFlags"]}
-    for key in ("admin.cost_enabled", "admin.quotas_enabled", "admin.permissions_enabled"):
+    for key in ("admin.quotas_enabled", "admin.permissions_enabled"):
         assert key in flags, f"{key} missing from featureFlags"
         assert flags[key] is False, f"{key} must default OFF"
 
@@ -181,3 +173,13 @@ def test_build_time_features_surface_read_only(fake_constance):
     # never targets them.
     runtime = {f["key"] for f in info["featureFlags"]}
     assert set(by_key) & runtime == set()
+
+
+def test_retired_cost_flag_is_neither_discoverable_nor_settable(permission_resolver, fake_constance):
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
+    assert "admin.cost_enabled" not in {flag["key"] for flag in _server_info()["featureFlags"]}
+    result = FeatureFlagMutations().set_feature_flag(
+        _info(_operator()), key="admin.cost_enabled", enabled=True
+    )
+    assert not result.ok and result.errors[0].code == "VALIDATION"
+    assert vars(fake_constance) == {}
