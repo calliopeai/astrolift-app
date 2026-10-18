@@ -75,6 +75,8 @@ def desired_revision(workflow) -> str:
         "cron": workflow.schedule_cron or "",
         "task_queue": getattr(settings, "TEMPORAL_TASK_QUEUE", "astrolift-main"),
     }
+    if workflow.reviewed_schedule_approval_id is not None:
+        intent["reviewed_schedule_approval_id"] = workflow.reviewed_schedule_approval_id
     return hashlib.sha256(json.dumps(intent, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 

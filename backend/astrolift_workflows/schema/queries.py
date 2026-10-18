@@ -76,6 +76,13 @@ from core.permissions import (
     require_permission,
 )
 from core.tenancy import get_current_tenant
+from workflows.reviewed_runtime import stage_kind_filter
+from workflows.schema.atomic_review_types import (
+    WorkflowDefinitionFullReview,
+    WorkflowScheduleFullReview,
+    definition_review_to_type,
+    schedule_review_to_type,
+)
 from workflows.schema.reviewed_start_types import (
     ReviewedWorkflowDefinition,
     WorkflowDefinitionStartType,
@@ -540,6 +547,34 @@ def _workflow_definitions_qs(
 @strawberry.type
 class WorkflowsQuery:
     @strawberry.field(
+        description="Capture the complete exact-GUID native graph and revision in one read-only PostgreSQL snapshot."
+    )
+    @require_permission(
+        Permission.WORKFLOW_READ,
+        scope=definition_scope_by_guid("id", permission=Permission.WORKFLOW_READ),
+        operation=agent_region_operation,
+    )
+    @tenant_scoped()
+    def workflow_definition_full_review(self, info: Info, id: GUID) -> WorkflowDefinitionFullReview:
+        from workflows.atomic_review import capture_review
+
+        return definition_review_to_type(capture_review(definition_id=str(id)))
+
+    @strawberry.field(
+        description="Review the complete exact configured schedule, graph and compiled-plan digests before explicit activation."
+    )
+    @require_permission(
+        Permission.WORKFLOW_READ,
+        scope=workflow_scope_by_guid("workflow_id"),
+        operation=agent_region_operation,
+    )
+    @tenant_scoped()
+    def workflow_schedule_full_review(self, info: Info, workflow_id: GUID) -> WorkflowScheduleFullReview:
+        from workflows.atomic_review import capture_review
+
+        return schedule_review_to_type(capture_review(workflow_id=str(workflow_id)))
+
+    @strawberry.field(
         description="Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null."
     )
     @require_permission(Permission.WORKFLOW_TRIGGER, any_scope=True)
@@ -558,11 +593,11 @@ class WorkflowsQuery:
         )
         page: KeysetPage[WorkflowStageExecution] = keyset_page(
             WorkflowStageExecution.objects.filter(
+                stage_kind_filter("human_gate"),
                 workflow_run_id__in=runs.values("pk"),
                 workflow_run__status="running",
                 workflow_run__ended_at__isnull=True,
                 workflow_run__deleted_at__isnull=True,
-                stage__kind="human_gate",
                 stage__deleted_at__isnull=True,
                 deleted_at__isnull=True,
                 status="running",
@@ -576,7 +611,7 @@ class WorkflowsQuery:
             items=[
                 pending_gate_to_type(row)
                 for row in page.rows
-                if may_decide_human_gate(info.context.user, row.stage.approvers)
+                if may_decide_human_gate(info.context.user, row.effective_stage.approvers)
             ],
             next_cursor=page.next_cursor,
         )
@@ -1082,7 +1117,7 @@ class WorkflowsQuery:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return []
-        from workflows.models import WorkflowStage, WorkflowStageExecution
+        from workflows.models import WorkflowStageExecution
 
         runs = visible_runs(
             WorkflowRun.objects.filter(organization_id=caller), caller, Permission.WORKFLOW_TRIGGER
@@ -1094,7 +1129,7 @@ class WorkflowsQuery:
         # (``may_decide_human_gate``), so the two never disagree.
         rows = (
             WorkflowStageExecution.objects.filter(
-                stage__kind=WorkflowStage.StageKind.HUMAN_GATE,
+                stage_kind_filter("human_gate"),
                 stage__deleted_at__isnull=True,
                 deleted_at__isnull=True,
                 status="running",
@@ -1111,5 +1146,5 @@ class WorkflowsQuery:
         return [
             pending_gate_to_type(execution)
             for execution in rows
-            if may_decide_human_gate(user, execution.stage.approvers)
+            if may_decide_human_gate(user, execution.effective_stage.approvers)
         ]

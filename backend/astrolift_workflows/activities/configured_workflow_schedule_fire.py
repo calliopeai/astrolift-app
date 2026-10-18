@@ -58,14 +58,31 @@ def _create_sync(action: dict[str, Any]) -> ScheduledWorkflowFire:
         ):
             return ScheduledWorkflowFire(skipped="schedule configuration changed")
 
+        approval = payload = None
+        if wf.reviewed_schedule_approval_id is not None:
+            from core.permissions import PermissionDenied
+            from workflows.atomic_review import WorkflowReviewError
+            from workflows.reviewed_schedules import admit_scheduled_run
+
+            try:
+                approval, payload = admit_scheduled_run(wf)
+            except (WorkflowReviewError, PermissionDenied):
+                return ScheduledWorkflowFire(
+                    skipped="reviewed schedule requires a new review or current authority"
+                )
+
         run, run_input, workflow_id = build_workflow_definition_run_input(
             wf.definition,
-            trigger_payload=dict(wf.inputs or {}),
+            trigger_payload=payload["configuration"]["resolvedInputs"] if payload else dict(wf.inputs or {}),
             organization_id=wf.organization_id,
             actor=Actor(kind="system", user_id=None, display="scheduled"),
-            stage_bindings=wf.stage_bindings,
+            stage_bindings=None if payload else wf.stage_bindings,
             trigger_kind=RunTrigger.SCHEDULE,
         )
+        if approval is not None:
+            from workflows.reviewed_schedules import link_scheduled_run
+
+            link_scheduled_run(run, approval)
         # `runCount` and the Workflow's run history count these records; the
         # manual `runWorkflow` path writes one per run too.
         WorkflowInstance.start(configured_workflow=wf, temporal_workflow_id=workflow_id)

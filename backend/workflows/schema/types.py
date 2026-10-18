@@ -113,7 +113,7 @@ class WorkflowStageExecutionType:
     def fanout_stage_id(self) -> str | None:
         parent = self.fanout_parent_execution
         return (
-            str(parent.stage.guid)
+            str(parent.effective_stage.guid)
             if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage_id == self.stage_id
             else None
         )
@@ -127,15 +127,15 @@ class WorkflowStageExecutionType:
             else None
         )
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot"], select_related=["stage"])
     def collection_stage_id(self) -> str | None:
         parent = self.collection_parent_execution
-        return str(parent.stage.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage.definition_id == self.stage.definition_id else None
+        return str(parent.effective_stage.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.effective_stage.definition_id == self.effective_stage.definition_id else None
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot"], select_related=["stage"])
     def collection_parent_execution_guid(self) -> str | None:
         parent = self.collection_parent_execution
-        return str(parent.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage.definition_id == self.stage.definition_id else None
+        return str(parent.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.effective_stage.definition_id == self.effective_stage.definition_id else None
 
     @strawberry_django.field
     def execution_id(self) -> str:
@@ -147,35 +147,35 @@ class WorkflowStageExecutionType:
         through the platform (#1018)."""
         return str(self.pk)
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot"], select_related=["stage"])
     def stage_guid(self) -> str:
-        return str(self.stage.guid)
+        return str(self.effective_stage.guid)
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot"], select_related=["stage"])
     def stage_kind(self) -> str:
-        return self.stage.kind
+        return self.effective_stage.kind
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot"], select_related=["stage"])
     def stage_order(self) -> int:
-        return self.stage.order
+        return self.effective_stage.order
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot"], select_related=["stage"])
     def stage_role(self) -> str:
         """The stage's role label — the human-readable "who does this" that
         pairs with ``stage_kind`` when rendering a run's stage list."""
-        return self.stage.role or ""
+        return self.effective_stage.role or ""
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot"], select_related=["stage"])
     def stage_approvers(self) -> list[str]:
         """The stage's declared approvers (team / role slugs) — who a gate in
         ``human_gate_state: pending`` is waiting on. Empty for a stage that
         declares none, and for every non-gate kind."""
-        approvers = self.stage.approvers
+        approvers = self.effective_stage.approvers
         if not isinstance(approvers, list):
             return []
         return [str(a) for a in approvers if str(a).strip()]
 
-    @strawberry_django.field
+    @strawberry_django.field(only=["reviewed_stage_snapshot", "status", "output"], select_related=["stage"])
     def human_gate_state(self) -> str:
         """Read-only gate state for a ``human_gate`` stage; ``""`` for every
         other stage kind.
@@ -194,7 +194,7 @@ class WorkflowStageExecutionType:
         * ``closed`` — the row reached a terminal status with no decision
           recorded.
         """
-        if self.stage.kind != WorkflowStage.StageKind.HUMAN_GATE:
+        if self.effective_stage.kind != WorkflowStage.StageKind.HUMAN_GATE:
             return ""
         decision = _gate_payload(self.output).get("decision")
         if decision in ("approved", "rejected"):

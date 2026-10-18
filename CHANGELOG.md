@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Exact workflow GUIDs now support atomic full native graph/configuration review and explicit reviewed schedule consent (#2459). PostgreSQL captures the raw root/children and canonical revision together; current per-child/agent authority is required. Consent seals configured root/nested plans, records the real approver and bearer ceiling, and rechecks current authority and content at each timer reservation. Saved human gate descriptors preserve kind, role and approvers through later definition edits. The receipt reports saved consent with engine state unconfirmed; the mutation performs no engine transport. Capability `workflows.atomic_full_review`; migration workflows 0021. See docs/runbooks/atomic-workflow-review.md.
+
 - Temporary-app expiry removes the exact app-owned brain credential Secrets during runtime retirement, with native ownership and original UID checks; the data namespace and managed services remain through grace (#2433).
 
 - Chat Studio promotion records the app creator for expiry warnings and accepts only an explicit JSON boolean for `delete_data_on_expiry`; strings such as `"false"` cannot accidentally select immediate data deletion. Re-promoting preserves the existing app expiry and data choice (#2433).
