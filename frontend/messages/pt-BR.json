@@ -4726,6 +4726,25 @@
       "subscribeFailed": "Falha ao inscrever",
       "unsubscribed": "Inscrição em {app} cancelada",
       "unsubscribeFailed": "Falha ao cancelar a inscrição"
+    },
+    "quietHours": {
+      "title": "Horário de silêncio",
+      "description": "Pausa as notificações pessoais e os e-mails de mensagens de agentes durante este período diário. As mensagens permanecem na caixa de entrada. Os webhooks da organização não são afetados.",
+      "enabled": "Ativar horário de silêncio",
+      "timezone": "Fuso horário (IANA)",
+      "start": "Início",
+      "end": "Fim",
+      "active": "O horário de silêncio está ativo",
+      "inactive": "O horário de silêncio está inativo",
+      "save": "Salvar",
+      "saved": "Horário de silêncio salvo",
+      "loading": "Carregando preferências de notificação…",
+      "error": "Não foi possível carregar as preferências de notificação.",
+      "retry": "Tentar novamente",
+      "saveError": "Não foi possível salvar o horário de silêncio.",
+      "invalidTime": "Digite um horário válido.",
+      "timezoneRequired": "Digite um fuso horário IANA.",
+      "differentTimes": "Os horários de início e fim devem ser diferentes."
     }
   },
   "securitySettings": {
@@ -16341,7 +16360,8 @@
     "semanticLayer": "Camada semântica",
     "substrate": "Substrato",
     "sharing": "Compartilhamento",
-    "connect": "Conectar"
+    "connect": "Conectar",
+    "agentInbox": "Caixa de entrada"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17208,5 +17228,42 @@
     "reasonPermission": "Você não tem permissão para isso.",
     "reasonStepUp": "Isso exige entrar novamente.",
     "reasonRateLimited": "Tentativas demais. Aguarde um minuto e tente novamente."
+  },
+  "agentInbox": {
+    "title": "Caixa de entrada",
+    "description": "{count, plural, =0 {Mensagens dos seus agentes. Nada não lido.} one {Mensagens dos seus agentes. # não lida.} other {Mensagens dos seus agentes. # não lidas.}}",
+    "buttonUnread": "Caixa de entrada, {count} não lidas",
+    "unreadOnly": "Somente não lidas",
+    "emptyTitle": "Nenhuma mensagem ainda",
+    "emptyUnreadTitle": "Nada não lido",
+    "emptyDescription": "Quando um agente envia uma atualização, uma pergunta ou um resultado, ele aparece aqui.",
+    "pickThread": "Escolha uma conversa para ler.",
+    "threads": "Conversas",
+    "thread": "Conversa",
+    "unknownAgent": "Agente removido",
+    "more": "Carregar mais",
+    "earlier": "Carregar mensagens anteriores",
+    "openRun": "Abrir a execução",
+    "markRead": "Marcar como lida",
+    "replyToAgent": "Responder ao agente",
+    "answer": "Sua resposta",
+    "reason": "Motivo (opcional)",
+    "allow": "Permitir",
+    "deny": "Negar",
+    "send": "Enviar",
+    "expires": "Expira {when}",
+    "kind": {
+      "update": "Atualização",
+      "question": "Pergunta",
+      "approval": "Aprovação",
+      "result": "Resultado",
+      "alert": "Alerta"
+    },
+    "route": {
+      "live_run": "enviada ao agente em execução",
+      "gate": "respondeu à solicitação do agente",
+      "woke": "iniciou o agente",
+      "queued": "aguarda a próxima execução do agente"
+    }
   }
 }

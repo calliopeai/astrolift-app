@@ -150,3 +150,9 @@ def commit_task_events(task, prepared):
     from astrolift_agents.services.agent_enforcement import poll_enforcements
 
     transaction.on_commit(lambda: poll_enforcements(task))
+    gates = [row for row in rows if row.request is not None]
+    if gates:
+        # A run waiting at a gate asks its person through a message (#2434).
+        from astrolift_agents.services.agent_messages import signal_gate_requests
+
+        transaction.on_commit(lambda: signal_gate_requests(task, gates))

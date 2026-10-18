@@ -303,12 +303,13 @@ class _CoreSubscription:
 # Add a new submodule's subscriptions by importing it here and
 # extending the bases tuple.
 
+from astrolift_agents.message_schema import AgentMessagesSubscription  # noqa: E402
 from astrolift_lifecycle.schema.subscriptions import (  # noqa: E402
     LifecycleSubscription,
 )
 
 
 @strawberry.type
-class Subscription(_CoreSubscription, LifecycleSubscription):
+class Subscription(_CoreSubscription, LifecycleSubscription, AgentMessagesSubscription):
     """Composed subscription root — see also Query / Mutation in
     ``config.schema``."""

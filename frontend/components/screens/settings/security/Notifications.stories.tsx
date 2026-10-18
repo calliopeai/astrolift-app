@@ -9,6 +9,7 @@ import { ALERT_SUBSCRIPTIONS_LIST } from "./alert-subscriptions-list";
 import { AlertSubscriptionsView, type AlertSubscriptionsViewProps } from "./AlertSubscriptions";
 import { NotificationsScreen } from "./Notifications";
 import { NotificationsInbox } from "./NotificationsInbox";
+import { NotificationQuietHoursPanel } from "./NotificationQuietHoursPanel";
 import {
   LONG_NOTIFICATIONS,
   alertProps,
@@ -49,6 +50,37 @@ export const Full: Story = { render: () => <Screen /> };
 
 /** The alert subscriptions section: only it is mounted. */
 export const AlertsSection: Story = { render: () => <Screen initial="alerts" /> };
+
+export const QuietHoursSection: Story = {
+  render: function QuietHoursStory() {
+    const section = useLocalSettingsSection("quiet-hours");
+    return (
+      <NotificationsScreen
+        section={section}
+        inbox={<NotificationsInbox {...inboxProps()} />}
+        alertSubscriptions={<AlertSubscriptionsStory />}
+        quietHours={
+          <NotificationQuietHoursPanel
+            preferences={{
+              enabled: true,
+              timezone: "UTC",
+              startMinute: 1320,
+              endMinute: 480,
+              active: true,
+            }}
+            loading={false}
+            error={false}
+            saving={false}
+            saveError={false}
+            saved={false}
+            onRetry={() => {}}
+            onSave={async () => {}}
+          />
+        }
+      />
+    );
+  },
+};
 
 export const Loading: Story = {
   render: () => (

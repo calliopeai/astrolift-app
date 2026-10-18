@@ -4726,6 +4726,25 @@
       "subscribeFailed": "購読に失敗しました",
       "unsubscribed": "{app} の購読を解除しました",
       "unsubscribeFailed": "購読解除に失敗しました"
+    },
+    "quietHours": {
+      "title": "通知を控える時間帯",
+      "description": "この毎日の時間帯は、エージェントメッセージの個人向けプッシュ通知とメールを停止します。メッセージは受信トレイに残ります。組織のWebhookには影響しません。",
+      "enabled": "通知を控える時間帯を有効にする",
+      "timezone": "タイムゾーン（IANA）",
+      "start": "開始",
+      "end": "終了",
+      "active": "現在、通知を控える時間帯です",
+      "inactive": "現在、通知を控える時間帯ではありません",
+      "save": "保存",
+      "saved": "通知を控える時間帯を保存しました",
+      "loading": "通知設定を読み込み中…",
+      "error": "通知設定を読み込めませんでした。",
+      "retry": "再試行",
+      "saveError": "通知を控える時間帯を保存できませんでした。",
+      "invalidTime": "有効な時刻を入力してください。",
+      "timezoneRequired": "IANAタイムゾーンを入力してください。",
+      "differentTimes": "開始時刻と終了時刻は別の時刻にしてください。"
     }
   },
   "securitySettings": {
@@ -16341,7 +16360,8 @@
     "semanticLayer": "セマンティックレイヤー",
     "substrate": "基盤",
     "sharing": "共有",
-    "connect": "接続"
+    "connect": "接続",
+    "agentInbox": "受信トレイ"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17208,5 +17228,42 @@
     "reasonPermission": "この操作の権限がありません。",
     "reasonStepUp": "再サインインが必要です。",
     "reasonRateLimited": "試行回数が多すぎます。1 分待ってから再試行してください。"
+  },
+  "agentInbox": {
+    "title": "受信トレイ",
+    "description": "{count, plural, =0 {エージェントからのメッセージ。未読はありません。} other {エージェントからのメッセージ。未読 # 件。}}",
+    "buttonUnread": "受信トレイ、未読 {count} 件",
+    "unreadOnly": "未読のみ",
+    "emptyTitle": "メッセージはまだありません",
+    "emptyUnreadTitle": "未読はありません",
+    "emptyDescription": "エージェントから更新、質問、結果が届くとここに表示されます。",
+    "pickThread": "読む会話を選んでください。",
+    "threads": "会話",
+    "thread": "会話",
+    "unknownAgent": "削除されたエージェント",
+    "more": "さらに読み込む",
+    "earlier": "以前のメッセージを読み込む",
+    "openRun": "実行を開く",
+    "markRead": "既読にする",
+    "replyToAgent": "エージェントに返信",
+    "answer": "回答",
+    "reason": "理由 (任意)",
+    "allow": "許可",
+    "deny": "拒否",
+    "send": "送信",
+    "expires": "期限 {when}",
+    "kind": {
+      "update": "更新",
+      "question": "質問",
+      "approval": "承認",
+      "result": "結果",
+      "alert": "アラート"
+    },
+    "route": {
+      "live_run": "実行中のエージェントに送信済み",
+      "gate": "エージェントのリクエストに回答済み",
+      "woke": "エージェントを起動済み",
+      "queued": "エージェントの次回実行を待機中"
+    }
   }
 }
