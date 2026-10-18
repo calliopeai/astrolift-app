@@ -8,7 +8,7 @@ import re
 
 
 _WORKFLOWS = Path(__file__).resolve().parents[3] / ".github" / "workflows"
-_USES = re.compile(r"^\s*-\s*uses:\s*([^\s#]+)")
+_USES = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)")
 
 _MIGRATED_NODE24_REFS = Counter(
     {
