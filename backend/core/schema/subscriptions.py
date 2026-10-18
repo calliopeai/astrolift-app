@@ -307,9 +307,12 @@ from astrolift_agents.message_schema import AgentMessagesSubscription  # noqa: E
 from astrolift_lifecycle.schema.subscriptions import (  # noqa: E402
     LifecycleSubscription,
 )
+from astrolift_operations.schema.notification_inbox import NotificationInboxSubscription  # noqa: E402
 
 
 @strawberry.type
-class Subscription(_CoreSubscription, LifecycleSubscription, AgentMessagesSubscription):
+class Subscription(
+    _CoreSubscription, LifecycleSubscription, NotificationInboxSubscription, AgentMessagesSubscription
+):
     """Composed subscription root — see also Query / Mutation in
     ``config.schema``."""

@@ -29,6 +29,11 @@ BACKEND = Path(__file__).resolve().parents[2]
 # Resolvers that intentionally do NOT need @tenant_scoped.
 # Each entry must include the qualified name and a why.
 EXEMPT: dict[str, str] = {
+    "NotificationInboxSubscription.astrolift_my_notification_stream": (
+        "#2457 capture_identity explicitly rejects a missing pinned tenant/person; each poll rechecks live "
+        "membership, credential, app visibility and recipient/mute rules. The subscription tenant_scoped "
+        "decorator would silently complete instead of returning an explicit authorization error."
+    ),
     "OperationsQuery.astrolift_zentinelle_install_connection": (
         "Install-level Zentinelle connection, a row that belongs to no organization; "
         "check_platform_operator refuses anyone but the platform operator (#1905)."
@@ -191,6 +196,10 @@ EXEMPT: dict[str, str] = {
     # Notifications are user-scoped: the resolver filters by the
     # caller's user_id directly, not by tenant.
     "OperationsQuery.astrolift_my_notifications": "self-service: caller's own notifications",
+    "NotificationInboxQuery.astrolift_my_notifications_page": (
+        "#2457 self-only inbox: capture_identity and notification_page recheck current person, org membership, "
+        "bearer scopes and team ceiling; actual expiry rows additionally recheck current app audience and app.read"
+    ),
     # Push device registry / notification prefs / alert subscriptions
     # (#476, #490, #499, #747) — all self-service: each resolver filters
     # by the caller's own user (viewer.pk / tenant.actor_user_id), never

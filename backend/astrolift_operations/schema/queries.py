@@ -19,7 +19,6 @@ from astrolift_operations.models import (
     AuditEvent,
     DeviceRegistration,
     Event,
-    Notification,
     NotificationChannel,
     NotificationPreference,
     UserAlertSubscription,
@@ -31,6 +30,7 @@ from astrolift_operations.models import (
 )
 from astrolift_operations.schema.audit_list import AuditEventsFilterInput, audit_events_qs, audit_sort
 from astrolift_operations.schema.install_alert_mail import InstallAlertMailQuery
+from astrolift_operations.schema.notification_inbox import NotificationInboxQuery
 from astrolift_operations.schema.notification_quiet_hours import NotificationQuietHoursQuery
 from astrolift_operations.schema.run_audit import RunAuditFilterInput, RunAuditItemType, run_audit_page
 from astrolift_operations.schema.types import (
@@ -61,7 +61,6 @@ from astrolift_operations.schema.types import (
     device_registration_to_type,
     event_to_type,
     notification_preference_to_type,
-    notification_to_type,
     shape_activity_item,
     synthetic_preference_type,
     user_alert_subscription_to_type,
@@ -312,7 +311,9 @@ def _alert_events_qs(
 
 
 @strawberry.type
-class OperationsQuery(InstallAlertMailQuery, ZentinelleReadsQuery, NotificationQuietHoursQuery):
+class OperationsQuery(
+    InstallAlertMailQuery, ZentinelleReadsQuery, NotificationInboxQuery, NotificationQuietHoursQuery
+):
     @strawberry.field
     @require_permission(
         Permission.APP_READ_METRICS,
@@ -1185,13 +1186,9 @@ class OperationsQuery(InstallAlertMailQuery, ZentinelleReadsQuery, NotificationQ
         unread_only: bool = False,
         limit: int = 50,
     ) -> list[NotificationType]:
-        tenant = get_current_tenant()
-        if tenant is None or tenant.actor_user_id is None:
-            return []
-        qs = Notification.objects.filter(user_id=tenant.actor_user_id).order_by("-created_at")
-        if unread_only:
-            qs = qs.filter(read_at__isnull=True)
-        return [notification_to_type(n) for n in qs[: max(1, min(limit, 200))]]
+        from astrolift_operations.notification_inbox import capture_identity, latest_notifications
+
+        return latest_notifications(capture_identity(info), unread_only=unread_only, limit=limit)
 
     # ---- Push device registry (#476 §B) ----------------------------
 

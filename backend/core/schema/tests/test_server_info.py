@@ -149,6 +149,7 @@ class AstroliftServerInfoTest(TestCase):
         self.assertIn("server_info.handshake", caps)
         self.assertIn("apps.temporary_expiry", caps)
         self.assertIn("builder.brain_source_artifacts", caps)
+        self.assertIn("notifications.structured_inbox", caps)
         # Sorted for stable client-side diffing.
         self.assertEqual(caps, sorted(caps))
         self.assertEqual(set(caps), set(shipped_capabilities()))
