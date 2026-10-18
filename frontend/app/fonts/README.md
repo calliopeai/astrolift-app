@@ -26,7 +26,7 @@ The complete asset directory is about 1.2 MiB. This removes Google Fonts
 network access from the production build; it does not promise pixel-identical
 rendering across browsers or operating systems.
 
-All three licenses are SIL Open Font License 1.1. Their local SHA-256 values
-are `dm-sans/OFL.txt` `9af36190332437f5ecd09974de43c1f7c77a310a996cdd8ceb25628b458840e1`,
+All three licenses are SIL Open Font License 1.1. The Git-blob SHA-256 values
+are `dm-sans/OFL.txt` `2af94f4fb533be8fa23282eb33e08ca311ddf47c2f32777e2040b282deeec65c`,
 `ibm-plex-sans/OFL.txt` and `ibm-plex-mono/OFL.txt` both
-`7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da`.
+`37784b44044a4ffd9256702b7c0982c37e5c8887ba90c6dca0479aea93dc898d`.
