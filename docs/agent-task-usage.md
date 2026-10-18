@@ -1,27 +1,25 @@
 # Task usage and cost provenance
 
-Probe the public `astroliftServerInfo` handshake for `agents.task_usage_snapshot` before querying an older server. The authenticated read is `agentTask(id: ID!) { usageSnapshot }`. It requires the existing task read (`app.read`) and an independent `agent.read` at the task's recorded project, team, agent app, or explicit organization scope. Current tenant, operation policy, bearer organization/team/scope ceilings, live organization membership and role grants, token revocation, expiry and deletion apply at the nested read. A previously fetched task object does not retain permission to read its usage.
+Probe the public `astroliftServerInfo` handshake for `agents.task_usage_snapshot` before querying an older server. The authenticated read is `agentTaskUsageSnapshot(id: ID!)`. It requires the existing task read (`app.read`) and `agent.read` at the task's recorded project, team, agent app, or explicit organization scope. Current tenant, operation policy, bearer organization/team/scope ceilings, live organization membership and role grants, token revocation, expiry and deletion apply at every read. A prior response does not retain permission to read usage. This exact-task root field is intentionally absent from task-list items, so listing tasks cannot fan out into per-task usage reads.
 
 ```graphql
 query TaskUsage($id: ID!) {
-  agentTask(id: $id) {
-    usageSnapshot {
-      taskId taskVersion taskStatus asOf aggregationScope
-      linkedRunId linkedRunRetryCount
-      inputTokens { value unit source sourceRecordedAt completeness reason }
-      outputTokens { value unit source sourceRecordedAt completeness reason }
-      duration { value unit source sourceRecordedAt completeness reason }
-      reportedCost { amount currency source sourceRecordedAt completeness reconciliation reason }
-      actualCost { amount currency source sourceRecordedAt completeness reconciliation reason }
-      model modelSource modelSourceRecordedAt
-    }
+  agentTaskUsageSnapshot(id: $id) {
+    taskId taskVersion taskStatus asOf aggregationScope
+    linkedRunId linkedRunRetryCount
+    inputTokens { value unit source sourceRecordedAt completeness reason }
+    outputTokens { value unit source sourceRecordedAt completeness reason }
+    duration { value unit source sourceRecordedAt completeness reason }
+    reportedCost { amount currency source sourceRecordedAt completeness reconciliation reason }
+    actualCost { amount currency source sourceRecordedAt completeness reconciliation reason }
+    model modelSource modelSourceRecordedAt
   }
 }
 ```
 
 The CLI can submit this operation through its existing `astro api graphql --file task-usage.graphql --var id=<task-guid> --json` command using the person's configured API credential. No elevated credential or second billing lookup is needed. The same operation is generated as `AgentTaskUsage` for Apollo consumers.
 
-`asOf` is the server read time. `taskVersion` and `taskStatus` describe the same task row used for the snapshot; clients should use these rather than a previously cached parent status. `sourceRecordedAt` is when the platform stored a source record, when known; it is not provider billing time. Completion reports have no independently recorded report timestamp, so their timestamp stays null. An unrelated task `updatedAt` is never substituted. Platform duration uses the terminal `ended_at` as its observation time. A meter's timestamp is its ingestion time.
+`asOf` is the server read time. `taskVersion` and `taskStatus` describe the same task row used for the snapshot; clients should use these rather than a previously cached task status. `sourceRecordedAt` is when the platform stored a source record, when known; it is not provider billing time. Completion reports have no independently recorded report timestamp, so their timestamp stays null. An unrelated task `updatedAt` is never substituted. Platform duration uses the terminal `ended_at` as its observation time. A meter's timestamp is its ingestion time.
 
 `Decimal` values are decimal **strings**, including integer token quantities. Keep them as strings or use a decimal/big-integer library: JavaScript `Number` cannot represent every supported token count. This transport preserves the stored value; it cannot recover precision already lost when an incoming JSON cost was normalized to a float. Units are `TOKENS` or `MILLISECONDS`. A duration is only available for coherent recorded start/end timestamps on a terminal task; it is not a live clock or billed runtime.
 

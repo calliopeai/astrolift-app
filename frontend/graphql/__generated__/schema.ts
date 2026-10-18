@@ -849,7 +849,6 @@ export type AstroliftAgentTask = {
   triggeredByMe: Scalars['Boolean']['output'];
   triggeredByUserId?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
-  usageSnapshot?: Maybe<AgentTaskUsageSnapshot>;
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
 };
@@ -12644,6 +12643,8 @@ export type Query = {
   agentTaskLogs: Array<Scalars['String']['output']>;
   agentTaskLogsPage: AstroliftAgentTaskLogPage;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
+  /** Read usage provenance for one exact task, with fresh app.read and agent.read authority. */
+  agentTaskUsageSnapshot?: Maybe<AgentTaskUsageSnapshot>;
   agentTasks: Array<AstroliftAgentTask>;
   agentTasksPage: AstroliftAgentTaskPage;
   /** @deprecated Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead. */
@@ -13279,6 +13280,11 @@ export type QueryAgentTaskTransitionsSinceArgs = {
   limit?: Scalars['Int']['input'];
   orgId: Scalars['ID']['input'];
   since?: InputMaybe<Scalars['DateTime']['input']>;
+};
+
+
+export type QueryAgentTaskUsageSnapshotArgs = {
+  id: Scalars['ID']['input'];
 };
 
 

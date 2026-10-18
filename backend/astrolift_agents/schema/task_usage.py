@@ -284,13 +284,22 @@ def _snapshot(task):
     )
 
 
-@require_permission(Permission.AGENT_READ, scope=agent_task_scope("id"), operation=agent_task_operation("id"))
+@require_permission(
+    Permission.APP_READ,
+    Permission.AGENT_READ,
+    scope=agent_task_scope("id"),
+    operation=agent_task_operation("id"),
+)
 @tenant_scoped()
 def _authorized_usage(info: Info, id: str) -> TaskUsageSnapshot | None:
     tenant = get_current_tenant()
     task = (
         agent_tasks(tenant.organization_id, Permission.AGENT_READ)
-        .filter(guid=id, organization_id=tenant.organization_id)
+        .filter(
+            guid=id,
+            organization_id=tenant.organization_id,
+            pk__in=agent_tasks(tenant.organization_id, Permission.APP_READ).values("pk"),
+        )
         .select_related("agent_run__metering_record", "agent_run__workload__registered_app")
         .first()
     )

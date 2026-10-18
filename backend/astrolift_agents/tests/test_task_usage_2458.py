@@ -10,7 +10,6 @@ from django.utils import timezone
 
 from astrolift_agents.models import AgentTask, TaskMeteringRecord
 from astrolift_agents.schema.task_usage import read_task_usage
-from astrolift_agents.schema.types import agent_task_to_type
 from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token
 from astrolift_identity.models import ApiToken, Member
 from astrolift_lifecycle.models import AgentRun
@@ -23,7 +22,7 @@ from core.tests.utils.scope_world import ScopeWorld, bind_role, make_info, make_
 pytestmark = pytest.mark.django_db
 
 QUERY = """query Usage($id: ID!) {
-  agentTask(id: $id) { usageSnapshot {
+  agentTaskUsageSnapshot(id: $id) {
     taskId taskVersion taskStatus asOf aggregationScope linkedRunId linkedRunRetryCount
     inputTokens { value unit source sourceRecordedAt completeness reason }
     outputTokens { value unit source sourceRecordedAt completeness reason }
@@ -31,7 +30,7 @@ QUERY = """query Usage($id: ID!) {
     reportedCost { amount currency source sourceRecordedAt completeness reconciliation reason }
     actualCost { amount currency source sourceRecordedAt completeness reconciliation reason }
     model modelSource modelSourceRecordedAt
-  } }
+  }
 }"""
 
 
@@ -96,7 +95,7 @@ def execute(d):
         QUERY, variable_values={"id": str(d.task.guid)}, context_value=d.info.context
     )
     assert result.errors is None, result.errors
-    return result.data["agentTask"]["usageSnapshot"]
+    return result.data["agentTaskUsageSnapshot"]
 
 
 @contextmanager
@@ -229,24 +228,24 @@ def test_corrupt_cross_scope_run_binding_is_not_exposed(data):
     assert snap["inputTokens"]["reason"] == "UNVERIFIED_RUN_BINDING"
 
 
-def test_app_read_does_not_grant_nested_agent_read(data):
-    grant(data, [Permission.APP_READ])
+@pytest.mark.parametrize("permission", [Permission.APP_READ, Permission.AGENT_READ])
+def test_both_app_read_and_agent_read_are_required(data, permission):
+    grant(data, [permission])
     with tenant(data):
         result = schema.execute_sync(
             QUERY, variable_values={"id": str(data.task.guid)}, context_value=data.info.context
         )
     assert result.errors
-    assert result.data["agentTask"]["usageSnapshot"] is None
+    assert result.data["agentTaskUsageSnapshot"] is None
 
 
-def test_revoked_role_is_rechecked_on_previously_projected_task(data):
+def test_revoked_role_is_rechecked_after_an_earlier_usage_read(data):
     binding = grant(data)
     with tenant(data):
-        projected = agent_task_to_type(data.task)
-        assert projected.usage_snapshot(data.info) is not None
+        assert read_task_usage(data.info, str(data.task.guid)) is not None
         binding.soft_delete()
         with pytest.raises(PermissionDenied):
-            projected.usage_snapshot(data.info)
+            read_task_usage(data.info, str(data.task.guid))
 
 
 @pytest.mark.parametrize("change", ["revoke", "expire", "delete", "scope", "team", "rotate"])
@@ -462,3 +461,59 @@ def test_capability_is_publicly_advertised():
     from core.capabilities_registry import shipped_capabilities
 
     assert "agents.task_usage_snapshot" in shipped_capabilities()
+
+
+def test_task_list_has_no_usage_child_in_the_public_schema(data):
+    result = schema.execute_sync('{ __type(name: "AstroliftAgentTask") { fields { name } } }')
+    assert result.errors is None
+    assert "usageSnapshot" not in {field["name"] for field in result.data["__type"]["fields"]}
+    # Validation refuses a list fan-out before any row or credential lookup.
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    with CaptureQueriesContext(connection) as queries:
+        result = schema.execute_sync(
+            "query($org: ID!) { agentTasks(orgId: $org) { usageSnapshot { taskId } } }",
+            variable_values={"org": str(data.w.org.guid)},
+            context_value=data.info.context,
+        )
+    assert result.errors
+    assert len(queries) == 0
+
+
+def test_public_list_plus_exact_usage_has_constant_queries_for_one_vs_many_tasks(data):
+    import logging
+
+    from django.db import connection
+    from django.test.utils import CaptureQueriesContext
+
+    grant(data)
+    query = """query UsageWithTasks($id: ID!, $org: ID!) {
+      agentTaskUsageSnapshot(id: $id) { taskId inputTokens { value } actualCost { amount } }
+      agentTasks(orgId: $org) { id }
+    }"""
+
+    def measure():
+        with tenant(data), CaptureQueriesContext(connection) as captured:
+            result = schema.execute_sync(
+                query,
+                variable_values={
+                    "id": str(data.task.guid),
+                    "org": str(data.w.org.guid),
+                },
+                context_value=data.info.context,
+            )
+        assert result.errors is None, result.errors
+        assert result.data["agentTaskUsageSnapshot"]["taskId"] == str(data.task.guid)
+        meter_reads = sum('"astrolift_agents_taskmeteringrecord"' in row["sql"] for row in captured)
+        return len(captured), meter_reads, len(result.data["agentTasks"])
+
+    one = measure()
+    AgentTask.objects.bulk_create(
+        [AgentTask(organization=data.w.org, agent_definition=data.task.agent_definition) for _ in range(20)]
+    )
+    many = measure()
+    assert (one[2], many[2]) == (1, 21)
+    assert one[1] == many[1] == 1  # One joined source read, never one per listed task.
+    assert one[0] == many[0]
+    logging.getLogger(__name__).info("usage GraphQL query counts: 1 task=%s; 21 tasks=%s", one, many)

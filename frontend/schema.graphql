@@ -859,7 +859,6 @@ type AstroliftAgentTask {
   callbackLastError: String
   model: String!
   brains: [AstroliftAgentTaskBrain!]!
-  usageSnapshot: AgentTaskUsageSnapshot
 }
 
 type AstroliftAgentTaskBacklog {
@@ -11451,6 +11450,11 @@ type Query {
   orgSkillRepos(orgId: ID!): [AstroliftOrgSkillRepo!]!
   agentTasks(orgId: ID!, status: String = null, workloadId: ID = null): [AstroliftAgentTask!]!
   agentGallery(orgId: ID!): [AstroliftAgentTask!]!
+
+  """
+  Read usage provenance for one exact task, with fresh app.read and agent.read authority.
+  """
+  agentTaskUsageSnapshot(id: ID!): AgentTaskUsageSnapshot
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
   agentTaskInputMessage(taskId: ID!, clientRequestId: String!): AstroliftAgentTaskInputMessage

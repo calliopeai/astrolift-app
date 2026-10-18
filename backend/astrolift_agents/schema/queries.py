@@ -43,6 +43,7 @@ from astrolift_agents.models import (
     Skill,
     ToolDef,
 )
+from astrolift_agents.schema.task_usage import TaskUsageSnapshot, read_task_usage
 from astrolift_agents.schema.types import (
     AgentBoxType,
     AgentDetailType,
@@ -1189,6 +1190,14 @@ class AgentsQuery:
             .order_by("-started_at", "-created_at")[:200]
         )
         return agent_tasks_to_types(qs)
+
+    @strawberry.field(
+        description="Read usage provenance for one exact task, with fresh app.read and agent.read authority."
+    )
+    @tenant_scoped()
+    def agent_task_usage_snapshot(self, info: Info, id: strawberry.ID) -> TaskUsageSnapshot | None:
+        guid = _valid_guid(id)
+        return read_task_usage(info, str(guid)) if guid is not None else None
 
     @strawberry.field
     @require_permission(

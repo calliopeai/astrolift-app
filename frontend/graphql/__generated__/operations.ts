@@ -849,7 +849,6 @@ export type AstroliftAgentTask = {
   triggeredByMe: Scalars['Boolean']['output'];
   triggeredByUserId?: Maybe<Scalars['String']['output']>;
   updatedAt: Scalars['DateTime']['output'];
-  usageSnapshot?: Maybe<AgentTaskUsageSnapshot>;
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
 };
@@ -12644,6 +12643,8 @@ export type Query = {
   agentTaskLogs: Array<Scalars['String']['output']>;
   agentTaskLogsPage: AstroliftAgentTaskLogPage;
   agentTaskTransitionsSince: Array<AstroliftAgentTask>;
+  /** Read usage provenance for one exact task, with fresh app.read and agent.read authority. */
+  agentTaskUsageSnapshot?: Maybe<AgentTaskUsageSnapshot>;
   agentTasks: Array<AstroliftAgentTask>;
   agentTasksPage: AstroliftAgentTaskPage;
   /** @deprecated Unbounded: returns every trigger bound to the agent in one response. Use agentTriggersPage instead. */
@@ -13279,6 +13280,11 @@ export type QueryAgentTaskTransitionsSinceArgs = {
   limit?: Scalars['Int']['input'];
   orgId: Scalars['ID']['input'];
   since?: InputMaybe<Scalars['DateTime']['input']>;
+};
+
+
+export type QueryAgentTaskUsageSnapshotArgs = {
+  id: Scalars['ID']['input'];
 };
 
 
@@ -17858,7 +17864,7 @@ export type AgentTaskUsageQueryVariables = Exact<{
 }>;
 
 
-export type AgentTaskUsageQuery = { agentTask?: { usageSnapshot?: { taskId: string, taskVersion: number, taskStatus: string, asOf: string, aggregationScope: string, linkedRunId?: string | null, linkedRunRetryCount?: number | null, model?: string | null, modelSource?: TaskUsageSource | null, modelSourceRecordedAt?: string | null, inputTokens: { value?: string | null, unit: TaskUsageUnit, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reason?: TaskUsageReason | null }, outputTokens: { value?: string | null, unit: TaskUsageUnit, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reason?: TaskUsageReason | null }, duration: { value?: string | null, unit: TaskUsageUnit, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reason?: TaskUsageReason | null }, reportedCost: { amount?: string | null, currency?: string | null, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reconciliation: TaskCostReconciliation, reason?: TaskUsageReason | null }, actualCost: { amount?: string | null, currency?: string | null, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reconciliation: TaskCostReconciliation, reason?: TaskUsageReason | null } } | null } | null };
+export type AgentTaskUsageQuery = { agentTaskUsageSnapshot?: { taskId: string, taskVersion: number, taskStatus: string, asOf: string, aggregationScope: string, linkedRunId?: string | null, linkedRunRetryCount?: number | null, model?: string | null, modelSource?: TaskUsageSource | null, modelSourceRecordedAt?: string | null, inputTokens: { value?: string | null, unit: TaskUsageUnit, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reason?: TaskUsageReason | null }, outputTokens: { value?: string | null, unit: TaskUsageUnit, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reason?: TaskUsageReason | null }, duration: { value?: string | null, unit: TaskUsageUnit, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reason?: TaskUsageReason | null }, reportedCost: { amount?: string | null, currency?: string | null, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reconciliation: TaskCostReconciliation, reason?: TaskUsageReason | null }, actualCost: { amount?: string | null, currency?: string | null, source?: TaskUsageSource | null, sourceRecordedAt?: string | null, completeness: TaskUsageCompleteness, reconciliation: TaskCostReconciliation, reason?: TaskUsageReason | null } } | null };
 
 export type ListQuotasQueryVariables = Exact<{ [key: string]: never; }>;
 

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Task usage provenance (#2458): `agentTask.usageSnapshot` independently checks scoped `agent.read`, current bearer ceilings and revocation. Typed token counts, duration and runner-reported USD cost carry source, timestamps and completeness; exact task/linked-run observations are selected without summing retries. Actual billing remains explicitly unknown (`NO_TASK_BILLING_SOURCE`). Capability: `agents.task_usage_snapshot`. See `docs/agent-task-usage.md`.
+- Task usage provenance (#2458): `agentTaskUsageSnapshot(id)` checks scoped `app.read` and `agent.read`, current bearer ceilings and revocation. Typed token counts, duration and runner-reported USD cost carry source, timestamps and completeness; exact task/linked-run observations are selected without summing retries. Actual billing remains explicitly unknown (`NO_TASK_BILLING_SOURCE`). Capability: `agents.task_usage_snapshot`. See `docs/agent-task-usage.md`.
 
 - Temporary-app expiry removes the exact app-owned brain credential Secrets during runtime retirement, with native ownership and original UID checks; the data namespace and managed services remain through grace (#2433).
 
