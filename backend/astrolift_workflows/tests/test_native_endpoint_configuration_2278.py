@@ -513,7 +513,12 @@ def _safe_observer_request(value):
             if not isinstance(option, str) or not option or len(option) > 512:
                 return None
             result[key] = option
-    return {"pid": pid, "connect": result}
+    return {
+        "pid": pid,
+        "expectedDatabase": database,
+        "expectedUser": user,
+        "connect": result,
+    }
 
 
 _PG_WAIT_OBSERVER = r"""
@@ -533,7 +538,7 @@ try:
     connection.set_session(readonly=True, autocommit=True)
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT pid, state, wait_event_type, wait_event, "
+            "SELECT pid, datname, usename, state, wait_event_type, wait_event, "
             "CASE WHEN query_start IS NULL THEN NULL ELSE "
             "GREATEST(0, LEAST(86400, floor(EXTRACT(EPOCH FROM clock_timestamp() - query_start) / 5) * 5))::integer END, "
             "CASE WHEN xact_start IS NULL THEN NULL ELSE "
@@ -545,16 +550,18 @@ try:
         row = cursor.fetchone()
     if row is None:
         result = {"status": "pid-not-visible"}
+    elif row[1] != request["expectedDatabase"] or row[2] != request["expectedUser"]:
+        result = {"status": "identity-mismatch"}
     else:
         result = {
             "status": "observed",
             "backendPID": row[0],
-            "state": row[1],
-            "waitEventType": row[2],
-            "waitEvent": row[3],
-            "queryAgeBucketSeconds": row[4],
-            "transactionAgeBucketSeconds": row[5],
-            "blockingPids": row[6] or [],
+            "state": row[3],
+            "waitEventType": row[4],
+            "waitEvent": row[5],
+            "queryAgeBucketSeconds": row[6],
+            "transactionAgeBucketSeconds": row[7],
+            "blockingPids": row[8] or [],
         }
     print(json.dumps(result, separators=(",", ":")))
 except BaseException:
@@ -569,7 +576,13 @@ finally:
 
 
 def _observe_owned_pg_wait(activity_connection):
-    """Observe one captured backend through a read-only child with hard bounds."""
+    """Observe one captured backend through a read-only child with hard bounds.
+
+    PID, database, and login-user matching reduce reuse ambiguity. The existing
+    worker connection does not expose backend_start, and this diagnostic does
+    not issue another hot-path query to capture it; a PID reused by the same
+    database and login user before observation cannot be distinguished.
+    """
     request = _safe_observer_request(activity_connection)
     if request is None:
         return {"status": "unavailable"}
@@ -823,6 +836,7 @@ def test_pg_wait_summary_is_allowlisted_bounded_and_pid_pinned():
     assert summary["blockingPids"] == list(range(42, 50))
     assert summary["queryAgeBucketSeconds"] == 15
     assert "query" not in summary and "password" not in summary
+    assert _safe_pg_wait_summary({"status": "identity-mismatch"}, 41) == {"status": "unavailable"}
     assert _safe_pg_wait_summary({"status": "observed", "backendPID": 42}, 41) == {"status": "unavailable"}
     assert _safe_pg_wait_summary({"status": "observed", "backendPID": True}, 1) == {"status": "unavailable"}
     assert (
@@ -871,6 +885,8 @@ def test_pg_observer_request_requires_worker_captured_test_database():
     request = _safe_observer_request(state)
 
     assert request["pid"] == 41
+    assert request["expectedDatabase"] == "custom_ci_db"
+    assert request["expectedUser"] == "test_user"
     assert request["connect"]["dbname"] == "custom_ci_db"
     assert request["connect"]["hostaddr"] == "127.0.0.1"
     assert request["connect"]["passfile"] == os.devnull
@@ -881,6 +897,13 @@ def test_pg_observer_request_requires_worker_captured_test_database():
         _safe_observer_request({**state, "observerConnect": {**state["observerConnect"], "port": "999999"}})
         is None
     )
+
+
+def test_pg_observer_source_matches_pid_database_and_login_user():
+    assert "SELECT pid, datname, usename, state" in _PG_WAIT_OBSERVER
+    assert 'row[1] != request["expectedDatabase"]' in _PG_WAIT_OBSERVER
+    assert 'row[2] != request["expectedUser"]' in _PG_WAIT_OBSERVER
+    assert '{"status": "identity-mismatch"}' in _PG_WAIT_OBSERVER
 
 
 def test_activity_db_snapshot_cannot_be_overwritten_by_unregistered_thread(monkeypatch):
