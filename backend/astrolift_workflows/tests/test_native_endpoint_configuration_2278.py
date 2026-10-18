@@ -479,7 +479,56 @@ async def _fetch_bounded_failure_history(handle):
         except StopAsyncIteration:
             break
         events.append(event)
-    return _safe_temporal_history_summary(SimpleNamespace(events=events))
+    limit_reached = len(events) == _HISTORY_SCAN_LIMIT
+    summary = _safe_temporal_history_summary(SimpleNamespace(events=events))
+    summary["inputEventLimitReached"] = limit_reached
+    summary["eventsTotalKnown"] = not limit_reached
+    if limit_reached:
+        # The iterator was intentionally not advanced to discover whether the
+        # history ended exactly at the cap; report a possibly truncated prefix.
+        summary["eventsTruncated"] = True
+    return summary
+
+
+@pytest.mark.asyncio
+async def test_bounded_failure_history_marks_limit_without_fetching_an_extra_event():
+    class Iterator:
+        def __init__(self):
+            self.consumed = 0
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if self.consumed >= _HISTORY_SCAN_LIMIT + 2:
+                raise StopAsyncIteration
+            event = SimpleNamespace(
+                event_id=self.consumed + 1,
+                event_type=EventType.EVENT_TYPE_TIMER_STARTED,
+                payload="private-event-content-canary",
+            )
+            self.consumed += 1
+            return event
+
+    class Handle:
+        def __init__(self):
+            self.iterator = Iterator()
+            self.arguments = None
+
+        def fetch_history_events(self, **kwargs):
+            self.arguments = kwargs
+            return self.iterator
+
+    handle = Handle()
+    summary = await _fetch_bounded_failure_history(handle)
+
+    assert handle.arguments == {"page_size": 64, "rpc_timeout": timedelta(seconds=1)}
+    assert handle.iterator.consumed == _HISTORY_SCAN_LIMIT
+    assert summary["eventsScanned"] == _HISTORY_SCAN_LIMIT
+    assert summary["inputEventLimitReached"] is True
+    assert summary["eventsTotalKnown"] is False
+    assert summary["eventsTruncated"] is True
+    assert "private-event-content-canary" not in json.dumps(summary)
 
 
 pytestmark = pytest.mark.django_db(transaction=True)
