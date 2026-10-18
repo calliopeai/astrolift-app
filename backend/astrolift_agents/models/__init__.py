@@ -7,6 +7,7 @@ from astrolift_agents.models.agent_host import (
     AgentHostTerminal,
 )
 from astrolift_agents.models.agent_interaction import AgentInteraction, record_interaction
+from astrolift_agents.models.agent_message import AgentMessage, AgentMessageRecipient, AgentMessageReply
 from astrolift_agents.models.agent_secret_binding import (
     AgentSecretBindingOverride,
     AgentSecretBundleRef,
@@ -48,6 +49,9 @@ __all__ = [
     "AgentEnforcementNonce",
     "AgentEnvironmentSpec",
     "AgentInteraction",
+    "AgentMessage",
+    "AgentMessageRecipient",
+    "AgentMessageReply",
     "AgentSecretBindingOverride",
     "AgentSecretBundleRef",
     "AgentSkillRef",

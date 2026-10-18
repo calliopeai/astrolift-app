@@ -18,6 +18,7 @@ from astrolift_operations.models.notification_preference import (
     is_enabled,
 )
 from astrolift_operations.models.notification_profile import NotificationProfile
+from astrolift_operations.models.notification_quiet_hours import NotificationQuietHours
 from astrolift_operations.models.retention_hold import (
     ANY_STREAM,
     ObservabilityRetentionHold,
@@ -50,6 +51,7 @@ __all__ = [
     "InstallAlertMailTest",
     "NotificationChannel",
     "NotificationPreference",
+    "NotificationQuietHours",
     "AppUptimeResult",
     "NotificationDelivery",
     "NotificationProfile",

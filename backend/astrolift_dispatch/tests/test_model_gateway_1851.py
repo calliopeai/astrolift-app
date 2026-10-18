@@ -1043,6 +1043,9 @@ def test_each_organizations_keys_are_minted_and_revoked_with_its_own_install(
 
 #: sha256 of the canonical JSON of the manifests an opt-out task applies in
 #: the fixture below, taken at origin/main (bd808822) with the same fixture.
+#: Agent messaging (#2434) deliberately adds the two run-scoped endpoint
+#: variables. Assert those separately and retain the original digest for
+#: every other manifest field, including the gateway opt-out behavior.
 #: Turning the gateway on for the install, connecting the organization and
 #: deploying the cluster's gateway must not change a task whose spec does not
 #: ask for it. A deliberate change to the task manifests updates this digest
@@ -1070,6 +1073,16 @@ def test_a_spec_that_does_not_ask_is_spawned_exactly_as_before(
     [batch] = driver.applied
     assert f"agents/{org.guid}/anthropic" in store.reads
     assert _one(batch, "Secret")["stringData"]["ANTHROPIC_API_KEY"] == "sk-ant-stored-provider-key"
+    container = _one(batch, "Job")["spec"]["template"]["spec"]["containers"][0]
+    env = {entry["name"]: entry for entry in container["env"]}
+    callback = env["AGENT_CALLBACK_URL"]["value"]
+    assert env["ASTROLIFT_MESSAGES_URL"]["value"] == callback.replace("/callback/", "/messages/")
+    assert env["ASTROLIFT_RUN_MCP_URL"]["value"] == callback.replace("/callback/", "/mcp/")
+    container["env"] = [
+        entry
+        for entry in container["env"]
+        if entry["name"] not in {"ASTROLIFT_MESSAGES_URL", "ASTROLIFT_RUN_MCP_URL"}
+    ]
     assert _canonical_sha256(batch) == _OPT_OUT_BATCH_SHA256
 
 
