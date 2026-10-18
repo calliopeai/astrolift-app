@@ -204,7 +204,7 @@ def test_inbox_ignores_external_preferences_and_role_revocation_hides_warning(wo
     NotificationPreference.objects.create(
         user=world.user,
         channel="push",
-        event_type="app.expiring",
+        event_kind="app.expiring",
         enabled=False,
     )
     assert len(page(world).items) == 1
@@ -217,6 +217,28 @@ def test_wrong_token_scope_is_explicitly_rejected(world, scopes):
     notice(world)
     with pytest.raises(GraphQLError, match="authorization"):
         page(world, token=token_for(world, scopes=scopes))
+
+
+def test_foreign_token_and_person_mismatch_are_rejected(world):
+    other = ScopeWorld("inbox-token-foreign")
+    other.user = world.user
+    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=other.org.pk)
+    with pytest.raises(GraphQLError, match="authorization"):
+        page(world, token=token_for(other))
+    with actor(world):
+        with pytest.raises(GraphQLError, match="authorization"):
+            OperationsQuery().astrolift_my_notifications_page(make_info(make_user("wrong-inbox-person")))
+
+
+def test_expired_token_and_unavailable_team_are_rejected(world):
+    token = token_for(world, team=world.medops)
+    ApiToken.objects.filter(pk=token.pk).update(expires_at=timezone.now() - dt.timedelta(seconds=1))
+    with pytest.raises(GraphQLError, match="authorization"):
+        page(world, token=token)
+    ApiToken.objects.filter(pk=token.pk).update(expires_at=None)
+    world.medops.soft_delete()
+    with pytest.raises(GraphQLError, match="authorization"):
+        page(world, token=token)
 
 
 def test_team_ceiling_current_audience_and_muting(world):
@@ -294,6 +316,35 @@ async def test_missing_stream_identity_is_an_explicit_error():
     with pytest.raises(GraphQLError, match="authorization"):
         await anext(stream)
     await stream.aclose()
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_public_graphql_subscription_serializes_actual_notification(world):
+    from config.schema import schema
+
+    row = await sync_to_async(warn)(world)
+    info = make_info(world.user)
+    info.context._ws_tenant = TenantContext(organization_id=world.org.pk, actor_user_id=world.user.pk)
+    info.context._ws_api_token = None
+    stream = await schema.subscribe(
+        """subscription { astroliftMyNotificationStream {
+      items { id expiryWarning { appId warningWindow } } endCursor hasMore
+    } }""",
+        context_value=info.context,
+    )
+    try:
+        result = await asyncio.wait_for(anext(stream), timeout=5)
+        assert result.errors is None
+        payload = result.data["astroliftMyNotificationStream"]
+        assert payload["items"] == [
+            {
+                "id": str(row.guid),
+                "expiryWarning": {"appId": str(world.medops_app.guid), "warningWindow": "1h"},
+            }
+        ]
+        assert payload["endCursor"] and not payload["hasMore"]
+    finally:
+        await stream.aclose()
 
 
 @pytest.mark.django_db(transaction=True)
