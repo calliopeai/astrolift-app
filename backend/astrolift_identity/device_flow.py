@@ -47,6 +47,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from astrolift_identity.api_tokens import (
+    CLI_ADMIN_DEVICE_SCOPES,
     CLI_DEVICE_SCOPES,
     CLI_OPERATOR_DEVICE_SCOPES,
     DEFAULT_SCOPES,
@@ -71,6 +72,10 @@ must refresh."""
 
 REFRESH_TOKEN_TTL = dt.timedelta(days=30)
 """How long the rotating refresh-token chain stays valid."""
+
+CLIENT_KIND_ADMIN = "cli-admin"
+"""``astro auth login --scope admin`` (#2448): full administrative access,
+approvable only by the platform operator, for ``CLI_ADMIN_SESSION_HOURS``."""
 
 POLL_INTERVAL_SECONDS = 2
 """Default poll cadence advertised to the CLI on /start."""
@@ -174,7 +179,7 @@ def normalize_client_kind(kind: str | None) -> str:
     if not kind:
         return "cli"
     k = kind.strip().lower()
-    if k in {"cli", "cli-operator", "mobile", "browser", "ide"}:
+    if k in {"cli", "cli-operator", CLIENT_KIND_ADMIN, "mobile", "browser", "ide"}:
         return k
     return "cli"
 
@@ -188,6 +193,9 @@ def token_scopes_for_client_kind(client_kind: str | None) -> list[str]:
     retain the read-only baseline. RBAC remains the second gate in every case.
     """
     kind = normalize_client_kind(client_kind)
+    if kind == CLIENT_KIND_ADMIN:
+        # Only a platform operator's approval issues it (approve_session).
+        return list(CLI_ADMIN_DEVICE_SCOPES)
     if kind == "cli-operator":
         # ``astro auth login --scope clusters`` (#2120). The approval page
         # lists these scopes, so the approver sees the cluster surface asked for.
@@ -203,10 +211,34 @@ def token_scopes_for_session(session: DeviceFlowSession) -> list[str]:
     Enrollment is pre-approved before the consuming device identifies itself,
     so it must never gain CLI operator scopes by claiming ``client_kind=cli``.
     ``origin`` is server-authored and immutable for the session lifecycle.
+    An admin request issues ``admin`` only while its approver is the platform
+    operator (#2448); otherwise the read-only baseline.
     """
     if session.origin == session.ORIGIN_ENROLLMENT:
         return list(DEFAULT_SCOPES)
+    if is_admin_session(session) and not _approver_is_operator(session):
+        return list(DEFAULT_SCOPES)
     return token_scopes_for_client_kind(session.client_kind)
+
+
+def is_admin_session(session: DeviceFlowSession) -> bool:
+    """Is this a browser-approved ``astro auth login --scope admin`` (#2448)?"""
+    return session.origin == session.ORIGIN_DEVICE_FLOW and session.client_kind == CLIENT_KIND_ADMIN
+
+
+def admin_session_ttl() -> dt.timedelta:
+    """How long an admin sign-in lasts: ``CLI_ADMIN_SESSION_HOURS`` (12 by
+    default), at least an hour and never longer than a plain CLI sign-in."""
+    from django.conf import settings
+
+    hours = dt.timedelta(hours=max(int(getattr(settings, "CLI_ADMIN_SESSION_HOURS", 12)), 1))
+    return min(hours, REFRESH_TOKEN_TTL)
+
+
+def _approver_is_operator(session: DeviceFlowSession) -> bool:
+    from core.permissions import is_platform_operator
+
+    return is_platform_operator(session.approved_user)
 
 
 # ---- lifecycle transitions ------------------------------------------
@@ -242,13 +274,18 @@ def approve_session(
     """Move a pending row to approved.
 
     Returns ``None`` on success; an error code on rejection
-    (``"expired"`` / ``"already_terminal"``).
+    (``"expired"`` / ``"already_terminal"``, or ``"operator_required"`` when
+    anyone but the platform operator approves an admin request, #2448).
     """
+    from core.permissions import is_platform_operator
+
     now = now or timezone.now()
     if mark_expired_if_needed(session, now=now):
         return "expired"
     if session.state != session.STATE_PENDING:
         return "already_terminal"
+    if is_admin_session(session) and not is_platform_operator(user):
+        return "operator_required"
     session.state = session.STATE_APPROVED
     session.approved_user = user
     session.organization = organization
@@ -327,8 +364,9 @@ def _consume_session_locked(
 
     minted_access = mint_api_token()
     minted_refresh = mint_refresh_token()
-    access_expires = now + ACCESS_TOKEN_TTL
-    refresh_expires = now + REFRESH_TOKEN_TTL
+    # An admin sign-in's chain ends admin_session_ttl() after issue (#2448).
+    refresh_expires = now + (admin_session_ttl() if is_admin_session(session) else REFRESH_TOKEN_TTL)
+    access_expires = min(now + ACCESS_TOKEN_TTL, refresh_expires)
 
     api_token_row = ApiToken.objects.create(
         user=session.approved_user,
@@ -392,8 +430,12 @@ def _rotate_refresh_locked(
 
     minted_access = mint_api_token()
     minted_refresh = mint_refresh_token()
-    access_expires = now + ACCESS_TOKEN_TTL
-    refresh_expires = now + REFRESH_TOKEN_TTL
+    # Refreshing never extends an admin sign-in past the end set at issue (#2448).
+    if is_admin_session(session) and session.refresh_token_expires_at is not None:
+        refresh_expires = session.refresh_token_expires_at
+    else:
+        refresh_expires = now + REFRESH_TOKEN_TTL
+    access_expires = min(now + ACCESS_TOKEN_TTL, refresh_expires)
 
     api_token_row = ApiToken.objects.create(
         user=session.approved_user,
@@ -603,6 +645,10 @@ def refresh_credentials(
             # would only hand out a bearer the token check refuses, and
             # the chain could otherwise outlive the membership for its
             # full 30 days, so end it the way an expired chain ends.
+            _end_refresh_chain_locked(row)
+            return CompletionResult(status="expired")
+        if is_admin_session(row) and not _approver_is_operator(row):
+            # The approver is no longer the platform operator (#2448).
             _end_refresh_chain_locked(row)
             return CompletionResult(status="expired")
 
@@ -1023,6 +1069,7 @@ def consume_enrollment(
 
 __all__ = [
     "ACCESS_TOKEN_TTL",
+    "CLIENT_KIND_ADMIN",
     "CompletionResult",
     "EnrollmentCreated",
     "EnrollmentResult",
@@ -1038,6 +1085,7 @@ __all__ = [
     "REFRESH_TOKEN_PREFIX",
     "REFRESH_TOKEN_TTL",
     "SESSION_TTL",
+    "admin_session_ttl",
     "approve_session",
     "build_login_url",
     "consume_enrollment",
@@ -1045,6 +1093,7 @@ __all__ = [
     "create_enrollment",
     "create_session",
     "deny_session",
+    "is_admin_session",
     "lookup_session_for_complete",
     "mark_expired_if_needed",
     "mint_enrollment_token",

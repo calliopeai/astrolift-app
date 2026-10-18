@@ -720,11 +720,11 @@ def test_the_tenant_middleware_scopes_attributes_to_one_request(rf):
     assert abac.current_attributes() is None
 
 
-def test_the_allowlist_ip_is_the_one_the_proxy_appended(rf):
-    """A client-written X-Forwarded-For entry must not pass an allowlist."""
+def test_the_allowlist_ip_is_remote_addr_never_the_raw_header(rf):
+    """A client-written X-Forwarded-For entry must not pass an allowlist (#2440)."""
     forged = rf.get("/", HTTP_X_FORWARDED_FOR="10.0.0.1, 198.51.100.9", REMOTE_ADDR="172.16.0.2")
-    assert abac.policy_client_ip(forged) == "198.51.100.9"
+    assert abac.policy_client_ip(forged) == "172.16.0.2"
     direct = rf.get("/", REMOTE_ADDR="10.9.9.9")
     assert abac.policy_client_ip(direct) == "10.9.9.9"
-    junk = rf.get("/", HTTP_X_FORWARDED_FOR="not-an-ip")
+    junk = rf.get("/", HTTP_X_FORWARDED_FOR="203.0.113.1", REMOTE_ADDR="not-an-ip")
     assert abac.policy_client_ip(junk) is None

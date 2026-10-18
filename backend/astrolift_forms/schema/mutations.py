@@ -541,13 +541,10 @@ class FormsMutation:
 def _extract_source_ip(request) -> str | None:
     if request is None:
         return None
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR") if hasattr(request, "META") else None
-    if forwarded:
-        # XFF can carry a comma-separated list of proxies; the leftmost
-        # entry is the original client (per RFC 7239 convention).
-        return forwarded.split(",")[0].strip() or None
-    remote = request.META.get("REMOTE_ADDR") if hasattr(request, "META") else None
-    return remote or None
+    # REMOTE_ADDR as config.asgi set it from the trusted proxies (#2440).
+    from config.proxies import client_address
+
+    return client_address(request)
 
 
 def _extract_user_agent(request) -> str:

@@ -164,6 +164,27 @@ def redact_url_secrets(text: str) -> str:
     return _INVITATION_TOKEN.sub(rf"\g<1>{_REDACTED}", text)
 
 
+def redact_event_url_secrets(event: Any, hint: Any = None) -> Any:
+    """A Sentry event or transaction with :func:`redact_url_secrets` applied to every string (#2440).
+
+    The request's ``query_string`` comes without its ``?``, so it is redacted
+    as the query of a URL. Used as ``before_send`` and ``before_send_transaction``.
+    """
+    return _redact_strings(event)
+
+
+def _redact_strings(value: Any, key: Any = None) -> Any:
+    if isinstance(value, str):
+        if key == "query_string":
+            return redact_url_secrets("?" + value)[1:]
+        return redact_url_secrets(value)
+    if isinstance(value, dict):
+        return {k: _redact_strings(v, k) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return type(value)(_redact_strings(v) for v in value)
+    return value
+
+
 class UrlSecretFilter(logging.Filter):
     """Redact the credentials a logged URL carries (#2429).
 

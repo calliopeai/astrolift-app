@@ -7,11 +7,15 @@ import {
   type ZentinelleAuditEvent,
   type ZentinelleCluster,
   type ZentinelleConnection,
+  type ZentinelleHealthCounts,
   type ZentinellePolicy,
   type ZentinelleUsageRow,
 } from "./zentinelle-model";
 
 const ok = async () => null;
+
+/** "Last seen" relative to when the story loads, so it reads the same every run. */
+const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
 export const FULL_ACCESS: ZentinelleAccess = {
   status: true,
@@ -48,6 +52,8 @@ const cluster = (over: Partial<ZentinelleCluster>): ZentinelleCluster => ({
   credentialRotatedAt: "2026-10-12T09:00:00Z",
   lastError: "",
   unregistered: false,
+  gatewayVersion: "0.9.1",
+  lastSeenAt: ago(1),
   ...over,
 });
 
@@ -62,6 +68,7 @@ export const HEALTHY_CONNECTION: ZentinelleConnection = {
   disconnectedAt: null,
   lastError: "",
   gatewayFeatureEnabled: true,
+  serverVersion: "1.5.0",
   clusters: [
     cluster({}),
     cluster({
@@ -98,6 +105,73 @@ export const DEGRADED_CONNECTION: ZentinelleConnection = {
       status: "registered",
     }),
   ],
+};
+
+/** A gateway Zentinelle has not heard from, and one that never reported. */
+export const STALE_CONNECTION: ZentinelleConnection = {
+  ...HEALTHY_CONNECTION,
+  clusters: [
+    cluster({}),
+    cluster({
+      clusterId: "0199a1b2-0000-7000-8000-000000000002",
+      clusterSlug: "prod-eu-west-1",
+      zentinelleClusterId: "0199a1b2-0000-7000-8000-000000000002",
+      lastSeenAt: ago(42),
+    }),
+    cluster({
+      clusterId: "0199a1b2-0000-7000-8000-000000000003",
+      clusterSlug: "staging",
+      zentinelleClusterId: "0199a1b2-0000-7000-8000-000000000003",
+      gatewayVersion: "",
+      lastSeenAt: null,
+    }),
+  ],
+};
+
+/** A Zentinelle released before the health read: nothing to report. */
+export const OLDER_ZENTINELLE_CONNECTION: ZentinelleConnection = {
+  ...HEALTHY_CONNECTION,
+  serverVersion: null,
+  clusters: HEALTHY_CONNECTION.clusters.map((c) => ({
+    ...c,
+    gatewayVersion: null,
+    lastSeenAt: null,
+  })),
+};
+
+export const HEALTH_COUNTS: ZentinelleHealthCounts = {
+  available: true,
+  windowHours: 24,
+  blocks: 37,
+  openApprovals: 2,
+  budgets: [
+    {
+      id: "pol_2",
+      name: "Monthly model budget",
+      scope: "organization",
+      limitUsd: 500,
+      spendUsd: 412.4,
+      percent: 82.48,
+      level: "threshold",
+    },
+    {
+      id: "pol_4",
+      name: "triage-bot budget",
+      scope: "deployment",
+      limitUsd: 100,
+      spendUsd: 15.56,
+      percent: 15.56,
+      level: "",
+    },
+  ],
+};
+
+export const HEALTH_NOT_AVAILABLE: ZentinelleHealthCounts = {
+  available: false,
+  windowHours: null,
+  blocks: null,
+  openApprovals: null,
+  budgets: null,
 };
 
 export const REVOKED_CONNECTION: ZentinelleConnection = {
@@ -223,6 +297,7 @@ export const CONNECTED: ZentinelleScreenProps = {
       loading: false,
       error: null,
     },
+    counts: { data: HEALTH_COUNTS, loading: false, error: null },
   },
   clusters: {
     busyClusterId: null,

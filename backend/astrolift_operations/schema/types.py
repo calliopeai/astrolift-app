@@ -1038,6 +1038,24 @@ class ObservabilityRetentionType:
     """When to warn an admin before retention closes on a row."""
 
 
+class _ZentinelleHealthMemo:
+    """Zentinelle's install-wide health for one connection, asked for at most
+    once per response, and only when a field that needs it is selected."""
+
+    def __init__(self, connection) -> None:
+        self._connection = connection
+        self._done = False
+        self._value = None
+
+    def get(self):
+        if not self._done:
+            from astrolift_operations.zentinelle_reads import health_if_reachable
+
+            self._value = health_if_reachable(self._connection)
+            self._done = True
+        return self._value
+
+
 @strawberry.type(name="AstroliftZentinelleClusterGateway")
 class ZentinelleClusterGatewayType:
     """A cluster registered with Zentinelle, and its gateway (#1887).
@@ -1063,6 +1081,26 @@ class ZentinelleClusterGatewayType:
     credential_rotated_at: dt.datetime | None
     last_error: str
     unregistered: bool
+    health: strawberry.Private[_ZentinelleHealthMemo | None] = None
+
+    @strawberry.field
+    def gateway_version(self) -> str | None:
+        """The version the gateway last reported, from Zentinelle (#2436); empty
+        before its first report, null when Zentinelle cannot say (not reached,
+        or a release without the health read)."""
+        cluster = self._reported()
+        return cluster.gateway_version if cluster is not None else None
+
+    @strawberry.field
+    def last_seen_at(self) -> dt.datetime | None:
+        """When Zentinelle last heard from the gateway (#2436); null before its
+        first report or when Zentinelle cannot say (see ``gatewayVersion``)."""
+        cluster = self._reported()
+        return cluster.last_seen_at if cluster is not None else None
+
+    def _reported(self):
+        snapshot = self.health.get() if self.health is not None else None
+        return snapshot.clusters.get(self.zentinelle_cluster_id) if snapshot is not None else None
 
 
 @strawberry.type(name="AstroliftZentinelleConnection")
@@ -1091,6 +1129,15 @@ class ZentinelleConnectionType:
     """The install-wide ``ZENTINELLE_GATEWAY_ENABLED`` flag."""
 
     clusters: list[ZentinelleClusterGatewayType]
+    health: strawberry.Private[_ZentinelleHealthMemo | None] = None
+
+    @strawberry.field
+    def server_version(self) -> str | None:
+        """The Zentinelle server's release (#2436), cached briefly, never stored;
+        null when Zentinelle cannot say: not reached, a release without the
+        health read, or a build that carries no version."""
+        snapshot = self.health.get() if self.health is not None else None
+        return (snapshot.server_version or None) if snapshot is not None else None
 
 
 @strawberry.type(name="AstroliftZentinelleDisconnect")
@@ -1101,7 +1148,7 @@ class ZentinelleDisconnectType:
     whose gateway objects are left behind."""
 
 
-def zentinelle_cluster_gateway_to_type(row) -> ZentinelleClusterGatewayType:
+def zentinelle_cluster_gateway_to_type(row, health=None) -> ZentinelleClusterGatewayType:
     return ZentinelleClusterGatewayType(
         cluster_id=GUID(str(row.cluster.guid)),
         cluster_slug=row.cluster.slug,
@@ -1114,6 +1161,7 @@ def zentinelle_cluster_gateway_to_type(row) -> ZentinelleClusterGatewayType:
         credential_rotated_at=row.credential_rotated_at,
         last_error=row.last_error,
         unregistered=row.deleted_at is not None,
+        health=health if health is not None else _ZentinelleHealthMemo(row.connection),
     )
 
 
@@ -1124,6 +1172,7 @@ def zentinelle_connection_to_type(row) -> ZentinelleConnectionType:
     gateways = (
         ZentinelleClusterGateway.objects.filter(connection=row).select_related("cluster").order_by("pk")
     )
+    health = _ZentinelleHealthMemo(row)
     return ZentinelleConnectionType(
         id=GUID(str(row.guid)),
         base_url=row.base_url,
@@ -1135,7 +1184,8 @@ def zentinelle_connection_to_type(row) -> ZentinelleConnectionType:
         disconnected_at=row.disconnected_at,
         last_error=row.last_error,
         gateway_feature_enabled=gateway_feature_enabled(),
-        clusters=[zentinelle_cluster_gateway_to_type(g) for g in gateways],
+        clusters=[zentinelle_cluster_gateway_to_type(g, health) for g in gateways],
+        health=health,
     )
 
 
