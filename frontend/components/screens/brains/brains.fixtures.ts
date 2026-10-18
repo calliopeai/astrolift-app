@@ -1,4 +1,5 @@
 import type { BrainConnection } from "./brain-connection";
+import { HEALTHY, summaryOf } from "./brain-status.fixtures";
 import type { BrainRow } from "./use-brains";
 
 export const BRAINS: BrainRow[] = [
@@ -9,11 +10,13 @@ export const BRAINS: BrainRow[] = [
     kind: "mimwell",
     team: "platform",
     project: "core",
+    archived: false,
     environments: [{ name: "production", url: "https://brain.acme.example" }],
     sharedWith: [
       { team: "medops", access: "viewer" },
       { team: "sales", access: "viewer" },
     ],
+    summary: summaryOf(HEALTHY),
   },
   {
     id: "b0000000-0000-4000-8000-000000000002",
@@ -22,10 +25,23 @@ export const BRAINS: BrainRow[] = [
     kind: "mimwell",
     team: "sales",
     project: "gtm",
+    archived: false,
     environments: [],
     sharedWith: [],
+    // Registered, with a production environment that serves nothing yet.
+    summary: { ...summaryOf(HEALTHY, false)!, deployment: null },
   },
 ];
+
+/** An archived layer, listed in the With archived view; its page offers Restore. */
+export const ARCHIVED_BRAIN: BrainRow = {
+  ...BRAINS[0]!,
+  id: "b0000000-0000-4000-8000-000000000004",
+  slug: "old-brain",
+  name: "Old brain",
+  archived: true,
+  sharedWith: [],
+};
 
 export const LONG_BRAIN: BrainRow = {
   id: "b0000000-0000-4000-8000-000000000003",
@@ -34,6 +50,8 @@ export const LONG_BRAIN: BrainRow = {
   kind: "mimwell",
   team: "platform-engineering-and-reliability",
   project: "knowledge-and-ontology-services",
+  archived: false,
+  summary: summaryOf(HEALTHY),
   environments: [
     {
       name: "production",

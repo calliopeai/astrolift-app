@@ -117,15 +117,18 @@ export function hostedAppRows(
     .sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-/** The environment names a rebuild or status can name: the served ones, or production. */
-export function environmentNames(brain: Pick<FramedBrain, "environments">): string[] {
-  const names = brain.environments.map((e) => e.name);
+/**
+ * The environment names a rebuild or status can name: every environment of
+ * the layer, served or not (#2444), or production before it has one.
+ */
+export function environmentNames(brain: Pick<FramedBrain, "allEnvironments">): string[] {
+  const names = brain.allEnvironments.map((e) => e.name);
   return names.length ? names : ["production"];
 }
 
 /** The environment a tab reads (`?env=`), when the layer has it; else the default one. */
 export function pickEnvironment(
-  brain: Pick<FramedBrain, "environments">,
+  brain: Pick<FramedBrain, "allEnvironments">,
   asked: string | null
 ): string {
   const names = environmentNames(brain);

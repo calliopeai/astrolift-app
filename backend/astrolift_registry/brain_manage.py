@@ -187,6 +187,9 @@ def status(app: RegisteredApp, environment_name: str) -> dict[str, Any] | None:
 
 
 def _with_substrate(out: dict, app: RegisteredApp, connection, manifest_doc) -> dict:
+    from django.core.cache import cache
+    from django.utils import timezone
+
     out["substrate"] = substrate_status(
         app,
         deployed_commit=out["deployed_commit"],
@@ -194,6 +197,97 @@ def _with_substrate(out: dict, app: RegisteredApp, connection, manifest_doc) -> 
         manifest_doc=manifest_doc,
         warnings=out["warnings"],
     )
+    # What lists show without reading the host again (#2444).
+    cache.set(
+        _freshness_key(app.pk, out["environment_name"]),
+        {
+            "compiled_at": out["compiled_at"],
+            "behind": out["behind"],
+            "last_ingest": out["last_ingest"],
+            "checked_at": timezone.now().isoformat(),
+        },
+        FRESHNESS_TTL,
+    )
+    return out
+
+
+#: How long the last status read's freshness stands in on lists.
+FRESHNESS_TTL = 7 * 24 * 3600
+
+
+def _freshness_key(app_id: int, environment_name: str) -> str:
+    return f"astrolift:brain-freshness:{app_id}:{environment_name}"
+
+
+def overviews(apps) -> dict[int, dict[str, Any]]:
+    """Every environment of each brain in ``apps`` with its state, and a
+    summary of the one its status is read in (production, else the first
+    served, else the first): the latest deployment there and the freshness
+    the last ``status`` read found. Three queries and one cache read for
+    any number of brains; no host reads (#2444)."""
+    from django.core.cache import cache
+
+    from astrolift_lifecycle.models import AppEnvironment, Deployment
+
+    apps = list(apps)
+    envs = list(
+        AppEnvironment.objects.filter(registered_app__in=apps, deleted_at__isnull=True).order_by("name", "pk")
+    )
+    latest = {
+        row.app_environment_id: row
+        for row in Deployment.objects.filter(app_environment__in=envs)
+        .order_by("app_environment_id", "-created_at", "-pk")
+        .distinct("app_environment_id")
+    }
+    picked: dict[int, Any] = {}
+    for app in apps:
+        own = [env for env in envs if env.registered_app_id == app.pk]
+        served = [env for env in own if env.url]
+        chosen = next((env for env in own if env.name == "production"), None) or next(
+            iter(served or own), None
+        )
+        if chosen is not None:
+            picked[app.pk] = chosen
+    cached = cache.get_many([_freshness_key(pk, env.name) for pk, env in picked.items()])
+    out: dict[int, dict[str, Any]] = {}
+    for app in apps:
+        environments = []
+        for env in (env for env in envs if env.registered_app_id == app.pk):
+            deployment = latest.get(env.pk)
+            environments.append(
+                {
+                    "name": env.name,
+                    "url": env.url or "",
+                    "served": bool(env.url),
+                    "paused": bool(env.ingress_paused),
+                    "deployment_status": deployment.status if deployment else None,
+                    "deployed_at": _iso(deployment.created_at) if deployment else None,
+                }
+            )
+        summary = None
+        env = picked.get(app.pk)
+        if env is not None:
+            deployment = latest.get(env.pk)
+            fresh = cached.get(_freshness_key(app.pk, env.name)) or {}
+            summary = {
+                "environment_name": env.name,
+                "deployment": (
+                    {
+                        "id": str(deployment.guid),
+                        "status": deployment.status,
+                        "image_tag": deployment.image_tag or "",
+                        "commit_sha": deployment.commit_sha or "",
+                        "created_at": _iso(deployment.created_at),
+                    }
+                    if deployment is not None
+                    else None
+                ),
+                "compiled_at": fresh.get("compiled_at"),
+                "behind": fresh.get("behind"),
+                "last_ingest": fresh.get("last_ingest"),
+                "checked_at": fresh.get("checked_at"),
+            }
+        out[app.pk] = {"environments": environments, "summary": summary}
     return out
 
 
@@ -729,6 +823,7 @@ def substrate_status(
         "persistence": list(selection.persistence),
         "replicas": selection.replicas,
         "image": selection.image,
+        "port": selection.port,
         "adopted_store": str(authority.get("store") or "") if isinstance(authority, dict) else "",
         "adopted": None if config is None else bool(authority),
         "graduation_needed": bool(needed) if needed is not None else None,

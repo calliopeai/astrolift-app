@@ -15703,6 +15703,7 @@
     "none": "无",
     "notServed": "尚未提供服务",
     "notShared": "仅所属团队",
+    "archived": "已归档",
     "shareTitle": "{team}：{access}",
     "emptyTitle": "没有语义层",
     "emptyDescription": "以 [app] kind = \"mimwell\" 声明且你可以读取的应用会显示在这里。",
@@ -15744,8 +15745,8 @@
     "columnFreshness": "新鲜度",
     "new": "新建语义层",
     "status": {
-      "unavailable": "不可用",
       "unknown": "未知",
+      "notChecked": "尚未从源主机读取；打开该层以检查。",
       "never": "从未",
       "noEnvironment": "没有 {environment} 环境",
       "notDeployed": "未部署",
@@ -15808,6 +15809,7 @@
       "templateRef": "模板引用",
       "templateRefHelp": "Mimwell 发行版的标签、分支或提交。留空则使用此安装固定的发行版。",
       "pinnedEdition": "此安装固定的发行版",
+      "pinnedEditionRef": "此安装固定的发行版（{ref}）",
       "name": "名称",
       "nameHelp": "显示在列表中。留空时使用标识符。",
       "namePlaceholder": "平台知识",
@@ -15849,6 +15851,7 @@
         "repoFormat": "请使用 owner/name 格式，可包含字母、数字、点、连字符和下划线。",
         "refFormat": "标签、分支或提交名称，不能包含空格或连续的两个点。",
         "slugFormat": "小写字母、数字和连字符，须以字母开头、以字母或数字结尾，最多 63 个字符。",
+        "needsAppSlug": "此发行版没有 deploy.app_slug，因此 slug 必须以 -brain 结尾。",
         "envFormat": "简短的小写名称：字母、数字和连字符，最多 32 个字符。",
         "long": "最多 255 个字符。"
       }
@@ -15869,13 +15872,6 @@
         "graph": "图投影存放的位置。"
       },
       "supported": "Mimwell 支持：",
-      "reasons": {
-        "d1Authority": "d1 是投影目标，不能作为权威源。",
-        "dbBlobNeedsDatabase": "db-blob 将二进制对象保存在权威源的数据库中，而此权威源没有数据库。",
-        "inDbVectorsMongo": "in-db 向量是 SQL 向量列，而 mongo 没有这种列。",
-        "inDbVectorsNeedSql": "in-db 向量存放在权威源的数据库中，而此权威源没有数据库。",
-        "ageNeedsPostgres": "age 是 Postgres 扩展，因此需要 postgres 权威源。"
-      },
       "persistence": "持久化",
       "persistenceHelp": "Astrolift 为该层附加的资源。仓库始终存在。",
       "persistenceKinds": {
@@ -15896,8 +15892,7 @@
       "imageFormat": "镜像引用不能包含空格。",
       "imageKept": "该层保留当前运行的镜像。",
       "port": "端口",
-      "portRange": "1 到 65535。",
-      "portGraduate": "API 不会报告当前端口：请保留该层正在使用的服务端口。"
+      "portRange": "1 到 65535。"
     },
     "creation": {
       "listCrumb": "语义层",
@@ -16481,7 +16476,8 @@
     "brains": {
       "search": "搜索名称和标识符…",
       "views": {
-        "all": "全部"
+        "all": "全部",
+        "archived": "包含已归档"
       },
       "fields": {
         "team": "团队"

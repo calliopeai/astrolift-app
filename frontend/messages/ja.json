@@ -15703,6 +15703,7 @@
     "none": "なし",
     "notServed": "未提供",
     "notShared": "所有チームのみ",
+    "archived": "アーカイブ済み",
     "shareTitle": "{team}: {access}",
     "emptyTitle": "セマンティックレイヤーはありません",
     "emptyDescription": "[app] kind = \"mimwell\" で宣言され、閲覧できるアプリがここに表示されます。",
@@ -15744,8 +15745,8 @@
     "columnFreshness": "鮮度",
     "new": "新しいセマンティックレイヤー",
     "status": {
-      "unavailable": "取得不可",
       "unknown": "不明",
+      "notChecked": "ソースホストからまだ読み取っていません。レイヤーを開いて確認してください。",
       "never": "なし",
       "noEnvironment": "{environment} 環境はありません",
       "notDeployed": "未デプロイ",
@@ -15808,6 +15809,7 @@
       "templateRef": "テンプレート参照",
       "templateRefHelp": "Mimwell エディションのタグ、ブランチ、またはコミット。空欄にすると、このインストールで固定されたエディションを使います。",
       "pinnedEdition": "このインストールで固定されたエディション",
+      "pinnedEditionRef": "このインストールで固定されたエディション ({ref})",
       "name": "名前",
       "nameHelp": "一覧に表示されます。空欄の場合はスラッグが使われます。",
       "namePlaceholder": "プラットフォームのナレッジ",
@@ -15849,6 +15851,7 @@
         "repoFormat": "owner/name の形式で、英字、数字、ドット、ハイフン、アンダースコアを使ってください。",
         "refFormat": "タグ、ブランチ、コミットのいずれかの名前。空白や連続した 2 つのドットは使えません。",
         "slugFormat": "英小文字、数字、ハイフンで、先頭は英字、末尾は英字か数字、63 文字以内。",
+        "needsAppSlug": "このエディションには deploy.app_slug がないため、スラッグは -brain で終わる必要があります。",
         "envFormat": "短い小文字の名前。英字、数字、ハイフンで 32 文字以内。",
         "long": "255 文字以内。"
       }
@@ -15869,13 +15872,6 @@
         "graph": "グラフの投影を置く場所。"
       },
       "supported": "Mimwell でサポートされています:",
-      "reasons": {
-        "d1Authority": "d1 は投影先であり、正本にはなりません。",
-        "dbBlobNeedsDatabase": "db-blob は BLOB を正本のデータベースに置きますが、この正本にはデータベースがありません。",
-        "inDbVectorsMongo": "in-db のベクトルは SQL のベクトル列ですが、mongo にはベクトル列がありません。",
-        "inDbVectorsNeedSql": "in-db のベクトルは正本のデータベースに置かれますが、この正本にはデータベースがありません。",
-        "ageNeedsPostgres": "age は Postgres の拡張機能のため、正本に postgres が必要です。"
-      },
       "persistence": "永続化",
       "persistenceHelp": "Astrolift がレイヤーに接続するもの。リポジトリは常に含まれます。",
       "persistenceKinds": {
@@ -15896,8 +15892,7 @@
       "imageFormat": "イメージ参照に空白は使えません。",
       "imageKept": "レイヤーは実行中のイメージをそのまま使います。",
       "port": "ポート",
-      "portRange": "1 から 65535 まで。",
-      "portGraduate": "API は現在のポートを返しません。レイヤーが待ち受けているポートのままにしてください。"
+      "portRange": "1 から 65535 まで。"
     },
     "creation": {
       "listCrumb": "セマンティックレイヤー",
@@ -16628,7 +16623,8 @@
     "brains": {
       "search": "名前とスラッグを検索…",
       "views": {
-        "all": "すべて"
+        "all": "すべて",
+        "archived": "アーカイブを含む"
       },
       "fields": {
         "team": "チーム"

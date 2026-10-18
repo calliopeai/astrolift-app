@@ -25,7 +25,8 @@ import {
   ON_POSTGRES,
   UNKNOWN_VALUES,
 } from "../brain-status.fixtures";
-import type { BrainStatusResult } from "../BrainStatusCell";
+import type { BrainStatusResult } from "../brain-status-model";
+import { CELLS } from "../brain-cells.fixtures";
 import { draftFromSubstrate } from "../substrate-cells";
 import { BRAIN_APPS_LIST, BRAIN_SHARES_LIST } from "./brain-detail-lists";
 import { DEFAULT_ASK, EVERYTHING, hostedAppRows, NOTHING } from "./brain-detail-model";
@@ -170,6 +171,7 @@ const GRADUATION: BrainSubstrateTabProps["graduation"] = {
   draft: draftFromSubstrate(HEALTHY.substrate),
   onChange: () => {},
   locked: [],
+  matrix: CELLS,
   submitting: false,
   onSubmit: () => {},
   error: null,

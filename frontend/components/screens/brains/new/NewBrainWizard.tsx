@@ -1,6 +1,7 @@
 "use client";
 
 import { BrainSubstrateForm, type SubstrateServerError } from "../BrainSubstrateForm";
+import type { CellMatrix } from "../substrate-cells";
 import { BrainCreationProgress, type BrainCreationProgressProps } from "./BrainCreationProgress";
 import { BrainDetailsStep } from "./BrainDetailsStep";
 import { BrainReviewStep } from "./BrainReviewStep";
@@ -30,6 +31,10 @@ export interface NewBrainWizardProps {
   problems: Partial<Record<DraftField, Problem>>;
   serverErrors: Partial<Record<DraftField, string>>;
   substrateError: SubstrateServerError | null;
+  /** Mimwell's matrix for the substrate step; null until it arrives. */
+  matrix: CellMatrix | null;
+  /** The ref the install pins, once read, when the draft names none. */
+  pinnedRef: string | null;
   generalError: string | null;
   connections: WizardConnection[];
   connectionsLoading: boolean;
@@ -92,6 +97,7 @@ export function NewBrainWizard(props: NewBrainWizardProps) {
           mode="create"
           draft={draft.substrate}
           onChange={(substrate) => onChange({ ...draft, substrate })}
+          matrix={props.matrix}
           serverError={props.substrateError}
         />
       ) : (
@@ -102,6 +108,7 @@ export function NewBrainWizard(props: NewBrainWizardProps) {
           projectSlug={props.projectSlug}
           canDeploy={props.canDeploy}
           onEdit={props.onStep}
+          pinnedRef={props.pinnedRef}
           serverError={props.generalError}
         />
       )}

@@ -19,6 +19,7 @@ import {
   substrateInput,
   type SubstrateDraft,
 } from "../substrate-cells";
+import { useBrainCells } from "../use-brain-cells";
 import type { BrainSubstrateTabProps } from "./BrainSubstrateTab";
 import { useBrainEnvironmentStatus } from "./use-brain-overview";
 import type { FramedBrainValue } from "./use-brain-frame";
@@ -38,6 +39,8 @@ export function useBrainSubstrate(framed: FramedBrainValue): BrainSubstrateTabPr
   const [draft, setDraft] = React.useState<SubstrateDraft>(() => draftFromSubstrate(current));
   const [error, setError] = React.useState<SubstrateServerError | null>(null);
   const locked = heldPersistence(current?.persistence ?? []);
+  // Only the open graduation form reads the matrix.
+  const matrix = useBrainCells({ skip: !open });
   const [update, updateState] = useMutation<
     UpdateBrainSubstrateMutation,
     UpdateBrainSubstrateMutationVariables
@@ -64,6 +67,7 @@ export function useBrainSubstrate(framed: FramedBrainValue): BrainSubstrateTabPr
         setError(null);
       },
       locked,
+      matrix,
       submitting: updateState.loading,
       onSubmit: async () => {
         const outcome = await gatedWrite(

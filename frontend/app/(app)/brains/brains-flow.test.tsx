@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stepUpLink } from "@/lib/apollo/links";
 import { ELEVATED_EVENT, STEP_UP_EVENT } from "@/lib/auth/step-up-events";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
+import { CELLS } from "@/components/screens/brains/brain-cells.fixtures";
 import en from "@/messages/en.json";
 
 import { BrainFrameContainer } from "./[slug]/components/brain-frame";
@@ -89,6 +90,9 @@ function server() {
     team: "platform",
     project: "core",
     environments: [{ name: "production", url: "https://handbook-brain.apps.example.test" }],
+    allEnvironments: [{ name: "production", served: true }],
+    archived: state.archived,
+    summary: null,
     sharedWith: state.shares,
     hostedApps: [],
     substrate: {
@@ -100,6 +104,7 @@ function server() {
       persistence: [],
       replicas: 1,
       image: "",
+      port: 8080,
       adopted: null,
       adoptedStore: "",
       graduationNeeded: null,
@@ -171,6 +176,15 @@ function server() {
       viewerPermissions: [...ASTROLIFT_PERMISSIONS],
     }),
     astroliftBrain: () => (state.archived ? null : brain()),
+    astroliftBrainCells: () => CELLS,
+    astroliftBrainEdition: ({ templateRef }: { templateRef: string | null }) => ({
+      templateRepo: "ConflictHQ/mimwell",
+      ref: templateRef ?? "v1.4.0",
+      version: "1.4.0",
+      supportsAppSlug: true,
+      shipsPortalContainer: true,
+      error: null,
+    }),
     astroliftTeamsPage: () => ({
       items: [
         {

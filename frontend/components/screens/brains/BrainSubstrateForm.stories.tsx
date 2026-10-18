@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
+import { CELLS } from "./brain-cells.fixtures";
 import { BrainSubstrateForm, type BrainSubstrateFormProps } from "./BrainSubstrateForm";
 import { DEFAULT_SUBSTRATE, type SubstrateDraft } from "./substrate-cells";
 
@@ -9,7 +10,7 @@ const meta: Meta<typeof BrainSubstrateForm> = {
   title: "Screens/Brains/BrainSubstrateForm",
   component: BrainSubstrateForm,
   parameters: { layout: "padded" },
-  args: { draft: DEFAULT_SUBSTRATE, onChange: fn(), mode: "create" },
+  args: { draft: DEFAULT_SUBSTRATE, onChange: fn(), mode: "create", matrix: CELLS },
 };
 export default meta;
 
@@ -25,7 +26,9 @@ const POSTGRES: SubstrateDraft = {
 
 function Live(props: Partial<BrainSubstrateFormProps>) {
   const [draft, setDraft] = React.useState(props.draft ?? DEFAULT_SUBSTRATE);
-  return <BrainSubstrateForm mode="create" {...props} draft={draft} onChange={setDraft} />;
+  return (
+    <BrainSubstrateForm mode="create" matrix={CELLS} {...props} draft={draft} onChange={setDraft} />
+  );
 }
 
 /** The files cell: the repository is the canon, nothing to attach. */
@@ -102,6 +105,24 @@ export const ServerRefusedCell: Story = {
       message:
         "unsupported cell: authority=files, blobs=db-blob, vectors=local, graph=edges-table: db-blob keeps blobs in the authority database and files has none",
     },
+  },
+};
+
+/** An unsupported cell, refused with Mimwell's reason as the server words it. */
+export const UnsupportedCell: Story = {
+  args: { draft: { ...DEFAULT_SUBSTRATE, cell: { ...DEFAULT_SUBSTRATE.cell, graph: "age" } } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText(/age is a Postgres extension/)).not.toHaveLength(0);
+  },
+};
+
+/** The matrix has not arrived: the cell shows without a verdict, nothing is refused here. */
+export const MatrixLoading: Story = {
+  args: { matrix: null },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByText(/Supported by Mimwell/)).not.toBeInTheDocument();
   },
 };
 
