@@ -68,7 +68,7 @@ jobs:
       pytest_markers: ${{ steps.classify.outputs.pytest_markers }}
       testdb_key: ${{ steps.testdb.outputs.key }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       # Everything that decides the migrated schema. A shard restores the
@@ -80,7 +80,7 @@ jobs:
           echo "key=testdb-v1-pg16-${{ hashFiles('backend/**/migrations/**', 'backend/Pipfile.lock', 'backend/config/*.py') }}" >> "$GITHUB_OUTPUT"
       - name: Look up the migrated test database
         id: testdb-cached
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/testdb
           key: ${{ steps.testdb.outputs.key }}
@@ -378,8 +378,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -466,10 +466,10 @@ jobs:
       TEMPORAL_ADDRESS: 127.0.0.1:7233
       TEMPORAL_NAMESPACE: default
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # The whole pipenv virtualenv is cached, keyed on everything it is
       # built from (#2413): a cache hit skips about a minute of installs.
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         id: python
         with:
           python-version: "3.12"
@@ -558,7 +558,7 @@ jobs:
       # pg_get_constraintdef text, across a migration roundtrip.
       - name: Restore the migrated test database
         id: testdb
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/testdb
           key: ${{ needs.changes.outputs.testdb_key }}
@@ -591,7 +591,7 @@ jobs:
         if: ${{ steps.testdb.outputs.cache-hit != 'true' }}
         # Parallel shards race to save the same key; the losers only warn.
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{ runner.temp }}/testdb
           key: ${{ needs.changes.outputs.testdb_key }}
@@ -676,8 +676,8 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         id: python
         with:
           python-version: "3.12"
@@ -731,8 +731,8 @@ jobs:
       FEATURE_FILE_UPLOADS: "true"
       FEATURE_DEPLOY_PIPELINE: "true"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         id: python
         with:
           python-version: "3.12"
@@ -771,8 +771,8 @@ jobs:
       run:
         working-directory: backend/providers
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -804,8 +804,8 @@ jobs:
     if: ${{ needs.changes.outputs.providers == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Detect "real-but-stubbed" client classes
@@ -891,8 +891,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       # node_modules itself is cached (#2413): restoring it takes seconds,
@@ -900,7 +900,7 @@ jobs:
       # `npm ci`, before any build writes its own caches into it.
       - name: Restore node_modules
         id: node-modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -910,7 +910,7 @@ jobs:
       - name: Save node_modules
         if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -960,8 +960,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       # node_modules itself is cached (#2413): restoring it takes seconds,
@@ -969,7 +969,7 @@ jobs:
       # `npm ci`, before any build writes its own caches into it.
       - name: Restore node_modules
         id: node-modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -979,7 +979,7 @@ jobs:
       - name: Save node_modules
         if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -997,8 +997,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       # node_modules itself is cached (#2413): restoring it takes seconds,
@@ -1006,7 +1006,7 @@ jobs:
       # `npm ci`, before any build writes its own caches into it.
       - name: Restore node_modules
         id: node-modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -1016,7 +1016,7 @@ jobs:
       - name: Save node_modules
         if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -1044,8 +1044,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "20"
       # node_modules itself is cached (#2413): restoring it takes seconds,
@@ -1053,7 +1053,7 @@ jobs:
       # `npm ci`, before any build writes its own caches into it.
       - name: Restore node_modules
         id: node-modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -1063,7 +1063,7 @@ jobs:
       - name: Save node_modules
         if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
         continue-on-error: true
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: frontend/node_modules
           key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
@@ -1087,7 +1087,7 @@ jobs:
           TZ: "UTC"
       - name: Save route navigation evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: production-route-navigation
           path: frontend/test-results/routes

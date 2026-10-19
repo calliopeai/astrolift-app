@@ -302,7 +302,7 @@ def render_astrolift_agent_ci_workflow(app: RegisteredApp) -> str:
         "    runs-on: ubuntu-latest\n"
         "    steps:\n"
         "      - name: Checkout\n"
-        "        uses: actions/checkout@v4\n"
+        "        uses: actions/checkout@v6\n"
         "\n"
         "      - name: Validate selected agent manifest\n"
         "        env:\n"
