@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Move ordinary repository CI and generated managed GitHub app/agent workflows to Node 24 action runtimes (#2473). Managed workflow template version 11 uses checkout v6 and AWS OIDC credentials v6; non-GitHub renderers retain their existing output. The separately validated CPU model workflow and runtime scripts are unchanged; its migration and runtime qualification remain open in #2474 and #2492. This does not upgrade the frontend's application Node.js toolchain.
+
 - Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).
 
 - Preserve existing brain memory and build settings when merging manifests after the monetary parser module is retired (#2464), and correct the operator guide to describe the retained quota APIs and coordinated worker retirement.
