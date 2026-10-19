@@ -53,3 +53,18 @@ def test_a_row_without_a_zone_id_adopts_the_zone_the_platform_created(route53, m
     assert row.provision_nameservers == nameservers
     zones = route53.list_hosted_zones_by_name(DNSName=f"{ZONE}.")["HostedZones"]
     assert [z["Id"].rsplit("/", 1)[-1] for z in zones if z["Name"] == f"{ZONE}."] == [zone_id]
+
+
+def test_a_run_whose_row_was_deleted_adopts_nothing(route53, monkeypatch, cluster, org):
+    """Adopting would bind the deleted row's zone to the new org-less row the activity creates."""
+    from aws._errors import ConflictError
+
+    Route53Driver(config=Route53Config(), client=route53).provision_zone(ZONE)
+    ManagedDomain.objects.create(organization=org, zone=ZONE, dns_driver="route53").soft_delete()
+    driver = Route53Driver(config=Route53Config(), client=route53)
+    monkeypatch.setattr("core.app_deploy.driver_for_capability", lambda c, cap: driver)
+
+    with pytest.raises(ConflictError):
+        pmd._provision_dns_zone_sync(cluster.pk, ZONE)
+
+    assert not ManagedDomain.objects.filter(zone=ZONE).exists()
