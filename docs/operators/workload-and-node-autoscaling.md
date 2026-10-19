@@ -50,6 +50,10 @@ full apply carry UID and resourceVersion preconditions: a concurrent scale,
 replacement or status update refuses the apply rather than overwriting newer
 state. Retry the deployment after reviewing that failure. Missing or invalid
 observations and an unconfirmed handover also refuse the Deployment apply.
+A Deployment first created with both bounds has no replica owner at all: its
+count was defaulted, and the apiserver records no owner for `/scale` writes to
+a count nobody owns, the HPA's included. Nothing is handed over then, and the
+apply leaves the count alone (#2495).
 Dry-run requests do not persist either ownership or workload changes.
 
 The temporary owner preserves even a zero count until HPA changes `/scale`;

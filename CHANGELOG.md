@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- An app workload first deployed with both HPA bounds deploys again (#2495). Created without `replicas`, its Deployment's count had no field manager, and the apiserver records none for `/scale` writes to it, the HPA's included; the replica handover took that for unknown ownership and refused every later apply (`cannot safely transfer HPA replicas with unknown field ownership`), as it did the model-subscription re-apply of such a Deployment. With no owner there is nothing to hand over: the apply leaves the count alone, still under its UID and resourceVersion preconditions, and malformed managed-field entries are still refused. Apps created before the handover (#2210) owned their count and were not affected.
+
 - Move ordinary repository CI and generated managed GitHub app/agent workflows to Node 24 action runtimes (#2473). Managed workflow template version 11 uses checkout v6 and AWS OIDC credentials v6; non-GitHub renderers retain their existing output. The separately validated CPU model workflow and runtime scripts are unchanged; its migration and runtime qualification remain open in #2474 and #2492. This does not upgrade the frontend's application Node.js toolchain.
 
 - Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).
