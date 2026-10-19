@@ -609,7 +609,7 @@ def test_register_deploys_the_gateway_when_the_flag_is_on(org, cluster, admin, z
 
     assert result.ok, result.errors
     assert result.data.status == "deployed" and result.data.gateway_deployed is True
-    assert driver.kinds() == ["Namespace", "Secret", "Deployment", "Service"]
+    assert driver.kinds() == ["Namespace", "Secret", "Deployment", "Service", "HorizontalPodAutoscaler"]
     container = driver.last("Deployment")["spec"]["template"]["spec"]["containers"][0]
     assert container["image"] == IMAGE
     env = {item["name"]: item["value"] for item in container["env"]}
@@ -745,6 +745,7 @@ def test_turning_the_gateway_off_removes_it_and_keeps_the_credential(org, cluste
     assert off.ok, off.errors
     assert off.data.gateway_enabled is False and off.data.status == "registered"
     assert driver.deleted == [
+        ("astrolift-system", "HorizontalPodAutoscaler", "zentinelle-gateway"),
         ("astrolift-system", "Deployment", "zentinelle-gateway"),
         ("astrolift-system", "Service", "zentinelle-gateway"),
     ]
@@ -753,7 +754,7 @@ def test_turning_the_gateway_off_removes_it_and_keeps_the_credential(org, cluste
 
     assert on.ok, on.errors
     assert on.data.status == "deployed"
-    assert driver.kinds()[-2:] == ["Deployment", "Service"]
+    assert driver.kinds()[-3:] == ["Deployment", "Service", "HorizontalPodAutoscaler"]
 
 
 def test_rotation_writes_the_next_credential_with_the_overlap(org, cluster, admin, zentinelle, driver):
@@ -811,7 +812,12 @@ def test_unregister_revokes_then_removes_the_gateway_and_its_secret(org, cluster
     assert result.ok, result.errors
     assert result.data.unregistered is True
     assert zentinelle.paths()[-1] == ("DELETE", f"{API}/clusters/{cluster.guid}")
-    assert [kind for _ns, kind, _name in driver.deleted] == ["Deployment", "Service", "Secret"]
+    assert [kind for _ns, kind, _name in driver.deleted] == [
+        "HorizontalPodAutoscaler",
+        "Deployment",
+        "Service",
+        "Secret",
+    ]
     assert not ZentinelleClusterGateway.objects.filter(cluster=cluster).exists()
     assert zentinelle_connect.fenced_agents_reach_gateway(cluster) is False
 
@@ -836,7 +842,7 @@ def test_disconnect_revokes_first_then_cleans_every_cluster(org, plugin, admin, 
     assert result.data.connection.clusters == []
     assert zentinelle.paths() == [("DELETE", f"{API}/install")]
     assert sorted(kind for _ns, kind, _name in driver.deleted) == sorted(
-        ["Deployment", "Service", "Secret"] * 2
+        ["HorizontalPodAutoscaler", "Deployment", "Service", "Secret"] * 2
     )
     row = ZentinelleConnection.all_objects.get(organization=org)
     assert row.deleted_at is not None and bytes(row.credential_ciphertext) == b""
@@ -868,7 +874,12 @@ def test_disconnect_stops_when_zentinelle_is_unreachable_unless_forced(
     [warning] = forced.data.warnings
     assert "Zentinelle was not told" in warning
     assert not ZentinelleConnection.objects.filter(organization=org).exists()
-    assert [kind for _ns, kind, _name in driver.deleted] == ["Deployment", "Service", "Secret"]
+    assert [kind for _ns, kind, _name in driver.deleted] == [
+        "HorizontalPodAutoscaler",
+        "Deployment",
+        "Service",
+        "Secret",
+    ]
 
 
 # ---- status query ------------------------------------------------------------
@@ -892,8 +903,8 @@ def test_the_status_query_is_scoped_to_the_callers_org(org, other_org, cluster, 
 
 
 def test_the_gateway_runs_non_root_read_only_with_probes_and_limits():
-    deployment, service = zentinelle_connect.gateway_manifests(
-        cluster_id="c-1", zentinelle_url=BASE, image=IMAGE
+    deployment, service, _autoscaler = zentinelle_connect.gateway_manifests(
+        cluster_id="c-1", zentinelle_url=BASE, image=IMAGE, max_replicas=6
     )
     pod = deployment["spec"]["template"]["spec"]
     [container] = pod["containers"]
@@ -942,11 +953,12 @@ def test_flipping_the_install_switch_reconciles_every_registered_gateway(
 
     with override_config(ZENTINELLE_GATEWAY_ENABLED=True, ZENTINELLE_GATEWAY_IMAGE=IMAGE):
         assert reconcile_gateways() == [GatewayReconcile(cluster.slug, "deployed")]
-        assert driver.kinds()[-2:] == ["Deployment", "Service"]
+        assert driver.kinds()[-3:] == ["Deployment", "Service", "HorizontalPodAutoscaler"]
         assert reconcile_gateways() == [GatewayReconcile(cluster.slug, "unchanged")]
 
     assert reconcile_gateways() == [GatewayReconcile(cluster.slug, "removed")]
     assert driver.deleted == [
+        ("astrolift-system", "HorizontalPodAutoscaler", "zentinelle-gateway"),
         ("astrolift-system", "Deployment", "zentinelle-gateway"),
         ("astrolift-system", "Service", "zentinelle-gateway"),
     ]

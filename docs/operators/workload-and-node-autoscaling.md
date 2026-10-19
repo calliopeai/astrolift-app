@@ -67,6 +67,41 @@ Manual scaling is transient while an HPA remains active. To return to fixed
 capacity, remove both bounds and explicitly remove the old HPA; omission from
 the rendered manifest does not itself prune Kubernetes objects.
 
+## Zentinelle cluster gateway
+
+Astrolift renders the Zentinelle gateway, so it renders the gateway's
+autoscaler too (#2482). Beside Deployment and Service `zentinelle-gateway` in
+`astrolift-system` it applies an `autoscaling/v2` HPA of the same name: at least
+two replicas, at most `ZENTINELLE_GATEWAY_MAX_REPLICAS` (default 6), CPU at 60%
+of the 100m request, and scale-in only after five minutes below that. That is
+the shape the installer gives Zentinelle's backend, worker and console on a
+cluster. The gateway is a stateless proxy whose only state is its mounted
+credential file, so any replica serves any request. Set the ceiling to 2 to
+hold every gateway at two; the setting refuses less than 2.
+
+The gateway Deployment omits `replicas` and declares
+`astrolift.dev/replica-owner: hpa`, so the handover above applies to it. A
+gateway already running the two replicas Astrolift applied keeps them while the
+HPA takes over, with no pod replaced, and applying it again later (a new
+credential, a gateway URL change) leaves the HPA's count alone. A new gateway
+is created at one replica and the HPA raises it to two at its next sync. Without
+Metrics Server the HPA cannot read CPU, so it holds the gateway at two. An apply
+that lands while the HPA or the Deployment controller is writing the Deployment
+is refused with a 409 rather than overwriting the newer state; the gateway's
+last error says so, and applying it again succeeds.
+
+A ceiling change, like an image change, reaches a gateway the next time
+Astrolift applies it. A gateway that was running before this release gets its
+HPA the same way: registering its cluster again, changing the gateway URL,
+moving a shared cluster to the install connection, or setting its gateway on
+again with `setZentinelleGatewayEnabled(enabled: true)` applies it in place.
+`reconcile_zentinelle_gateways` and the install switch deploy only a gateway
+that is not running. Turning a gateway off, turning the install switch off,
+unregistering, disconnecting and decommissioning remove the HPA with the
+Deployment and Service; a gateway from before this release has none to remove,
+which is not an error. The minimal control-plane RBAC already grants
+`horizontalpodautoscalers`.
+
 ## Demand-driven CPU nodes
 
 Use Cluster Autoscaler for scheduling demand. Its scale-down utilization
@@ -124,6 +159,11 @@ ASTROLIFT_TEST_KUBECONFIG=/path/to/local-kind.yaml \
 # From backend/providers, with the provider SDK extras installed:
 ASTROLIFT_TEST_KUBECONFIG=/path/to/local-kind.yaml \
   python -m pytest tests/_sdk/test_hpa_handover_integration.py
+# The Zentinelle gateway: handover from a running gateway, the floor without
+# Metrics Server, a gateway created for its HPA applied again (#2495), and
+# removal with and without an HPA.
+ASTROLIFT_TEST_KUBECONFIG=/path/to/local-kind.yaml \
+  python -m pytest astrolift_operations/tests/test_zentinelle_gateway_hpa_integration_2482.py
 ```
 
 Sources: [Kubernetes HPA](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/),
