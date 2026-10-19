@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Managed-domain provisioning adopts the hosted zone the platform already created when the domain row records no zone id, instead of failing at `provision_dns_zone` with "zone creation failed (ConflictError)" (#2389). Rows provisioned before #1931, such as CONFLICT's astro.conflict.cloud and conflict.sh, record neither `provision_zone_id` nor `dns_config.zone_id`, so the run Revalidate restarted called `provision_zone`, which refuses a taken name; a retry after a successful create did the same. The Route53 driver's new `adopt_platform_zone` (audited as `dns.adopt_platform_zone`) takes a zone only when it is the one hosted zone with that name and its name and `astrolift-<zone>-` CallerReference prove `provision_zone` made it, the proof `backfill_managed_zone_ids` uses; the row records it as `provision_zone_id` with its Route53 nameservers. A name any other zone holds, or more than one, is still refused, and an absent zone is still created. GCP, Azure and external-dns drivers create no zones and are unchanged.
+
 - Move ordinary repository CI and generated managed GitHub app/agent workflows to Node 24 action runtimes (#2473). Managed workflow template version 11 uses checkout v6 and AWS OIDC credentials v6; non-GitHub renderers retain their existing output. The separately validated CPU model workflow and runtime scripts are unchanged; its migration and runtime qualification remain open in #2474 and #2492. This does not upgrade the frontend's application Node.js toolchain.
 
 - Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).
