@@ -227,7 +227,8 @@ def test_an_org_wide_viewer_reads_the_whole_tenant(world, zentinelle):
     assert "deployment_id" not in call.query
     assert call.query["since"] == [SINCE.isoformat()]
     assert {r.agent_slug for r in result.rows} == {"medops", "platform"}
-    assert result.rows[0].cost_usd == 0.25 and result.rows[0].input_tokens == 100
+    assert not hasattr(result.rows[0], "cost_usd")
+    assert result.rows[0].input_tokens == 100
 
 
 def test_a_project_viewer_reads_only_its_projects_agents(world, zentinelle):

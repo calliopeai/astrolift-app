@@ -135,21 +135,6 @@ class ZentinelleUsageRowType:
     requests: int
     input_tokens: int
     output_tokens: int
-    cost_usd: float
-
-
-@strawberry.type(name="AstroliftZentinelleBudget")
-class ZentinelleBudgetType:
-    """A Zentinelle budget in effect for the agents read, this month."""
-
-    id: str
-    name: str
-    scope: str
-    limit_usd: float
-    spend_usd: float
-    percent: float
-    level: str
-    """Empty, ``threshold`` (at or past its alert threshold) or ``exceeded``."""
 
 
 @strawberry.type(name="AstroliftZentinelleHealth")
@@ -167,8 +152,6 @@ class ZentinelleHealthType:
 
     open_approvals: int | None
     """Held calls still waiting on a human."""
-
-    budgets: list[ZentinelleBudgetType] | None
 
 
 @strawberry.type(name="AstroliftZentinelleUsage")
@@ -314,7 +297,7 @@ class ZentinelleReadsQuery:
         project_id: GUID | None = None,  # type: ignore[valid-type]
         team_id: GUID | None = None,  # type: ignore[valid-type]
     ) -> ZentinelleUsageType:
-        """Model usage and cost from Zentinelle's gateway metering since ``since``
+        """Model token usage from Zentinelle's gateway metering since ``since``
         (default 30 days ago), per agent, provider and model, for the agents the
         caller may see: one agent, a project's, a team's, or all of them."""
         since = since or timezone.now() - DEFAULT_USAGE_WINDOW
@@ -339,7 +322,6 @@ class ZentinelleReadsQuery:
                     requests=r.requests,
                     input_tokens=r.input_tokens,
                     output_tokens=r.output_tokens,
-                    cost_usd=r.cost_usd,
                 )
                 for r in rows
             ],
@@ -349,7 +331,7 @@ class ZentinelleReadsQuery:
     @require_permission(Permission.ZENTINELLE_STATUS_VIEW, any_scope=True)
     @tenant_scoped()
     def astrolift_zentinelle_health(self, info: Info) -> ZentinelleHealthType:
-        """Blocks in the last 24 hours, open approvals and budgets, from Zentinelle,
+        """Blocks in the last 24 hours and open approvals from Zentinelle,
         for the agents the caller holds ``zentinelle.status_view`` on. Answers
         ``available: false`` from a Zentinelle without the read rather than failing."""
         try:
@@ -362,26 +344,12 @@ class ZentinelleReadsQuery:
         except (_ReadError, ZentinelleConnectError) as exc:
             raise _graphql_error(exc) from None
         if not result.available:
-            return ZentinelleHealthType(
-                available=False, window_hours=None, blocks=None, open_approvals=None, budgets=None
-            )
+            return ZentinelleHealthType(available=False, window_hours=None, blocks=None, open_approvals=None)
         return ZentinelleHealthType(
             available=True,
             window_hours=result.window_hours,
             blocks=result.blocks,
             open_approvals=result.open_approvals,
-            budgets=[
-                ZentinelleBudgetType(
-                    id=b.id,
-                    name=b.name,
-                    scope=b.scope,
-                    limit_usd=b.limit_usd,
-                    spend_usd=b.spend_usd,
-                    percent=b.percent,
-                    level=b.level,
-                )
-                for b in result.budgets
-            ],
         )
 
     @strawberry.field

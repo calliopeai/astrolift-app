@@ -475,15 +475,13 @@ def test_parse_handle_rejects_invalid_shapes(value: str) -> None:
         _parse_handle(value)
 
 
-def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
+def test_registration_catalog_and_runtime_config_are_wired() -> None:
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
-    from gcp.cost import SERVICE_ID_BY_VARIANT
     from gcp.plugin import PLUGIN
 
     assert PLUGIN.managed_service_drivers[("encryption_key", "cloud_kms")] is CloudKMSDriver
-    assert SERVICE_ID_BY_VARIANT[("encryption_key", "cloud_kms")] == "EE2F-D110-890C"
     entry = next(
         item
         for item in MATRIX.managed_services

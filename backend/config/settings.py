@@ -727,15 +727,10 @@ CONSTANCE_CONFIG = {
         "body size. The file is shipped in a private artifact and seeded into the data volume.",
     ),
     # ---- Admin console surfaces (feature flipper) ----
-    # Runtime gates for the platform-admin cost / quotas / permissions
+    # Runtime gates for the platform-admin quotas / permissions
     # screens. Default OFF — the screens ship dark and each gates itself
     # on its flag once the underlying implementation lands. Flip on from
     # /administration/features (the in-app feature flipper) or here.
-    "ADMIN_COST_ENABLED": (
-        False,
-        "Enable the platform-admin Cost console (/administration/cost). Default OFF until the "
-        "cost aggregation surface is production-ready; toggle from the in-app feature flipper.",
-    ),
     "ADMIN_QUOTAS_ENABLED": (
         False,
         "Enable the platform-admin Quotas console (/administration/quotas). Default OFF until "
@@ -933,7 +928,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
     },
     "Admin screens": {
         "fields": (
-            "ADMIN_COST_ENABLED",
             "ADMIN_QUOTAS_ENABLED",
             "ADMIN_PERMISSIONS_ENABLED",
         ),

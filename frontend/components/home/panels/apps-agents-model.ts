@@ -140,22 +140,6 @@ export function runsPerDay(
   return out;
 }
 
-/**
- * A cost trend laid onto the same days, zero where the trend has no point
- * (a day with no spend recorded).
- */
-export function spendPerDay(
-  trend: { date: string; amountCents: number }[],
-  days: RunDay[]
-): number[] {
-  const byDay = new Map<string, number>();
-  for (const p of trend) {
-    const d = p.date.slice(0, 10);
-    byDay.set(d, (byDay.get(d) ?? 0) + p.amountCents);
-  }
-  return days.map((d) => byDay.get(d.date) ?? 0);
-}
-
 /** The last sample's value and the mean, from a series of points. */
 export function seriesFigures(values: number[]): { last: number | null; mean: number | null } {
   if (values.length === 0) return { last: null, mean: null };

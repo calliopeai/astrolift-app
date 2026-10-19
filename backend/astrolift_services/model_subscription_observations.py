@@ -26,9 +26,8 @@ _METRICS = {
     "latency_p95": "seconds",
     "input_tokens": "tokens",
     "output_tokens": "tokens",
-    "cost_usd": "USD",
 }
-_UNSUPPORTED = {"input_tokens", "output_tokens", "cost_usd"}
+_UNSUPPORTED = {"input_tokens", "output_tokens"}
 
 
 def subscription_metric_operation(args):

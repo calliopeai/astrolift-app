@@ -173,7 +173,7 @@ def rival(provider_plugin):
 def pod_calls():
     """Records every live pod listing the preview enrichment performs.
 
-    ``_preview_with_cost`` makes one cluster round-trip per row, so the
+    ``_preview_with_resources`` makes one cluster round-trip per row, so the
     count is the direct measure of whether enrichment ran before or after
     the page slice.
     """

@@ -2,8 +2,8 @@
 
 Each function below is a single-sweep activity called by exactly one
 scheduled workflow in ``astrolift_workflows/workflows/scheduled.py``.
-Sweeps are read-mostly (preview-gc kicks off teardown workflows; cost
-snapshots write a row per org); none take payload args because the
+Sweeps are read-mostly (preview-gc kicks off teardown workflows);
+none take payload args because the
 scheduler doesn't pass any.
 
 Activities are async + dispatch the DB work through ``sync_to_async``
@@ -15,7 +15,7 @@ directly without an event loop.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from temporalio import activity
 
@@ -699,338 +699,19 @@ async def prune_audit_log(retention_days: int = 365) -> int:
     return await sync_to_async(_prune_audit_log_sync)(retention_days)
 
 
-# ---- Cost snapshot -----------------------------------------------
-
-
-# Cost actuals client factory registry, keyed by ProviderPlugin slug
-# ("aws" / "gcp" / "azure"). The activity dispatches through this
-# table so a deployer can wire a fake factory in tests / dev without
-# patching the activity itself. The factory receives the cluster
-# row (with its ``provider_config``) and returns a billing-actuals
-# client OR None when the cluster isn't configured for actuals
-# (e.g. k8s_native).
-#
-# Public surface so tests can monkey-patch one entry; the default
-# bindings live in ``_default_cost_actuals_factories`` below and
-# wire in lazily so an environment without the vendor providers
-# package can still register the activity.
-COST_ACTUALS_FACTORIES: dict[str, Any] = {}
-
-
-def _default_cost_actuals_factories() -> dict[str, Any]:
-    """Lazy-load the per-cloud actuals clients. Imports are inside
-    the per-factory closures so an environment that doesn't ship a
-    given cloud's SDK still loads the others."""
-
-    def _aws_factory(cluster: Any) -> Any:
-        from aws.cost import AWSBillingActuals, AWSBillingActualsConfig
-
-        return AWSBillingActuals(config=AWSBillingActualsConfig())
-
-    def _gcp_factory(cluster: Any) -> Any:
-        from gcp.cost import GCPBillingActuals, GCPBillingActualsConfig
-
-        provider_config = (getattr(cluster, "provider_config", {}) or {}).get("billing", {}) or {}
-        return GCPBillingActuals(
-            config=GCPBillingActualsConfig(
-                project=str(provider_config.get("project", "") or ""),
-                dataset=str(provider_config.get("dataset", "") or ""),
-                table=str(provider_config.get("table", "") or "gcp_billing_export_resource_v1"),
-            )
-        )
-
-    def _azure_factory(cluster: Any) -> Any:
-        from azure.cost import AzureBillingActuals, AzureBillingActualsConfig
-
-        provider_config = (getattr(cluster, "provider_config", {}) or {}).get("billing", {}) or {}
-        return AzureBillingActuals(
-            config=AzureBillingActualsConfig(scope=str(provider_config.get("scope", "") or "")),
-        )
-
-    return {
-        "aws": _aws_factory,
-        "gcp": _gcp_factory,
-        "azure": _azure_factory,
-    }
-
-
-def _resolve_actuals_factory(provider_slug: str) -> Any | None:
-    factory = COST_ACTUALS_FACTORIES.get(provider_slug)
-    if factory is not None:
-        return factory
-    # Lazy-default on first lookup so the default impl can fail
-    # cleanly (ImportError on vendor package) without breaking the
-    # activity registration.
-    try:
-        defaults = _default_cost_actuals_factories()
-    except Exception:  # noqa: BLE001
-        return None
-    return defaults.get(provider_slug)
+# ---- Retired cost snapshot history compatibility (#2464) ------------
 
 
 def _capture_platform_cost_snapshot_sync() -> int:
-    """Write the daily cost snapshot rows per organization (#502).
-
-    For each org, walk its managed clusters and ask each cloud's
-    billing-actuals client (providers/<cloud>/cost.py)
-    for the per-service spend over the previous calendar day. Each
-    row is keyed back to a ``ManagedService`` via the
-    ``astrolift.io/managed_service_id`` tag stamped at provision time;
-    rows whose tag is empty or doesn't match a known service land
-    with ``managed_service_id = NULL`` so the UI rolls them up as
-    "Shared / untagged".
-
-    This keyed on ``astrolift.io/binding`` until #1418, which never
-    attributed a single row: no driver ever stamped that tag, because
-    a binding is one row per injected env var and its GUIDs are
-    recreated on every envelope sync. A cloud resource belongs to
-    exactly one managed service, so the service GUID is what the
-    drivers can and do stamp.
-
-    A zero-amount ``OTHER`` placeholder row per org is still emitted
-    when no driver returns data (or no clusters are configured) so
-    the trend chart has a continuous x-axis. Failures on a single
-    cloud are logged + skipped — partial data beats no data on a
-    multi-cloud install where one tenant's billing-export isn't
-    enabled yet.
-
-    Returns the count of CostSnapshot rows produced. Returns 0
-    (no-op) when the billing app isn't installed, keeping the
-    schedule safe to register on environments without billing
-    wired up.
-    """
-    try:
-        from astrolift_billing.models import CostSnapshot
-        from astrolift_identity.models import Organization
-        from astrolift_services.models import ManagedService
-    except ImportError:
-        return 0
-    from datetime import timedelta
-
-    from django.utils import timezone
-
-    # Snapshots align to UTC calendar days; "yesterday's spend" is
-    # the window we ask each cloud for. Today's row is written with
-    # ``taken_at=today`` so re-runs the same day are idempotent at
-    # the unique constraint.
-    today = timezone.now().date()
-    window_start = today - timedelta(days=1)
-    window_end = today
-
-    n = 0
-    for org in Organization.objects.filter(deleted_at__isnull=True).iterator():
-        n += _capture_org_cost_snapshot(
-            org=org,
-            taken_at=today,
-            window_start=window_start,
-            window_end=window_end,
-            CostSnapshot=CostSnapshot,
-            ManagedService=ManagedService,
-        )
-    return n
-
-
-def _capture_org_cost_snapshot(
-    *,
-    org: Any,
-    taken_at: Any,
-    window_start: Any,
-    window_end: Any,
-    CostSnapshot: Any,
-    ManagedService: Any,
-) -> int:
-    """Walk one org's clusters + write per-binding cost rows.
-
-    Returns the count of CostSnapshot rows produced for this org
-    (placeholder + per-binding combined). Always emits the
-    placeholder OTHER row so the trend chart x-axis stays
-    continuous, even when no cloud returns data.
-    """
-    from django.db.models import Q
-
-    from astrolift_clusters.models import TenantCluster
-
-    rows = 0
-
-    # Walk clusters scoped to this org (NULL org = platform-shared
-    # cluster also counted toward org billing if assigned via
-    # AppEnvironment, but the per-org sweep here just keys off the
-    # cluster.organization field).
-    clusters = TenantCluster.objects.filter(
-        organization=org,
-        deleted_at__isnull=True,
-        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
-    ).select_related("provider_plugin")
-
-    # Cache service GUIDs once per org so the per-row resolve is an
-    # O(1) dict hit rather than a per-row DB query. A managed service
-    # is owned by exactly one of registered_app / project (model check
-    # constraint), so both ownership paths have to be in the filter —
-    # scoping to registered_app alone would drop every project-owned
-    # shared resource into the untagged bucket.
-    services_by_guid: dict[str, Any] = {
-        str(s.guid): s
-        for s in ManagedService.objects.filter(
-            Q(registered_app__organization=org) | Q(project__organization=org),
-            deleted_at__isnull=True,
-        )
-        .select_related("registered_app", "project")
-        .iterator()
-    }
-
-    seen_provider: set[str] = set()
-    for cluster in clusters.iterator():
-        provider_slug = (cluster.provider_plugin.slug or "").lower()
-        if not provider_slug or provider_slug in seen_provider:
-            continue
-        seen_provider.add(provider_slug)
-        factory = _resolve_actuals_factory(provider_slug)
-        if factory is None:
-            log.info(
-                "cost actuals: no factory registered for provider=%s (cluster=%s) — skipping",
-                provider_slug,
-                cluster.slug,
-            )
-            continue
-        try:
-            client = factory(cluster)
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "cost actuals: factory for provider=%s (cluster=%s) raised: %s",
-                provider_slug,
-                cluster.slug,
-                exc,
-            )
-            continue
-        try:
-            result = client.query_actuals_by_service(
-                start=window_start,
-                end=window_end,
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "cost actuals: query failed for provider=%s (cluster=%s): %s",
-                provider_slug,
-                cluster.slug,
-                exc,
-            )
-            continue
-        if not isinstance(result, list):
-            # BillingActualsUnavailable — log + skip per-binding
-            # writes, the OTHER placeholder still goes out below.
-            log.info(
-                "cost actuals: provider=%s (cluster=%s) unavailable: %s — %s",
-                provider_slug,
-                cluster.slug,
-                getattr(result, "reason", "unknown"),
-                getattr(result, "message", ""),
-            )
-            continue
-        rows += _write_actuals_rows(
-            org=org,
-            taken_at=taken_at,
-            provider_slug=provider_slug,
-            items=result,
-            services_by_guid=services_by_guid,
-            CostSnapshot=CostSnapshot,
-        )
-
-    # Trend-chart x-axis continuity: always emit one OTHER
-    # placeholder per org per day.
-    _, created = CostSnapshot.objects.get_or_create(
-        organization=org,
-        taken_at=taken_at,
-        registered_app=None,
-        managed_service_binding=None,
-        managed_service=None,
-        by=CostSnapshot.CostBy.OTHER,
-        source=CostSnapshot.Source.PLATFORM_METER,
-        defaults={"amount_cents": 0, "currency": "USD"},
-    )
-    if created:
-        rows += 1
-    return rows
-
-
-def _write_actuals_rows(
-    *,
-    org: Any,
-    taken_at: Any,
-    provider_slug: str,
-    items: list[Any],
-    services_by_guid: dict[str, Any],
-    CostSnapshot: Any,
-) -> int:
-    """Persist one CostSnapshot row per actuals line item.
-
-    Rows whose ``managed_service_guid`` resolves to a known service
-    write both that FK and the owning app's; rows with an empty or
-    unknown GUID write NULL for both so they roll up under the
-    "Shared / untagged" bucket. Idempotent via the model's unique
-    constraint on (organization, registered_app,
-    managed_service_binding, managed_service, by, taken_at, source).
-    """
-    rows = 0
-    for item in items:
-        service_guid = (getattr(item, "managed_service_guid", "") or "").strip()
-        service = services_by_guid.get(service_guid) if service_guid else None
-        registered_app = None
-        project = None
-        by = CostSnapshot.CostBy.MANAGED_SERVICE if service is not None else CostSnapshot.CostBy.OTHER
-        if service is not None:
-            registered_app = service.registered_app
-            project = service.project
-            owner = registered_app or project
-            # ``services_by_guid`` is already filtered to this org, so
-            # a mismatch here means the filter and the FK disagree —
-            # refuse the write rather than bill one tenant for
-            # another's resource.
-            if owner is None or owner.organization_id != org.id:
-                log.warning(
-                    "cost actuals: managed service %s does not belong to org %s — skipping",
-                    service_guid,
-                    org.id,
-                )
-                continue
-        amount_cents = int(getattr(item, "amount_cents", 0) or 0)
-        currency = getattr(item, "currency", "USD") or "USD"
-        _, created = CostSnapshot.objects.get_or_create(
-            organization=org,
-            taken_at=taken_at,
-            project=project,
-            registered_app=registered_app,
-            managed_service_binding=None,
-            managed_service=service,
-            by=by,
-            source=CostSnapshot.Source.PROVIDER_ESTIMATE,
-            defaults={"amount_cents": amount_cents, "currency": currency},
-        )
-        if created:
-            rows += 1
-        else:
-            # An existing row from an earlier same-day run takes
-            # precedence (snapshots are immutable per the model
-            # docstring — corrections come as a later taken_at).
-            log.debug(
-                "cost actuals: snapshot already exists for org=%s service=%s — skipping",
-                org.slug,
-                service_guid or "<untagged>",
-            )
-    log.info(
-        "cost actuals: wrote %d row(s) for org=%s provider=%s",
-        rows,
-        org.slug,
-        provider_slug,
-    )
-    return rows
+    """Old activity callers complete without collecting or writing monetary data."""
+    return 0
 
 
 @activity.defn(name="astrolift.scheduled.capture_platform_cost_snapshot")
 async def capture_platform_cost_snapshot() -> int:
-    from asgiref.sync import sync_to_async
-
+    """Keep existing Temporal histories executable while operators retire schedules."""
     activity.heartbeat()
-    return await sync_to_async(_capture_platform_cost_snapshot_sync)()
+    return 0
 
 
 # ---- Quota usage snapshot (#1182) ---------------------------------
@@ -1044,7 +725,7 @@ _QUOTA_USAGE_RETENTION_DAYS = 90
 def _capture_quota_usage_snapshot_sync() -> int:
     """Append one QuotaUsageSnapshot per active quota (#1182).
 
-    Mirrors the daily cost-snapshot collector: each pass records the
+    Each pass records the
     current ``(used, limit)`` reading for every active Quota so the quota
     detail view can plot usage-vs-limit over time (``Quota.current_usage``
     is otherwise a single scalar the reconciliation overwrites in place,

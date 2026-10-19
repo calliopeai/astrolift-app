@@ -3,7 +3,6 @@ import { expect, userEvent, within } from "storybook/test";
 
 import {
   ALERT_RULES,
-  COST,
   EMAIL_DETAIL,
   EMAIL_DETAIL_LONG,
   EMAIL_DETAIL_UNSUPPORTED,
@@ -18,7 +17,6 @@ import {
 } from "./app-managed-services.fixtures";
 import {
   AlertRulesPanelView,
-  CostPanelView,
   EmailDetailSheetView,
   EngagementMetricsPanelView,
   MessageLogPanelView,
@@ -41,7 +39,6 @@ type Story = StoryObj;
 const stats = () => <TemplateStatsView {...TEMPLATE_STATS} />;
 
 const panels = {
-  cost: <CostPanelView {...COST} />,
   suppression: <SuppressionPanelView {...SUPPRESSION} />,
   senderConfig: <SenderConfigPanelView {...SENDER_CONFIG} />,
   alertRules: <AlertRulesPanelView {...ALERT_RULES} />,
@@ -232,14 +229,6 @@ export const UnsupportedSuppressions: Story = {
 };
 
 // ── Panels on their own ────────────────────────────────────────────
-
-export const CostLoading: Story = {
-  render: () => <CostPanelView {...COST} mtdSum={null} trailingSum={null} loading />,
-};
-
-export const CostEmpty: Story = {
-  render: () => <CostPanelView {...COST} mtdSum={null} trailingSum={null} />,
-};
 
 export const SuppressionEmpty: Story = {
   render: () => (

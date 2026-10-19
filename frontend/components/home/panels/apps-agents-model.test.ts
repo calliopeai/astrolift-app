@@ -7,7 +7,6 @@ import {
   runningSnapshot,
   runReason,
   runsPerDay,
-  spendPerDay,
   workflowRunReason,
 } from "./apps-agents-model";
 
@@ -72,7 +71,7 @@ describe("reasons", () => {
   });
 });
 
-describe("runsPerDay and spendPerDay", () => {
+describe("runsPerDay", () => {
   it("buckets runs into the last seven UTC days, oldest first", () => {
     const days = runsPerDay(
       [
@@ -95,13 +94,6 @@ describe("runsPerDay and spendPerDay", () => {
     ]);
     expect(days[0]).toEqual({ date: "2026-09-22", runs: 1, failed: 1 });
     expect(days[6]).toEqual({ date: "2026-09-28", runs: 2, failed: 1 });
-  });
-
-  it("lays the cost trend onto the same days, zero where there is no point", () => {
-    const days = runsPerDay([], NOW);
-    expect(spendPerDay([{ date: "2026-09-27", amountCents: 500 }], days)).toEqual([
-      0, 0, 0, 0, 0, 500, 0,
-    ]);
   });
 });
 

@@ -27,7 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 it.each(locales)(
-  "%s renders preview amounts, TTL and raw branch submissions with translated controls",
+  "%s renders preview resources, TTL and raw branch submissions with translated controls",
   async (locale) => {
     const messages = JSON.parse(readFileSync(`messages/${locale}.json`, "utf8"));
     const t = createTranslator({ locale, messages, namespace: "apps.previews" });
@@ -37,7 +37,6 @@ it.each(locales)(
       branch: "feature/raw-branch",
       ttlUntil: new Date(Date.now() + (2 * 24 + 5) * 3600000 + 30000).toISOString(),
       lastDeployedAt: "2026-09-27T14:05:00Z",
-      estimatedDailyCostUsd: null,
     };
     function View() {
       const list = useLocalListState(APP_PREVIEWS_LIST, { view: "previews" });
@@ -48,14 +47,6 @@ it.each(locales)(
           list={list}
           configHref="/apps/storefront/config"
           onCreate={create}
-          spend={{
-            dailyTotal: 1234.5,
-            monthlyProjection: 37035,
-            liveCount: 3,
-            priced: 1,
-            unpriced: 2,
-            approximate: 1,
-          }}
         />
       );
     }
@@ -67,16 +58,6 @@ it.each(locales)(
     expect(screen.getByPlaceholderText(t("list.search"))).toBeVisible();
     expect(screen.getByText("feature/raw-branch")).toBeVisible();
     expect(screen.getByText(t("countdown.daysHours", { days: 2, hours: 5 }))).toBeVisible();
-    expect(screen.getByText(t("costUnavailable"))).toBeVisible();
-    expect(screen.getByText(t("spend.priced", { priced: 1, total: 3 }))).toBeVisible();
-    expect(
-      screen.getByText(
-        new Intl.NumberFormat(locale, { style: "currency", currency: "USD" })
-          .format(1234.5)
-          .replace(/\s+/g, " ")
-      )
-    ).toBeVisible();
-    expect(screen.getByText(/SKU/)).toHaveTextContent(t("spend.overcount", { count: 1 }));
     expect(screen.getByTitle(row.status)).toHaveTextContent(t(`status.${row.status}`));
     fireEvent.click(screen.getByRole("button", { name: t("create.action") }));
     expect(screen.getByRole("heading", { name: t("create.title") })).toBeVisible();

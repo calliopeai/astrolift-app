@@ -68,8 +68,7 @@ class StorageError(ValueError):
 def parse_size(size: str) -> int:
     """Parse k8s-style size strings to bytes. ``20Gi`` → bytes.
 
-    Used by the validator to enforce min/max sizes per tier and
-    by the cost-estimation panel.
+    Used by the validator to enforce min/max sizes per tier.
     """
     if not size:
         raise StorageError("size is required")

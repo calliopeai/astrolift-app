@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-test("basic preview detail leaves resource and cost reads explicit", async ({ page }) => {
+test("basic preview detail leaves runtime resource reads explicit", async ({ page }) => {
   await page.goto(
     "/iframe.html?id=screens-previews-previewdetail--runtime-not-requested&viewMode=story"
   );
   await expect(page.getByRole("heading", { name: "PR #412" })).toBeVisible();
   await expect(page.getByText("review-target · Available")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Load resources and cost" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Load resources" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Load logs" })).toBeEnabled();
   await expect(page.getByRole("button", { name: "Load deployments" })).toBeEnabled();
   await expect(page.getByText("$0.00", { exact: true })).toHaveCount(0);

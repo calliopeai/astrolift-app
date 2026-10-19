@@ -14,7 +14,7 @@ import {
   PANEL,
 } from "./builder-operator.fixtures";
 
-/** The Builder KPI strip: deploys, runs, success, p95 and spend, with the period. */
+/** The Builder KPI strip: deploys, runs, success, p95, with the period. */
 const meta: Meta = { title: "Home/Panels/KpisPanel", parameters: { layout: "padded" } };
 export default meta;
 

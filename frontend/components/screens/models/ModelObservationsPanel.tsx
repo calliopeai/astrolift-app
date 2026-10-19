@@ -179,7 +179,6 @@ export function ModelObservationsPanel({
               {usage("selectionHint")}
             </a>
           </p>
-          <p>{inventory("costUnavailable")}</p>
           <Button variant="outline" size="sm" asChild>
             <Link href="/documentation/cluster-prerequisites">{inventory("metricsSetup")}</Link>
           </Button>

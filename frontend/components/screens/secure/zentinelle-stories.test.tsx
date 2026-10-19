@@ -7,7 +7,6 @@ import * as preview from "../../../.storybook/preview";
 import {
   DEGRADED_CONNECTION,
   FULL_ACCESS,
-  HEALTH_COUNTS,
   HEALTHY_CONNECTION,
   NO_ACCESS,
   STALE_CONNECTION,
@@ -16,7 +15,6 @@ import {
   gatewayHealth,
   isDegraded,
   scopeVariables,
-  tightestBudget,
   visibleTabs,
   windowStart,
 } from "./zentinelle-model";
@@ -78,20 +76,19 @@ describe("Zentinelle screen states (#1888)", () => {
     });
   });
 
-  it("shows Zentinelle's version, blocks, open approvals and the tightest budget (#2436)", async () => {
+  it("shows Zentinelle's version, blocks, approvals and gateway reports (#2436)", async () => {
     await check(s.ConnectedHealthy, (page) => {
       expect(page.getByText("1.5.0")).toBeVisible();
       expect(page.getByText("37")).toBeVisible();
       expect(page.getByText("Open approvals")).toBeVisible();
-      expect(page.getByText("82% used")).toBeVisible();
-      expect(page.getByText(/\$412\.40 of \$500\.00 \(Monthly model budget\)/)).toBeVisible();
+      expect(page.queryByText(/budget this month|\$412\.40/i)).toBeNull();
       expect(page.getAllByText(/^0\.9\.1, seen /)).toHaveLength(2);
     });
   });
 
   it("says not available, rather than failing, for an older Zentinelle", async () => {
     await check(o.OlderZentinelle, (page) => {
-      expect(page.getAllByText("Not available")).toHaveLength(4);
+      expect(page.getAllByText("Not available")).toHaveLength(3);
       expect(page.getAllByText("Version and last seen not available")).toHaveLength(2);
       expect(page.queryByText(/Could not read/)).toBeNull();
       expect(page.queryByText(/need attention/)).toBeNull();
@@ -136,7 +133,7 @@ describe("Zentinelle screen states (#1888)", () => {
         within(tabs)
           .getAllByRole("link")
           .map((l) => l.textContent)
-      ).toEqual(["Overview", "Usage and cost", "Policies"]);
+      ).toEqual(["Overview", "Usage", "Policies"]);
       expect(page.queryByRole("button", { name: "Disconnect" })).toBeNull();
     });
   });
@@ -182,11 +179,6 @@ describe("Zentinelle model", () => {
     expect(gatewayHealth({ ...ok, lastSeenAt: null }, true, now)).toBe("healthy");
     expect(gatewayHealth({ ...seen(60), gatewayDeployed: false }, true, now)).toBe("pending");
     expect(isDegraded(STALE_CONNECTION)).toBe(true);
-  });
-
-  it("picks the budget closest to its limit", () => {
-    expect(tightestBudget(HEALTH_COUNTS.budgets ?? [])?.name).toBe("Monthly model budget");
-    expect(tightestBudget([])).toBeNull();
   });
 
   it("names one scope at most and anchors windows", () => {

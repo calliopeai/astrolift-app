@@ -1,13 +1,10 @@
 """
 Periodic maintenance workflow policy (#144, spec 06 §5 + 03 §11).
 
-Pure-Python policy module that the three scheduled Temporal
-workflows consult:
+Pure-Python policy module for scheduled Temporal maintenance workflows:
 
   * RehealWebhookSubscriptionsWorkflow — daily re-test of
     disabled webhook subscriptions (spec 06 §5).
-  * CapturePlatformCostSnapshotWorkflow — daily cost rollup
-    (spec 06 §5; pairs with the cost ledger from #30).
   * PruneAuditLogWorkflow — retention-window enforcement
     with cold-storage archive (spec 03 §11; pairs with
     #161 audit-log streaming export and #160 obs retention).
@@ -19,7 +16,7 @@ are thin orchestrators on top.
 from __future__ import annotations
 
 import dataclasses
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from enum import StrEnum
 
 # ---- webhook reheal ------------------------------------------------
@@ -112,40 +109,6 @@ def classify_test_delivery(
         # Notify exactly when crossing the threshold; subsequent
         # cycles set this back to False.
         notify_operator=(new_count == notify_threshold),
-    )
-
-
-# ---- platform cost snapshot ----------------------------------------
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class CostSnapshotPlan:
-    """Plan emitted by the daily cost-snapshot workflow. The
-    workflow then iterates orgs and writes a CostSnapshot row
-    per (org, app, binding, category) per #30."""
-
-    snapshot_date: date
-    organizations_to_capture: tuple[int, ...]
-    """Active org ids — workflow filters out suspended /
-    deleted orgs since their cost is zero by definition."""
-
-
-def plan_cost_snapshot(
-    *,
-    snapshot_date: date,
-    active_org_ids: tuple[int, ...],
-) -> CostSnapshotPlan:
-    """Build the per-day capture plan. Active orgs only —
-    suspended/deleted orgs aren't billed; running their
-    aggregations would just emit zero rows."""
-    if not active_org_ids:
-        return CostSnapshotPlan(
-            snapshot_date=snapshot_date,
-            organizations_to_capture=(),
-        )
-    return CostSnapshotPlan(
-        snapshot_date=snapshot_date,
-        organizations_to_capture=tuple(sorted(set(active_org_ids))),
     )
 
 

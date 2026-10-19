@@ -2173,17 +2173,6 @@ export type AstroliftBrief = {
   storageKey: Scalars['String']['output'];
 };
 
-export type AstroliftBudget = {
-  alertsAtPct: Array<Scalars['Int']['output']>;
-  amountCents: Scalars['Int']['output'];
-  currency: Scalars['String']['output'];
-  currentSpendCents: Scalars['Int']['output'];
-  id: Scalars['GUID']['output'];
-  period: Scalars['String']['output'];
-  scopeId: Scalars['String']['output'];
-  scopeKind: Scalars['String']['output'];
-};
-
 export type AstroliftBulkAssignTeamMemberRolesPayload = {
   alreadyAssignedCount: Scalars['Int']['output'];
   assignedCount: Scalars['Int']['output'];
@@ -2738,52 +2727,6 @@ export type AstroliftConversationTransferMutationResult = {
   data?: Maybe<AstroliftConversationTransfer>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
-};
-
-export type AstroliftCostAttribution = {
-  attributedRows: Array<AstroliftCostBindingRow>;
-  currency: Scalars['String']['output'];
-  totalCents: Scalars['Int']['output'];
-  unattributedCents: Scalars['Int']['output'];
-};
-
-export type AstroliftCostBindingRow = {
-  amountCents: Scalars['Int']['output'];
-  by: Scalars['String']['output'];
-  currency: Scalars['String']['output'];
-  managedServiceBindingId?: Maybe<Scalars['String']['output']>;
-  managedServiceId?: Maybe<Scalars['String']['output']>;
-  managedServiceKind?: Maybe<Scalars['String']['output']>;
-  managedServiceName?: Maybe<Scalars['String']['output']>;
-  registeredAppSlug?: Maybe<Scalars['String']['output']>;
-};
-
-export type AstroliftCostForecast = {
-  confidence: ForecastConfidence;
-  currency: Scalars['String']['output'];
-  deltaPct: Scalars['Float']['output'];
-  mtdCents: Scalars['Int']['output'];
-  previousMonthCents: Scalars['Int']['output'];
-  projectedMonthlyCents: Scalars['Int']['output'];
-};
-
-export type AstroliftCostSnapshot = {
-  amountCents: Scalars['Int']['output'];
-  by: Scalars['String']['output'];
-  currency: Scalars['String']['output'];
-  id: Scalars['GUID']['output'];
-  managedServiceBindingId?: Maybe<Scalars['String']['output']>;
-  projectId?: Maybe<Scalars['String']['output']>;
-  registeredAppId?: Maybe<Scalars['String']['output']>;
-  source: Scalars['String']['output'];
-  takenAt: Scalars['Date']['output'];
-};
-
-export type AstroliftCostTrendPoint = {
-  amountCents: Scalars['Int']['output'];
-  currency: Scalars['String']['output'];
-  date: Scalars['Date']['output'];
-  isAnomaly: Scalars['Boolean']['output'];
 };
 
 export type AstroliftCronJobLastRun = {
@@ -3957,20 +3900,6 @@ export type AstroliftManagedServiceContextPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
-export type AstroliftManagedServiceCostPreview = {
-  approximate: Scalars['Boolean']['output'];
-  available: Scalars['Boolean']['output'];
-  currency: Scalars['String']['output'];
-  lineItems: Scalars['JSON']['output'];
-  managedServiceId: Scalars['GUID']['output'];
-  message: Scalars['String']['output'];
-  monthlyTotal?: Maybe<Scalars['Float']['output']>;
-  notes: Array<Scalars['String']['output']>;
-  pricingFetchedAt: Scalars['String']['output'];
-  pricingSourceUrl: Scalars['String']['output'];
-  reason: Scalars['String']['output'];
-};
-
 export type AstroliftManagedServiceMetricSeries = {
   name: Scalars['String']['output'];
   samples: Array<AstroliftTimeSeriesPoint>;
@@ -4811,9 +4740,6 @@ export type AstroliftPreviewEnvironment = {
   environment?: Maybe<AstroliftPreviewEnvironmentTarget>;
   /** available, retired or unavailable; retired targets cannot route logs. */
   environmentStatus: Scalars['String']['output'];
-  estimatedCostApproximate: Scalars['Boolean']['output'];
-  estimatedCostNotes: Array<Scalars['String']['output']>;
-  estimatedDailyCostUsd?: Maybe<Scalars['Float']['output']>;
   /** Why a failed preview failed, in one line: the build's recorded reason, else its latest deployment's. Empty unless status is failed. */
   failureReason: Scalars['String']['output'];
   hostname: Scalars['String']['output'];
@@ -4831,7 +4757,7 @@ export type AstroliftPreviewEnvironment = {
   prNumber: Scalars['Int']['output'];
   prUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
-  /** not_requested, available or unavailable; basic reads do not query pods or pricing. */
+  /** not_requested, available or unavailable; basic reads do not query pods. */
   runtimeStatus: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];
   status: Scalars['String']['output'];
@@ -6781,16 +6707,6 @@ export type AstroliftZentinelleAuditPage = {
   nextCursor?: Maybe<Scalars['String']['output']>;
 };
 
-export type AstroliftZentinelleBudget = {
-  id: Scalars['String']['output'];
-  level: Scalars['String']['output'];
-  limitUsd: Scalars['Float']['output'];
-  name: Scalars['String']['output'];
-  percent: Scalars['Float']['output'];
-  scope: Scalars['String']['output'];
-  spendUsd: Scalars['Float']['output'];
-};
-
 export type AstroliftZentinelleCapability = {
   connected: Scalars['Boolean']['output'];
 };
@@ -6852,7 +6768,6 @@ export type AstroliftZentinelleDisconnectMutationResult = {
 export type AstroliftZentinelleHealth = {
   available: Scalars['Boolean']['output'];
   blocks?: Maybe<Scalars['Int']['output']>;
-  budgets?: Maybe<Array<AstroliftZentinelleBudget>>;
   openApprovals?: Maybe<Scalars['Int']['output']>;
   windowHours?: Maybe<Scalars['Int']['output']>;
 };
@@ -6874,7 +6789,6 @@ export type AstroliftZentinelleUsage = {
 
 export type AstroliftZentinelleUsageRow = {
   agentSlug: Scalars['String']['output'];
-  costUsd: Scalars['Float']['output'];
   inputTokens: Scalars['Int']['output'];
   model: Scalars['String']['output'];
   outputTokens: Scalars['Int']['output'];
@@ -7543,12 +7457,6 @@ export type ConversationTransferRecordInput = {
   snapshotSha256: Scalars['String']['input'];
 };
 
-export type CostWindow =
-  | 'D7'
-  | 'D30'
-  | 'H24'
-  | 'MTD';
-
 export type CreateAgentEnvironmentSpecInput = {
   agentType: Scalars['String']['input'];
   allowInstall: Scalars['Boolean']['input'];
@@ -8183,11 +8091,6 @@ export type ForceRedeployInput = {
   confirmSlug: Scalars['String']['input'];
   environmentName: InputMaybe<Scalars['String']['input']>;
 };
-
-export type ForecastConfidence =
-  | 'HIGH'
-  | 'LOW'
-  | 'MEDIUM';
 
 export type FormDefinitionInput = {
   description: InputMaybe<Scalars['String']['input']>;
@@ -12514,7 +12417,6 @@ export type ObservabilityRetentionHoldTypeMutationResult = {
 };
 
 export type ObservabilityRetentionType = {
-  billableWindowDays: Scalars['Int']['output'];
   days: Scalars['Int']['output'];
   source: Scalars['String']['output'];
   stream: Scalars['String']['output'];
@@ -12955,7 +12857,6 @@ export type Query = {
   astroliftBrains: Array<AstroliftBrain>;
   /** Semantic layers the caller can read, one page at a time (#2444): search over name and slug, the home team's slug, a sort, and archived ones too with includeArchived. totalCount counts every match; nextCursor reaches the next page under the same sort. */
   astroliftBrainsPage: AstroliftBrainPage;
-  astroliftBudgets: Array<AstroliftBudget>;
   astroliftCluster?: Maybe<AstroliftTenantCluster>;
   astroliftClusterAgentInstall: AstroliftClusterAgentInstall;
   astroliftClusterAgentInstallReview: AstroliftClusterAgentInstallReview;
@@ -12984,10 +12885,6 @@ export type Query = {
   astroliftCommandRunsPage: AstroliftCommandRunPage;
   astroliftCompareDeployments?: Maybe<AstroliftDeploymentComparison>;
   astroliftContainers: Array<AstroliftContainer>;
-  astroliftCostByBinding: AstroliftCostAttribution;
-  astroliftCostForecast: AstroliftCostForecast;
-  astroliftCostSnapshots: Array<AstroliftCostSnapshot>;
-  astroliftCostTrend: Array<AstroliftCostTrendPoint>;
   astroliftDeployment?: Maybe<AstroliftDeployment>;
   astroliftDeploymentApprovalHistory: Array<AstroliftDeploymentApprovalHistoryEntry>;
   astroliftDeploymentLog: Array<AstroliftDeploymentLogEntry>;
@@ -13036,7 +12933,6 @@ export type Query = {
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftManagedService?: Maybe<AstroliftManagedServiceContext>;
   astroliftManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
-  astroliftManagedServiceCostPreview?: Maybe<AstroliftManagedServiceCostPreview>;
   astroliftManagedServiceObjects?: Maybe<AstroliftManagedServiceObjects>;
   astroliftManagedServiceQueueDepth?: Maybe<AstroliftManagedServiceQueueDepth>;
   astroliftManagedServiceSummariesPage: AstroliftManagedServiceSummaryPage;
@@ -14166,26 +14062,6 @@ export type QueryAstroliftContainersArgs = {
 };
 
 
-export type QueryAstroliftCostByBindingArgs = {
-  days?: InputMaybe<Scalars['Int']['input']>;
-  registeredAppSlug?: InputMaybe<Scalars['String']['input']>;
-  window?: InputMaybe<CostWindow>;
-};
-
-
-export type QueryAstroliftCostSnapshotsArgs = {
-  days?: InputMaybe<Scalars['Int']['input']>;
-  limit?: Scalars['Int']['input'];
-  window?: InputMaybe<CostWindow>;
-};
-
-
-export type QueryAstroliftCostTrendArgs = {
-  days?: InputMaybe<Scalars['Int']['input']>;
-  window?: InputMaybe<CostWindow>;
-};
-
-
 export type QueryAstroliftDeploymentArgs = {
   id: Scalars['String']['input'];
 };
@@ -14460,12 +14336,6 @@ export type QueryAstroliftManagedServiceAttachmentsPageArgs = {
 };
 
 
-export type QueryAstroliftManagedServiceCostPreviewArgs = {
-  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
-  managedServiceId: Scalars['GUID']['input'];
-};
-
-
 export type QueryAstroliftManagedServiceObjectsArgs = {
   limit?: Scalars['Int']['input'];
   managedServiceId: Scalars['GUID']['input'];
@@ -14728,7 +14598,7 @@ export type QueryAstroliftPreviewDeploymentsPageArgs = {
 
 export type QueryAstroliftPreviewEnvironmentArgs = {
   id: Scalars['GUID']['input'];
-  includeRuntimeCost?: Scalars['Boolean']['input'];
+  includeRuntimeResources?: Scalars['Boolean']['input'];
 };
 
 
@@ -18166,42 +18036,6 @@ export type RequestQuotaIncreaseMutationVariables = Exact<{
 
 export type RequestQuotaIncreaseMutation = { requestQuotaIncrease: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, quotaId: string, requestedFactor: number, reason: string, status: string, requestedByDisplay: string, decidedByDisplay?: string | null, decidedAt?: string | null, decisionNote: string, createdAt: string } | null } };
 
-export type ListBudgetsQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type ListBudgetsQuery = { astroliftBudgets: Array<{ id: string, scopeKind: string, scopeId: string, amountCents: number, currency: string, period: string, currentSpendCents: number, alertsAtPct: Array<number> }> };
-
-export type ListCostSnapshotsQueryVariables = Exact<{
-  days?: InputMaybe<Scalars['Int']['input']>;
-  window?: InputMaybe<CostWindow>;
-  limit?: InputMaybe<Scalars['Int']['input']>;
-}>;
-
-
-export type ListCostSnapshotsQuery = { astroliftCostSnapshots: Array<{ id: string, projectId?: string | null, registeredAppId?: string | null, managedServiceBindingId?: string | null, takenAt: any, by: string, amountCents: number, currency: string, source: string }> };
-
-export type GetCostTrendQueryVariables = Exact<{
-  window?: InputMaybe<CostWindow>;
-  days?: InputMaybe<Scalars['Int']['input']>;
-}>;
-
-
-export type GetCostTrendQuery = { astroliftCostTrend: Array<{ date: any, amountCents: number, currency: string, isAnomaly: boolean }> };
-
-export type GetCostForecastQueryVariables = Exact<{ [key: string]: never; }>;
-
-
-export type GetCostForecastQuery = { astroliftCostForecast: { mtdCents: number, previousMonthCents: number, deltaPct: number, projectedMonthlyCents: number, confidence: ForecastConfidence, currency: string } };
-
-export type GetCostByBindingQueryVariables = Exact<{
-  window?: InputMaybe<CostWindow>;
-  days?: InputMaybe<Scalars['Int']['input']>;
-  registeredAppSlug?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type GetCostByBindingQuery = { astroliftCostByBinding: { unattributedCents: number, totalCents: number, currency: string, attributedRows: Array<{ managedServiceBindingId?: string | null, managedServiceId?: string | null, managedServiceName?: string | null, managedServiceKind?: string | null, registeredAppSlug?: string | null, by: string, amountCents: number, currency: string }> } };
-
 export type RegisterTenantClusterMutationVariables = Exact<{
   input: RegisterTenantClusterInput;
 }>;
@@ -19352,17 +19186,17 @@ export type ListPreviewEnvironmentsQueryVariables = Exact<{
 }>;
 
 
-export type ListPreviewEnvironmentsQuery = { astroliftPreviewEnvironments: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> };
+export type ListPreviewEnvironmentsQuery = { astroliftPreviewEnvironments: Array<{ id: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> };
 
-export type PreviewEnvironmentFieldsFragment = { id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } };
+export type PreviewEnvironmentFieldsFragment = { id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } };
 
 export type GetPreviewEnvironmentQueryVariables = Exact<{
   id: Scalars['GUID']['input'];
-  includeRuntimeCost?: Scalars['Boolean']['input'];
+  includeRuntimeResources?: Scalars['Boolean']['input'];
 }>;
 
 
-export type GetPreviewEnvironmentQuery = { astroliftPreviewEnvironment?: { id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } } | null };
+export type GetPreviewEnvironmentQuery = { astroliftPreviewEnvironment?: { id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } } | null };
 
 export type GetPreviewLogsQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -19400,7 +19234,7 @@ export type ListPreviewEnvironmentsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListPreviewEnvironmentsPageQuery = { astroliftPreviewEnvironmentsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, estimatedDailyCostUsd?: number | null, estimatedCostNotes: Array<string>, estimatedCostApproximate: boolean, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> } };
+export type ListPreviewEnvironmentsPageQuery = { astroliftPreviewEnvironmentsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, environmentStatus: string, runtimeStatus: string, registeredAppSlug: string, prNumber: number, branch: string, commitSha: string, status: string, hostname: string, namespace: string, lastDeployedAt?: string | null, tornDownAt?: string | null, ttlUntil: string, sourceUrl: string, prUrl: string, isManual: boolean, isPinned: boolean, pinnedAt?: string | null, pinnedByEmail?: string | null, pinReason: string, openedByLogin: string, openedByUserId?: string | null, openedByMe: boolean, failureReason: string, environment?: { previewId: string, previewVersion: number, appId: string, appVersion: number, appSlug: string, environmentId: string, environmentVersion: number, environmentName: string, clusterId: string, clusterVersion: number, namespace: string } | null, aggregateResources: { cpuCores: number, memoryBytes: number, podCount: number } }> } };
 
 export type ListAppPodsQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -21187,14 +21021,6 @@ export type ListAppSecretsQueryVariables = Exact<{
 
 export type ListAppSecretsQuery = { astroliftAppSecrets: Array<{ id: string, key: string, environmentName: string, source: string, bundleSlug: string, managedServiceKind: string, isMasked: boolean, lastEditedAt?: string | null, expiresAt?: string | null, setVia: string, scope: string, deploysAsShown: boolean, lastEditedBy?: { id: string, username: string, displayName: string } | null }> };
 
-export type PreviewManagedServiceCostQueryVariables = Exact<{
-  managedServiceId: Scalars['GUID']['input'];
-  expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
-}>;
-
-
-export type PreviewManagedServiceCostQuery = { astroliftManagedServiceCostPreview?: { managedServiceId: string, available: boolean, reason: string, message: string, monthlyTotal?: number | null, currency: string, lineItems: unknown, pricingSourceUrl: string, pricingFetchedAt: string, notes: Array<string>, approximate: boolean } | null };
-
 export type GetAppVersionQueryVariables = Exact<{
   slug: Scalars['String']['input'];
 }>;
@@ -21546,7 +21372,7 @@ export type ZentinelleConnectionQuery = { astroliftZentinelleConnection?: { id: 
 export type ZentinelleHealthQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ZentinelleHealthQuery = { astroliftZentinelleHealth: { available: boolean, windowHours?: number | null, blocks?: number | null, openApprovals?: number | null, budgets?: Array<{ id: string, name: string, scope: string, limitUsd: number, spendUsd: number, percent: number, level: string }> | null } };
+export type ZentinelleHealthQuery = { astroliftZentinelleHealth: { available: boolean, windowHours?: number | null, blocks?: number | null, openApprovals?: number | null } };
 
 export type ZentinelleUsageQueryVariables = Exact<{
   since?: InputMaybe<Scalars['DateTime']['input']>;
@@ -21556,7 +21382,7 @@ export type ZentinelleUsageQueryVariables = Exact<{
 }>;
 
 
-export type ZentinelleUsageQuery = { astroliftZentinelleUsage: { since: string, rows: Array<{ agentSlug: string, provider: string, model: string, requests: number, inputTokens: number, outputTokens: number, costUsd: number }> } };
+export type ZentinelleUsageQuery = { astroliftZentinelleUsage: { since: string, rows: Array<{ agentSlug: string, provider: string, model: string, requests: number, inputTokens: number, outputTokens: number }> } };
 
 export type ZentinellePoliciesQueryVariables = Exact<{
   agentSlug?: InputMaybe<Scalars['String']['input']>;

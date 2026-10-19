@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertTriangleIcon,
   CpuIcon,
   ExternalLinkIcon,
   GitPullRequestIcon,
@@ -19,7 +18,6 @@ import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { appsDetailCrumbs } from "@/components/screens/deployments/apps-area";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DefinitionList } from "@/components/ui/definition-list";
 import {
@@ -323,42 +321,6 @@ export function PreviewDetailScreen({
                 {
                   term: t("detail.pods"),
                   description: <span className="font-mono">{p.aggregateResources.podCount}</span>,
-                },
-                {
-                  term: t("detail.dailyCost"),
-                  // The figure and what the driver said about it (#1509): a
-                  // GCP variant's total is an over-count by construction, and
-                  // an operator must not read it as exact.
-                  description:
-                    p.estimatedDailyCostUsd == null ? (
-                      "—"
-                    ) : (
-                      <span className="flex min-w-0 flex-col gap-1">
-                        <span className="flex items-center gap-1.5">
-                          <span className="font-mono">
-                            {fmt.number(p.estimatedDailyCostUsd, {
-                              style: "currency",
-                              currency: "USD",
-                            })}
-                          </span>
-                          {p.estimatedCostApproximate && (
-                            <Badge variant="outline" className="text-2xs gap-1 uppercase">
-                              <AlertTriangleIcon className="size-3" />
-                              {t("detail.approximate")}
-                            </Badge>
-                          )}
-                        </span>
-                        {p.estimatedCostNotes.length > 0 && (
-                          <span className="text-muted-foreground flex flex-col gap-0.5 text-xs">
-                            {p.estimatedCostNotes.map((note) => (
-                              <span key={note} className="[overflow-wrap:anywhere]">
-                                {note}
-                              </span>
-                            ))}
-                          </span>
-                        )}
-                      </span>
-                    ),
                 },
               ]}
             />

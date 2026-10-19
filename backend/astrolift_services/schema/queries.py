@@ -56,8 +56,6 @@ from astrolift_services.schema.model_connections import ModelConnectionsQuery
 from astrolift_services.schema.model_runtime_settings import ModelRuntimeSettingsQuery
 from astrolift_services.schema.resource_reads import (
     ManagedResourceReadsQuery,
-    check_context_revision,
-    context_row,
 )
 from astrolift_services.schema.types import (
     AppSecretBundleAttachmentType,
@@ -74,7 +72,6 @@ from astrolift_services.schema.types import (
     EmailSuppressionEntryType,
     EmailTemplateType,
     ManagedServiceCatalogEntryType,
-    ManagedServiceCostPreviewType,
     ManagedServiceObjectsType,
     ManagedServiceObjectType,
     ManagedServiceQueueDepthType,
@@ -1345,41 +1342,6 @@ class ServicesQuery(
         # tenancy: _app_managed_service_rows pins registered_app__organization_id to the caller's org
         row = _managed_services_qs(app_slug=app_slug, environment_name=None).filter(guid=guid).first()
         return managed_service_to_type(row) if row is not None else None
-
-    @strawberry.field
-    @require_permission(
-        Permission.APP_READ,
-        scope=managed_service_scope_by_guid("managed_service_id", permissions=(Permission.APP_READ,)),
-        operation=managed_service_operation("managed_service_id"),
-    )
-    @tenant_scoped()
-    def astrolift_managed_service_cost_preview(
-        self,
-        info: Info,
-        managed_service_id: GUID,
-        expected_context_revision: str | None = None,
-    ) -> ManagedServiceCostPreviewType | None:
-        """Live-pricing preview for the resource's current desired state."""
-        service = context_row(managed_service_id)
-        if service is None:
-            return None
-        check_context_revision(service, expected_context_revision)
-        from astrolift_services.cost_preview import preview_managed_service_cost
-
-        preview = preview_managed_service_cost(service)
-        return ManagedServiceCostPreviewType(
-            managed_service_id=GUID(str(service.guid)),
-            available=preview.available,
-            reason=preview.reason,
-            message=preview.message,
-            monthly_total=preview.monthly_total,
-            currency=preview.currency,
-            line_items=list(preview.line_items),
-            pricing_source_url=preview.pricing_source_url,
-            pricing_fetched_at=preview.pricing_fetched_at,
-            notes=list(preview.notes),
-            approximate=preview.approximate,
-        )
 
     @strawberry.field
     @require_permission(

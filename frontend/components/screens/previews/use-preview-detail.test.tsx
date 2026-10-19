@@ -37,7 +37,7 @@ function setup(hold = false) {
                     ...PREVIEWS[0],
                     id,
                     environment: { ...PREVIEWS[0].environment, previewId: id },
-                    runtimeStatus: operation.variables.includeRuntimeCost
+                    runtimeStatus: operation.variables.includeRuntimeResources
                       ? "available"
                       : "not_requested",
                   },
@@ -68,7 +68,7 @@ beforeEach(() => {
 });
 
 describe("exact preview detail", () => {
-  it("loads one GUID without walking catalog or requesting runtime pricing/logs", async () => {
+  it("loads one GUID without walking catalog or requesting runtime resources/logs", async () => {
     const fixture = setup();
     const { result } = renderHook(() => usePreviewDetail(PREVIEWS[0].id), {
       wrapper: fixture.wrapper,
@@ -77,7 +77,7 @@ describe("exact preview detail", () => {
     expect(fixture.requests).toEqual([
       {
         name: "GetPreviewEnvironment",
-        variables: { id: PREVIEWS[0].id, includeRuntimeCost: false },
+        variables: { id: PREVIEWS[0].id, includeRuntimeResources: false },
         actor: "actor-one",
       },
     ]);
@@ -93,7 +93,10 @@ describe("exact preview detail", () => {
     await waitFor(() => expect(result.current.preview).not.toBeNull());
     act(() => result.current.onLoadRuntime());
     await waitFor(() => expect(result.current.preview?.runtimeStatus).toBe("available"));
-    expect(fixture.requests[1].variables).toEqual({ id: PREVIEWS[0].id, includeRuntimeCost: true });
+    expect(fixture.requests[1].variables).toEqual({
+      id: PREVIEWS[0].id,
+      includeRuntimeResources: true,
+    });
   });
 
   it("log and deployment reads carry the reviewed GUID and immutable versions", async () => {
@@ -132,7 +135,7 @@ describe("exact preview detail", () => {
     await waitFor(() => expect(result.current.preview?.id).toBe(PREVIEWS[1].id));
     expect(fixture.requests.at(-1)?.variables).toEqual({
       id: PREVIEWS[1].id,
-      includeRuntimeCost: false,
+      includeRuntimeResources: false,
     });
     expect(result.current.logs).toBeNull();
   });

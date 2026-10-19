@@ -2,7 +2,6 @@
 
 import {
   AlertRulesPanelView,
-  CostPanelView,
   EmailDetailSheetView,
   EngagementMetricsPanelView,
   MessageLogPanelView,
@@ -13,7 +12,6 @@ import {
 } from "@/components/screens/apps/managed-services/EmailDetailSheet";
 import {
   useAppManagedServiceConfig,
-  useEmailCost,
   useEmailDetail,
   useEmailTemplates,
   useEngagementMetrics,
@@ -71,13 +69,6 @@ export function EmailDetailSheet({
               delivery: open ? (
                 <EmailDeliveryClient id={managedServiceId} name={serviceName} />
               ) : null,
-              cost: (
-                <CostPanel
-                  managedServiceId={detail.managedServiceId}
-                  appSlug={appSlug}
-                  open={open}
-                />
-              ),
               suppression: <SuppressionPanel detail={detail} onRefetch={onRefetch} />,
               senderConfig: (
                 <SenderConfigPanel
@@ -106,18 +97,6 @@ export function EmailDetailSheet({
       }
     />
   );
-}
-
-function CostPanel({
-  managedServiceId,
-  appSlug,
-  open,
-}: {
-  managedServiceId: string;
-  appSlug: string;
-  open: boolean;
-}) {
-  return <CostPanelView {...useEmailCost(managedServiceId, appSlug, open)} />;
 }
 
 function SuppressionPanel({

@@ -599,17 +599,15 @@ def test_generated_requests_match_botocore_stepfunctions_models() -> None:
             validate_parameters(request, model.operation_model(operations[name]).input_shape)
 
 
-def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
+def test_registration_catalog_and_runtime_config_are_wired() -> None:
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
     from _sdk.managed_service_kinds import KINDS
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     for variant in ("step_functions_standard", "step_functions_express"):
         assert ("workflow_engine", variant) in PLUGIN.managed_service_drivers
-        assert SERVICE_CODE_BY_VARIANT[("workflow_engine", variant)] == "AWSStepFunctions"
         entry = next(
             item
             for item in MATRIX.managed_services
