@@ -92,3 +92,25 @@ edit is refused. The ownership comment is provenance, not a cryptographic
 signature or permission grant. GitLab, Gitea and Bitbucket retain their existing
 host-specific paths and contracts; this change does not certify equivalent
 multi-app isolation for those hosts.
+
+## Deregister removes the app's workflow
+
+Deregistering an app removes its managed GitHub workflow from the source
+repository (#2480). The workflow assumes the app's push role and sends its
+deploy token, and deregister removes both, so every later run would fail. On
+the deploy branch, deregister checks the app path, the agent path and the path
+the app's last sync recorded. It deletes a file only when its ownership comment
+names this app, organization and repository and its content stamp is intact;
+the delete sends the inspected blob SHA, so a concurrent edit is refused. A
+protected deploy branch gets the deletion on
+`astrolift/remove-ci-workflow-<app-guid-without-hyphens>` and a pull request to
+merge. An edited, legacy or other registration's file stays in place.
+
+The removal runs after the app's platform rows are soft-deleted, so its commit
+cannot redeploy the app and the CI resync sweep does not restore the file. The
+`ci_workflow` step of the `DeregisterAppWorkflow-<app-guid>` result names each
+file removed, put up for review or left in place. A removal that cannot reach
+the repository does not reopen the finished teardown; the step names the files
+to delete by hand. GitLab, Gitea and Bitbucket keep the managed CI in a
+repository-wide file that can hold other jobs, so deregister names it and
+leaves it. A sync pull request the app opened earlier is not closed.

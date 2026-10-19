@@ -1950,3 +1950,237 @@ def _sync_gitea(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncRe
         commit_sha=put_result.commit_sha,
         rendered_size=rendered_size,
     )
+
+
+# ---------------------------------------------------------------------------
+# Removal when the app is deregistered (#2480)
+# ---------------------------------------------------------------------------
+
+# GitLab, Bitbucket and Gitea keep the managed CI at one repository-wide path
+# that can also hold the operator's own jobs, so deregister never deletes it.
+_SHARED_HOST_WORKFLOW_PATHS: Final = {
+    "gitlab": GITLAB_WORKFLOW_PATH,
+    "bitbucket": BITBUCKET_WORKFLOW_PATH,
+    "gitea": GITEA_WORKFLOW_PATH,
+}
+
+
+def _managed_github_workflow_paths(app: RegisteredApp) -> list[str]:
+    """Every path a managed workflow of ``app`` can occupy.
+
+    Both shapes, since the file moves between them when an agent workload
+    comes or goes (#1697), then the path its last sync recorded: a slug edit
+    moves the agent file, and templates before generation 9 wrote the shared
+    ``astrolift-ci.yml``.
+    """
+    paths = [github_workflow_path_for(app), _superseded_workflow_path(app)]
+    recorded = str((app.ci_workflow_state or {}).get("path") or "").strip()
+    if recorded and recorded not in paths:
+        paths.append(recorded)
+    return paths
+
+
+def _removal_branch_for(app: RegisteredApp) -> str:
+    """Review branch for a removal on a protected deploy branch. Separate from
+    the sync's branch so an unmerged sync PR is not turned into a deletion."""
+    return f"astrolift/remove-ci-workflow-{github_ci_identity(app)}"
+
+
+def _remove_via_pull_request(
+    connection: SourceConnection,
+    app: RegisteredApp,
+    *,
+    branch: str,
+    files: dict[str, str],
+    commit_message: str,
+) -> str:
+    """Delete ``files`` (path to the reviewed text) on a review branch and
+    open a pull request into ``branch``. Returns the PR's URL.
+
+    A review branch left by an earlier attempt is reused: a file it no longer
+    has was removed there already, and a file that differs from the reviewed
+    text is someone else's edit, refused rather than deleted.
+    """
+    review_branch = _removal_branch_for(app)
+    head_sha = _github_get_branch_sha(connection, repo_full_name=app.source_repo, branch=branch)
+    created = _github_create_ref(
+        connection,
+        repo_full_name=app.source_repo,
+        new_branch=review_branch,
+        from_sha=head_sha,
+    )
+    from astrolift_scm.providers.github import delete_github_file
+
+    for path, reviewed in files.items():
+        if not created:
+            on_review_branch = fetch_file(
+                connection,
+                repo_full_name=app.source_repo,
+                path=path,
+                ref=review_branch,
+            )
+            if on_review_branch is None:
+                continue
+            if on_review_branch != reviewed:
+                raise ProviderError(
+                    "CONFLICT",
+                    f"The review branch {review_branch} has independent edits to {path}; "
+                    "review it before retrying.",
+                    recoverable=True,
+                )
+        delete_github_file(
+            connection,
+            repo_full_name=app.source_repo,
+            path=path,
+            branch=review_branch,
+            commit_message=commit_message,
+            expected_sha=git_blob_sha(reviewed.encode("utf-8")),
+        )
+    listed = ", ".join(f"`{path}`" for path in files)
+    return _github_open_pull_request(
+        connection,
+        repo_full_name=app.source_repo,
+        head=review_branch,
+        base_branch=branch,
+        title=f"Astrolift: remove CI workflow for {app.slug}",
+        body=(
+            f"This PR was opened by Astrolift because **{app.slug}** was deregistered. "
+            f"{listed} authenticated with the app's push role and deploy token, which were "
+            "removed with it, so every run of it would fail.\n\n"
+            f"Merge to remove it from `{branch}`."
+        ),
+    )
+
+
+def remove_workflow_file_from_repo(app: RegisteredApp) -> dict:
+    """Remove the managed CI workflow a deregistered app leaves in its repo.
+
+    The workflow authenticates with the app's push role and deploy token, and
+    deregister removes both, so every later push runs a job that can only fail
+    (#2480). This removes each managed path that holds a file this app
+    provably wrote: one owner line naming this app, organization and
+    repository, and an intact content stamp, the contract the superseded
+    workflow cleanup uses (#1697). The delete is conditional on the reviewed
+    blob SHA, so a concurrent edit is refused. An unprotected deploy branch
+    gets a direct commit; a protected one a review branch and pull request.
+    Any other file at those paths (edited, legacy or another registration's)
+    is left in place and named in the summary.
+
+    Returns a JSON-safe summary: ``status`` is one of ``removed``,
+    ``pr_opened``, ``retained``, ``absent``, ``no_repo``, ``no_connection``
+    or ``unsupported_host``; ``removed`` lists the deleted paths (on the
+    review branch for ``pr_opened``) and ``retained`` the paths left for
+    review. Host failures raise ``ProviderError`` naming the repository and
+    the paths, so the caller can report what to delete by hand.
+    """
+    repo = (app.source_repo or "").strip()
+    branch = (app.deploy_branch or "main").strip() or "main"
+    summary: dict = {
+        "status": "",
+        "detail": "",
+        "repo": repo,
+        "branch": branch,
+        "removed": [],
+        "retained": [],
+        "pr_url": "",
+    }
+    if not repo:
+        return {**summary, "status": "no_repo", "detail": "app has no source repo configured"}
+
+    if app.source_kind != "github":
+        recorded = str((app.ci_workflow_state or {}).get("path") or "").strip()
+        if not recorded:
+            return {
+                **summary,
+                "status": "unsupported_host",
+                "detail": f"no managed CI file is recorded for this {app.source_kind} app; nothing removed",
+            }
+        return {
+            **summary,
+            "status": "unsupported_host",
+            "retained": [recorded],
+            "detail": (
+                f"{recorded} on {repo}@{branch} is shared by the whole repository, so it was left in "
+                "place; remove the Astrolift job from it by hand"
+            ),
+        }
+
+    paths = _managed_github_workflow_paths(app)
+    connection = _pick_source_connection(app)
+    if connection is None:
+        return {
+            **summary,
+            "status": "no_connection",
+            "detail": (
+                f"no source connection can write to {repo}; delete "
+                f"{' or '.join(paths)} from {branch} by hand if present"
+            ),
+        }
+
+    commit_message = f"chore(astrolift): remove CI workflow for deregistered app {app.slug}"
+    removable: dict[str, str] = {}
+    retained: list[str] = []
+    try:
+        for path in paths:
+            existing = fetch_file(connection, repo_full_name=repo, path=path, ref=branch)
+            if existing is None:
+                continue
+            if owns_unchanged_github_workflow(app, existing):
+                removable[path] = existing
+            else:
+                retained.append(path)
+        pr_url = ""
+        removed: list[str] = []
+        if removable and _is_github_branch_protected(connection, repo_full_name=repo, branch=branch):
+            pr_url = _remove_via_pull_request(
+                connection, app, branch=branch, files=removable, commit_message=commit_message
+            )
+            removed = list(removable)
+        elif removable:
+            from astrolift_scm.providers.github import delete_github_file
+
+            for path, reviewed in removable.items():
+                if delete_github_file(
+                    connection,
+                    repo_full_name=repo,
+                    path=path,
+                    branch=branch,
+                    commit_message=commit_message,
+                    expected_sha=git_blob_sha(reviewed.encode("utf-8")),
+                ):
+                    removed.append(path)
+    except (ProviderError, GithubProviderError) as exc:
+        raise ProviderError(
+            exc.code,
+            f"could not remove the CI workflow from {repo}@{branch} ({exc.message}); "
+            f"delete {' or '.join(paths)} by hand if present",
+            recoverable=exc.recoverable,
+        ) from exc
+
+    notes = []
+    if pr_url:
+        notes.append(f"opened {pr_url} to remove {', '.join(removed)} from {repo}@{branch}")
+    elif removed:
+        notes.append(f"removed {', '.join(removed)} from {repo}@{branch}")
+    if retained:
+        notes.append(
+            f"left {', '.join(retained)} in place: not provably this app's file (edited, legacy or "
+            "another registration's); remove it through repository review if nothing else uses it"
+        )
+    if pr_url:
+        status = "pr_opened"
+    elif removed:
+        status = "removed"
+    elif retained:
+        status = "retained"
+    else:
+        status = "absent"
+        notes.append(f"no managed CI workflow for this app on {repo}@{branch}")
+    return {
+        **summary,
+        "status": status,
+        "detail": "; ".join(notes),
+        "removed": removed,
+        "retained": retained,
+        "pr_url": pr_url,
+    }

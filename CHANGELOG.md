@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Deregister removes the app's managed GitHub CI workflow from its source repository (#2480). It runs after the platform rows are soft-deleted, deletes only a file whose ownership comment and content stamp prove it is the app's, conditional on the reviewed blob SHA, and opens a review pull request on a protected deploy branch. Edited, legacy and other registrations' files, and the shared GitLab, Gitea and Bitbucket CI files, stay in place and are named in the step result; a failed removal names the files to delete by hand without reopening the teardown. The CI resync sweep no longer restores the file of an app deregistered while it runs. See [managed monorepo CI](docs/operators/managed-monorepo-ci.md).
+
 - Move ordinary repository CI and generated managed GitHub app/agent workflows to Node 24 action runtimes (#2473). Managed workflow template version 11 uses checkout v6 and AWS OIDC credentials v6; non-GitHub renderers retain their existing output. The separately validated CPU model workflow and runtime scripts are unchanged; its migration and runtime qualification remain open in #2474 and #2492. This does not upgrade the frontend's application Node.js toolchain.
 
 - Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).
