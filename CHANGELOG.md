@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The AVX2 CPU runtime smoke's proof records the candidate's cgroup memory evidence (#2492). The server runs under a fresh cgroup parent of its own, which sets no limit and outlives the container, and every smoke that started it keeps `memory_evidence` in `runtime-proof.json`: `peak_bytes`, `current_bytes` and the `max`, `oom`, `oom_kill` and `oom_group_kill` counts, integers only, or `unavailable` with the exception type where the host has no readable cgroup v2 files. An OOM stop now says whether the container reached its own 4 GiB limit (`oom`) or the host's OOM killer took it (`oom_kill` without `oom`). CPU, memory, KV cache, context, sequence count and deadlines are unchanged. The failed and the prior green run had identical recorded build and runtime inputs and differed only in runner region and image ID, which identifies no correction, so none is made.
+
 - Move ordinary repository CI and generated managed GitHub app/agent workflows to Node 24 action runtimes (#2473). Managed workflow template version 11 uses checkout v6 and AWS OIDC credentials v6; non-GitHub renderers retain their existing output. The separately validated CPU model workflow and runtime scripts are unchanged; its migration and runtime qualification remain open in #2474 and #2492. This does not upgrade the frontend's application Node.js toolchain.
 
 - Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).

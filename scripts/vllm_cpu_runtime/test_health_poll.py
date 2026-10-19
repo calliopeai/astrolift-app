@@ -62,7 +62,7 @@ def startup_server(*, always_reset=False):
         worker.join(2)
 
 
-def docker_observations(port, *, stops_after_reset=False):
+def docker_observations(port, *, stops_after_reset=False, cgroup_root=None):
     inspections = 0
 
     def output(command, **_kwargs):
@@ -87,6 +87,14 @@ def docker_observations(port, *, stops_after_reset=False):
         if command[:3] == ["docker", "run", "--rm"]:
             return b'{"vllm":"0.15.1+cpu","float32_cpu_kernel":true}\n'
         if command[:3] == ["docker", "run", "--detach"]:
+            if cgroup_root:
+                parent = cgroup_root / command[command.index("--cgroup-parent") + 1]
+                parent.mkdir()
+                (parent / "memory.peak").write_text("3758096384\n")
+                (parent / "memory.current").write_text("3489660928\n")
+                (parent / "memory.events").write_text(
+                    "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n"
+                )
             return b"owned-test-container"
         raise AssertionError("Unexpected subprocess in isolated smoke proof")
 
@@ -121,6 +129,52 @@ class HealthPollingTests(unittest.TestCase):
             self.assertEqual(
                 remove.call_args.args[0],
                 ["docker", "rm", "--force", "owned-test-container"],
+            )
+
+    def test_completion_records_the_parent_memory_evidence(self):
+        with startup_server() as (
+            port,
+            observed,
+        ), tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof = root / "proof.json"
+            with self.run_smoke(port, cgroup_root=root), patch.object(
+                smoke, "CGROUP_ROOT", root
+            ), patch.object(
+                smoke, "inspect_target", return_value="synthetic-image"
+            ), patch.object(smoke.time, "sleep"), patch.object(smoke.subprocess, "run"):
+                smoke.smoke("synthetic-image", proof)
+            data = json.loads(proof.read_text())
+            self.assertTrue(data["passed"])
+            self.assertEqual(observed, {"health": 2, "completion": 1})
+            self.assertEqual(
+                data["memory_evidence"],
+                {
+                    "peak_bytes": 3758096384,
+                    "current_bytes": 3489660928,
+                    "events": {"max": 0, "oom": 0, "oom_kill": 0, "oom_group_kill": 0},
+                },
+            )
+
+    def test_unreadable_memory_evidence_leaves_the_completion_passing(self):
+        with startup_server() as (
+            port,
+            observed,
+        ), tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof = root / "proof.json"
+            with self.run_smoke(port), patch.object(
+                smoke, "CGROUP_ROOT", root
+            ), patch.object(
+                smoke, "inspect_target", return_value="synthetic-image"
+            ), patch.object(smoke.time, "sleep"), patch.object(smoke.subprocess, "run"):
+                smoke.smoke("synthetic-image", proof)
+            data = json.loads(proof.read_text())
+            self.assertTrue(data["passed"])
+            self.assertTrue(data["completion_received"])
+            self.assertEqual(observed, {"health": 2, "completion": 1})
+            self.assertEqual(
+                data["memory_evidence"], {"unavailable": "FileNotFoundError"}
             )
 
     def test_repeated_native_resets_still_stop_at_original_deadline(self):
