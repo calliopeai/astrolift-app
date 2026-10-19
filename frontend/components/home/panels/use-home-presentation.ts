@@ -7,12 +7,6 @@ export function useHomePresentation(liveClock = false) {
   const fmt = useFormatter();
   const now = useNow(liveClock ? { updateInterval: 60_000 } : undefined);
   const number = (value: number) => fmt.number(value);
-  const money = (cents: number, currency: string) =>
-    fmt.number(cents / 100, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    });
   const percent = (value: number) =>
     fmt.number(value, {
       style: "percent",
@@ -66,5 +60,5 @@ export function useHomePresentation(liveClock = false) {
         return fmt.number(value, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
     }
   };
-  return { t, fmt, number, money, percent, status, age, duration, signal };
+  return { t, fmt, number, percent, status, age, duration, signal };
 }

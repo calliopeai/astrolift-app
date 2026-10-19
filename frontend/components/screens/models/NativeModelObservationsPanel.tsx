@@ -12,7 +12,7 @@ export function NativeModelObservationsPanel() {
         items={[
           { term: t("inference"), description: t("inferenceUnknown") },
           { term: t("traffic"), description: t("trafficUnsupported") },
-          { term: t("tokensCost"), description: t("tokensCostUnsupported") },
+          { term: t("tokens"), description: t("tokensUnsupported") },
         ]}
       />
     </Section>

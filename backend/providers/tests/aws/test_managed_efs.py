@@ -674,11 +674,10 @@ def test_efs_networking_discovers_three_azs_and_nfs_security_group():
     assert permission["FromPort"] == permission["ToPort"] == 2049
 
 
-def test_config_plugin_cost_and_catalogue_are_wired():
+def test_config_plugin_and_catalogue_are_wired():
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     cluster = SimpleNamespace(
@@ -699,7 +698,6 @@ def test_config_plugin_cost_and_catalogue_are_wired():
     assert config.security_group_ids == SECURITY_GROUPS
     assert config.kms_key_id == "alias/platform-efs"
     assert PLUGIN.managed_service_drivers[("filesystem", "efs")] is EFSDriver
-    assert SERVICE_CODE_BY_VARIANT[("filesystem", "efs")] == "AmazonEFS"
     entry = next(item for item in MATRIX.managed_services if item.plugin_id == "aws" and item.variant == "efs")
     assert entry.status == "preview"
     assert "FILESYSTEM_HANDLE" in entry.binding_envs

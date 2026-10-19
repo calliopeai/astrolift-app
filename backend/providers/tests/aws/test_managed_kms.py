@@ -663,15 +663,13 @@ def test_generated_requests_match_botocore_kms_models() -> None:
             validate_parameters(request, model.operation_model(operations[name]).input_shape)
 
 
-def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
+def test_registration_catalog_and_runtime_config_are_wired() -> None:
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     assert ("encryption_key", "kms") in PLUGIN.managed_service_drivers
-    assert SERVICE_CODE_BY_VARIANT[("encryption_key", "kms")] == "awskms"
     entry = next(
         item
         for item in MATRIX.managed_services

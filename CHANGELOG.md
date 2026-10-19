@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).
+
+- Preserve existing brain memory and build settings when merging manifests after the monetary parser module is retired (#2464), and correct the operator guide to describe the retained quota APIs and coordinated worker retirement.
+
+- Remove the remaining `billableWindowDays` retention API field and its unused billing helper (#2464); effective retention days, warning windows, policy controls and eviction remain operational.
+
+- Retire Astrolift application/task/model monetary APIs, estimates, budgets, forecasts and spend emission (#2464), retaining resource quotas and canonical Zentinelle token reads. Preview runtime enrichment is explicitly resource-only (`includeRuntimeResources`, `previews.explicit_runtime_resources`). Historical rows/outboxes remain; old cost histories complete through no-op activities and exact retired spend webhooks stop before HTTP. See [operator rollout and schedule retirement](docs/operators/retire-costing.md).
+
 - The main rail and ⌘K link to Secure › Zentinelle (`/secure/zentinelle`), which only an agent's Secure tab reached before. The Secure area shows while the organization's Zentinelle connection is live and the viewer holds a `zentinelle.*` permission, read from the `astroliftZentinelleCapability` boolean; disconnected, revoked or never connected, it is hidden.
 - A semantic layer's container verifies its read tokens itself (#2441). The edge keeps `X-Astrolift-Brain-Token` on the routes of a brain app (stripped everywhere else, as before), and every container of a brain's workloads gets `BRAIN_MCP_JWKS_URL`, `BRAIN_MCP_ISSUER` and `BRAIN_MCP_AUDIENCE` (the brain's guid) from the install, over any value its manifest sets. A new layer builds the template-owned `runtime/portal-container/Dockerfile` (mimwell-pvt#479) and asks for 128Mi of memory, limit 512Mi; graduation keeps more if the layer's manifest asks for it, and an older layer's own Dockerfile.
 - Unattended agent runs read semantic layers through the agent's own grants (#2449). `shareBrain` and `unshareBrain` (and MCP `astrolift_share_brain` / `astrolift_unshare_brain`) take `agentSlug` instead of `teamSlug`, viewer only. A run nobody launched (schedule, loop, webhook, workflow stage) reads the layers shared with its agent that it also lists in `brains` or `brains_allowed`, as the agent (`sub` `agent:<guid>`); unsharing, archiving the layer or deleting the agent revokes. `agent(orgId, slug).brainGrants`, `astroliftBrain(slug).agentShares` and MCP `astrolift_get_agent` (`run.brain_grants`) list the grants. Migration registry 0051.

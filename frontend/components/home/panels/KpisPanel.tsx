@@ -5,7 +5,7 @@
  * period they cover.
  *
  *   KPIs · last 30 days
- *   Deploys 14 · Runs 212 · Success 97.0% · p95 3m 10s · Spend $41
+ *   Deploys 14 · Runs 212 · Success 97.0% · p95 3m 10s
  *
  * Each figure links to the page it summarizes. A figure the person may not
  * see is left out; one whose source has not answered is a dash. Pure.
@@ -33,13 +33,11 @@ function Figure({ figure }: { figure: KpiFigure }) {
     runs: "Runs",
     success: "Success",
     p95: "p95",
-    spend: "Spend",
   };
   const hints: Partial<Record<KpiFigure["key"], string>> = {
     runs: "agent runs",
     success: "of deploys",
     p95: "deploy time",
-    spend: "month to date",
   };
   const label = figure.label === labels[figure.key] ? t(`kpi.${figure.key}`) : figure.label;
   const hint =
@@ -85,7 +83,7 @@ export function KpisPanelView({
       span={panel.span}
       loading={loading && nothingYet}
       skeleton={
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {figures.map((f) => (
             <Skeleton key={f.key} className="h-12 w-full" />
           ))}
@@ -105,7 +103,7 @@ export function KpisPanelView({
     >
       <ul
         aria-label={t("copy.kpiAria", { panel: homePanelTitle(panel, t), count: windowDays })}
-        className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-5"
+        className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3 lg:grid-cols-4"
       >
         {figures.map((f) => (
           <Figure key={f.key} figure={f} />

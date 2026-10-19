@@ -35,7 +35,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from _cert import billing
+from _cert import resource_policy
 from _cert.harness.fingerprint import Fingerprint, compare
 from _cert.harness.model import AssertionFailed as Failed
 from _cert.harness.model import (
@@ -115,12 +115,11 @@ class LifecycleRunner:
 
     provision_poll: Poll = field(default_factory=lambda: Poll(timeout_s=2700, interval_s=15))
     teardown_poll: Poll = field(default_factory=lambda: Poll(timeout_s=2700, interval_s=15))
-    estimate_logged: bool = False
-    """Explicit operator assertion for billing-class C cells.
+    capacity_resources_authorized: bool = False
+    """Operator authorization for reviewed capacity resources, false by default.
 
-    The estimate itself must come from the live pricing estimator and be logged
-    on the campaign issue.  This switch records that the external prerequisite
-    happened; it is deliberately false by default.
+    This is not evidence of observed capacity, provider permission or any
+    financial bound. Explicit cloud credentials and teardown checks remain.
     """
     """Teardown's floor is not the workflow: ``deregisterAstroliftApp`` waits out
     a roughly five-minute grace window before its first destructive activity, so
@@ -262,7 +261,7 @@ class LifecycleRunner:
     # -- 1. BUILDOUT ---------------------------------------------------------
 
     def _buildout(self, cell: Cell, state: dict[str, Any]) -> None:
-        self._check_spend_gate(cell)
+        self._check_resource_gate(cell)
         slug = cell.app_name
         if self.platform.get_app(slug) is not None:
             raise Failed(
@@ -301,7 +300,7 @@ class LifecycleRunner:
                 f"deployment {deployment.id or '<unknown>'} ended {deployment.status!r}",
             )
 
-    def _check_spend_gate(self, cell: Cell) -> None:
+    def _check_resource_gate(self, cell: Cell) -> None:
         """Refuse a live preview cell before registration creates anything."""
         for binding in cell.bindings:
             matches = [
@@ -315,22 +314,26 @@ class LifecycleRunner:
             if entry is None:
                 raise Failed(
                     f"{binding.kind}:{binding.variant} must exist in the availability matrix before BUILDOUT",
-                    "the manifest names a variant whose status and billing shape cannot be verified",
+                    "the manifest names a variant whose status and resource lifecycle cannot be verified",
                 )
             if entry.status not in {"preview", "experimental"}:
                 continue
             if entry.plugin_id == "k8s_native":
-                continue  # no cloud resource, and therefore no cloud billing class
+                continue  # no cloud resource to authorize in this gate
             try:
-                billing.check_may_run(
+                resource_policy.check_may_run(
                     entry.plugin_id,
                     entry.kind,
                     entry.variant,
-                    estimate_logged=self.estimate_logged,
+                    capacity_resources_authorized=self.capacity_resources_authorized,
                 )
-            except (billing.UnclassifiedVariant, billing.EstimateRequired, billing.NotCertifiable) as exc:
+            except (
+                resource_policy.UnreviewedVariant,
+                resource_policy.CapacityReviewRequired,
+                resource_policy.NotCertifiable,
+            ) as exc:
                 raise Failed(
-                    f"the spend gate must approve {entry.plugin_id} {entry.kind}:{entry.variant} before BUILDOUT",
+                    f"the resource gate must authorize {entry.plugin_id} {entry.kind}:{entry.variant} before BUILDOUT",
                     str(exc),
                 ) from exc
 

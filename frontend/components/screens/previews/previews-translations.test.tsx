@@ -99,7 +99,7 @@ describe("translated global previews", () => {
     }
   );
 
-  it("formats German resources and USD while preserving caveats and loading the exact failed-preview logs", () => {
+  it("formats German resources and loading the exact failed-preview logs", () => {
     const onError = vi.fn();
     const preview = {
       ...PREVIEWS[3],
@@ -128,10 +128,6 @@ describe("translated global previews", () => {
     );
     expect(screen.getByText("2,50")).toBeInTheDocument();
     expect(screen.getByText("4,00 GiB")).toBeInTheDocument();
-    expect(screen.getByText("9,87 $", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("ungefähr")).toBeInTheDocument();
-    for (const note of preview.estimatedCostNotes)
-      expect(screen.getByText(note)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Logs öffnen" }));
     expect(onLoadLogs).toHaveBeenCalledOnce();
     expect(document.querySelector(`a[href="/apps/${preview.registeredAppSlug}/logs"]`)).toBeNull();

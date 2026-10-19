@@ -267,9 +267,6 @@ const PREVIEW_BASE: AstroliftPreviewEnvironment = {
   lastDeployedAt: ago(3 * 3600),
   ttlUntil: ahead(2 * 86400 + 5 * 3600),
   aggregateResources: { podCount: 3, cpuCores: 0.75, memoryBytes: 1.5 * 1024 ** 3 },
-  estimatedDailyCostUsd: 1.84,
-  estimatedCostApproximate: false,
-  estimatedCostNotes: [],
   openedByLogin: "barbara",
   openedByMe: false,
   failureReason: "",
@@ -288,9 +285,6 @@ export const PREVIEW_ROWS: AstroliftPreviewEnvironment[] = [
     isManual: true,
     lastDeployedAt: ago(9 * 86400),
     ttlUntil: ahead(40 * 60),
-    estimatedDailyCostUsd: 0.62,
-    estimatedCostApproximate: true,
-    estimatedCostNotes: ["Summed every SKU in the service; an over-count."],
   },
   {
     ...PREVIEW_BASE,
@@ -302,7 +296,6 @@ export const PREVIEW_ROWS: AstroliftPreviewEnvironment[] = [
     hostname: "pr-409.checkout.astrolift.example.com",
     status: "failed",
     aggregateResources: { podCount: 0, cpuCores: 0, memoryBytes: 0 },
-    estimatedDailyCostUsd: null,
   },
   {
     ...PREVIEW_BASE,
@@ -316,20 +309,6 @@ export const PREVIEW_ROWS: AstroliftPreviewEnvironment[] = [
     tornDownAt: ago(86400),
   },
 ];
-
-function spendOf(list: AstroliftPreviewEnvironment[]) {
-  const live = list.filter((p) => p.status !== "torn_down");
-  const priced = live.filter((p) => typeof p.estimatedDailyCostUsd === "number");
-  const dailyTotal = priced.reduce((s, p) => s + (p.estimatedDailyCostUsd ?? 0), 0);
-  return {
-    dailyTotal,
-    monthlyProjection: dailyTotal * 30,
-    priced: priced.length,
-    unpriced: live.length - priced.length,
-    approximate: priced.filter((p) => p.estimatedCostApproximate).length,
-    liveCount: live.length,
-  };
-}
 
 /** Everything but the list state, which stories build with `useLocalListState`. */
 export type PreviewsFixture = Omit<AppPreviewsScreenProps, "list">;
@@ -347,7 +326,6 @@ export const PREVIEWS: PreviewsFixture = {
   totalCount: PREVIEW_ROWS.length,
   previewCount: PREVIEW_ROWS.length,
   counts: { running: 2, failed: 1, tornDown: 1 },
-  spend: spendOf(PREVIEW_ROWS),
   stalePreviews: [PREVIEW_ROWS[1]!],
   canDeploy: true,
   tearingDown: false,
@@ -365,7 +343,6 @@ export const PREVIEWS_EMPTY: PreviewsFixture = {
   totalCount: 0,
   previewCount: 0,
   counts: { running: 0, failed: 0, tornDown: 0 },
-  spend: spendOf([]),
   stalePreviews: [],
 };
 
@@ -384,6 +361,5 @@ export const PREVIEWS_LONG: PreviewsFixture = {
   totalCount: 1,
   previewCount: 1,
   counts: { running: 1, failed: 0, tornDown: 0 },
-  spend: spendOf([LONG_ROW]),
   stalePreviews: [],
 };

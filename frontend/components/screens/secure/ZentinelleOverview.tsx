@@ -3,8 +3,6 @@
 import {
   ActivityIcon,
   BotIcon,
-  CircleDollarSignIcon,
-  GaugeIcon,
   HandIcon,
   NetworkIcon,
   ServerIcon,
@@ -26,7 +24,6 @@ import {
   HEALTH_DOT,
   isDegraded,
   liveClusters,
-  tightestBudget,
   type ReadState,
   type UsageTotals,
   type ZentinelleCluster,
@@ -37,7 +34,7 @@ import {
 export interface ZentinelleHealth {
   /** Usage over the last 24 hours and this month; null without usage_view. */
   usage: ReadState<{ day: UsageTotals; month: UsageTotals } | null>;
-  /** Blocks, open approvals and budgets from Zentinelle; null without status_view. */
+  /** Blocks and open approvals from Zentinelle; null without status_view. */
   counts: ReadState<ZentinelleHealthCounts | null>;
 }
 
@@ -48,8 +45,8 @@ export interface ZentinelleOverviewProps extends ZentinelleHealth {
 
 /**
  * The health card: gateways, Zentinelle's version, blocks in the last 24
- * hours, open approvals, budget, agents observed, requests in the last 24
- * hours, spend this month, and each registered cluster's gateway. A count
+ * hours, open approvals, agents observed, requests in the last 24 hours,
+ * and each registered cluster's gateway. A count
  * an older Zentinelle cannot give reads "Not available".
  */
 export function ZentinelleOverview({ connection, usage, counts }: ZentinelleOverviewProps) {
@@ -66,8 +63,6 @@ export function ZentinelleOverview({ connection, usage, counts }: ZentinelleOver
   const month = usage.data?.month;
   const reported = counts.data?.available ? counts.data : null;
   const unavailable = counts.data?.available === false;
-  const budget = reported ? tightestBudget(reported.budgets ?? []) : null;
-  const usd = (value: number) => format.number(value, { style: "currency", currency: "USD" });
   const count = (value: number | null | undefined) =>
     unavailable ? t("notAvailable") : value == null ? null : format.number(value);
 
@@ -122,29 +117,6 @@ export function ZentinelleOverview({ connection, usage, counts }: ZentinelleOver
                 icon={HandIcon}
                 loading={counts.loading}
               />
-              <StatTile
-                label={t("budget")}
-                value={
-                  unavailable
-                    ? t("notAvailable")
-                    : budget
-                      ? t("budgetValue", { percent: Math.round(budget.percent) })
-                      : reported
-                        ? t("noBudget")
-                        : null
-                }
-                footer={
-                  budget
-                    ? t("budgetFooter", {
-                        spend: usd(budget.spendUsd),
-                        limit: usd(budget.limitUsd),
-                        name: budget.name,
-                      })
-                    : undefined
-                }
-                icon={GaugeIcon}
-                loading={counts.loading}
-              />
             </>
           ) : null}
           {usage.data !== null || usage.loading ? (
@@ -159,16 +131,6 @@ export function ZentinelleOverview({ connection, usage, counts }: ZentinelleOver
                 label={t("requests")}
                 value={day ? format.number(day.requests) : null}
                 icon={ActivityIcon}
-                loading={usage.loading}
-              />
-              <StatTile
-                label={t("spend")}
-                value={
-                  month
-                    ? format.number(month.costUsd, { style: "currency", currency: "USD" })
-                    : null
-                }
-                icon={CircleDollarSignIcon}
                 loading={usage.loading}
               />
             </>

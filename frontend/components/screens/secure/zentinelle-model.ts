@@ -21,7 +21,6 @@ export type ZentinellePolicy = ZentinellePoliciesQuery["astroliftZentinellePolic
 export type ZentinelleAuditEvent =
   ZentinelleAuditPageQuery["astroliftZentinelleAuditPage"]["events"][number];
 export type ZentinelleHealthCounts = ZentinelleHealthQuery["astroliftZentinelleHealth"];
-export type ZentinelleBudget = NonNullable<ZentinelleHealthCounts["budgets"]>[number];
 
 export const ZENTINELLE_TABS = ["overview", "clusters", "usage", "policies", "audit"] as const;
 export type ZentinelleTab = (typeof ZENTINELLE_TABS)[number];
@@ -132,14 +131,6 @@ export function isDegraded(connection: ZentinelleConnection | null): boolean {
   });
 }
 
-/** The budget closest to its limit, or null when none is set. */
-export function tightestBudget(budgets: readonly ZentinelleBudget[]): ZentinelleBudget | null {
-  return budgets.reduce<ZentinelleBudget | null>(
-    (worst, b) => (worst === null || b.percent > worst.percent ? b : worst),
-    null
-  );
-}
-
 /** Narrow a read to one agent, project or team; the server takes one at most. */
 export type ZentinelleScope =
   | { kind: "all" }
@@ -183,7 +174,6 @@ export interface UsageTotals {
   requests: number;
   inputTokens: number;
   outputTokens: number;
-  costUsd: number;
   agents: number;
 }
 
@@ -192,7 +182,6 @@ export function usageTotals(rows: ZentinelleUsageRow[]): UsageTotals {
     requests: rows.reduce((n, r) => n + r.requests, 0),
     inputTokens: rows.reduce((n, r) => n + r.inputTokens, 0),
     outputTokens: rows.reduce((n, r) => n + r.outputTokens, 0),
-    costUsd: rows.reduce((n, r) => n + r.costUsd, 0),
     agents: new Set(rows.map((r) => r.agentSlug).filter(Boolean)).size,
   };
 }

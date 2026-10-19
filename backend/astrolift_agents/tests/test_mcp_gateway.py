@@ -1102,3 +1102,25 @@ def test_streamable_http_rejects_nonstandard_nonfinite_json():
 
     assert response.status_code == 200
     assert json.loads(response.content)["error"]["code"] == -32700
+
+
+def test_retired_resource_pricing_tool_is_neither_discoverable_nor_callable(permission_resolver):
+    org = Organization.objects.create(name="Retired pricing MCP", slug="retired-pricing-mcp")
+    user, token = _token(org, scopes=[SCOPE_MCP_READ, SCOPE_READ_APPS])
+    permission_resolver.grant(Permission.PROJECT_READ)
+    _, listed = _call(org, user, token, "tools/list")
+    assert "astrolift_preview_project_resource_cost" not in {
+        tool["name"] for tool in listed["result"]["tools"]
+    }
+    _, called = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_preview_project_resource_cost",
+            "arguments": {"managed_service_id": "00000000-0000-4000-8000-000000000001"},
+        },
+    )
+    assert called["result"]["isError"]
+    assert called["result"]["structuredContent"]["code"] == "not_found"

@@ -734,16 +734,14 @@ def test_operation_error_is_not_reported_as_success(driver: FilestoreDriver, cli
         driver._wait_operation({"name": "operations/wait", "done": False})
 
 
-def test_registration_catalog_cost_encryption_and_runtime_config_are_wired() -> None:
+def test_registration_catalog_encryption_and_runtime_config_are_wired() -> None:
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
     from _sdk.storage_encryption import policy_for
-    from gcp.cost import SERVICE_ID_BY_VARIANT
     from gcp.plugin import PLUGIN
 
     assert PLUGIN.managed_service_drivers[("filesystem", "filestore")] is FilestoreDriver
-    assert SERVICE_ID_BY_VARIANT[("filesystem", "filestore")] == "D97E-AB26-5D95"
     entry = next(
         item
         for item in MATRIX.managed_services

@@ -24,27 +24,6 @@ export const LIST_APP_SECRETS = gql`
   }
 `;
 
-export const PREVIEW_MANAGED_SERVICE_COST = gql`
-  query PreviewManagedServiceCost($managedServiceId: GUID!, $expectedContextRevision: String) {
-    astroliftManagedServiceCostPreview(
-      managedServiceId: $managedServiceId
-      expectedContextRevision: $expectedContextRevision
-    ) {
-      managedServiceId
-      available
-      reason
-      message
-      monthlyTotal
-      currency
-      lineItems
-      pricingSourceUrl
-      pricingFetchedAt
-      notes
-      approximate
-    }
-  }
-`;
-
 /**
  * Minimal version-only fetch on the parent app row (#497).
  *

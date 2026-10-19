@@ -1,12 +1,11 @@
 /**
  * The pure half of the Builder and Operator panels: ordering, the KPI
- * figures and the spend meter, so the views only draw and the hooks only
+ * figures, so the views only draw and the hooks only
  * fetch. Tested in panel-model.test.ts.
  */
 
 import type { AlertEvent } from "@/components/screens/alerts/use-alerts";
 import type { ClusterRow } from "@/components/screens/clusters/list/use-clusters-list";
-import type { AstroliftBudget, AstroliftCostForecast } from "@/graphql/billing/billing.types";
 import type { AstroliftDeploymentMetrics } from "@/graphql/lifecycle/lifecycle.types";
 
 // ---------------------------------------------------------------- alerts
@@ -88,7 +87,7 @@ export function healthCounts(fleet: ClusterRow[]): Record<ClusterHealth, number>
 
 // ---------------------------------------------------------------- KPIs
 
-export type KpiKey = "deploys" | "runs" | "success" | "p95" | "spend";
+export type KpiKey = "deploys" | "runs" | "success" | "p95";
 
 export interface KpiFigure {
   key: KpiKey;
@@ -116,14 +115,6 @@ export function formatDuration(seconds: number | null | undefined): string | nul
   return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
-export function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
-
 /**
  * The strip's figures, each only when its source is in (undefined means the
  * person may not see it, so it is left out; null means not loaded yet).
@@ -134,7 +125,6 @@ export function kpiFigures(
   {
     metrics,
     runs,
-    forecast,
     windowDays,
   }: {
     metrics?: AstroliftDeploymentMetrics | null;
@@ -144,14 +134,12 @@ export function kpiFigures(
       now: number;
       loading?: boolean;
     };
-    forecast?: AstroliftCostForecast | null;
     windowDays: number;
   },
   presentation = {
     number: (value: number) => value.toLocaleString("en-US"),
     percent: (value: number) => `${(value * 100).toFixed(1)}%`,
     duration: formatDuration,
-    money: formatMoney,
   }
 ): KpiFigure[] {
   const out: KpiFigure[] = [];
@@ -201,65 +189,7 @@ export function kpiFigures(
       href: "/administration/metrics",
     });
   }
-  if (forecast !== undefined) {
-    out.push({
-      key: "spend",
-      label: "Spend",
-      value: forecast ? presentation.money(forecast.mtdCents, forecast.currency) : null,
-      hint: "month to date",
-      href: "/administration/metrics",
-    });
-  }
   return out;
-}
-
-// ---------------------------------------------------------------- spend & quota
-
-/** The organization's budget: the quota spend is drawn against. */
-export function orgBudget(budgets: AstroliftBudget[]): AstroliftBudget | null {
-  return budgets.find((b) => b.scopeKind === "ORG") ?? null;
-}
-
-export interface SpendQuotaData {
-  forecast: AstroliftCostForecast | null;
-  budget: AstroliftBudget | null;
-  loading?: boolean;
-  /** The forecast failed: nothing to draw. */
-  error?: string | null;
-  /** Only the budget failed: spend still draws, the bar says why it has no quota. */
-  budgetError?: string | null;
-  onRetry?: () => void;
-}
-
-export type MeterTone = "ok" | "warn" | "error";
-
-export interface SpendMeter {
-  /** Spend so far as a share of the budget, 0 to 1 (clamped for drawing). */
-  spent: number;
-  /** The projected month end as a share of the budget, 0 to 1 (clamped), or null. */
-  projected: number | null;
-  /** The unclamped share, for the percentage. */
-  ratio: number;
-  /** Over the budget's first alert threshold warns; over the budget is an error. */
-  tone: MeterTone;
-}
-
-/** Spend against the budget, or null when there is no budget to draw it against. */
-export function spendMeter(
-  forecast: AstroliftCostForecast | null,
-  budget: AstroliftBudget | null
-): SpendMeter | null {
-  if (!budget || budget.amountCents <= 0) return null;
-  const spentCents = forecast?.mtdCents ?? budget.currentSpendCents;
-  const ratio = spentCents / budget.amountCents;
-  const warnAt = Math.min(...(budget.alertsAtPct.length ? budget.alertsAtPct : [80])) / 100;
-  const clamp = (n: number) => Math.max(0, Math.min(1, n));
-  return {
-    spent: clamp(ratio),
-    projected: forecast ? clamp(forecast.projectedMonthlyCents / budget.amountCents) : null,
-    ratio,
-    tone: ratio >= 1 ? "error" : ratio >= warnAt ? "warn" : "ok",
-  };
 }
 
 // ---------------------------------------------------------------- platform activity

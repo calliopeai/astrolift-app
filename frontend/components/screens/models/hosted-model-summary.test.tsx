@@ -62,7 +62,7 @@ describe("hosted model connection and usage summaries", () => {
       ).not.toBeInTheDocument();
     }
   );
-  it("keeps serving configuration, per-app attribution and unmeasured cost truthful", () => {
+  it("keeps serving configuration and per-app attribution truthful", () => {
     view(
       <ModelObservationsPanel
         {...modelObservationsProps}
@@ -82,7 +82,7 @@ describe("hosted model connection and usage summaries", () => {
     );
     expect(screen.getByText(en.models.shared.inventory.metricsUnconfigured)).toBeInTheDocument();
     expect(screen.getByText(en.models.shared.subscriptionUsage.selectionHint)).toBeInTheDocument();
-    expect(screen.getByText(en.models.shared.inventory.costUnavailable)).toBeInTheDocument();
+    expect(screen.queryByText(/Cost is unavailable|USD/)).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: en.models.shared.inventory.metricsSetup })
     ).toHaveAttribute("href", "/documentation/cluster-prerequisites");
@@ -117,7 +117,6 @@ describe("hosted model connection and usage summaries", () => {
       expect(
         screen.getByText(locales[locale].models.shared.subscriptionUsage.selectionHint)
       ).toBeInTheDocument();
-      expect(screen.getByText(copy.costUnavailable)).toBeInTheDocument();
     }
   );
 });

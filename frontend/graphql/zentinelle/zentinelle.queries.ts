@@ -68,15 +68,6 @@ export const ZENTINELLE_HEALTH = gql`
       windowHours
       blocks
       openApprovals
-      budgets {
-        id
-        name
-        scope
-        limitUsd
-        spendUsd
-        percent
-        level
-      }
     }
   }
 `;
@@ -97,7 +88,6 @@ export const ZENTINELLE_USAGE = gql`
         requests
         inputTokens
         outputTokens
-        costUsd
       }
     }
   }

@@ -5,8 +5,8 @@ preview GUID for detail; a branch, pull request number, retained hostname, or
 conventional environment name does not identify a workload target.
 
 ```graphql
-query Preview($id: GUID!, $includeRuntimeCost: Boolean = false) {
-  astroliftPreviewEnvironment(id: $id, includeRuntimeCost: $includeRuntimeCost) {
+query Preview($id: GUID!, $includeRuntimeResources: Boolean! = false) {
+  astroliftPreviewEnvironment(id: $id, includeRuntimeResources: $includeRuntimeResources) {
     id version registeredAppSlug prNumber isManual branch status hostname
     tornDownAt ttlUntil isPinned pinnedAt pinnedByEmail pinReason
     environmentStatus runtimeStatus
@@ -16,7 +16,6 @@ query Preview($id: GUID!, $includeRuntimeCost: Boolean = false) {
       clusterId clusterVersion namespace
     }
     aggregateResources { cpuCores memoryBytes podCount }
-    estimatedDailyCostUsd estimatedCostApproximate estimatedCostNotes
   }
 }
 ```
@@ -34,11 +33,12 @@ in the record, but it is not an action target. An unavailable binding exposes no
 target. Manual preview identity, lifecycle timestamps, pin and TTL remain metadata.
 
 Basic exact reads, paged browsing, and the deprecated unpaged catalog never list
-pods or look up pricing. They report `runtimeStatus: not_requested`, empty resource
-aggregates, and null estimated cost. Set `includeRuntimeCost: true` to request one
-bounded runtime read for the exact available target. A provider failure reports
-`unavailable`; a missing price remains null, not a zero-cost claim. Retired or
-unavailable targets do not trigger provider reads even with that option enabled.
+pods. They report `runtimeStatus: not_requested` and empty resource aggregates.
+Set `includeRuntimeResources: true` to request one bounded CPU/memory/pod read for
+the exact available target. A provider failure reports `unavailable`; do not
+interpret its empty aggregate as an observed zero. Retired or unavailable targets
+do not trigger provider reads even with that option enabled. Monetary estimate
+fields and pricing calls are retired (#2464).
 
 ## Bound logs and deployment history
 
@@ -72,7 +72,7 @@ namespace or cluster from a name or URL. Ordinary app logs without preview proof
 retain their existing behavior.
 
 Deployment history requires `APP_READ`, filters the exact app and environment
-foreign keys, and reads stored deployment snapshots without live pricing or
+foreign keys, and reads stored deployment snapshots without
 computed deployment-status provider calls. Its cursor is scoped to that preview
 and environment. A stale or retired target is refused rather than substituted.
 
@@ -169,7 +169,7 @@ contracts, not successful log delivery from a live production preview.
 ## Web and CLI
 
 The web detail route reads one GUID rather than finding it in a capped catalog.
-Resource/cost, logs, and deployment history each have explicit load controls. A
+Resources, logs, and deployment history each have explicit load controls. A
 new actor, organization, preview, or target hides the prior scope's data, and late
 responses cannot populate the new detail.
 
@@ -177,7 +177,7 @@ The matching CLI supports:
 
 ```sh
 astro app previews show example-app --id PREVIEW_GUID --json
-astro app previews show example-app --id PREVIEW_GUID --cost --json
+astro app previews show example-app --id PREVIEW_GUID --resources --json
 astro app previews logs example-app --id PREVIEW_GUID --since 30m --tail 200
 astro app previews open example-app --id PREVIEW_GUID --url
 ```
@@ -190,7 +190,7 @@ server and CLI together: the matching CLI requires the additive exact-preview
 schema and reports an explicit error against an older server.
 
 Public capability metadata exposes `previews.exact_identity`,
-`previews.reviewed_routes`, and `previews.explicit_runtime_cost`. Discovery is
+`previews.reviewed_routes`, and `previews.explicit_runtime_resources`. Discovery is
 informational and never grants permission. Mobile clients can consume this
 additive canonical contract; native mobile integration and consent UI require
 separate acceptance evidence.

@@ -37,10 +37,21 @@ The terminal transition (`completed`, `failed`, `cancelled`, `timed_out`) and it
 single logical event commit in one PostgreSQL transaction. Intermediate states
 and Temporal activity retries do not create completion events. The body contains
 task identity, unchanged correlation ID, final execution attempt, timestamps and
-observed usage. Unknown token/cost/model/duration values are null. Agents may
-report `usage: {input_tokens, output_tokens, total_cost_usd, model}` with their
+reported token/model usage and duration. Unknown token/model/duration values are
+null. Agents may report `usage: {input_tokens, output_tokens, model}` with their
 final pod callback. `FULL` includes the task result and failure message;
 `NOTIFY` omits `result` and makes `failure_message` null.
+
+Monetary usage is retired (#2464). New normalization discards `total_cost_usd`.
+For pending historical callbacks and manual redelivery, the worker removes only
+known envelope `usage.total_cost_usd` in memory before signing the actual outgoing
+bytes. Stored historical metadata and queued ciphertext are not backfilled or
+rewritten; arbitrary user result JSON remains unchanged. Normal terminal and
+retention purges still apply. Consumers must accept the missing optional field,
+including on an existing logical event. Malformed envelopes and bodies above
+8 MiB fail closed with a fixed metadata-only delivery error. Drain old workers
+as described in [the retirement rollout](../operators/retire-costing.md); an old
+worker can still send the earlier envelope until stopped.
 
 Any 2xx response succeeds. 4xx responses other than 408 and 429 fail permanently.
 Other responses and connection/time-out errors retry with ±20% jitter: 30 seconds,

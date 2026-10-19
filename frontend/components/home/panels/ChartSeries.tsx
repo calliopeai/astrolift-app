@@ -3,7 +3,7 @@
 /**
  * One series of a Home chart panel: its legend (a swatch in the series'
  * colour and what it counts), its figure in mono, and the compact chart
- * under them, full width. Traffic & errors and Runs & spend stack these
+ * under them, full width. Traffic & errors and Run history stack these
  * inside a Panel. Static SVG, so reduced motion changes nothing. Pure.
  */
 

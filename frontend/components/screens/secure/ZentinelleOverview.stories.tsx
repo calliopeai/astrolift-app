@@ -4,7 +4,6 @@ import { ZentinelleOverview } from "./ZentinelleOverview";
 import {
   CONNECTED,
   DEGRADED_CONNECTION,
-  HEALTH_COUNTS,
   HEALTH_NOT_AVAILABLE,
   HEALTHY_CONNECTION,
   OLDER_ZENTINELLE_CONNECTION,
@@ -47,43 +46,6 @@ export const OlderZentinelle: Story = {
       connection={OLDER_ZENTINELLE_CONNECTION}
       usage={usage}
       counts={{ data: HEALTH_NOT_AVAILABLE, loading: false, error: null }}
-    />
-  ),
-};
-
-export const NoBudget: Story = {
-  render: () => (
-    <ZentinelleOverview
-      connection={HEALTHY_CONNECTION}
-      usage={usage}
-      counts={{ data: { ...HEALTH_COUNTS, budgets: [] }, loading: false, error: null }}
-    />
-  ),
-};
-
-export const BudgetExceeded: Story = {
-  render: () => (
-    <ZentinelleOverview
-      connection={HEALTHY_CONNECTION}
-      usage={usage}
-      counts={{
-        data: {
-          ...HEALTH_COUNTS,
-          budgets: [
-            {
-              id: "pol_2",
-              name: "Monthly model budget for the platform reliability team's long-running agents",
-              scope: "organization",
-              limitUsd: 500,
-              spendUsd: 538.12,
-              percent: 107.62,
-              level: "exceeded",
-            },
-          ],
-        },
-        loading: false,
-        error: null,
-      }}
     />
   ),
 };

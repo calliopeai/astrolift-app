@@ -42,7 +42,7 @@ export const LongStrings: Story = {
         panel={{ ...HOME_PANELS["my-apps"], title: `My apps ${LONG_SHA}`, href: LONG_URL }}
       />
       <PlaceholderPanel panel={{ ...HOME_PANELS.activity, title: LONG_ARN }} />
-      <PlaceholderPanel panel={{ ...HOME_PANELS["spend-quota"], title: LONG_ARN }} />
+      <PlaceholderPanel panel={{ ...HOME_PANELS["platform-activity"], title: LONG_ARN }} />
     </PanelGrid>
   ),
 };
