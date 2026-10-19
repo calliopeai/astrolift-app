@@ -118,6 +118,26 @@ class SmokeControlTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "platform"):
                 smoke.inspect_target("fixture")
 
+    def test_refusal_before_a_server_starts_records_no_memory_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof = root / "proof.json"
+            with patch.object(smoke, "CGROUP_ROOT", root), patch.object(
+                smoke,
+                "inspect_target",
+                side_effect=ValueError("Wrong candidate platform"),
+            ), patch.object(
+                smoke.subprocess,
+                "check_output",
+                side_effect=AssertionError("No container may start"),
+            ), patch.object(smoke.subprocess, "run") as run:
+                with self.assertRaises(SystemExit):
+                    smoke.smoke("fixture", proof)
+            receipt = json.loads(proof.read_text())
+        self.assertEqual(receipt["failure_type"], "ValueError")
+        self.assertNotIn("memory_evidence", receipt)
+        run.assert_not_called()
+
     def test_failure_to_start_records_refusal_and_removes_owned_container(self):
         running = [
             {
