@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Renaming an app in place no longer accepts a blank or over-long name (#2477). `updateApp` trims `name` and refuses an empty one, or one over 200 characters, as a `VALIDATION` error on `name` before anything is written; a blank name used to leave the app nameless, and an over-long one failed in Postgres as `INTERNAL`. The rename changes the display name only: the slug, and the namespace, hostname, registry repository and CI role named after it, stay. Renaming the slug remains open in #2477.
+
 - Move ordinary repository CI and generated managed GitHub app/agent workflows to Node 24 action runtimes (#2473). Managed workflow template version 11 uses checkout v6 and AWS OIDC credentials v6; non-GitHub renderers retain their existing output. The separately validated CPU model workflow and runtime scripts are unchanged; its migration and runtime qualification remain open in #2474 and #2492. This does not upgrade the frontend's application Node.js toolchain.
 
 - Stop advertising the retired monetary feature in the frontend route-test API fixture (#2464).
