@@ -13,6 +13,7 @@ from django.utils import timezone
 from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_scm.ci_identity import github_ci_identity
 from astrolift_scm.providers import ProviderError
+from astrolift_scm.services import workflow_sync
 from astrolift_scm.services.workflow_sync import (
     _superseded_workflow_path,
     github_workflow_path_for,
@@ -92,6 +93,25 @@ def test_a_protected_deploy_branch_gets_a_review_pull_request(apps, host):
     assert path not in host.branches[_review_branch(app)]
     assert [(pull["head"], pull["base"]) for pull in host.pulls] == [(_review_branch(app), "main")]
     assert app.slug in host.pulls[0]["title"] and path in host.pulls[0]["body"]
+
+
+def test_a_review_pull_request_whose_url_is_unknown_is_still_reported_as_opened(apps, host, monkeypatch):
+    """GitHub answers a repeated pull request with "already exists", and the
+    lookup of the open one can come back empty. The file is still on the
+    deploy branch, so the summary must not call it removed."""
+    app = apps[0]
+    assert sync_workflow_file_to_repo(app).status == "created"
+    path = github_workflow_path_for(app)
+    host.protected = True
+    monkeypatch.setattr(workflow_sync, "_github_open_pull_request", lambda *args, **kwargs: "")
+
+    summary = remove_workflow_file_from_repo(app)
+
+    assert summary["status"] == "pr_opened" and summary["pr_url"] == ""
+    assert summary["detail"] == (
+        f"opened a pull request from {_review_branch(app)} to remove {path} from example/monorepo@main"
+    )
+    assert path in host.files
 
 
 def test_a_retry_reuses_its_review_branch_without_a_second_delete(apps, host):

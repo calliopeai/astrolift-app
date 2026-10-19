@@ -1956,14 +1956,6 @@ def _sync_gitea(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncRe
 # Removal when the app is deregistered (#2480)
 # ---------------------------------------------------------------------------
 
-# GitLab, Bitbucket and Gitea keep the managed CI at one repository-wide path
-# that can also hold the operator's own jobs, so deregister never deletes it.
-_SHARED_HOST_WORKFLOW_PATHS: Final = {
-    "gitlab": GITLAB_WORKFLOW_PATH,
-    "bitbucket": BITBUCKET_WORKFLOW_PATH,
-    "gitea": GITEA_WORKFLOW_PATH,
-}
-
 
 def _managed_github_workflow_paths(app: RegisteredApp) -> list[str]:
     """Every path a managed workflow of ``app`` can occupy.
@@ -2088,6 +2080,8 @@ def remove_workflow_file_from_repo(app: RegisteredApp) -> dict:
         return {**summary, "status": "no_repo", "detail": "app has no source repo configured"}
 
     if app.source_kind != "github":
+        # GitLab, Bitbucket and Gitea keep the managed CI at one repository-wide
+        # path that can also hold the operator's own jobs: name it, never delete.
         recorded = str((app.ci_workflow_state or {}).get("path") or "").strip()
         if not recorded:
             return {
@@ -2129,9 +2123,12 @@ def remove_workflow_file_from_repo(app: RegisteredApp) -> dict:
                 removable[path] = existing
             else:
                 retained.append(path)
+        via_review = bool(removable) and _is_github_branch_protected(
+            connection, repo_full_name=repo, branch=branch
+        )
         pr_url = ""
         removed: list[str] = []
-        if removable and _is_github_branch_protected(connection, repo_full_name=repo, branch=branch):
+        if via_review:
             pr_url = _remove_via_pull_request(
                 connection, app, branch=branch, files=removable, commit_message=commit_message
             )
@@ -2158,8 +2155,11 @@ def remove_workflow_file_from_repo(app: RegisteredApp) -> dict:
         ) from exc
 
     notes = []
-    if pr_url:
-        notes.append(f"opened {pr_url} to remove {', '.join(removed)} from {repo}@{branch}")
+    if via_review:
+        # GitHub answers a repeated pull request with "already exists"; when the
+        # open one cannot be looked up, name its branch instead.
+        opened = pr_url or f"a pull request from {_removal_branch_for(app)}"
+        notes.append(f"opened {opened} to remove {', '.join(removed)} from {repo}@{branch}")
     elif removed:
         notes.append(f"removed {', '.join(removed)} from {repo}@{branch}")
     if retained:
@@ -2167,7 +2167,7 @@ def remove_workflow_file_from_repo(app: RegisteredApp) -> dict:
             f"left {', '.join(retained)} in place: not provably this app's file (edited, legacy or "
             "another registration's); remove it through repository review if nothing else uses it"
         )
-    if pr_url:
+    if via_review:
         status = "pr_opened"
     elif removed:
         status = "removed"
