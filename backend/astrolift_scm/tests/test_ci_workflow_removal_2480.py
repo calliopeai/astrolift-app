@@ -165,6 +165,22 @@ def test_a_file_this_app_cannot_prove_it_wrote_is_left_and_named(apps, host, var
     assert _repo_writes(host) == []
 
 
+def test_a_protected_branch_with_nothing_removable_gets_no_review_branch(apps, host):
+    """A review branch and pull request are only for a file this app can
+    remove; an edited one on a protected branch is just named."""
+    app = apps[0]
+    path = github_workflow_path_for(app)
+    edited = render_astrolift_ci_workflow(app) + "# operator edit\n"
+    host.files[path] = edited
+    host.protected = True
+
+    summary = remove_workflow_file_from_repo(app)
+
+    assert summary["status"] == "retained" and summary["retained"] == [path]
+    assert host.files[path] == edited
+    assert _repo_writes(host) == [] and set(host.branches) == {"main"}
+
+
 def test_the_legacy_path_a_sync_recorded_is_named_never_deleted(apps, host):
     """Generations before 9 wrote one shared ``astrolift-ci.yml`` with no
     owner line; it can belong to every registration in the repository."""
@@ -211,6 +227,33 @@ def test_a_concurrent_edit_is_refused_and_the_failure_names_the_files(apps, host
     assert "example/monorepo@main" in failed.value.message
     assert f"delete {path} or {_superseded_workflow_path(app)} by hand" in failed.value.message
     assert host.files[path] == edited and not host.deletes
+
+
+def test_a_concurrent_edit_carried_onto_the_review_branch_is_refused(apps, host):
+    """On a protected branch the review branch is cut from the deploy branch
+    after the review read, so an edit landing in between rides along. The
+    delete there is conditional on the reviewed blob too."""
+    app = apps[0]
+    assert sync_workflow_file_to_repo(app).status == "created"
+    path = github_workflow_path_for(app)
+    edited = host.files[path] + "# concurrent edit\n"
+    host.protected = True
+
+    def edit_after_review(branch, file, _current):
+        if branch == "main" and file == path:
+            host.after_read = None
+            host.files[path] = edited
+
+    host.after_read = edit_after_review
+
+    with pytest.raises(ProviderError) as failed:
+        remove_workflow_file_from_repo(app)
+
+    assert failed.value.code == "DELETE_FAILED"
+    assert f"delete {path} or {_superseded_workflow_path(app)} by hand" in failed.value.message
+    assert host.branches[_review_branch(app)][path] == edited
+    assert host.files[path] == edited
+    assert not host.deletes and not host.pulls
 
 
 def test_without_a_connection_the_paths_are_named_for_manual_removal(apps):
