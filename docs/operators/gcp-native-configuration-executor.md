@@ -102,6 +102,12 @@ What settling does:
 
 The next Deployment takes the settled journals as its previous generation.
 
+A teardown's grant removal (see [Teardown](#teardown)) has no Deployment. It is
+settled only while the app is tearing down, with the same guard window, and its
+`GCPNativeJournalResolution` row names no Deployment. Its unfinished writes and
+removals are folded into the owned set, so the next teardown run removes
+whatever is still there.
+
 ## Rollback
 
 `rollbackDeployment` on a native app no longer refuses
@@ -113,6 +119,71 @@ quorum like any native Deployment, and runs it as the canonical
 `RollbackDeploymentWorkflow` still refuses a native app. The current Deployment
 stays `running` until the rollback is observed live; completion then marks it
 `rolled_back`.
+
+## Teardown
+
+Deregistering a native app (`deregisterAstroliftApp`, or a temporary app's
+expiry) or tearing it down (`tearDownApp`) revokes every grant its IAM journals
+own, through those journals, before any managed service is deprovisioned. The
+activity `astrolift.app.remove_native_endpoint_identity` runs after the
+namespace delete. On each cluster where the app has an IAM journal it:
+
+- takes the executor's preparation and IAM mutexes, without waiting, so it
+  never runs beside a native configuration;
+- reserves a removal operation on the IAM journal, the next revision, with the
+  empty desired union: no Endpoint grant and no KSA principal;
+- runs the IAM port. Every Endpoint prediction grant and every Workload
+  Identity binding on the GSA that the journal owns is removed against the
+  current etag and before-hash, and a final pass reads every policy back.
+
+Bindings the journal does not own stay: another app's grant on the same
+Endpoint, foreign and conditional bindings, and an equivalent grant that was
+there before the app's. The removal reads the project, the GSA and IAM policies
+and writes only those policies. No Endpoint, model, GSA or KSA is created or
+deleted; the GSA stays, without grants or impersonation bindings.
+
+It refuses before any native call, as `NATIVE_IDENTITY_REMOVAL_PENDING:<REASON>`:
+
+- `APP_NOT_TEARING_DOWN` unless the app is tearing down;
+- `PRIOR_SEND_UNRESOLVED` or `PRIOR_OPERATION_INCOMPLETE` while a Deployment's
+  IAM operation is unresolved (settle it first, above);
+- `PREPARATION_BUSY` or `JOURNAL_BUSY` while a worker holds a mutex;
+- `CURRENT_IDENTITY_SOURCE_UNAVAILABLE` when the cluster's declared credential
+  changed, a renamed cluster included, and `ORIGINAL_TARGET_INTEGRITY_FAILED`
+  when the recorded target does not match its hash.
+
+Partial inventory stays pending. A policy that cannot be read (denied, or an
+Endpoint deleted elsewhere), a lost reply, or a GSA that was replaced or
+disabled leaves the journal unobserved, with its removal obligations kept.
+Every native call is fenced by a checkpoint that re-reads the app's teardown
+state and the declared credential; a change while it runs stops it before the
+next write (`CURRENT_OPERATION_UNCONFIRMED`). While the removal is pending:
+
+- `DeregisterAppWorkflow` reports `native_identity` still live and holds the
+  managed services (`managed_services` still live, nothing deprovisioned), so
+  the Endpoints whose policies still name the app stay readable. It keeps the
+  platform rows and does not remove the CI workflow. An expiring app's kept
+  services stay kept. Re-firing the deregister resumes the same removal
+  operation.
+- `TearDownAppWorkflow` revokes the deploy tokens and stops: no managed service
+  is deprovisioned and the rows stay. Running it again resumes the removal.
+
+The activity runs once per teardown run, never retried. A `SENT` write is
+resolved only by its exact after-hash, never by sending again. If another
+writer moved the policy since, the removal stays `SENT_SUBMISSION_UNRESOLVED`
+until an operator settles it ([above](#settling-a-stuck-journal)); the next
+run then removes what the settled ledger still owns.
+
+After the removal the IAM journal has moved past the last Deployment's fence,
+and the native configuration refuses an app that is tearing down or
+deregistered (`APP_TEARDOWN_IN_PROGRESS`): at its preflight, and again on the
+locked app row when it reserves its IAM operation. A configuration that was
+already running when the teardown began either reserved its IAM operation
+first, so the removal finds that journal and stays pending (`PREPARATION_BUSY`)
+until the run ends and the next teardown run revokes its grants, or is refused
+there before it grants anything. Either way no Deployment adds the grants back.
+Removing a grant from a policy does not revoke a token already issued, and
+access another grant allows is not denied.
 
 ## Rollout observation
 
@@ -128,8 +199,11 @@ readback does not prove token exchange or a successful prediction.
 - The shared organization-owned native-model subscription path.
 - Mixed unions and migrating a legacy GSA or its project-wide grants.
 - Platform builds for native apps.
-- Physical subject evolution (renamed namespaces or service accounts) and
-  complete resource removal.
+- Physical subject evolution (renamed namespaces or service accounts).
+- The rest of resource removal: deleting the app's GSA at teardown, and
+  deleting its namespaces and KSAs by their recorded UIDs (the legacy namespace
+  delete still runs, by name). A teardown whose GSA was deleted outside
+  Astrolift stays pending with no recovery yet.
 - Live GKE token exchange and Vertex inference acceptance.
 
 Controlled generated-SDK, owned TLS, PostgreSQL and Temporal fixtures are local

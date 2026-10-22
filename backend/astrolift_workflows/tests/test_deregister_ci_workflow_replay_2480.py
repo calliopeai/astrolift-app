@@ -69,7 +69,14 @@ async def _replay(history: WorkflowHistory) -> None:
     ).replay_workflow(history)
 
 
-def _fake_activities(remove_ci_workflow: Callable[[int], dict]) -> list:
+def _no_native_identity(registered_app_id: int) -> list[dict]:
+    return []
+
+
+def _fake_activities(
+    remove_ci_workflow: Callable[[int], dict],
+    remove_native_identity: Callable[[int], list[dict]] = _no_native_identity,
+) -> list:
     @activity.defn(name="astrolift.app.mark_tearing_down")
     async def mark_tearing_down(registered_app_id: int) -> bool:
         return False
@@ -138,6 +145,10 @@ def _fake_activities(remove_ci_workflow: Callable[[int], dict]) -> list:
     async def remove_ci_workflow_activity(registered_app_id: int) -> dict:
         return remove_ci_workflow(registered_app_id)
 
+    @activity.defn(name="astrolift.app.remove_native_endpoint_identity")
+    async def remove_native_endpoint_identity(registered_app_id: int) -> list[dict]:
+        return remove_native_identity(registered_app_id)
+
     return [
         mark_tearing_down,
         abort_in_flight_deploys,
@@ -156,6 +167,7 @@ def _fake_activities(remove_ci_workflow: Callable[[int], dict]) -> list:
         soft_delete_records,
         mark_deregistered,
         remove_ci_workflow_activity,
+        remove_native_endpoint_identity,
     ]
 
 
@@ -197,8 +209,19 @@ async def test_a_fresh_deregister_removes_the_ci_workflow_last_and_replays(tempo
     result, history = await _deregister(temporal_env, remove, "deregister-removes-ci-workflow-2480")
 
     assert result.ok is True and result.data["still_live_resources"] == []
-    assert _scheduled(history) == [*_BEFORE_2480, "astrolift.app.remove_ci_workflow"]
+    # The native identity removal (#2278) runs after the namespace delete.
+    assert _scheduled(history) == [
+        *_BEFORE_2480[:3],
+        "astrolift.app.remove_native_endpoint_identity",
+        *_BEFORE_2480[3:],
+        "astrolift.app.remove_ci_workflow",
+    ]
     assert calls == [7]
+    assert result.data["teardown"]["native_identity"] == {
+        "ok": True,
+        "detail": "no native GCP identity",
+        "data": [],
+    }
     assert result.data["teardown"]["ci_workflow"] == {
         "ok": True,
         "detail": removed["detail"],

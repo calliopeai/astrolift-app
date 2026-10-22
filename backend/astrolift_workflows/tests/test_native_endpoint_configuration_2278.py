@@ -1533,6 +1533,7 @@ async def test_actual_registered_configuration_worker_commits_every_stage_and_re
         "malformed_snapshot",
         "malformed_literals",
         "zero_replicas",
+        "teardown",
     ],
 )
 async def test_current_original_withdrawal_and_mixed_union_refuse_before_native_effects(
@@ -1560,6 +1561,9 @@ async def test_current_original_withdrawal_and_mixed_union_refuse_before_native_
             type(w.medops_app).objects.filter(pk=w.medops_app.pk).update(
                 manifest_raw=w.medops_app.manifest_raw.replace("replicas = 1", "replicas = 0")
             )
+        elif withdrawal == "teardown":
+            # Teardown revokes the app's owned grants; nothing may re-add them (#2278).
+            type(w.medops_app).objects.filter(pk=w.medops_app.pk).update(provisioning_status="tearing_down")
         else:
             ManagedService.objects.create(
                 registered_app=w.medops_app, app_environment=w.env, kind="postgres", name="unsupported"
@@ -1601,6 +1605,40 @@ async def test_actual_namespace_reply_retains_original_uid_after_token_withdrawa
     assert journal.state == "SENT" and journal.prepared_revision == journal.observed_revision == 0
     assert all(value["state"] == "SENT" for value in journal.submissions.values())
     assert not w.iam_wires
+    assert await sync_to_async(GCPWorkloadIdentityJournal.objects.count)() == 0
+    assert await sync_to_async(GCPGKEAppApplyJournal.objects.count)() == 0
+
+
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_teardown_begun_after_the_preflight_opens_no_iam_operation(native_world, client, temporal_env):
+    """A teardown that begins while a first configuration prepares finds no IAM
+    journal, so its removal revokes nothing: the configuration must not grant
+    behind it (#2278)."""
+    w = native_world
+    from django.db import connections
+
+    original = w.http["after_write"]
+    torn_down = []
+
+    def tear_down_after_namespace_create(method, path):
+        original(method, path)
+        if method == "POST" and w.http["objects"][path]["kind"] == "Namespace":
+            torn_down.append(path)
+            try:
+                type(w.medops_app).objects.filter(pk=w.medops_app.pk).update(
+                    provisioning_status="tearing_down"
+                )
+            finally:
+                # This server thread owns its fresh default connection only.
+                connections["default"].close()
+
+    w.http["after_write"] = tear_down_after_namespace_create
+    result, _ = await run(w, client, temporal_env)
+    assert result == {"refused": True}
+    assert len(torn_down) == 1
+    assert w.failures == [("NativeConfigurationError", "APP_TEARDOWN_IN_PROGRESS")]
+    assert not any(wire.calls for wire in w.iam_wires)
     assert await sync_to_async(GCPWorkloadIdentityJournal.objects.count)() == 0
     assert await sync_to_async(GCPGKEAppApplyJournal.objects.count)() == 0
 
