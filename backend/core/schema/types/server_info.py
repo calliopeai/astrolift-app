@@ -27,7 +27,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import socket
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -167,6 +166,18 @@ class BuildTimeFeatureInfo:
     description: str | None = None
 
 
+def _resolve_install_id() -> str:
+    """The id from :func:`core.install_identity.current_install_id`:
+    ``ASTROLIFT_INSTALL_ID`` when set, otherwise the id generated once and
+    stored for the install. Push payloads carry the same value, so a client
+    can route a notification to the install it signed in to (#2161). It is
+    a database read, so it runs only when a query selects ``installId``.
+    """
+    from core.install_identity import current_install_id
+
+    return current_install_id()
+
+
 @strawberry.type(
     description=(
         "Install identity + capabilities handshake (#479). "
@@ -178,7 +189,7 @@ class BuildTimeFeatureInfo:
 class AstroliftServerInfo:
     version: str
     api_version: str
-    install_id: str
+    install_id: str = strawberry.field(resolver=_resolve_install_id)
     install_slug: str
     install_label: str | None = None
     region: str | None = None
@@ -204,35 +215,22 @@ class AstroliftServerInfo:
 
 @dataclass(frozen=True, slots=True)
 class _InstallIdentity:
-    install_id: str
     install_slug: str
     install_label: str | None
     region: str | None
 
 
 def _resolve_install_identity() -> _InstallIdentity:
-    """Resolve the install identity from env, falling back to a stable
-    derived value when nothing is configured.
-
-    Operators set ``ASTROLIFT_INSTALL_ID`` / ``_SLUG`` / ``_LABEL`` /
-    ``_REGION`` in production. Dev installs typically set neither; for
-    them we derive a hash from the django secret key + hostname so
-    restarts return the same id (mobile clients use it to detect "same
-    URL is now a different install").
+    """Resolve the install's slug, label and region from
+    ``ASTROLIFT_INSTALL_SLUG`` / ``_LABEL`` / ``_REGION``. The install id
+    has its own field resolver, :func:`_resolve_install_id`.
     """
-    explicit_id = os.environ.get("ASTROLIFT_INSTALL_ID", "").strip()
-    if explicit_id:
-        install_id = explicit_id
-    else:
-        seed = f"{settings.SECRET_KEY}|{socket.gethostname()}".encode()
-        install_id = "install-" + hashlib.sha256(seed).hexdigest()[:24]
-
     slug = os.environ.get("ASTROLIFT_INSTALL_SLUG", "").strip() or "local"
     raw_label = os.environ.get("ASTROLIFT_INSTALL_LABEL", "").strip()
     label = raw_label or None
     raw_region = os.environ.get("ASTROLIFT_INSTALL_REGION", "").strip()
     region = raw_region or None
-    return _InstallIdentity(install_id=install_id, install_slug=slug, install_label=label, region=region)
+    return _InstallIdentity(install_slug=slug, install_label=label, region=region)
 
 
 def _resolve_api_version() -> str:
@@ -370,7 +368,6 @@ class AstroliftServerInfoQuery:
         return AstroliftServerInfo(
             version=settings.VERSION,
             api_version=_resolve_api_version(),
-            install_id=identity.install_id,
             install_slug=identity.install_slug,
             install_label=identity.install_label,
             region=identity.region,
