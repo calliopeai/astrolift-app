@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import strawberry
-from django.db.models import Q
+from django.db.models import F, IntegerField, Q
+from django.db.models.functions import Cast, Coalesce
 from strawberry.types import Info
 
 from astrolift_identity.operation_context import instance_operation, workflow_id_operation
@@ -143,5 +144,10 @@ class Query:
                 "child_workflow_run",
                 "child_workflow_run__workflow_definition",
             )
-            .order_by("stage__order", "-created_at")
+            .annotate(
+                _reviewed_order=Coalesce(
+                    Cast("reviewed_stage_snapshot__order", IntegerField()), F("stage__order")
+                )
+            )
+            .order_by("_reviewed_order", "-created_at")
         )

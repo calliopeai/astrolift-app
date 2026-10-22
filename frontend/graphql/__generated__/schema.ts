@@ -38,6 +38,13 @@ export type AcknowledgeAlertEventInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type ActivateReviewedWorkflowScheduleInput = {
+  confirmed: Scalars['Boolean']['input'];
+  expectedScheduleReviewDigest: Scalars['String']['input'];
+  requestId: Scalars['String']['input'];
+  workflowId: Scalars['GUID']['input'];
+};
+
 export type AddAppDomainInput = {
   appSlug: Scalars['String']['input'];
   hostname: Scalars['String']['input'];
@@ -9452,6 +9459,8 @@ export type Mutation = {
   acknowledgeAlertEvent: AstroliftAlertEventMutationResult;
   /** Activate or deactivate an object by its global ID. */
   activate: Scalars['Boolean']['output'];
+  /** Save explicit consent for the exact reviewed schedule; engine state remains unconfirmed. */
+  activateReviewedWorkflowSchedule: ReviewedWorkflowScheduleApprovalReceiptMutationResult;
   addAppDomain: AstroliftAppDomainMutationResult;
   addEmailSuppressionEntry: EmailsuppressionaddpayloadMutationResult;
   addOrganizationAllowlistDomain: AstroliftOrganizationAllowlistedDomainMutationResult;
@@ -9986,6 +9995,11 @@ export type MutationAcknowledgeAlertEventArgs = {
 export type MutationActivateArgs = {
   active?: Scalars['Boolean']['input'];
   gid: Scalars['ID']['input'];
+};
+
+
+export type MutationActivateReviewedWorkflowScheduleArgs = {
+  input: ActivateReviewedWorkflowScheduleInput;
 };
 
 
@@ -13249,6 +13263,8 @@ export type Query = {
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
   /** Review one exact definition GUID and its canonical input/revision contract; no slug substitution. */
   workflowDefinitionById?: Maybe<ReviewedWorkflowDefinition>;
+  /** Capture the complete exact-GUID native graph and revision in one read-only PostgreSQL snapshot. */
+  workflowDefinitionFullReview: WorkflowDefinitionFullReview;
   /** One run of a workflow definition by guid, or null (#2155). */
   workflowDefinitionRun?: Maybe<WorkflowDefinitionRun>;
   /** Recent runs of workflow definitions visible in the caller's organization. */
@@ -13280,6 +13296,8 @@ export type Query = {
   workflowRuns: Array<WorkflowRun>;
   /** Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion. */
   workflowSchedule?: Maybe<WorkflowScheduleState>;
+  /** Review the complete exact configured schedule, graph and compiled-plan digests before explicit activation. */
+  workflowScheduleFullReview: WorkflowScheduleFullReview;
   /** List stage executions for a WorkflowRun (by workflow_id + run_id). */
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
@@ -15652,6 +15670,11 @@ export type QueryWorkflowDefinitionByIdArgs = {
 };
 
 
+export type QueryWorkflowDefinitionFullReviewArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryWorkflowDefinitionRunArgs = {
   guid: Scalars['String']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
@@ -15731,6 +15754,11 @@ export type QueryWorkflowRunsArgs = {
 
 
 export type QueryWorkflowScheduleArgs = {
+  workflowId: Scalars['GUID']['input'];
+};
+
+
+export type QueryWorkflowScheduleFullReviewArgs = {
   workflowId: Scalars['GUID']['input'];
 };
 
@@ -16082,6 +16110,30 @@ export type ReviewedWorkflowDefinition = {
   guid: Scalars['GUID']['output'];
   inputContract: RunInputContract;
   revision: Scalars['String']['output'];
+};
+
+export type ReviewedWorkflowScheduleApprovalReceipt = {
+  approvedAt: Scalars['DateTime']['output'];
+  approvedByUserId: Scalars['ID']['output'];
+  compiledPlansDigest: Scalars['String']['output'];
+  configurationDigest: Scalars['String']['output'];
+  credentialExpiresAt?: Maybe<Scalars['DateTime']['output']>;
+  credentialKind: Scalars['String']['output'];
+  databaseStatus: Scalars['String']['output'];
+  definitionId: Scalars['GUID']['output'];
+  definitionRevision: Scalars['String']['output'];
+  engineState: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  isCurrent: Scalars['Boolean']['output'];
+  reviewDigest: Scalars['String']['output'];
+  scheduleReviewDigest: Scalars['String']['output'];
+  workflowId: Scalars['GUID']['output'];
+};
+
+export type ReviewedWorkflowScheduleApprovalReceiptMutationResult = {
+  data?: Maybe<ReviewedWorkflowScheduleApprovalReceipt>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type RevokeApiTokenInput = {
@@ -17218,6 +17270,18 @@ export type WorkflowDefinitionActivationResult = {
   revision?: Maybe<Scalars['String']['output']>;
 };
 
+export type WorkflowDefinitionFullReview = {
+  canonicalReview: Scalars['String']['output'];
+  canonicalization: Scalars['String']['output'];
+  capturedAt: Scalars['DateTime']['output'];
+  consistency: WorkflowReviewConsistency;
+  definitionId: Scalars['GUID']['output'];
+  inputSchemaDigest: Scalars['String']['output'];
+  reviewDigest: Scalars['String']['output'];
+  revision: Scalars['String']['output'];
+  rootManifest: Scalars['String']['output'];
+};
+
 export type WorkflowDefinitionRun = {
   childRunCount: Scalars['Int']['output'];
   currentStageOrder?: Maybe<Scalars['Int']['output']>;
@@ -17481,6 +17545,9 @@ export type WorkflowManifestStageType = {
   workflow?: Maybe<Scalars['String']['output']>;
 };
 
+export type WorkflowReviewConsistency =
+  | 'POSTGRES_REPEATABLE_READ';
+
 export type WorkflowRun = {
   completedAt?: Maybe<Scalars['DateTime']['output']>;
   currentState: Scalars['String']['output'];
@@ -17489,6 +17556,24 @@ export type WorkflowRun = {
   startedAt: Scalars['DateTime']['output'];
   temporalRunId?: Maybe<Scalars['String']['output']>;
   temporalWorkflowId?: Maybe<Scalars['String']['output']>;
+};
+
+export type WorkflowScheduleFullReview = {
+  activationIntent: Scalars['String']['output'];
+  canonicalConfiguration: Scalars['String']['output'];
+  canonicalReview: Scalars['String']['output'];
+  canonicalization: Scalars['String']['output'];
+  capturedAt: Scalars['DateTime']['output'];
+  compiledPlansDigest: Scalars['String']['output'];
+  configurationDigest: Scalars['String']['output'];
+  consistency: WorkflowReviewConsistency;
+  definitionId: Scalars['GUID']['output'];
+  inputSchemaDigest: Scalars['String']['output'];
+  reviewDigest: Scalars['String']['output'];
+  revision: Scalars['String']['output'];
+  rootManifest: Scalars['String']['output'];
+  scheduleReviewDigest: Scalars['String']['output'];
+  workflowId: Scalars['GUID']['output'];
 };
 
 export type WorkflowScheduleResult = {

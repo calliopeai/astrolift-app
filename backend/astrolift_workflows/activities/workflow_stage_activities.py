@@ -363,12 +363,13 @@ def _create_nested_workflow_run_sync(
         execution = WorkflowStageExecution.objects.select_related("stage__definition").get(
             pk=int(stage_execution_id), workflow_run=parent
         )
-        if execution.stage.kind != WorkflowStage.StageKind.WORKFLOW:
+        stage = execution.effective_stage
+        if stage.kind != WorkflowStage.StageKind.WORKFLOW:
             raise RuntimeError("nested child runs require a workflow stage execution")
 
         expected = resolve_child_definition(
-            execution.stage.definition,
-            execution.stage.workflow_ref,
+            stage.definition,
+            stage.workflow_ref,
         )
         if expected is None or expected.pk != int(child_definition_id):
             raise RuntimeError("nested child definition is unavailable or outside project scope")
@@ -499,8 +500,8 @@ def _execution_metadata(run, stage, context: dict | None) -> dict:
             raise ValueError("collection parent binding is unavailable")
         if (
             parent.status != "running"
-            or parent.stage.kind != "collection"
-            or parent.stage.definition_id != run.workflow_definition_id
+            or parent.effective_stage.kind != "collection"
+            or parent.effective_stage.definition_id != run.workflow_definition_id
             or parent.collection_parent_execution_id is not None
             or parent.fanout_parent_execution_id is not None
             or str(stage.pk) not in binding.get("body_stage_ids", [])
@@ -560,6 +561,10 @@ def _create_stage_execution_sync(
         if run.status != "running" or run.ended_at is not None:
             raise RuntimeError("Cannot open a stage on a closed workflow")
         stage = WorkflowStage.objects.get(pk=int(stage_id))
+        from workflows.reviewed_runtime import stage_snapshot
+
+        snapshot = stage_snapshot(run, stage)
+        stage = WorkflowStageExecution(stage=stage, reviewed_stage_snapshot=snapshot).effective_stage
 
         if context is not None:
             from workflows.stage_limits import validate_stage_attempts
@@ -571,6 +576,7 @@ def _create_stage_execution_sync(
             slug=_unique_slug(f"wfse-{run.pk}-{stage.pk}-a{attempt}"),
             workflow_run=run,
             stage=stage,
+            reviewed_stage_snapshot=snapshot,
             status=WorkflowStageExecution.Status.RUNNING,
             attempt_number=attempt,
             started_at=timezone.now(),
@@ -732,17 +738,27 @@ def _dispatch_agent_for_stage_sync(
     from astrolift_lifecycle.models import AgentRun
     from astrolift_registry.models import Workload
     from core.run_trigger import RunTrigger
-    from workflows.models import WorkflowStage, WorkflowStageExecution
+    from workflows.models import WorkflowStageExecution
 
-    stage = WorkflowStage.objects.select_related("agent_definition", "definition").get(pk=int(stage_id))
-    execution = WorkflowStageExecution.objects.select_related("workflow_run").get(pk=int(execution_id))
+    execution = WorkflowStageExecution.objects.select_related("workflow_run", "stage").get(
+        pk=int(execution_id)
+    )
+    stage = execution.effective_stage
+    if stage.pk != int(stage_id):
+        raise RuntimeError("The dispatch stage does not match its execution")
     run = execution.workflow_run
     organization_id = run.organization_id
     config = resolved_config if isinstance(resolved_config, dict) else {}
+    if execution.reviewed_stage_snapshot is not None:
+        from workflows.reviewed_runtime import compiled_stage
+
+        config = compiled_stage(run, stage)
     workload_id = config.get("agent_definition_id") or stage.agent_definition_id
     workload = (
         Workload.objects.filter(
             pk=workload_id,
+            registered_app__deleted_at__isnull=True,
+            registered_app__organization__deleted_at__isnull=True,
             kind=Workload.Kind.AGENT,
             deleted_at__isnull=True,
             **({"registered_app__organization_id": organization_id} if organization_id is not None else {}),
@@ -754,6 +770,15 @@ def _dispatch_agent_for_stage_sync(
         raise RuntimeError(
             f"stage {stage_id} is kind={stage.kind} with no agent_definition resolvable — cannot dispatch"
         )
+    if execution.reviewed_stage_snapshot is not None and (
+        config.get("reviewed_agent_guid") != str(workload.guid)
+        or config.get("reviewed_agent_version") != workload.version
+        or config.get("reviewed_app_guid") != str(workload.registered_app.guid)
+        or config.get("reviewed_app_version") != workload.registered_app.version
+        or config.get("reviewed_app_team_id") != workload.registered_app.team_id
+        or config.get("reviewed_app_project_id") != workload.registered_app.project_id
+    ):
+        raise RuntimeError("The approved agent changed; review is required before dispatch")
     skill_refs = list(config.get("skill_refs", stage.skill_refs or []))
     environment_spec_slug = str(config.get("environment_spec_slug", stage.environment_spec_slug) or "")
     prompt = str(config.get("prompt", stage.prompt) or "")
@@ -1132,15 +1157,17 @@ def _resolve_gate_agent_tasks_sync(execution) -> tuple[list, bool]:
     from astrolift_agents.models import resolve_agent_task_for_run
     from workflows.models import WorkflowStage, WorkflowStageExecution
 
-    gate_order = execution.stage.order
+    gate_order = execution.effective_stage.order
     agent_execs = list(
         WorkflowStageExecution.objects.filter(
             workflow_run_id=execution.workflow_run_id,
             agent_run__isnull=False,
-            stage__kind=WorkflowStage.StageKind.AGENT_DISPATCH,
         ).select_related("stage", "agent_run")
     )
-    below = [(e.stage.order, e.agent_run) for e in agent_execs if e.stage.order < gate_order]
+    agent_execs = [e for e in agent_execs if e.effective_stage.kind == WorkflowStage.StageKind.AGENT_DISPATCH]
+    below = [
+        (e.effective_stage.order, e.agent_run) for e in agent_execs if e.effective_stage.order < gate_order
+    ]
     if below:
         max_order = max(order for order, _ in below)
         target_runs = [run for order, run in below if order == max_order]
@@ -1177,7 +1204,7 @@ def _capture_gate_interaction(
         tasks, ambiguous = _resolve_gate_agent_tasks_sync(execution)
         if not tasks:
             return
-        stage = execution.stage
+        stage = execution.effective_stage
         name = stage.name or stage.role or f"human_gate #{stage.order}"
         detail = {
             "execution_id": str(execution.pk),
@@ -1347,6 +1374,8 @@ def _snapshot_checkpoint_sync(
         execution_id = _create_stage_execution_sync(workflow_run_id, stage_id, 1, context)
         _update_stage_execution_sync(execution_id, "completed", {"checkpoint": previous_output or {}}, None)
         return execution_id
+    from workflows.reviewed_runtime import stage_snapshot
+
     run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
     now = timezone.now()
@@ -1354,6 +1383,7 @@ def _snapshot_checkpoint_sync(
         slug=_unique_slug(f"wfse-{run.pk}-{stage.pk}-checkpoint"),
         workflow_run=run,
         stage=stage,
+        reviewed_stage_snapshot=stage_snapshot(run, stage),
         status=WorkflowStageExecution.Status.COMPLETED,
         attempt_number=1,
         started_at=now,
@@ -1381,6 +1411,7 @@ def _aggregate_fan_out_sync(
 
     from astrolift_operations.models import WorkflowRun
     from workflows.models import WorkflowStage, WorkflowStageExecution
+    from workflows.reviewed_runtime import stage_snapshot
 
     run = WorkflowRun.objects.get(pk=_parent_run_pk(workflow_run_id))
     stage = WorkflowStage.objects.get(pk=int(stage_id))
@@ -1421,6 +1452,7 @@ def _aggregate_fan_out_sync(
         slug=_unique_slug(f"wfse-{run.pk}-{stage.pk}-agg"),
         workflow_run=run,
         stage=stage,
+        reviewed_stage_snapshot=stage_snapshot(run, stage),
         status=WorkflowStageExecution.Status.COMPLETED,
         attempt_number=1,
         started_at=now,

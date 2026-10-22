@@ -11,6 +11,13 @@ input AcknowledgeAlertEventInput {
   id: GUID!
 }
 
+input ActivateReviewedWorkflowScheduleInput {
+  workflowId: GUID!
+  expectedScheduleReviewDigest: String!
+  requestId: String!
+  confirmed: Boolean! = false
+}
+
 input AddAppDomainInput {
   appSlug: String!
   hostname: String!
@@ -10642,6 +10649,11 @@ type Mutation {
   replyToAgentMessage(input: AstroliftReplyToAgentMessageInput!): AstroliftAgentMessageReplyMutationResult!
 
   """
+  Save explicit consent for the exact reviewed schedule; engine state remains unconfirmed.
+  """
+  activateReviewedWorkflowSchedule(input: ActivateReviewedWorkflowScheduleInput!): ReviewedWorkflowScheduleApprovalReceiptMutationResult!
+
+  """
   Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response.
   """
   startWorkflowDefinition(input: StartWorkflowDefinitionInput!): WorkflowDefinitionStartMutationResult!
@@ -11703,6 +11715,16 @@ type Query {
   exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
 
   """
+  Capture the complete exact-GUID native graph and revision in one read-only PostgreSQL snapshot.
+  """
+  workflowDefinitionFullReview(id: GUID!): WorkflowDefinitionFullReview!
+
+  """
+  Review the complete exact configured schedule, graph and compiled-plan digests before explicit activation.
+  """
+  workflowScheduleFullReview(workflowId: GUID!): WorkflowScheduleFullReview!
+
+  """
   Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null.
   """
   pendingHumanGatesPage(limit: Int! = 50, after: String = null): PendingHumanGatePage!
@@ -12137,6 +12159,30 @@ type ReviewedWorkflowDefinition {
   revision: String!
   inputContract: RunInputContract!
   definition: WorkflowDefinitionSummary!
+}
+
+type ReviewedWorkflowScheduleApprovalReceipt {
+  id: GUID!
+  workflowId: GUID!
+  definitionId: GUID!
+  approvedByUserId: ID!
+  approvedAt: DateTime!
+  reviewDigest: String!
+  definitionRevision: String!
+  configurationDigest: String!
+  compiledPlansDigest: String!
+  credentialKind: String!
+  credentialExpiresAt: DateTime
+  isCurrent: Boolean!
+  scheduleReviewDigest: String!
+  databaseStatus: String!
+  engineState: String!
+}
+
+type ReviewedWorkflowScheduleApprovalReceiptMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ReviewedWorkflowScheduleApprovalReceipt
 }
 
 input RevokeApiTokenInput {
@@ -13255,6 +13301,18 @@ type WorkflowDefinitionActivationResult {
   changed: Boolean!
 }
 
+type WorkflowDefinitionFullReview {
+  definitionId: GUID!
+  revision: String!
+  capturedAt: DateTime!
+  consistency: WorkflowReviewConsistency!
+  canonicalization: String!
+  reviewDigest: String!
+  canonicalReview: String!
+  rootManifest: String!
+  inputSchemaDigest: String!
+}
+
 type WorkflowDefinitionRun {
   guid: String!
   definitionGuid: String!
@@ -13536,6 +13594,10 @@ type WorkflowManifestStageType {
   approvers: [String!]!
 }
 
+enum WorkflowReviewConsistency {
+  POSTGRES_REPEATABLE_READ
+}
+
 type WorkflowRun {
   guid: String!
   currentState: String!
@@ -13544,6 +13606,24 @@ type WorkflowRun {
   startedAt: DateTime!
   completedAt: DateTime
   isCompleted: Boolean!
+}
+
+type WorkflowScheduleFullReview {
+  definitionId: GUID!
+  revision: String!
+  capturedAt: DateTime!
+  consistency: WorkflowReviewConsistency!
+  canonicalization: String!
+  reviewDigest: String!
+  canonicalReview: String!
+  rootManifest: String!
+  inputSchemaDigest: String!
+  workflowId: GUID!
+  canonicalConfiguration: String!
+  configurationDigest: String!
+  compiledPlansDigest: String!
+  scheduleReviewDigest: String!
+  activationIntent: String!
 }
 
 type WorkflowScheduleResult {
