@@ -31,6 +31,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.cluster_management")
 
 
@@ -68,8 +70,7 @@ def _verify_reachability_sync(cluster_id: int) -> None:
 async def verify_reachability(cluster_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_verify_reachability_sync)(cluster_id)
+    await heartbeat_while(sync_to_async(_verify_reachability_sync)(cluster_id))
 
 
 def _apply_platform_rbac_sync(cluster_id: int) -> list[str]:
@@ -91,8 +92,7 @@ def _apply_platform_rbac_sync(cluster_id: int) -> list[str]:
 async def apply_platform_rbac(cluster_id: int) -> list[str]:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_apply_platform_rbac_sync)(cluster_id)
+    return await heartbeat_while(sync_to_async(_apply_platform_rbac_sync)(cluster_id))
 
 
 def _provision_secrets_backend_sync(cluster_id: int) -> dict[str, Any]:
@@ -155,8 +155,7 @@ async def provision_secrets_backend(cluster_id: int) -> dict[str, Any]:
     SecretsBackend.ensure_initialized()."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_provision_secrets_backend_sync)(cluster_id)
+    return await heartbeat_while(sync_to_async(_provision_secrets_backend_sync)(cluster_id))
 
 
 def _probe_capabilities_sync(cluster_id: int) -> dict:
@@ -181,8 +180,7 @@ async def probe_capabilities(cluster_id: int) -> dict:
     Temporal history for debugging)."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_probe_capabilities_sync)(cluster_id)
+    return await heartbeat_while(sync_to_async(_probe_capabilities_sync)(cluster_id))
 
 
 def _run_preflight_job_sync(cluster_id: int) -> str:
@@ -205,8 +203,7 @@ def _run_preflight_job_sync(cluster_id: int) -> str:
 async def run_preflight_job(cluster_id: int) -> str:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_run_preflight_job_sync)(cluster_id)
+    return await heartbeat_while(sync_to_async(_run_preflight_job_sync)(cluster_id))
 
 
 def _mark_managed_sync(cluster_id: int) -> None:
@@ -242,8 +239,7 @@ def _mark_managed_sync(cluster_id: int) -> None:
 async def mark_managed(cluster_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_managed_sync)(cluster_id)
+    await heartbeat_while(sync_to_async(_mark_managed_sync)(cluster_id))
 
 
 def _mark_error_sync(cluster_id: int, message: str, retirement: bool = False) -> None:
@@ -280,12 +276,11 @@ def _mark_error_sync(cluster_id: int, message: str, retirement: bool = False) ->
 async def mark_error(cluster_id: int, message: str) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
     # Preserve the existing activity signature/history. Trusted workflow
     # identity distinguishes a real retirement failure from a stale management
     # workflow trying to overwrite the same cluster's retiring state.
     retirement = activity.info().workflow_type == "DecommissionClusterWorkflow"
-    await sync_to_async(_mark_error_sync)(cluster_id, message, retirement)
+    await heartbeat_while(sync_to_async(_mark_error_sync)(cluster_id, message, retirement))
 
 
 def _mark_managing_sync(cluster_id: int) -> None:
@@ -323,8 +318,7 @@ def _mark_managing_sync(cluster_id: int) -> None:
 async def mark_managing(cluster_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_managing_sync)(cluster_id)
+    await heartbeat_while(sync_to_async(_mark_managing_sync)(cluster_id))
 
 
 # ---- Cluster decommission ----------------------------------------------
@@ -370,8 +364,7 @@ async def ensure_cluster_drained(cluster_id: int) -> int:
     """Refuse decommission when app envs are bound to this cluster."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_ensure_cluster_drained_sync)(cluster_id)
+    return await heartbeat_while(sync_to_async(_ensure_cluster_drained_sync)(cluster_id))
 
 
 def _mark_decommissioning_sync(cluster_id: int) -> None:
@@ -393,8 +386,7 @@ def _mark_decommissioning_sync(cluster_id: int) -> None:
 async def mark_decommissioning(cluster_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_decommissioning_sync)(cluster_id)
+    await heartbeat_while(sync_to_async(_mark_decommissioning_sync)(cluster_id))
 
 
 def _remove_platform_rbac_sync(cluster_id: int) -> str:
@@ -436,8 +428,7 @@ async def remove_platform_rbac(cluster_id: int) -> str:
     """Lift the platform RBAC bundle — inverse of apply_platform_rbac."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_remove_platform_rbac_sync)(cluster_id)
+    return await heartbeat_while(sync_to_async(_remove_platform_rbac_sync)(cluster_id))
 
 
 def _mark_decommissioned_sync(cluster_id: int) -> None:
@@ -456,8 +447,7 @@ def _mark_decommissioned_sync(cluster_id: int) -> None:
 async def mark_decommissioned(cluster_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_decommissioned_sync)(cluster_id)
+    await heartbeat_while(sync_to_async(_mark_decommissioned_sync)(cluster_id))
 
 
 def _teardown_cluster_infra_sync(cluster_id: int, delete_cloud_infra: bool) -> dict[str, Any]:
@@ -516,5 +506,4 @@ async def teardown_cluster_infra(
     behavior leaves the cluster running, just removes platform RBAC)."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_teardown_cluster_infra_sync)(cluster_id, delete_cloud_infra)
+    return await heartbeat_while(sync_to_async(_teardown_cluster_infra_sync)(cluster_id, delete_cloud_infra))

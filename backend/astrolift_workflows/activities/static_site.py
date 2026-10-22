@@ -37,6 +37,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.static_site")
 
 # The platform namespace the static-build Job runs in (same as kaniko).
@@ -352,9 +354,7 @@ async def ensure_cloudfront_cert(deployment_id: int) -> dict:
     No-op when no cdn-backed public workload / no managed domain."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_ensure_cloudfront_cert_sync)(deployment_id)
-    activity.heartbeat()
+    result = await heartbeat_while(sync_to_async(_ensure_cloudfront_cert_sync)(deployment_id))
     return result
 
 
@@ -489,9 +489,7 @@ async def ensure_static_site_services(deployment_id: int) -> dict:
     and pre-existing apps pay nothing."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_ensure_static_site_services_sync)(deployment_id)
-    activity.heartbeat()
+    result = await heartbeat_while(sync_to_async(_ensure_static_site_services_sync)(deployment_id))
     return result
 
 
@@ -687,9 +685,7 @@ async def sync_static_assets(inp: SyncStaticAssetsInput) -> dict:
     No-op fast-return when the manifest has no static workload."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_sync_static_assets_sync)(inp)
-    activity.heartbeat()
+    result = await heartbeat_while(sync_to_async(_sync_static_assets_sync)(inp))
     return result
 
 
@@ -798,9 +794,7 @@ async def ensure_static_dns(deployment_id: int) -> dict:
     (idempotent UPSERT)."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_ensure_static_dns_sync)(deployment_id)
-    activity.heartbeat()
+    result = await heartbeat_while(sync_to_async(_ensure_static_dns_sync)(deployment_id))
     return result
 
 
@@ -878,5 +872,4 @@ async def delete_static_dns_records(registered_app_id: int) -> dict:
     partial teardowns complete."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_delete_static_dns_records_sync)(registered_app_id)
+    return await heartbeat_while(sync_to_async(_delete_static_dns_records_sync)(registered_app_id))

@@ -101,6 +101,18 @@ def _container_of(manifest: dict) -> dict:
             "ghcr.io/calliopeai/agent-vnc@sha256:abcd1234ef567890",
             "ghcr.io/calliopeai/agent-vnc@sha256:abcd1234ef567890",
         ),
+        # A tag beside the digest (#2491). Registries pull by the digest
+        # alone, so "-vnc" on the tag would run the non-VNC repository.
+        (
+            "ghcr.io/calliopeai/agent:1.2@sha256:abcd1234ef567890",
+            "ghcr.io/calliopeai/agent-vnc:1.2@sha256:abcd1234ef567890",
+        ),
+        (
+            "ghcr.io/calliopeai/agent-vnc:1.2@sha256:abcd1234ef567890",
+            "ghcr.io/calliopeai/agent-vnc:1.2@sha256:abcd1234ef567890",
+        ),
+        # A name with no registry or namespace keeps its tag too.
+        ("agent-toolchain:1.2", "agent-toolchain-vnc:1.2"),
     ],
 )
 def test_vnc_image_variant(base, expected):

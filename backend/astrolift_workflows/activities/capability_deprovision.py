@@ -36,6 +36,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.capability_deprovision")
 
 
@@ -365,9 +367,10 @@ async def deprovision_app_identity_role(registered_app_id: int) -> dict[str, Any
     """Activity entry — delete the app's cloud identity role."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_deprovision_identity_role_sync)(
-        registered_app_id=registered_app_id,
+    summary = await heartbeat_while(
+        sync_to_async(_deprovision_identity_role_sync)(
+            registered_app_id=registered_app_id,
+        )
     )
     log.info(
         "deprovision_app_identity_role cluster=%s app_id=%s role=%s",
@@ -481,10 +484,11 @@ async def deprovision_app_registry_repo(
     the platform's stored URI."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_deprovision_registry_repo_sync)(
-        registered_app_id=registered_app_id,
-        archive=archive,
+    summary = await heartbeat_while(
+        sync_to_async(_deprovision_registry_repo_sync)(
+            registered_app_id=registered_app_id,
+            archive=archive,
+        )
     )
     log.info(
         "deprovision_app_registry_repo cluster=%s app_id=%s repo=%s archived=%s",

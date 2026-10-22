@@ -8,6 +8,8 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 
 @activity.defn(name="astrolift.app.expiry_next_step")
 async def app_expiry_next_step(registered_app_id: int) -> dict[str, Any]:
@@ -27,7 +29,7 @@ async def fire_app_expiry(registered_app_id: int) -> bool:
 async def retire_expired_app_runtime(registered_app_id: int) -> list[str]:
     from astrolift_registry.expiry_cleanup import retire_runtime
 
-    return await sync_to_async(retire_runtime)(registered_app_id)
+    return await heartbeat_while(sync_to_async(retire_runtime)(registered_app_id))
 
 
 @activity.defn(name="astrolift.app.expiry_purge_namespaces")
