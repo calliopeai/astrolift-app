@@ -93,6 +93,7 @@ from astrolift_workflows.workflows.scheduled import (
     PruneAuditLogWorkflow,
     PruneStaleSessionsWorkflow,
     ReconcileClusterCapabilitiesWorkflow,
+    ReconcileProductDeploymentsWorkflow,
     RehealWebhookSubscriptionsWorkflow,
 )
 from astrolift_workflows.workflows.secret_rotation import (
@@ -168,6 +169,7 @@ __all__ = [
     "PruneAuditLogWorkflow",
     "PruneStaleSessionsWorkflow",
     "ReconcileClusterCapabilitiesWorkflow",
+    "ReconcileProductDeploymentsWorkflow",
     "ReconcileWorkloadIdentityWorkflow",
     "RegistryProvisionWorkflow",
     "RehealWebhookSubscriptionsWorkflow",

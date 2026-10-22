@@ -233,6 +233,7 @@ from astrolift_workflows.activities.scheduled import (
     apply_observability_retention,
     probe_app_cronjob_runs_activity,
     probe_app_dns_activity,
+    reconcile_product_deployments,
 )
 from astrolift_workflows.activities.webhook_deliver import deliver_webhook
 from astrolift_workflows.activities.workflow_result_delivery import deliver_workflow_run_result
@@ -287,6 +288,7 @@ from astrolift_workflows.workflows import (
     PruneAuditLogWorkflow,
     PruneStaleSessionsWorkflow,
     ReconcileClusterCapabilitiesWorkflow,
+    ReconcileProductDeploymentsWorkflow,
     ReconcileWorkloadIdentityWorkflow,
     RegistryProvisionWorkflow,
     RehealWebhookSubscriptionsWorkflow,
@@ -376,6 +378,7 @@ WORKFLOWS = (
     PruneAuditLogWorkflow,
     PruneStaleSessionsWorkflow,
     ReconcileClusterCapabilitiesWorkflow,
+    ReconcileProductDeploymentsWorkflow,
     ReconcileWorkloadIdentityWorkflow,
     RegistryProvisionWorkflow,
     RehealWebhookSubscriptionsWorkflow,
@@ -422,6 +425,7 @@ ACTIVITIES = (
     apply_observability_retention,
     probe_app_cronjob_runs_activity,
     probe_app_dns_activity,
+    reconcile_product_deployments,
     create_scheduled_pipeline_run,
     create_scheduled_workflow_run,
     record_scheduled_workflow_start,

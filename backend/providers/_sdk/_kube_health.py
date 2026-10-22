@@ -11,7 +11,35 @@ from __future__ import annotations
 
 from typing import Any
 
-from _sdk.cluster import ClusterEvent, PodPhaseSummary, WorkloadHealth
+from _sdk.cluster import ClusterEvent, NamespaceState, PodPhaseSummary, RunningImage, WorkloadHealth
+
+
+def namespaces_from_client(k8s_client: Any, *, label_selector: str) -> list[NamespaceState]:
+    """Namespaces matching ``label_selector``, sorted by name (#2465).
+
+    The one helper here that does not swallow a failure: callers read an
+    empty list as "nothing matched", so an unreachable apiserver must
+    raise instead of looking like an empty cluster.
+    """
+    listed = k8s_client.list_namespace(label_selector=label_selector)
+    out: list[NamespaceState] = []
+    for item in getattr(listed, "items", None) or []:
+        meta = getattr(item, "metadata", None)
+        name = getattr(meta, "name", "") or ""
+        if not name:
+            continue
+        status = getattr(item, "status", None)
+        out.append(
+            NamespaceState(
+                name=name,
+                labels=dict(getattr(meta, "labels", None) or {}),
+                annotations=dict(getattr(meta, "annotations", None) or {}),
+                phase=getattr(status, "phase", None) or "Active",
+                uid=getattr(meta, "uid", None) or "",
+            ),
+        )
+    out.sort(key=lambda ns: ns.name)
+    return out
 
 
 def pod_phase_summary_from_client(
@@ -119,6 +147,7 @@ def workload_health_from_client(
     Clients that surface ``restart_count`` but not termination
     timestamps contribute their full ``restart_count`` (best-effort);
     the UI surfaces this as a single integer either way.
+    ``running_images`` comes from the same pods' container statuses.
 
     ``last_image_deployed_at`` reads the Deployment's Progressing
     condition with reason ``NewReplicaSetAvailable`` — the canonical
@@ -155,12 +184,12 @@ def workload_health_from_client(
             selector_str = _selector_to_label_selector(
                 getattr(spec, "selector", None) if spec else None,
             )
-            restart_count_24h = _restart_count_for_deployment(
+            pods = _pods_for_deployment(
                 k8s_client,
                 namespace=ns,
                 label_selector=selector_str,
-                window_start=window_start,
             )
+            restart_count_24h = _restart_count_24h(pods, window_start=window_start)
             last_deployed = _last_image_deployed_at(status)
 
             out.append(
@@ -171,6 +200,7 @@ def workload_health_from_client(
                     ready_replicas=ready,
                     restart_count_24h=restart_count_24h,
                     last_image_deployed_at=last_deployed,
+                    running_images=_running_images(pods),
                 ),
             )
     out.sort(key=lambda w: (w.namespace, w.name))
@@ -192,19 +222,14 @@ def _selector_to_label_selector(selector: Any) -> str:
     return ",".join(f"{k}={v}" for k, v in sorted(match_labels.items()))
 
 
-def _restart_count_for_deployment(
+def _pods_for_deployment(
     k8s_client: Any,
     *,
     namespace: str,
     label_selector: str,
-    window_start: Any,
-) -> int:
-    """Sum container restart counts for pods matched by ``label_selector``
-    in ``namespace``, scoped to restarts whose last termination fell
-    inside the trailing 24h window. Clients without termination
-    timestamps contribute their full restart_count (best-effort)."""
-    import datetime as _dt
-
+) -> list[Any]:
+    """Pods matched by ``label_selector`` in ``namespace``; empty when
+    they cannot be listed."""
     try:
         pods = k8s_client.list_namespaced_pod(
             namespace=namespace,
@@ -215,12 +240,34 @@ def _restart_count_for_deployment(
         try:
             pods = k8s_client.list_namespaced_pod(namespace=namespace)
         except Exception:
-            return 0
+            return []
     except Exception:
-        return 0
+        return []
+    return list(getattr(pods, "items", []) or [])
+
+
+def _running_images(pods: list[Any]) -> tuple[RunningImage, ...]:
+    """Distinct images the pods' containers report running, sorted."""
+    seen: set[RunningImage] = set()
+    for pod in pods:
+        status = getattr(pod, "status", None)
+        for cs in getattr(status, "container_statuses", None) or []:
+            image = getattr(cs, "image", None) or ""
+            image_id = getattr(cs, "image_id", None) or ""
+            if image or image_id:
+                seen.add(RunningImage(image=str(image), image_id=str(image_id)))
+    return tuple(sorted(seen))
+
+
+def _restart_count_24h(pods: list[Any], *, window_start: Any) -> int:
+    """Sum container restart counts across ``pods``, scoped to restarts
+    whose last termination fell inside the trailing 24h window. Clients
+    without termination timestamps contribute their full restart_count
+    (best-effort)."""
+    import datetime as _dt
 
     total = 0
-    for pod in getattr(pods, "items", []) or []:
+    for pod in pods:
         status = getattr(pod, "status", None)
         if status is None:
             continue

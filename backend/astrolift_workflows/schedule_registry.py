@@ -57,6 +57,14 @@ class ScheduleKind(StrEnum):
     """Every 10 min — refresh TenantCluster.capabilities snapshot;
     emit CLUSTER_CAPABILITY_CHANGED on drift (spec §4.18)."""
 
+    RECONCILE_PRODUCT_DEPLOYMENTS = "reconcile_product_deployments"
+    """Every 2 min: list the namespaces the Deployment Manager labels for
+    the Workbench hub and Zentinelle on each managed cluster, keep one
+    ProductDeployment row per namespace and emit product_deployment.changed
+    when one appears, goes, changes health or changes images (#2465).
+    Separate from RECONCILE_CLUSTER_CAPABILITIES so a slow capability probe
+    does not hold it; read-only against the clusters."""
+
     DRIFT_DETECTION = "drift_detection"
     """Every 1 hr — compare platform DB to live cluster state for
     each active deployment; emit DRIFT_DETECTED on material diff
@@ -352,6 +360,13 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.RECONCILE_CLUSTER_CAPABILITIES,
         ),
         description="Refresh cluster capability snapshot",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.RECONCILE_PRODUCT_DEPLOYMENTS,
+        workflow_name="ReconcileProductDeploymentsWorkflow",
+        interval_seconds=2 * 60,
+        schedule_id=schedule_id_for(kind=ScheduleKind.RECONCILE_PRODUCT_DEPLOYMENTS),
+        description="Record the Workbench and Zentinelle deployments on managed clusters (#2465)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.DRIFT_DETECTION,

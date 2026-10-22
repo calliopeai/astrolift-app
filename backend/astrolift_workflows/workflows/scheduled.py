@@ -37,6 +37,7 @@ with workflow.unsafe.imports_passed_through():
     prune_audit_log,
         prune_stale_sessions,
         reconcile_cluster_capabilities,
+        reconcile_product_deployments,
         reheal_webhook_subscriptions,
     )
     from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
@@ -89,6 +90,24 @@ class ReconcileClusterCapabilitiesWorkflow:
             heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"reconciled {n} cluster(s)")
+
+
+@workflow.defn(name="ReconcileProductDeploymentsWorkflow")
+class ReconcileProductDeploymentsWorkflow:
+    """Record the Calliope AI products running on managed clusters (#2465).
+
+    Read-only against the clusters -- it lists labelled namespaces and reads
+    their workload health -- so it ships active rather than held.
+    """
+
+    @workflow.run
+    async def run(self) -> WorkflowResult:
+        n = await workflow.execute_activity(
+            reconcile_product_deployments,
+            start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
+        )
+        return WorkflowResult(ok=True, message=f"scanned {n} cluster(s) for product deployments")
 
 
 @workflow.defn(name="DriftDetectionWorkflow")
