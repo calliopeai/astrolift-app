@@ -1859,11 +1859,12 @@
           "EDGE_PROMETHEUS": "Métriques ingress",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "Aucune"
         },
         "reasons": {
           "target": "Cible sélectionnée indisponible.",
-          "partial": "Mesure incomplète ou ambiguë ; aucun ratio affiché.",
+          "partial": "Mesure incomplète ou ambiguë ; aucune valeur affichée.",
           "noData": "Aucune donnée d’utilisation vérifiée dans cette période.",
           "readError": "Impossible de lire la source de mesure.",
           "MISSING_LIMITS": "Limites de ressources manquantes ; saturation indisponible.",
@@ -11580,6 +11581,16 @@
       "rate": "{rate} req/s",
       "rateWithTop": "{rate} req/s (principaux : {top})"
     },
+    "network": {
+      "title": "E/S réseau",
+      "description": "Octets par seconde reçus et envoyés par les pods, d’après les compteurs réseau cAdvisor du kubelet.",
+      "receive": "Reçus",
+      "transmit": "Envoyés",
+      "total": "{bytes} sur cette période",
+      "noDataTitle": "Aucune donnée réseau pour l'instant",
+      "noDataDescription": "Rien à afficher sur cette période. Les E/S réseau apparaîtront ici dès que le collecteur du cluster aura des échantillons pour ces pods.",
+      "notConfigured": "Ce cluster n'a pas de point de terminaison Prometheus, ou l'environnement ou la charge de travail sélectionné n'est pas disponible."
+    },
     "showPromql": "Afficher le PromQL",
     "tryAgain": "Réessayer",
     "seeDocs": "Voir la documentation"
@@ -11969,6 +11980,27 @@
         "podsRunning": "Pods en cours",
         "cpu": "CPU",
         "memory": "Mémoire"
+      },
+      "workloadIdentity": {
+        "title": "Rôles d’identité de charge de travail",
+        "state": {
+          "pending": "En file d’attente",
+          "running": "Déplacement",
+          "succeeded": "Déplacé",
+          "failed": "Échec"
+        },
+        "description": {
+          "pending": "Le cluster a été redirigé vers un cluster doté d’un autre émetteur OIDC. Les rôles IAM de ses applications attendent d’y être déplacés.",
+          "running": "Le cluster a été redirigé vers un cluster doté d’un autre émetteur OIDC. Les rôles IAM de ses applications y sont en cours de déplacement ; un pod ne peut pas assumer un rôle tant qu’il n’a pas été déplacé.",
+          "succeeded": "Chaque rôle IAM d’application de ce cluster fait confiance à son émetteur OIDC.",
+          "failed": "Certains rôles IAM d’applications font encore confiance à l’émetteur OIDC précédent ; leurs pods sur ce cluster ne peuvent donc pas les assumer. Déployer une application déplace son rôle ; réenregistrer le cluster relance le reste."
+        },
+        "issuer": "Émetteur OIDC",
+        "apps": "Applications",
+        "progress": "{reached} sur {total}",
+        "started": "Démarré",
+        "finished": "Terminé",
+        "failuresTitle": "{count, plural, one {# rôle non déplacé} other {# rôles non déplacés}}"
       }
     }
   },

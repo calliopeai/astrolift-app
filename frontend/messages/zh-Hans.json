@@ -1865,11 +1865,12 @@
           "EDGE_PROMETHEUS": "入口指标",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "无"
         },
         "reasons": {
           "target": "所选目标不可用。",
-          "partial": "测量不完整或有歧义，因此不显示比率。",
+          "partial": "测量不完整或有歧义，因此不显示数值。",
           "noData": "此时间段内没有经过验证的使用量数据。",
           "readError": "无法读取测量来源。",
           "MISSING_LIMITS": "缺少资源上限，无法提供饱和度。",
@@ -11577,6 +11578,16 @@
       "rate": "{rate} 请求/秒",
       "rateWithTop": "{rate} 请求/秒(最多：{top})"
     },
+    "network": {
+      "title": "网络 I/O",
+      "description": "Pod 每秒接收和发送的字节数，来自 kubelet 的 cAdvisor 网络计数器。",
+      "receive": "接收",
+      "transmit": "发送",
+      "total": "此时间段内 {bytes}",
+      "noDataTitle": "暂无网络数据",
+      "noDataDescription": "此时间窗口内没有可显示的内容。集群采集器获得这些 Pod 的样本后，网络 I/O 将显示在这里。",
+      "notConfigured": "此集群没有 Prometheus 端点，或所选环境或工作负载不可用。"
+    },
     "showPromql": "显示 PromQL",
     "tryAgain": "重试",
     "seeDocs": "查看文档"
@@ -11966,6 +11977,27 @@
         "podsRunning": "运行中的 Pod",
         "cpu": "CPU",
         "memory": "内存"
+      },
+      "workloadIdentity": {
+        "title": "工作负载身份角色",
+        "state": {
+          "pending": "排队中",
+          "running": "迁移中",
+          "succeeded": "已迁移",
+          "failed": "失败"
+        },
+        "description": {
+          "pending": "此集群已重新指向一个使用其他 OIDC 颁发者的集群。其应用的 IAM 角色正在排队迁移到该颁发者。",
+          "running": "此集群已重新指向一个使用其他 OIDC 颁发者的集群。正在迁移其应用的 IAM 角色；角色迁移完成前，Pod 无法代入该角色。",
+          "succeeded": "此集群上每个应用的 IAM 角色都信任集群的 OIDC 颁发者。",
+          "failed": "部分应用的 IAM 角色仍信任之前的 OIDC 颁发者，因此它们在此集群上的 Pod 无法代入这些角色。部署应用会迁移其角色；再次注册集群会重试其余角色。"
+        },
+        "issuer": "OIDC 颁发者",
+        "apps": "应用",
+        "progress": "已处理 {reached} / {total}",
+        "started": "开始时间",
+        "finished": "完成时间",
+        "failuresTitle": "{count, plural, other {# 个角色未迁移}}"
       }
     }
   },

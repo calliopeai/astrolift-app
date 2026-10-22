@@ -889,6 +889,8 @@ export type AstroliftAgentStartupDiagnostic = {
 export type AstroliftAgentTask = {
   agentName: Scalars['String']['output'];
   agentSlug: Scalars['String']['output'];
+  /** Evidence the run attached to its result (#2488), in the order it reported them. Metadata only; agentTaskArtifact returns one artifact's content. */
+  artifacts: Array<AstroliftAgentTaskArtifact>;
   brains: Array<AstroliftAgentTaskBrain>;
   callbackAttempts: Scalars['Int']['output'];
   callbackLastError?: Maybe<Scalars['String']['output']>;
@@ -917,6 +919,27 @@ export type AstroliftAgentTask = {
   updatedAt: Scalars['DateTime']['output'];
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
+};
+
+/** Evidence a run attached to its result with its terminal callback (#2488). kind is junit, coverage, conformance-json or other, and mediaType is the type the run reported. sizeBytes and sha256 describe the UTF-8 bytes of the content, which agentTaskArtifact returns. */
+export type AstroliftAgentTaskArtifact = {
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  mediaType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  sha256: Scalars['String']['output'];
+  sizeBytes: Scalars['Int']['output'];
+};
+
+/** One artifact a run attached to its result (#2488), with its UTF-8 content. */
+export type AstroliftAgentTaskArtifactContent = {
+  content: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  mediaType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  sha256: Scalars['String']['output'];
+  sizeBytes: Scalars['Int']['output'];
 };
 
 export type AstroliftAgentTaskBacklog = {
@@ -1628,6 +1651,25 @@ export type AstroliftAppMetricsPoint = {
   timestamp: Scalars['DateTime']['output'];
 };
 
+export type AstroliftAppNetworkMetrics = {
+  rangeSeconds: Scalars['Int']['output'];
+  rateWindowSeconds: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
+  series: Array<AstroliftAppNetworkSeries>;
+  sourcedAt: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+};
+
+export type AstroliftAppNetworkSeries = {
+  direction: NetworkDirection;
+  measurement: AstroliftGoldenSignalMeasurement;
+  promql: Scalars['String']['output'];
+  reason: AstroliftObservabilityPanelReason;
+  samples: Array<AstroliftTimeSeriesPoint>;
+  totalBytes?: Maybe<Scalars['Float']['output']>;
+  unit: Scalars['String']['output'];
+};
+
 export type AstroliftAppPod = {
   age?: Maybe<Scalars['DateTime']['output']>;
   containerStatuses: Array<AstroliftContainerStatus>;
@@ -1700,6 +1742,18 @@ export type AstroliftAppSettingsLastModified = {
   observability?: Maybe<Scalars['DateTime']['output']>;
   secrets?: Maybe<Scalars['DateTime']['output']>;
   webhooks?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftAppSourceChange = {
+  app: AstroliftRegisteredApp;
+  /** The repository the app pointed at before the call; app.sourceRepo when nothing changed. */
+  previousSourceRepo: Scalars['String']['output'];
+};
+
+export type AstroliftAppSourceChangeMutationResult = {
+  data?: Maybe<AstroliftAppSourceChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftAppSourceKindFilter =
@@ -6200,6 +6254,8 @@ export type AstroliftTenantCluster = {
   slug: Scalars['String']['output'];
   /** The cluster permissions the viewer holds on this cluster (#1867), from the checker the mutations use; a shared cluster's writes are the platform operator's. Advisory: offer only these, the mutation still decides. */
   viewerPermissions: Array<Scalars['String']['output']>;
+  /** The latest move of this cluster's per-app workload identity roles to a new OIDC issuer (#2472), started when a registration re-points the cluster at another cluster. Null when it was never re-pointed and outside the operator view; on a shared cluster, whose apps span organizations, only the platform operator sees it. */
+  workloadIdentityRebind?: Maybe<AstroliftWorkloadIdentityRebind>;
 };
 
 
@@ -6576,6 +6632,31 @@ export type AstroliftWorkloadIdentityGrant = {
   roleName: Scalars['String']['output'];
   scope: Scalars['String']['output'];
   state: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadIdentityRebind = {
+  /** Apps whose role now trusts the issuer, or needed nothing: no role, or one another cluster holds. */
+  appsReconciled: Scalars['Int']['output'];
+  appsTotal: Scalars['Int']['output'];
+  /** Why the move could not start or stopped before reaching every app. */
+  error: Scalars['String']['output'];
+  failures: Array<AstroliftWorkloadIdentityRebindFailure>;
+  finishedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** The issuer the roles are moved to, host and path. */
+  issuer: Scalars['String']['output'];
+  previousIssuers: Array<Scalars['String']['output']>;
+  requestedAt: Scalars['DateTime']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** pending | running | succeeded | failed */
+  state: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadIdentityRebindFailure = {
+  /** The app, as <organization slug>/<app slug>. */
+  app: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  /** The IAM role whose trust was not moved. */
+  role: Scalars['String']['output'];
 };
 
 export type AstroliftWorkloadManifest = {
@@ -8174,6 +8255,7 @@ export type GoldenSignalScope =
 
 export type GoldenSignalSource =
   | 'APP_INSTRUMENTATION'
+  | 'CADVISOR'
   | 'CADVISOR_KUBE_STATE_METRICS'
   | 'CLOUDWATCH_ALB'
   | 'EDGE_PROMETHEUS'
@@ -9793,6 +9875,8 @@ export type Mutation = {
   setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
+  /** Point a GitHub app at another repository, or at its repository's new name after a rename on GitHub (#2478). The repository must be in the organization's GitHub App installation, and the name GitHub lists is stored; sourceUrl follows when it named the old repository. Autowire then runs against the repository: the CI workflow and the CI push role follow it, and the CI secrets are pushed to it, which rotates the deploy token. Audited as app.set_source. */
+  setAppSource: AstroliftAppSourceChangeMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
   setClusterAuthUserEnabled: AstroliftClusterAuthUserChangeMutationResult;
   setClusterAuthUserGroups: AstroliftClusterAuthUserChangeMutationResult;
@@ -11693,6 +11777,11 @@ export type MutationSetAppSecretMetadataArgs = {
 };
 
 
+export type MutationSetAppSourceArgs = {
+  input: SetAppSourceInput;
+};
+
+
 export type MutationSetAppSubdomainArgs = {
   input: SetAppSubdomainInput;
 };
@@ -12407,6 +12496,10 @@ export type NativeModelInvokeAccess =
 export type NativeModelProtocol =
   | 'BEDROCK';
 
+export type NetworkDirection =
+  | 'RECEIVE'
+  | 'TRANSMIT';
+
 export type NoneTypeMutationResult = {
   data?: Maybe<Scalars['Void']['output']>;
   errors: Array<MutationError>;
@@ -12766,6 +12859,8 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  /** One artifact a run attached to its result (#2488), by name, with its content. Null for an unknown name, and to a caller with organization-wide agent.read for a task the organization does not have. Any other task the caller cannot read is refused. */
+  agentTaskArtifact?: Maybe<AstroliftAgentTaskArtifactContent>;
   agentTaskBacklog?: Maybe<AstroliftAgentTaskBacklog>;
   agentTaskByClientRequestId?: Maybe<AstroliftAgentTask>;
   agentTaskCallbackPolicy: AgentTaskCallbackPolicy;
@@ -12839,6 +12934,7 @@ export type Query = {
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetricNames: AstroliftAppMetricNames;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
+  astroliftAppNetworkMetrics: AstroliftAppNetworkMetrics;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecretHistory: Array<AstroliftSecretHistoryEntry>;
@@ -13368,6 +13464,13 @@ export type QueryAgentTaskArgs = {
 };
 
 
+export type QueryAgentTaskArtifactArgs = {
+  name: Scalars['String']['input'];
+  orgId: Scalars['ID']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
+
 export type QueryAgentTaskBacklogArgs = {
   orgId: Scalars['ID']['input'];
   taskId: Scalars['ID']['input'];
@@ -13743,6 +13846,14 @@ export type QueryAstroliftAppMetricNamesArgs = {
 export type QueryAstroliftAppMetricsArgs = {
   appSlug: Scalars['String']['input'];
   timeRange?: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppNetworkMetricsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -16369,6 +16480,13 @@ export type SetAppSecretMetadataInput = {
   setVia: InputMaybe<Scalars['String']['input']>;
 };
 
+export type SetAppSourceInput = {
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
+  /** The GitHub repository, as owner/name. */
+  sourceRepo: Scalars['String']['input'];
+};
+
 export type SetAppSubdomainInput = {
   id: Scalars['GUID']['input'];
   subdomain: Scalars['String']['input'];
@@ -18187,7 +18305,7 @@ export type GetClusterQueryVariables = Exact<{
 }>;
 
 
-export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, viewerPermissions: Array<string>, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
+export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, viewerPermissions: Array<string>, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, workloadIdentityRebind?: { state: string, issuer: string, previousIssuers: Array<string>, appsTotal: number, appsReconciled: number, error: string, requestedAt: string, startedAt?: string | null, finishedAt?: string | null, failures: Array<{ app: string, role: string, error: string }> } | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
 
 export type UpdateTenantClusterMutationVariables = Exact<{
   input: UpdateTenantClusterInput;

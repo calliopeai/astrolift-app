@@ -1865,11 +1865,12 @@
           "EDGE_PROMETHEUS": "인그레스 지표",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "없음"
         },
         "reasons": {
           "target": "선택한 대상이 사용 불가능합니다.",
-          "partial": "측정이 불완전하거나 모호하여 비율을 표시하지 않습니다.",
+          "partial": "측정이 불완전하거나 모호하여 값을 표시하지 않습니다.",
           "noData": "이 기간에 검증된 사용량 데이터가 없습니다.",
           "readError": "측정 출처를 읽을 수 없습니다.",
           "MISSING_LIMITS": "리소스 제한이 없어 포화도를 사용할 수 없습니다.",
@@ -11577,6 +11578,16 @@
       "rate": "{rate} req/s",
       "rateWithTop": "{rate} req/s (상위: {top})"
     },
+    "network": {
+      "title": "네트워크 I/O",
+      "description": "Pod가 초당 수신하고 송신한 바이트 수로, kubelet의 cAdvisor 네트워크 카운터에서 가져옵니다.",
+      "receive": "수신",
+      "transmit": "송신",
+      "total": "이 기간 동안 {bytes}",
+      "noDataTitle": "아직 네트워크 데이터가 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 클러스터 수집기에 이 Pod의 샘플이 쌓이면 네트워크 I/O가 여기에 표시됩니다.",
+      "notConfigured": "이 클러스터에 Prometheus 엔드포인트가 없거나, 선택한 환경 또는 워크로드를 사용할 수 없습니다."
+    },
     "showPromql": "PromQL 보기",
     "tryAgain": "다시 시도",
     "seeDocs": "문서 보기"
@@ -11966,6 +11977,27 @@
         "podsRunning": "실행 중인 Pod",
         "cpu": "CPU",
         "memory": "메모리"
+      },
+      "workloadIdentity": {
+        "title": "워크로드 ID 역할",
+        "state": {
+          "pending": "대기 중",
+          "running": "이동 중",
+          "succeeded": "이동됨",
+          "failed": "실패"
+        },
+        "description": {
+          "pending": "이 클러스터는 다른 OIDC 발급자를 가진 클러스터로 다시 지정되었습니다. 앱의 IAM 역할이 해당 발급자로 이동하기를 기다리고 있습니다.",
+          "running": "이 클러스터는 다른 OIDC 발급자를 가진 클러스터로 다시 지정되었습니다. 앱의 IAM 역할을 이동하고 있으며, 이동이 끝날 때까지 Pod는 해당 역할을 맡을 수 없습니다.",
+          "succeeded": "이 클러스터의 모든 앱 IAM 역할이 클러스터의 OIDC 발급자를 신뢰합니다.",
+          "failed": "일부 앱의 IAM 역할이 아직 이전 OIDC 발급자를 신뢰하므로 이 클러스터의 Pod가 해당 역할을 맡을 수 없습니다. 앱을 배포하면 역할이 이동하며, 클러스터를 다시 등록하면 나머지를 다시 시도합니다."
+        },
+        "issuer": "OIDC 발급자",
+        "apps": "앱",
+        "progress": "{total}개 중 {reached}개",
+        "started": "시작",
+        "finished": "완료",
+        "failuresTitle": "{count, plural, other {이동하지 못한 역할 #개}}"
       }
     }
   },

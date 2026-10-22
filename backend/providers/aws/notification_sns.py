@@ -352,11 +352,15 @@ class SNSNotificationDriver(NotificationDriver):
             **payload.data,
             **({"action_url": payload.action_url} if payload.action_url else {}),
         }
+        # SNS maps this legacy FCM shape onto an FCM HTTP v1 message; its
+        # channel key is ``android_channel_id``, which SNS places under
+        # ``android.notification.channel_id`` ("Using the legacy payload
+        # structure to send messages to the FCM v1 API", SNS guide).
         gcm_dict = {
             "notification": {
                 "title": payload.title,
                 "body": payload.body,
-                **({"channel_id": payload.category} if payload.category else {}),
+                **({"android_channel_id": payload.category} if payload.category else {}),
             },
             "data": {
                 **payload.data,

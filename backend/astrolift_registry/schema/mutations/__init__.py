@@ -24,6 +24,7 @@ from astrolift_registry.schema.mutations.helpers import (  # noqa: F401
 )
 from astrolift_registry.schema.mutations.manifest import ManifestMutations
 from astrolift_registry.schema.mutations.registration import RegistrationMutations
+from astrolift_registry.schema.mutations.source import SourceMutations
 from astrolift_registry.schema.mutations.team_access import TeamAccessMutations
 
 # Re-exported for the public import surface (tests / cross-app importers).
@@ -73,5 +74,6 @@ class RegistryMutation(
     BrainMutations,
     BrainManagementMutations,
     ExpiryMutations,
+    SourceMutations,
 ):
     """Root mutation type — inherits fields from each domain mixin."""

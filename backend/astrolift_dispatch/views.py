@@ -36,8 +36,14 @@ from django.views.decorators.http import require_http_methods
 from astrolift_agents.models import (
     AgentInteraction,
     AgentTask,
+    AgentTaskArtifact,
     DispatcherInstance,
     record_interaction,
+)
+from astrolift_agents.services.agent_task_artifacts import (
+    TaskArtifactError,
+    record_task_artifacts,
+    validate_task_artifacts,
 )
 from astrolift_agents.services.agent_task_events import (
     TaskEventError,
@@ -576,12 +582,17 @@ def agent_checkin(request: HttpRequest, task_id: str) -> JsonResponse:
 def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
     """Heartbeat and result callback from thread-mode agents.
 
-    Body: {status, result?, partial?, error?, continue?, input_intent?, events?}
+    Body: {status, result?, partial?, error?, continue?, input_intent?, events?, artifacts?}
 
     A terminal ``status`` of "completed"/"failed" records the outcome and
     transitions the task. ``running`` (or an omitted status) is a heartbeat;
     unknown values are rejected. The response carries ``continue`` — false
     tells the agent to stop (the task is no longer RUNNING).
+
+    ``artifacts`` (#2488) is the evidence a terminal callback attaches to its
+    result, stored in the same transaction; an empty list on any callback
+    probes support. A callback that carries the field is acknowledged with
+    ``artifact_count``, the number the task holds.
 
     Steering channel (#1390). ``input_intent`` is how the runner asks for
     queued follow-up prompts on the state callback it already posts, so the
@@ -644,6 +655,15 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
         events = validate_task_events(body["events"]) if "events" in body else None
     except TaskEventError as exc:
         return JsonResponse({"error": str(exc)}, status=exc.status)
+    try:
+        artifacts = validate_task_artifacts(body["artifacts"]) if "artifacts" in body else None
+    except TaskArtifactError as exc:
+        return JsonResponse({"error": str(exc)}, status=exc.status)
+    if artifacts and new_status not in {"completed", "failed"}:
+        return JsonResponse(
+            {"error": "artifacts accompany a terminal status (completed or failed)"},
+            status=400,
+        )
     finding = body.get("finding")
     if finding is not None:
         if not isinstance(finding, dict):
@@ -770,6 +790,8 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
                 }
             task.completion_usage = normalized_usage(body.get("usage"))
             task.save(update_fields=["result", "failure", "completion_usage", "updated_at", "version"])
+            if artifacts:
+                record_task_artifacts(task, artifacts)
             target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
             task.transition_to(target)
 
@@ -810,6 +832,8 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
         payload["structured_event_protocol_version"] = 1
     if "input_request" in body:
         payload["input_response"] = input_response
+    if artifacts is not None:
+        payload["artifact_count"] = AgentTaskArtifact.objects.filter(agent_task=task).count()
     payload.update(_steering_input_payload(task, input_intent))
     return JsonResponse(payload)
 

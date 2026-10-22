@@ -9,7 +9,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
-from astrolift_agents.models import AgentTask
+from astrolift_agents.models import AgentTask, AgentTaskArtifact
 from astrolift_agents.schema.mutations import AgentsMutation
 from astrolift_agents.schema.queries import AgentsQuery
 from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token
@@ -315,6 +315,33 @@ def test_task_interactions_follow_task_ownership(fleet):
             AgentsQuery().agent_task_interactions(
                 fleet.info, org_id=str(fleet.world.org.guid), task_id=str(fleet.tasks[1].guid)
             )
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_task_artifacts_follow_task_ownership(fleet, selected):
+    for task in [*fleet.tasks, fleet.orphan]:
+        AgentTaskArtifact.objects.create(
+            organization=fleet.world.org,
+            agent_task=task,
+            name="report.xml",
+            kind=AgentTaskArtifact.Kind.JUNIT,
+            media_type="application/xml",
+            content="<testsuites/>",
+            size_bytes=13,
+            sha256="0" * 64,
+        )
+    bind(fleet)
+
+    def read(task):
+        return AgentsQuery().agent_task_artifact(
+            fleet.info, org_id=str(fleet.world.org.guid), task_id=str(task.guid), name="report.xml"
+        )
+
+    with tenant(fleet, selected):
+        assert read(fleet.tasks[0]).content == "<testsuites/>"
+        for task in [fleet.tasks[1], fleet.orphan]:
+            with pytest.raises(PermissionDenied):
+                read(task)
 
 
 def test_gallery_and_vnc_apply_the_same_watch_scope(fleet, monkeypatch):

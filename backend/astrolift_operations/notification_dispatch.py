@@ -13,7 +13,11 @@ Pipeline:
    :data:`NOTIFICATION_TEMPLATES`. Unknown types are dropped
    silently (the in-app activity feed covers them already).
 3. The template resolves a recipient list (users to notify), a
-   title, body, and an action_url.
+   title, body, action_url, and the target the notification is about.
+   :func:`_build_data_payload` turns those into the versioned data
+   contract the mobile app routes by (#2161): see
+   ``docs/mobile-push-contract.md`` and the generated
+   ``contracts/push-notifications.json``.
 4. The dispatcher walks each recipient's live device registrations,
    honours :class:`NotificationPreference`, resolves the right
    per-cloud :class:`NotificationDriver` instance for the
@@ -61,6 +65,7 @@ import datetime as dt
 import logging
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import urlencode
 
 from _sdk.notification import (
     DevicePlatform,
@@ -400,6 +405,10 @@ PUSH_TITLE_MAX = 64
 PUSH_BODY_MAX = 240
 PUSH_DATA_VALUE_MAX = 240
 
+# Version of the ``NotificationPayload.data`` contract (#2161). Bump it when
+# a key is renamed or removed or changes meaning; a new optional key keeps it.
+PUSH_PAYLOAD_VERSION = "1"
+
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class NotificationTemplate:
@@ -407,9 +416,10 @@ class NotificationTemplate:
     body: str
     action_url: str
     recipient_user_ids: tuple[int, ...]
-    # Optional extra data (deep-link payload, ids) merged into
-    # ``NotificationPayload.data`` verbatim. Strings only.
-    extra_data: dict[str, str] = dataclasses.field(default_factory=dict)
+    # What the notification is about, e.g. ("deployment", <guid>). The
+    # client reads it after authenticating; empty id when the emit had none.
+    target_kind: str
+    target_id: str = ""
 
 
 def _truncate(value: str, limit: int) -> str:
@@ -478,17 +488,24 @@ def _template_deploy_event(envelope: EventEnvelope, action_label: str) -> Notifi
     env_name = str(payload.get("environment_name", "") or "")
     deploy_guid = str(payload.get("deployment_guid", "") or envelope.resource_id or "")
     body = f"{app_slug} → {env_name}" if app_slug or env_name else "Deployment update"
-    action_url = f"astrolift://deployments/{deploy_guid}" if deploy_guid else "astrolift://deployments"
+    # The phone opens a deployment inside its app, ``apps/:slug/deployments/:id``,
+    # and shows it only when the app and the ``environmentName`` it was given
+    # match the deployment it reads (#2161).
+    if app_slug and deploy_guid:
+        action_url = f"astrolift://apps/{app_slug}/deployments/{deploy_guid}"
+        if env_name:
+            action_url += "?" + urlencode({"environmentName": env_name})
+    elif app_slug:
+        action_url = f"astrolift://apps/{app_slug}/deployments"
+    else:
+        action_url = "astrolift://apps"
     return NotificationTemplate(
         title=_truncate(f"Deploy {action_label}", PUSH_TITLE_MAX),
         body=_truncate(body, PUSH_BODY_MAX),
         action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
         recipient_user_ids=tuple(sorted(recipients)),
-        extra_data={
-            "deployment_guid": _truncate(deploy_guid, PUSH_DATA_VALUE_MAX),
-            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
-            "environment_name": _truncate(env_name, PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="deployment",
+        target_id=_truncate(deploy_guid, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -507,9 +524,8 @@ def _template_secret_revealed(envelope: EventEnvelope) -> NotificationTemplate |
         body=_truncate(body, PUSH_BODY_MAX),
         action_url=_truncate("astrolift://audit?filter=secret.revealed", PUSH_DATA_VALUE_MAX),
         recipient_user_ids=tuple(sorted(set(admin_ids))),
-        extra_data={
-            "secret_key": _truncate(secret_key, PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="secret",
+        target_id=_truncate(envelope.resource_id, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -528,17 +544,17 @@ def _template_alert_fired(envelope: EventEnvelope) -> NotificationTemplate | Non
     summary = str(payload.get("summary", "") or "")
     title_bits = [bit for bit in (severity.upper() or None, rule_name or None) if bit]
     title = " · ".join(title_bits) or "Alert fired"
-    rule_guid = str(payload.get("rule_guid", "") or envelope.resource_id or "")
-    action_url = f"astrolift://alerts/{rule_guid}" if rule_guid else "astrolift://alerts"
+    # The link opens the incident (the AlertEvent), not the rule: the phone's
+    # ``astrolift://alerts/<id>`` route takes an alert event id (#2161).
+    event_guid = str(payload.get("alert_event_guid", "") or "")
+    action_url = f"astrolift://alerts/{event_guid}" if event_guid else "astrolift://alerts"
     return NotificationTemplate(
         title=_truncate(title, PUSH_TITLE_MAX),
         body=_truncate(summary or "An alert rule fired.", PUSH_BODY_MAX),
         action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
         recipient_user_ids=tuple(sorted(set(member_ids))),
-        extra_data={
-            "rule_guid": _truncate(rule_guid, PUSH_DATA_VALUE_MAX),
-            "severity": _truncate(severity, PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="alert_event",
+        target_id=_truncate(event_guid, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -546,7 +562,7 @@ def _template_alert_resolved(envelope: EventEnvelope) -> NotificationTemplate | 
     """Alert-rule resolved (firing → clear) fan-out. Symmetric to
     :func:`_template_alert_fired` so on-call gets the all-clear through the
     same path the firing page took. Payload keys match the fired template
-    (``rule_name`` / ``severity`` / ``summary`` / ``rule_guid``)."""
+    (``rule_name`` / ``summary`` / ``alert_event_guid``)."""
     if envelope.organization_id is None:
         return None
     member_ids = _org_admin_user_ids(organization_id=envelope.organization_id)
@@ -554,21 +570,18 @@ def _template_alert_resolved(envelope: EventEnvelope) -> NotificationTemplate | 
         return None
     payload = envelope.payload or {}
     rule_name = str(payload.get("rule_name", "") or "")
-    severity = str(payload.get("severity", "") or "").lower()
     summary = str(payload.get("summary", "") or "")
     title_bits = [bit for bit in ("Resolved", rule_name or None) if bit]
     title = " · ".join(title_bits)
-    rule_guid = str(payload.get("rule_guid", "") or envelope.resource_id or "")
-    action_url = f"astrolift://alerts/{rule_guid}" if rule_guid else "astrolift://alerts"
+    event_guid = str(payload.get("alert_event_guid", "") or "")
+    action_url = f"astrolift://alerts/{event_guid}" if event_guid else "astrolift://alerts"
     return NotificationTemplate(
         title=_truncate(title, PUSH_TITLE_MAX),
         body=_truncate(summary or "An alert rule resolved.", PUSH_BODY_MAX),
         action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
         recipient_user_ids=tuple(sorted(set(member_ids))),
-        extra_data={
-            "rule_guid": _truncate(rule_guid, PUSH_DATA_VALUE_MAX),
-            "severity": _truncate(severity, PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="alert_event",
+        target_id=_truncate(event_guid, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -597,7 +610,8 @@ def _template_cluster_bootstrap_failed(envelope: EventEnvelope) -> NotificationT
             PUSH_DATA_VALUE_MAX,
         ),
         recipient_user_ids=tuple(sorted(set(admin_ids))),
-        extra_data={"cluster_guid": _truncate(cluster_guid, PUSH_DATA_VALUE_MAX)},
+        target_kind="cluster",
+        target_id=_truncate(cluster_guid, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -621,18 +635,18 @@ def _template_app_deregister_pending(envelope: EventEnvelope) -> NotificationTem
         if app_slug
         else "An app is scheduled for deregistration."
     )
+    # Apps are read by slug (``astroliftApp(slug)``), so the link names the
+    # slug like every other app link; the target id keeps the GUID (#2161).
     return NotificationTemplate(
         title=_truncate("App deregister pending", PUSH_TITLE_MAX),
         body=_truncate(body, PUSH_BODY_MAX),
         action_url=_truncate(
-            f"astrolift://apps/{app_guid}" if app_guid else "astrolift://apps",
+            f"astrolift://apps/{app_slug}" if app_slug else "astrolift://apps",
             PUSH_DATA_VALUE_MAX,
         ),
         recipient_user_ids=tuple(sorted(recipients)),
-        extra_data={
-            "app_guid": _truncate(app_guid, PUSH_DATA_VALUE_MAX),
-            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="app",
+        target_id=_truncate(app_guid, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -671,20 +685,16 @@ def _template_session_created(envelope: EventEnvelope) -> NotificationTemplate |
         else "If this wasn't you, tap to revoke."
     )
     session_guid = str(payload.get("session_guid", "") or envelope.resource_id or "")
-    action_url = (
-        f"astrolift://settings/devices?session={session_guid}"
-        if session_guid
-        else "astrolift://settings/devices"
-    )
+    # The phone's sessions route (#2161); revoking stays an authenticated,
+    # confirmed action in the app, never something the tap does.
+    action_url = f"astrolift://sessions/{session_guid}" if session_guid else "astrolift://sessions"
     return NotificationTemplate(
         title=_truncate(title, PUSH_TITLE_MAX),
         body=_truncate(body, PUSH_BODY_MAX),
         action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
         recipient_user_ids=(user_id_int,),
-        extra_data={
-            "session_guid": _truncate(session_guid, PUSH_DATA_VALUE_MAX),
-            "client_kind": _truncate(client_kind, PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="session",
+        target_id=_truncate(session_guid, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -716,11 +726,9 @@ def _template_app_uptime_event(envelope: EventEnvelope, action_label: str) -> No
         body=_truncate(body, PUSH_BODY_MAX),
         action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
         recipient_user_ids=tuple(sorted(admin_ids)),
-        extra_data={
-            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
-            "target_url": _truncate(str(payload.get("target_url", "") or ""), PUSH_DATA_VALUE_MAX),
-            "status_code": _truncate(str(payload.get("status_code", "") or ""), PUSH_DATA_VALUE_MAX),
-        },
+        # ``uptime_probe`` emits the app's GUID as the resource id.
+        target_kind="app",
+        target_id=_truncate(envelope.resource_id, PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -762,13 +770,10 @@ def _template_cert_event(envelope: EventEnvelope, *, renewal_failed: bool) -> No
         body=_truncate(body, PUSH_BODY_MAX),
         action_url=_truncate(action_url, PUSH_DATA_VALUE_MAX),
         recipient_user_ids=tuple(sorted(admin_ids)),
-        extra_data={
-            "hostname": _truncate(hostname, PUSH_DATA_VALUE_MAX),
-            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
-            "days_until_expiry": _truncate(
-                str(days_int if days_int is not None else ""), PUSH_DATA_VALUE_MAX
-            ),
-        },
+        target_kind="custom_domain",
+        target_id=_truncate(
+            str(payload.get("domain_guid", "") or envelope.resource_id or ""), PUSH_DATA_VALUE_MAX
+        ),
     )
 
 
@@ -802,11 +807,8 @@ def _template_agent_message(envelope: EventEnvelope) -> NotificationTemplate | N
             f"astrolift://inbox/{thread_id}" if thread_id else "astrolift://inbox", PUSH_DATA_VALUE_MAX
         ),
         recipient_user_ids=tuple(sorted(set(recipients))),
-        extra_data={
-            "message_id": _truncate(str(payload.get("message_id", "") or ""), PUSH_DATA_VALUE_MAX),
-            "thread_id": _truncate(thread_id, PUSH_DATA_VALUE_MAX),
-            "kind": _truncate(str(payload.get("kind", "") or ""), PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="agent_message",
+        target_id=_truncate(str(payload.get("message_id", "") or ""), PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -828,10 +830,8 @@ def _template_app_expiring(envelope: EventEnvelope) -> NotificationTemplate | No
         ),
         action_url=_truncate(f"astrolift://apps/{app_slug}", PUSH_DATA_VALUE_MAX),
         recipient_user_ids=tuple(sorted(set(recipients))),
-        extra_data={
-            "app_slug": _truncate(app_slug, PUSH_DATA_VALUE_MAX),
-            "expires_at": _truncate(str(payload.get("expires_at", "") or ""), PUSH_DATA_VALUE_MAX),
-        },
+        target_kind="app",
+        target_id=_truncate(str(payload.get("app_guid", "") or ""), PUSH_DATA_VALUE_MAX),
     )
 
 
@@ -952,6 +952,8 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
     )
 
     seen: set[int] = set()
+    # Same for every device of the envelope; built at the first send.
+    data: dict[str, str] | None = None
 
     for user_id in template.recipient_user_ids:
         if user_id in seen:
@@ -1029,10 +1031,12 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
                     driver_name=getattr(driver, "name", ""),
                 )
                 continue
+            if data is None:
+                data = _build_data_payload(template=template, envelope=envelope)
             payload = NotificationPayload(
                 title=template.title,
                 body=template.body,
-                data=_build_data_payload(template=template, envelope=envelope),
+                data=dict(data),
                 action_url=template.action_url,
                 category=envelope.event_type,
             )
@@ -1168,25 +1172,40 @@ def _audit_email(*, envelope: EventEnvelope, user_id: int, status: str, detail: 
 
 
 def _build_data_payload(*, template: NotificationTemplate, envelope: EventEnvelope) -> dict[str, str]:
-    """Compose the ``NotificationPayload.data`` dict.
+    """Compose the versioned ``NotificationPayload.data`` contract (#2161).
 
     Driver-side this becomes the FCM ``data`` block / APNs custom
     keys / ANH user properties. All-string by contract so we don't
     need per-driver serialisation rules.
+
+    Only routing identity and the destination travel: the client opens
+    ``action_url`` in the install named by ``install_id`` (the value
+    ``astroliftServerInfo.installId`` reports) and the organization named by
+    ``organization_id``, then reads the target after it authenticates.
     """
+    from core.install_identity import current_install_id
+
     data: dict[str, str] = {
-        "event_type": _truncate(envelope.event_type, PUSH_DATA_VALUE_MAX),
+        "payload_version": PUSH_PAYLOAD_VERSION,
+        "install_id": current_install_id(),
+        "event_kind": envelope.event_type,
+        "target_kind": template.target_kind,
         "action_url": template.action_url,
-        "request_id": _truncate(envelope.request_id, PUSH_DATA_VALUE_MAX),
-        "trace_id": _truncate(envelope.trace_id, PUSH_DATA_VALUE_MAX),
     }
-    if envelope.resource_kind:
-        data["resource_kind"] = _truncate(envelope.resource_kind, PUSH_DATA_VALUE_MAX)
-    if envelope.resource_id:
-        data["resource_id"] = _truncate(envelope.resource_id, PUSH_DATA_VALUE_MAX)
-    for k, v in template.extra_data.items():
-        if v:
-            data[k] = v
+    if envelope.organization_id is not None:
+        from astrolift_identity.models import Organization
+
+        # Soft-deleted orgs too: a client must never guess the org, and its
+        # reads in a deleted one fail closed.
+        guid = (
+            Organization.all_objects.filter(pk=envelope.organization_id)
+            .values_list("guid", flat=True)
+            .first()
+        )
+        if guid is not None:
+            data["organization_id"] = str(guid)
+    if template.target_id:
+        data["target_id"] = template.target_id
     return data
 
 

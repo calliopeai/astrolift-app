@@ -1865,11 +1865,12 @@
           "EDGE_PROMETHEUS": "Ingress メトリクス",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "なし"
         },
         "reasons": {
           "target": "選択した対象は利用できません。",
-          "partial": "測定が不完全または曖昧なため、比率は表示されません。",
+          "partial": "測定が不完全または曖昧なため、値は表示されません。",
           "noData": "この期間には検証済みの使用量データがありません。",
           "readError": "測定ソースを読み取れませんでした。",
           "MISSING_LIMITS": "リソース上限がないため、飽和度は利用できません。",
@@ -11577,6 +11578,16 @@
       "rate": "{rate} req/s",
       "rateWithTop": "{rate} req/s (上位：{top})"
     },
+    "network": {
+      "title": "ネットワーク I/O",
+      "description": "Pod が 1 秒あたりに受信・送信したバイト数（kubelet の cAdvisor ネットワークカウンターより）。",
+      "receive": "受信",
+      "transmit": "送信",
+      "total": "この期間で {bytes}",
+      "noDataTitle": "ネットワークデータはまだありません",
+      "noDataDescription": "この期間に表示するものはありません。クラスターのコレクターがこれらの Pod のサンプルを取得すると、ネットワーク I/O がここに表示されます。",
+      "notConfigured": "このクラスターには Prometheus エンドポイントがないか、選択した環境またはワークロードを利用できません。"
+    },
     "showPromql": "PromQL を表示",
     "tryAgain": "再試行",
     "seeDocs": "ドキュメントを見る"
@@ -11966,6 +11977,27 @@
         "podsRunning": "実行中のPod",
         "cpu": "CPU",
         "memory": "メモリ"
+      },
+      "workloadIdentity": {
+        "title": "ワークロード ID ロール",
+        "state": {
+          "pending": "待機中",
+          "running": "移行中",
+          "succeeded": "移行済み",
+          "failed": "失敗"
+        },
+        "description": {
+          "pending": "このクラスターは別の OIDC 発行者を持つクラスターに付け替えられました。アプリの IAM ロールはその発行者への移行を待っています。",
+          "running": "このクラスターは別の OIDC 発行者を持つクラスターに付け替えられました。アプリの IAM ロールを移行しています。移行が終わるまで、Pod はそのロールを引き受けられません。",
+          "succeeded": "このクラスター上のすべてのアプリの IAM ロールが、クラスターの OIDC 発行者を信頼しています。",
+          "failed": "一部のアプリの IAM ロールが以前の OIDC 発行者を信頼したままのため、このクラスター上の Pod はそれらを引き受けられません。アプリをデプロイするとロールが移行され、クラスターを再登録すると残りを再試行します。"
+        },
+        "issuer": "OIDC 発行者",
+        "apps": "アプリ",
+        "progress": "{total} 件中 {reached} 件",
+        "started": "開始",
+        "finished": "完了",
+        "failuresTitle": "{count, plural, other {移行できなかったロール: # 件}}"
       }
     }
   },

@@ -259,6 +259,35 @@ class AstroliftServerInfoTest(TestCase):
         self.assertEqual(info_a["installId"], info_b["installId"])
         self.assertTrue(info_a["installId"])
 
+    @mock.patch.dict("os.environ", {"ASTROLIFT_INSTALL_ID": ""})
+    def test_install_id_is_the_same_on_every_host(self) -> None:
+        """Web replicas and the worker that sends pushes run on different
+        hosts, and a container gets a new hostname on every restart. The id
+        a client stored at sign-in must be the one each of them reports, and
+        the one push payloads carry (#2161)."""
+        with mock.patch("socket.gethostname", return_value="astrolift-web-6c9f7"):
+            web = self._execute()["installId"]
+        with mock.patch("socket.gethostname", return_value="astrolift-worker-2b81d"):
+            worker = self._execute()["installId"]
+        self.assertEqual(web, worker)
+
+    @mock.patch.dict("os.environ", {"ASTROLIFT_INSTALL_ID": ""})
+    def test_install_id_is_generated_once_and_stored(self) -> None:
+        from core.models import InstallIdentity
+
+        InstallIdentity.objects.all().delete()
+        first = self._execute()["installId"]
+        self.assertRegex(first, r"^install-[0-9a-f]{24}$")
+        self.assertEqual(self._execute()["installId"], first)
+        self.assertEqual(list(InstallIdentity.objects.values_list("install_id", flat=True)), [first])
+
+    @mock.patch.dict("os.environ", {"ASTROLIFT_INSTALL_ID": "  acme-prod  "})
+    def test_operator_install_id_wins_over_the_stored_one(self) -> None:
+        from core.models import InstallIdentity
+
+        InstallIdentity.objects.create(install_id="install-000000000000000000000000")
+        self.assertEqual(self._execute()["installId"], "acme-prod")
+
     # ---- Bonus pin: authMethods always lists session_cookie --------
 
     def test_auth_methods_always_lists_session_cookie(self) -> None:

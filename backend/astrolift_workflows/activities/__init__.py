@@ -227,6 +227,7 @@ from astrolift_workflows.activities.static_site import (
 )
 from astrolift_workflows.activities.supply_chain_gate import evaluate_supply_chain_gate
 from astrolift_workflows.activities.uptime import probe_uptime_tick
+from astrolift_workflows.activities.workflow_github_checks import poll_github_checks
 from astrolift_workflows.activities.workflow_run_reconcile import reconcile_workflow_runs_tick
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
@@ -245,6 +246,10 @@ from astrolift_workflows.activities.workflow_stage_activities import (
 )
 from astrolift_workflows.activities.workload_identity import (
     ensure_workload_identity,
+)
+from astrolift_workflows.activities.workload_identity_rebind import (
+    mark_cluster_workload_identity_rebind_failed,
+    rebind_cluster_workload_identity,
 )
 
 __all__ = [
@@ -341,6 +346,7 @@ __all__ = [
     "mark_app_failed",
     "mark_app_ready",
     "mark_app_tearing_down",
+    "mark_cluster_workload_identity_rebind_failed",
     "mark_decommissioned",
     "mark_decommissioning",
     "mark_deploying",
@@ -370,6 +376,7 @@ __all__ = [
     "poll_agent_run_status",
     "poll_agent_run_progress",
     "poll_cert_issuance",
+    "poll_github_checks",
     "poll_pipeline_job",
     "poll_rollout",
     "poll_rollout_on_target",
@@ -389,6 +396,7 @@ __all__ = [
     "prune_audit_log",
     "prune_stale_sessions",
     "reap_agent_boxes_tick",
+    "rebind_cluster_workload_identity",
     "reconcile_agent_deployments",
     "reconcile_cluster_capabilities",
     "reconcile_runs_tick",

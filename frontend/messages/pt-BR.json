@@ -1865,11 +1865,12 @@
           "EDGE_PROMETHEUS": "Métricas de ingresso",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "Nenhuma"
         },
         "reasons": {
           "target": "Destino selecionado indisponível.",
-          "partial": "Medição incompleta ou ambígua; nenhuma proporção é exibida.",
+          "partial": "Medição incompleta ou ambígua; nenhum valor é exibido.",
           "noData": "Não há dados de uso verificados neste intervalo.",
           "readError": "Não foi possível ler a fonte de medição.",
           "MISSING_LIMITS": "Faltam limites de recursos; a saturação está indisponível.",
@@ -11577,6 +11578,16 @@
       "rate": "{rate} req/s",
       "rateWithTop": "{rate} req/s (principais: {top})"
     },
+    "network": {
+      "title": "E/S de rede",
+      "description": "Bytes por segundo recebidos e enviados pelos pods, segundo os contadores de rede do cAdvisor no kubelet.",
+      "receive": "Recebidos",
+      "transmit": "Enviados",
+      "total": "{bytes} neste intervalo",
+      "noDataTitle": "Ainda não há dados de rede",
+      "noDataDescription": "Nada para mostrar neste intervalo. A E/S de rede aparecerá aqui quando o coletor do cluster tiver amostras desses pods.",
+      "notConfigured": "Este cluster não tem um endpoint do Prometheus, ou o ambiente ou a carga de trabalho selecionados não estão disponíveis."
+    },
     "showPromql": "Mostrar PromQL",
     "tryAgain": "Tentar novamente",
     "seeDocs": "Ver a documentação"
@@ -11966,6 +11977,27 @@
         "podsRunning": "Pods em execução",
         "cpu": "CPU",
         "memory": "Memória"
+      },
+      "workloadIdentity": {
+        "title": "Funções de identidade de carga de trabalho",
+        "state": {
+          "pending": "Na fila",
+          "running": "Movendo",
+          "succeeded": "Movido",
+          "failed": "Falhou"
+        },
+        "description": {
+          "pending": "O cluster foi reapontado para um cluster com outro emissor OIDC. As funções do IAM dos aplicativos estão na fila para passar para ele.",
+          "running": "O cluster foi reapontado para um cluster com outro emissor OIDC. As funções do IAM dos aplicativos estão passando para ele; um pod não pode assumir uma função até que ela tenha sido movida.",
+          "succeeded": "Todas as funções do IAM dos aplicativos deste cluster confiam no emissor OIDC dele.",
+          "failed": "Algumas funções do IAM de aplicativos ainda confiam no emissor OIDC anterior, então os pods delas neste cluster não podem assumi-las. Implantar um aplicativo move a função dele; registrar o cluster de novo tenta o restante novamente."
+        },
+        "issuer": "Emissor OIDC",
+        "apps": "Aplicativos",
+        "progress": "{reached} de {total}",
+        "started": "Iniciado",
+        "finished": "Concluído",
+        "failuresTitle": "{count, plural, one {# função não movida} other {# funções não movidas}}"
       }
     }
   },

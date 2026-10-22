@@ -151,6 +151,15 @@ class ReconcileWorkloadIdentityInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class RebindClusterWorkloadIdentityInput:
+    """The ``ClusterWorkloadIdentityRebind`` whose per-app role trust is moved
+    to its cluster's new OIDC issuer (#2472)."""
+
+    rebind_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class BuildPreviewInput:
     """Input for ``BuildPreviewWorkflow`` (#751).
 
