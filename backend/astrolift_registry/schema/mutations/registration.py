@@ -696,6 +696,7 @@ class RegistrationMutations:
         permanent_refusal = expiry.permanent_refusal(
             project.organization, remedy="give each new app's manifest an [app] expires_in"
         )
+        actor_user_id = tenant.actor_user_id if tenant else None
 
         with allow_project_attach(actor_may_attach_project_services(project_id=project.pk)):
             result = _register_app_repo(
@@ -708,7 +709,7 @@ class RegistrationMutations:
                 deploy_branch=input.deploy_branch or "",
                 default_cluster=managed_cluster,
                 permanent_refusal=permanent_refusal,
-                created_by_id=tenant.actor_user_id,
+                created_by_id=actor_user_id,
             )
 
         if result.status == "refused":
@@ -739,7 +740,7 @@ class RegistrationMutations:
             if app is None:
                 continue
             # The manifest's ``[app] expires_in`` makes it temporary (#2433).
-            expiry.started(app, actor_user_id=tenant.actor_user_id)
+            expiry.started(app, actor_user_id=actor_user_id)
             try:
                 with allow_project_attach(actor_may_attach_project_services(app)):
                     _bootstrap_app_environments(app, [])
