@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DM_Sans, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { ApolloWrapper } from "@/lib/apollo";
 import { AppearanceProvider } from "@/providers/AppearanceProvider";
 import { TooltipProvider } from "@/components/screens/shell/root-providers";
@@ -13,20 +13,41 @@ import { TimezoneDetector } from "@/providers/TimezoneDetector";
 import { getDirection } from "@/lib/i18n/direction";
 import "./globals.css";
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
+const dmSans = localFont({
+  src: "./fonts/dm-sans/DMSans-VF.ttf",
+  weight: "100 1000",
+  style: "normal",
+  display: "swap",
   variable: "--font-dm-sans",
 });
 
-const plexSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+const plexSans = localFont({
+  src: "./fonts/ibm-plex-sans/IBMPlexSans-VF.ttf",
+  weight: "300 700",
+  style: "normal",
+  display: "swap",
   variable: "--font-plex-sans",
 });
 
-const plexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const plexMono = localFont({
+  src: [
+    {
+      path: "./fonts/ibm-plex-mono/IBMPlexMono-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/ibm-plex-mono/IBMPlexMono-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "./fonts/ibm-plex-mono/IBMPlexMono-SemiBold.ttf",
+      weight: "600",
+      style: "normal",
+    },
+  ],
+  display: "swap",
   variable: "--font-plex-mono",
 });
 

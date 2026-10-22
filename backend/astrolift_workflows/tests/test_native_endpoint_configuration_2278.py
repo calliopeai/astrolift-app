@@ -3,7 +3,9 @@
 import asyncio
 import base64
 import json
+import os
 import re
+import subprocess
 import sys
 import time
 import traceback
@@ -11,8 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from dataclasses import asdict
 from datetime import timedelta
-from threading import Event
+from threading import Event, get_ident
 from threading import enumerate as active_threads
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -22,6 +25,15 @@ from gcp.gke_identity_preparation import GKEIdentityPreparation
 from gcp.identity_owned import NativeGCPIdentity
 from google.iam.v1 import policy_pb2
 from temporalio import workflow
+from temporalio.api.common.v1.message_pb2 import Payload, Payloads
+from temporalio.api.enums.v1 import EventType, TimeoutType
+from temporalio.api.failure.v1.message_pb2 import Failure, TimeoutFailureInfo
+from temporalio.api.history.v1.message_pb2 import (
+    ActivityTaskCancelRequestedEventAttributes,
+    ActivityTaskTimedOutEventAttributes,
+    HistoryEvent,
+    WorkflowExecutionCancelRequestedEventAttributes,
+)
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, CancelledError
 from temporalio.worker import Replayer, UnsandboxedWorkflowRunner, Worker
@@ -45,6 +57,946 @@ from astrolift_workflows.native_endpoint_configuration import (
 from astrolift_workflows.tests.test_native_execution_checkpoint_2278 import world as original_world
 from providers.tests.gcp.test_gke_app_apply_2278 import native as tls_fixture
 from providers.tests.gcp.test_identity_submission_2278 import SubmissionWire
+
+_HISTORY_SCAN_LIMIT = 2048
+_HISTORY_ROW_LIMIT = 8
+_HISTORY_COUNT_LIMIT = 1_000_000
+_FAILURE_DIAGNOSTIC_BYTES = 16 * 1024
+_FAILURE_HISTORY_SECONDS = 3
+_PG_WAIT_OBSERVER_SECONDS = 2.0
+_PG_WAIT_CONNECT_SECONDS = 1
+_PG_WAIT_STATEMENT_MS = 500
+_PG_WAIT_BLOCKER_LIMIT = 8
+_OWNED_THREAD_FRAME_LIMIT = 12
+_SAFE_TIMEOUT_NAMES = {
+    "TIMEOUT_TYPE_START_TO_CLOSE",
+    "TIMEOUT_TYPE_SCHEDULE_TO_START",
+    "TIMEOUT_TYPE_SCHEDULE_TO_CLOSE",
+    "TIMEOUT_TYPE_HEARTBEAT",
+}
+_SAFE_TERMINAL_EVENT_NAMES = {
+    "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_FAILED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED",
+    "EVENT_TYPE_WORKFLOW_EXECUTION_CONTINUED_AS_NEW",
+}
+
+
+def _safe_temporal_history_summary(history):
+    """Return only bounded Temporal event codes/IDs, never payloads or messages."""
+    events = getattr(history, "events", ())
+    if not hasattr(events, "__iter__"):
+        events = ()
+    try:
+        available = len(events)
+    except (TypeError, OverflowError):
+        available = 0
+    available = min(max(available, 0), _HISTORY_COUNT_LIMIT)
+    timeout_counts = dict.fromkeys(sorted(_SAFE_TIMEOUT_NAMES), 0)
+    event_type_counts = dict.fromkeys(
+        (
+            "EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT",
+            "EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED",
+            "EVENT_TYPE_ACTIVITY_TASK_CANCELED",
+            "EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED",
+            *_SAFE_TERMINAL_EVENT_NAMES,
+        ),
+        0,
+    )
+    timeout_rows = []
+    activity_cancel_request_rows = []
+    cancellation_ids = []
+    cancel_request_ids = []
+    terminal_rows = []
+    scanned = 0
+    unclassified_event_count = 0
+    unknown_event_enum_count = 0
+
+    def safe_id(value):
+        return value if type(value) is int and 0 <= value <= (2**63 - 1) else None
+
+    def has_field(message, field_name):
+        method = getattr(message, "HasField", None)
+        if not callable(method):
+            return False
+        try:
+            return method(field_name) is True
+        except (AttributeError, TypeError, ValueError):
+            return False
+
+    for event in events:
+        if scanned >= _HISTORY_SCAN_LIMIT:
+            break
+        scanned += 1
+        event_type = getattr(event, "event_type", None)
+        try:
+            name = EventType.Name(event_type) if type(event_type) is int else None
+        except (ValueError, TypeError):
+            name = None
+        event_id = safe_id(getattr(event, "event_id", None))
+        if name in event_type_counts:
+            event_type_counts[name] = min(event_type_counts[name] + 1, _HISTORY_COUNT_LIMIT)
+        if name == "EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT":
+            attrs = getattr(event, "activity_task_timed_out_event_attributes", None)
+            timeout_name = None
+            if (
+                attrs is not None
+                and has_field(event, "activity_task_timed_out_event_attributes")
+                and has_field(attrs, "failure")
+            ):
+                failure = attrs.failure
+                if has_field(failure, "timeout_failure_info"):
+                    timeout_failure = failure.timeout_failure_info
+                    # timeout_type is a proto3 scalar without field presence;
+                    # an unspecified/unknown enum is rejected by the whitelist below.
+                    try:
+                        timeout_type = timeout_failure.timeout_type
+                        timeout_name = TimeoutType.Name(timeout_type) if type(timeout_type) is int else None
+                    except (ValueError, TypeError):
+                        timeout_name = None
+            if timeout_name in timeout_counts:
+                timeout_counts[timeout_name] = min(timeout_counts[timeout_name] + 1, _HISTORY_COUNT_LIMIT)
+                if len(timeout_rows) < _HISTORY_ROW_LIMIT:
+                    timeout_rows.append(
+                        {
+                            "eventId": event_id,
+                            "timeoutType": timeout_name,
+                            "scheduledEventId": safe_id(getattr(attrs, "scheduled_event_id", None)),
+                            "startedEventId": safe_id(getattr(attrs, "started_event_id", None)),
+                        }
+                    )
+            else:
+                unclassified_event_count = min(unclassified_event_count + 1, _HISTORY_COUNT_LIMIT)
+        elif name == "EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED":
+            attrs = getattr(event, "activity_task_cancel_requested_event_attributes", None)
+            if attrs is not None and has_field(event, "activity_task_cancel_requested_event_attributes"):
+                if len(activity_cancel_request_rows) < _HISTORY_ROW_LIMIT:
+                    activity_cancel_request_rows.append(
+                        {
+                            "eventId": event_id,
+                            "scheduledEventId": safe_id(getattr(attrs, "scheduled_event_id", None)),
+                        }
+                    )
+            else:
+                unclassified_event_count = min(unclassified_event_count + 1, _HISTORY_COUNT_LIMIT)
+        elif name == "EVENT_TYPE_ACTIVITY_TASK_CANCELED":
+            if len(cancellation_ids) < _HISTORY_ROW_LIMIT:
+                cancellation_ids.append(event_id)
+        elif name == "EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED":
+            if len(cancel_request_ids) < _HISTORY_ROW_LIMIT:
+                cancel_request_ids.append(event_id)
+        elif name in _SAFE_TERMINAL_EVENT_NAMES and len(terminal_rows) < _HISTORY_ROW_LIMIT:
+            terminal_rows.append({"eventId": event_id, "eventType": name})
+        elif name is None:
+            unknown_event_enum_count = min(unknown_event_enum_count + 1, _HISTORY_COUNT_LIMIT)
+
+    return {
+        "eventsAvailableCapped": available,
+        "eventsScanned": scanned,
+        "eventsTruncated": scanned < available,
+        "unclassifiedEventCount": unclassified_event_count,
+        "unknownEventEnumCount": unknown_event_enum_count,
+        "eventTypeCounts": event_type_counts,
+        "activityTimeoutCounts": timeout_counts,
+        "activityTimeouts": timeout_rows,
+        "activityCancelRequestEvents": activity_cancel_request_rows,
+        "activityCancellationEventIds": cancellation_ids,
+        "workflowCancelRequestEventIds": cancel_request_ids,
+        "cancellationObserved": bool(
+            activity_cancel_request_rows
+            or cancellation_ids
+            or cancel_request_ids
+            or any(row["eventType"] == "EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED" for row in terminal_rows)
+        ),
+        "workflowTerminalEvents": terminal_rows,
+    }
+
+
+def test_safe_temporal_history_summary_is_bounded_and_omits_payloads():
+    timeout_event = HistoryEvent(
+        event_id=6,
+        event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT,
+        activity_task_timed_out_event_attributes=ActivityTaskTimedOutEventAttributes(
+            scheduled_event_id=4,
+            started_event_id=5,
+            failure=Failure(
+                message="private-failure-message-canary",
+                timeout_failure_info=TimeoutFailureInfo(
+                    timeout_type=TimeoutType.TIMEOUT_TYPE_HEARTBEAT,
+                    last_heartbeat_details=Payloads(
+                        payloads=[Payload(data=b"private-heartbeat-details-canary")]
+                    ),
+                ),
+            ),
+        ),
+    )
+    events = [
+        timeout_event,
+        HistoryEvent(
+            event_type=EventType.EVENT_TYPE_ACTIVITY_TASK_CANCEL_REQUESTED,
+            event_id=7,
+            activity_task_cancel_requested_event_attributes=ActivityTaskCancelRequestedEventAttributes(
+                scheduled_event_id=6,
+                workflow_task_completed_event_id=8,
+            ),
+        ),
+        HistoryEvent(
+            event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
+            event_id=8,
+            workflow_execution_cancel_requested_event_attributes=WorkflowExecutionCancelRequestedEventAttributes(
+                cause="private-cancel-cause-canary",
+            ),
+        ),
+        *(
+            HistoryEvent(event_type=EventType.EVENT_TYPE_TIMER_STARTED, event_id=index + 9)
+            for index in range(_HISTORY_SCAN_LIMIT + 2)
+        ),
+    ]
+    summary = _safe_temporal_history_summary(SimpleNamespace(events=events))
+    encoded = json.dumps(summary, sort_keys=True)
+
+    assert summary["eventsScanned"] == _HISTORY_SCAN_LIMIT
+    assert summary["eventsTruncated"] is True
+    assert summary["activityTimeoutCounts"]["TIMEOUT_TYPE_HEARTBEAT"] == 1
+    assert summary["eventTypeCounts"]["EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT"] == 1
+    assert summary["eventTypeCounts"]["EVENT_TYPE_WORKFLOW_EXECUTION_CANCEL_REQUESTED"] == 1
+    assert summary["cancellationObserved"] is True
+    assert summary["activityTimeouts"] == [
+        {"eventId": 6, "timeoutType": "TIMEOUT_TYPE_HEARTBEAT", "scheduledEventId": 4, "startedEventId": 5}
+    ]
+    assert summary["activityCancelRequestEvents"] == [{"eventId": 7, "scheduledEventId": 6}]
+    assert summary["workflowCancelRequestEventIds"] == [8]
+    assert len(encoded) < 4096
+    assert "private-" not in encoded
+
+
+def _safe_exception_chain(error):
+    rows = []
+    seen = set()
+    current = error
+    while isinstance(current, BaseException) and id(current) not in seen and len(rows) < 8:
+        seen.add(id(current))
+        exception_type = type(current).__name__
+        if not re.fullmatch(r"[A-Za-z0-9_]{1,96}", exception_type):
+            exception_type = "UnknownException"
+        frame = current.__traceback__
+        source_file, source_line = "unknown", 0
+        for _ in range(128):
+            if frame is None:
+                break
+            if frame.tb_next is None:
+                candidate = frame.tb_frame.f_code.co_filename.rsplit("/", 1)[-1]
+                if re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", candidate):
+                    source_file = candidate
+                source_line = frame.tb_lineno
+                break
+            frame = frame.tb_next
+        else:
+            source_file = "truncated"
+        rows.append({"exceptionType": exception_type, "sourceFile": source_file, "sourceLine": source_line})
+        current = current.__cause__ if current.__cause__ is not None else current.__context__
+    return rows
+
+
+def test_safe_exception_chain_includes_suppressed_context_without_text():
+    try:
+        try:
+            raise RuntimeError("private-inner-error-canary")
+        except RuntimeError:
+            raise ValueError("private-outer-error-canary") from None
+    except ValueError as error:
+        rows = _safe_exception_chain(error)
+
+    assert [row["exceptionType"] for row in rows] == ["ValueError", "RuntimeError"]
+    assert all(set(row) == {"exceptionType", "sourceFile", "sourceLine"} for row in rows)
+    assert all(row["sourceLine"] > 0 for row in rows)
+    assert "private-" not in json.dumps(rows)
+
+    chain = RuntimeError("private-cycle-canary")
+    chain.__context__ = chain
+    cycle_rows = _safe_exception_chain(chain)
+    assert len(cycle_rows) == 1 and cycle_rows[0]["exceptionType"] == "RuntimeError"
+
+    deep = [RuntimeError(f"private-depth-{index}") for index in range(10)]
+    for current, following in zip(deep[:-1], deep[1:], strict=True):
+        current.__context__ = following
+    deep_rows = _safe_exception_chain(deep[0])
+    assert len(deep_rows) == 8
+    assert "private-depth" not in json.dumps(deep_rows)
+
+
+def _safe_owned_thread_stack(thread_id):
+    """Read frames for one previously registered thread, never locals or other threads."""
+    if type(thread_id) is not int or thread_id <= 0:
+        return []
+    frame = sys._current_frames().get(thread_id)
+    rows = []
+    while frame is not None and len(rows) < _OWNED_THREAD_FRAME_LIMIT:
+        filename = frame.f_code.co_filename.rsplit("/", 1)[-1]
+        function = frame.f_code.co_name
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", filename):
+            filename = "unknown"
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", function):
+            function = "unknown"
+        line = frame.f_lineno
+        rows.append(
+            {"file": filename, "function": function, "line": line if type(line) is int and line > 0 else 0}
+        )
+        frame = frame.f_back
+    return rows
+
+
+def _safe_checkpoint_summary(world):
+    stage_names = {
+        "direct_db_transition",
+        "source_bootstrap",
+        "endpoint_source",
+        "endpoint_refresh",
+        "preparation",
+        "annotation",
+        "iam",
+        "placement",
+        "apply",
+        "runtime",
+    }
+    stages = {}
+    for name, count in getattr(world, "checkpoint_stages", {}).items():
+        if name in stage_names and type(count) is int and 0 <= count <= _HISTORY_COUNT_LIMIT:
+            stages[name] = count
+    calls = getattr(world, "checkpoint_calls", 0)
+    return {
+        "calls": calls if type(calls) is int and 0 <= calls <= _HISTORY_COUNT_LIMIT else 0,
+        "stages": stages,
+    }
+
+
+def _safe_pg_wait_summary(value, expected_pid):
+    """Keep only bounded, allowlisted wait metadata from the isolated observer."""
+    unavailable = {"status": "unavailable"}
+    if not isinstance(value, dict) or type(expected_pid) is not int or not 0 < expected_pid <= 2**31 - 1:
+        return unavailable
+    status = value.get("status")
+    if status == "pid-not-visible":
+        return {"status": status, "backendPID": expected_pid}
+    observed_pid = value.get("backendPID")
+    if status != "observed" or type(observed_pid) is not int or observed_pid != expected_pid:
+        return unavailable
+    states = {
+        "active",
+        "idle",
+        "idle in transaction",
+        "idle in transaction (aborted)",
+        "fastpath function call",
+        "disabled",
+    }
+    wait_types = {
+        "Activity",
+        "BufferPin",
+        "Client",
+        "Extension",
+        "IO",
+        "IPC",
+        "Lock",
+        "LWLock",
+        "SLRU",
+        "Timeout",
+    }
+
+    def text_field(name, allowed=None):
+        item = value.get(name)
+        if item is None:
+            return None
+        if type(item) is not str or (allowed is not None and item not in allowed):
+            return None
+        if len(item) > 64 or not re.fullmatch(r"[A-Za-z0-9_ ()-]{1,64}", item):
+            return None
+        return item
+
+    def age_bucket(name):
+        item = value.get(name)
+        if item is None:
+            return None
+        if type(item) is not int or item < 0 or item > 86400 or item % 5:
+            return None
+        return item
+
+    raw_blockers = value.get("blockingPids")
+    blockers = []
+    if isinstance(raw_blockers, list):
+        for item in raw_blockers[:_PG_WAIT_BLOCKER_LIMIT]:
+            if type(item) is int and 0 < item <= 2**31 - 1 and item != expected_pid and item not in blockers:
+                blockers.append(item)
+    return {
+        "status": "observed",
+        "backendPID": expected_pid,
+        "state": text_field("state", states),
+        "waitEventType": text_field("waitEventType", wait_types),
+        "waitEvent": text_field("waitEvent"),
+        "queryAgeBucketSeconds": age_bucket("queryAgeBucketSeconds"),
+        "transactionAgeBucketSeconds": age_bucket("transactionAgeBucketSeconds"),
+        "blockingPids": blockers,
+    }
+
+
+def _safe_activity_connection_summary(value):
+    if not isinstance(value, dict):
+        return {"status": "unavailable"}
+    pid = value.get("backendPID")
+    if type(pid) is not int or not 0 < pid <= 2**31 - 1:
+        return {"status": "unavailable"}
+    return {
+        "status": "last-checkpoint",
+        "backendPID": pid,
+        "autocommit": value["autocommit"] if type(value.get("autocommit")) is bool else None,
+        "inAtomicBlock": value["inAtomicBlock"] if type(value.get("inAtomicBlock")) is bool else None,
+    }
+
+
+def _safe_observer_request(value):
+    """Validate a worker-captured test-DB target before opening an observer."""
+    if not isinstance(value, dict) or value.get("testDatabase") is not True:
+        return None
+    pid = value.get("backendPID")
+    connect = value.get("observerConnect")
+    if type(pid) is not int or not 0 < pid <= 2**31 - 1 or not isinstance(connect, dict):
+        return None
+    database = connect.get("dbname")
+    configured_database = value.get("configuredDatabase")
+    test_database_name = value.get("testDatabaseName")
+    host = connect.get("host")
+    port = connect.get("port")
+    user = connect.get("user")
+    password = connect.get("password")
+    if (
+        not isinstance(database, str)
+        or not database
+        or len(database) > 256
+        or not isinstance(configured_database, str)
+        or database != configured_database
+        or (
+            database != test_database_name
+            if isinstance(test_database_name, str) and test_database_name
+            else not database.startswith("test_")
+        )
+        or not isinstance(host, str)
+        or len(host) > 512
+        or "," in host
+        or not isinstance(port, str)
+        or len(port) > 5
+        or not port.isdecimal()
+        or not 1 <= int(port) <= 65535
+        or not isinstance(user, str)
+        or not user
+        or len(user) > 512
+        or (password is not None and (not isinstance(password, str) or len(password) > 512))
+    ):
+        return None
+    result = {
+        "dbname": database,
+        "host": host,
+        "port": port,
+        "user": user,
+        "passfile": os.devnull,
+    }
+    hostaddr = connect.get("hostaddr")
+    if hostaddr is not None:
+        if not isinstance(hostaddr, str) or not hostaddr or len(hostaddr) > 512 or "," in hostaddr:
+            return None
+        result["hostaddr"] = hostaddr
+    if password is not None:
+        result["password"] = password
+    for key in ("sslmode", "sslcert", "sslkey", "sslrootcert", "sslcrl"):
+        option = connect.get(key)
+        if option is not None:
+            if not isinstance(option, str) or not option or len(option) > 512:
+                return None
+            result[key] = option
+    return {
+        "pid": pid,
+        "expectedDatabase": database,
+        "expectedUser": user,
+        "connect": result,
+    }
+
+
+_PG_WAIT_OBSERVER = r"""
+import json
+import sys
+
+connection = None
+try:
+    request = json.load(sys.stdin)
+    import psycopg2
+
+    connection = psycopg2.connect(
+        **request["connect"],
+        connect_timeout=__CONNECT_TIMEOUT__,
+        options="-c default_transaction_read_only=on -c statement_timeout=__STATEMENT_TIMEOUT__ -c lock_timeout=250",
+    )
+    connection.set_session(readonly=True, autocommit=True)
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT pid, datname, usename, state, wait_event_type, wait_event, "
+            "CASE WHEN query_start IS NULL THEN NULL ELSE "
+            "GREATEST(0, LEAST(86400, floor(EXTRACT(EPOCH FROM clock_timestamp() - query_start) / 5) * 5))::integer END, "
+            "CASE WHEN xact_start IS NULL THEN NULL ELSE "
+            "GREATEST(0, LEAST(86400, floor(EXTRACT(EPOCH FROM clock_timestamp() - xact_start) / 5) * 5))::integer END, "
+            "(pg_blocking_pids(pid))[1:8] "
+            "FROM pg_catalog.pg_stat_activity WHERE pid = %s",
+            (request["pid"],),
+        )
+        row = cursor.fetchone()
+    if row is None:
+        result = {"status": "pid-not-visible"}
+    elif row[1] != request["expectedDatabase"] or row[2] != request["expectedUser"]:
+        result = {"status": "identity-mismatch"}
+    else:
+        result = {
+            "status": "observed",
+            "backendPID": row[0],
+            "state": row[3],
+            "waitEventType": row[4],
+            "waitEvent": row[5],
+            "queryAgeBucketSeconds": row[6],
+            "transactionAgeBucketSeconds": row[7],
+            "blockingPids": row[8] or [],
+        }
+    print(json.dumps(result, separators=(",", ":")))
+except BaseException:
+    print('{"status":"unavailable"}')
+finally:
+    if connection is not None:
+        try:
+            connection.close()
+        except BaseException:
+            pass
+"""
+
+
+def _observe_owned_pg_wait(activity_connection):
+    """Observe one captured backend through a read-only child with hard bounds.
+
+    PID, database, and login-user matching reduce reuse ambiguity. The existing
+    worker connection does not expose backend_start, and this diagnostic does
+    not issue another hot-path query to capture it; a PID reused by the same
+    database and login user before observation cannot be distinguished.
+    """
+    request = _safe_observer_request(activity_connection)
+    if request is None:
+        return {"status": "unavailable"}
+    try:
+        payload = json.dumps(request, separators=(",", ":"))
+        observer = _PG_WAIT_OBSERVER.replace("__CONNECT_TIMEOUT__", str(_PG_WAIT_CONNECT_SECONDS)).replace(
+            "__STATEMENT_TIMEOUT__", str(_PG_WAIT_STATEMENT_MS)
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-c", observer],
+            input=payload,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            env={"PATH": os.defpath, "LANG": "C"},
+            timeout=_PG_WAIT_OBSERVER_SECONDS,
+            check=False,
+        )
+        if result.returncode != 0 or len(result.stdout.encode("utf-8")) > 2048:
+            return {"status": "unavailable"}
+        return _safe_pg_wait_summary(json.loads(result.stdout), request["pid"])
+    except BaseException:
+        return {"status": "unavailable"}
+
+
+def _safe_activity_connection_state():
+    """Snapshot current thread connection facts without opening it or issuing SQL."""
+    try:
+        from django.db import connection
+
+        raw = connection.connection
+        getter = getattr(raw, "get_backend_pid", None)
+        pid = getter() if connection.vendor == "postgresql" and callable(getter) else None
+        if type(pid) is not int or not 0 < pid <= 2**31 - 1:
+            return None
+        if connection.alias != "default":
+            return None
+        settings = connection.settings_dict
+        dsn_getter = getattr(raw, "get_dsn_parameters", None)
+        dsn = dsn_getter() if callable(dsn_getter) else None
+        if not isinstance(dsn, dict):
+            return None
+        database = dsn.get("dbname")
+        configured_database = settings.get("NAME")
+        test_settings = settings.get("TEST") or {}
+        if not isinstance(test_settings, dict):
+            return None
+        test_name = test_settings.get("NAME")
+        is_test_database = (
+            database == test_name if test_name else isinstance(database, str) and database.startswith("test_")
+        )
+        if (
+            not isinstance(database, str)
+            or database != configured_database
+            or not is_test_database
+            or len(database) > 256
+        ):
+            return None
+        host = dsn.get("host")
+        port = dsn.get("port")
+        user = dsn.get("user")
+        password = settings.get("PASSWORD")
+        if (
+            not isinstance(host, str)
+            or len(host) > 512
+            or not isinstance(port, str)
+            or len(port) > 5
+            or not port.isdecimal()
+            or not 1 <= int(port) <= 65535
+            or not isinstance(user, str)
+            or not user
+            or len(user) > 512
+            or (password is not None and (not isinstance(password, str) or len(password) > 512))
+        ):
+            return None
+        observer_connect = {
+            "dbname": database,
+            "host": host,
+            "port": port,
+            "user": user,
+            "password": password,
+        }
+        hostaddr = dsn.get("hostaddr")
+        if hostaddr is not None:
+            observer_connect["hostaddr"] = hostaddr
+        for key in ("sslmode", "sslcert", "sslkey", "sslrootcert", "sslcrl"):
+            value = dsn.get(key)
+            if value is not None:
+                observer_connect[key] = value
+        return {
+            "backendPID": pid,
+            "testDatabase": True,
+            "configuredDatabase": configured_database,
+            "testDatabaseName": test_name or None,
+            "observerConnect": observer_connect,
+            "autocommit": connection.get_autocommit(),
+            "inAtomicBlock": connection.in_atomic_block,
+        }
+    except BaseException:
+        return None
+
+
+def _capture_owned_activity_connection_state(world):
+    if get_ident() != getattr(world, "activity_thread_id", None):
+        return
+    activity_db_state = _safe_activity_connection_state()
+    if activity_db_state is not None:
+        world.activity_db_state = activity_db_state
+
+
+def _failure_diagnostic_line(
+    *,
+    callback_error,
+    thread_frames,
+    checkpoints,
+    history=None,
+    history_error=None,
+    activity_connection=None,
+    database_wait=None,
+):
+    callback_chain = _safe_exception_chain(callback_error)
+    history_error_chain = (
+        _safe_exception_chain(history_error) if isinstance(history_error, BaseException) else []
+    )
+    safe_frames = []
+    for row in thread_frames[:_OWNED_THREAD_FRAME_LIMIT]:
+        if not isinstance(row, dict):
+            continue
+        filename = row.get("file")
+        function = row.get("function")
+        line = row.get("line")
+        if not isinstance(filename, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", filename):
+            filename = "unknown"
+        if not isinstance(function, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,96}", function):
+            function = "unknown"
+        safe_frames.append(
+            {
+                "file": filename,
+                "function": function,
+                "line": line if type(line) is int and 0 < line < 10**7 else 0,
+            }
+        )
+    safe_activity_connection = _safe_activity_connection_summary(activity_connection)
+    expected_backend_pid = safe_activity_connection.get("backendPID")
+    safe_database_wait = (
+        _safe_pg_wait_summary(database_wait, expected_backend_pid)
+        if isinstance(database_wait, dict)
+        else {"status": "unavailable"}
+    )
+    value = {
+        "callbackError": callback_chain,
+        "activityThreadFrames": safe_frames,
+        "checkpoints": checkpoints,
+        "history": history,
+        "historyDiagnosticError": history_error_chain,
+        "activityConnection": safe_activity_connection,
+        "databaseWait": safe_database_wait,
+    }
+    try:
+        encoded = json.dumps(value, sort_keys=True, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) <= _FAILURE_DIAGNOSTIC_BYTES:
+            return encoded
+    except BaseException:
+        pass
+    # Diagnostics are best-effort and must never replace the callback failure.
+    return '{"diagnostic":"bounded_failure_diagnostic_unavailable"}'
+
+
+def test_failure_diagnostic_is_bounded_and_redacts_callback_and_history_payloads():
+    callback_error = None
+    try:
+        raise RuntimeError("private-callback-message-canary")
+    except RuntimeError as error:
+        callback_error = error
+    history = _safe_temporal_history_summary(
+        SimpleNamespace(
+            events=[
+                HistoryEvent(
+                    event_id=1,
+                    event_type=EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED,
+                )
+            ]
+        )
+    )
+    line = _failure_diagnostic_line(
+        callback_error=callback_error,
+        thread_frames=[{"file": "worker.py", "function": "run", "line": 12}] * 5000,
+        checkpoints={"calls": 3, "stages": {"apply": 1}},
+        history=history,
+        history_error=ValueError("private-history-message-canary"),
+        activity_connection={
+            "backendPID": 41,
+            "testDatabase": True,
+            "observerConnect": {"password": "private-database-password-canary"},
+            "autocommit": True,
+            "inAtomicBlock": False,
+        },
+        database_wait={
+            "status": "observed",
+            "backendPID": 41,
+            "state": "active",
+            "waitEventType": "Lock",
+            "waitEvent": "transactionid",
+            "query": "private SQL canary",
+            "password": "private credential canary",
+        },
+    )
+    parsed = json.loads(line)
+
+    assert len(line.encode("utf-8")) <= _FAILURE_DIAGNOSTIC_BYTES
+    assert len(parsed["activityThreadFrames"]) <= _OWNED_THREAD_FRAME_LIMIT
+    assert "private-" not in line
+    assert "callbackErrorType" not in parsed
+
+
+def test_failure_diagnostic_formatter_failure_has_constant_safe_fallback(monkeypatch):
+    try:
+        raise RuntimeError("private-callback-message-canary")
+    except RuntimeError as error:
+        callback_error = error
+
+    monkeypatch.setattr(json, "dumps", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("secret")))
+    line = _failure_diagnostic_line(
+        callback_error=callback_error,
+        thread_frames=[],
+        checkpoints={"calls": 0, "stages": {}},
+    )
+
+    assert line == '{"diagnostic":"bounded_failure_diagnostic_unavailable"}'
+
+
+def test_pg_wait_summary_is_allowlisted_bounded_and_pid_pinned():
+    summary = _safe_pg_wait_summary(
+        {
+            "status": "observed",
+            "backendPID": 41,
+            "state": "active",
+            "waitEventType": "Lock",
+            "waitEvent": "transactionid",
+            "queryAgeBucketSeconds": 15,
+            "transactionAgeBucketSeconds": 30,
+            "blockingPids": list(range(42, 60)),
+            "query": "private SQL canary",
+            "password": "private credential canary",
+        },
+        41,
+    )
+
+    assert summary["status"] == "observed"
+    assert summary["blockingPids"] == list(range(42, 50))
+    assert summary["queryAgeBucketSeconds"] == 15
+    assert "query" not in summary and "password" not in summary
+    assert _safe_pg_wait_summary({"status": "identity-mismatch"}, 41) == {"status": "unavailable"}
+    assert _safe_pg_wait_summary({"status": "observed", "backendPID": 42}, 41) == {"status": "unavailable"}
+    assert _safe_pg_wait_summary({"status": "observed", "backendPID": True}, 1) == {"status": "unavailable"}
+    assert (
+        _safe_pg_wait_summary({"status": "observed", "backendPID": 41, "queryAgeBucketSeconds": 16}, 41)[
+            "queryAgeBucketSeconds"
+        ]
+        is None
+    )
+
+
+def test_activity_connection_summary_keeps_only_pid_and_boolean_state():
+    summary = _safe_activity_connection_summary(
+        {
+            "backendPID": 41,
+            "autocommit": True,
+            "inAtomicBlock": False,
+            "database": "private-name",
+            "query": "private SQL canary",
+        }
+    )
+
+    assert summary == {
+        "status": "last-checkpoint",
+        "backendPID": 41,
+        "autocommit": True,
+        "inAtomicBlock": False,
+    }
+    assert _safe_activity_connection_summary({"backendPID": True}) == {"status": "unavailable"}
+
+
+def test_pg_observer_request_requires_worker_captured_test_database():
+    state = {
+        "backendPID": 41,
+        "testDatabase": True,
+        "configuredDatabase": "custom_ci_db",
+        "testDatabaseName": "custom_ci_db",
+        "observerConnect": {
+            "dbname": "custom_ci_db",
+            "host": "/var/run/postgresql",
+            "hostaddr": "127.0.0.1",
+            "port": "5432",
+            "user": "test_user",
+            "password": "private credential canary",
+        },
+    }
+    request = _safe_observer_request(state)
+
+    assert request["pid"] == 41
+    assert request["expectedDatabase"] == "custom_ci_db"
+    assert request["expectedUser"] == "test_user"
+    assert request["connect"]["dbname"] == "custom_ci_db"
+    assert request["connect"]["hostaddr"] == "127.0.0.1"
+    assert request["connect"]["passfile"] == os.devnull
+    assert request["connect"]["password"] == "private credential canary"
+    assert _safe_observer_request({**state, "testDatabase": False}) is None
+    assert _safe_observer_request({**state, "configuredDatabase": "production_db"}) is None
+    assert (
+        _safe_observer_request({**state, "observerConnect": {**state["observerConnect"], "port": "999999"}})
+        is None
+    )
+
+
+def test_pg_observer_source_matches_pid_database_and_login_user():
+    assert "SELECT pid, datname, usename, state" in _PG_WAIT_OBSERVER
+    assert 'row[1] != request["expectedDatabase"]' in _PG_WAIT_OBSERVER
+    assert 'row[2] != request["expectedUser"]' in _PG_WAIT_OBSERVER
+    assert '{"status": "identity-mismatch"}' in _PG_WAIT_OBSERVER
+
+
+def test_activity_db_snapshot_cannot_be_overwritten_by_unregistered_thread(monkeypatch):
+    world = SimpleNamespace(activity_thread_id=41, activity_db_state={"backendPID": 7})
+    monkeypatch.setattr(sys.modules[__name__], "get_ident", lambda: 42)
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "_safe_activity_connection_state",
+        lambda: {"backendPID": 99},
+    )
+
+    _capture_owned_activity_connection_state(world)
+
+    assert world.activity_db_state == {"backendPID": 7}
+
+
+def test_owned_thread_stack_reads_only_registered_thread_and_caps_frames(monkeypatch):
+    class Frame:
+        f_back = None
+        f_lineno = 7
+        f_code = SimpleNamespace(co_filename="/private/worker.py", co_name="owned")
+
+    frame = Frame()
+    monkeypatch.setattr(sys, "_current_frames", lambda: {41: frame, 42: Frame()})
+    rows = _safe_owned_thread_stack(41)
+
+    assert rows == [{"file": "worker.py", "function": "owned", "line": 7}]
+    assert _safe_owned_thread_stack(0) == []
+
+
+async def _fetch_bounded_failure_history(handle):
+    events = []
+    iterator = handle.fetch_history_events(
+        page_size=64,
+        rpc_timeout=timedelta(seconds=1),
+    ).__aiter__()
+    for _ in range(_HISTORY_SCAN_LIMIT):
+        try:
+            event = await iterator.__anext__()
+        except StopAsyncIteration:
+            break
+        events.append(event)
+    limit_reached = len(events) == _HISTORY_SCAN_LIMIT
+    summary = _safe_temporal_history_summary(SimpleNamespace(events=events))
+    summary["inputEventLimitReached"] = limit_reached
+    summary["eventsTotalKnown"] = not limit_reached
+    if limit_reached:
+        # The iterator was intentionally not advanced to discover whether the
+        # history ended exactly at the cap; report a possibly truncated prefix.
+        summary["eventsTruncated"] = True
+    return summary
+
+
+@pytest.mark.asyncio
+async def test_bounded_failure_history_marks_limit_without_fetching_an_extra_event():
+    class Iterator:
+        def __init__(self):
+            self.consumed = 0
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if self.consumed >= _HISTORY_SCAN_LIMIT + 2:
+                raise StopAsyncIteration
+            event = SimpleNamespace(
+                event_id=self.consumed + 1,
+                event_type=EventType.EVENT_TYPE_TIMER_STARTED,
+                payload="private-event-content-canary",
+            )
+            self.consumed += 1
+            return event
+
+    class Handle:
+        def __init__(self):
+            self.iterator = Iterator()
+            self.arguments = None
+
+        def fetch_history_events(self, **kwargs):
+            self.arguments = kwargs
+            return self.iterator
+
+    handle = Handle()
+    summary = await _fetch_bounded_failure_history(handle)
+
+    assert handle.arguments == {"page_size": 64, "rpc_timeout": timedelta(seconds=1)}
+    assert handle.iterator.consumed == _HISTORY_SCAN_LIMIT
+    assert summary["eventsScanned"] == _HISTORY_SCAN_LIMIT
+    assert summary["inputEventLimitReached"] is True
+    assert summary["eventsTotalKnown"] is False
+    assert summary["eventsTruncated"] is True
+    assert "private-event-content-canary" not in json.dumps(summary)
+
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -211,16 +1163,20 @@ def native_world(monkeypatch, client, tmp_path):
                 break
             frame = frame.f_back
         w.checkpoint_stages[stage] = w.checkpoint_stages.get(stage, 0) + 1
-        return original_admitted(self)
+        result = original_admitted(self)
+        _capture_owned_activity_connection_state(w)
+        return result
 
     monkeypatch.setattr(_ScopedDeploymentExecutionCheckpoint, "_admitted", measured_admitted)
 
     def recorded(input, *, ports):
+        w.activity_thread_id = get_ident()
         try:
             return execute_native_endpoint_configuration(input, ports=ports)
         except Exception as error:
             reason = str(error)
             w.frames = [(row.name, row.lineno) for row in traceback.extract_tb(error.__traceback__)]
+            w.failure_causes = _safe_exception_chain(error)
             w.failures.append(
                 (
                     type(error).__name__,
@@ -394,6 +1350,7 @@ async def run(
         return result
 
     def scheduled_ports():
+        w.activity_thread_id = get_ident()
         assert released.wait(30), "HTTP admission/controlled withdrawal must settle"
         if w.before_ports is not None:
             w.before_ports()
@@ -429,12 +1386,67 @@ async def run(
             if during:
                 try:
                     await during(handle)
+                except BaseException as callback_error:
+                    # Capture the one registered activity thread while it is
+                    # still held, then release it before diagnostic I/O.
+                    try:
+                        activity_frames = _safe_owned_thread_stack(getattr(w, "activity_thread_id", None))
+                    except BaseException:
+                        activity_frames = []
+                    try:
+                        checkpoints = _safe_checkpoint_summary(w)
+                    except BaseException:
+                        checkpoints = {"calls": 0, "stages": {}}
+                    try:
+                        activity_connection = _safe_activity_connection_summary(
+                            getattr(w, "activity_db_state", None)
+                        )
+                    except BaseException:
+                        activity_connection = {"status": "unavailable"}
+                    released.set()
+                    try:
+                        database_wait = _observe_owned_pg_wait(getattr(w, "activity_db_state", None))
+                    except BaseException:
+                        database_wait = {"status": "unavailable"}
+                    history_summary = None
+                    history_error = None
+                    try:
+                        history_summary = await asyncio.wait_for(
+                            _fetch_bounded_failure_history(handle),
+                            timeout=_FAILURE_HISTORY_SECONDS,
+                        )
+                    except BaseException as diagnostic_error:
+                        history_error = diagnostic_error
+                    try:
+                        print(
+                            _failure_diagnostic_line(
+                                callback_error=callback_error,
+                                thread_frames=activity_frames,
+                                checkpoints=checkpoints,
+                                history=history_summary,
+                                history_error=history_error,
+                                activity_connection=activity_connection,
+                                database_wait=database_wait,
+                            )
+                        )
+                    except BaseException:
+                        # The original callback failure remains authoritative.
+                        pass
+                    raise
                 finally:
                     released.set()
             try:
                 result = await handle.result()
             except Exception:
-                print(json.dumps({"safe_failures": w.failures, "safe_frames": getattr(w, "frames", [])}))
+                print(
+                    json.dumps(
+                        {
+                            "safe_failures": w.failures,
+                            "safe_frames": getattr(w, "frames", []),
+                            "safe_failure_causes": getattr(w, "failure_causes", []),
+                        }
+                    )
+                )
                 raise
             history = await handle.fetch_history()
     await Replayer(workflows=[workflow_type], workflow_runner=UnsandboxedWorkflowRunner()).replay_workflow(
@@ -877,9 +1889,15 @@ async def test_runtime_db_boundary_rechecks_render_and_original_caller_after_jou
                 type(w.token).objects.filter(pk=w.token.pk).update(is_revoked=True)
 
     monkeypatch.setattr(AppApplyStore, "validate_runtime_handoff", withdraw_after_current_read)
-    result, _ = await run(w, client, temporal_env)
+    result, history = await run(w, client, temporal_env)
     assert result == {"refused": True}
-    assert len(changed) == 1 and len(w.http["requests"]) == changed[0]
+    assert len(changed) == 1 and len(w.http["requests"]) == changed[0], json.dumps(
+        {
+            "safeFailureCauses": getattr(w, "failure_causes", []),
+            "temporalHistory": _safe_temporal_history_summary(history),
+        },
+        sort_keys=True,
+    )
     assert not any(path.endswith("/pods?limit=257") for _, path, _ in w.http["requests"])
     assert await sync_to_async(lambda: GCPGKEAppApplyJournal.objects.get().state)() == "OBSERVED"
     if withdrawal == "render":
