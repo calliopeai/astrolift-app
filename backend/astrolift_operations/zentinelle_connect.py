@@ -29,8 +29,9 @@ organization's connection until the operator moves it
 (``move_to_install``); nothing moves it on its own.
 
 The gateway runs as Deployment + Service ``zentinelle-gateway`` in
-``astrolift-system``, applied through the cluster driver the same way as the
-keep-alive agent, and only while ``ZENTINELLE_GATEWAY_ENABLED`` is on.
+``astrolift-system``, scaled by a HorizontalPodAutoscaler of the same name
+(#2482), applied through the cluster driver the same way as the keep-alive
+agent, and only while ``ZENTINELLE_GATEWAY_ENABLED`` is on.
 """
 
 from __future__ import annotations
@@ -79,7 +80,11 @@ GATEWAY_CREDENTIAL_FILE = "gateway-credential"
 # The image declares no USER, but nothing in it needs root: a static binary
 # listening above 1024 that writes no files.
 GATEWAY_UID = 65532
-GATEWAY_REPLICAS = 2
+# The autoscaler's shape is the one the installer gives Zentinelle's own
+# backend, worker and console on a cluster.
+GATEWAY_MIN_REPLICAS = 2
+GATEWAY_TARGET_CPU_PERCENT = 60
+GATEWAY_SCALE_DOWN_STABILIZATION_SECONDS = 300
 
 DEFAULT_ROTATION_OVERLAP_SECONDS = 600
 MAX_ROTATION_OVERLAP_SECONDS = 86400
@@ -132,6 +137,21 @@ def _gateway_image() -> str:
     if not image:
         raise ZentinelleConnectError(ErrorCode.PRECONDITION, "ZENTINELLE_GATEWAY_IMAGE is empty")
     return image
+
+
+def _gateway_max_replicas() -> int:
+    from constance import config
+
+    # The admin field refuses less than the floor; a value written around it
+    # is refused here, before the apiserver refuses the autoscaler.
+    value = config.ZENTINELLE_GATEWAY_MAX_REPLICAS
+    if not isinstance(value, int) or value < GATEWAY_MIN_REPLICAS:
+        raise ZentinelleConnectError(
+            ErrorCode.PRECONDITION,
+            f"ZENTINELLE_GATEWAY_MAX_REPLICAS must be a whole number of at least {GATEWAY_MIN_REPLICAS}, "
+            "the gateway's minimum",
+        )
+    return value
 
 
 def install_base_url() -> str:
@@ -382,16 +402,27 @@ def credential_secret_manifest(credential: str) -> dict[str, Any]:
     }
 
 
-def gateway_manifests(*, cluster_id: str, zentinelle_url: str, image: str) -> list[dict[str, Any]]:
-    """The gateway's Deployment and Service. Pure, so the shape is testable without a cluster."""
+def gateway_manifests(
+    *, cluster_id: str, zentinelle_url: str, image: str, max_replicas: int
+) -> list[dict[str, Any]]:
+    """The gateway's Deployment, Service and HorizontalPodAutoscaler. Pure, so
+    the shape is testable without a cluster."""
     labels = _labels()
     probe = {"httpGet": {"path": "/health", "port": "http"}}
     deployment = {
         "apiVersion": "apps/v1",
         "kind": "Deployment",
-        "metadata": {"name": GATEWAY_NAME, "namespace": GATEWAY_NAMESPACE, "labels": labels},
+        "metadata": {
+            "name": GATEWAY_NAME,
+            "namespace": GATEWAY_NAMESPACE,
+            "labels": labels,
+            # No replicas: the autoscaler owns /scale, and an apply that set
+            # them would reset its count. The marker has the apply client
+            # hand a count Astrolift owned to another field manager first, so
+            # a running gateway is not defaulted to one pod on the way.
+            "annotations": {"astrolift.dev/replica-owner": "hpa"},
+        },
         "spec": {
-            "replicas": GATEWAY_REPLICAS,
             "selector": {"matchLabels": {"app": GATEWAY_NAME}},
             "template": {
                 "metadata": {"labels": labels},
@@ -467,12 +498,41 @@ def gateway_manifests(*, cluster_id: str, zentinelle_url: str, image: str) -> li
             "ports": [{"name": "http", "port": GATEWAY_PORT, "targetPort": "http", "protocol": "TCP"}],
         },
     }
-    return [deployment, service]
+    autoscaler = {
+        "apiVersion": "autoscaling/v2",
+        "kind": "HorizontalPodAutoscaler",
+        "metadata": {"name": GATEWAY_NAME, "namespace": GATEWAY_NAMESPACE, "labels": labels},
+        "spec": {
+            "scaleTargetRef": {"apiVersion": "apps/v1", "kind": "Deployment", "name": GATEWAY_NAME},
+            "minReplicas": GATEWAY_MIN_REPLICAS,
+            "maxReplicas": max_replicas,
+            "metrics": [
+                {
+                    "type": "Resource",
+                    "resource": {
+                        "name": "cpu",
+                        "target": {"type": "Utilization", "averageUtilization": GATEWAY_TARGET_CPU_PERCENT},
+                    },
+                }
+            ],
+            # In only after five minutes below the target, so a lull is not
+            # taken for the end of a burst.
+            "behavior": {
+                "scaleDown": {"stabilizationWindowSeconds": GATEWAY_SCALE_DOWN_STABILIZATION_SECONDS}
+            },
+        },
+    }
+    return [deployment, service, autoscaler]
 
 
 def _workload_refs(*, with_secret: bool) -> list[dict[str, Any]]:
     """Kind and name of what a gateway put in the cluster, for deletion."""
     refs: list[dict[str, Any]] = [
+        {
+            "apiVersion": "autoscaling/v2",
+            "kind": "HorizontalPodAutoscaler",
+            "metadata": {"name": GATEWAY_NAME},
+        },
         {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": GATEWAY_NAME}},
         {"apiVersion": "v1", "kind": "Service", "metadata": {"name": GATEWAY_NAME}},
     ]
@@ -587,6 +647,7 @@ def _deploy(gateway: ZentinelleClusterGateway) -> None:
             cluster_id=gateway.zentinelle_cluster_id,
             zentinelle_url=gateway.connection.gateway_url or gateway.connection.base_url,
             image=_gateway_image(),
+            max_replicas=_gateway_max_replicas(),
         )
         _apply(gateway.cluster, manifests)
     except ZentinelleConnectError as exc:
@@ -1034,8 +1095,8 @@ def disconnect(*, connection: ZentinelleConnection, actor=None, force: bool = Fa
                 gateway.last_error = f"the gateway could not be removed: {exc.message}"
                 gateway.save()
                 warnings.append(
-                    f"cluster {cluster.slug}: {exc.message}. Remove Deployment and Service {GATEWAY_NAME} "
-                    f"and Secret {GATEWAY_SECRET_NAME} from {GATEWAY_NAMESPACE} by hand."
+                    f"cluster {cluster.slug}: {exc.message}. Remove HorizontalPodAutoscaler, Deployment and "
+                    f"Service {GATEWAY_NAME} and Secret {GATEWAY_SECRET_NAME} from {GATEWAY_NAMESPACE} by hand."
                 )
             gateway.soft_delete(by=actor)
 
@@ -1196,10 +1257,10 @@ def reconcile_gateways() -> list[GatewayReconcile]:
 
     On: deploy each gateway that is still wanted (``gateway_enabled``) on a
     connected organization and is not running, including clusters registered
-    while the switch was off. Off: remove each running gateway's Deployment
-    and Service; the registration, its credential Secret and the per-cluster
-    intent stay, so turning the switch back on brings them back. Idempotent;
-    one cluster's failure is reported and does not stop the others.
+    while the switch was off. Off: remove each running gateway's Deployment,
+    Service and autoscaler; the registration, its credential Secret and the
+    per-cluster intent stay, so turning the switch back on brings them back.
+    Idempotent; one cluster's failure is reported and does not stop the others.
     """
     on = gateway_feature_enabled()
     results: list[GatewayReconcile] = []
