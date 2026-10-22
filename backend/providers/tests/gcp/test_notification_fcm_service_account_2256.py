@@ -20,7 +20,6 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from _sdk.notification import DevicePlatform, NotificationPayload, PushTarget
 from gcp import notification_fcm
 from gcp.notification_fcm import (
-    FCM_SCOPE,
     FCMConfig,
     FCMCredentialsError,
     FCMNotificationDriver,
@@ -124,7 +123,8 @@ def test_the_token_comes_from_a_signed_jwt_bearer_grant_for_the_firebase_scope(a
     assert json.loads(_b64decode(header))["alg"] == "RS256"
     claim_set = json.loads(_b64decode(claims))
     assert claim_set["iss"] == "push@astrolift-mobile.iam.gserviceaccount.com"
-    assert claim_set["scope"] == FCM_SCOPE
+    # The scope FCM HTTP v1 documents for send requests.
+    assert claim_set["scope"] == "https://www.googleapis.com/auth/firebase.messaging"
     assert claim_set["aud"] == TOKEN_URI
 
 
