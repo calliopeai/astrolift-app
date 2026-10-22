@@ -7,6 +7,7 @@ so the connection resolver, token minting and client code all run for real.
 
 import asyncio
 import functools
+import http.client
 import io
 import json
 import urllib.error
@@ -87,6 +88,7 @@ class FakeGitHub:
         self.head = FIRST
         self.listings = {FIRST: [[]], SECOND: [[]]}
         self.pull_errors: list[int] = []
+        self.token_errors: list[Exception] = []
         self.log: list[tuple[str, str]] = []
         self.observe = None
 
@@ -97,6 +99,8 @@ class FakeGitHub:
         auth = request.get_header("Authorization")
         self.log.append((request.get_method(), path))
         if path == f"/app/installations/{INSTALLATION}/access_tokens":
+            if self.token_errors:
+                raise self.token_errors.pop(0)
             claims = jwt.decode(auth.removeprefix("Bearer "), _key().public_key(), algorithms=["RS256"])
             assert claims["iss"] == CLIENT_ID
             return self._json(
@@ -314,6 +318,36 @@ async def test_gate_waits_through_a_transient_error_and_pending_checks_then_pass
     assert len(github.reads("/access_tokens")) == 1
     assert timer_seconds(history) == [interval, interval]
     assert (await run_row(plan)).status == "completed"
+
+
+async def test_a_github_outage_while_the_app_token_is_minted_keeps_the_gate_waiting(temporal_env, github):
+    plan = await sync_to_async(create_gate)()
+    # urllib wraps only a failed connect: a timeout or a dropped connection
+    # while the token's response arrives reaches the client raw. Five in a
+    # row are every attempt the poll activity's retry policy allows.
+    github.token_errors = [TimeoutError("The read operation timed out")] * 3 + [
+        http.client.RemoteDisconnected("Remote end closed connection without response")
+    ] * 2
+    github.listings[FIRST] = [[check("lint"), check("test")]]
+    seen = []
+    github.observe = lambda sha: seen.append(
+        WorkflowStageExecution.objects.filter(workflow_run=plan["run"], stage=plan["gate"]).values_list(
+            "status", "output"
+        )[0]
+    )
+
+    result, history = await run_gate(temporal_env, plan, {"pr": 7})
+
+    assert result.ok, result.message
+    [row] = await gate_rows(plan)
+    assert (row.status, row.output["github_checks"]["outcome"]) == ("completed", "passed")
+    # The running row carried the outage while the gate waited it out.
+    [(status, progress)] = seen
+    assert status == "running"
+    assert progress["github_checks"]["outcome"] == "pending"
+    assert progress["github_checks"]["error"] == "Could not reach GitHub to mint the App installation token"
+    assert len(github.reads("/access_tokens")) == 6
+    assert timer_seconds(history) == [60, 60, 60, 60, 60]
 
 
 async def test_a_failed_required_check_fails_the_run_at_once(temporal_env, github):

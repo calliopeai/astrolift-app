@@ -34,6 +34,17 @@ def _headers(connection) -> dict[str, str]:
         token = github._token(connection)
     except github.GithubProviderError as exc:
         raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+    except (OSError, http.client.HTTPException) as exc:
+        # The App installation token exchange maps only what urllib wraps in
+        # URLError, a failed connect. A timeout, reset or short read while its
+        # response arrives escapes raw, and is as transient as on a read below.
+        raise ProviderError(
+            "NETWORK", "Could not reach GitHub to mint the App installation token", recoverable=True
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ProviderError(
+            "UNEXPECTED_SHAPE", "GitHub returned an invalid App installation token response"
+        ) from exc
     except (InvalidToken, UnicodeDecodeError, RuntimeError, jwt.PyJWTError) as exc:
         raise ProviderError(
             "CREDENTIAL_UNAVAILABLE",

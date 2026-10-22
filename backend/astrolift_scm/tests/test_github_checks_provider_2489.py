@@ -1,5 +1,7 @@
 """Pull request heads and check runs read through stored GitHub credentials (#2489)."""
 
+import functools
+import http.client
 import io
 import json
 import urllib.error
@@ -8,6 +10,8 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from astrolift_scm.providers import ProviderError, github_checks
 from core.secrets import encrypt_at_rest
@@ -161,6 +165,56 @@ def test_network_failures_are_recoverable(monkeypatch, error):
     with pytest.raises(ProviderError) as caught:
         github_checks.read_pull_request_checks(_connection(), repo_full_name="acme/web", number=7)
     assert (caught.value.code, caught.value.recoverable) == ("NETWORK", True)
+
+
+@functools.cache
+def _app_pem():
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    return key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+
+
+@pytest.mark.parametrize(
+    "error,code,recoverable",
+    [
+        (TimeoutError("The read operation timed out"), "NETWORK", True),
+        (ConnectionResetError(54, "Connection reset by peer"), "NETWORK", True),
+        (http.client.RemoteDisconnected("Remote end closed connection without response"), "NETWORK", True),
+        (http.client.IncompleteRead(b""), "NETWORK", True),
+        (json.JSONDecodeError("Expecting value", "<html>", 0), "UNEXPECTED_SHAPE", False),
+    ],
+)
+def test_a_failed_app_token_mint_maps_like_a_failed_read(monkeypatch, error, code, recoverable):
+    # urllib wraps only a failed connect in URLError. A timeout, a reset or a
+    # short read while the installation token's response arrives, or a body
+    # that is not JSON, reaches the client raw from the token exchange.
+    secret = encrypt_at_rest(_app_pem())
+    app = SimpleNamespace(
+        kind="github_app_install",
+        api_base_url="",
+        account_login="acme",
+        guid=uuid.uuid4(),
+        app_client_id="Iv23liChecksFixture01",
+        oauth_client_id="",
+        installation_id="99",
+        secret_backend_kind=secret.backend_kind,
+        secret_ciphertext=secret.backend_ref,
+    )
+    requests = []
+
+    def request(req, *, timeout):
+        requests.append(req.full_url)
+        if isinstance(error, json.JSONDecodeError):
+            return io.BytesIO(b"<html>gateway</html>")
+        raise error
+
+    monkeypatch.setattr(github_checks.urllib.request, "urlopen", request)
+    with pytest.raises(ProviderError) as caught:
+        github_checks.read_pull_request_checks(app, repo_full_name="acme/web", number=7)
+
+    assert (caught.value.code, caught.value.recoverable) == (code, recoverable)
+    assert requests == ["https://api.github.com/app/installations/99/access_tokens"]
 
 
 @pytest.mark.parametrize(
