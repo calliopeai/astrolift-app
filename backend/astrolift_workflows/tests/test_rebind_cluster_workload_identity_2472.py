@@ -168,6 +168,32 @@ def test_every_app_on_the_cluster_trusts_the_new_issuer_and_nothing_else_moves(w
     assert summary["outcomes"] == {"rebound": 3}
 
 
+def test_a_shared_cluster_moves_every_live_organizations_apps(world):
+    """A shared cluster belongs to every organization, so its walk is not held
+    to one; an organization since deleted is still left out."""
+    TenantCluster.all_objects.filter(pk=world.cluster.pk).update(organization=None)
+    defunct = Organization.objects.create(name="Defunct", slug="defunct-2472")
+    defunct_team = Team.objects.create(organization=defunct, name="d", slug="d-2472")
+    defunct_project = Project.objects.create(organization=defunct, team=defunct_team, name="d", slug="d-2472")
+    orphan = _app(defunct, defunct_team, defunct_project, "orphan-app")
+    _environment(orphan, world.cluster)
+    role = workload_identity_role_name(orphan)
+    old = IRSADriver(
+        config=IRSAConfig(region="us-east-1", account_id=ACCOUNT, cluster_oidc_issuer=OLD),
+        iam_client=boto3.client("iam", region_name="us-east-1"),
+    )
+    old.create_identity_role(role, GRANT)
+    old.bind_service_account("old", "orphan-app-production", role, role)
+    defunct.soft_delete()
+
+    _rebind_cluster_sync(world.rebind.pk)
+
+    assert _trusts(world.roles["foreign-app"], NEW, "foreign-app-production")
+    assert _trusts(role, OLD, "orphan-app-production")
+    world.rebind.refresh_from_db()
+    assert (world.rebind.apps_total, world.rebind.state) == (4, ClusterWorkloadIdentityRebind.State.SUCCEEDED)
+
+
 def test_a_role_that_cannot_move_fails_the_request_and_a_rerun_finishes_it(world):
     iam = boto3.client("iam", region_name="us-east-1")
     role = world.roles[world.second.slug]
