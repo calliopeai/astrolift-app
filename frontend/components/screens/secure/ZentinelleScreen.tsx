@@ -52,7 +52,7 @@ export interface ZentinelleScreenProps {
 
 /**
  * Secure › Zentinelle (#1888): connect the organization, then its health,
- * cluster gateways, usage and cost, policies in effect, and audit, one tab
+ * cluster gateways, model usage, policies in effect, and audit, one tab
  * each. A tab shows only with the zentinelle.* grant that reads it; the
  * server enforces every one regardless.
  */

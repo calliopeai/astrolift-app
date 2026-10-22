@@ -53,9 +53,10 @@ Consumer counts reflect visibility, not all subscriptions in the installation.
 
 Metadata exposes owner/placement GUIDs and versions, status, timestamps,
 `contextRevision` and operation receipts. It excludes provider configuration,
-connection material and unrequested grants. Pricing remains an explicit
-independently permitted read with amount, currency, source, fetch time and
-approximation evidence; missing evidence is unavailable rather than zero cost.
+connection material and unrequested grants. Monetary pricing previews and
+their amount, currency and approximation fields are removed. Resource
+metadata and exporter metrics remain available under their existing scope
+checks; neither establishes a monetary estimate or infrastructure attribution.
 
 Attach, detach, update, reprovision and deprovision accept a nullable
 `expectedContextRevision`. Reviewed clients submit the fresh metadata revision;

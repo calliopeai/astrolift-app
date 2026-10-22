@@ -128,14 +128,6 @@ from _sdk.cluster_registry import (
     probe_connectivity,
 )
 from _sdk.composition import CompositionRegistry
-from _sdk.cost import (
-    CostEstimate,
-    CostEstimateRequest,
-    CostEstimateUnavailable,
-    CostEstimator,
-    CostLineItem,
-    CostResult,
-)
 
 # Policy modules (storage encryption, edge security, postgres
 # extensions, variant migration, identity chains, CSI, instrumentation)
@@ -232,12 +224,6 @@ __all__ = [
     "ClusterDriver",
     "CompositionRegistry",
     "ContainerStatusInfo",
-    "CostEstimate",
-    "CostEstimateRequest",
-    "CostEstimateUnavailable",
-    "CostEstimator",
-    "CostLineItem",
-    "CostResult",
     "CsiDriverProfile",
     "DkimToken",
     "DnsAuthCheck",

@@ -3,16 +3,16 @@
 The reads go out as the organization's install, with the credential
 ``zentinelle_connect`` holds, on the install channel
 (``/api/zentinelle/v1/astrolift/...``, ``AstroliftInstallAuthentication``).
-Zentinelle's main does not serve these three reads on that channel yet: its
-usage, policy and audit APIs take a service, platform or portal credential,
-none of which an install holds. This module is the contract Astrolift asks
-for (calliopeai/zentinelle#390), with the field names Zentinelle already uses
-for these records (``OperatorPolicyView``, ``serialize_record``). Each read
-takes ``tenant_id``, one of the tenants the enrollment code scoped the install
-to, and answers only for agents this install minted keys for:
+Compatible Zentinelle source implements these install-scoped reads. Deployed
+availability and enrollment remain separate runtime checks; this module does
+not establish that a particular installation serves them. Each read takes
+``tenant_id``, one of the tenants the enrollment code scoped the install to,
+and requests only agents this install minted keys for:
 
-* ``GET .../astrolift/usage?since=`` answers ``{"usage": [{deployment_id,
-  provider, model, requests, input_tokens, output_tokens, cost_usd}]}``.
+* ``GET .../astrolift/usage?since=``: Astrolift consumes ``deployment_id``,
+  ``provider``, ``model``, ``requests``, ``input_tokens`` and ``output_tokens``
+  from the response's ``usage`` rows. Additional fields, including monetary
+  fields returned by Zentinelle, are ignored rather than relayed.
 * ``GET .../astrolift/policies`` answers ``{"policies": [{id, name,
   policy_type, enforcement, scope_type, priority, description}]}``.
 * ``GET .../astrolift/audit?since=&until=&cursor=&limit=`` answers
@@ -25,16 +25,17 @@ agent workload's slug. Repeating it narrows a read to those agents; leaving
 it out reads the whole tenant. Astrolift decides which agents a viewer may
 see before it asks, so Zentinelle never sees a viewer, only the install.
 
-A Zentinelle without these endpoints, which today is every Zentinelle,
-answers 404; that is reported as an upgrade to make, not as an empty result.
+A deployment without these endpoints answers 404; that is reported as an
+upgrade requirement rather than an empty usage result. Source support does
+not prove deployed token telemetry.
 
-The health card's read (#2436) is ``GET .../astrolift/health`` answering
-``{server_version, window_hours, blocks, open_approvals, budgets: [{id, name,
-scope_type, limit_usd, spend_usd, percent, level}], clusters: [{cluster_id,
-status, health, gateway_version, last_seen_at}]}``. Its answer is cached for
-``HEALTH_CACHE_SECONDS`` (a gateway reports once a minute) and never stored.
-A Zentinelle older than that read answers 404, which reads as not available
-rather than as an error: the card shows what it has.
+The health card reads ``GET .../astrolift/health`` (#2436). Astrolift consumes
+only server version, window/counts and gateway version/last-seen observations;
+additional monetary fields returned by Zentinelle are ignored. A projected,
+typed snapshot is cached for ``HEALTH_CACHE_SECONDS``, never the raw response.
+A versioned key does not adopt earlier raw-response cache entries. A release
+without the health read answers 404, represented as unavailable rather than
+an error; other failures remain errors. Runtime support is checked separately.
 """
 
 from __future__ import annotations
@@ -69,7 +70,6 @@ class UsageRow:
     requests: int
     input_tokens: int
     output_tokens: int
-    cost_usd: float
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -97,18 +97,6 @@ class AuditEvent:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Budget:
-    id: str
-    name: str
-    scope: str
-    limit_usd: float
-    spend_usd: float
-    percent: float
-    level: str
-    """``""``, ``threshold`` (at or past its alert threshold) or ``exceeded``."""
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
 class ClusterHealth:
     gateway_version: str
     last_seen_at: datetime | None
@@ -123,7 +111,6 @@ class Health:
     window_hours: int = 24
     blocks: int = 0
     open_approvals: int = 0
-    budgets: tuple[Budget, ...] = ()
     clusters: dict[str, ClusterHealth] = dataclasses.field(default_factory=dict)
 
 
@@ -185,17 +172,10 @@ def _int(row: dict[str, Any], key: str) -> int:
         return 0
 
 
-def _float(row: dict[str, Any], key: str) -> float:
-    try:
-        return float(row.get(key) or 0)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def usage(
     connection: ZentinelleConnection, *, since: datetime, agent_slugs: Iterable[str] | None = None
 ) -> list[UsageRow]:
-    """Model usage and cost since ``since``, per agent, provider and model."""
+    """Model token usage since ``since``, per agent, provider and model."""
     body = _get(connection, "/usage", "usage", [("since", since.isoformat()), *_agents(agent_slugs)])
     return [
         UsageRow(
@@ -205,7 +185,6 @@ def usage(
             requests=_int(row, "requests"),
             input_tokens=_int(row, "input_tokens"),
             output_tokens=_int(row, "output_tokens"),
-            cost_usd=_float(row, "cost_usd"),
         )
         for row in _list(body, "usage")
     ]
@@ -266,59 +245,39 @@ def audit_page(
     return events, next_cursor if isinstance(next_cursor, str) and next_cursor else None
 
 
-def _health_body(
-    connection: ZentinelleConnection, agent_slugs: Iterable[str] | None
-) -> dict[str, Any] | None:
-    """Zentinelle's health answer, from the cache when fresh; None when it has no such read."""
+def health(connection: ZentinelleConnection, *, agent_slugs: Iterable[str] | None = None) -> Health:
+    """Blocks, open approvals, gateways and server version; cache only this projection."""
     agents = _agents(agent_slugs)
-    key = "zentinelle-health:{}:{}".format(
+    key = "zentinelle-health-v2:{}:{}".format(
         connection.guid, ",".join(slug for _, slug in agents) if agent_slugs is not None else "*"
     )
     cached = cache.get(key)
     if cached is not None:
-        return cached.get("body")
+        return cached
     try:
-        body: dict[str, Any] | None = _get(connection, "/health", "health", agents)
+        body = _get(connection, "/health", "health", agents)
     except ZentinelleConnectError as exc:
         if exc.status != 404:
             raise
-        body = None
-    cache.set(key, {"body": body}, HEALTH_CACHE_SECONDS)
-    return body
-
-
-def health(connection: ZentinelleConnection, *, agent_slugs: Iterable[str] | None = None) -> Health:
-    """Blocks in the last day, open approvals, budgets, gateways and server version."""
-    body = _health_body(connection, agent_slugs)
-    if body is None:
-        return Health(available=False)
-    clusters = {}
-    for row in _list(body, "clusters"):
-        raw = row.get("last_seen_at")
-        clusters[_str(row, "cluster_id")] = ClusterHealth(
-            gateway_version=_str(row, "gateway_version"),
-            last_seen_at=parse_datetime(raw) if isinstance(raw, str) else None,
-        )
-    return Health(
-        available=True,
-        server_version=_str(body, "server_version"),
-        window_hours=_int(body, "window_hours") or 24,
-        blocks=_int(body, "blocks"),
-        open_approvals=_int(body, "open_approvals"),
-        budgets=tuple(
-            Budget(
-                id=_str(row, "id"),
-                name=_str(row, "name"),
-                scope=_str(row, "scope_type"),
-                limit_usd=_float(row, "limit_usd"),
-                spend_usd=_float(row, "spend_usd"),
-                percent=_float(row, "percent"),
-                level=_str(row, "level"),
+        result = Health(available=False)
+    else:
+        clusters = {}
+        for row in _list(body, "clusters"):
+            raw = row.get("last_seen_at")
+            clusters[_str(row, "cluster_id")] = ClusterHealth(
+                gateway_version=_str(row, "gateway_version"),
+                last_seen_at=parse_datetime(raw) if isinstance(raw, str) else None,
             )
-            for row in _list(body, "budgets")
-        ),
-        clusters=clusters,
-    )
+        result = Health(
+            available=True,
+            server_version=_str(body, "server_version"),
+            window_hours=_int(body, "window_hours") or 24,
+            blocks=_int(body, "blocks"),
+            open_approvals=_int(body, "open_approvals"),
+            clusters=clusters,
+        )
+    cache.set(key, result, HEALTH_CACHE_SECONDS)
+    return result
 
 
 def health_if_reachable(connection: ZentinelleConnection | None) -> Health | None:

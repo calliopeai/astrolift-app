@@ -30,6 +30,15 @@ class BudgetAdmin(admin.ModelAdmin):
     )
     list_filter = ("scope_kind", "period", "currency")
 
+    def has_add_permission(self, *args, **kwargs):
+        return False
+
+    def has_change_permission(self, *args, **kwargs):
+        return False
+
+    def has_delete_permission(self, *args, **kwargs):
+        return False
+
 
 @admin.register(CostSnapshot)
 class CostSnapshotAdmin(admin.ModelAdmin):

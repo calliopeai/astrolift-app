@@ -306,3 +306,8 @@ def test_validation_callback_requires_zentinelle_id():
             zentinelle_evidence_id="",
             validated_at_unix=0,
         )
+
+
+def test_retired_spend_vocabulary_is_historical_and_not_a_default_subscription():
+    assert "AUDIT.agent.model_spend" not in DEFAULT_SUBSCRIBED_EVENTS
+    assert ZentinelleEventType("AUDIT.agent.model_spend") is ZentinelleEventType.AGENT_MODEL_SPEND

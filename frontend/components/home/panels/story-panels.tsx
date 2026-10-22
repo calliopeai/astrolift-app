@@ -19,9 +19,7 @@ import {
   ACTIVITY,
   AGENT_RUNS,
   ALERTS,
-  BUDGET,
   CLUSTERS,
-  FORECAST,
   KPIS,
   PLATFORM_RUNS,
   READY,
@@ -36,8 +34,7 @@ import { MyAppsPanelView } from "./MyAppsPanel";
 import { PlatformActivityPanelView } from "./PlatformActivityPanel";
 import { RecentDeploymentsPanelView } from "./RecentDeploymentsPanel";
 import { RunningNowPanelView } from "./RunningNowPanel";
-import { RunsSpendPanelView } from "./RunsSpendPanel";
-import { SpendQuotaPanelView } from "./SpendQuotaPanel";
+import { RunsHistoryPanelView } from "./RunsHistoryPanel";
 import { TrafficErrorsPanelView } from "./TrafficErrorsPanel";
 import { WaitingPanelView } from "./WaitingPanel";
 
@@ -97,13 +94,7 @@ export const storyPanels: Partial<Record<HomePanelKey, React.ComponentType<HomeP
     />
   ),
   "runs-spend": ({ panel }) => (
-    <RunsSpendPanelView
-      panel={panel}
-      days={AA.RUN_DAYS}
-      capped={false}
-      spend={AA.SPEND}
-      {...AA.READY}
-    />
+    <RunsHistoryPanelView panel={panel} days={AA.RUN_DAYS} capped={false} {...AA.READY} />
   ),
   activity: ({ panel }) => <ActivityPanelView panel={panel} {...ACTIVITY} />,
   kpis: ({ panel }) => <KpisPanelView panel={panel} {...KPIS} />,
@@ -121,9 +112,6 @@ export const storyPanels: Partial<Record<HomePanelKey, React.ComponentType<HomeP
   ),
   "platform-activity": ({ panel }) => (
     <PlatformActivityPanelView panel={panel} items={PLATFORM_RUNS} hasMore {...READY} />
-  ),
-  "spend-quota": ({ panel }) => (
-    <SpendQuotaPanelView panel={panel} forecast={FORECAST} budget={BUDGET} {...READY} />
   ),
 };
 

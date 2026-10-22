@@ -32,8 +32,7 @@ import { ClustersPanelView } from "./ClustersPanel";
 import { MyAgentsPanelView } from "./MyAgentsPanel";
 import { MyAppsPanelView } from "./MyAppsPanel";
 import { RecentDeploymentsPanelView } from "./RecentDeploymentsPanel";
-import { RunsSpendPanelView } from "./RunsSpendPanel";
-import { SpendQuotaPanelView } from "./SpendQuotaPanel";
+import { RunsHistoryPanelView } from "./RunsHistoryPanel";
 import { TrafficErrorsPanelView } from "./TrafficErrorsPanel";
 import { WaitingPanelView } from "./WaitingPanel";
 import {
@@ -45,17 +44,9 @@ import {
   TRAFFIC,
   ERRORS,
   APPS_PICK,
-  SPEND,
   READY,
 } from "./apps-agents.fixtures";
-import {
-  ALERTS,
-  CLUSTERS,
-  BUDGET,
-  FORECAST,
-  METRICS,
-  AGENT_RUNS,
-} from "./builder-operator.fixtures";
+import { ALERTS, CLUSTERS, METRICS, AGENT_RUNS } from "./builder-operator.fixtures";
 import { useHomePresentation } from "./use-home-presentation";
 import { useKpisPanel } from "./use-home-panels";
 import { useWaiting, deployItem, gateItem, secretItem } from "./use-waiting";
@@ -266,91 +257,43 @@ describe("Home panel locale behavior", () => {
       expect(w.onError).not.toHaveBeenCalled();
     }
   );
-  it.each(locales)(
-    "%s formats genuine money, budget meter values, rates and missing observations",
-    (locale) => {
-      const t = translator(locale),
-        w = wrapper(locale);
-      const view = render(
-        <SpendQuotaPanelView
-          panel={HOME_PANELS["spend-quota"]}
-          forecast={FORECAST}
-          budget={BUDGET}
-          {...READY}
-        />,
-        { wrapper: w.wrap }
-      );
-      const money = (c: number, currency: string) =>
-        new Intl.NumberFormat(locale, {
-          style: "currency",
-          currency,
-          maximumFractionDigits: 0,
-        }).format(c / 100);
-      const meter = screen.getByRole("meter");
-      expect(meter).toHaveAttribute("aria-valuenow", String(FORECAST.mtdCents / 100));
-      expect(meter).toHaveAttribute("aria-valuemax", String(BUDGET.amountCents / 100));
-      expect(meter).toHaveAttribute(
-        "aria-valuetext",
-        t("copy.spendBudgetValue", {
-          spent: money(FORECAST.mtdCents, FORECAST.currency),
-          budget: money(BUDGET.amountCents, BUDGET.currency),
+  it.each(locales)("%s formats run counts, rates and missing observations", (locale) => {
+    const t = translator(locale),
+      w = wrapper(locale);
+    const chart = render(
+      <RunsHistoryPanelView panel={HOME_PANELS["runs-spend"]} days={RUN_DAYS} capped {...READY} />,
+      { wrapper: w.wrap }
+    );
+    const count = RUN_DAYS.reduce((sum, d) => sum + d.runs, 0);
+    expect(screen.getByText(`${new Intl.NumberFormat(locale).format(count)}+`)).toBeInTheDocument();
+    expect(screen.getByText(t("copy.cappedRuns"))).toBeInTheDocument();
+    chart.unmount();
+    render(
+      <TrafficErrorsPanelView
+        panel={HOME_PANELS["traffic-errors"]}
+        apps={APPS_PICK}
+        appSlug={APPS_PICK[0].slug}
+        onAppChange={vi.fn()}
+        traffic={TRAFFIC}
+        errors={ERRORS}
+        reason="OK"
+        {...READY}
+      />,
+      { wrapper: w.wrap }
+    );
+    const sample = TRAFFIC.values.at(-1)!;
+    expect(
+      screen.getByText(
+        t("operations.requestRate", {
+          value: new Intl.NumberFormat(locale, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }).format(sample),
         })
-      );
-      view.rerender(
-        <SpendQuotaPanelView
-          panel={HOME_PANELS["spend-quota"]}
-          forecast={null}
-          budget={null}
-          {...READY}
-        />
-      );
-      expect(screen.getByText("—")).toBeInTheDocument();
-      expect(screen.queryByRole("meter")).not.toBeInTheDocument();
-      expect(screen.queryByText(money(0, "USD"))).not.toBeInTheDocument();
-      view.unmount();
-      const chart = render(
-        <RunsSpendPanelView
-          panel={HOME_PANELS["runs-spend"]}
-          days={RUN_DAYS}
-          capped
-          spend={SPEND}
-          {...READY}
-        />,
-        { wrapper: w.wrap }
-      );
-      const count = RUN_DAYS.reduce((sum, d) => sum + d.runs, 0);
-      expect(
-        screen.getByText(`${new Intl.NumberFormat(locale).format(count)}+`)
-      ).toBeInTheDocument();
-      expect(screen.getByText(t("copy.cappedRuns"))).toBeInTheDocument();
-      chart.unmount();
-      render(
-        <TrafficErrorsPanelView
-          panel={HOME_PANELS["traffic-errors"]}
-          apps={APPS_PICK}
-          appSlug={APPS_PICK[0].slug}
-          onAppChange={vi.fn()}
-          traffic={TRAFFIC}
-          errors={ERRORS}
-          reason="OK"
-          {...READY}
-        />,
-        { wrapper: w.wrap }
-      );
-      const sample = TRAFFIC.values.at(-1)!;
-      expect(
-        screen.getByText(
-          t("operations.requestRate", {
-            value: new Intl.NumberFormat(locale, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            }).format(sample),
-          })
-        )
-      ).toBeInTheDocument();
-      expect(w.onError).not.toHaveBeenCalled();
-    }
-  );
+      )
+    ).toBeInTheDocument();
+    expect(w.onError).not.toHaveBeenCalled();
+  });
   it.each(locales)("%s distinguishes every metric reason and actual read retries", (locale) => {
     const t = translator(locale),
       retry = vi.fn(),
@@ -502,21 +445,19 @@ describe("Home panel locale behavior", () => {
               const data =
                 operation.operationName === "GetDeploymentMetrics"
                   ? { astroliftDeploymentMetrics: { ...METRICS, total: 1234 } }
-                  : operation.operationName === "GetCostForecast"
-                    ? { astroliftCostForecast: FORECAST }
-                    : operation.operationName === "ListDeployments"
-                      ? { astroliftDeployments: [deployment, TRIGGERED_BY_ME] }
-                      : operation.operationName === "ApproveDeployment"
-                        ? {
-                            approveDeployment: {
-                              ok: approvalOk,
-                              errors: approvalOk
-                                ? []
-                                : [{ code: "DENIED", message: "RAW_POLICY_REFUSAL" }],
-                              data: approvalOk ? deployment : null,
-                            },
-                          }
-                        : {};
+                  : operation.operationName === "ListDeployments"
+                    ? { astroliftDeployments: [deployment, TRIGGERED_BY_ME] }
+                    : operation.operationName === "ApproveDeployment"
+                      ? {
+                          approveDeployment: {
+                            ok: approvalOk,
+                            errors: approvalOk
+                              ? []
+                              : [{ code: "DENIED", message: "RAW_POLICY_REFUSAL" }],
+                            data: approvalOk ? deployment : null,
+                          },
+                        }
+                      : {};
               observer.next({ data });
               observer.complete();
             })
@@ -551,15 +492,8 @@ describe("Home panel locale behavior", () => {
         "deploys",
         "success",
         "p95",
-        "spend",
       ]);
-      expect(hook.result.current.kpi.figures.find((f) => f.key === "spend")?.value).toBe(
-        new Intl.NumberFormat(locale, {
-          style: "currency",
-          currency: "USD",
-          maximumFractionDigits: 0,
-        }).format(FORECAST.mtdCents / 100)
-      );
+      expect(requests.some((r) => /Cost|Budget|Forecast/.test(r.operationName ?? ""))).toBe(false);
       expect(hook.result.current.presentation.age("2026-09-28T13:30:00Z")).toBe(
         new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(-30, "minute")
       );

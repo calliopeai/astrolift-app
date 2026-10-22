@@ -32,7 +32,7 @@ _RESOURCE_PROFILES: dict[str, tuple[str, str, str, str]] = {
 # bundles for "static" projects.
 _RUNTIME_IMAGES: dict[str, tuple[str, str]] = {
     "python": ("python:3.11-slim", "pip install -r requirements.txt --quiet || true"),
-    "node": ("node:20-slim", "npm install --quiet || true"),
+    "node": ("node:24-slim", "npm install --quiet || true"),
     "ruby": ("ruby:3.3-slim", "bundle install --quiet || true"),
     "go": ("golang:1.22-alpine", "go mod download || true"),
     "static": ("nginx:alpine", ""),

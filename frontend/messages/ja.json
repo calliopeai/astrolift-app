@@ -130,7 +130,7 @@
     "slug": "スラッグ",
     "team": "チーム",
     "created": "作成日時",
-    "renameNote": "プロジェクト名の変更はバックエンドのミューテーション対応後に提供されます。スラッグは意図的に変更不可にしており、名前を変えても下流のコスト配分は変わりません。",
+    "renameNote": "プロジェクト名の変更はバックエンドのミューテーション実装後に利用できます。既存のリソース参照を保つため、スラッグは変更できません。",
     "dangerZone": "危険な操作",
     "dangerZoneDescription": "論理削除すると、このプロジェクトは一覧に表示されなくなります。関連付けられたワークロードは、再割り当てするまで表示されたままです。",
     "deleteProject": "プロジェクトを削除",
@@ -188,13 +188,13 @@
     "team": "チーム",
     "created": "作成日",
     "title": "プロジェクト",
-    "context": "デプロイの頻度、ドメイン、スタックが共通するアプリをまとめます。コストレポートはこの単位で集計されます。",
+    "context": "デプロイの周期、ドメイン、スタックを共有するアプリをまとめます。",
     "newProject": "新しいプロジェクト",
     "edit": "編集",
     "delete": "削除",
     "empty": "プロジェクトはまだありません",
     "emptyNoTeams": "先にチームを作成してください。プロジェクトはチームの下に作られます。",
-    "emptyDescription": "アプリをプロジェクトにまとめると、コストとクォータを整理して集計できます。",
+    "emptyDescription": "関連するアプリをプロジェクトにまとめ、共有アクセスを管理します。",
     "manageTeams": "チームを管理",
     "deleteTitle": "プロジェクト {team}/{project} を削除しますか？",
     "deleteTitleGeneric": "プロジェクトを削除しますか？",
@@ -878,7 +878,7 @@
     "exampleSenior": "<code>prod-*</code> という名前のアプリにデプロイできるのはシニアエンジニアだけ。",
     "exampleNight": "呼び出しを受けていない限り、UTC 22:00 から 06:00 の間は誰もシークレットを書き込めない。",
     "exampleMfa": "本番前環境へのデプロイには、60 分以内に行った MFA 認証が必要。",
-    "exampleContractors": "外部委託者はプロジェクト内のすべてを閲覧できるが、請求に関わるものは変更できない。",
+    "exampleContractors": "外部協力者はプロジェクト内のすべてを閲覧できますが、リソースクォータは変更できません。",
     "prerequisitesTitle": "前提条件",
     "prereqPermission": "<strong>権限。</strong><code>policy.create</code> (Owner と Admin が保有)。",
     "prereqModel": "<strong>ABAC と RBAC の考え方。</strong>RBAC は「このユーザーのロールにこの権限が含まれているか」を問います。ABAC は「このリクエストの属性 (誰が、何を、いつ、どこで) を踏まえて、<em>拒否</em>とするポリシーがあるか」を問います。リクエストが成功するのは、RBAC が許可し、かつどのポリシーも拒否しない場合だけです。",
@@ -1680,10 +1680,6 @@
         "1d": "+1 日",
         "7d": "+7 日"
       },
-      "costPerDay": "{cost}/日",
-      "costUnavailable": "費用を取得できません",
-      "costTooltip": "{pods, plural, one {Pod # 個} other {Pod # 個}} · クラウドの現在の料金で {cost}/日",
-      "costTooltipUnavailable": "{pods, plural, one {Pod # 個} other {Pod # 個}} · このクラスターの費用 API は利用できません",
       "staleBadge": "未更新",
       "tearDown": "削除",
       "footer": "アプリごとに {count, plural, one {プレビュー環境を # 件} other {プレビュー環境を # 件}}保持 · 未更新とみなす期間：{days, number} 日。",
@@ -1753,14 +1749,7 @@
         "hoursMinutes": "{hours, number}時間 {minutes, number}分",
         "minutes": "{minutes, number}分"
       },
-      "spend": {
-        "daily": "1 日の費用",
-        "monthly": "今月（予測）",
-        "approximate": "概算",
-        "priced": "{total, number} 件中 {priced, number} 件のプレビューの料金を取得",
-        "unpriced": "{count, number} 件はこのクラスターのドライバーで料金を取得できません",
-        "overcount": "{count, number} 件はサービス内の全 SKU を合算しているため、合計は過大な見積もりです"
-      }
+      "resourceTooltip": "リソース：{pods, plural, one {# 個の Pod} other {# 個の Pod}}"
     },
     "observability": {
       "scope": {
@@ -5543,12 +5532,10 @@
         "cpu": "vCPU（合計）",
         "memory": "メモリ（合計）",
         "pods": "Pod 数",
-        "dailyCost": "推定日額コスト",
-        "approximate": "概算",
         "environment": "環境",
-        "loadResources": "リソースと費用を読み込む",
-        "resourcesUnavailable": "現在のリソース使用量と推定費用を取得できません。",
-        "resourcesNotRequested": "必要に応じて現在のリソース使用量と推定費用を読み込めます。",
+        "loadResources": "リソースを読み込む",
+        "resourcesUnavailable": "現在のリソース使用量を取得できません。",
+        "resourcesNotRequested": "必要に応じて現在のリソース使用量を読み込みます。",
         "previewLogs": "プレビューのログ",
         "loadLogs": "ログを読み込む",
         "logsEmpty": "この期間のログはありません。",
@@ -7380,12 +7367,6 @@
       "recipeSlug": "エージェントレシピのスラッグ",
       "consumerContext": "利用先はこのリソースと同じプロジェクトとクラスターに属している必要があります。",
       "attach": "接続",
-      "costUnavailable": "料金情報を利用できません。",
-      "costMonthly": "月額 {amount}",
-      "costApproximate": "月額約 {amount}",
-      "costFetched": "料金取得日時：{at}",
-      "costSource": "料金情報の出典",
-      "costPreview": "費用を見積もる",
       "reprovision": "再プロビジョニング",
       "deprovision": "プロビジョニング解除",
       "actionRefused": "操作が拒否されました。リソースと現在の権限を確認してください。",
@@ -7580,14 +7561,6 @@
       "sentToday": "本日の送信数",
       "ofQuota": "24 時間クォータの {pct}%",
       "nearCeiling": "24 時間クォータの {pct}%、1 日の上限に近づいています"
-    },
-    "cost": {
-      "title": "コスト",
-      "empty": "このサービスに紐づくコストデータはまだありません。コストドライバーが次の照合を実行すると表示されます。",
-      "thisMonth": "今月",
-      "monthToDate": "月初から現在まで",
-      "last30": "過去 30 日間",
-      "trailing30": "直近 30 日間の支出"
     },
     "identity": {
       "title": "ID 検証",
@@ -8352,7 +8325,7 @@
           "provider_plugin": "プロバイダー",
           "scm": "ソース管理",
           "audit_log": "監査ログ",
-          "billing": "請求",
+          "billing": "リソースクォータ",
           "zentinelle": "Zentinelle",
           "admin": "管理"
         }
@@ -9407,7 +9380,6 @@
         "metricsReadUnavailable": "使用量データを読み取れませんでした。",
         "metricsScope": "利用者全体のデプロイ集計値であり、アプリ別の通信量ではありません。",
         "metricsSetup": "メトリクスの設定",
-        "costUnavailable": "使用量の実測値と料金情報がないため、費用は取得できません。",
         "selectApp": "アプリを選択",
         "appSearch": "アプリを検索",
         "appsEmpty": "利用可能なアプリがありません",
@@ -9440,7 +9412,7 @@
         "empty": "この期間のトラフィックのサンプルはありません。",
         "unconfigured": "サブスクリプションのトラフィック収集は未設定です。",
         "bytes": "モデルを提供するアプリが受け付けた応答バイト数です。モデルのトークン数やネットワーク配信の確認ではありません。",
-        "unsupported": "入出力トークン数と費用は未対応です。",
+        "unsupported": "ここでは入力と出力のトークン使用量の観測に対応していません。",
         "boundary": "HTTP ステータスが 200 でも、失敗したストリームはエラーとして数えられる場合があります。",
         "requests": "毎秒のリクエスト数",
         "errors": "毎秒のエラーリクエスト数",
@@ -9609,8 +9581,8 @@
         "inferenceUnknown": "推論アクセスは検証されていません。",
         "traffic": "アプリのトラフィックとレイテンシー",
         "trafficUnsupported": "ここではネイティブモデルのトラフィックとレイテンシーの観測をサポートしていません。観測がないことは、トラフィックがゼロであることを意味しません。",
-        "tokensCost": "トークンと費用",
-        "tokensCostUnsupported": "ここではトークン使用量と費用の観測をサポートしていません。"
+        "tokens": "トークン",
+        "tokensUnsupported": "ここではトークン使用量の観測に対応していません。"
       },
       "bindingHelp": "ネイティブアプリのバインディングはクラウド ID を使用します。適用済みのバインディングリビジョンは、モデルの推論アクセスを検証しません。",
       "connect": {
@@ -10530,7 +10502,7 @@
       },
       "agents": {
         "title": "エージェント",
-        "description": "エージェントの作成と実行向け：失敗した実行と進行中の実行、自分のエージェントと支出。"
+        "description": "エージェントの構築と実行：失敗した実行、実行中の処理、自分のエージェント。"
       },
       "builder": {
         "title": "開発",
@@ -10538,7 +10510,7 @@
       },
       "operator": {
         "title": "運用",
-        "description": "プラットフォームの運用向け：アラート、クラスター、プラットフォームのアクティビティと割り当て。"
+        "description": "プラットフォームの運用：アラート、クラスター、プラットフォームのアクティビティ。"
       }
     },
     "panels": {
@@ -10550,15 +10522,14 @@
       "failed-runs": "失敗した実行",
       "running-now": "実行中",
       "my-agents": "自分のエージェント",
-      "runs-spend": "実行と支出",
+      "runs-spend": "実行履歴",
       "activity": "アクティビティ",
       "kpis": "主要指標",
       "deployments": "デプロイ",
       "agent-runs": "エージェントの実行",
       "alerts": "アラート",
       "clusters": "クラスター",
-      "platform-activity": "プラットフォームのアクティビティ",
-      "spend-quota": "支出と割り当て"
+      "platform-activity": "プラットフォームのアクティビティ"
     },
     "copy": {
       "auditLog": "監査ログ",
@@ -10618,16 +10589,7 @@
       "noRunReason": "この実行の理由は記録されていません。",
       "timedOut": "タイムアウトしました。",
       "noReason": "理由は記録されていません。",
-      "monthToDate": "今月の累計",
-      "ofBudget": "{amount} のうち · {percentage}",
-      "spent": "支出済み",
-      "projected": "予測",
-      "budget": "予算",
       "legend": "凡例",
-      "budgetReadFailed": "予算を読み込めませんでした：{message}",
-      "noBudget": "組織の予算が設定されていないため、支出と比較する割り当てはありません。",
-      "spendAgainstBudget": "{panel}：予算に対する支出",
-      "spendBudgetValue": "予算 {budget} に対する支出 {spent}",
       "last24Hours": "過去24時間",
       "app": "アプリ",
       "pickApp": "アプリを選択",
@@ -10648,14 +10610,12 @@
       "last7Days": "過去7日間",
       "runsPerDay": "1日あたりのエージェント実行数",
       "failedPerDay": "1日あたりの失敗した実行数",
-      "spendPerDay": "1日あたりの組織の支出",
       "sevenDays": "7日間",
-      "spendReadFailed": "支出を読み込めませんでした：{message}",
       "cappedRuns": "最新の実行から集計しています。この週にはさらに多くの実行があります。",
-      "kpiWindow": "過去 {count, number} 日間 · 今月の累計支出",
+      "kpiWindow": "過去 {count, number} 日間",
       "kpiAria": "{panel}、過去 {count, number} 日間",
       "noKpisTitle": "権限内の指標はありません",
-      "noKpisDescription": "閲覧できる領域のデプロイ、実行、支出の指標が表示されます。",
+      "noKpisDescription": "アクセス可能な領域のデプロイと実行の指標が表示されます。",
       "noProject": "プロジェクトなし"
     },
     "health": {
@@ -10704,11 +10664,9 @@
       "runs": "実行",
       "success": "成功率",
       "p95": "p95",
-      "spend": "支出",
       "runsHint": "エージェントの実行",
       "successHint": "デプロイの割合",
-      "p95Hint": "デプロイ時間",
-      "spendHint": "今月の累計"
+      "p95Hint": "デプロイ時間"
     },
     "period": {
       "monthly": "月次",
@@ -14666,7 +14624,7 @@
   },
   "zentinelleScreen": {
     "title": "保護 · Zentinelle",
-    "description": "この組織を Zentinelle に接続し、エージェントのガバナンス、使用量とコスト、ポリシー、監査を扱います。",
+    "description": "この組織を Zentinelle に接続して、エージェントのガバナンス、トークン使用量、ポリシー、監査を管理します。",
     "noAccess": "Zentinelle へのアクセス権がありません",
     "noAccessBody": "ここでは、あなたのロールに Zentinelle の権限がありません。組織の管理者に Zentinelle の権限を依頼してください。",
     "error": "Zentinelle の接続を読み取れませんでした",
@@ -14677,7 +14635,7 @@
     "tabs": {
       "overview": "概要",
       "clusters": "クラスター",
-      "usage": "使用量とコスト",
+      "usage": "使用状況",
       "policies": "ポリシー",
       "audit": "監査"
     },
@@ -14729,7 +14687,6 @@
       "gatewaysValue": "{total} 件中 {healthy} 件",
       "agents": "今月観測されたエージェント",
       "requests": "モデルリクエスト(過去 24 時間)",
-      "spend": "今月の支出",
       "usageError": "Zentinelle から使用量を読み取れませんでした",
       "clustersTitle": "クラスターごとのゲートウェイの状態",
       "clustersDescription": "登録済みの各クラスターの Zentinelle ゲートウェイです。",
@@ -14738,10 +14695,6 @@
       "serverVersion": "Zentinelle のバージョン",
       "blocks": "ブロック数(過去 24 時間)",
       "approvals": "未処理の承認",
-      "budget": "今月の予算",
-      "budgetValue": "{percent}% 使用",
-      "budgetFooter": "{limit} 中 {spend}({name})",
-      "noBudget": "予算は未設定です",
       "notAvailable": "利用できません",
       "countsError": "Zentinelle から稼働状況を読み取れませんでした",
       "reportNotAvailable": "バージョンと最終確認は利用できません",
@@ -14787,7 +14740,6 @@
       "error": "Zentinelle から使用量を読み取れませんでした",
       "requests": "モデルリクエスト",
       "tokens": "使用トークン",
-      "cost": "モデルのコスト",
       "title": "エージェントとモデル別",
       "empty": "この期間にモデルの使用はありません。",
       "noAgent": "(エージェントなし)",

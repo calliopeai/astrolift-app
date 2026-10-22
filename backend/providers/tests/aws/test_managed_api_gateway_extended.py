@@ -588,17 +588,14 @@ def test_api_gateway_native_requests_match_botocore_models() -> None:
             validate_parameters(request, websocket_model.operation_model(operation_names[lookup]).input_shape)
 
 
-def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
+def test_registration_catalog_and_runtime_config_are_wired() -> None:
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     assert ("api_gateway", "rest_api") in PLUGIN.managed_service_drivers
     assert ("api_gateway", "websocket_api") in PLUGIN.managed_service_drivers
-    assert SERVICE_CODE_BY_VARIANT[("api_gateway", "rest_api")] == "AmazonApiGateway"
-    assert SERVICE_CODE_BY_VARIANT[("api_gateway", "websocket_api")] == "AmazonApiGateway"
     entries = {
         entry.variant: entry
         for entry in MATRIX.managed_services

@@ -1,4 +1,4 @@
-"""Exact preview reads preserve tenant ownership and opt into bounded pricing."""
+"""Exact preview reads preserve tenant ownership and opt into observed resource reads."""
 
 from types import SimpleNamespace
 from uuid import uuid4
@@ -54,9 +54,6 @@ def read(world, id=None, **kwargs):
 def forbidden_runtime(monkeypatch):
     calls = []
     monkeypatch.setattr(queries, "list_app_pods", lambda **kwargs: calls.append("pods") or [])
-    monkeypatch.setattr(
-        "astrolift_lifecycle.preview_cost.estimate_daily_cost", lambda **kwargs: calls.append("pricing")
-    )
     return calls
 
 
@@ -133,40 +130,35 @@ def test_denied_permission_never_reads_or_prices_preview(world, permission_resol
     assert calls == []
 
 
-def test_basic_catalog_page_never_calls_runtime_even_with_cost_fields(world, monkeypatch):
+def test_basic_catalog_page_never_calls_runtime(world, monkeypatch):
     calls = forbidden_runtime(monkeypatch)
     with tenant_context(world.tenant):
         page = queries.LifecycleQuery().astrolift_preview_environments_page(info(), limit=3)
         legacy = queries.LifecycleQuery().astrolift_preview_environments(info())
     assert page.items[0].runtime_status == legacy[0].runtime_status == "not_requested"
-    assert page.items[0].estimated_daily_cost_usd is None
     assert calls == []
 
 
-def test_explicit_runtime_cost_prices_one_canonical_target(world, monkeypatch):
+def test_explicit_runtime_resources_prices_one_canonical_target(world, monkeypatch):
     calls = []
     monkeypatch.setattr(
         queries, "list_app_pods", lambda **kwargs: calls.append(("pods", kwargs)) or [object()]
     )
     monkeypatch.setattr(
-        "astrolift_lifecycle.preview_cost.aggregate_pod_resources",
+        "astrolift_lifecycle.preview_resources.aggregate_pod_resources",
         lambda pods: SimpleNamespace(cpu_cores=1.0, memory_bytes=1024.0, pod_count=1),
     )
-    monkeypatch.setattr(
-        "astrolift_lifecycle.preview_cost.estimate_daily_cost",
-        lambda **kwargs: calls.append(("pricing", kwargs))
-        or SimpleNamespace(daily_usd=2.3, notes=["explicit provider estimate"], approximate=True),
-    )
-    result = read(world, include_runtime_cost=True)
+    result = read(world, include_runtime_resources=True)
     assert result.runtime_status == "available"
-    assert result.estimated_daily_cost_usd == 2.3
-    assert [kind for kind, _ in calls] == ["pods", "pricing"]
+    assert result.aggregate_resources.cpu_cores == 1.0
+    assert result.aggregate_resources.pod_count == 1
+    assert [kind for kind, _ in calls] == ["pods"]
     assert calls[0][1]["namespace"] == world.env.k8s_namespace
     assert calls[0][1]["cluster"].pk == world.env.tenant_cluster_id
 
 
 @pytest.mark.parametrize("failure", ["retired", "pod_transport"])
-def test_requested_runtime_unavailability_is_explicit_never_fabricated_zero_cost(world, monkeypatch, failure):
+def test_requested_runtime_unavailability_is_explicit(world, monkeypatch, failure):
     calls = forbidden_runtime(monkeypatch)
     if failure == "retired":
         world.env.soft_delete()
@@ -177,8 +169,7 @@ def test_requested_runtime_unavailability_is_explicit_never_fabricated_zero_cost
             raise RuntimeError("unavailable transport")
 
         monkeypatch.setattr(queries, "list_app_pods", unavailable)
-    result = read(world, include_runtime_cost=True)
+    result = read(world, include_runtime_resources=True)
     assert result.runtime_status == "unavailable"
-    assert result.estimated_daily_cost_usd is None
-    assert result.estimated_cost_notes
+    assert result.aggregate_resources.pod_count == 0
     assert calls == ([] if failure == "retired" else ["pods"])

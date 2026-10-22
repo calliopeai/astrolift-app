@@ -4,7 +4,7 @@
  * Email-service detail sheet (#629, #631, #632, #633, #634).
  *
  * Renders the SES (or future GCP/Azure) observability surface for one
- * bound email managed-service: reputation, quota, cost, identity and DNS
+ * bound email managed-service: reputation, quota, identity and DNS
  * authentication, suppressions, sender configuration, SNS publishing,
  * alert rules, engagement metrics, message logs and templates.
  *
@@ -34,7 +34,6 @@ import {
   CheckCircle2Icon,
   ChevronDownIcon,
   ChevronRightIcon,
-  CoinsIcon,
   CopyIcon,
   FileTextIcon,
   GaugeIcon,
@@ -113,7 +112,6 @@ import {
   defaultAlertName,
   type AlertRuleRow,
   type SesAlertKind,
-  type useEmailCost,
   type useEmailTemplates,
   type useEngagementMetrics,
   type useMessageLog,
@@ -160,14 +158,6 @@ function formatNumber(fmt: Formatter, value: number, digits = 0): string {
   });
 }
 
-function formatMoney(fmt: Formatter, cents: number, currency: string): string {
-  return fmt.number(cents / 100, {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  });
-}
-
 /** The client-side step's input, from a panel's own list state. */
 function pageOf(list: ListStateController) {
   return {
@@ -204,7 +194,6 @@ function emailList(
 /** The panels that carry data of their own, rendered by the route's containers. */
 export interface EmailDetailPanels {
   delivery?: React.ReactNode;
-  cost?: React.ReactNode;
   suppression?: React.ReactNode;
   senderConfig?: React.ReactNode;
   alertRules?: React.ReactNode;
@@ -321,7 +310,6 @@ export function EmailDetailSheetView({
               <>
                 <ReputationPanel detail={detail} />
                 <QuotaPanel detail={detail} />
-                {panels?.cost}
                 {panels?.engagement}
                 {detail.unsupportedNotes.length > 0 ? (
                   <Card className="bg-muted/40 p-3">
@@ -528,53 +516,6 @@ function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
           </div>
         </div>
       </div>
-    </Card>
-  );
-}
-
-// ── Cost-per-period tile (#630) ────────────────────────────────────
-
-export function CostPanelView({
-  mtdSum,
-  trailingSum,
-  currency,
-  loading,
-}: ReturnType<typeof useEmailCost>) {
-  const t = useTranslations("appEmailService.cost");
-  const fmt = useFormatter();
-  const haveAny = (mtdSum !== null && mtdSum > 0) || (trailingSum !== null && trailingSum > 0);
-
-  return (
-    <Card className="p-4">
-      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        <CoinsIcon className="size-4" />
-        {t("title")}
-      </h3>
-      {loading && !haveAny ? (
-        <div className="grid grid-cols-2 gap-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
-      ) : !haveAny && mtdSum === null && trailingSum === null ? (
-        <p className="text-muted-foreground text-xs">{t("empty")}</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-muted-foreground text-2xs uppercase">{t("thisMonth")}</p>
-            <p className="font-mono text-lg tabular-nums">
-              {mtdSum === null ? "—" : formatMoney(fmt, mtdSum, currency)}
-            </p>
-            <p className="text-muted-foreground text-2xs">{t("monthToDate")}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-2xs uppercase">{t("last30")}</p>
-            <p className="font-mono text-lg tabular-nums">
-              {trailingSum === null ? "—" : formatMoney(fmt, trailingSum, currency)}
-            </p>
-            <p className="text-muted-foreground text-2xs">{t("trailing30")}</p>
-          </div>
-        </div>
-      )}
     </Card>
   );
 }

@@ -461,6 +461,8 @@ def _run_workflow_with_fakes(
         SimpleNamespace(
             execute_activity=fake_api.execute_activity,
             wait_condition=_grace_window_timeout,
+            # Every patch is on, as on a run started after it shipped.
+            patched=lambda _patch_id: True,
             logger=SimpleNamespace(
                 warning=lambda *a, **k: None,
                 info=lambda *a, **k: None,
@@ -1075,6 +1077,7 @@ def _clean_teardown_fakes():
         "revoke_app_deploy_tokens": lambda *_: 0,
         "soft_delete_app_records": lambda *_: {"registered_app": 1},
         "mark_app_deregistered": lambda *_: None,
+        "remove_app_ci_workflow": lambda *_: {"status": "absent", "detail": "nothing to remove"},
     }
 
 
@@ -1109,6 +1112,69 @@ def test_workflow_registry_hard_deleted_on_force_destroy(app):
     assert result.ok is True
     assert _registry_archive_arg(fake_api) is False
     assert result.data["teardown"]["registry_repo"]["detail"].startswith("deleted")
+
+
+# ---------------------------------------------------------------------------
+# #2480 — the managed CI workflow file leaves the repo with the app
+# ---------------------------------------------------------------------------
+
+
+def test_ci_workflow_is_removed_after_the_app_is_deregistered(app):
+    """The removal is a push to the deploy branch: it comes after the rows
+    are soft-deleted, so the push can neither redeploy the app nor have the
+    CI resync sweep put the file back."""
+    fakes = _clean_teardown_fakes()
+    fakes["remove_app_ci_workflow"] = lambda *_: {
+        "status": "removed",
+        "detail": "removed .github/workflows/astrolift-app-abc.yml from acme/hello@main",
+        "removed": [".github/workflows/astrolift-app-abc.yml"],
+    }
+
+    fake_api, result = _run_workflow_with_fakes(app, fakes)
+
+    names = [name for name, _, _ in fake_api.calls]
+    assert names[-3:] == ["soft_delete_app_records", "mark_app_deregistered", "remove_app_ci_workflow"]
+    removal_args = next(
+        call_args for name, call_args, _ in fake_api.calls if name == "remove_app_ci_workflow"
+    )
+    assert removal_args == (app.pk,)
+    assert result.ok is True and result.data["still_live_resources"] == []
+    step = result.data["teardown"]["ci_workflow"]
+    assert step["ok"] is True
+    assert step["detail"] == "removed .github/workflows/astrolift-app-abc.yml from acme/hello@main"
+    assert step["data"]["removed"] == [".github/workflows/astrolift-app-abc.yml"]
+
+
+def test_ci_workflow_stays_while_the_teardown_is_incomplete(app):
+    """A partial teardown keeps the app row for a retry; the file stays with
+    it, so nothing the retry needs is gone."""
+    fakes = _clean_teardown_fakes()
+    fakes["delete_app_namespaces"] = RuntimeError("cluster unreachable")
+    fakes["remove_app_ci_workflow"] = RuntimeError("must wait for a clean pass")
+
+    fake_api, result = _run_workflow_with_fakes(app, fakes)
+
+    assert result.ok is False
+    assert "remove_app_ci_workflow" not in [name for name, _, _ in fake_api.calls]
+    assert "ci_workflow" not in result.data["teardown"]
+
+
+def test_ci_workflow_failure_names_the_file_without_reopening_the_teardown(app):
+    """The app is deregistered by then and a re-fire cannot find it, so a
+    failed removal is reported with the file to delete by hand, not listed
+    as still live."""
+    fakes = _clean_teardown_fakes()
+    fakes["remove_app_ci_workflow"] = RuntimeError(
+        "could not remove the CI workflow from acme/hello@main (HTTP 409); "
+        "delete .github/workflows/astrolift-app-abc.yml by hand if present"
+    )
+
+    _, result = _run_workflow_with_fakes(app, fakes)
+
+    assert result.ok is True and result.data["still_live_resources"] == []
+    step = result.data["teardown"]["ci_workflow"]
+    assert step["ok"] is False
+    assert ".github/workflows/astrolift-app-abc.yml by hand" in step["detail"]
 
 
 # ---------------------------------------------------------------------------
@@ -1545,6 +1611,7 @@ def test_workflow_grace_period_elapses_proceeds_with_teardown(app):
         SimpleNamespace(
             execute_activity=fake_api.execute_activity,
             wait_condition=fake_api.wait_condition,
+            patched=lambda _patch_id: True,
             logger=SimpleNamespace(
                 warning=lambda *a, **k: None,
                 info=lambda *a, **k: None,
@@ -1601,6 +1668,7 @@ def _run_workflow_with_wait_recorder(app, fakes):
         SimpleNamespace(
             execute_activity=fake_api.execute_activity,
             wait_condition=_wait_condition,
+            patched=lambda _patch_id: True,
             logger=SimpleNamespace(
                 warning=lambda *a, **k: None,
                 info=lambda *a, **k: None,

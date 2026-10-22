@@ -18,8 +18,6 @@ import { useGrowingLimit } from "@/components/feed/use-growing-limit";
 import { useHomePresentation } from "./use-home-presentation";
 import type { AlertEvent } from "@/components/screens/alerts/use-alerts";
 import type { ClusterRow } from "@/components/screens/clusters/list/use-clusters-list";
-import { GET_COST_FORECAST, LIST_BUDGETS } from "@/graphql/billing/billing.queries";
-import type { AstroliftBudget, AstroliftCostForecast } from "@/graphql/billing/billing.types";
 import { LIST_CLUSTERS_PAGE } from "@/graphql/clusters/clusters.queries";
 import { GET_DEPLOYMENT_METRICS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeploymentMetrics } from "@/graphql/lifecycle/lifecycle.types";
@@ -31,9 +29,7 @@ import {
   alertsFiringFirst,
   clustersWorstFirst,
   type KpisPanelData,
-  type SpendQuotaData,
   kpiFigures,
-  orgBudget,
 } from "./builder-operator-model";
 import { type HomeAgentTask, type HomeRead, useHomeAgentRuns, usePanelAccess } from "./home-reads";
 
@@ -66,13 +62,10 @@ export function useAgentRunsPanel(): {
 interface MetricsResp {
   astroliftDeploymentMetrics: AstroliftDeploymentMetrics;
 }
-interface ForecastResp {
-  astroliftCostForecast: AstroliftCostForecast;
-}
 
 /**
  * The KPI strip: deploy counts and timing from the deployment metrics, runs
- * from the shared run window, spend from the cost forecast. Each figure's
+ * from the shared run window. Each figure's
  * query runs only when the person may see it; a figure they may not see is
  * left out of the strip.
  */
@@ -81,7 +74,6 @@ export function useKpisPanel(): KpisPanelData {
   const { canView, can } = usePanelAccess();
   const apps = canView("apps") && can("app.read");
   const agents = canView("agents") && can("agent.read");
-  const billing = can("billing.read");
   const [now] = React.useState(() => Date.now());
 
   const metrics = useQuery<MetricsResp>(GET_DEPLOYMENT_METRICS, {
@@ -90,24 +82,14 @@ export function useKpisPanel(): KpisPanelData {
     skip: !apps,
   });
   const runs = useHomeAgentRuns(null, { limit: RUN_WINDOW, skip: !agents });
-  const forecast = useQuery<ForecastResp>(GET_COST_FORECAST, {
-    fetchPolicy: "cache-and-network",
-    skip: !billing,
-  });
 
   const m = (metrics.data ?? metrics.previousData)?.astroliftDeploymentMetrics ?? null;
-  const f = (forecast.data ?? forecast.previousData)?.astroliftCostForecast ?? null;
-  const pending = [
-    apps && metrics.loading && !m,
-    agents && runs.loading,
-    billing && forecast.loading && !f,
-  ].some(Boolean);
+  const pending = [apps && metrics.loading && !m, agents && runs.loading].some(Boolean);
   const failed = [
     apps ? errorOf(metrics.error, Boolean(m)) : null,
     agents ? runs.error : null,
-    billing ? errorOf(forecast.error, Boolean(f)) : null,
   ].filter((e): e is string => e !== null);
-  const shown = [apps, agents, billing].filter(Boolean).length;
+  const shown = [apps, agents].filter(Boolean).length;
 
   return {
     windowDays: KPI_WINDOW_DAYS,
@@ -122,7 +104,6 @@ export function useKpisPanel(): KpisPanelData {
               loading: runs.loading,
             }
           : undefined,
-        forecast: billing ? f : undefined,
         windowDays: KPI_WINDOW_DAYS,
       },
       presentation
@@ -133,7 +114,6 @@ export function useKpisPanel(): KpisPanelData {
     onRetry: () => {
       if (apps) void metrics.refetch();
       if (agents) runs.onRetry();
-      if (billing) void forecast.refetch();
     },
   };
 }
@@ -215,32 +195,5 @@ export function usePlatformActivityPanel() {
     error: errorOf(q.error, Boolean(data)),
     onRetry: () => void q.refetch(),
     ...grow.feed(items.length, q.loading),
-  };
-}
-
-// ---------------------------------------------------------------- spend & quota
-
-interface BudgetsResp {
-  astroliftBudgets: AstroliftBudget[];
-}
-
-/** Spend & quota: month-to-date spend and its projection against the org budget. */
-export function useSpendQuotaPanel(): SpendQuotaData {
-  const forecast = useQuery<ForecastResp>(GET_COST_FORECAST, {
-    fetchPolicy: "cache-and-network",
-  });
-  const budgets = useQuery<BudgetsResp>(LIST_BUDGETS, { fetchPolicy: "cache-and-network" });
-  const f = (forecast.data ?? forecast.previousData)?.astroliftCostForecast ?? null;
-  const b = (budgets.data ?? budgets.previousData)?.astroliftBudgets;
-  return {
-    forecast: f,
-    budget: b ? orgBudget(b) : null,
-    loading: (forecast.loading && !f) || (budgets.loading && !b),
-    error: errorOf(forecast.error, Boolean(f)),
-    budgetError: errorOf(budgets.error, Boolean(b)),
-    onRetry: () => {
-      void forecast.refetch();
-      void budgets.refetch();
-    },
   };
 }

@@ -130,7 +130,7 @@
     "slug": "슬러그",
     "team": "팀",
     "created": "생성일",
-    "renameNote": "프로젝트 이름 변경은 백엔드 뮤테이션이 준비되면 제공됩니다. 슬러그는 이름을 바꿔도 이후 비용 배분이 유지되도록 의도적으로 변경할 수 없습니다.",
+    "renameNote": "프로젝트 이름 변경은 백엔드 변이가 구현되면 제공됩니다. 기존 리소스 참조를 유지하기 위해 슬러그는 변경할 수 없습니다.",
     "dangerZone": "위험 영역",
     "dangerZoneDescription": "소프트 삭제하면 이 프로젝트가 목록에서 제거됩니다. 연결된 워크로드는 다시 할당할 때까지 계속 표시됩니다.",
     "deleteProject": "프로젝트 삭제",
@@ -188,13 +188,13 @@
     "team": "팀",
     "created": "생성일",
     "title": "프로젝트",
-    "context": "배포 주기, 도메인, 스택이 같은 앱을 묶습니다. 비용 보고는 이 단위로 집계됩니다.",
+    "context": "배포 주기, 도메인 또는 스택을 공유하는 앱을 그룹화하세요.",
     "newProject": "새 프로젝트",
     "edit": "편집",
     "delete": "삭제",
     "empty": "아직 프로젝트가 없습니다",
     "emptyNoTeams": "먼저 팀을 만드세요. 프로젝트는 팀 아래에 속합니다.",
-    "emptyDescription": "앱을 프로젝트로 묶으면 비용과 할당량이 깔끔하게 집계됩니다.",
+    "emptyDescription": "관련 앱을 프로젝트로 묶고 공유 접근 권한을 관리하세요.",
     "manageTeams": "팀 관리",
     "deleteTitle": "프로젝트 {team}/{project}을(를) 삭제할까요?",
     "deleteTitleGeneric": "프로젝트를 삭제할까요?",
@@ -878,7 +878,7 @@
     "exampleSenior": "<code>prod-*</code> 이름의 앱에는 시니어 엔지니어만 배포할 수 있습니다.",
     "exampleNight": "호출을 받은 경우가 아니면 UTC 22:00부터 06:00까지는 아무도 시크릿을 쓸 수 없습니다.",
     "exampleMfa": "프리프로덕션 배포에는 60분 이내에 인증한 MFA 요소가 필요합니다.",
-    "exampleContractors": "외부 계약자는 프로젝트의 모든 항목을 읽을 수 있지만 결제와 관련된 항목은 변경할 수 없습니다.",
+    "exampleContractors": "외부 계약자는 프로젝트의 모든 내용을 읽을 수 있지만 리소스 할당량을 변경할 수는 없습니다.",
     "prerequisitesTitle": "사전 요구 사항",
     "prereqPermission": "<strong>권한.</strong> <code>policy.create</code>(Owner와 Admin이 보유).",
     "prereqModel": "<strong>ABAC와 RBAC의 개념.</strong> RBAC는 “이 사용자의 역할에 이 권한이 포함되어 있는가?”를 묻습니다. ABAC는 “이 요청의 속성(누가, 무엇을, 언제, 어디서)을 고려할 때 <em>거부</em>하는 정책이 있는가?”를 묻습니다. 요청은 RBAC가 허용하고 어떤 정책도 거부하지 않을 때만 성공합니다.",
@@ -1680,10 +1680,6 @@
         "1d": "+1일",
         "7d": "+7일"
       },
-      "costPerDay": "{cost}/일",
-      "costUnavailable": "비용을 확인할 수 없음",
-      "costTooltip": "{pods, plural, one {파드 #개} other {파드 #개}} · 실시간 클라우드 요금 기준 {cost}/일",
-      "costTooltipUnavailable": "{pods, plural, one {파드 #개} other {파드 #개}} · 이 클러스터의 비용 API를 사용할 수 없음",
       "staleBadge": "오래됨",
       "tearDown": "삭제",
       "footer": "앱별로 {count, plural, one {활성 미리보기 환경 #개} other {활성 미리보기 환경 #개}} 유지 · 오래됨 기준: {days, number}일.",
@@ -1753,14 +1749,7 @@
         "hoursMinutes": "{hours, number}시간 {minutes, number}분",
         "minutes": "{minutes, number}분"
       },
-      "spend": {
-        "daily": "일일 비용",
-        "monthly": "이번 달(예상)",
-        "approximate": "근사치",
-        "priced": "미리보기 {total, number}개 중 {priced, number}개 비용 산정",
-        "unpriced": "이 클러스터 드라이버에서 {count, number}개의 비용을 산정하지 못함",
-        "overcount": "{count, number}개는 서비스의 모든 SKU를 합산하여 계산되므로 총액이 과대 산정됩니다"
-      }
+      "resourceTooltip": "리소스: {pods, plural, one {파드 #개} other {파드 #개}}"
     },
     "observability": {
       "scope": {
@@ -5543,12 +5532,10 @@
         "cpu": "vCPU(합계)",
         "memory": "메모리(합계)",
         "pods": "파드",
-        "dailyCost": "예상 일일 비용",
-        "approximate": "근사치",
         "environment": "환경",
-        "loadResources": "리소스 및 비용 불러오기",
-        "resourcesUnavailable": "현재 리소스 사용량과 예상 비용을 확인할 수 없습니다.",
-        "resourcesNotRequested": "필요할 때 현재 리소스 사용량과 예상 비용을 불러오세요.",
+        "loadResources": "리소스 불러오기",
+        "resourcesUnavailable": "현재 리소스 사용량을 확인할 수 없습니다.",
+        "resourcesNotRequested": "필요할 때 현재 리소스 사용량을 불러오세요.",
         "previewLogs": "미리보기 로그",
         "loadLogs": "로그 불러오기",
         "logsEmpty": "이 시간 범위에 로그가 없습니다.",
@@ -7380,12 +7367,6 @@
       "recipeSlug": "에이전트 레시피 슬러그",
       "consumerContext": "사용 대상은 이 리소스와 같은 프로젝트 및 클러스터에 속해야 합니다.",
       "attach": "연결",
-      "costUnavailable": "요금 정보를 사용할 수 없습니다.",
-      "costMonthly": "월 {amount}",
-      "costApproximate": "월 약 {amount}",
-      "costFetched": "요금 조회 시각: {at}",
-      "costSource": "요금 정보 출처",
-      "costPreview": "비용 미리 보기",
       "reprovision": "다시 프로비저닝",
       "deprovision": "프로비저닝 해제",
       "actionRefused": "작업이 거부되었습니다. 리소스와 현재 권한을 확인하세요.",
@@ -7580,14 +7561,6 @@
       "sentToday": "오늘 전송됨",
       "ofQuota": "24시간 할당량의 {pct}%",
       "nearCeiling": "24시간 할당량의 {pct}%, 일일 한도에 근접"
-    },
-    "cost": {
-      "title": "비용",
-      "empty": "아직 이 서비스에 귀속된 비용 데이터가 없습니다. 비용 드라이버가 다음 조정을 실행하면 비용이 표시됩니다.",
-      "thisMonth": "이번 달",
-      "monthToDate": "이번 달 누계",
-      "last30": "지난 30일",
-      "trailing30": "최근 30일 지출"
     },
     "identity": {
       "title": "ID 확인",
@@ -8352,7 +8325,7 @@
           "provider_plugin": "공급자",
           "scm": "소스 제어",
           "audit_log": "감사 로그",
-          "billing": "결제",
+          "billing": "리소스 할당량",
           "zentinelle": "Zentinelle",
           "admin": "관리"
         }
@@ -9407,7 +9380,6 @@
         "metricsReadUnavailable": "사용량 데이터를 읽을 수 없습니다.",
         "metricsScope": "소비자 전체의 배포 합계이며, 앱별 트래픽이 아닙니다.",
         "metricsSetup": "지표 설정",
-        "costUnavailable": "측정된 사용량과 가격 정보 없이는 비용을 확인할 수 없습니다.",
         "selectApp": "앱 선택",
         "appSearch": "앱 검색",
         "appsEmpty": "사용 가능한 앱이 없습니다",
@@ -9440,7 +9412,7 @@
         "empty": "이 기간에는 트래픽 샘플이 없습니다.",
         "unconfigured": "구독 트래픽 수집이 설정되지 않았습니다.",
         "bytes": "모델 제공 앱이 수락한 응답 바이트 수입니다. 모델 토큰 수나 확인된 네트워크 전송량이 아닙니다.",
-        "unsupported": "입출력 토큰 수와 비용은 지원되지 않습니다.",
+        "unsupported": "여기에서는 입력 및 출력 토큰 관측을 지원하지 않습니다.",
         "boundary": "HTTP 상태가 200이어도 실패한 스트림은 오류로 집계될 수 있습니다.",
         "requests": "초당 요청 수",
         "errors": "초당 오류 요청 수",
@@ -9609,8 +9581,8 @@
         "inferenceUnknown": "추론 접근 권한이 검증되지 않았습니다.",
         "traffic": "앱 트래픽 및 지연 시간",
         "trafficUnsupported": "여기서는 네이티브 모델의 트래픽과 지연 시간 관측을 지원하지 않습니다. 관측이 없다고 트래픽이 0인 것은 아닙니다.",
-        "tokensCost": "토큰 및 비용",
-        "tokensCostUnsupported": "여기서는 토큰 사용량 및 비용 관측을 지원하지 않습니다."
+        "tokens": "토큰",
+        "tokensUnsupported": "여기에서는 토큰 사용량 관측을 지원하지 않습니다."
       },
       "bindingHelp": "네이티브 앱 바인딩은 클라우드 ID를 사용합니다. 적용된 바인딩 리비전이 모델 추론 접근을 검증하지는 않습니다.",
       "connect": {
@@ -10530,7 +10502,7 @@
       },
       "agents": {
         "title": "에이전트",
-        "description": "에이전트 생성 및 실행용: 실패한 실행과 진행 중인 실행, 내 에이전트 및 지출."
+        "description": "에이전트 구축 및 실행: 실패한 실행과 진행 중인 실행, 내 에이전트."
       },
       "builder": {
         "title": "개발",
@@ -10538,7 +10510,7 @@
       },
       "operator": {
         "title": "운영",
-        "description": "플랫폼 운영용: 알림, 클러스터, 플랫폼 활동 및 할당량."
+        "description": "플랫폼 운영: 알림, 클러스터, 플랫폼 활동."
       }
     },
     "panels": {
@@ -10550,15 +10522,14 @@
       "failed-runs": "실패한 실행",
       "running-now": "실행 중",
       "my-agents": "내 에이전트",
-      "runs-spend": "실행 및 지출",
+      "runs-spend": "실행 기록",
       "activity": "활동",
       "kpis": "주요 지표",
       "deployments": "배포",
       "agent-runs": "에이전트 실행",
       "alerts": "알림",
       "clusters": "클러스터",
-      "platform-activity": "플랫폼 활동",
-      "spend-quota": "지출 및 할당량"
+      "platform-activity": "플랫폼 활동"
     },
     "copy": {
       "auditLog": "감사 로그",
@@ -10618,16 +10589,7 @@
       "noRunReason": "이 실행의 원인이 기록되지 않았습니다.",
       "timedOut": "시간이 초과되었습니다.",
       "noReason": "원인이 기록되지 않았습니다.",
-      "monthToDate": "이번 달 누계",
-      "ofBudget": "{amount} 중 · {percentage}",
-      "spent": "지출",
-      "projected": "예상",
-      "budget": "예산",
       "legend": "범례",
-      "budgetReadFailed": "예산을 불러오지 못했습니다: {message}",
-      "noBudget": "조직 예산이 설정되지 않아 지출을 비교할 할당량이 없습니다.",
-      "spendAgainstBudget": "{panel}: 예산 대비 지출",
-      "spendBudgetValue": "예산 {budget} 중 {spent}",
       "last24Hours": "최근 24시간",
       "app": "앱",
       "pickApp": "앱 선택",
@@ -10648,14 +10610,12 @@
       "last7Days": "최근 7일",
       "runsPerDay": "일별 에이전트 실행",
       "failedPerDay": "일별 실패한 실행",
-      "spendPerDay": "일별 조직 지출",
       "sevenDays": "7일",
-      "spendReadFailed": "지출을 불러오지 못했습니다: {message}",
       "cappedRuns": "최근 실행을 기준으로 집계했습니다. 이 주에는 더 많은 실행이 있습니다.",
-      "kpiWindow": "최근 {count, number}일 · 이번 달 누적 지출",
+      "kpiWindow": "최근 {count, number}일",
       "kpiAria": "{panel}, 최근 {count, number}일",
       "noKpisTitle": "권한 내 지표가 없습니다",
-      "noKpisDescription": "볼 수 있는 영역의 배포, 실행 및 지출 지표가 표시됩니다.",
+      "noKpisDescription": "접근할 수 있는 영역의 배포 및 실행 지표가 표시됩니다.",
       "noProject": "프로젝트 없음"
     },
     "health": {
@@ -10704,11 +10664,9 @@
       "runs": "실행",
       "success": "성공률",
       "p95": "p95",
-      "spend": "지출",
       "runsHint": "에이전트 실행",
       "successHint": "배포 기준",
-      "p95Hint": "배포 시간",
-      "spendHint": "이번 달 누계"
+      "p95Hint": "배포 시간"
     },
     "period": {
       "monthly": "월별",
@@ -14666,7 +14624,7 @@
   },
   "zentinelleScreen": {
     "title": "보안 · Zentinelle",
-    "description": "이 조직을 Zentinelle에 연결해 에이전트 거버넌스, 사용량과 비용, 정책, 감사를 관리합니다.",
+    "description": "이 조직을 Zentinelle에 연결하여 에이전트 거버넌스, 토큰 사용량, 정책 및 감사를 관리하세요.",
     "noAccess": "Zentinelle 접근 권한 없음",
     "noAccessBody": "여기서는 내 역할에 Zentinelle 권한이 없습니다. 조직 관리자에게 Zentinelle 권한을 요청하세요.",
     "error": "Zentinelle 연결을 읽지 못했습니다",
@@ -14677,7 +14635,7 @@
     "tabs": {
       "overview": "개요",
       "clusters": "클러스터",
-      "usage": "사용량과 비용",
+      "usage": "사용량",
       "policies": "정책",
       "audit": "감사"
     },
@@ -14729,7 +14687,6 @@
       "gatewaysValue": "{total}개 중 {healthy}개",
       "agents": "이번 달 관측된 에이전트",
       "requests": "모델 요청(최근 24시간)",
-      "spend": "이번 달 지출",
       "usageError": "Zentinelle에서 사용량을 읽지 못했습니다",
       "clustersTitle": "클러스터별 게이트웨이 상태",
       "clustersDescription": "등록된 각 클러스터의 Zentinelle 게이트웨이입니다.",
@@ -14738,10 +14695,6 @@
       "serverVersion": "Zentinelle 버전",
       "blocks": "차단, 최근 24시간",
       "approvals": "대기 중인 승인",
-      "budget": "이번 달 예산",
-      "budgetValue": "{percent}% 사용",
-      "budgetFooter": "{limit} 중 {spend} ({name})",
-      "noBudget": "설정된 예산 없음",
       "notAvailable": "사용할 수 없음",
       "countsError": "Zentinelle에서 상태를 읽을 수 없습니다",
       "reportNotAvailable": "버전 및 마지막 확인 정보를 사용할 수 없음",
@@ -14787,7 +14740,6 @@
       "error": "Zentinelle에서 사용량을 읽지 못했습니다",
       "requests": "모델 요청",
       "tokens": "사용한 토큰",
-      "cost": "모델 비용",
       "title": "에이전트 및 모델별",
       "empty": "이 기간에 모델 사용이 없습니다.",
       "noAgent": "(에이전트 없음)",

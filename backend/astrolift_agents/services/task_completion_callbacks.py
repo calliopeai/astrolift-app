@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import math
 import random
 import re
 import uuid
@@ -15,6 +14,7 @@ from django.utils import timezone
 from astrolift_agents.completion_webhook import (
     RETRY_WINDOW_SECONDS,
     CallbackConfigurationError,
+    callback_wire_body,
     classify_response,
     encoded_body,
     normalize_allowed_hosts,
@@ -87,21 +87,12 @@ def normalized_usage(value: object) -> dict:
     usage: dict[str, int | float | str | None] = {
         "input_tokens": None,
         "output_tokens": None,
-        "total_cost_usd": None,
         "model": None,
     }
     for key in ("input_tokens", "output_tokens"):
         item = source.get(key)
         if isinstance(item, int) and not isinstance(item, bool) and 0 <= item <= 2**63 - 1:
             usage[key] = item
-    cost = source.get("total_cost_usd")
-    if (
-        isinstance(cost, (int, float))
-        and not isinstance(cost, bool)
-        and 0 <= cost <= 1e15
-        and math.isfinite(cost)
-    ):
-        usage["total_cost_usd"] = cost
     model = source.get("model")
     if isinstance(model, str) and len(model) <= 256 and not any(ord(char) < 32 for char in model):
         usage["model"] = model
@@ -314,14 +305,14 @@ def deliver_attempt(callback_id: int, generation: int, *, now=None, jitter=None)
         validate_destination(destination, hosts)
         secret = read_org_secret(organization_id, _secret_name(secret_ref))
         if secret:
-            code = post_completion_callback(destination, hosts, decrypt(sealed), secret)
+            code = post_completion_callback(destination, hosts, callback_wire_body(decrypt(sealed)), secret)
             classification = classify_response(code)
             error = "" if classification == "delivered" else f"callback HTTP {code}"
         else:
             error = "callback signing secret unavailable"
     except CallbackConfigurationError:
         classification = "failed"
-        error = "callback destination is no longer permitted"
+        error = "callback destination or envelope is unavailable"
     except Exception:  # noqa: BLE001 — HTTP/crypto exceptions can contain payloads or addresses
         pass
     settled_at = now if jitter is not None else timezone.now()

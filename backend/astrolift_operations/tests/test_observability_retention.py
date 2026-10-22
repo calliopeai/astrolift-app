@@ -11,7 +11,6 @@ from astrolift_operations.observability_retention import (
     PLATFORM_DEFAULTS,
     EffectiveRetention,
     RetentionHold,
-    billable_window_days,
     cutoff_at,
     effective_for,
     is_held,
@@ -235,12 +234,7 @@ def test_no_holds_means_unheld():
     )
 
 
-# ---- billing helpers ------------------------------------------------
-
-
-def test_billable_window_returns_days():
-    r = EffectiveRetention(stream="metric_raw", days=180, source="org_override")
-    assert billable_window_days(r) == 180
+# ---- warning windows -----------------------------------------------
 
 
 def test_warn_threshold_proportional_to_window():

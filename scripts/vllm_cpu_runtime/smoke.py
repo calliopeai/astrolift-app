@@ -2,6 +2,8 @@
 
 import argparse
 import json
+import re
+import secrets
 import subprocess
 import time
 import urllib.error
@@ -82,6 +84,63 @@ def keep_container_log(container, path):
         path.chmod(0o600)
 
 
+CGROUP_ROOT = Path("/sys/fs/cgroup")
+CGROUP_READ_BOUND = 4096
+MEMORY_EVENTS = ("max", "oom", "oom_kill", "oom_group_kill")
+
+
+def memory_parent():
+    """Name a cgroup parent for one candidate, fresh for each run.
+
+    Docker deletes a container's cgroup when the container stops, and an OOM
+    kill's counters go with it. The parent outlives the container and counts
+    hierarchically, so the counters survive the stop. It sets no limit of its
+    own and is left empty on the host afterwards.
+    """
+    return f"astrolift_cpu_smoke_{secrets.token_hex(8)}.slice"
+
+
+def read_cgroup(path):
+    with path.open("rb") as source:
+        data = source.read(CGROUP_READ_BOUND + 1)
+    if len(data) > CGROUP_READ_BOUND:
+        raise ValueError("cgroup file exceeds bound")
+    return data.decode("ascii")
+
+
+def cgroup_counter(text):
+    value = text.strip()
+    if not re.fullmatch(r"[0-9]{1,20}", value):
+        raise ValueError("Unexpected cgroup counter")
+    return int(value)
+
+
+def memory_evidence(parent):
+    """Whitelisted integer counters of the candidate's cgroup parent.
+
+    Read once, at the end of the smoke and before the container is removed:
+    after a completion or a timeout, current is the running candidate's use;
+    after a stop, only what its exited processes left charged. `oom` counts
+    the container reaching its own limit; `oom_kill` counts any OOM killer.
+    Values only, never paths or identifiers.
+    """
+    try:
+        events = {}
+        for line in read_cgroup(parent / "memory.events").splitlines():
+            name, _, value = line.partition(" ")
+            if name in MEMORY_EVENTS:
+                events[name] = cgroup_counter(value)
+        if any(name not in events for name in ("max", "oom", "oom_kill")):
+            raise ValueError("Incomplete cgroup memory events")
+        return {
+            "peak_bytes": cgroup_counter(read_cgroup(parent / "memory.peak")),
+            "current_bytes": cgroup_counter(read_cgroup(parent / "memory.current")),
+            "events": events,
+        }
+    except (OSError, ValueError) as exc:
+        return {"unavailable": type(exc).__name__}
+
+
 def smoke(image, proof):
     spec = json.loads(Path(__file__).with_name("source.json").read_text())
     receipt = {
@@ -95,6 +154,7 @@ def smoke(image, proof):
         "live_cluster_certified": False,
     }
     container = None
+    parent = memory_parent()
     try:
         receipt["image_id"] = inspect_target(image)
         output = subprocess.check_output(
@@ -123,6 +183,8 @@ def smoke(image, proof):
                     "--detach",
                     "--pull",
                     "never",
+                    "--cgroup-parent",
+                    parent,
                     "--cpus",
                     "1",
                     "--memory",
@@ -190,6 +252,8 @@ def smoke(image, proof):
             "CPU runtime candidate smoke failed; see sanitized proof"
         ) from None
     finally:
+        if container:
+            receipt["memory_evidence"] = memory_evidence(CGROUP_ROOT / parent)
         if container and not receipt["passed"]:
             keep_container_log(container, proof.with_name("runtime-container.log"))
         if container:

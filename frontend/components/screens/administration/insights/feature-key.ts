@@ -1,4 +1,4 @@
-// "admin.cost_enabled" -> "Admin · Cost Enabled"
+// "admin.quotas_enabled" -> "Admin · Quotas Enabled"
 export function humanizeKey(key: string): string {
   return key
     .split(".")

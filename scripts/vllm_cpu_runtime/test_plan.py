@@ -22,6 +22,22 @@ def load(name):
 prepare = load("prepare")
 smoke = load("smoke")
 
+OOM_EVENTS = (
+    "low 0\nhigh 0\nmax 41\noom 1\noom_kill 1\noom_group_kill 0\nsock_throttled 0\n"
+)
+
+
+def write_parent(parent, events=OOM_EVENTS, peak="4294967296\n", current="1052672\n"):
+    """Lay out the cgroup v2 files the Docker daemon's parent would hold."""
+    parent.mkdir(parents=True, exist_ok=True)
+    for name, content in (
+        ("memory.events", events),
+        ("memory.peak", peak),
+        ("memory.current", current),
+    ):
+        data = content if isinstance(content, bytes) else content.encode()
+        (parent / name).write_bytes(data)
+
 
 def archive(
     name,
@@ -102,6 +118,26 @@ class SmokeControlTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "platform"):
                 smoke.inspect_target("fixture")
 
+    def test_refusal_before_a_server_starts_records_no_memory_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof = root / "proof.json"
+            with patch.object(smoke, "CGROUP_ROOT", root), patch.object(
+                smoke,
+                "inspect_target",
+                side_effect=ValueError("Wrong candidate platform"),
+            ), patch.object(
+                smoke.subprocess,
+                "check_output",
+                side_effect=AssertionError("No container may start"),
+            ), patch.object(smoke.subprocess, "run") as run:
+                with self.assertRaises(SystemExit):
+                    smoke.smoke("fixture", proof)
+            receipt = json.loads(proof.read_text())
+        self.assertEqual(receipt["failure_type"], "ValueError")
+        self.assertNotIn("memory_evidence", receipt)
+        run.assert_not_called()
+
     def test_failure_to_start_records_refusal_and_removes_owned_container(self):
         running = [
             {
@@ -138,6 +174,151 @@ class SmokeControlTests(unittest.TestCase):
                 remove.call_args_list[0].args[0],
                 ["docker", "logs", "--tail", "200", "owned-fixture-id"],
             )
+
+    def stopped_docker(self, commands, cgroup_root=None):
+        stopped = [
+            {
+                "State": {"Running": False, "ExitCode": 1, "OOMKilled": True},
+                "NetworkSettings": {"Ports": {"8000/tcp": [{"HostPort": "12345"}]}},
+            }
+        ]
+
+        def output(command, **_kwargs):
+            commands.append(command)
+            if command[:3] == ["docker", "run", "--rm"]:
+                return b'{"vllm":"0.15.1+cpu"}\n'
+            if command[:3] == ["docker", "run", "--detach"]:
+                if cgroup_root:
+                    # The daemon creates the parent; the container's own
+                    # cgroup under it is gone once the candidate stops.
+                    write_parent(
+                        cgroup_root / command[command.index("--cgroup-parent") + 1]
+                    )
+                return b"owned-fixture-id"
+            if command[:2] == ["docker", "inspect"]:
+                return json.dumps(stopped).encode()
+            raise AssertionError("Unexpected subprocess in isolated smoke proof")
+
+        return output
+
+    def test_oom_stop_keeps_the_parent_counters_after_the_container_is_gone(self):
+        commands = []
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof = root / "proof.json"
+            with patch.object(smoke, "CGROUP_ROOT", root), patch.object(
+                smoke, "inspect_target", return_value="fixture-image"
+            ), patch.object(
+                smoke.subprocess,
+                "check_output",
+                side_effect=self.stopped_docker(commands, cgroup_root=root),
+            ), patch.object(smoke.subprocess, "run"):
+                with self.assertRaises(SystemExit):
+                    smoke.smoke("fixture", proof)
+            receipt = json.loads(proof.read_text())
+        self.assertFalse(receipt["passed"])
+        self.assertEqual(receipt["failure_type"], "ValueError")
+        self.assertTrue(receipt["oom_killed"])
+        self.assertEqual(receipt["container_exit"], 1)
+        self.assertEqual(
+            receipt["memory_evidence"],
+            {
+                "peak_bytes": 4294967296,
+                "current_bytes": 1052672,
+                "events": {"max": 41, "oom": 1, "oom_kill": 1, "oom_group_kill": 0},
+            },
+        )
+
+    def test_each_run_starts_its_server_under_a_fresh_parent_with_unchanged_limits(
+        self,
+    ):
+        commands = []
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(smoke, "CGROUP_ROOT", root), patch.object(
+                smoke, "inspect_target", return_value="fixture-image"
+            ), patch.object(
+                smoke.subprocess,
+                "check_output",
+                side_effect=self.stopped_docker(commands),
+            ), patch.object(smoke.subprocess, "run"):
+                for _ in range(2):
+                    with self.assertRaises(SystemExit):
+                        smoke.smoke("fixture", root / "proof.json")
+            receipt = json.loads((root / "proof.json").read_text())
+        servers = [c for c in commands if c[:3] == ["docker", "run", "--detach"]]
+        checks = [c for c in commands if c[:3] == ["docker", "run", "--rm"]]
+        self.assertEqual((len(servers), len(checks)), (2, 2))
+        parents = [c[c.index("--cgroup-parent") + 1] for c in servers]
+        for parent in parents:
+            self.assertRegex(parent, r"^astrolift_cpu_smoke_[0-9a-f]{16}\.slice$")
+        self.assertNotEqual(parents[0], parents[1])
+        for check in checks:
+            self.assertNotIn("--cgroup-parent", check)
+        for server in servers:
+            pairs = list(zip(server, server[1:]))
+            for pair in (
+                ("--cpus", "1"),
+                ("--memory", "4g"),
+                ("--memory-swap", "4g"),
+                ("--shm-size", "1g"),
+                ("--env", "VLLM_CPU_KVCACHE_SPACE=1"),
+                ("--dtype", "float32"),
+                ("--max-model-len", "256"),
+                ("--max-num-seqs", "1"),
+                ("--max-num-batched-tokens", "256"),
+            ):
+                self.assertIn(pair, pairs)
+        self.assertEqual(
+            receipt["memory_evidence"], {"unavailable": "FileNotFoundError"}
+        )
+
+
+class MemoryEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = directory.name
+        self.parent = (
+            Path(directory.name) / "astrolift_cpu_smoke_0123456789abcdef.slice"
+        )
+
+    def test_only_whitelisted_integer_counters_leave_the_parent(self):
+        write_parent(self.parent)
+        evidence = smoke.memory_evidence(self.parent)
+        self.assertEqual(
+            evidence,
+            {
+                "peak_bytes": 4294967296,
+                "current_bytes": 1052672,
+                "events": {"max": 41, "oom": 1, "oom_kill": 1, "oom_group_kill": 0},
+            },
+        )
+        self.assertNotIn(self.root, json.dumps(evidence))
+
+    def test_kernel_without_group_kill_counter_still_reports(self):
+        write_parent(self.parent, events="low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n")
+        self.assertEqual(
+            smoke.memory_evidence(self.parent)["events"],
+            {"max": 0, "oom": 0, "oom_kill": 0},
+        )
+
+    def test_unreadable_or_unexpected_counters_record_only_the_reason(self):
+        cases = {
+            "missing parent": (None, "FileNotFoundError"),
+            "unlimited peak": ({"peak": "max\n"}, "ValueError"),
+            "signed current": ({"current": "-5\n"}, "ValueError"),
+            "oversized counter": ({"peak": "1" * 21 + "\n"}, "ValueError"),
+            "missing oom_kill": ({"events": "max 0\noom 0\n"}, "ValueError"),
+            "unbounded events": ({"events": OOM_EVENTS + "x 0\n" * 2048}, "ValueError"),
+            "non-ascii counter": ({"current": b"\xff\n"}, "UnicodeDecodeError"),
+        }
+        for name, (files, reason) in cases.items():
+            with self.subTest(name):
+                parent = Path(self.root) / name.replace(" ", "_")
+                if files is not None:
+                    write_parent(parent, **files)
+                self.assertEqual(smoke.memory_evidence(parent), {"unavailable": reason})
 
 
 if __name__ == "__main__":

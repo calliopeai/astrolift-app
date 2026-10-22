@@ -70,8 +70,8 @@ def test_the_gateway_rule_selects_the_gateway_pods_on_its_port():
         ],
         "ports": [{"protocol": "TCP", "port": zentinelle_connect.GATEWAY_PORT}],
     }
-    [deployment, _service] = zentinelle_connect.gateway_manifests(
-        cluster_id="c", zentinelle_url="https://z.test", image="i"
+    [deployment, _service, _autoscaler] = zentinelle_connect.gateway_manifests(
+        cluster_id="c", zentinelle_url="https://z.test", image="i", max_replicas=6
     )
     assert deployment["spec"]["template"]["metadata"]["labels"]["app"] == zentinelle_connect.GATEWAY_NAME
     assert _gateway_rules(render_agent_fence(namespace="agents-acme")) == []

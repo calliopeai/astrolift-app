@@ -130,7 +130,7 @@
     "slug": "Slug",
     "team": "Team",
     "created": "Erstellt",
-    "renameNote": "Das Umbenennen von Projekten folgt, sobald die Backend-Mutation verfügbar ist. Der Slug ist bewusst unveränderlich, damit die nachgelagerte Kostenzuordnung bei einer Umbenennung stabil bleibt.",
+    "renameNote": "Das Umbenennen wird mit der Backend-Mutation verfügbar; der Slug bleibt unveränderlich, damit Ressourcenreferenzen stabil bleiben.",
     "dangerZone": "Gefahrenbereich",
     "dangerZoneDescription": "Vorläufiges Löschen entfernt dieses Projekt aus den Listen. Zugeordnete Workloads bleiben sichtbar, bis sie neu zugeordnet werden.",
     "deleteProject": "Projekt löschen",
@@ -188,13 +188,13 @@
     "team": "Team",
     "created": "Erstellt",
     "title": "Projekte",
-    "context": "Bündeln Sie Apps mit gleichem Deploy-Rhythmus, gleicher Domain oder gleichem Stack. Kostenberichte werden auf dieser Ebene zusammengefasst.",
+    "context": "Gruppieren Sie Apps mit gemeinsamem Bereitstellungsrhythmus, einer Domain oder einem Stack.",
     "newProject": "Neues Projekt",
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "empty": "Noch keine Projekte",
     "emptyNoTeams": "Erstellen Sie zuerst ein Team; Projekte gehören zu Teams.",
-    "emptyDescription": "Bündeln Sie Ihre Apps in einem Projekt, damit Kosten und Kontingente sauber zusammengefasst werden.",
+    "emptyDescription": "Gruppieren Sie zusammengehörige Apps in einem Projekt und verwalten Sie ihren gemeinsamen Zugriff.",
     "manageTeams": "Teams verwalten",
     "deleteTitle": "Projekt {team}/{project} löschen?",
     "deleteTitleGeneric": "Projekt löschen?",
@@ -872,7 +872,7 @@
     "exampleSenior": "Nur Senior Engineers dürfen Apps mit dem Namen <code>prod-*</code> bereitstellen.",
     "exampleNight": "Niemand darf zwischen 22:00 und 06:00 UTC Secrets schreiben, außer bei einer Alarmierung.",
     "exampleMfa": "Deployments in Vorproduktionsumgebungen erfordern einen MFA-Faktor, der jünger als 60 Minuten ist.",
-    "exampleContractors": "Externe Mitarbeitende dürfen alles in einem Projekt lesen, aber nichts ändern, was die Abrechnung betrifft.",
+    "exampleContractors": "Auftragnehmer können alles in einem Projekt lesen, aber keine Ressourcenkontingente ändern.",
     "prerequisitesTitle": "Voraussetzungen",
     "prereqPermission": "<strong>Berechtigung.</strong> <code>policy.create</code> (Owner und Admin haben sie).",
     "prereqModel": "<strong>Denkmodell ABAC vs. RBAC.</strong> RBAC fragt: „Enthält die Rolle dieses Benutzers diese Berechtigung?“ ABAC fragt: „Sagt angesichts der Attribute dieser Anfrage (wer, was, wann, wo) irgendeine Richtlinie <em>verweigern</em>?“ Eine Anfrage gelingt nur, wenn RBAC sie erlaubt und keine Richtlinie sie verweigert.",
@@ -1674,10 +1674,6 @@
         "1d": "+1 Tag",
         "7d": "+7 Tage"
       },
-      "costPerDay": "{cost}/Tag",
-      "costUnavailable": "Kosten nicht verfügbar",
-      "costTooltip": "{pods, plural, one {# Pod} other {# Pods}} · {cost}/Tag laut aktuellen Cloud-Preisen",
-      "costTooltipUnavailable": "{pods, plural, one {# Pod} other {# Pods}} · Kosten-API für diesen Cluster nicht verfügbar",
       "staleBadge": "Veraltet",
       "tearDown": "Abbauen",
       "footer": "Jede App behält {count, plural, one {# aktive Vorschauumgebung} other {# aktive Vorschauumgebungen}} · Veraltungsgrenze: {days, number} Tage.",
@@ -1747,14 +1743,7 @@
         "hoursMinutes": "{hours, number}Std {minutes, number}Min",
         "minutes": "{minutes, number}Min"
       },
-      "spend": {
-        "daily": "Tägliche Kosten",
-        "monthly": "Dieser Monat (Prognose)",
-        "approximate": "Näherungswert",
-        "priced": "{priced, number} von {total, number} Vorschauen mit Preis",
-        "unpriced": "Für {count, number} liefert der Cluster-Treiber keinen Preis",
-        "overcount": "Bei {count, number} wurden alle SKUs des Dienstes summiert; die Gesamtsumme ist zu hoch"
-      }
+      "resourceTooltip": "Ressourcen: {pods, plural, one {# Pod} other {# Pods}}"
     },
     "observability": {
       "scope": {
@@ -5537,12 +5526,10 @@
         "cpu": "vCPU (gesamt)",
         "memory": "Arbeitsspeicher (gesamt)",
         "pods": "Pods",
-        "dailyCost": "Geschätzte Tageskosten",
-        "approximate": "ungefähr",
         "environment": "Umgebung",
-        "loadResources": "Ressourcen und Kosten laden",
-        "resourcesUnavailable": "Aktuelle Ressourcennutzung und geschätzte Kosten sind nicht verfügbar.",
-        "resourcesNotRequested": "Aktuelle Ressourcennutzung und geschätzte Kosten bei Bedarf laden.",
+        "loadResources": "Ressourcen laden",
+        "resourcesUnavailable": "Die aktuelle Ressourcennutzung ist nicht verfügbar.",
+        "resourcesNotRequested": "Laden Sie bei Bedarf die aktuelle Ressourcennutzung.",
         "previewLogs": "Vorschauprotokolle",
         "loadLogs": "Protokolle laden",
         "logsEmpty": "Keine Protokollzeilen in diesem Zeitraum.",
@@ -7383,12 +7370,6 @@
       "recipeSlug": "Slug des Agent-Rezepts",
       "consumerContext": "Nutzer müssen zum selben Projekt und Cluster wie diese Ressource gehören.",
       "attach": "Verbinden",
-      "costUnavailable": "Preisinformationen sind nicht verfügbar.",
-      "costMonthly": "{amount} pro Monat",
-      "costApproximate": "Ungefähr {amount} pro Monat",
-      "costFetched": "Preis abgerufen am {at}",
-      "costSource": "Preisquelle",
-      "costPreview": "Kosten schätzen",
       "reprovision": "Erneut bereitstellen",
       "deprovision": "Bereitstellung aufheben",
       "actionRefused": "Die Aktion wurde abgelehnt. Prüfen Sie die Ressource und Ihre aktuellen Berechtigungen.",
@@ -7583,14 +7564,6 @@
       "sentToday": "Heute gesendet",
       "ofQuota": "{pct} % des 24-h-Kontingents",
       "nearCeiling": "{pct} % des 24-h-Kontingents, nahe am Tageslimit"
-    },
-    "cost": {
-      "title": "Kosten",
-      "empty": "Diesem Dienst sind noch keine Kostendaten zugeordnet. Kosten erscheinen, nachdem der Kostentreiber seinen nächsten Abgleich ausgeführt hat.",
-      "thisMonth": "Dieser Monat",
-      "monthToDate": "Monat bis heute",
-      "last30": "Letzte 30 Tage",
-      "trailing30": "Ausgaben der letzten 30 Tage"
     },
     "identity": {
       "title": "Identitätsprüfung",
@@ -8355,7 +8328,7 @@
           "provider_plugin": "Anbieter",
           "scm": "Versionsverwaltung",
           "audit_log": "das Auditprotokoll",
-          "billing": "Abrechnung",
+          "billing": "Ressourcenkontingente",
           "zentinelle": "Zentinelle",
           "admin": "Verwaltung"
         }
@@ -9410,7 +9383,6 @@
         "metricsReadUnavailable": "Nutzungsdaten konnten nicht gelesen werden.",
         "metricsScope": "Bereitstellungssummen über alle Verbraucher; kein Datenverkehr je App.",
         "metricsSetup": "Metriken einrichten",
-        "costUnavailable": "Ohne gemessene Nutzung und Preise sind keine Kosten verfügbar.",
         "selectApp": "Eine App auswählen",
         "appSearch": "Apps suchen",
         "appsEmpty": "Keine geeigneten Apps",
@@ -9443,7 +9415,7 @@
         "empty": "Keine Traffic-Messwerte in diesem Zeitraum.",
         "unconfigured": "Die Traffic-Erfassung für dieses Abonnement ist nicht konfiguriert.",
         "bytes": "Von der bereitstellenden App angenommene Antwortbytes; keine Modell-Token oder bestätigte Netzwerkzustellung.",
-        "unsupported": "Ein-/Ausgabe-Token und Kosten werden nicht unterstützt.",
+        "unsupported": "Beobachtungen zu Eingabe- und Ausgabetokens werden hier nicht unterstützt.",
         "boundary": "Fehlgeschlagene Streams können auch bei HTTP-Status 200 als Fehler zählen.",
         "requests": "Anfragen pro Sekunde",
         "errors": "Fehlerhafte Anfragen pro Sekunde",
@@ -9612,8 +9584,8 @@
         "inferenceUnknown": "Der Inferenzzugriff wurde nicht geprüft.",
         "traffic": "App-Verkehr und Latenz",
         "trafficUnsupported": "Beobachtungen zu Verkehr und Latenz nativer Modelle werden hier nicht unterstützt. Fehlende Beobachtungen bedeuten nicht, dass kein Verkehr vorliegt.",
-        "tokensCost": "Tokens und Kosten",
-        "tokensCostUnsupported": "Beobachtungen zur Token-Nutzung und zu Kosten werden hier nicht unterstützt."
+        "tokens": "Tokens",
+        "tokensUnsupported": "Beobachtungen zur Token-Nutzung werden hier nicht unterstützt."
       },
       "bindingHelp": "Native App-Bindungen verwenden Cloud-Identitäten. Angewendete Bindungsrevisionen prüfen keinen Inferenzzugriff auf das Modell.",
       "connect": {
@@ -10533,7 +10505,7 @@
       },
       "agents": {
         "title": "Agenten",
-        "description": "Zum Erstellen und Ausführen von Agenten: fehlgeschlagene und laufende Ausführungen, Ihre Agenten und Ausgaben."
+        "description": "Zum Erstellen und Ausführen von Agenten: fehlgeschlagene und aktive Ausführungen sowie Ihre Agenten."
       },
       "builder": {
         "title": "Entwicklung",
@@ -10541,7 +10513,7 @@
       },
       "operator": {
         "title": "Betrieb",
-        "description": "Zum Betreiben der Plattform: Warnungen, Cluster, Plattformaktivität und Kontingent."
+        "description": "Für den Plattformbetrieb: Warnungen, Cluster und Plattformaktivität."
       }
     },
     "panels": {
@@ -10553,15 +10525,14 @@
       "failed-runs": "Fehlgeschlagene Ausführungen",
       "running-now": "Läuft jetzt",
       "my-agents": "Meine Agenten",
-      "runs-spend": "Ausführungen und Ausgaben",
+      "runs-spend": "Ausführungsverlauf",
       "activity": "Aktivität",
       "kpis": "Kennzahlen",
       "deployments": "Bereitstellungen",
       "agent-runs": "Agentenausführungen",
       "alerts": "Warnungen",
       "clusters": "Cluster",
-      "platform-activity": "Plattformaktivität",
-      "spend-quota": "Ausgaben und Kontingent"
+      "platform-activity": "Plattformaktivität"
     },
     "copy": {
       "auditLog": "Auditprotokoll",
@@ -10621,16 +10592,7 @@
       "noRunReason": "Für diese Ausführung wurde kein Grund aufgezeichnet.",
       "timedOut": "Zeitüberschreitung.",
       "noReason": "Es wurde kein Grund aufgezeichnet.",
-      "monthToDate": "Seit Monatsbeginn",
-      "ofBudget": "von {amount} · {percentage}",
-      "spent": "Ausgegeben",
-      "projected": "Prognose",
-      "budget": "Budget",
       "legend": "Legende",
-      "budgetReadFailed": "Das Budget konnte nicht geladen werden: {message}",
-      "noBudget": "Es ist kein Organisationsbudget festgelegt, daher gibt es kein Kontingent für den Ausgabenvergleich.",
-      "spendAgainstBudget": "{panel}: Ausgaben im Vergleich zum Budget",
-      "spendBudgetValue": "{spent} von {budget}",
       "last24Hours": "Letzte 24 Stunden",
       "app": "App",
       "pickApp": "App auswählen",
@@ -10651,14 +10613,12 @@
       "last7Days": "Letzte 7 Tage",
       "runsPerDay": "Agentenausführungen pro Tag",
       "failedPerDay": "Fehlgeschlagene Ausführungen pro Tag",
-      "spendPerDay": "Organisationsausgaben pro Tag",
       "sevenDays": "7 Tage",
-      "spendReadFailed": "Ausgaben konnten nicht geladen werden: {message}",
       "cappedRuns": "Aus den neuesten Ausführungen gezählt; die Woche enthält weitere.",
-      "kpiWindow": "letzte {count, number} Tage · Ausgaben seit Monatsbeginn",
+      "kpiWindow": "letzte {count, number} Tage",
       "kpiAria": "{panel}, letzte {count, number} Tage",
       "noKpisTitle": "Keine Kennzahlen für Ihren Zugriff",
-      "noKpisDescription": "Kennzahlen zu Bereitstellungen, Ausführungen und Ausgaben erscheinen für die für Sie sichtbaren Bereiche.",
+      "noKpisDescription": "Kennzahlen zu Bereitstellungen und Ausführungen erscheinen für die zugänglichen Bereiche.",
       "noProject": "Kein Projekt"
     },
     "health": {
@@ -10707,11 +10667,9 @@
       "runs": "Ausführungen",
       "success": "Erfolg",
       "p95": "p95",
-      "spend": "Ausgaben",
       "runsHint": "Agentenausführungen",
       "successHint": "der Bereitstellungen",
-      "p95Hint": "Bereitstellungsdauer",
-      "spendHint": "seit Monatsbeginn"
+      "p95Hint": "Bereitstellungsdauer"
     },
     "period": {
       "monthly": "monatlich",
@@ -14669,7 +14627,7 @@
   },
   "zentinelleScreen": {
     "title": "Absichern · Zentinelle",
-    "description": "Verbinden Sie diese Organisation mit Zentinelle für Agent-Governance, Nutzung und Kosten, Richtlinien und Prüfprotokoll.",
+    "description": "Verbinden Sie diese Organisation mit Zentinelle für Agenten-Governance, Token-Nutzung, Richtlinien und Audits.",
     "noAccess": "Kein Zugriff auf Zentinelle",
     "noAccessBody": "Ihre Rollen gewähren hier nichts für Zentinelle. Bitten Sie einen Organisationsadministrator um eine Zentinelle-Berechtigung.",
     "error": "Die Zentinelle-Verbindung konnte nicht gelesen werden",
@@ -14680,7 +14638,7 @@
     "tabs": {
       "overview": "Übersicht",
       "clusters": "Cluster",
-      "usage": "Nutzung und Kosten",
+      "usage": "Nutzung",
       "policies": "Richtlinien",
       "audit": "Prüfprotokoll"
     },
@@ -14732,7 +14690,6 @@
       "gatewaysValue": "{healthy} von {total}",
       "agents": "Beobachtete Agents in diesem Monat",
       "requests": "Modellanfragen, letzte 24 Stunden",
-      "spend": "Ausgaben in diesem Monat",
       "usageError": "Die Nutzung konnte nicht von Zentinelle gelesen werden",
       "clustersTitle": "Gateway-Zustand je Cluster",
       "clustersDescription": "Das Zentinelle-Gateway jedes registrierten Clusters.",
@@ -14741,10 +14698,6 @@
       "serverVersion": "Zentinelle-Version",
       "blocks": "Blockierungen, letzte 24 Stunden",
       "approvals": "Offene Freigaben",
-      "budget": "Budget in diesem Monat",
-      "budgetValue": "{percent} % genutzt",
-      "budgetFooter": "{spend} von {limit} ({name})",
-      "noBudget": "Kein Budget festgelegt",
       "notAvailable": "Nicht verfügbar",
       "countsError": "Zustand konnte nicht aus Zentinelle gelesen werden",
       "reportNotAvailable": "Version und letzte Meldung nicht verfügbar",
@@ -14790,7 +14743,6 @@
       "error": "Die Nutzung konnte nicht von Zentinelle gelesen werden",
       "requests": "Modellanfragen",
       "tokens": "Verbrauchte Tokens",
-      "cost": "Modellkosten",
       "title": "Nach Agent und Modell",
       "empty": "Keine Modellnutzung in diesem Zeitraum.",
       "noAgent": "(kein Agent)",

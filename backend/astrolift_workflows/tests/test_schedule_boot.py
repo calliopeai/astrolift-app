@@ -508,3 +508,14 @@ async def test_boot_wrapper_swallows_registrar_error(monkeypatch):
 
     assert worker_continued is True
     assert any("schedule registrar failed" in r.getMessage() for r in handler.records)
+
+
+@pytest.mark.asyncio
+async def test_retired_cost_allowlist_does_not_create_update_or_delete_its_old_schedule(monkeypatch):
+    monkeypatch.setenv(ACTIVE_SCHEDULES_ENV, "capture_platform_cost_snapshot")
+    entry = _FakeListEntry(
+        "astro-capture_platform_cost_snapshot", "CapturePlatformCostSnapshotWorkflow", 86400
+    )
+    client = _FakeClient(existing=[entry])
+    await register_schedules(client)
+    assert client.created == [] and client.updated == []

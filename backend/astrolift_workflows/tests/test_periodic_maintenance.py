@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -10,7 +10,6 @@ from astrolift_workflows.periodic_maintenance import (
     MIN_REHEAL_INTERVAL_HOURS,
     RehealOutcome,
     classify_test_delivery,
-    plan_cost_snapshot,
     plan_prune,
     reheal_due,
     safe_to_delete,
@@ -158,33 +157,6 @@ def test_notify_operator_at_threshold_only():
         notify_threshold=5,
     )
     assert out.notify_operator is False  # now 11; threshold already passed
-
-
-# ---- plan_cost_snapshot --------------------------------------------
-
-
-def test_cost_snapshot_plan_dedupes_orgs():
-    plan = plan_cost_snapshot(
-        snapshot_date=date(2026, 5, 9),
-        active_org_ids=(2, 1, 2, 3, 1),
-    )
-    assert plan.organizations_to_capture == (1, 2, 3)
-
-
-def test_cost_snapshot_plan_empty_when_no_orgs():
-    plan = plan_cost_snapshot(
-        snapshot_date=date(2026, 5, 9),
-        active_org_ids=(),
-    )
-    assert plan.organizations_to_capture == ()
-
-
-def test_cost_snapshot_plan_carries_date():
-    plan = plan_cost_snapshot(
-        snapshot_date=date(2026, 5, 9),
-        active_org_ids=(1,),
-    )
-    assert plan.snapshot_date == date(2026, 5, 9)
 
 
 # ---- plan_prune ----------------------------------------------------

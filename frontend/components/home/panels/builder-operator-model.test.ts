@@ -8,18 +8,8 @@ import {
   healthCounts,
   kpiFigures,
   platformRunReason,
-  spendMeter,
 } from "./builder-operator-model";
-import {
-  AGENT_RUNS,
-  BUDGET,
-  BUDGET_NEAR,
-  BUDGET_OVER,
-  CLUSTERS,
-  FORECAST,
-  METRICS,
-  NOW,
-} from "./builder-operator.fixtures";
+import { AGENT_RUNS, CLUSTERS, METRICS, NOW } from "./builder-operator.fixtures";
 
 describe("alertsFiringFirst", () => {
   it("puts firing before acknowledged before resolved, then the worst severity", () => {
@@ -72,17 +62,15 @@ describe("kpiFigures", () => {
   const all = kpiFigures({
     metrics: METRICS,
     runs: { runs: AGENT_RUNS, capped: false, now: NOW },
-    forecast: FORECAST,
     windowDays: 30,
   });
 
-  it("is one row: deploys, runs, success, p95, spend", () => {
+  it("is one row: deploys, runs, success, p95", () => {
     expect(all.map((f) => [f.key, f.value])).toEqual([
       ["deploys", "14"],
       ["runs", "5"],
       ["success", "92.9%"],
       ["p95", "3m 10s"],
-      ["spend", "$1,240"],
     ]);
   });
 
@@ -106,7 +94,7 @@ describe("kpiFigures", () => {
   });
 
   it("draws a dash before a source answers, and when there were no deploys", () => {
-    const pending = kpiFigures({ metrics: null, forecast: null, windowDays: 30 });
+    const pending = kpiFigures({ metrics: null, windowDays: 30 });
     expect(pending.every((f) => f.value === null)).toBe(true);
     const none = kpiFigures({
       metrics: { ...METRICS, total: 0, p95DurationSeconds: null },
@@ -114,27 +102,6 @@ describe("kpiFigures", () => {
     });
     expect(none.find((f) => f.key === "success")!.value).toBe("—");
     expect(none.find((f) => f.key === "p95")!.value).toBe("—");
-  });
-});
-
-describe("spendMeter", () => {
-  it("draws spend and the projection against the budget", () => {
-    const m = spendMeter(FORECAST, BUDGET)!;
-    expect(m.spent).toBeCloseTo(0.62);
-    expect(m.projected).toBeCloseTo(0.955);
-    expect(m.tone).toBe("ok");
-  });
-
-  it("warns past the first alert threshold and errs over the budget", () => {
-    expect(spendMeter(FORECAST, BUDGET_NEAR)!.tone).toBe("warn");
-    const over = spendMeter(FORECAST, BUDGET_OVER)!;
-    expect(over.tone).toBe("error");
-    expect(over.spent).toBe(1);
-    expect(over.ratio).toBeCloseTo(1.24);
-  });
-
-  it("has nothing to draw without a budget", () => {
-    expect(spendMeter(FORECAST, null)).toBeNull();
   });
 });
 

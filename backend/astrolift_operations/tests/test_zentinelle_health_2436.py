@@ -8,13 +8,15 @@ roles on the #1888 two-team world, so the narrowing is the resolver's.
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 
 import pytest
+from django.core.cache import cache
 from django.utils import timezone
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
-from astrolift_operations import zentinelle_connect
+from astrolift_operations import zentinelle_connect, zentinelle_reads
 from astrolift_operations.models import ZentinelleClusterGateway, ZentinelleConnection
 from astrolift_operations.schema.queries import OperationsQuery
 from astrolift_operations.schema.types import zentinelle_connection_to_type
@@ -110,14 +112,7 @@ def test_an_org_wide_viewer_reads_the_whole_tenants_health(world, zentinelle):
     [call] = zentinelle.health_calls()
     assert call.query["tenant_id"] == ["tenant-a"] and "deployment_id" not in call.query
     assert (result.available, result.window_hours, result.blocks, result.open_approvals) == (True, 24, 6, 2)
-    [budget] = result.budgets
-    assert (budget.name, budget.scope, budget.limit_usd, budget.spend_usd, budget.level) == (
-        "org budget",
-        "organization",
-        100.0,
-        85.5,
-        "threshold",
-    )
+    assert not hasattr(result, "budgets")
 
 
 def test_the_answer_is_cached_not_asked_again(world, zentinelle):
@@ -151,12 +146,7 @@ def test_an_older_zentinelle_reads_as_not_available_not_as_an_error(world, zenti
     _health(world)
 
     assert result.available is False
-    assert (result.blocks, result.open_approvals, result.budgets, result.window_hours) == (
-        None,
-        None,
-        None,
-        None,
-    )
+    assert (result.blocks, result.open_approvals, result.window_hours) == (None, None, None)
     assert len(zentinelle.health_calls()) == 1
 
 
@@ -250,3 +240,41 @@ def test_a_disconnected_connection_never_asks(world, monkeypatch):
     _connect(world, status=ZentinelleConnection.Status.DISCONNECTED)
     connection = ZentinelleConnection.objects.get(organization=world.org)
     assert zentinelle_connection_to_type(connection).server_version() is None
+
+
+def test_health_cache_contains_only_typed_nonmonetary_observations(world, zentinelle):
+    _grant(world, [Permission.ZENTINELLE_STATUS_VIEW])
+    connection = ZentinelleConnection.objects.get(organization=world.org)
+    legacy_key = f"zentinelle-health:{connection.guid}:*"
+    legacy = {"body": {"budgets": [{"limit_usd": 999, "spend_usd": 777}], "blocks": 999}}
+    cache.set(legacy_key, legacy, zentinelle_reads.HEALTH_CACHE_SECONDS)
+
+    result = _health(world)
+
+    assert result.blocks == 6 and len(zentinelle.health_calls()) == 1
+    snapshot = cache.get(f"zentinelle-health-v2:{connection.guid}:*")
+    assert isinstance(snapshot, zentinelle_reads.Health)
+    assert set(dataclasses.asdict(snapshot)) == {
+        "available",
+        "server_version",
+        "window_hours",
+        "blocks",
+        "open_approvals",
+        "clusters",
+    }
+    assert snapshot.server_version == "1.5.0" and snapshot.blocks == 6
+    assert not hasattr(zentinelle_reads, "Budget")
+    assert cache.get(legacy_key) == legacy  # Neither adopt nor rewrite the earlier raw answer.
+    _health(world)
+    assert len(zentinelle.health_calls()) == 1
+
+
+def test_health_schema_has_no_budget_type_or_field():
+    from config.schema import schema
+
+    sdl = schema.as_str()
+    assert "type AstroliftZentinelleBudget" not in sdl
+    health_type = sdl.split("type AstroliftZentinelleHealth {", 1)[1].split("}", 1)[0]
+    assert "budgets" not in health_type
+    for field in ("available:", "windowHours:", "blocks:", "openApprovals:"):
+        assert field in health_type

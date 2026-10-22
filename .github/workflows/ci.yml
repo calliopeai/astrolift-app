@@ -894,7 +894,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
       # node_modules itself is cached (#2413): restoring it takes seconds,
       # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
       # `npm ci`, before any build writes its own caches into it.
@@ -963,7 +963,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
       # node_modules itself is cached (#2413): restoring it takes seconds,
       # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
       # `npm ci`, before any build writes its own caches into it.
@@ -1000,7 +1000,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
       # node_modules itself is cached (#2413): restoring it takes seconds,
       # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
       # `npm ci`, before any build writes its own caches into it.
@@ -1047,7 +1047,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "24"
       # node_modules itself is cached (#2413): restoring it takes seconds,
       # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
       # `npm ci`, before any build writes its own caches into it.

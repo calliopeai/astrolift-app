@@ -45,7 +45,7 @@ export const RuntimeUnavailable: Story = {
   render: () => (
     <PreviewDetailScreen
       {...previewDetailProps({
-        preview: { ...PREVIEWS[0], runtimeStatus: "unavailable", estimatedDailyCostUsd: null },
+        preview: { ...PREVIEWS[0], runtimeStatus: "unavailable" },
       })}
     />
   ),
@@ -82,7 +82,7 @@ export const ExactLogsLoaded: Story = {
   ),
 };
 
-/** Failed: the failure first, with the way to its logs; approximate cost with caveats. */
+/** Failed: the failure first, with the way to its logs. */
 export const Failed: Story = {
   render: () => <PreviewDetailScreen {...previewDetailProps({ preview: PREVIEWS[3] })} />,
 };
@@ -92,7 +92,7 @@ export const Empty: Story = {
   render: () => <PreviewDetailScreen {...previewDetailProps({ preview: PREVIEWS[1] })} />,
 };
 
-/** Torn down: no PR link, no source, no cost. */
+/** Torn down: no PR link, no source. */
 export const TornDown: Story = {
   render: () => <PreviewDetailScreen {...previewDetailProps({ preview: PREVIEWS[2] })} />,
 };
