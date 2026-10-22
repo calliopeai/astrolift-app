@@ -7,7 +7,7 @@ import * as React from "react";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { cn } from "@/lib/utils";
 
-import type { DeployStrategy, OnboardingWizardState } from "./types";
+import { registersApp, type DeployStrategy, type OnboardingWizardState } from "./types";
 
 interface Props {
   state: OnboardingWizardState;
@@ -32,6 +32,8 @@ const STRATEGIES: Array<{
  */
 export function DeployStrategyStep({ state, setState }: Props) {
   const t = useTranslations("onboarding.strategy");
+  const lifetimeCopy = useTranslations("apps.temporaryCreation");
+  const lifetime = registersApp(state) ? state.expiresIn.trim() : "";
 
   return (
     <div className="flex flex-col gap-5">
@@ -82,6 +84,17 @@ export function DeployStrategyStep({ state, setState }: Props) {
               term: t("summary.repo"),
               description: state.sourceRepo || t("summary.repoSkipped"),
             },
+            ...(lifetime
+              ? [
+                  { term: lifetimeCopy("ttl"), description: lifetime },
+                  {
+                    term: lifetimeCopy("deleteData"),
+                    description: state.deleteDataOnExpiry
+                      ? lifetimeCopy("deleteWarning")
+                      : lifetimeCopy("reviewKeep"),
+                  },
+                ]
+              : []),
             {
               term: t("summary.strategy"),
               description: t(`options.${state.deployStrategy}.label`),

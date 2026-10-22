@@ -1828,9 +1828,9 @@ class RegisteredAppEntry:
 class RegisterAppRepoResult:
     """Return shape from :func:`register_app_repo`.
 
-    ``status`` is one of ``ok`` / ``fetch_failed`` / ``no_apps`` / ``error``.
-    ``apps`` lists what was created or matched (only on ``ok``); ``error``
-    carries the message on the failure statuses.
+    ``status`` is one of ``ok`` / ``fetch_failed`` / ``no_apps`` / ``refused``
+    / ``error``. ``apps`` lists what was created or matched (only on ``ok``);
+    ``error`` carries the message on the failure statuses.
     """
 
     status: str
@@ -1963,6 +1963,7 @@ def _register_one_app(
     default_branch: str,
     deploy_branch: str,
     default_cluster,
+    created_by_id: int | None = None,
 ) -> RegisteredAppEntry:
     """Create (or match) one ``RegisteredApp`` + its workloads for a manifest.
 
@@ -1998,6 +1999,8 @@ def _register_one_app(
             raise ValueError(_host_refusal)
         app = RegisteredApp.objects.create(
             organization=org,
+            # Who hears the expiry warnings of a temporary app (#2433).
+            created_by_id=created_by_id,
             team=project.team,
             project=project,
             name=discovered.name,
@@ -2048,6 +2051,8 @@ def register_app_repo(
     deploy_branch: str = "",
     default_cluster=None,
     tree: _TreeFn | None = None,
+    permanent_refusal: str | None = None,
+    created_by_id: int | None = None,
 ) -> RegisterAppRepoResult:
     """Register every app manifest in ``source_repo`` under ``project``.
 
@@ -2058,9 +2063,15 @@ def register_app_repo(
     already registered. Every row is created under ``project`` (its
     organization is the tenancy boundary).
 
+    A new app is temporary when its manifest sets ``[app] expires_in``
+    (#2433). ``permanent_refusal`` is the caller's reason not to have a
+    permanent app (``expiry.permanent_refusal``): with it, a new app whose
+    manifest sets no expiry refuses the whole registration.
+
     Returns ``no_apps`` when the repo has no app manifests, ``fetch_failed``
-    when the repo can't be fetched, ``error`` on an unexpected persist
-    failure, else ``ok`` with the per-manifest outcome.
+    when the repo can't be fetched, ``refused`` when a new app would be
+    permanent against ``permanent_refusal``, ``error`` on an unexpected
+    persist failure, else ``ok`` with the per-manifest outcome.
     """
     discovered, error = _scan_repo_for_apps(
         source_kind=source_kind,
@@ -2073,6 +2084,27 @@ def register_app_repo(
         return RegisterAppRepoResult(status="fetch_failed", error=error)
     if not discovered:
         return RegisterAppRepoResult(status="no_apps")
+
+    if permanent_refusal is not None:
+        from astrolift_registry.expiry import manifest_expires_in
+
+        # Matched the way ``_register_one_app`` matches: these are not new.
+        registered = set(
+            RegisteredApp.objects.filter(
+                organization=project.organization,
+                source_repo=source_repo,
+                deleted_at__isnull=True,
+            ).values_list("manifest_path", flat=True)
+        )
+        permanent = [
+            d.manifest_path
+            for d in discovered
+            if d.manifest_path not in registered and not manifest_expires_in(d.raw_text)
+        ]
+        if permanent:
+            return RegisterAppRepoResult(
+                status="refused", error=f"{permanent_refusal} (missing from {', '.join(permanent)})"
+            )
 
     eff_deploy_branch = deploy_branch or default_branch or "main"
 
@@ -2088,6 +2120,7 @@ def register_app_repo(
                     default_branch=default_branch or "main",
                     deploy_branch=eff_deploy_branch,
                     default_cluster=default_cluster,
+                    created_by_id=created_by_id,
                 )
                 for d in discovered
             ]

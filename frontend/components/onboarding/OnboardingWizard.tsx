@@ -4,6 +4,7 @@ import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, SparklesIcon, XIcon } from "l
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import type { TemporaryAppPolicyState } from "@/components/screens/apps/temporary-app-model";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -33,6 +34,9 @@ interface Props {
   setState: React.Dispatch<React.SetStateAction<OnboardingWizardState>>;
   /** The repo step's source connections and repos, from useRepoStepData. */
   repo: RepoStepData;
+  /** The organization's temporary-app policy, from useTemporaryAppRules,
+   *  for the lifetime of the app the repo step registers (#2433). */
+  temporary: TemporaryAppPolicyState;
   /** Optional callback fired after the wizard closes either by
    *  completion or skip — handed back to the parent so the dashboard
    *  can kick off the spotlight tour. */
@@ -45,7 +49,8 @@ const TOTAL_STEPS: OnboardingStep[] = [1, 2, 3, 4];
  * First-run onboarding wizard. Four steps, all dismissable:
  *  1. Welcome + team
  *  2. Project
- *  3. Repo picker (optional — skips if no source provider is wired)
+ *  3. Repo picker (optional — skips if no source provider is wired),
+ *     and the picked repo's app lifetime
  *  4. Deploy strategy + confirmation summary
  *
  * "Skip" on any step marks the org's onboarding as complete via
@@ -66,6 +71,7 @@ export function OnboardingWizard({
   setState,
   actions,
   repo,
+  temporary,
   onComplete,
 }: Props) {
   const t = useTranslations("onboarding");
@@ -77,11 +83,11 @@ export function OnboardingWizard({
       case 2:
         return isProjectValid(state);
       case 3:
-        return isRepoValid(state);
+        return isRepoValid(state, temporary);
       case 4:
         return isStrategyValid(state);
     }
-  }, [state]);
+  }, [state, temporary]);
 
   async function handleSkip() {
     if (await actions.skip()) {
@@ -169,7 +175,9 @@ export function OnboardingWizard({
         <div className="min-h-[300px]">
           {state.step === 1 && <WelcomeStep state={state} setState={setState} />}
           {state.step === 2 && <ProjectStep state={state} setState={setState} />}
-          {state.step === 3 && <RepoStep state={state} setState={setState} {...repo} />}
+          {state.step === 3 && (
+            <RepoStep state={state} setState={setState} temporary={temporary} {...repo} />
+          )}
           {state.step === 4 && <DeployStrategyStep state={state} setState={setState} />}
         </div>
 
