@@ -1,4 +1,5 @@
 import type { SortState } from "@/components/data-table";
+import type { AstroliftWorkloadIdentityRebind } from "@/graphql/__generated__/schema";
 
 import type { ClusterDetailProps } from "./ClusterDetail";
 import type { ClusterLiveStatsProps } from "./ClusterLiveStats";
@@ -245,6 +246,44 @@ export function detailProps(patch: Partial<ClusterDetailProps> = {}): ClusterDet
     ...patch,
   };
 }
+
+/** A re-pointed cluster's role move (#2472), running unless patched. */
+export function rebind(
+  patch: Partial<AstroliftWorkloadIdentityRebind> = {}
+): AstroliftWorkloadIdentityRebind {
+  return {
+    state: "running",
+    issuer: "oidc.eks.us-west-2.amazonaws.com/id/8D5B4A1C0F2E9B7A6C3D1E0F9A8B7C6D",
+    previousIssuers: ["oidc.eks.us-east-1.amazonaws.com/id/1F0E9D8C7B6A5F4E3D2C1B0A9F8E7D6C"],
+    appsTotal: 12,
+    appsReconciled: 7,
+    failures: [],
+    error: "",
+    requestedAt: "2026-10-18T11:40:00Z",
+    startedAt: "2026-10-18T11:40:02Z",
+    finishedAt: null,
+    ...patch,
+  };
+}
+
+export const REBIND_FAILED = rebind({
+  state: "failed",
+  appsReconciled: 10,
+  finishedAt: "2026-10-18T11:41:30Z",
+  failures: [
+    {
+      app: "acme/billing-worker",
+      role: "astrolift-acme-billing-worker",
+      error:
+        "role astrolift-acme-billing-worker is not managed by the platform; its trust was left unchanged",
+    },
+    {
+      app: "acme/prd-us-west-2-tenant-shared-workloads-with-a-deliberately-long-slug",
+      role: "astrolift-acme-prd-us-west-2-tenant-shared-workloads-wi-3f9a2c1d",
+      error: `AccessDenied: User: ${ARN} is not authorized to perform: iam:UpdateAssumeRolePolicy on resource: role astrolift-acme-prd-us-west-2-tenant-shared-workloads-wi-3f9a2c1d because no identity-based policy allows the iam:UpdateAssumeRolePolicy action`,
+    },
+  ],
+});
 
 export const LIVE_STATS: ClusterLiveStatsProps = {
   appCount: 14,

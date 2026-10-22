@@ -1744,6 +1744,18 @@ export type AstroliftAppSettingsLastModified = {
   webhooks?: Maybe<Scalars['DateTime']['output']>;
 };
 
+export type AstroliftAppSourceChange = {
+  app: AstroliftRegisteredApp;
+  /** The repository the app pointed at before the call; app.sourceRepo when nothing changed. */
+  previousSourceRepo: Scalars['String']['output'];
+};
+
+export type AstroliftAppSourceChangeMutationResult = {
+  data?: Maybe<AstroliftAppSourceChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAppSourceKindFilter =
   | 'ALL'
   | 'BITBUCKET'
@@ -6242,6 +6254,8 @@ export type AstroliftTenantCluster = {
   slug: Scalars['String']['output'];
   /** The cluster permissions the viewer holds on this cluster (#1867), from the checker the mutations use; a shared cluster's writes are the platform operator's. Advisory: offer only these, the mutation still decides. */
   viewerPermissions: Array<Scalars['String']['output']>;
+  /** The latest move of this cluster's per-app workload identity roles to a new OIDC issuer (#2472), started when a registration re-points the cluster at another cluster. Null when it was never re-pointed and outside the operator view; on a shared cluster, whose apps span organizations, only the platform operator sees it. */
+  workloadIdentityRebind?: Maybe<AstroliftWorkloadIdentityRebind>;
 };
 
 
@@ -6618,6 +6632,31 @@ export type AstroliftWorkloadIdentityGrant = {
   roleName: Scalars['String']['output'];
   scope: Scalars['String']['output'];
   state: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadIdentityRebind = {
+  /** Apps whose role now trusts the issuer, or needed nothing: no role, or one another cluster holds. */
+  appsReconciled: Scalars['Int']['output'];
+  appsTotal: Scalars['Int']['output'];
+  /** Why the move could not start or stopped before reaching every app. */
+  error: Scalars['String']['output'];
+  failures: Array<AstroliftWorkloadIdentityRebindFailure>;
+  finishedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** The issuer the roles are moved to, host and path. */
+  issuer: Scalars['String']['output'];
+  previousIssuers: Array<Scalars['String']['output']>;
+  requestedAt: Scalars['DateTime']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** pending | running | succeeded | failed */
+  state: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadIdentityRebindFailure = {
+  /** The app, as <organization slug>/<app slug>. */
+  app: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  /** The IAM role whose trust was not moved. */
+  role: Scalars['String']['output'];
 };
 
 export type AstroliftWorkloadManifest = {
@@ -9836,6 +9875,8 @@ export type Mutation = {
   setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
+  /** Point a GitHub app at another repository, or at its repository's new name after a rename on GitHub (#2478). The repository must be in the organization's GitHub App installation, and the name GitHub lists is stored; sourceUrl follows when it named the old repository. Autowire then runs against the repository: the CI workflow and the CI push role follow it, and the CI secrets are pushed to it, which rotates the deploy token. Audited as app.set_source. */
+  setAppSource: AstroliftAppSourceChangeMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
   setClusterAuthUserEnabled: AstroliftClusterAuthUserChangeMutationResult;
   setClusterAuthUserGroups: AstroliftClusterAuthUserChangeMutationResult;
@@ -11733,6 +11774,11 @@ export type MutationSetAppSecretArgs = {
 
 export type MutationSetAppSecretMetadataArgs = {
   input: SetAppSecretMetadataInput;
+};
+
+
+export type MutationSetAppSourceArgs = {
+  input: SetAppSourceInput;
 };
 
 
@@ -16432,6 +16478,13 @@ export type SetAppSecretMetadataInput = {
   key: Scalars['String']['input'];
   scope: InputMaybe<Scalars['String']['input']>;
   setVia: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SetAppSourceInput = {
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
+  /** The GitHub repository, as owner/name. */
+  sourceRepo: Scalars['String']['input'];
 };
 
 export type SetAppSubdomainInput = {
