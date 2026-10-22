@@ -295,7 +295,8 @@ class AzureNotificationHubsDriver(NotificationDriver):
         payload: NotificationPayload,
     ) -> str:
         # ANH wants the native per-platform body; we shape APNs JSON
-        # for iOS and FCM JSON for Android / Web.
+        # for iOS, an FCM HTTP v1 message for Android and FCM-style
+        # JSON for Web.
         if platform == DevicePlatform.IOS:
             wire: dict[str, Any] = {
                 "aps": {
@@ -312,6 +313,22 @@ class AzureNotificationHubsDriver(NotificationDriver):
             if payload.category:
                 wire["aps"]["category"] = payload.category
             return json.dumps(wire, separators=(",", ":"))
+        if platform == DevicePlatform.ANDROID:
+            # The ``fcmv1`` format takes the FCM HTTP v1 message under
+            # ``message``, with the channel under ``android.notification``
+            # (Microsoft's FCM v1 migration guide for Notification Hubs).
+            message: dict[str, Any] = {
+                "notification": {
+                    "title": payload.title,
+                    "body": payload.body,
+                },
+                "data": dict(payload.data),
+            }
+            if payload.action_url:
+                message["data"]["action_url"] = payload.action_url
+            if payload.category:
+                message["android"] = {"notification": {"channel_id": payload.category}}
+            return json.dumps({"message": message}, separators=(",", ":"))
         wire = {
             "notification": {
                 "title": payload.title,

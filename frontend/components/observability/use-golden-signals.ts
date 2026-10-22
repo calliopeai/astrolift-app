@@ -6,10 +6,12 @@ import * as React from "react";
 import type { ObservabilityPanelReason } from "@/components/observability/panel-reason";
 import type {
   AstroliftAppGoldenSignal,
+  AstroliftAppNetworkMetrics,
   AstroliftStatusCodeBreakdown,
 } from "@/graphql/__generated__/schema";
 import {
   GET_APP_GOLDEN_SIGNALS,
+  GET_APP_NETWORK_METRICS,
   GET_APP_STATUS_CODE_BREAKDOWN,
 } from "@/graphql/observability/observability.queries";
 
@@ -30,10 +32,14 @@ interface StatusBreakdownResp {
   astroliftAppStatusCodeBreakdown: StatusBreakdownWithReason | null;
 }
 
+interface NetworkResp {
+  astroliftAppNetworkMetrics: AstroliftAppNetworkMetrics;
+}
+
 /**
- * The golden signals and the status-code breakdown over one time range,
- * optionally scoped to an environment and a workload (#422). The data
- * half of GoldenSignalsPanel.
+ * The golden signals, the status-code breakdown and the pods' network I/O
+ * over one time range, optionally scoped to an environment and a workload
+ * (#422, #2271). The data half of GoldenSignalsPanel.
  */
 export function useGoldenSignals(
   appSlug: string,
@@ -58,6 +64,10 @@ export function useGoldenSignals(
     variables,
     fetchPolicy: "cache-and-network",
   });
+  const network = useQuery<NetworkResp>(GET_APP_NETWORK_METRICS, {
+    variables,
+    fetchPolicy: "cache-and-network",
+  });
 
   return {
     range,
@@ -71,5 +81,11 @@ export function useGoldenSignals(
       : (statusBreakdown.data?.astroliftAppStatusCodeBreakdown ?? null),
     statusLoading: statusBreakdown.loading && !statusBreakdown.data,
     onStatusRetry: () => void statusBreakdown.refetch(),
+    network: network.error ? null : (network.data?.astroliftAppNetworkMetrics ?? null),
+    networkReason: network.error
+      ? "ERROR"
+      : (network.data?.astroliftAppNetworkMetrics?.reason ?? null),
+    networkLoading: network.loading && !network.data,
+    onNetworkRetry: () => void network.refetch(),
   };
 }

@@ -516,6 +516,8 @@ class WorkflowStage(BaseCoreModel):
         WORKFLOW = "workflow"
         COLLECTION = "collection"
         FORMAT_RECORD = "format_record"
+        # Wait for named GitHub check runs on a pull request's head commit.
+        GITHUB_CHECKS = "github_checks", "GitHub Checks"
 
     class OnFailure(models.TextChoices):
         FAIL = "fail"

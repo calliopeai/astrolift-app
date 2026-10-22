@@ -889,6 +889,8 @@ export type AstroliftAgentStartupDiagnostic = {
 export type AstroliftAgentTask = {
   agentName: Scalars['String']['output'];
   agentSlug: Scalars['String']['output'];
+  /** Evidence the run attached to its result (#2488), in the order it reported them. Metadata only; agentTaskArtifact returns one artifact's content. */
+  artifacts: Array<AstroliftAgentTaskArtifact>;
   brains: Array<AstroliftAgentTaskBrain>;
   callbackAttempts: Scalars['Int']['output'];
   callbackLastError?: Maybe<Scalars['String']['output']>;
@@ -917,6 +919,27 @@ export type AstroliftAgentTask = {
   updatedAt: Scalars['DateTime']['output'];
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
+};
+
+/** Evidence a run attached to its result with its terminal callback (#2488). kind is junit, coverage, conformance-json or other, and mediaType is the type the run reported. sizeBytes and sha256 describe the UTF-8 bytes of the content, which agentTaskArtifact returns. */
+export type AstroliftAgentTaskArtifact = {
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  mediaType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  sha256: Scalars['String']['output'];
+  sizeBytes: Scalars['Int']['output'];
+};
+
+/** One artifact a run attached to its result (#2488), with its UTF-8 content. */
+export type AstroliftAgentTaskArtifactContent = {
+  content: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  mediaType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  sha256: Scalars['String']['output'];
+  sizeBytes: Scalars['Int']['output'];
 };
 
 export type AstroliftAgentTaskBacklog = {
@@ -1626,6 +1649,25 @@ export type AstroliftAppMetricsPoint = {
   latencyP95: Scalars['Float']['output'];
   requestRate: Scalars['Float']['output'];
   timestamp: Scalars['DateTime']['output'];
+};
+
+export type AstroliftAppNetworkMetrics = {
+  rangeSeconds: Scalars['Int']['output'];
+  rateWindowSeconds: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
+  series: Array<AstroliftAppNetworkSeries>;
+  sourcedAt: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+};
+
+export type AstroliftAppNetworkSeries = {
+  direction: NetworkDirection;
+  measurement: AstroliftGoldenSignalMeasurement;
+  promql: Scalars['String']['output'];
+  reason: AstroliftObservabilityPanelReason;
+  samples: Array<AstroliftTimeSeriesPoint>;
+  totalBytes?: Maybe<Scalars['Float']['output']>;
+  unit: Scalars['String']['output'];
 };
 
 export type AstroliftAppPod = {
@@ -8174,6 +8216,7 @@ export type GoldenSignalScope =
 
 export type GoldenSignalSource =
   | 'APP_INSTRUMENTATION'
+  | 'CADVISOR'
   | 'CADVISOR_KUBE_STATE_METRICS'
   | 'CLOUDWATCH_ALB'
   | 'EDGE_PROMETHEUS'
@@ -12407,6 +12450,10 @@ export type NativeModelInvokeAccess =
 export type NativeModelProtocol =
   | 'BEDROCK';
 
+export type NetworkDirection =
+  | 'RECEIVE'
+  | 'TRANSMIT';
+
 export type NoneTypeMutationResult = {
   data?: Maybe<Scalars['Void']['output']>;
   errors: Array<MutationError>;
@@ -12766,6 +12813,8 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  /** One artifact a run attached to its result (#2488), by name, with its content. Null for an unknown name, and to a caller with organization-wide agent.read for a task the organization does not have. Any other task the caller cannot read is refused. */
+  agentTaskArtifact?: Maybe<AstroliftAgentTaskArtifactContent>;
   agentTaskBacklog?: Maybe<AstroliftAgentTaskBacklog>;
   agentTaskByClientRequestId?: Maybe<AstroliftAgentTask>;
   agentTaskCallbackPolicy: AgentTaskCallbackPolicy;
@@ -12839,6 +12888,7 @@ export type Query = {
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetricNames: AstroliftAppMetricNames;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
+  astroliftAppNetworkMetrics: AstroliftAppNetworkMetrics;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecretHistory: Array<AstroliftSecretHistoryEntry>;
@@ -13368,6 +13418,13 @@ export type QueryAgentTaskArgs = {
 };
 
 
+export type QueryAgentTaskArtifactArgs = {
+  name: Scalars['String']['input'];
+  orgId: Scalars['ID']['input'];
+  taskId: Scalars['ID']['input'];
+};
+
+
 export type QueryAgentTaskBacklogArgs = {
   orgId: Scalars['ID']['input'];
   taskId: Scalars['ID']['input'];
@@ -13743,6 +13800,14 @@ export type QueryAstroliftAppMetricNamesArgs = {
 export type QueryAstroliftAppMetricsArgs = {
   appSlug: Scalars['String']['input'];
   timeRange?: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppNetworkMetricsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 

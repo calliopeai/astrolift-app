@@ -87,6 +87,58 @@ export const GET_APP_STATUS_CODE_BREAKDOWN = gql`
 `;
 
 /**
+ * Pod network I/O (#2271): bytes/s received and sent, plus the bytes moved
+ * in the window, each direction with its own reason and measurement.
+ */
+export const GET_APP_NETWORK_METRICS = gql`
+  query GetAppNetworkMetrics(
+    $appSlug: String!
+    $environmentName: String
+    $workloadSlug: String
+    $rangeSeconds: Int
+  ) {
+    astroliftAppNetworkMetrics(
+      appSlug: $appSlug
+      environmentName: $environmentName
+      workloadSlug: $workloadSlug
+      rangeSeconds: $rangeSeconds
+    ) {
+      reason
+      rangeSeconds
+      stepSeconds
+      rateWindowSeconds
+      sourcedAt
+      series {
+        direction
+        unit
+        totalBytes
+        promql
+        reason
+        samples {
+          ${TIME_SERIES_POINT_FIELDS}
+        }
+        measurement {
+          effectiveScope
+          source
+          identityBasis
+          available
+          unavailableReason
+          membershipObservedAt
+          measurementStart
+          target {
+            organizationId appId appSlug environmentId environmentName clusterId namespace workloadId workloadSlug
+          }
+          containers { podName podUid containerName containerId }
+          usageUnit
+          usageSamples { ${TIME_SERIES_POINT_FIELDS} }
+          limitSamples { ${TIME_SERIES_POINT_FIELDS} }
+        }
+      }
+    }
+  }
+`;
+
+/**
  * Per-managed-service metric envelope (#645 + #646).
  *
  * RDS-style tile when the app has a `postgres` managed service;

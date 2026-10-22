@@ -8,10 +8,17 @@ contracts without starting Astrolift.
 |---|---|
 | `../schema.graphql` | Strawberry schema assembled in `config/schema.py` with every feature enabled |
 | `mcp-tools.json` | MCP metadata and authorization requirements in `astrolift_agents/mcp_contract.py` |
+| `push-notifications.json` | Push data contract from `astrolift_operations/notification_dispatch.py` and the push drivers in `providers/` |
 
 Run `make contracts` from the repository root to regenerate them and
 `make contracts-check` to verify the checked-in copies. CI also regenerates
 frontend GraphQL client types and rejects drift.
+
+`push-notifications.json` needs a database, so `make contracts` does not write
+it: `astrolift_operations/tests/test_push_contract_2161.py` generates it from
+the real dispatcher and drivers, fails in the backend test run when the copy is
+stale, and rewrites it with `ASTROLIFT_WRITE_PUSH_CONTRACT=1`. The contract
+itself is described in `docs/mobile-push-contract.md`.
 
 `mcp-tools.json` is the installation capability superset. A caller sees only
 the tools allowed by both its bearer-token scope and its user's RBAC grants.

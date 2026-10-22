@@ -333,6 +333,72 @@ exports as `back_edge_json = '<JSON object>'`; importing that representation
 restores the same typed condition. Supplying both `back_edge` and
 `back_edge_json` is refused. The YAML and GraphQL forms use their native `null`.
 
+## GitHub check gates
+
+A `github_checks` stage waits for named GitHub check runs on a pull request's
+head commit, then passes or fails, the way a human gate does for a decision.
+Its configuration is the stage's `iteration` object, with exactly these fields:
+
+```toml
+[[stage]]
+kind = "agent_dispatch"
+agent = "fossil-builder"
+output_key = "build"
+
+[[stage]]
+kind = "github_checks"
+output_key = "ci"
+timeout = 3600
+iteration = { repo = "ConflictHQ/fossilrepo", sha_source = "pull_request_head", pull_request_path = "pr", checks = ["lint", "test", "conformance"] }
+back_edge = { to = "build", when = "output_equals", path = "github_checks.outcome", value = "failed", max_rounds = 3 }
+```
+
+- `repo` is the GitHub `owner/name` repository.
+- `sha_source` names the commit; `pull_request_head`, the pull request's current
+  head, is the only source.
+- `pull_request_path` is a dotted field in the preceding stage's output (the run
+  input for a first stage). It holds a pull request number, such as `456` or
+  `"456"`, or that repository's pull request URL. A missing value, or a URL of
+  another repository, stops the run as unavailable before the gate opens.
+- `checks` lists 1 to 20 distinct check-run names, matched exactly.
+
+The configuration is validated wherever `iteration` is: TOML and YAML import,
+`createWorkflowStage` and `updateWorkflowStage`, plan load and execution. It is
+frozen into reviewed plans with the rest of the stage.
+
+The gate polls once a minute until it is decided or `timeout` (seconds) elapses.
+A timeout over 1,000 minutes spaces the polls out so one gate makes about
+1,000 at most. Each poll uses the run organization's GitHub connection: the
+organization's GitHub App installation when one exists, otherwise its OAuth or
+PAT connection, never another organization's. It reads the pull request's
+current head and that commit's latest check runs. The gate passes when every
+required name has runs and all of them concluded `success`, `neutral` or
+`skipped`, the conclusions GitHub branch protection accepts. It fails as soon as
+any run of a required name concludes otherwise. A name with no run yet is
+`missing` and keeps the gate waiting. Still waiting at the timeout, the gate is
+`timed_out`. Rate limits, network failures and GitHub server errors keep it
+waiting with the last error recorded. A missing connection, a refused
+credential or an unknown pull request decide it at once as `error`.
+
+The execution row and the stage output carry the result:
+
+```json
+{"github_checks": {"outcome": "failed", "repo": "ConflictHQ/fossilrepo",
+  "pull_request": 456, "sha": "<head sha>", "required": ["lint", "test"],
+  "checks": [{"name": "lint", "state": "passed", "runs": [{"id": 1, "status": "completed",
+    "conclusion": "success", "app": "github-actions", "url": "https://github.com/..."}]},
+   {"name": "test", "state": "failed", "runs": ["..."]}]}}
+```
+
+While the gate waits, the running row shows the latest pending evaluation. Any
+outcome but `passed` fails the run with a message naming the checks, unless an
+`output_equals` return edge on `github_checks.outcome` routes it. In the example
+above, failed checks return to the builder, which receives the gate's result as
+loop feedback, at most twice. `on_failure` and `max_attempts` do not apply to a
+gate. Every run of a required name counts, so a passing run reported under the
+same name cannot hide a failing one. A passing run reported for a check that CI
+never ran does count: the gate does not yet pin a check to the GitHub App
+expected to report it.
 
 ## Imported bounded control loops
 

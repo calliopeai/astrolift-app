@@ -25,9 +25,18 @@ def validate_iteration(value: Any, *, kind: str) -> dict:
             return validate_source_ports(value, kind=kind)
         except SourcePortContractError as exc:
             raise CollectionContractError(str(exc)) from exc
+    if kind == "github_checks":
+        from workflows.github_checks import GithubChecksContractError, validate_github_checks
+
+        try:
+            return validate_github_checks(value)
+        except GithubChecksContractError as exc:
+            raise CollectionContractError(str(exc)) from exc
     if kind not in {"collection", "format_record"}:
         if value != {}:
-            raise CollectionContractError("iteration is valid only for collection and format_record stages")
+            raise CollectionContractError(
+                "iteration is valid only for collection, format_record and github_checks stages"
+            )
         return {}
     if not isinstance(value, dict):
         raise CollectionContractError("iteration must be an object")
