@@ -130,7 +130,7 @@
     "slug": "Slug",
     "team": "Equipo",
     "created": "Creado",
-    "renameNote": "El cambio de nombre llegará con la mutación del backend; el slug permanece inmutable para mantener estables las referencias a recursos.",
+    "renameNote": "Cambia el nombre de este proyecto o su slug con Editar en la página Proyectos.",
     "dangerZone": "Zona de peligro",
     "dangerZoneDescription": "La eliminación reversible quita este proyecto de los listados. Se rechaza mientras el proyecto tenga aplicaciones, agentes o recursos gestionados.",
     "deleteProject": "Eliminar proyecto",

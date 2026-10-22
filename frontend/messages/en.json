@@ -130,7 +130,7 @@
     "slug": "Slug",
     "team": "Team",
     "created": "Created",
-    "renameNote": "Project rename ships when the backend mutation lands; the slug stays immutable so existing resource references remain stable.",
+    "renameNote": "Rename this project or change its slug with Edit on the Projects page.",
     "dangerZone": "Danger zone",
     "dangerZoneDescription": "Soft delete removes this project from listings. It is refused while the project still has apps, agents or managed resources.",
     "deleteProject": "Delete project",

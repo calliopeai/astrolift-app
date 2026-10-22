@@ -130,7 +130,7 @@
     "slug": "Slug",
     "team": "Team",
     "created": "Erstellt",
-    "renameNote": "Das Umbenennen wird mit der Backend-Mutation verfügbar; der Slug bleibt unveränderlich, damit Ressourcenreferenzen stabil bleiben.",
+    "renameNote": "Benennen Sie dieses Projekt um oder ändern Sie seinen Slug mit „Bearbeiten“ auf der Seite Projekte.",
     "dangerZone": "Gefahrenbereich",
     "dangerZoneDescription": "Vorläufiges Löschen entfernt dieses Projekt aus den Listen. Es wird abgelehnt, solange das Projekt noch Apps, Agenten oder verwaltete Ressourcen hat.",
     "deleteProject": "Projekt löschen",
