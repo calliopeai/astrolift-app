@@ -338,7 +338,7 @@ def test_the_operator_moves_a_shared_cluster_install_first_then_revokes_the_orgs
         ("POST", f"{API}/clusters", install_name),
         ("DELETE", f"{API}/clusters/{shared.guid}", zentinelle.installs[org_install]),
     ]
-    assert driver.kinds() == ["Namespace", "Secret", "Deployment", "Service"]
+    assert driver.kinds() == ["Namespace", "Secret", "Deployment", "Service", "HorizontalPodAutoscaler"]
     env = {
         e["name"]: e["value"]
         for e in driver.last("Deployment")["spec"]["template"]["spec"]["containers"][0]["env"]
