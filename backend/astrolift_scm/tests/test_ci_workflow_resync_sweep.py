@@ -138,6 +138,22 @@ def test_reconcile_pushes_on_absent(monkeypatch, org):
     assert pushed == [app.pk]
 
 
+def test_reconcile_does_not_restore_the_file_of_an_app_deregistered_during_the_sweep(monkeypatch, org):
+    """The sweep works through rows it read when it started. Deregister
+    removes the app's file once the row is soft-deleted (#2480), and that
+    ABSENT reading must not put it back."""
+    from django.utils import timezone
+
+    app = _scaffold(org, slug="gone-app", source_repo="acme/gone")
+    body = render_astrolift_bitbucket_pipeline(app)
+    _seed(app, version=TEMPLATE_VERSION, synced_hash=content_hash(body))
+    RegisteredApp.all_objects.filter(pk=app.pk).update(deleted_at=timezone.now())
+    monkeypatch.setattr(drift, "fetch_repo_ci_workflow", lambda a, **kw: None)
+    _no_push(monkeypatch)
+
+    assert reconcile_one_ci_workflow(app) is ReconcileOutcome.SKIPPED
+
+
 def test_reconcile_does_not_push_on_repo_drift(monkeypatch, org):
     app = _scaffold(org, slug="drift-app", source_repo="acme/drift")
     body = render_astrolift_bitbucket_pipeline(app)

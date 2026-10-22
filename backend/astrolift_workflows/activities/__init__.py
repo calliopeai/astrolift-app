@@ -12,6 +12,7 @@ from astrolift_workflows.activities.alert_eval import evaluate_alerts_tick
 from astrolift_workflows.activities.app_deregister import (
     delete_app_source_webhook,
     list_app_secret_targets,
+    remove_app_ci_workflow,
     revoke_app_secret_bundle_refs,
 )
 from astrolift_workflows.activities.app_domain_sync import (
@@ -398,6 +399,7 @@ __all__ = [
     "register_managed_domain_row",
     "reheal_webhook_subscriptions",
     "reissue_cert",
+    "remove_app_ci_workflow",
     "remove_platform_rbac",
     "render_manifests",
     "request_wildcard_cert_for_zone",

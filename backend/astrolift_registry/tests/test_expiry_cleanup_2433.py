@@ -398,6 +398,7 @@ async def test_real_temporal_deregister_retries_native_runtime_and_keeps_origina
         "revoke_app_deploy_tokens": 0,
         "soft_delete_app_records": {"registered_app": 1},
         "mark_app_deregistered": None,
+        "remove_app_ci_workflow": {"status": "no_repo", "detail": "app has no source repo configured"},
     }
     platform_observations = []
 

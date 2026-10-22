@@ -595,10 +595,18 @@ def reconcile_one_ci_workflow(app) -> ReconcileOutcome:
         # SAFE to push: repo side is byte-for-byte what we synced (or the file
         # is gone), so overwriting with the current template can't destroy an
         # operator edit. Reuse Phase 1's push wholesale — it re-stamps too.
+        from astrolift_registry.models import RegisteredApp
         from astrolift_scm.services.workflow_sync import (
             WorkflowSyncError,
             sync_workflow_file_to_repo,
         )
+
+        # The sweep works through rows it read when it started. Deregister
+        # removes the app's file once the row is soft-deleted (#2480), so an
+        # ABSENT reading of a row deregistered since must not put it back.
+        if not RegisteredApp.objects.filter(pk=app.pk).exists():
+            logger.info("ci-workflow resync: app=%s was deregistered during the sweep", app.pk)
+            return ReconcileOutcome.SKIPPED
 
         try:
             result = sync_workflow_file_to_repo(app)

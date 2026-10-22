@@ -161,7 +161,10 @@ class ECRDriver(ImageRegistryDriver):
             try:
                 response = self._client.batch_get_image(repositoryName=repo, imageIds=[image_id])
                 images = response.get("images", [])
-                if response.get("failures") or len(images) != 1:
+                # ECR returns one entry per tag when asked by digest, so an
+                # image already pinned by an earlier deployment comes back
+                # more than once. Every entry is the same image.
+                if response.get("failures") or len({i["imageId"]["imageDigest"] for i in images}) != 1:
                     raise ProviderError(f"cannot retain deployment image {ref}: image unavailable")
                 image = images[0]
                 digest = image["imageId"]["imageDigest"]

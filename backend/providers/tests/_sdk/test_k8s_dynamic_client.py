@@ -517,13 +517,29 @@ def test_hpa_invalid_replica_observation_is_never_fabricated(replicas) -> None:
     resource.server_side_apply.assert_not_called()
 
 
-@pytest.mark.parametrize("managers", [(), (None,), ("",), (0,)])
+@pytest.mark.parametrize("managers", [(None,), ("",), (0,)])
 def test_hpa_unknown_replica_owner_refuses_without_a_write(managers) -> None:
     before = _replica_observation(*managers)
     client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=before)
     with pytest.raises(ValueError, match="unknown field ownership"):
         client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
     resource.server_side_apply.assert_not_called()
+
+
+def test_hpa_unowned_replicas_apply_again_without_a_handover() -> None:
+    """A Deployment created for its HPA never had replicas set, so no manager
+    owns the count, not even after the HPA scales it (#2495)."""
+    before = _replica_observation()
+    client, resource, _tok = _ssa_test_setup(pre_get_payload=before, post_apply_payload=before)
+
+    client.server_side_apply(namespace="ns", manifest=_hpa_manifest(), dry_run=False)
+
+    resource.server_side_apply.assert_called_once()
+    request = resource.server_side_apply.call_args.kwargs
+    assert request["field_manager"] == "astrolift"
+    assert "replicas" not in request["body"]["spec"]
+    assert request["body"]["metadata"]["uid"] == "observed-deployment-uid"
+    assert request["body"]["metadata"]["resourceVersion"] == "10"
 
 
 def test_hpa_handover_failure_never_releases_existing_owner() -> None:
