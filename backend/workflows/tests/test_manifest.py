@@ -126,6 +126,8 @@ def test_every_stage_kind_parses(kind):
         child = '\noutput_key = "each"\niteration_json = \'{"max_items":1,"items":[],"body_end":"body"}\'\n\n[[stage]]\nkind = "checkpoint"\noutput_key = "body"'
     elif kind == WorkflowStage.StageKind.FORMAT_RECORD:
         child = '\niteration_json = \'{"source_format":"langflow_parser","pattern":"{text}","separator":""}\''
+    elif kind == WorkflowStage.StageKind.GITHUB_CHECKS:
+        child = '\niteration_json = \'{"repo":"acme/web","sha_source":"pull_request_head","pull_request_path":"pr","checks":["test"]}\''
     toml = f'[workflow]\nslug = "w"\nname = "W"\npattern = "single"\n\n[[stage]]\nkind = "{kind}"{child}\n'
     parsed = parse_workflow_manifest(toml)
     assert parsed.stages[0].kind == kind
