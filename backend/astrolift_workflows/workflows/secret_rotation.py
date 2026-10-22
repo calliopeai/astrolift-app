@@ -43,6 +43,7 @@ with workflow.unsafe.imports_passed_through():
         list_bundles_due_for_refresh,
         refresh_secret_bundle_in_cluster,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 # Each activity is a single backend / cluster apply call — generous
 # enough to absorb a slow secrets-manager fetch but tight enough that
@@ -61,6 +62,7 @@ class RotateSecretBundleWorkflow:
             list_active_secret_bundle_targets,
             input.secret_bundle_id,
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         if not targets:
             return WorkflowResult(
@@ -76,6 +78,7 @@ class RotateSecretBundleWorkflow:
                     refresh_secret_bundle_in_cluster,
                     t,
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 )
                 refreshed += 1
             except Exception as exc:  # noqa: BLE001
@@ -92,6 +95,7 @@ class RotateSecretBundleWorkflow:
                         bounce_workloads_consuming_bundle,
                         t,
                         start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     )
                     bounced_total += int(n or 0)
                 except Exception as exc:  # noqa: BLE001
@@ -131,6 +135,7 @@ class DeleteSecretBundleFromClustersWorkflow:
             list_active_secret_bundle_targets,
             input.secret_bundle_id,
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         if not targets:
             return WorkflowResult(
@@ -145,6 +150,7 @@ class DeleteSecretBundleFromClustersWorkflow:
                     delete_secret_from_cluster,
                     t,
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 )
                 deleted += 1
             except Exception as exc:  # noqa: BLE001
@@ -178,6 +184,7 @@ class SecretBundleScheduledRefreshWorkflow:
         bundle_ids = await workflow.execute_activity(
             list_bundles_due_for_refresh,
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         if not bundle_ids:
             return WorkflowResult(
@@ -192,6 +199,7 @@ class SecretBundleScheduledRefreshWorkflow:
                 list_active_secret_bundle_targets,
                 bundle_id,
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             total_targets += len(targets)
             for t in targets:
@@ -200,6 +208,7 @@ class SecretBundleScheduledRefreshWorkflow:
                         refresh_secret_bundle_in_cluster,
                         t,
                         start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     )
                     total_refreshed += 1
                 except Exception as exc:  # noqa: BLE001

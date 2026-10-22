@@ -26,6 +26,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.app_domain_sync")
 
 # TLS handshake budget per hostname inside ``verify_app_hostnames``. The
@@ -145,10 +147,11 @@ async def plan_app_domain_sync(
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_plan_app_domain_sync_sync)(
-        registered_app_id,
-        previous_subdomain,
+    result = await heartbeat_while(
+        sync_to_async(_plan_app_domain_sync_sync)(
+            registered_app_id,
+            previous_subdomain,
+        )
     )
     log.info(
         "plan_app_domain_sync app=%s envs=%d",
@@ -180,10 +183,11 @@ async def revert_app_subdomain(registered_app_id: int, previous_subdomain: str) 
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    restored = await sync_to_async(_revert_app_subdomain_sync)(
-        registered_app_id,
-        previous_subdomain,
+    restored = await heartbeat_while(
+        sync_to_async(_revert_app_subdomain_sync)(
+            registered_app_id,
+            previous_subdomain,
+        )
     )
     log.info(
         "revert_app_subdomain restored=%s",
@@ -250,9 +254,9 @@ async def verify_app_hostnames(
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_verify_app_hostnames_sync)(list(hostnames), timeout_seconds)
-    activity.heartbeat()
+    result = await heartbeat_while(
+        sync_to_async(_verify_app_hostnames_sync)(list(hostnames), timeout_seconds)
+    )
     if result["unverified"]:
         raise RuntimeError(
             "hostname verification failed for "

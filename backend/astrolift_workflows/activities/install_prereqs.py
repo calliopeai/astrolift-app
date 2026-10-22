@@ -34,6 +34,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 _FLUX_VERSION = os.environ.get("ASTROLIFT_FLUX_VERSION", "v2.4.0")
 _FLUX_INSTALL_URL = os.environ.get(
     "ASTROLIFT_FLUX_INSTALL_URL",
@@ -1174,16 +1176,17 @@ async def record_cluster_bootstrap_run(
     panel reflects UI-triggered installs, not just CLI runs."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_record_bootstrap_run_sync)(
-        cluster_id,
-        actor_user_id,
-        status,
-        applied,
-        error_message,
-        started_at_iso,
-        ended_at_iso,
-        organization_id,
+    await heartbeat_while(
+        sync_to_async(_record_bootstrap_run_sync)(
+            cluster_id,
+            actor_user_id,
+            status,
+            applied,
+            error_message,
+            started_at_iso,
+            ended_at_iso,
+            organization_id,
+        )
     )
     log.info(
         "record_cluster_bootstrap_run cluster_id=%d status=%s applied=%d",
@@ -1211,12 +1214,13 @@ async def install_cluster_prereqs(
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_install_cluster_prereqs_sync)(
-        cluster_id,
-        selected_keys,
-        option_overrides,
-        additive,
+    result = await heartbeat_while(
+        sync_to_async(_install_cluster_prereqs_sync)(
+            cluster_id,
+            selected_keys,
+            option_overrides,
+            additive,
+        )
     )
     log.info(
         "install_cluster_prereqs applied=%d skipped=%d",

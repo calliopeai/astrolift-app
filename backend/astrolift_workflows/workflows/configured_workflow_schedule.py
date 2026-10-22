@@ -35,6 +35,7 @@ with workflow.unsafe.imports_passed_through():
         DELIVERY_MAX_ATTEMPTS,
         deliver_workflow_run_result,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 # The stage executor's own budget for its thin DB activities.
 _DB_TIMEOUT = timedelta(minutes=2)
@@ -64,6 +65,7 @@ class ConfiguredWorkflowScheduleWorkflow:
             create_scheduled_workflow_run,
             action,
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         if fire.skipped:
@@ -85,6 +87,7 @@ class ConfiguredWorkflowScheduleWorkflow:
             record_scheduled_workflow_start,
             args=[fire.run_input.workflow_run_id, handle.first_execution_run_id],
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         try:
@@ -108,6 +111,7 @@ class ConfiguredWorkflowScheduleWorkflow:
                 deliver_workflow_run_result,
                 {"workflow_run_id": workflow_run_id, "outcome": outcome},
                 start_to_close_timeout=_DELIVERY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DELIVERY_RETRY,
             )
         except ActivityError:

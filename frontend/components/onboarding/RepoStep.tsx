@@ -16,13 +16,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TemporaryAppFields } from "@/components/screens/apps/TemporaryAppFields";
+import {
+  temporaryAppValid,
+  type TemporaryAppPolicyState,
+} from "@/components/screens/apps/temporary-app-model";
 import type { AstroliftRemoteRepoList, AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 
-import type { OnboardingWizardState } from "./types";
+import { registersApp, type OnboardingWizardState } from "./types";
 
 interface Props {
   state: OnboardingWizardState;
   setState: React.Dispatch<React.SetStateAction<OnboardingWizardState>>;
+  /** The organization's temporary-app policy, for the picked repo's app lifetime. */
+  temporary: TemporaryAppPolicyState;
 }
 
 /** The repo step's data: source connections, and the repos of the chosen one. */
@@ -36,6 +43,7 @@ export interface RepoStepData {
 export function RepoStep({
   state,
   setState,
+  temporary,
   connections: availableConnections,
   connectionsLoading,
   repos: repoList,
@@ -177,16 +185,38 @@ export function RepoStep({
         </div>
       )}
 
+      {registersApp(state) && (
+        <TemporaryAppFields
+          value={{ expiresIn: state.expiresIn, deleteDataOnExpiry: state.deleteDataOnExpiry }}
+          onChange={(value) =>
+            setState((prev) => ({
+              ...prev,
+              expiresIn: value.expiresIn ?? "",
+              deleteDataOnExpiry: value.deleteDataOnExpiry ?? false,
+            }))
+          }
+          rules={temporary.rules}
+          loading={temporary.loading}
+          failed={temporary.failed}
+          onRetry={temporary.onRetry}
+        />
+      )}
+
       <p className="text-muted-foreground text-xs">{t("optionalNote")}</p>
     </div>
   );
 }
 
 /**
- * The repo step is always considered valid — operators may continue
- * without picking a repo. When the picker is left empty, the submit
- * handler simply skips the register-app call.
+ * Operators may continue without picking a repo: the submit handler then
+ * skips the register-app call. With one picked, the app's lifetime must
+ * fit the organization's temporary-app policy, so the policy has to have
+ * been read.
  */
-export function isRepoValid(_state: OnboardingWizardState): boolean {
-  return true;
+export function isRepoValid(
+  state: OnboardingWizardState,
+  temporary: TemporaryAppPolicyState
+): boolean {
+  if (!registersApp(state)) return true;
+  return !temporary.loading && !temporary.failed && temporaryAppValid(state, temporary.rules);
 }

@@ -39,6 +39,7 @@ with workflow.unsafe.imports_passed_through():
         probe_required_records,
         transition_domain_status,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _QUICK_TIMEOUT = timedelta(minutes=2)
@@ -75,6 +76,7 @@ class ValidateCustomDomainWorkflow:
                 ensure_platform_managed_records,
                 domain_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ENSURE_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface to operator
@@ -86,6 +88,7 @@ class ValidateCustomDomainWorkflow:
                     f"platform DNS write failed: {exc}",
                 ],
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ENSURE_RETRY,
             )
             return WorkflowResult(
@@ -104,6 +107,7 @@ class ValidateCustomDomainWorkflow:
                     probe_required_records,
                     domain_id,
                     start_to_close_timeout=_PROBE_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ENSURE_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -121,6 +125,7 @@ class ValidateCustomDomainWorkflow:
                 transition_domain_status,
                 args=[domain_id, True],
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ENSURE_RETRY,
             )
             # Cert issuance happens after validation flips. We don't
@@ -138,6 +143,7 @@ class ValidateCustomDomainWorkflow:
                     issue_custom_domain_certificate,
                     domain_id,
                     start_to_close_timeout=timedelta(minutes=10),
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ENSURE_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -170,6 +176,7 @@ class ValidateCustomDomainWorkflow:
             transition_domain_status,
             args=[domain_id, False, reason],
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_ENSURE_RETRY,
         )
         return WorkflowResult(

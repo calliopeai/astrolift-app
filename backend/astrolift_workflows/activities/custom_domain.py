@@ -29,6 +29,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.custom_domain")
 
 
@@ -235,8 +237,7 @@ async def ensure_platform_managed_records(
     via the bound cluster's ``DnsDriver``. No-op for self-serve."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_ensure_records_sync)(custom_domain_id)
+    result = await heartbeat_while(sync_to_async(_ensure_records_sync)(custom_domain_id))
     log.info(
         "ensure_platform_managed_records ensured=%s errors=%s",
         result.get("ensured"),
@@ -288,8 +289,7 @@ async def probe_required_records(
     the per-row propagation state on the CustomDomain row."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_probe_sync)(custom_domain_id)
+    result = await heartbeat_while(sync_to_async(_probe_sync)(custom_domain_id))
     log.info(
         "probe_required_records all_propagated=%s",
         result.get("all_propagated"),
@@ -336,11 +336,12 @@ async def transition_domain_status(
     operator-facing error message on failure."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    final = await sync_to_async(_transition_sync)(
-        custom_domain_id,
-        success,
-        error_message,
+    final = await heartbeat_while(
+        sync_to_async(_transition_sync)(
+            custom_domain_id,
+            success,
+            error_message,
+        )
     )
     log.info(
         "transition_domain_status final=%s",
@@ -522,8 +523,7 @@ async def issue_custom_domain_certificate(
     + persist the returned cert id on the row."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_issue_cert_sync)(custom_domain_id)
+    result = await heartbeat_while(sync_to_async(_issue_cert_sync)(custom_domain_id))
     log.info(
         "issue_custom_domain_certificate ok=%s certificate_id=%s",
         result.get("ok"),

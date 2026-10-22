@@ -43,6 +43,7 @@ with workflow.unsafe.imports_passed_through():
         record_promoted_app_deployment,
         sync_dev_environment_files,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _ACTIVITY_TIMEOUT = timedelta(minutes=10)
 # Bounded, as DeployAppWorkflow's are: under Temporal's default unlimited
@@ -72,6 +73,7 @@ class CreateDevEnvironmentWorkflow:
                 provision_dev_environment,
                 input.dev_environment_id,
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ACTIVITY_RETRY,
             )
             return WorkflowResult(ok=True, message="provisioned", data=result)
@@ -80,6 +82,7 @@ class CreateDevEnvironmentWorkflow:
                 mark_dev_environment_failed,
                 args=[input.dev_environment_id, _cause(exc)],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             return WorkflowResult(ok=False, message=_cause(exc))
 
@@ -93,6 +96,7 @@ class SyncDevEnvironmentFilesWorkflow:
                 sync_dev_environment_files,
                 input.dev_environment_id,
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ACTIVITY_RETRY,
             )
             return WorkflowResult(ok=True, message="files synced")
@@ -101,6 +105,7 @@ class SyncDevEnvironmentFilesWorkflow:
                 mark_dev_environment_failed,
                 args=[input.dev_environment_id, _cause(exc)],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             return WorkflowResult(ok=False, message=_cause(exc))
 
@@ -114,6 +119,7 @@ class DeployPromotedAppWorkflow:
                 deploy_promoted_app,
                 args=[input.dev_environment_id, input.storage_class],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ACTIVITY_RETRY,
             )
             # #1875: record the runtime as a Workload + Deployment so the
@@ -125,6 +131,7 @@ class DeployPromotedAppWorkflow:
                     record_promoted_app_deployment,
                     args=[input.dev_environment_id, input.storage_class],
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ACTIVITY_RETRY,
                 )
             return WorkflowResult(ok=True, message="promoted app deployed", data=result)
@@ -133,5 +140,6 @@ class DeployPromotedAppWorkflow:
                 mark_dev_environment_failed,
                 args=[input.dev_environment_id, _cause(exc)],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             return WorkflowResult(ok=False, message=_cause(exc))

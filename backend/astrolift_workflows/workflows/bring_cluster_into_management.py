@@ -49,6 +49,7 @@ with workflow.unsafe.imports_passed_through():
         run_preflight_job,
         verify_reachability,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 # Each activity gets its own timeout. The preflight Job's 60s wait
@@ -109,6 +110,7 @@ class BringClusterIntoManagementWorkflow:
                 mark_managing,
                 cluster_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -122,6 +124,7 @@ class BringClusterIntoManagementWorkflow:
                 verify_reachability,
                 cluster_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -138,6 +141,7 @@ class BringClusterIntoManagementWorkflow:
                 provision_secrets_backend,
                 cluster_id,
                 start_to_close_timeout=_SECRETS_BACKEND_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_SECRETS_BACKEND_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -148,6 +152,7 @@ class BringClusterIntoManagementWorkflow:
                 apply_platform_rbac,
                 cluster_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -158,6 +163,7 @@ class BringClusterIntoManagementWorkflow:
                 probe_capabilities,
                 cluster_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -169,6 +175,7 @@ class BringClusterIntoManagementWorkflow:
                     run_preflight_job,
                     cluster_id,
                     start_to_close_timeout=_PREFLIGHT_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     # Preflight is a one-shot Job — retrying it on
                     # failure just runs the same Job over again. Cap at
                     # one attempt; operator inspects + retries via the
@@ -183,6 +190,7 @@ class BringClusterIntoManagementWorkflow:
                 mark_managed,
                 cluster_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -201,6 +209,7 @@ class BringClusterIntoManagementWorkflow:
                 mark_error,
                 args=[cluster_id, truncated],
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_MARK_ERROR_RETRY,
             )
         except Exception:  # noqa: BLE001

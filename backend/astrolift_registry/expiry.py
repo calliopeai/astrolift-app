@@ -194,17 +194,17 @@ def _is_org_admin(org) -> bool:
     return True
 
 
-def permanent_refusal(org, *, surface: str | None = None) -> str | None:
-    """Why this caller may not have a permanent app here, or ``None``."""
+def permanent_refusal(
+    org, *, surface: str | None = None, remedy: str = "set expiresIn or expiresAt"
+) -> str | None:
+    """Why this caller may not have a permanent app here, or ``None``.
+    ``remedy`` is how the caller's own input gives the app an expiry."""
     policy = policy_for(org)
     surface = surface or current_surface()
     if surface in policy.ttl_required_surfaces:
-        return (
-            f"this organization requires an expiry for apps created through {SURFACES[surface]}: "
-            "set expiresIn or expiresAt"
-        )
+        return f"this organization requires an expiry for apps created through {SURFACES[surface]}: {remedy}"
     if policy.temporary_only_for_members and not _is_org_admin(org):
-        return "this organization lets members create temporary apps only: set expiresIn or expiresAt"
+        return f"this organization lets members create temporary apps only: {remedy}"
     return None
 
 

@@ -52,6 +52,7 @@ with workflow.unsafe.imports_passed_through():
         finalize_managed_service_deletion,
         mark_managed_service_deprovisioning,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _QUICK_TIMEOUT = timedelta(minutes=2)
@@ -109,6 +110,7 @@ class DeprovisionManagedServiceWorkflow:
                 deprovision_managed_service,
                 args=_reviewed_args(input, [svc_id, delete_data, force_destroy]),
                 start_to_close_timeout=_DEPROVISION_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DEPROVISION_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface to operator
