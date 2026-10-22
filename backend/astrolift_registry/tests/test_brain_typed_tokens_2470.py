@@ -302,6 +302,18 @@ def test_a_typed_token_over_the_byte_limit_is_refused_not_trimmed(world, monkeyp
     assert f"{size} bytes, over this install's {size - 1}" in refused.errors[0].message
 
 
+def test_a_hosted_apps_typed_token_over_the_byte_limit_fails_its_deploy(world, monkeypatch):
+    from core.app_deploy import AppDeployError
+
+    app, env = _hosted(world)
+    typed(world.brain, world.operator)
+    monkeypatch.setattr(brain_tokens, "MAX_TYPED_TOKEN_BYTES", 100)
+
+    with pytest.raises(AppDeployError, match="over this install's 100"):
+        _materialize(_deploy(app, env), monkeypatch)
+    assert not BrainTokenKey.objects.exclude(typed_contract="").exists()
+
+
 def test_typed_claims_never_come_from_the_caller(world):
     for name in sorted(brain_tokens.TYPED_CLAIMS):
         with pytest.raises(BrainTokenError, match="never from a caller"):
