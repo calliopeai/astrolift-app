@@ -434,6 +434,20 @@ def test_image_ids_read_as_digests(image_id, digest):
     assert pd._digest(image_id) == digest
 
 
+@pytest.mark.parametrize(
+    ("image_id", "repository"),
+    [
+        ("ghcr.io/calliopeai/junohub@sha256:0b1d", "ghcr.io/calliopeai/junohub"),
+        ("docker-pullable://ghcr.io/calliopeai/junohub@sha256:0b1d", "ghcr.io/calliopeai/junohub"),
+        ("docker.io/library/busybox@sha256:73aa", "docker.io/library/busybox"),
+        ("sha256:b7c873bd97bd", ""),
+        ("", ""),
+    ],
+)
+def test_image_ids_name_the_repository_they_were_pulled_from(image_id, repository):
+    assert pd._image_id_repository(image_id) == repository
+
+
 # ---- the dispatch layer ----------------------------------------------------------
 
 
@@ -509,6 +523,51 @@ def test_the_scan_records_each_product_namespace(plugin, org, drivers, scan):
     assert hub.running_images == {"hub": [HUB_DIGEST]}
     assert hub.endpoints == {"hub": "https://hub.acme.example.com"}
     assert [e.payload["changes"] for e in _events()] == [["appeared"], ["appeared"]]
+
+
+@pytest.mark.parametrize(
+    "image_id_prefix",
+    ["", "docker-pullable://"],
+    ids=["containerd", "dockershim"],
+)
+def test_a_digest_pinned_image_is_matched_by_the_repository_its_image_id_names(
+    plugin, org, drivers, scan, image_id_prefix
+):
+    """A container started from ``repo@sha256:...`` reports ``image`` as the
+    node's local image id (``sha256:<config>``), not the reference: containerd
+    2.3 on Kubernetes 1.37 does. Only ``imageID`` names the repository, and
+    the contract's own Zentinelle images are pinned that way."""
+    cluster = _cluster(plugin, organization=org)
+    reported = {
+        "zentinelle-backend": ("sha256:b7c873bd97bd", BACKEND_IMAGE),
+        "zentinelle-worker": ("sha256:b7c873bd97bd", BACKEND_IMAGE),
+        "zentinelle-frontend": ("sha256:0deac8b82696", FRONTEND_IMAGE),
+        "zentinelle-temporal": ("sha256:5f2a08c1d3e4", "docker.io/temporalio/auto-setup@sha256:7e"),
+    }
+    drivers[cluster.slug] = FakeDriver(
+        [_namespace(ZENTINELLE)],
+        [
+            _workload("zentinelle", name, desired=2, ready=2, images=[(image, f"{image_id_prefix}{image_id}")])
+            for name, (image, image_id) in reported.items()
+        ],
+    )
+
+    scan(cluster)
+
+    row = ProductDeployment.objects.get(cluster=cluster)
+    assert row.running_images == {"backend": ["sha256:8cc9..."], "frontend": ["sha256:e281..."]}
+
+
+def test_a_preloaded_image_is_matched_by_the_reference_it_runs_as(plugin, org, drivers, scan):
+    """An image loaded onto the node rather than pulled (an air-gapped node)
+    has no repository digest: ``imageID`` is the bare local id, and only
+    ``image`` names the repository."""
+    cluster = _cluster(plugin, organization=org)
+    drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub(images=[(HUB_IMAGE, "sha256:b7c873bd97bd")]))
+
+    scan(cluster)
+
+    assert ProductDeployment.objects.get(cluster=cluster).running_images == {"hub": ["sha256:b7c873bd97bd"]}
 
 
 def test_a_rescan_with_nothing_new_is_quiet(plugin, org, drivers, scan):

@@ -234,6 +234,16 @@ def _repository(reference: str) -> str:
     return f"{registry}/{path}"
 
 
+def _image_id_repository(image_id: str) -> str:
+    """The repository an ``imageID`` was pulled from (``repo@sha256:...``,
+    with or without dockershim's ``docker-pullable://``), normalized like
+    :func:`_repository`; empty for a bare image id, which names none."""
+    reference = image_id.strip().rpartition("://")[2]
+    if "@" not in reference:
+        return ""
+    return _repository(reference)
+
+
 def _digest(image_id: str) -> str:
     _, at, digest = image_id.rpartition("@")
     if at:
@@ -269,7 +279,14 @@ def _observe(
     running: dict[str, list[str]] = {}
     for component, reference in product.images.items():
         repository = _repository(reference)
-        digests = {_digest(i["image_id"]) for i in seen if _repository(i["image"]) == repository}
+        # A container started from ``repo@sha256:...`` reports ``image`` as
+        # the node's local image id (containerd), so ``imageID`` is the only
+        # place its repository shows; a tag-pinned one shows it in both.
+        digests = {
+            _digest(i["image_id"])
+            for i in seen
+            if repository in (_repository(i["image"]), _image_id_repository(i["image_id"]))
+        }
         running[component] = sorted(digests - {""})
     return health, workloads, running
 
