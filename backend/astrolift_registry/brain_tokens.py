@@ -93,8 +93,6 @@ def member_teams(user: Any, organization: Any, team_ceiling: frozenset[str] | No
     live member of the organization itself."""
     from astrolift_identity.models import Member, Team
 
-    if team_ceiling is not None and not team_ceiling:
-        return []
     live = Member.objects.filter(
         user_id=user.pk, user__is_active=True, is_active=True, lifecycle=Member.Lifecycle.ACTIVE
     )
