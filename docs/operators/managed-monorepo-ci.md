@@ -115,7 +115,10 @@ registered from the repository. The workflow definitions the old repository
 declared (`workflows/*.toml`) are keyed on its name; once no other app of the
 organization names it, they follow, and the next sync updates them in place and
 retires the ones the repository no longer declares. They never merge into a
-repository that already has definitions of its own.
+repository that already has definitions of its own. A reviewed schedule (#2463)
+approved a review that includes each definition's repository and version, so
+once its definitions move it skips every fire ("reviewed schedule requires a
+new review or current authority") until someone approves it again.
 
 The change then runs autowire against the repository. The workflow sync
 re-points the push role's trust and rewrites the app's workflow, whose
