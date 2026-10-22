@@ -4,8 +4,11 @@ Owned AWS role reconciliation and verification use `driver_op` for operation
 counts, durations, spans and entry heartbeats. Reconciliation also emits the
 existing best-effort audit event. All keyword arguments are redacted: role
 names, grants, GUID ownership and service-account subjects are private metadata.
-The Azure owned-reconciler factory records an operation without an effect audit
-or heartbeat; creating a reconciler does not establish native readiness.
+The Azure owned-reconciler and owned-provisioner factories record an operation
+without an effect audit or heartbeat; creating a port does not establish native
+readiness. The Azure owned ports' effects, `AzureIdentityProvisioner.ensure`,
+`AzureOwnedIdentityDriver.reconcile` and `AzureOwnedIdentityDriver.remove`, emit
+the same best-effort audit event with every keyword argument redacted (#2279).
 
 These operations opt into `redact_errors=True`. Their logs contain the exception
 class without its message or traceback; spans retain a fixed error status without
