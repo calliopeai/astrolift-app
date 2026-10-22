@@ -61,8 +61,11 @@ def test_real_cadvisor_network_reads_only_the_workloads_own_pods(native, kind_pr
     world, _, _, core, _ = native
     namespace = world.environment.k8s_namespace
     api, worker = membership(native)[0], membership(native, world.other)[0]
-    # Bytes count from a full rate window after the newest pod started.
-    while time.time() < max(api.started_at, worker.started_at) + 125:
+    # The window opens a full rate window after the newest pod started, and
+    # cAdvisor collects each pod's stats every 10-15 s with its own
+    # timestamps: ping once the window already holds a couple of
+    # collections, or the jump falls before its first sample.
+    while time.time() < max(api.started_at, worker.started_at) + 120 + 35:
         time.sleep(1)
     worker_ip = core.read_namespaced_pod(worker.pod_name, namespace).status.pod_ip
     output = stream(
@@ -77,14 +80,18 @@ def test_real_cadvisor_network_reads_only_the_workloads_own_pods(native, kind_pr
         tty=False,
     )
     assert f"{PINGS} packets received" in output, output
-    # The kubelet refreshes container stats every 10-15 s; Prometheus scrapes each second.
-    deadline = time.monotonic() + 90
-    while True:
-        data, series = read(world, reader, workload="api")
-        if series["TRANSMIT"]["totalBytes"] and series["TRANSMIT"]["totalBytes"] >= PING_BYTES:
-            break
-        assert time.monotonic() < deadline, series
-        time.sleep(3)
+
+    def settled(workload, direction):
+        # The kubelet refreshes each pod's stats every 10-15 s; Prometheus scrapes each second.
+        deadline = time.monotonic() + 90
+        while True:
+            data, series = read(world, reader, workload=workload)
+            if (series[direction]["totalBytes"] or 0) >= PING_BYTES:
+                return data, series
+            assert time.monotonic() < deadline, series
+            time.sleep(3)
+
+    data, series = settled("api", "TRANSMIT")
     assert data["reason"] == "OK"
     for row in series.values():
         measured = row["measurement"]
@@ -101,12 +108,11 @@ def test_real_cadvisor_network_reads_only_the_workloads_own_pods(native, kind_pr
     # Echo requests leave the api pod and replies come back.
     assert series["RECEIVE"]["totalBytes"] >= PING_BYTES
 
-    _, sibling = read(world, reader, workload=world.other.slug)
+    _, sibling = settled(world.other.slug, "RECEIVE")
     assert [c["podUid"] for c in sibling["RECEIVE"]["measurement"]["containers"]] == [worker.pod_uid]
-    assert sibling["RECEIVE"]["totalBytes"] >= PING_BYTES
     assert api.pod_name not in sibling["RECEIVE"]["promql"]
 
-    environment, total = read(world, reader)
+    environment, total = settled(None, "RECEIVE")
     assert environment["reason"] == "OK"
     assert total["RECEIVE"]["measurement"]["identityBasis"] == "NAMESPACE"
     assert total["RECEIVE"]["promql"].count(f'namespace="{namespace}"') == 1
