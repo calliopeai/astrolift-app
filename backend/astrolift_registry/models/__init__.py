@@ -4,6 +4,7 @@ from astrolift_registry.models.brain_app_binding import BrainAppBinding
 from astrolift_registry.models.brain_creation import BrainCreation, BrainSubstrate
 from astrolift_registry.models.brain_run_binding import BrainRunBinding
 from astrolift_registry.models.brain_token_key import BrainTokenKey
+from astrolift_registry.models.brain_typed_token_rollout import BrainTypedTokenRollout
 from astrolift_registry.models.container import Container
 from astrolift_registry.models.hostname_claim import HostnameClaim
 from astrolift_registry.models.registered_app import RegisteredApp
@@ -18,6 +19,7 @@ __all__ = [
     "BrainRunBinding",
     "BrainSubstrate",
     "BrainTokenKey",
+    "BrainTypedTokenRollout",
     "AppTeamAccess",
     "Container",
     "HostnameClaim",

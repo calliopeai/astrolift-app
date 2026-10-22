@@ -12,6 +12,9 @@ app and brain are live, which is how deleting any of them revokes it.
 A key with a ``run_binding`` signs only the tokens one agent run reads one
 brain with (#2432); it is published while the run is in flight and the
 binding and brain are live.
+
+``typed_contract`` marks a hosted-app deployment key that signed a typed
+token (#2470): while one is published, the brain's consumer stays staged.
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ class BrainTokenKey(BaseCoreModel):
         blank=True,
         on_delete=models.CASCADE,
     )
+    typed_contract = models.CharField(max_length=8, blank=True, default="", db_default="")
 
     def __str__(self) -> str:
         return f"BrainTokenKey({self.kid})"
