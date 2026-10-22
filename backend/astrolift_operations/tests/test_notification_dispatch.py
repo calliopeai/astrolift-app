@@ -631,8 +631,8 @@ def test_resolve_driver_for_recipient_uses_active_profile(monkeypatch):
     class _Stub:
         name = "aws_sns"
 
-    def fake_build(*, driver_slug, config):
-        built.append((driver_slug, config))
+    def fake_build(*, driver_slug, config, organization_id):
+        built.append((driver_slug, config, organization_id))
         return _Stub()
 
     monkeypatch.setattr(
@@ -652,6 +652,8 @@ def test_resolve_driver_for_recipient_uses_active_profile(monkeypatch):
                     "android": "arn:aws:sns:us-west-2:111:app/GCM/android",
                 },
             },
+            # The organization locates its secret files (#2256).
+            org.id,
         )
     ]
 

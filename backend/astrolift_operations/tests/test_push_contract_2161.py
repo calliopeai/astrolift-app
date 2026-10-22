@@ -10,7 +10,9 @@ Postgres, from the real dispatcher and the real push drivers:
   and deregister kinds have a template but no emitter yet; they are emitted
   with the payload keys their templates read.
 * ``deliveries``: the alert notification as each driver sends it to iOS and
-  Android, captured by a recording transport.
+  Android, captured by a recording transport. Direct APNs (#2256) sends to
+  iOS only; its request is recorded whole, with the per-send provider token
+  and notification id replaced by placeholders.
 * ``routing``: two installs that both hold an app called ``web``, and what a
   client must do with each payload (``docs/mobile-push-contract.md``).
 
@@ -22,6 +24,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -31,10 +34,13 @@ import pytest
 from _sdk.notification import DevicePlatform, NotificationPayload, PushTarget
 from aws.notification_sns import SNSNotificationConfig, SNSNotificationDriver
 from azure.notification_anh import AzureNotificationHubsConfig, AzureNotificationHubsDriver
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from gcp.notification_fcm import FCMConfig, FCMNotificationDriver
+from k8s_native.notification_apns import APNsConfig, APNsNotificationDriver, APNsResponse
 from k8s_native.notification_otlp import WebhookSMTPConfig, WebhookSMTPNotificationDriver
 
 import core.events as _events_mod
@@ -355,6 +361,54 @@ class _RecordingSns:
         return {"MessageId": "sns-message-1"}
 
 
+class _RecordingApns:
+    def __init__(self) -> None:
+        self.posts: list[tuple[str, dict[str, str], dict[str, Any]]] = []
+
+    def post(self, *, url: str, headers: dict[str, str], body: bytes) -> APNsResponse:
+        self.posts.append((url, dict(headers), json.loads(body)))
+        return APNsResponse(200, "apns-id-1")
+
+
+def _apns_request(payload: NotificationPayload) -> dict[str, Any]:
+    """The direct APNs request for iOS. The provider token is signed afresh
+    (ES256 is randomised) and the notification id is per send, so both are
+    checked here and recorded as placeholders."""
+    key = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+    apns = _RecordingApns()
+    driver = APNsNotificationDriver(
+        config=APNsConfig(
+            team_id="A1B2C3D4E5",
+            key_id="K1L2M3N4O5",
+            topic="com.example.astrolift",
+            environment="production",
+            auth_key=key.decode("ascii"),
+            transport=apns,
+            clock=NOW.timestamp,
+        )
+    )
+    token = "a1b2c3d4" * 8
+    result = driver.send(
+        target=PushTarget(registration_id=token, platform=DevicePlatform.IOS), payload=payload
+    )
+    assert result.status == "delivered", result
+    [(url, headers, body)] = apns.posts
+    assert re.fullmatch(r"bearer [\w-]+\.[\w-]+\.[\w-]+", headers["authorization"])
+    assert headers["apns-collapse-id"] == headers["apns-id"]
+    return {
+        "url": url,
+        "headers": {
+            **headers,
+            "authorization": "bearer <ES256 provider token>",
+            "apns-id": "<per-send UUID>",
+            "apns-collapse-id": "<apns-id>",
+        },
+        "body": body,
+    }
+
+
 def _deliveries(payload: NotificationPayload) -> list[dict[str, Any]]:
     """The alert notification as each driver sends it, per mobile platform."""
     out: list[dict[str, Any]] = []
@@ -429,6 +483,8 @@ def _deliveries(payload: NotificationPayload) -> list[dict[str, Any]]:
     )
     send(bridge, DevicePlatform.ANDROID, "bridge-registration-1")
     out.append({"driver": "otlp_webhook", "platform": "android", "request": http.posts[0][1]})
+
+    out.append({"driver": "apns", "platform": "ios", "request": _apns_request(payload)})
     return out
 
 

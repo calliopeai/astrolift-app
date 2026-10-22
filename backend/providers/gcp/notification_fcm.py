@@ -6,10 +6,11 @@ too -- FCM dispatches to APNs on the operator's behalf via the
 APNs Auth Key the operator uploads to the Firebase console.
 
 The driver authenticates with a Google service-account access
-token. Tokens are minted out-of-band by ``GCPCredentialProvider``
-(the same chain GCP's other drivers use); the driver accepts a
-pre-minted token or a token-callable so tests don't need real
-Google auth.
+token. It accepts a pre-minted token or a token-callable so tests
+don't need real Google auth. Outside GCP (#2256) the callable is
+:func:`service_account_token_provider`: it mints tokens from the
+operator's service-account JSON key, so FCM needs no GCP workload
+identity and no relay.
 
 FCM HTTP v1 endpoint shape:
 
@@ -26,9 +27,11 @@ FCM HTTP v1 endpoint shape:
         "webpush": { ... }
     } }
 
-The driver returns ``invalid_token`` when FCM responds with
-``UNREGISTERED`` / ``INVALID_ARGUMENT`` on the token field. The
-dispatcher uses that to mark the device row revoked.
+The driver returns ``invalid_token`` only when FCM answers
+``UNREGISTERED`` (the ``FcmError`` detail of a 404), the code FCM
+documents for a token that is gone. The dispatcher uses that to mark
+the device row revoked. A ``NOT_FOUND`` without that code says
+nothing about the token, so it fails instead of pruning.
 
 Channel coverage in this driver:
 
@@ -45,7 +48,10 @@ Channel coverage in this driver:
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
+import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -72,6 +78,82 @@ from _sdk.notification import (
 )
 
 _FCM_ENDPOINT_TMPL = "https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
+_FCM_CODE = re.compile(r"[A-Z][A-Z_]{0,63}")
+
+
+class FCMCredentialsError(ValueError):
+    """A service-account key that cannot mint FCM tokens. Messages never
+    carry key material."""
+
+
+# One google-auth Credentials per service-account key, keyed by
+# (client_email, private_key_id, sha256 of the private key), with a lock that
+# serialises its refresh. The dispatcher builds a driver per event; the
+# shared credentials keep that from minting a token per event.
+_SERVICE_ACCOUNTS: dict[tuple[str, str, str], tuple[Any, threading.Lock]] = {}
+_SERVICE_ACCOUNTS_LOCK = threading.Lock()
+
+
+def service_account_token_provider(
+    service_account_json: str,
+    *,
+    request: Any | None = None,
+) -> Callable[[], str]:
+    """Bearer tokens for FCM HTTP v1 from a Google service-account JSON key.
+
+    The key's account needs permission to send through the Firebase project
+    (``cloudmessaging.messages.create``, in the "Firebase Cloud Messaging API
+    Admin" role). Tokens carry the ``firebase.messaging`` scope and are
+    refreshed when google-auth reports them stale, a few minutes before
+    Google's one-hour expiry. ``request`` is google-auth's HTTP transport;
+    ``None`` uses ``google.auth.transport.requests``.
+    """
+    try:
+        info = json.loads(service_account_json)
+    except ValueError:
+        raise FCMCredentialsError("service-account key is not JSON") from None
+    if not isinstance(info, dict) or info.get("type") != "service_account":
+        raise FCMCredentialsError('service-account key must be a JSON object with "type": "service_account"')
+    missing = [key for key in ("client_email", "private_key", "token_uri") if not info.get(key)]
+    if missing:
+        raise FCMCredentialsError(f"service-account key is missing {', '.join(missing)}")
+
+    from google.oauth2 import service_account
+
+    cache_key = (
+        str(info["client_email"]),
+        str(info.get("private_key_id", "")),
+        hashlib.sha256(str(info["private_key"]).encode("utf-8")).hexdigest(),
+    )
+    with _SERVICE_ACCOUNTS_LOCK:
+        cached = _SERVICE_ACCOUNTS.get(cache_key)
+        if cached is None:
+            try:
+                credentials = service_account.Credentials.from_service_account_info(  # type: ignore[no-untyped-call]
+                    info, scopes=[FCM_SCOPE]
+                )
+            except (ValueError, TypeError) as exc:
+                raise FCMCredentialsError("service-account private_key is not a usable RSA key") from exc
+            cached = (credentials, threading.Lock())
+            _SERVICE_ACCOUNTS[cache_key] = cached
+    credentials, refresh_lock = cached
+
+    def token() -> str:
+        from google.auth.credentials import TokenState
+
+        with refresh_lock:
+            if credentials.token_state != TokenState.FRESH:
+                credentials.refresh(request if request is not None else _google_request())
+            return str(credentials.token)
+
+    return token
+
+
+def _google_request() -> Any:
+    from google.auth.transport.requests import Request
+
+    return Request()
 
 
 @dataclass(frozen=True)
@@ -250,6 +332,17 @@ class FCMNotificationDriver(NotificationDriver):
             err_obj = body.get("error") or {}
             err_status = (err_obj.get("status") or "").upper()
             details = err_obj.get("details") or []
+            # FCM's status and error code name the cause (SENDER_ID_MISMATCH
+            # is a token from another Firebase project); the HTTP reason
+            # phrase does not. Only code-shaped values are echoed.
+            reasons = [err_status] + [
+                detail["errorCode"]
+                for detail in details
+                if isinstance(detail, dict) and isinstance(detail.get("errorCode"), str)
+            ]
+            reasons = [reason for reason in reasons if _FCM_CODE.fullmatch(reason)]
+            if reasons:
+                message = f"{message} ({' '.join(reasons)})"
             for detail in details:
                 if not isinstance(detail, dict):
                     continue
@@ -258,7 +351,7 @@ class FCMNotificationDriver(NotificationDriver):
                     retriable = False
                     break
             else:
-                if err_status in {"UNREGISTERED", "NOT_FOUND"}:
+                if err_status == "UNREGISTERED":
                     status = "invalid_token"
                     retriable = False
                 elif err_status in {
@@ -269,6 +362,7 @@ class FCMNotificationDriver(NotificationDriver):
                     retriable = True
                 elif err_status in {
                     "INVALID_ARGUMENT",
+                    "NOT_FOUND",
                     "PERMISSION_DENIED",
                     "UNAUTHENTICATED",
                 }:

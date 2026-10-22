@@ -222,6 +222,39 @@
         "platform": "android",
         "registration_id": "bridge-registration-1"
       }
+    },
+    {
+      "driver": "apns",
+      "platform": "ios",
+      "request": {
+        "body": {
+          "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+          "aps": {
+            "alert": {
+              "body": "5xx surge is firing",
+              "title": "CRITICAL \u00b7 5xx surge"
+            },
+            "category": "alert.fired",
+            "sound": "default"
+          },
+          "event_kind": "alert.fired",
+          "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+          "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+          "payload_version": "1",
+          "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+          "target_kind": "alert_event"
+        },
+        "headers": {
+          "apns-collapse-id": "<apns-id>",
+          "apns-expiration": "1792756800",
+          "apns-id": "<per-send UUID>",
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+          "apns-topic": "com.example.astrolift",
+          "authorization": "bearer <ES256 provider token>"
+        },
+        "url": "https://api.push.apple.com/3/device/a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4"
+      }
     }
   ],
   "documentation": "docs/mobile-push-contract.md",
