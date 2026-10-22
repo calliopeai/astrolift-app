@@ -21,9 +21,9 @@ the next task from it.
 ## Build on a published agent image
 
 The control plane does not inspect an image before it runs it. The runner, the
-harness CLI and the `agent` user must already be inside, as the
-[agent image contract](https://github.com/calliopeai/astrolift-agents/blob/main/AGENT-IMAGE-CONTRACT.md)
-lists. Add a thin layer to a published runtime image,
+harness CLI and the `agent` user must already be inside, as the agent image
+contract lists; every published agent image carries that contract as the
+`astrolift-agent-contract` script. Add a thin layer to a published runtime image,
 `docker.io/calliopeai/astrolift-agent-<runtime>`, pinned to its immutable
 `main-<commit>` tag or a digest; `latest` moves with every published build.
 
@@ -111,16 +111,13 @@ repositories need. What each part is for:
 - **Lineage.** The base's labels say `lineage="platform"`. Set your own, so
   `docker inspect` on a running image says who built it.
 
-Check the build with the contract's runtime tier, as the image's default user and
-again the way non-root mode runs it:
+Check the build with the contract's runtime tier, which the image inherits from its
+base, as the image's default user and again the way non-root mode runs it:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/calliopeai/astrolift-agents/main/scripts/agent-image-contract.sh
-docker run --rm -v "$PWD/agent-image-contract.sh:/tmp/c.sh:ro" \
-    --entrypoint /bin/sh <image> /tmp/c.sh runtime
+docker run --rm --entrypoint astrolift-agent-contract <image> runtime
 docker run --rm --user 42042:42042 --cap-drop ALL --security-opt no-new-privileges \
-    -v "$PWD/agent-image-contract.sh:/tmp/c.sh:ro" \
-    --entrypoint /bin/sh <image> /tmp/c.sh runtime
+    --entrypoint astrolift-agent-contract <image> runtime
 ```
 
 Then build one of your crates for `wasm32-unknown-unknown` with the same
