@@ -182,14 +182,18 @@ class _ProviderToken:
     issued_at: float
 
 
-# Keyed by (team id, key id, sha256 of the key): a rotated key gets its own.
+# Keyed by (team id, key id, the key's fingerprint): a rotated key gets its
+# own. The fingerprint is the key's, not its file's, so one key copied into
+# two organizations' Secrets with other line endings still signs one token.
 _TOKENS: dict[tuple[str, str, str], _ProviderToken] = {}
 _TOKENS_LOCK = threading.Lock()
 
-# Keyed by (endpoint, team id, key id, timeout). Apple asks providers to keep
-# connections open, and refuses a connection whose provider tokens change key
-# (``UnrelatedKeyIdInToken``), so each key gets its own client.
-_TRANSPORTS: dict[tuple[str, str, str, float], APNsTransport] = {}
+# Keyed by (endpoint, team id, key id, the key's fingerprint, timeout). Apple
+# asks providers to keep connections open, refuses a connection whose provider
+# tokens change key (``UnrelatedKeyIdInToken``), and errors when a connection
+# sees a new token more often than every 20 minutes. So each key gets its own
+# client, and a profile naming another key's ids never shares its connection.
+_TRANSPORTS: dict[tuple[str, str, str, str, float], APNsTransport] = {}
 _TRANSPORTS_LOCK = threading.Lock()
 
 _RETRY_NONE = "none"
@@ -206,15 +210,13 @@ class APNsNotificationDriver(NotificationDriver):
         self._config = config
         self._key = _load_auth_key(config.auth_key)
         self._endpoint = APNS_ENDPOINTS[config.environment]
-        self._token_key = (
-            config.team_id,
-            config.key_id,
-            hashlib.sha256(config.auth_key.encode("utf-8")).hexdigest(),
-        )
+        fingerprint = _key_fingerprint(self._key)
+        self._token_key = (config.team_id, config.key_id, fingerprint)
         self._transport = config.transport or _shared_transport(
             endpoint=self._endpoint,
             team_id=config.team_id,
             key_id=config.key_id,
+            key_fingerprint=fingerprint,
             timeout=config.timeout_seconds,
         )
 
@@ -486,6 +488,12 @@ def _load_auth_key(pem: str) -> EllipticCurvePrivateKey:
     return key
 
 
+def _key_fingerprint(key: EllipticCurvePrivateKey) -> str:
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    return hashlib.sha256(key.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)).hexdigest()
+
+
 class _DeviceTokenLogFilter(logging.Filter):
     """httpx logs every request's URL at INFO, and an APNs request's path is the
     device token, so the token is replaced before the record is emitted."""
@@ -536,8 +544,10 @@ class _HttpxTransport:
         )
 
 
-def _shared_transport(*, endpoint: str, team_id: str, key_id: str, timeout: float) -> APNsTransport:
-    key = (endpoint, team_id, key_id, timeout)
+def _shared_transport(
+    *, endpoint: str, team_id: str, key_id: str, key_fingerprint: str, timeout: float
+) -> APNsTransport:
+    key = (endpoint, team_id, key_id, key_fingerprint, timeout)
     with _TRANSPORTS_LOCK:
         transport = _TRANSPORTS.get(key)
         if transport is None:

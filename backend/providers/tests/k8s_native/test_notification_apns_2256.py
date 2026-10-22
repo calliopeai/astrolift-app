@@ -466,6 +466,33 @@ def test_the_default_transport_is_one_http2_client_per_key(monkeypatch, clock, k
     assert created == [{"http2": True, "timeout": 10.0}, {"http2": True, "timeout": 10.0}]
 
 
+def test_each_connection_carries_one_keys_token_whatever_its_file_looks_like(monkeypatch, clock, key) -> None:
+    # Organizations' Secrets can hold one .p8 with other line endings or no
+    # final newline, and any profile can name a key id. Apple reports an error
+    # when a connection sees a new provider token more often than every 20
+    # minutes, so one key signs one token, and another key gets its own client.
+    created: list[Any] = []
+
+    class RecordingTransport:
+        def __init__(self, *, timeout: float) -> None:
+            self.authorizations: list[str] = []
+            created.append(self)
+
+        def post(self, *, url: str, headers: dict[str, str], body: bytes) -> APNsResponse:
+            self.authorizations.append(headers["authorization"])
+            return APNsResponse(200, "apple-id-1")
+
+    monkeypatch.setattr(notification_apns, "_HttpxTransport", RecordingTransport)
+    pem = _p8(key)
+    impostor = _p8(ec.generate_private_key(ec.SECP256R1()))
+    for auth_key in (pem, pem.replace("\n", "\r\n"), pem.rstrip("\n"), impostor):
+        config = APNsConfig("TEAM123456", "KEY1234567", "com.example.astrolift", "production", auth_key, clock=clock)
+        assert _send(APNsNotificationDriver(config=config)).status == "delivered"
+
+    assert [len(transport.authorizations) for transport in created] == [3, 1]
+    assert [len(set(transport.authorizations)) for transport in created] == [1, 1]
+
+
 def test_the_default_transport_reads_status_apns_id_and_reason() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/gone"):
