@@ -762,22 +762,24 @@ def _vnc_image(image: str) -> str:
 
     A digest-pinned ref (``...@sha256:...``) must be split on ``@``: the
     digest itself contains a ``:`` so an rpartition on ``:`` would slice
-    inside the digest and yield a corrupt, unpullable ref. Otherwise the
-    tag separator is the last ``:`` that is not part of a registry
-    ``host:port`` (it must come after the last ``/``). Idempotent: an
-    already ``-vnc`` repo is returned unchanged.
+    inside the digest and yield a corrupt, unpullable ref. The part before
+    the ``@`` may carry a tag as well (``repo:tag@sha256:...``); a registry
+    pulls such a ref by its digest alone, so the ``-vnc`` goes on that
+    part's repository, never on its tag, which would run the non-VNC
+    repository (#2491). Otherwise the tag separator is the last ``:`` that
+    is not part of a registry ``host:port`` (it must come after the last
+    ``/``). Idempotent: an already ``-vnc`` repo is returned unchanged.
     """
-    # Digest-pinned ref: everything before "@" is the repo, the rest
-    # (including its internal ":") is the digest and must stay intact.
+    # Digest-pinned ref: everything before "@" is the name (a repo, maybe
+    # with a tag), the rest (including its internal ":") is the digest and
+    # must stay intact.
     if "@" in image:
-        repo, sep, digest = image.partition("@")
-        if repo.endswith("-vnc"):
-            return image
-        return f"{repo}-vnc{sep}{digest}"
+        name, sep, digest = image.partition("@")
+        return f"{_vnc_image(name)}{sep}{digest}"
 
     repo, sep, tag = image.rpartition(":")
     # A ":" before the final "/" is a registry port, not a tag separator.
-    if not sep or "/" not in repo or "/" in tag:
+    if not sep or "/" in tag:
         repo, sep, tag = image, "", ""
     if repo.endswith("-vnc"):
         return image

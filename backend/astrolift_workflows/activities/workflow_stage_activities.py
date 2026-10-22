@@ -42,6 +42,7 @@ import uuid
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 from workflows.stage_incarnations import StageIncarnation
 
 log = logging.getLogger("astrolift_workflows.activities.workflow_stage")
@@ -1547,16 +1548,17 @@ async def get_workflow_stages(params: str | dict) -> dict:
     """Return ``{pattern_kind, stages: [ordered stage dicts]}``."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
     if isinstance(params, str):
-        return await sync_to_async(_get_workflow_stages_sync)(params)
-    return await sync_to_async(_get_workflow_stages_sync)(
-        str(params["workflow_definition_slug"]),
-        params.get("workflow_run_id"),
-        params.get("stage_bindings"),
-        params.get("workflow_definition_id"),
-        params.get("workflow_ancestry"),
-        review_bounded_loops=bool(params.get("bounded_loops", False)),
+        return await heartbeat_while(sync_to_async(_get_workflow_stages_sync)(params))
+    return await heartbeat_while(
+        sync_to_async(_get_workflow_stages_sync)(
+            str(params["workflow_definition_slug"]),
+            params.get("workflow_run_id"),
+            params.get("stage_bindings"),
+            params.get("workflow_definition_id"),
+            params.get("workflow_ancestry"),
+            review_bounded_loops=bool(params.get("bounded_loops", False)),
+        )
     )
 
 
@@ -1569,11 +1571,12 @@ async def create_nested_workflow_run(
     """Create or return a linked nested WorkflowRun mirror."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_create_nested_workflow_run_sync)(
-        parent_workflow_run_id,
-        stage_execution_id,
-        child_definition_id,
+    return await heartbeat_while(
+        sync_to_async(_create_nested_workflow_run_sync)(
+            parent_workflow_run_id,
+            stage_execution_id,
+            child_definition_id,
+        )
     )
 
 
@@ -1585,10 +1588,11 @@ async def record_nested_workflow_start(
     """Record the child handle's first execution run id for observability."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_record_nested_workflow_start_sync)(
-        child_workflow_run_id,
-        temporal_run_id,
+    await heartbeat_while(
+        sync_to_async(_record_nested_workflow_start_sync)(
+            child_workflow_run_id,
+            temporal_run_id,
+        )
     )
 
 
@@ -1602,18 +1606,19 @@ async def create_stage_execution(
     """Create a RUNNING WorkflowStageExecution; return its pk as str."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
     source = activity.info()
     if source.workflow_namespace is None or source.workflow_id is None or source.workflow_run_id is None:
         raise ValueError("Stage creation requires a workflow activity identity")
-    return await sync_to_async(_create_stage_execution_sync)(
-        workflow_run_id,
-        stage_id,
-        attempt_number,
-        context,
-        temporal_identity=StageIncarnation(
-            source.workflow_namespace, source.workflow_id, source.workflow_run_id, source.activity_id
-        ),
+    return await heartbeat_while(
+        sync_to_async(_create_stage_execution_sync)(
+            workflow_run_id,
+            stage_id,
+            attempt_number,
+            context,
+            temporal_identity=StageIncarnation(
+                source.workflow_namespace, source.workflow_id, source.workflow_run_id, source.activity_id
+            ),
+        )
     )
 
 
@@ -1627,8 +1632,7 @@ async def update_stage_execution(
     """Transition an execution row to ``status`` with optional output/error."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_update_stage_execution_sync)(execution_id, status, output, error)
+    await heartbeat_while(sync_to_async(_update_stage_execution_sync)(execution_id, status, output, error))
 
 
 @activity.defn(name="astrolift.workflow_stage.dispatch_agent_for_stage")
@@ -1641,12 +1645,13 @@ async def dispatch_agent_for_stage(
     """Create an AgentRun + dispatch an AgentTask; return the AgentRun pk."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_dispatch_agent_for_stage_sync, thread_sensitive=False)(
-        stage_id,
-        execution_id,
-        trigger_payload,
-        resolved_config,
+    return await heartbeat_while(
+        sync_to_async(_dispatch_agent_for_stage_sync, thread_sensitive=False)(
+            stage_id,
+            execution_id,
+            trigger_payload,
+            resolved_config,
+        )
     )
 
 
@@ -1675,8 +1680,7 @@ def _poll_agent_run_progress_sync(agent_run_id: str) -> dict:
 async def poll_agent_run_progress(agent_run_id: str) -> dict:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_poll_agent_run_progress_sync)(agent_run_id)
+    return await heartbeat_while(sync_to_async(_poll_agent_run_progress_sync)(agent_run_id))
 
 
 @activity.defn(name="astrolift.workflow_stage.poll_agent_run_status")
@@ -1684,8 +1688,7 @@ async def poll_agent_run_status(agent_run_id: str) -> str:
     """Return the current AgentRun status, reconciling the dispatched task."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_poll_agent_run_status_sync)(agent_run_id)
+    return await heartbeat_while(sync_to_async(_poll_agent_run_status_sync)(agent_run_id))
 
 
 @activity.defn(name="astrolift.workflow_stage.load_agent_run_outcome")
@@ -1693,8 +1696,7 @@ async def load_agent_run_outcome(agent_run_id: str) -> dict:
     """Load the terminal AgentTask callback result for stage chaining."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_load_agent_run_outcome_sync)(agent_run_id)
+    return await heartbeat_while(sync_to_async(_load_agent_run_outcome_sync)(agent_run_id))
 
 
 @activity.defn(name="astrolift.workflow_stage.record_human_gate_decision")
@@ -1708,7 +1710,6 @@ async def record_human_gate_decision(
     """Persist a human-gate ``approved``/``rejected`` outcome on the row."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
     identity = None
     if request is not None:
         source = activity.info()
@@ -1717,8 +1718,10 @@ async def record_human_gate_decision(
         identity = StageIncarnation(
             source.workflow_namespace, source.workflow_id, source.workflow_run_id, source.activity_id
         )
-    await sync_to_async(_record_human_gate_decision_sync)(
-        execution_id, decision, decided_by_user_id, note, request, temporal_identity=identity
+    await heartbeat_while(
+        sync_to_async(_record_human_gate_decision_sync)(
+            execution_id, decision, decided_by_user_id, note, request, temporal_identity=identity
+        )
     )
 
 
@@ -1732,8 +1735,9 @@ async def snapshot_checkpoint(
     """Create a COMPLETED checkpoint execution snapshotting prior output."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_snapshot_checkpoint_sync)(workflow_run_id, stage_id, previous_output, context)
+    return await heartbeat_while(
+        sync_to_async(_snapshot_checkpoint_sync)(workflow_run_id, stage_id, previous_output, context)
+    )
 
 
 @activity.defn(name="astrolift.workflow_stage.aggregate_fan_out")
@@ -1746,9 +1750,8 @@ async def aggregate_fan_out(
     """Merge fan-out source outputs into one AGGREGATION execution."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_aggregate_fan_out_sync)(
-        workflow_run_id, stage_id, source_execution_ids, context
+    return await heartbeat_while(
+        sync_to_async(_aggregate_fan_out_sync)(workflow_run_id, stage_id, source_execution_ids, context)
     )
 
 
@@ -1762,5 +1765,4 @@ async def mark_workflow_run(
     """Move the WorkflowRun mirror to a terminal status."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_workflow_run_sync)(workflow_run_id, status, result, failure)
+    await heartbeat_while(sync_to_async(_mark_workflow_run_sync)(workflow_run_id, status, result, failure))

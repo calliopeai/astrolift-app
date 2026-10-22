@@ -84,6 +84,7 @@ with workflow.unsafe.imports_passed_through():
         snapshot_checkpoint,
         update_stage_execution,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
     from workflows.back_edges import (
         MAX_STAGE_VISITS,
         SUPPORTED_EXECUTOR_PATTERNS,
@@ -422,6 +423,7 @@ class WorkflowDefinitionRunWorkflow:
             get_workflow_stages,
             plan_params,
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         pattern_kind: str = plan["pattern_kind"]
@@ -576,6 +578,7 @@ class WorkflowDefinitionRunWorkflow:
             create_stage_execution,
             args=args,
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         self._current_stage_execution_id = execution_id
@@ -779,6 +782,7 @@ class WorkflowDefinitionRunWorkflow:
                             update_stage_execution,
                             args=[execution_id, STATUS_FAILED, None, str(exc)],
                             start_to_close_timeout=_DB_TIMEOUT,
+                            heartbeat_timeout=HEARTBEAT_TIMEOUT,
                             retry_policy=_DB_RETRY,
                         )
                         raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
@@ -786,6 +790,7 @@ class WorkflowDefinitionRunWorkflow:
                         update_stage_execution,
                         args=[execution_id, STATUS_COMPLETED, output, None],
                         start_to_close_timeout=_DB_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         retry_policy=_DB_RETRY,
                     )
                 else:
@@ -796,6 +801,7 @@ class WorkflowDefinitionRunWorkflow:
                         update_stage_execution,
                         args=[self._current_stage_execution_id, STATUS_FAILED, None, str(exc)],
                         start_to_close_timeout=_DB_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         retry_policy=_DB_RETRY,
                     )
                 raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
@@ -892,6 +898,7 @@ class WorkflowDefinitionRunWorkflow:
             update_stage_execution,
             args=[parent, "running", {"collection": binding}, None],
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         context = {
@@ -998,6 +1005,7 @@ class WorkflowDefinitionRunWorkflow:
                         message,
                     ],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 raise _WorkflowAbort(
@@ -1015,6 +1023,7 @@ class WorkflowDefinitionRunWorkflow:
             update_stage_execution,
             args=[parent, STATUS_COMPLETED, output, None],
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         self._current_stage_execution_id = parent
@@ -1043,6 +1052,7 @@ class WorkflowDefinitionRunWorkflow:
                     "round limit reached",
                 ],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
             if await self._wait_escalation_cleared(execution_id, max(1, stage["timeout_seconds"])):
@@ -1137,6 +1147,7 @@ class WorkflowDefinitionRunWorkflow:
                 None if complete else "fan-out incomplete",
             ],
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         self._current_stage_execution_id = parent_execution
@@ -1153,6 +1164,7 @@ class WorkflowDefinitionRunWorkflow:
             get_workflow_stages,
             input.workflow_definition_slug,
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         pattern_kind: str = plan["pattern_kind"]
@@ -1220,6 +1232,7 @@ class WorkflowDefinitionRunWorkflow:
                 create_stage_execution,
                 args=[input.workflow_run_id, stage["stage_id"], attempt],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
 
@@ -1228,6 +1241,7 @@ class WorkflowDefinitionRunWorkflow:
                     dispatch_agent_for_stage,
                     args=[stage["stage_id"], execution_id, previous_output or {}],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 run_status = await self._poll_agent_to_terminal(agent_run_id, timeout_seconds)
@@ -1247,6 +1261,7 @@ class WorkflowDefinitionRunWorkflow:
                     update_stage_execution,
                     args=[execution_id, decision.terminal_status, output, None],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 return output
@@ -1261,6 +1276,7 @@ class WorkflowDefinitionRunWorkflow:
                         f"attempt {attempt} failed ({run_status}); retrying",
                     ],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 attempt += 1
@@ -1271,6 +1287,7 @@ class WorkflowDefinitionRunWorkflow:
                     update_stage_execution,
                     args=[execution_id, STATUS_ESCALATED, None, "escalated to operator"],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 cleared = await self._wait_escalation_cleared(execution_id, timeout_seconds)
@@ -1285,6 +1302,7 @@ class WorkflowDefinitionRunWorkflow:
                 update_stage_execution,
                 args=[execution_id, STATUS_FAILED, None, f"stage failed ({run_status})"],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
             raise _WorkflowAbort(
@@ -1316,6 +1334,7 @@ class WorkflowDefinitionRunWorkflow:
                 update_stage_execution,
                 args=[execution_id, STATUS_FAILED, None, str(exc)],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
             raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
@@ -1356,6 +1375,7 @@ class WorkflowDefinitionRunWorkflow:
                         },
                     ],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 run_status = await self._poll_agent_to_terminal(agent_run_id, timeout_seconds)
@@ -1375,6 +1395,7 @@ class WorkflowDefinitionRunWorkflow:
                         load_agent_run_outcome,
                         agent_run_id,
                         start_to_close_timeout=_DB_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         retry_policy=_DB_RETRY,
                     )
                 else:
@@ -1399,6 +1420,7 @@ class WorkflowDefinitionRunWorkflow:
                     update_stage_execution,
                     args=[execution_id, decision.terminal_status, output, None],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 return output
@@ -1413,6 +1435,7 @@ class WorkflowDefinitionRunWorkflow:
                         f"attempt {attempt} failed ({run_status}); retrying",
                     ],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 attempt += 1
@@ -1423,6 +1446,7 @@ class WorkflowDefinitionRunWorkflow:
                     update_stage_execution,
                     args=[execution_id, STATUS_ESCALATED, None, "escalated to operator"],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 cleared = await self._wait_escalation_cleared(execution_id, timeout_seconds)
@@ -1440,6 +1464,7 @@ class WorkflowDefinitionRunWorkflow:
                         load_agent_run_outcome,
                         agent_run_id,
                         start_to_close_timeout=_DB_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         retry_policy=_DB_RETRY,
                     )
                 else:
@@ -1449,6 +1474,7 @@ class WorkflowDefinitionRunWorkflow:
                 update_stage_execution,
                 args=[execution_id, STATUS_FAILED, None, f"stage failed ({run_status})"],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
             raise _WorkflowAbort(
@@ -1473,6 +1499,7 @@ class WorkflowDefinitionRunWorkflow:
                     poll_agent_run_progress,
                     agent_run_id,
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 status = progress["status"]
@@ -1482,6 +1509,7 @@ class WorkflowDefinitionRunWorkflow:
                     poll_agent_run_status,
                     agent_run_id,
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 effective_deadline = deadline
@@ -1514,6 +1542,7 @@ class WorkflowDefinitionRunWorkflow:
                     stage["nested_definition_id"],
                 ],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
 
@@ -1538,6 +1567,7 @@ class WorkflowDefinitionRunWorkflow:
                     record_nested_workflow_start,
                     args=[child["workflow_run_id"], handle.first_execution_run_id],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 result = await handle
@@ -1568,6 +1598,7 @@ class WorkflowDefinitionRunWorkflow:
                         {"message": failure_message or "nested workflow failed"},
                     ],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
             persisted_output = {
@@ -1587,6 +1618,7 @@ class WorkflowDefinitionRunWorkflow:
                     update_stage_execution,
                     args=[execution_id, decision.terminal_status, persisted_output, None],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 return persisted_output
@@ -1596,6 +1628,7 @@ class WorkflowDefinitionRunWorkflow:
                     update_stage_execution,
                     args=[execution_id, STATUS_FAILED, persisted_output, failure_message],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 attempt += 1
@@ -1606,6 +1639,7 @@ class WorkflowDefinitionRunWorkflow:
                     update_stage_execution,
                     args=[execution_id, STATUS_ESCALATED, persisted_output, failure_message],
                     start_to_close_timeout=_DB_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_DB_RETRY,
                 )
                 cleared = await self._wait_escalation_cleared(execution_id, timeout_seconds)
@@ -1620,6 +1654,7 @@ class WorkflowDefinitionRunWorkflow:
                 update_stage_execution,
                 args=[execution_id, STATUS_FAILED, persisted_output, failure_message],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
             abort_data = {"execution_id": execution_id, **persisted_output}
@@ -1656,6 +1691,7 @@ class WorkflowDefinitionRunWorkflow:
                 record_human_gate_decision,
                 args=[execution_id, "rejected", None, "gate timed out"],
                 start_to_close_timeout=_DB_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
             raise _WorkflowAbort(
@@ -1676,6 +1712,7 @@ class WorkflowDefinitionRunWorkflow:
             record_human_gate_decision,
             args=decision_args,
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
 
@@ -1754,6 +1791,7 @@ class WorkflowDefinitionRunWorkflow:
             snapshot_checkpoint,
             args=checkpoint_args,
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         if self._bounded_loops_enabled:
@@ -1772,6 +1810,7 @@ class WorkflowDefinitionRunWorkflow:
             snapshot_checkpoint,
             args=[input.workflow_run_id, stage["stage_id"], previous_output or {}],
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         return previous_output or {}
@@ -1789,6 +1828,7 @@ class WorkflowDefinitionRunWorkflow:
             aggregate_fan_out,
             args=aggregation_args,
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
         if self._bounded_loops_enabled:
@@ -1960,6 +2000,7 @@ class WorkflowDefinitionRunWorkflow:
             mark_workflow_run,
             args=[run_id, status, result, failure],
             start_to_close_timeout=_DB_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
 

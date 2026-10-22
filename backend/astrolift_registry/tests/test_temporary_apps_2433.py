@@ -317,6 +317,135 @@ def test_host_app_on_brain_takes_an_expiry(world, armed, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# registerAppRepo: no expiry input, so each new app's comes from its manifest
+# ---------------------------------------------------------------------------
+
+
+def _repo_toml(name, expires_in=None):
+    app = f'[app]\nexpires_in = "{expires_in}"\n\n' if expires_in else ""
+    return (
+        f'name = "{name}"\n\n{app}[[workloads]]\nname = "{name}"\nkind = "deployment"\n\n'
+        f'[[workloads.containers]]\nname = "{name}"\nis_primary = true\nimage_ref = "nginx:1"\nport = 80\n'
+    )
+
+
+@pytest.fixture
+def repo(world, monkeypatch):
+    """The repo ``acme/stack``, read through the organization's connection:
+    set ``files`` to the manifests it holds."""
+    from types import SimpleNamespace
+
+    from astrolift_registry.services import manifest_sync
+    from astrolift_scm.models import SourceConnection
+
+    SourceConnection.objects.create(
+        organization=world.org,
+        kind=SourceConnection.Kind.GITHUB_PAT,
+        display_name="acme PAT",
+        account_login="acme",
+    )
+    state = SimpleNamespace(files={})
+    monkeypatch.setattr(manifest_sync, "_default_tree_fetch", lambda connection, name, ref: dict(state.files))
+    return state
+
+
+def _register_repo(world, user=None, token=None):
+    from astrolift_registry.schema.mutations import RegisterAppRepoInput
+
+    with _as(world, user, token) as info:
+        return RegistryMutation().register_app_repo(
+            info,
+            input=RegisterAppRepoInput(project_id=str(world.medops_project.guid), source_repo="acme/stack"),
+        )
+
+
+def _repo_apps(world):
+    return {
+        app.manifest_path: app
+        for app in RegisteredApp.objects.filter(organization=world.org, source_repo="acme/stack")
+    }
+
+
+def test_register_app_repo_takes_each_new_apps_expiry_from_its_manifest(world, repo, armed, audit):
+    repo.files = {
+        "apps/web/astrolift.toml": _repo_toml("web", expires_in="2h"),
+        "apps/api/astrolift.toml": _repo_toml("api"),
+    }
+    before = timezone.now()
+    result = _register_repo(world)
+    assert result.ok, result.errors
+    apps = _repo_apps(world)
+    web, api = apps["apps/web/astrolift.toml"], apps["apps/api/astrolift.toml"]
+    assert before + dt.timedelta(hours=2) <= web.expires_at <= timezone.now() + dt.timedelta(hours=2)
+    assert api.expires_at is None
+    # Its warnings reach whoever registered it.
+    assert web.created_by_id == api.created_by_id == world.user.pk
+    assert armed == [web.pk]
+    assert [row.target_id for row in audit if row.action == "app.expiry.set"] == [web.slug]
+
+
+def test_register_app_repo_holds_members_to_temporary_apps(world, repo, armed):
+    world.org.temporary_app_policy = {"temporary_only_for_members": True}
+    world.org.save(update_fields=["temporary_app_policy"])
+    member = make_user("tmp2433-repo-member")
+    bind_role(member, permissions=ALL, kind="ORG", scope_id=world.org.pk, slug="tmp-repo-member")
+    repo.files = {
+        "apps/web/astrolift.toml": _repo_toml("web", expires_in="1d"),
+        "apps/api/astrolift.toml": _repo_toml("api"),
+    }
+
+    refused = _register_repo(world, user=member)
+    assert refused.ok is False and refused.errors[0].code == "PERMISSION_DENIED"
+    message = refused.errors[0].message
+    assert "temporary apps only" in message and "[app] expires_in" in message
+    assert "apps/api/astrolift.toml" in message and "apps/web/astrolift.toml" not in message
+    # There is no expiresIn on this call to point at.
+    assert "expiresIn" not in message
+    # Nothing is half-registered.
+    assert _repo_apps(world) == {}
+    assert armed == []
+
+    repo.files["apps/api/astrolift.toml"] = _repo_toml("api", expires_in="4h")
+    allowed = _register_repo(world, user=member)
+    assert allowed.ok, allowed.errors
+    apps = _repo_apps(world)
+    assert set(apps) == {"apps/web/astrolift.toml", "apps/api/astrolift.toml"}
+    assert all(app.expires_at is not None and app.created_by_id == member.pk for app in apps.values())
+
+    # A re-run holds only the apps it would create to the policy.
+    repo.files["apps/api/astrolift.toml"] = _repo_toml("api")
+    repo.files["apps/worker/astrolift.toml"] = _repo_toml("worker", expires_in="1h")
+    again = _register_repo(world, user=member)
+    assert again.ok, again.errors
+    assert _repo_apps(world)["apps/worker/astrolift.toml"].expires_at is not None
+
+    # An org admin may still register a permanent app.
+    bind_role(
+        world.user, permissions=[Permission.ORG_UPDATE], kind="ORG", scope_id=world.org.pk, slug="adm-repo"
+    )
+    repo.files["apps/batch/astrolift.toml"] = _repo_toml("batch")
+    assert _register_repo(world).ok
+    assert _repo_apps(world)["apps/batch/astrolift.toml"].expires_at is None
+
+
+def test_register_app_repo_requires_an_expiry_on_a_required_surface(world, repo, armed):
+    world.org.temporary_app_policy = {"ttl_required_surfaces": ["api_token"]}
+    world.org.save(update_fields=["temporary_app_policy"])
+    token = _token(world, [SCOPE_READ_APPS, SCOPE_WRITE_APPS])
+    repo.files = {"astrolift.toml": _repo_toml("stack")}
+
+    refused = _register_repo(world, token=token)
+    assert refused.ok is False and refused.errors[0].code == "PERMISSION_DENIED"
+    assert "API tokens" in refused.errors[0].message and "astrolift.toml" in refused.errors[0].message
+    assert _repo_apps(world) == {}
+
+    repo.files = {"astrolift.toml": _repo_toml("stack", expires_in="1d")}
+    allowed = _register_repo(world, token=token)
+    assert allowed.ok, allowed.errors
+    assert _repo_apps(world)["astrolift.toml"].expires_at is not None
+
+
+# ---------------------------------------------------------------------------
 # setAppExpiry
 # ---------------------------------------------------------------------------
 

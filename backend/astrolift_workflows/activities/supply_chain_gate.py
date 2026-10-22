@@ -63,6 +63,7 @@ from astrolift_workflows.activities.image_scan import (
     get_scanner,
 )
 from astrolift_workflows.activities.image_signing import SigningDecision
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 
 log = logging.getLogger("astrolift_workflows.activities.supply_chain_gate")
 
@@ -459,5 +460,4 @@ async def evaluate_supply_chain_gate(deployment_id: int) -> dict:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_evaluate_supply_chain_gate_sync)(deployment_id)
+    return await heartbeat_while(sync_to_async(_evaluate_supply_chain_gate_sync)(deployment_id))

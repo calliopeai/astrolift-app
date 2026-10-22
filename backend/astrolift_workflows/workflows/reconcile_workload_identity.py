@@ -20,6 +20,7 @@ from astrolift_workflows.inputs import ReconcileWorkloadIdentityInput
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import ensure_workload_identity
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 # The same budget the deploy gives this activity: IAM writes are a few
 # round trips each, and a throttled or 5xx call is retried.
@@ -42,5 +43,6 @@ class ReconcileWorkloadIdentityWorkflow:
             ensure_workload_identity,
             args=[input.registered_app_id, input.app_environment_id],
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_RETRY,
         )

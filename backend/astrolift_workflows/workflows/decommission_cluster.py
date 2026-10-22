@@ -63,6 +63,7 @@ with workflow.unsafe.imports_passed_through():
         revoke_cluster_zentinelle_gateway,
         teardown_cluster_infra,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _QUICK_TIMEOUT = timedelta(minutes=2)
@@ -118,6 +119,7 @@ class DecommissionClusterWorkflow:
                 ensure_cluster_drained,
                 cluster_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_DRAIN_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface to operator
@@ -126,6 +128,7 @@ class DecommissionClusterWorkflow:
                 mark_error,
                 args=[cluster_id, message],
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_MARK_ERROR_RETRY,
             )
             return WorkflowResult(ok=False, message=message)
@@ -135,6 +138,7 @@ class DecommissionClusterWorkflow:
             mark_decommissioning,
             cluster_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
 
@@ -150,6 +154,7 @@ class DecommissionClusterWorkflow:
                     revoke_cluster_zentinelle_gateway,
                     cluster_id,
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001 — best-effort
@@ -171,6 +176,7 @@ class DecommissionClusterWorkflow:
                 remove_platform_rbac,
                 cluster_id,
                 start_to_close_timeout=_DELETE_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface to operator
@@ -183,6 +189,7 @@ class DecommissionClusterWorkflow:
                     mark_error,
                     args=[cluster_id, message],
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_MARK_ERROR_RETRY,
                 )
                 return WorkflowResult(ok=False, message=message)
@@ -212,6 +219,7 @@ class DecommissionClusterWorkflow:
                     activity_fn,
                     cluster_id,
                     start_to_close_timeout=_CLEANUP_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001 — best-effort
@@ -240,6 +248,7 @@ class DecommissionClusterWorkflow:
                     teardown_cluster_infra,
                     args=[cluster_id, True],
                     start_to_close_timeout=_TEARDOWN_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_TEARDOWN_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001 — surface to operator
@@ -248,6 +257,7 @@ class DecommissionClusterWorkflow:
                     mark_error,
                     args=[cluster_id, message],
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_MARK_ERROR_RETRY,
                 )
                 return WorkflowResult(ok=False, message=message)
@@ -263,6 +273,7 @@ class DecommissionClusterWorkflow:
             mark_decommissioned,
             cluster_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
         result_message = "cluster decommissioned"
