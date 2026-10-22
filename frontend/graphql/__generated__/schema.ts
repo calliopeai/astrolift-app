@@ -1628,6 +1628,25 @@ export type AstroliftAppMetricsPoint = {
   timestamp: Scalars['DateTime']['output'];
 };
 
+export type AstroliftAppNetworkMetrics = {
+  rangeSeconds: Scalars['Int']['output'];
+  rateWindowSeconds: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
+  series: Array<AstroliftAppNetworkSeries>;
+  sourcedAt: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+};
+
+export type AstroliftAppNetworkSeries = {
+  direction: NetworkDirection;
+  measurement: AstroliftGoldenSignalMeasurement;
+  promql: Scalars['String']['output'];
+  reason: AstroliftObservabilityPanelReason;
+  samples: Array<AstroliftTimeSeriesPoint>;
+  totalBytes?: Maybe<Scalars['Float']['output']>;
+  unit: Scalars['String']['output'];
+};
+
 export type AstroliftAppPod = {
   age?: Maybe<Scalars['DateTime']['output']>;
   containerStatuses: Array<AstroliftContainerStatus>;
@@ -8174,6 +8193,7 @@ export type GoldenSignalScope =
 
 export type GoldenSignalSource =
   | 'APP_INSTRUMENTATION'
+  | 'CADVISOR'
   | 'CADVISOR_KUBE_STATE_METRICS'
   | 'CLOUDWATCH_ALB'
   | 'EDGE_PROMETHEUS'
@@ -12407,6 +12427,10 @@ export type NativeModelInvokeAccess =
 export type NativeModelProtocol =
   | 'BEDROCK';
 
+export type NetworkDirection =
+  | 'RECEIVE'
+  | 'TRANSMIT';
+
 export type NoneTypeMutationResult = {
   data?: Maybe<Scalars['Void']['output']>;
   errors: Array<MutationError>;
@@ -12839,6 +12863,7 @@ export type Query = {
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetricNames: AstroliftAppMetricNames;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
+  astroliftAppNetworkMetrics: AstroliftAppNetworkMetrics;
   astroliftAppPods: Array<AstroliftAppPod>;
   astroliftAppSecretBundleAttachments: Array<AstroliftAppSecretBundleAttachment>;
   astroliftAppSecretHistory: Array<AstroliftSecretHistoryEntry>;
@@ -13743,6 +13768,14 @@ export type QueryAstroliftAppMetricNamesArgs = {
 export type QueryAstroliftAppMetricsArgs = {
   appSlug: Scalars['String']['input'];
   timeRange?: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftAppNetworkMetricsArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
+  workloadSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 

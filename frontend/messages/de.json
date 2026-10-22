@@ -1859,11 +1859,12 @@
           "EDGE_PROMETHEUS": "Ingress-Metriken",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "Keine"
         },
         "reasons": {
           "target": "Ausgewähltes Ziel nicht verfügbar.",
-          "partial": "Unvollständige oder mehrdeutige Messung; kein Verhältnis angezeigt.",
+          "partial": "Unvollständige oder mehrdeutige Messung; kein Wert angezeigt.",
           "noData": "Keine verifizierten Nutzungsdaten in diesem Zeitraum.",
           "readError": "Messquelle konnte nicht gelesen werden.",
           "MISSING_LIMITS": "Ressourcenlimits fehlen; Sättigung ist nicht verfügbar.",
@@ -11579,6 +11580,16 @@
       "description": "Gestapelte Anfragerate nach HTTP-Statusklasse. Fahren Sie mit der Maus darüber, um die häufigsten Einzelcodes je Klasse zu sehen.",
       "rate": "{rate} Anfr./s",
       "rateWithTop": "{rate} Anfr./s (häufigste: {top})"
+    },
+    "network": {
+      "title": "Netzwerk-I/O",
+      "description": "Von den Pods empfangene und gesendete Bytes pro Sekunde, aus den cAdvisor-Netzwerkzählern des Kubelets.",
+      "receive": "Empfangen",
+      "transmit": "Gesendet",
+      "total": "{bytes} in diesem Zeitraum",
+      "noDataTitle": "Noch keine Netzwerkdaten",
+      "noDataDescription": "Für diesen Zeitraum gibt es nichts anzuzeigen. Netzwerk-I/O erscheint hier, sobald der Collector des Clusters Messwerte für diese Pods hat.",
+      "notConfigured": "Dieser Cluster hat keinen Prometheus-Endpunkt, oder die ausgewählte Umgebung bzw. Workload ist nicht verfügbar."
     },
     "showPromql": "PromQL anzeigen",
     "tryAgain": "Erneut versuchen",

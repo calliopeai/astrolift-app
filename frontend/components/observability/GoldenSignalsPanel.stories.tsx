@@ -6,11 +6,17 @@ import {
   type GoldenSignalsPanelProps,
 } from "@/components/observability/GoldenSignalsPanel";
 import type { TimeRangeKey } from "@/components/observability/golden-signals-types";
+import type { ObservabilityPanelReason } from "@/components/observability/panel-reason";
 import type { StatusBreakdownWithReason } from "@/components/observability/use-golden-signals";
 import type {
   AstroliftAppGoldenSignal,
+  AstroliftAppNetworkMetrics,
+  AstroliftAppNetworkSeries,
+  AstroliftGoldenSignalMeasurement,
   AstroliftTimeSeriesPoint,
   GoldenSignalKind,
+  GoldenSignalUnavailableReason,
+  NetworkDirection,
 } from "@/graphql/__generated__/schema";
 
 const meta: Meta = { title: "Patterns/Observability/GoldenSignalsPanel" };
@@ -80,6 +86,67 @@ const BREAKDOWN: StatusBreakdownWithReason = {
   ],
 };
 
+const networkSeries = (
+  direction: NetworkDirection,
+  points: AstroliftTimeSeriesPoint[],
+  measured: Partial<AstroliftGoldenSignalMeasurement> = {}
+): AstroliftAppNetworkSeries => ({
+  direction,
+  unit: "bytes_per_second",
+  promql: `sum(rate(container_network_${direction.toLowerCase()}_bytes_total{namespace="checkout-production"}[2m]))`,
+  reason: "OK",
+  samples: points,
+  // 24 samples 150 s apart.
+  totalBytes: points.reduce((sum, point) => sum + point.value * 150, 0),
+  measurement: {
+    effectiveScope: "APP_ENVIRONMENT",
+    source: "CADVISOR",
+    identityBasis: "NAMESPACE",
+    available: true,
+    unavailableReason: null,
+    target: SIGNALS[0].measurement!.target,
+    containers: [],
+    usageSamples: [],
+    limitSamples: [],
+    ...measured,
+  },
+});
+
+const NETWORK: AstroliftAppNetworkMetrics = {
+  reason: "OK",
+  rangeSeconds: 3600,
+  stepSeconds: 15,
+  rateWindowSeconds: 120,
+  sourcedAt: "2026-09-28T13:00:00Z",
+  series: [
+    networkSeries("RECEIVE", samples(180_000, 60_000)),
+    networkSeries("TRANSMIT", samples(42_000, 15_000)),
+  ],
+};
+
+/** Both directions unavailable for one reason: no line, no total. */
+const unavailableNetwork = (
+  reason: ObservabilityPanelReason,
+  cause: GoldenSignalUnavailableReason,
+  measured: Partial<AstroliftGoldenSignalMeasurement> = {}
+): AstroliftAppNetworkMetrics => ({
+  ...NETWORK,
+  reason,
+  series: NETWORK.series.map((row) => ({
+    ...row,
+    reason,
+    samples: [],
+    totalBytes: null,
+    measurement: { ...row.measurement, ...measured, available: false, unavailableReason: cause },
+  })),
+});
+
+const WORKLOAD_TARGET = {
+  ...SIGNALS[0].measurement!.target,
+  workloadId: "019eb737-0100-7000-8000-000000000005",
+  workloadSlug: "api",
+};
+
 const base: GoldenSignalsPanelProps = {
   range: "1h",
   onRangeChange: () => {},
@@ -90,6 +157,10 @@ const base: GoldenSignalsPanelProps = {
   statusBreakdown: BREAKDOWN,
   statusLoading: false,
   onStatusRetry: () => {},
+  network: NETWORK,
+  networkReason: "OK",
+  networkLoading: false,
+  onNetworkRetry: () => {},
 };
 
 /** Holds the range the way useGoldenSignals does in the app. */
@@ -125,7 +196,16 @@ export const MixedAvailability: Story = {
 
 export const Loading: Story = {
   render: () => (
-    <Controlled signals={null} reason={null} loading statusBreakdown={null} statusLoading />
+    <Controlled
+      signals={null}
+      reason={null}
+      loading
+      statusBreakdown={null}
+      statusLoading
+      network={null}
+      networkReason={null}
+      networkLoading
+    />
   ),
 };
 
@@ -144,8 +224,106 @@ export const NoDataYet: Story = {
         },
       }))}
       statusBreakdown={{ ...BREAKDOWN, reason: "NO_DATA_YET", series: [] }}
+      network={unavailableNetwork("NO_DATA_YET", "NO_DATA_YET")}
+      networkReason="NO_DATA_YET"
     />
   ),
+};
+
+/** A workload's verified pods: provenance names each physical container. */
+export const NetworkVerifiedWorkload: Story = {
+  render: () => (
+    <Controlled
+      network={{
+        ...NETWORK,
+        series: NETWORK.series.map((row) => ({
+          ...row,
+          measurement: {
+            ...row.measurement,
+            effectiveScope: "WORKLOAD",
+            identityBasis: "VERIFIED_RUNTIME",
+            target: WORKLOAD_TARGET,
+            membershipObservedAt: "2026-09-28T13:00:00Z",
+            measurementStart: "2026-09-28T12:12:00Z",
+            containers: [
+              {
+                podName: "api-7d9f8c6b5-xk2pq",
+                podUid: "019eb737-0100-7000-8000-000000000006",
+                containerName: "api",
+                containerId: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              },
+            ],
+          },
+        })),
+      }}
+    />
+  ),
+};
+
+/** Sent failed to read; received still draws, sent shows its reason. */
+export const NetworkOneDirectionFailed: Story = {
+  render: () => (
+    <Controlled
+      network={{
+        ...NETWORK,
+        series: [
+          NETWORK.series[0],
+          {
+            ...NETWORK.series[1],
+            reason: "ERROR",
+            samples: [],
+            totalBytes: null,
+            measurement: {
+              ...NETWORK.series[1].measurement,
+              available: false,
+              unavailableReason: "QUERY_ERROR",
+            },
+          },
+        ],
+      }}
+    />
+  ),
+};
+
+/** A replaced workload: refused, never the namespace total. */
+export const NetworkOwnershipUnverified: Story = {
+  render: () => (
+    <Controlled
+      network={unavailableNetwork("ERROR", "OWNERSHIP_UNVERIFIED", {
+        effectiveScope: "WORKLOAD",
+        identityBasis: "UNRESOLVED",
+        target: WORKLOAD_TARGET,
+      })}
+      networkReason="ERROR"
+    />
+  ),
+};
+
+export const NetworkNotConfigured: Story = {
+  render: () => (
+    <Controlled
+      network={unavailableNetwork("NOT_CONFIGURED", "NOT_CONFIGURED")}
+      networkReason="NOT_CONFIGURED"
+    />
+  ),
+};
+
+export const NetworkNotSupportedByProvider: Story = {
+  render: () => (
+    <Controlled
+      network={unavailableNetwork("NOT_SUPPORTED_BY_PROVIDER", "NOT_SUPPORTED_BY_PROVIDER", {
+        effectiveScope: "WORKLOAD",
+        identityBasis: "UNRESOLVED",
+        target: WORKLOAD_TARGET,
+      })}
+      networkReason="NOT_SUPPORTED_BY_PROVIDER"
+    />
+  ),
+};
+
+/** The query itself failed: nothing to describe, a retry. */
+export const NetworkReadFailed: Story = {
+  render: () => <Controlled network={null} networkReason="ERROR" />,
 };
 
 export const NotConfigured: Story = {
