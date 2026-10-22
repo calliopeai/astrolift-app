@@ -48,9 +48,24 @@ export function formatSignalValue(value: number, unit: string): string {
       return value < 1 ? `${(value * 1000).toFixed(0)} ms` : `${value.toFixed(2)} s`;
     case "percent":
       return `${value.toFixed(1)}%`;
+    case "bytes_per_second":
+      return `${formatBytes(value)}/s`;
     default:
       return value.toFixed(3);
   }
+}
+
+const BYTE_UNITS = ["B", "KiB", "MiB", "GiB", "TiB"] as const;
+
+/** A byte count in binary (IEC) units: whole bytes, then one decimal. */
+export function formatBytes(value: number): string {
+  let scaled = value;
+  let unit = 0;
+  while (scaled >= 1024 && unit < BYTE_UNITS.length - 1) {
+    scaled /= 1024;
+    unit += 1;
+  }
+  return `${scaled.toFixed(unit === 0 ? 0 : 1)} ${BYTE_UNITS[unit]}`;
 }
 
 /**

@@ -63,6 +63,7 @@ class GoldenSignalSource(enum.Enum):
     EDGE_PROMETHEUS = "edge_prometheus"
     CLOUDWATCH_ALB = "cloudwatch_alb"
     CADVISOR_KUBE_STATE_METRICS = "cadvisor_kube_state_metrics"
+    CADVISOR = "cadvisor"
     NONE = "none"
 
 
@@ -211,6 +212,53 @@ class StatusCodeBreakdown:
     range_seconds: int
     series: list[StatusCodeSeries]
     promql: str
+
+
+@strawberry.enum
+class NetworkDirection(enum.Enum):
+    RECEIVE = "receive"
+    TRANSMIT = "transmit"
+
+
+@strawberry.type(name="AstroliftAppNetworkSeries")
+class AppNetworkSeries:
+    """One direction of the pods' network I/O over the window (#2271).
+
+    ``samples`` are bytes per second from cAdvisor's
+    ``container_network_{receive,transmit}_bytes_total`` counters, summed
+    over the measured pods' interfaces. ``total_bytes`` is the bytes moved
+    in the measured window; ``null`` whenever the direction is unavailable.
+    An empty or failed read keeps ``samples`` empty: never a zero line.
+    """
+
+    direction: NetworkDirection
+    unit: str
+    samples: list[TimeSeriesPoint]
+    total_bytes: float | None
+    promql: str
+    measurement: GoldenSignalMeasurement
+    reason: ObservabilityPanelReason
+
+
+@strawberry.type(name="AstroliftAppNetworkMetrics")
+class AppNetworkMetrics:
+    """Network I/O for one app environment, or one verified workload (#2271).
+
+    ``reason`` speaks for the panel: OK when either direction has samples,
+    otherwise the directions' shared reason (ERROR when either read
+    failed). Each series carries its own reason and measurement. No
+    series at all means the app is not this tenant's.
+
+    ``rate_window_seconds`` is the ``rate()`` window behind each sample;
+    ``sourced_at`` is when the control plane read the collector.
+    """
+
+    reason: ObservabilityPanelReason
+    range_seconds: int
+    step_seconds: int
+    rate_window_seconds: int
+    sourced_at: dt.datetime
+    series: list[AppNetworkSeries]
 
 
 @strawberry.type(name="AstroliftWorkloadResourceGauge")
