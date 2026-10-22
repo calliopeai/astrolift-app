@@ -265,10 +265,11 @@ kubectl -n "$NS" patch serviceaccount default \
 
 From the pod as the platform renders it, and the installer's node configuration:
 
-- **CPU and memory.** Every agent task and box container requests 250m CPU and 512Mi
-  and is limited to 4 CPUs and 8Gi, install-wide, through `AGENT_POD_CPU_REQUEST`,
+- **CPU and memory.** An agent task or box container requests 250m CPU and 512Mi and
+  is limited to 4 CPUs and 8Gi, install-wide, through `AGENT_POD_CPU_REQUEST`,
   `AGENT_POD_CPU_LIMIT`, `AGENT_POD_MEMORY_REQUEST` and `AGENT_POD_MEMORY_LIMIT` on the
-  backend and the worker. A link step past the memory limit is OOMKilled;
+  backend and the worker. The `cpu_request` and `memory_request` in an agent's
+  manifest do not change them. A link step past the memory limit is OOMKilled;
   `CARGO_BUILD_JOBS` in the spec's `envVars` caps cargo's parallel jobs, and with
   them its peak memory.
 - **No ephemeral storage bounds.** The pod requests and limits no ephemeral storage,
@@ -286,6 +287,9 @@ From the pod as the platform renders it, and the installer's node configuration:
   any other cluster, read the root volume size of the node pools agents land on.
 - **Agents pack densely.** Small requests let the scheduler place many agent pods on
   one node, and nothing counts their disk.
+
+Managed IDE boxes (`runtime = "calliope-managed-ide"`) are the exception: they size
+their own containers and keep their workspace on a volume claim.
 
 Budget a node's root disk for the image (2.2 GB unpacked for the example, plus its
 0.8 GB download while it pulls), and for each task that can run there at once, its
