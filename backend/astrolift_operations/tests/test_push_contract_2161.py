@@ -494,12 +494,10 @@ def _routing(data: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
     ]
 
 
-def _document(
-    driver, monkeypatch, capture_on_commit
-) -> tuple[dict[str, Any], dict[str, NotificationPayload]]:
+def _document(driver, monkeypatch, capture_on_commit) -> dict[str, Any]:
     sent = _notifications(driver, monkeypatch, capture_on_commit)
     routing = _routing_payloads(driver, monkeypatch, sent["app.down"])
-    document = {
+    return {
         "contract": "astrolift.push-notification",
         "payload_version": PUSH_PAYLOAD_VERSION,
         "generated_by": "backend/astrolift_operations/tests/test_push_contract_2161.py",
@@ -509,7 +507,6 @@ def _document(
         "deliveries": _deliveries(sent["alert.fired"]),
         "routing": _routing(routing),
     }
-    return document, sent
 
 
 def _render(document: dict[str, Any]) -> str:
@@ -519,8 +516,7 @@ def _render(document: dict[str, Any]) -> str:
 def test_contract_file_matches_the_dispatcher_and_drivers(
     driver, monkeypatch, django_capture_on_commit_callbacks
 ):
-    document, _sent = _document(driver, monkeypatch, django_capture_on_commit_callbacks)
-    rendered = _render(document)
+    rendered = _render(_document(driver, monkeypatch, django_capture_on_commit_callbacks))
     if os.environ.get("ASTROLIFT_WRITE_PUSH_CONTRACT") == "1":
         CONTRACT.write_text(rendered, encoding="utf-8")
     assert CONTRACT.read_text(encoding="utf-8") == rendered, (
