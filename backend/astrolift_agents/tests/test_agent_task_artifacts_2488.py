@@ -11,7 +11,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from django.db import connection
+from django.db import DatabaseError, connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
@@ -194,7 +194,7 @@ def test_empty_list_probes_support_without_writing(task):
         [artifact(kind="JUNIT")],
         [artifact(media_type=None)],
         [artifact(media_type="xml")],
-        [artifact(media_type="application/xml\r\nX-Injected: 1")],
+        [artifact(media_type="application/xml; charset=utf-8\r\nX-Injected: 1")],
         [artifact(media_type="application/" + "x" * 250)],
         [artifact(content={"tests": 1})],
         [artifact(content="before\x00after")],
@@ -262,6 +262,17 @@ def test_artifacts_roll_back_with_the_result(task, monkeypatch):
     response = post(task, {"status": "completed", "result": "done", "artifacts": [artifact()]})
 
     assert response.status_code == 503
+    _assert_nothing_recorded(task)
+
+
+def test_a_failed_artifact_write_leaves_no_result(task, monkeypatch):
+    def broken(*_args, **_kwargs):
+        raise DatabaseError("artifact write failed")
+
+    monkeypatch.setattr("astrolift_dispatch.views.record_task_artifacts", broken)
+    with pytest.raises(DatabaseError):
+        post(task, {"status": "completed", "result": "done", "artifacts": [artifact()]})
+
     _assert_nothing_recorded(task)
 
 
