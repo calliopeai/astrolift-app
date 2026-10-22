@@ -700,6 +700,10 @@ class Workflow(BaseCoreModel):
     schedule_spec_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
     trigger_ref = models.CharField(max_length=200, null=True, blank=True)
     is_enabled = models.BooleanField(default=True)
+    reviewed_schedule_approval = models.ForeignKey(
+        "ReviewedWorkflowScheduleApproval", null=True, blank=True, editable=False,
+        on_delete=models.PROTECT, related_name="+",
+    )
     # Where a scheduled run's result card goes (#2244). Org admins configure
     # the channels; workflow editors pick them here.
     delivery_channels = models.ManyToManyField("DeliveryChannel", related_name="workflows", blank=True)
@@ -883,6 +887,28 @@ class WorkflowStageExecution(BaseCoreModel):
         related_name="executions",
         on_delete=models.PROTECT,
     )
+    reviewed_stage_snapshot = models.JSONField(null=True, blank=True, editable=False)
+
+    @property
+    def effective_stage(self):
+        from copy import copy, deepcopy
+        from uuid import UUID
+
+        from workflows.atomic_review import FROZEN_STAGE_FIELDS
+
+        snapshot = self.reviewed_stage_snapshot
+        if snapshot is None:
+            return self.stage
+        if not isinstance(snapshot, dict) or set(snapshot) != {"guid", *FROZEN_STAGE_FIELDS}:
+            raise ValidationError("The reviewed stage snapshot is unavailable")
+        stage = copy(self.stage)
+        stage._state = copy(stage._state)
+        stage._state.fields_cache = dict(stage._state.fields_cache)
+        stage.guid = UUID(snapshot["guid"])
+        for name in FROZEN_STAGE_FIELDS:
+            setattr(stage, name, deepcopy(snapshot[name]))
+        return stage
+
     # Set when the stage dispatches an agent run. Null for HUMAN_GATE /
     # CHECKPOINT stages which have no associated agent dispatch.
     agent_run = models.ForeignKey(
@@ -1059,3 +1085,52 @@ class WorkflowDelivery(DurableBaseCoreModel):
             ),
         ]
         indexes = [models.Index(fields=["workflow", "-created_at"], name="workflow_delivery_recent_idx")]
+
+
+class ReviewedWorkflowScheduleApproval(DurableBaseCoreModel):
+    """Explicit person consent for one immutable configured schedule plan."""
+
+    organization = models.ForeignKey("astrolift_identity.Organization", on_delete=models.PROTECT)
+    workflow = models.ForeignKey("Workflow", on_delete=models.PROTECT, related_name="reviewed_approvals")
+    definition = models.ForeignKey("WorkflowDefinition", on_delete=models.PROTECT)
+    approver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    api_token = models.ForeignKey("astrolift_identity.ApiToken", null=True, blank=True, on_delete=models.PROTECT)
+    actor_key = models.CharField(max_length=96)
+    request_id = models.CharField(max_length=128)
+    request_digest = models.CharField(max_length=64)
+    review_digest = models.CharField(max_length=64)
+    definition_revision = models.CharField(max_length=64)
+    configuration_digest = models.CharField(max_length=64)
+    compiled_plans_digest = models.CharField(max_length=64)
+    canonicalization = models.CharField(max_length=64)
+    credential_ceiling = models.JSONField(default=dict)
+    payload_backend_kind = models.CharField(max_length=32)
+    payload_ciphertext = models.BinaryField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(
+            fields=["organization", "actor_key", "request_id"],
+            name="workflow_schedule_approval_request_unique",
+        )]
+
+    def save(self, *args, **kwargs):
+        mutable = {"deleted_at", "deleted_by", "updated_at", "updated_by", "version"}
+        if self.pk and not (kwargs.get("update_fields") and set(kwargs["update_fields"]) <= mutable):
+            raise ValidationError("A reviewed schedule approval is immutable; create a new approval")
+        super().save(*args, **kwargs)
+
+
+class ReviewedWorkflowScheduleExecution(DurableBaseCoreModel):
+    """Immutable provenance: a timer reservation executes the approved sealed plan."""
+
+    workflow_run = models.OneToOneField(
+        "astrolift_operations.WorkflowRun", on_delete=models.PROTECT, related_name="reviewed_schedule_execution",
+    )
+    approval = models.ForeignKey(ReviewedWorkflowScheduleApproval, on_delete=models.PROTECT)
+    organization = models.ForeignKey("astrolift_identity.Organization", on_delete=models.PROTECT)
+
+    def save(self, *args, **kwargs):
+        mutable = {"deleted_at", "deleted_by", "updated_at", "updated_by", "version"}
+        if self.pk and not (kwargs.get("update_fields") and set(kwargs["update_fields"]) <= mutable):
+            raise ValidationError("A reviewed schedule execution is immutable")
+        super().save(*args, **kwargs)

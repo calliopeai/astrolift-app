@@ -95,6 +95,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "workflows.terminate",
     "workflows.signal",
     "workflows.reviewed_definition_starts",
+    "workflows.atomic_full_review",
     "workflows.definition_input_contracts",
     "workflows.definition_start_recovery",
     "workflows.bounded_review_loops",
