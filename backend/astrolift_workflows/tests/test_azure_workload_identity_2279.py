@@ -661,3 +661,88 @@ def test_deprovision_names_an_identity_on_a_cluster_it_can_no_longer_reach_once(
     assert AzureWorkloadIdentity.all_objects.get(pk=stranded.pk).deleted_at is not None
     assert _deprovision_identity_role_sync(registered_app_id=state.app.pk)["roles_deleted"] == []
     assert not arm.calls
+
+
+def test_deprovision_removes_the_identity_left_on_a_cluster_the_app_migrated_off(arm: ControlledARM) -> None:
+    # A migration moves the environment's binding to its target cluster and
+    # leaves the identity recorded on the source. Removal must still reach it,
+    # or deregister fails on that record for good and the identity keeps its grants.
+    from astrolift_workflows.activities.migration import _switch_app_env_binding_sync
+
+    state = azure_app()
+    app_service(state, "blobs")
+    reconcile(state, {"blobs": contributor("data")})
+    record = AzureWorkloadIdentity.objects.get()
+    target = TenantCluster.objects.create(
+        organization=state.org,
+        slug="aks-target",
+        name="AKS target",
+        provider_plugin=state.cluster.provider_plugin,
+        endpoint="https://target.example.invalid",
+        provider_config={
+            **state.cluster.provider_config,
+            "resource_group": "rg-target",
+            "cluster_name": "aks-2",
+        },
+    )
+    _switch_app_env_binding_sync(state.env.pk, target.pk)
+
+    summary = _deprovision_identity_role_sync(registered_app_id=state.app.pk)
+
+    assert not arm.identities and not arm.roles
+    assert summary["roles_deleted"] == [record.resource_id]
+    assert not AzureWorkloadIdentity.objects.exists()
+
+
+@pytest.mark.parametrize("tags", ["owned", "foreign"])
+def test_removal_gets_past_a_replaced_identity_and_never_touches_the_replacement(
+    arm: ControlledARM, tags: str
+) -> None:
+    # The refusal for a replaced identity says: remove the app's workload
+    # identity, then deploy. The recorded principal is gone, so removal is done
+    # with it; the identity holding the name now is not the platform's to strip.
+    state = azure_app()
+    app_service(state, "blobs")
+    reconcile(state, {"blobs": contributor("data")})
+    record = AzureWorkloadIdentity.objects.get()
+    name = workload_identity_role_name(state.app)
+    # Deleted in Azure, federations with it, and another identity made under the name.
+    del arm.identities[name]
+    arm.fics.pop(name)
+    replacement = arm.seed_identity(name, tags=owner_tags(state) if tags == "owned" else {"team": "data"})
+    arm.seed_federation(
+        name, "data-ci", issuer="https://ci.example/", subject="repo:data/x", audience=AUDIENCE
+    )
+    writes = len(arm.writes)
+
+    summary = _deprovision_identity_role_sync(registered_app_id=state.app.pk)
+
+    assert len(arm.writes) == writes, "nothing on the replacement is written"
+    assert arm.identities[name] is replacement and set(arm.fics[name]) == {"data-ci"}
+    [report] = summary["azure_identities"]
+    assert report["replaced"] and report["absent"] and not report["deleted"]
+    assert summary["roles_skipped"] == [record.resource_id]
+    assert not AzureWorkloadIdentity.objects.exists()
+    if tags == "owned":
+        reconcile(state, {"blobs": contributor("data")})
+        assert AzureWorkloadIdentity.objects.get().principal_id == replacement["properties"]["principalId"]
+    else:
+        with pytest.raises(AzureIdentityRefused, match="without this app's ownership markers"):
+            reconcile(state, {"blobs": contributor("data")})
+
+
+def test_a_grant_outside_the_clusters_subscription_fails_before_any_request(arm: ControlledARM) -> None:
+    # #1367 recorded a grant scoped to another subscription as failed with that
+    # reason. It must not read as an unconfirmed reconcile, pending for good,
+    # after the identity was already created.
+    state = azure_app()
+    store = app_service(state, "blobs")
+    elsewhere = blob_scope("data").replace(SUBSCRIPTION, "0b9e3c1a-5d2f-4e6a-8b7c-9d0e1f2a3b4c")
+
+    with pytest.raises(AzureWorkloadIdentityError, match="outside"):
+        reconcile(state, {"blobs": Binding([Grant(elsewhere, ["Storage Blob Data Contributor"])])})
+
+    assert not arm.calls
+    assert not AzureWorkloadIdentity.objects.exists()
+    grant = WorkloadIdentityGrant.objects.get(managed_service=store)
+    assert grant.state == "failed" and elsewhere in grant.reason

@@ -205,6 +205,7 @@ def ensure_identity(
     neither is removed; anything another party added is left alone.
     """
     from azure.identity_owned import AzureFederation, AzureIdentityGrant, AzureOwnedIdentityError
+    from azure.role_catalog import subscription_of
 
     from astrolift_services.models import AzureWorkloadIdentity
     from core.app_deploy import workload_identity_role_name
@@ -229,6 +230,17 @@ def ensure_identity(
         )
     except AzureOwnedIdentityError as exc:
         raise AzureWorkloadIdentityError(f"app {app.slug}: {exc}") from None
+    outside = sorted(
+        {grant.scope for grant in grants if subscription_of(grant.scope).lower() != placement.subscription_id}
+    )
+    if outside:
+        # The port refuses these too, but only after the identity exists, and as
+        # an unconfirmed reconcile: a binding would read pending for good.
+        raise AzureWorkloadIdentityError(
+            f"app {app.slug}: grant scope {', '.join(outside)} is outside subscription "
+            f"{placement.subscription_id} of cluster {cluster.slug}'s workload identity; the declaring service "
+            "must name a resource in that subscription",
+        )
 
     record = recorded_identity(app, cluster, lock=True)
     if record is not None:
@@ -340,11 +352,15 @@ def _remove_one(app: RegisteredApp, cluster: TenantCluster, record: AzureWorkloa
 
     from astrolift_lifecycle.models import AppEnvironment
 
+    # The context's environment names nothing native. A migration moves the
+    # environment's binding off this cluster and leaves the identity here, so
+    # any of the app's environments stands in once none is bound to it.
     environment = (
         AppEnvironment.all_objects.filter(registered_app=app, tenant_cluster=cluster).order_by("pk").first()
+        or AppEnvironment.all_objects.filter(registered_app=app).order_by("pk").first()
     )
     if environment is None:
-        raise AzureWorkloadIdentityError(f"app {app.slug} has no environment on cluster {cluster.slug}")
+        raise AzureWorkloadIdentityError(f"app {app.slug} has no environment")
     placement = placement_for(app, cluster)
     # Removal federates nothing new, so it holds the identity to its record,
     # including the issuer it was federated with, not to the current config.
@@ -383,6 +399,7 @@ def _remove_one(app: RegisteredApp, cluster: TenantCluster, record: AzureWorkloa
         "identity": record.resource_id,
         "deleted": result.identity_deleted,
         "absent": result.identity_absent,
+        "replaced": result.identity_replaced,
         "removed_federations": list(result.removed_federation_names),
         "removed_assignments": list(result.removed_assignment_names),
         "foreign_federations": list(result.foreign_federation_names),

@@ -66,10 +66,16 @@ Each refusal stops before anything is written:
 - **The configured issuer changed since the app's identity was federated.** A
   federation is never moved to a new issuer. Remove the app's workload identity,
   then deploy.
+- **A bound service grants on a resource outside the cluster's subscription.**
+  The grants show `failed` naming the scope. Correct the service, then deploy.
 
 To remove the app's workload identity, use `deleteAppIdentityRole` or deregister
-the app. Removal strips the platform's federations and role assignments, deletes
-the UAMI and soft-deletes the record; the next deploy creates a new one.
+the app. Removal reaches the app's identity on every live Azure cluster, including
+one its environments have since migrated off. It strips the platform's federations
+and role assignments, deletes the UAMI and soft-deletes the record; the next deploy
+creates a new one. A UAMI replaced under the recorded name is left untouched and
+the record is soft-deleted; if the replacement lacks the app's tags, the next
+deploy refuses it as a same-name UAMI.
 
 A UAMI that carries a federation or role assignment the platform did not add is
 left in place after its own are stripped, and the removal fails naming them.

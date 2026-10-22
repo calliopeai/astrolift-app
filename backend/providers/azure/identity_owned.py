@@ -299,6 +299,9 @@ class AzureIdentityRemovalResult:
     identity_absent: bool = False
     """The identity was already gone. Owned assignments on its principal, if
     any survived it, grant nothing and are not inspected."""
+    identity_replaced: bool = False
+    """Another identity holds the recorded name, so the recorded one is gone
+    (``identity_absent`` is set too). The replacement is left untouched."""
     removed_federation_names: tuple[str, ...] = ()
     removed_assignment_names: tuple[str, ...] = ()
     foreign_federation_names: tuple[str, ...] = ()
@@ -1000,7 +1003,8 @@ class AzureOwnedIdentityDriver(_NativeIdentityPort):
         deleting it would take another party's federation with it and orphan
         their assignments. Then it stays, stripped of everything this owner
         added, and the result names what is left. An identity already gone is
-        reported absent, not deleted.
+        reported absent, not deleted, and so is one replaced under its name:
+        the replacement is not this owner's to strip or delete.
         """
         if not self._lock.acquire(blocking=False):
             raise AzureOwnedIdentityError("Concurrent use of one native identity port is unsupported.")
@@ -1023,6 +1027,8 @@ class AzureOwnedIdentityDriver(_NativeIdentityPort):
         current = self._absent_or_current(self._msi.user_assigned_identities.get, c.resource_group, c.identity_name)
         if current is None:
             return AzureIdentityRemovalResult(identity_deleted=False, identity_absent=True)
+        if self._replacement(current):
+            return AzureIdentityRemovalResult(identity_deleted=False, identity_absent=True, identity_replaced=True)
         self._recorded(current)
         stripped = self._reconcile((), ())
         result = AzureIdentityRemovalResult(
@@ -1040,6 +1046,25 @@ class AzureOwnedIdentityDriver(_NativeIdentityPort):
         if self._absent_or_current(self._msi.user_assigned_identities.get, c.resource_group, c.identity_name):
             raise AzureOwnedIdentityError("The managed identity is still present after its deletion.")
         return dataclasses.replace(result, identity_deleted=True)
+
+    def _replacement(self, row: Any) -> bool:
+        """``row`` is a complete identity at the recorded name with another principal.
+
+        A principal is fixed for an identity's lifetime, so the recorded one was
+        deleted. Anything incomplete or misnamed is not evidence of that.
+        """
+        c = self.context
+        if (getattr(row, "id", None), getattr(row, "name", None), getattr(row, "tenant_id", None)) != (
+            c.resource_id,
+            c.identity_name,
+            c.tenant_id,
+        ):
+            return False
+        try:
+            _guid(getattr(row, "client_id", None))
+            return _guid(getattr(row, "principal_id", None)) != c.principal_id
+        except AzureOwnedIdentityError:
+            return False
 
     def _role_matches(self, row: Any, grant: AzureIdentityGrant) -> bool:
         c = self.context

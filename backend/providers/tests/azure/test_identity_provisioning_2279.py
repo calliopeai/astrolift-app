@@ -456,11 +456,32 @@ def test_remove_reports_an_identity_already_gone_without_writing() -> None:
     assert result.identity_absent and not result.identity_deleted and not arm.writes
 
 
-def test_remove_refuses_a_replaced_identity_without_writing() -> None:
+def test_remove_reports_a_replaced_identity_gone_without_writing() -> None:
+    # The recorded principal is gone, so the caller's removal is done; the
+    # identity now holding the name is not this owner's to strip or delete.
     arm = ProvisioningARM()
     arm.identity["properties"]["principalId"] = guid(99)
+    arm.identity["properties"]["clientId"] = guid(98)
     driver = AzureOwnedIdentityDriver(CONTEXT, checkpoint=lambda: None, credential=Credential(), transport=arm)
-    with pytest.raises(AzureIdentityRefused, match="replaced"):
+    result = driver.remove()
+    assert result.identity_replaced and result.identity_absent and not result.identity_deleted
+    assert not arm.writes and arm.identity is not None
+
+
+@pytest.mark.parametrize("change", ["no_principal", "same_principal_other_client", "other_tenant", "other_name"])
+def test_remove_refuses_an_identity_that_is_not_evidently_replaced(change: str) -> None:
+    arm = ProvisioningARM()
+    properties = arm.identity["properties"]
+    if change == "no_principal":
+        del properties["principalId"]
+    elif change == "same_principal_other_client":
+        properties["clientId"] = guid(98)
+    elif change == "other_tenant":
+        properties["tenantId"], properties["principalId"] = guid(97), guid(99)
+    else:
+        arm.identity["name"], properties["principalId"] = "other-uami", guid(99)
+    driver = AzureOwnedIdentityDriver(CONTEXT, checkpoint=lambda: None, credential=Credential(), transport=arm)
+    with pytest.raises(AzureIdentityRefused, match="replaced or is incomplete"):
         driver.remove()
     assert not arm.writes
 

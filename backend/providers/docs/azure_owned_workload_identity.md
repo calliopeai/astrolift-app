@@ -132,8 +132,11 @@ removing the identity under its recorded issuer and provisioning a new one.
 
 `remove()` reads the UAMI. If it is already gone, the result says
 `identity_absent`; owned assignments that outlived it name a deleted principal,
-grant nothing and are not inspected. Otherwise the UAMI must still carry the
-recorded IDs and owner markers. Removal strips every owned federation and
+grant nothing and are not inspected. A complete identity at the recorded name
+with another principal is a replacement: the recorded identity is gone too, so
+the result says `identity_absent` and `identity_replaced`, and the replacement
+is never stripped or deleted. Otherwise the UAMI must still carry the recorded
+IDs and owner markers; an incomplete or misnamed response refuses. Removal strips every owned federation and
 assignment through the same reconcile, then deletes the UAMI and reads it again
 to observe its absence. If a foreign federation or role assignment remains on the
 identity, removal stops after stripping the owned entries: deleting the UAMI would
