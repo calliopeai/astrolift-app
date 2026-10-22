@@ -15,6 +15,7 @@ with workflow.unsafe.imports_passed_through():
         finish_shared_model_reconcile,
         observe_shared_model,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=2), maximum_interval=timedelta(seconds=30), maximum_attempts=3
@@ -31,6 +32,7 @@ class SharedModelReconcileWorkflow:
                 apply_shared_model,
                 args=[sid, revision, input.action, input.delete_data],
                 start_to_close_timeout=timedelta(minutes=25),
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
             if input.action == "delete":
@@ -40,6 +42,7 @@ class SharedModelReconcileWorkflow:
                     observe_shared_model,
                     args=[sid, revision],
                     start_to_close_timeout=timedelta(minutes=2),
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_RETRY,
                 )
                 if state == "ready":
@@ -53,6 +56,7 @@ class SharedModelReconcileWorkflow:
                 activate_shared_model_subscriptions,
                 args=[sid, revision],
                 start_to_close_timeout=timedelta(minutes=5),
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
             for _ in range(60):
@@ -60,6 +64,7 @@ class SharedModelReconcileWorkflow:
                     finish_shared_model_reconcile,
                     args=[sid, revision],
                     start_to_close_timeout=timedelta(minutes=2),
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_RETRY,
                 )
                 if ready:
@@ -73,6 +78,7 @@ class SharedModelReconcileWorkflow:
                 fail_shared_model_reconcile,
                 args=[sid, revision],
                 start_to_close_timeout=timedelta(minutes=2),
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
             return WorkflowResult(

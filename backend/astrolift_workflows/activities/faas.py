@@ -56,6 +56,7 @@ from astrolift_workflows.activities.static_site import (
     _region_account,
     _resolve_account_id,
 )
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 
 log = logging.getLogger("astrolift_workflows.activities.faas")
 
@@ -251,7 +252,5 @@ async def ensure_faas_services(deployment_id: int) -> dict:
     pre-existing apps pay nothing."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_ensure_faas_services_sync)(deployment_id)
-    activity.heartbeat()
+    result = await heartbeat_while(sync_to_async(_ensure_faas_services_sync)(deployment_id))
     return result

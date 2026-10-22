@@ -20,6 +20,7 @@ from django.db import transaction
 from temporalio import activity
 
 from astrolift_lifecycle.run_history import observed_phase
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 
 log = logging.getLogger("astrolift_workflows.activities")
 
@@ -89,8 +90,7 @@ def _mark_app_provisioning_sync(registered_app_id: int) -> None:
 async def mark_app_provisioning(registered_app_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_app_provisioning_sync)(registered_app_id)
+    await heartbeat_while(sync_to_async(_mark_app_provisioning_sync)(registered_app_id))
 
 
 def _mark_app_failed_sync(registered_app_id: int, reason: str) -> None:
@@ -118,9 +118,8 @@ async def mark_app_failed(registered_app_id: int, reason: str) -> None:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
     try:
-        await sync_to_async(_mark_app_failed_sync)(registered_app_id, reason)
+        await heartbeat_while(sync_to_async(_mark_app_failed_sync)(registered_app_id, reason))
     except Exception as exc:  # noqa: BLE001
         log.warning(
             "could not mark app %s failed: %s",
@@ -141,8 +140,7 @@ def _mark_app_ready_sync(registered_app_id: int) -> None:
 async def mark_app_ready(registered_app_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_app_ready_sync)(registered_app_id)
+    await heartbeat_while(sync_to_async(_mark_app_ready_sync)(registered_app_id))
 
 
 def _environment_namespace_labels(app, env) -> tuple[dict[str, str], dict[str, str]]:
@@ -233,8 +231,9 @@ async def provision_namespace(registered_app_id: int, app_environment_id: int | 
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    namespace = await sync_to_async(_provision_namespace_sync)(registered_app_id, app_environment_id)
+    namespace = await heartbeat_while(
+        sync_to_async(_provision_namespace_sync)(registered_app_id, app_environment_id)
+    )
     log.info(
         "provision_namespace ensured namespace=%s",
         namespace,
@@ -339,8 +338,7 @@ async def provision_registry_repo(registered_app_id: int) -> str:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    uri = await sync_to_async(_provision_registry_repo_sync)(registered_app_id)
+    uri = await heartbeat_while(sync_to_async(_provision_registry_repo_sync)(registered_app_id))
     log.info("provision_registry_repo uri=%s", uri, extra={"registered_app_id": registered_app_id})
     return uri
 
@@ -399,8 +397,7 @@ async def resync_manifest_for_deploy(deployment_id: int) -> dict:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    outcome = await sync_to_async(_resync_manifest_for_deploy_sync)(deployment_id)
+    outcome = await heartbeat_while(sync_to_async(_resync_manifest_for_deploy_sync)(deployment_id))
     if outcome["status"] in ("applied", "in_sync"):
         log.info(
             "resync_manifest_for_deploy app=%s status=%s",
@@ -493,10 +490,11 @@ async def provision_managed_services_initial(
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    ids = await sync_to_async(_provision_managed_services_initial_sync)(
-        registered_app_id,
-        app_environment_id,
+    ids = await heartbeat_while(
+        sync_to_async(_provision_managed_services_initial_sync)(
+            registered_app_id,
+            app_environment_id,
+        )
     )
     log.info(
         "provision_managed_services_initial provisioned %d service(s)",
@@ -579,8 +577,7 @@ async def pre_flight(deployment_id: int) -> None:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_pre_flight_sync)(deployment_id)
+    await heartbeat_while(sync_to_async(_pre_flight_sync)(deployment_id))
 
 
 def _mark_deploying_sync(deployment_id: int) -> None:
@@ -605,8 +602,7 @@ def _mark_deploying_sync(deployment_id: int) -> None:
 async def mark_deploying(deployment_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_deploying_sync)(deployment_id)
+    await heartbeat_while(sync_to_async(_mark_deploying_sync)(deployment_id))
 
 
 @activity.defn(name="astrolift.deploy.render_manifests")
@@ -632,8 +628,6 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     from astrolift_manifest.normalize import NormalizationDefaults, normalize
     from astrolift_manifest.parser import parse_raw
     from astrolift_manifest.render import render_manifests as _render
-
-    activity.heartbeat()
 
     def _gather():
         d = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
@@ -664,7 +658,9 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
 
         return manifest, app, env, d, env_from, workload_env_from, namespace_for_environment(env)
 
-    manifest, app, env, d, env_from, workload_env_from, namespace = await sync_to_async(_gather)()
+    manifest, app, env, d, env_from, workload_env_from, namespace = await heartbeat_while(
+        sync_to_async(_gather)()
+    )
 
     resources = _render(
         manifest,
@@ -680,11 +676,11 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
 
     from astrolift_services.model_subscriptions import stamp_binding_revisions
 
-    await sync_to_async(stamp_binding_revisions)(resources, env)
+    await heartbeat_while(sync_to_async(stamp_binding_revisions)(resources, env))
 
     from astrolift_services.observability_pod_labels import stamp_observability_pod_labels
 
-    await sync_to_async(stamp_observability_pod_labels)(resources, env)
+    await heartbeat_while(sync_to_async(stamp_observability_pod_labels)(resources, env))
 
     from astrolift_services.rds_ca import inject_rds_ca, rds_binding_secret_names
 
@@ -692,7 +688,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
         resources,
         app_slug=app.slug,
         namespace=namespace,
-        secret_names=await sync_to_async(rds_binding_secret_names)(env),
+        secret_names=await heartbeat_while(sync_to_async(rds_binding_secret_names)(env)),
     )
 
     # Fold in CustomDomain Ingress + TLS Secret resources (#397). Each
@@ -700,9 +696,11 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     # TLS strategy choices stay isolated — auto-issued ACM lives on the
     # cluster's cert-manager / cloud cert manager, BYO PEM ships
     # inline as a kubernetes.io/tls Secret.
-    ingress_resources = await sync_to_async(
-        _render_app_ingresses_and_tls,
-    )(d.pk, namespace, manifest)
+    ingress_resources = await heartbeat_while(
+        sync_to_async(
+            _render_app_ingresses_and_tls,
+        )(d.pk, namespace, manifest)
+    )
     if ingress_resources:
         resources = sorted(
             [*resources, *ingress_resources],
@@ -718,7 +716,7 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
     # `app.network_policy["enabled"]` is set, which is every app today. The
     # policy is deny-by-default, so emitting one for an app that never had it
     # cuts every egress nobody declared -- opting in has to be deliberate.
-    policy_resources = await sync_to_async(_render_app_network_policy)(d.pk, namespace)
+    policy_resources = await heartbeat_while(sync_to_async(_render_app_network_policy)(d.pk, namespace))
     if policy_resources:
         resources = sorted(
             [*resources, *policy_resources],
@@ -1366,8 +1364,7 @@ async def apply_manifests(deployment_id: int) -> dict[str, list[str]]:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_apply_manifests_sync)(deployment_id)
+    summary = await heartbeat_while(sync_to_async(_apply_manifests_sync)(deployment_id))
     log.info(
         "apply_manifests created=%d updated=%d unchanged=%d",
         len(summary["created"]),
@@ -1688,8 +1685,7 @@ async def update_secrets(deployment_id: int) -> int:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    n = await sync_to_async(_update_secrets_sync)(deployment_id)
+    n = await heartbeat_while(sync_to_async(_update_secrets_sync)(deployment_id))
     log.info("update_secrets materialized %d bundle(s)", n, extra={"deployment_id": deployment_id})
     return n
 
@@ -1771,8 +1767,7 @@ async def restore_previous_secrets(deployment_id: int) -> bool:
     deploy fails (#1957). See ``_restore_previous_secrets_sync``."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    restored = await sync_to_async(_restore_previous_secrets_sync)(deployment_id)
+    restored = await heartbeat_while(sync_to_async(_restore_previous_secrets_sync)(deployment_id))
     log.info(
         "restore_previous_secrets restored=%s",
         restored,
@@ -1842,8 +1837,7 @@ async def wait_dns(deployment_id: int, timeout_seconds: int = 300) -> int:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    n = await sync_to_async(_wait_dns_sync)(deployment_id, timeout_seconds)
+    n = await heartbeat_while(sync_to_async(_wait_dns_sync)(deployment_id, timeout_seconds))
     log.info("wait_dns resolved %d hostname(s)", n, extra={"deployment_id": deployment_id})
     return n
 
@@ -1891,8 +1885,7 @@ async def poll_rollout(deployment_id: int, timeout_seconds: int = 600) -> bool:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_poll_rollout_sync)(deployment_id, timeout_seconds)
+    return await heartbeat_while(sync_to_async(_poll_rollout_sync)(deployment_id, timeout_seconds))
 
 
 @observed_phase("health")
@@ -1935,8 +1928,7 @@ async def health_check(deployment_id: int) -> bool:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_health_check_sync)(deployment_id)
+    return await heartbeat_while(sync_to_async(_health_check_sync)(deployment_id))
 
 
 def _mark_running_sync(deployment_id: int) -> None:
@@ -2045,8 +2037,7 @@ def _write_config_snapshot(deployment) -> None:
 async def mark_running(deployment_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_running_sync)(deployment_id)
+    await heartbeat_while(sync_to_async(_mark_running_sync)(deployment_id))
 
 
 def _mark_failed_sync(deployment_id: int, reason: str) -> None:
@@ -2085,8 +2076,7 @@ async def mark_failed(deployment_id: int, reason: str = "") -> None:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_failed_sync)(deployment_id, reason)
+    await heartbeat_while(sync_to_async(_mark_failed_sync)(deployment_id, reason))
 
 
 # ---- Preview lifecycle (build + teardown) -------------------------
@@ -2115,8 +2105,7 @@ async def mark_preview_building(preview_environment_id: int) -> None:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_preview_building_sync)(preview_environment_id)
+    await heartbeat_while(sync_to_async(_mark_preview_building_sync)(preview_environment_id))
 
 
 def _mark_preview_running_sync(preview_environment_id: int) -> None:
@@ -2135,8 +2124,7 @@ async def mark_preview_running(preview_environment_id: int) -> None:
     """Flip PreviewEnvironment to RUNNING and stamp last_deployed_at."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_preview_running_sync)(preview_environment_id)
+    await heartbeat_while(sync_to_async(_mark_preview_running_sync)(preview_environment_id))
 
 
 def _mark_preview_failed_sync(preview_environment_id: int, reason: str) -> None:
@@ -2159,8 +2147,7 @@ async def mark_preview_failed(preview_environment_id: int, reason: str = "") -> 
     """Flip PreviewEnvironment to FAILED."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_preview_failed_sync)(preview_environment_id, reason)
+    await heartbeat_while(sync_to_async(_mark_preview_failed_sync)(preview_environment_id, reason))
 
 
 def _provision_preview_namespace_sync(preview_environment_id: int) -> str:
@@ -2212,9 +2199,10 @@ async def provision_preview_managed_services_activity(preview_environment_id: in
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_provision_preview_managed_services_sync, thread_sensitive=False)(
-        preview_environment_id
+    return await heartbeat_while(
+        sync_to_async(_provision_preview_managed_services_sync, thread_sensitive=False)(
+            preview_environment_id
+        )
     )
 
 
@@ -2272,9 +2260,8 @@ async def cleanup_preview_managed_services_activity(preview_environment_id: int)
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_cleanup_preview_managed_services_sync, thread_sensitive=False)(
-        preview_environment_id
+    return await heartbeat_while(
+        sync_to_async(_cleanup_preview_managed_services_sync, thread_sensitive=False)(preview_environment_id)
     )
 
 
@@ -2327,8 +2314,9 @@ async def provision_preview_namespace(preview_environment_id: int) -> str:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    namespace = await sync_to_async(_provision_preview_namespace_sync)(preview_environment_id)
+    namespace = await heartbeat_while(
+        sync_to_async(_provision_preview_namespace_sync)(preview_environment_id)
+    )
     log.info(
         "provision_preview_namespace namespace=%s",
         namespace,
@@ -2356,8 +2344,7 @@ async def mark_preview_torn_down(preview_environment_id: int) -> None:
     """Flip the PreviewEnvironment row to TORN_DOWN + stamp torn_down_at."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_preview_torn_down_sync)(preview_environment_id)
+    await heartbeat_while(sync_to_async(_mark_preview_torn_down_sync)(preview_environment_id))
 
 
 def _delete_preview_namespace_sync(preview_environment_id: int) -> str:
@@ -2407,8 +2394,7 @@ async def delete_preview_namespace(preview_environment_id: int) -> str:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    namespace = await sync_to_async(_delete_preview_namespace_sync)(preview_environment_id)
+    namespace = await heartbeat_while(sync_to_async(_delete_preview_namespace_sync)(preview_environment_id))
     log.info(
         "delete_preview_namespace removed namespace=%s",
         namespace,
@@ -2441,8 +2427,7 @@ async def load_preview_teardown_state(preview_environment_id: int) -> dict:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_load_preview_teardown_state_sync)(preview_environment_id)
+    return await heartbeat_while(sync_to_async(_load_preview_teardown_state_sync)(preview_environment_id))
 
 
 def _emit_preview_torn_down_event_sync(preview_environment_id: int) -> None:
@@ -2479,8 +2464,7 @@ async def emit_preview_torn_down_event(preview_environment_id: int) -> None:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_emit_preview_torn_down_event_sync)(preview_environment_id)
+    await heartbeat_while(sync_to_async(_emit_preview_torn_down_event_sync)(preview_environment_id))
 
 
 def _create_rollback_deployment_sync(deployment_id: int) -> int:

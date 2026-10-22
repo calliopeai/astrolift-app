@@ -798,10 +798,13 @@ def test_the_activity_heartbeats_while_a_slow_build_runs(monkeypatch):
     """The build runs in a worker thread; the activity must keep beating."""
     import asyncio
     import time
+    from datetime import timedelta
+
+    from astrolift_workflows import activity_heartbeat
 
     beats = []
     monkeypatch.setattr(build_image_mod.activity, "heartbeat", lambda *a: beats.append(time.monotonic()))
-    monkeypatch.setattr(build_image_mod, "_HEARTBEAT_EVERY_SECONDS", 0.05)
+    monkeypatch.setattr(activity_heartbeat, "HEARTBEAT_EVERY", timedelta(seconds=0.05))
 
     def slow_build(inp):
         time.sleep(0.4)

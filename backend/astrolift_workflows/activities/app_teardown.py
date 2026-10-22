@@ -29,6 +29,7 @@ import logging
 from temporalio import activity
 
 from astrolift_services.model_retirement import retirement_activity
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 
 log = logging.getLogger("astrolift_workflows.activities.app_teardown")
 
@@ -88,18 +89,18 @@ def _mark_unbound_tearing_down(app):
 async def mark_app_tearing_down(registered_app_id: int) -> bool:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_mark_tearing_down_sync)(registered_app_id)
+    return await heartbeat_while(sync_to_async(_mark_tearing_down_sync)(registered_app_id))
 
 
 @activity.defn(name="astrolift.app.mark_deregistered")
 async def mark_app_deregistered(registered_app_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_state_sync)(
-        registered_app_id,
-        "deregistered",
+    await heartbeat_while(
+        sync_to_async(_mark_state_sync)(
+            registered_app_id,
+            "deregistered",
+        )
     )
 
 
@@ -123,9 +124,10 @@ async def list_app_managed_service_ids(
     ``DeprovisionManagedServiceWorkflow`` per id."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    ids = await sync_to_async(_list_managed_service_ids_sync)(
-        registered_app_id,
+    ids = await heartbeat_while(
+        sync_to_async(_list_managed_service_ids_sync)(
+            registered_app_id,
+        )
     )
     log.info(
         "list_app_managed_service_ids found %d service(s)",
@@ -238,9 +240,10 @@ async def delete_app_namespaces(registered_app_id: int) -> list[str]:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    deleted = await sync_to_async(_delete_app_namespaces_sync)(
-        registered_app_id,
+    deleted = await heartbeat_while(
+        sync_to_async(_delete_app_namespaces_sync)(
+            registered_app_id,
+        )
     )
     log.info(
         "delete_app_namespaces cleaned %d namespace(s)",
@@ -291,8 +294,7 @@ async def abort_in_flight_deploys(registered_app_id: int) -> list[str]:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    signalled = await sync_to_async(_abort_in_flight_deploys_sync)(registered_app_id)
+    signalled = await heartbeat_while(sync_to_async(_abort_in_flight_deploys_sync)(registered_app_id))
     log.info(
         "abort_in_flight_deploys signalled %d in-flight deploy(s)",
         len(signalled),
@@ -332,9 +334,10 @@ def _revoke_app_deploy_tokens_sync(registered_app_id: int) -> int:
 async def revoke_app_deploy_tokens(registered_app_id: int) -> int:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    n = await sync_to_async(_revoke_app_deploy_tokens_sync)(
-        registered_app_id,
+    n = await heartbeat_while(
+        sync_to_async(_revoke_app_deploy_tokens_sync)(
+            registered_app_id,
+        )
     )
     log.info(
         "revoke_app_deploy_tokens revoked %d token(s)",
@@ -609,9 +612,10 @@ async def soft_delete_app_records(
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_soft_delete_app_records_sync)(
-        registered_app_id,
+    summary = await heartbeat_while(
+        sync_to_async(_soft_delete_app_records_sync)(
+            registered_app_id,
+        )
     )
     log.info(
         "soft_delete_app_records summary=%s",

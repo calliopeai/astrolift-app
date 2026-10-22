@@ -82,9 +82,14 @@ workers drained one after another.
 A cancelled activity is retried at once only if it reports back. When a task is
 killed outright (stop timeout exceeded, host lost), Temporal notices through the
 activity's `heartbeat_timeout`, or, without one, only when `start_to_close_timeout`
-expires, which is up to 25 minutes for a build. Long activities should heartbeat
-and their callers should set `heartbeat_timeout`; several heartbeating
-activities do not set it yet.
+expires: 15 to 30 minutes for a deploy step, 6 hours for a pipeline job poll.
+Activities that heartbeat beat every 30s from the worker's event loop while their
+work runs, and every call that schedules one sets a two-minute
+`heartbeat_timeout`, so work on a lost worker is retried on another about two
+minutes later. Three pace their own beats with their own timeouts of two minutes
+or less: agent dispatch, native endpoint configuration and the domain route. A
+guard test fails any call that schedules a heartbeating activity without a
+timeout.
 
 ## Database connections
 

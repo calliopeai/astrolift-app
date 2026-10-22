@@ -130,13 +130,13 @@
     "slug": "Slug",
     "team": "Équipe",
     "created": "Créé",
-    "renameNote": "Le renommage sera disponible avec la mutation backend ; le slug reste immuable pour préserver les références aux ressources.",
+    "renameNote": "Renommez ce projet ou modifiez son slug avec Modifier sur la page Projets.",
     "dangerZone": "Zone de danger",
-    "dangerZoneDescription": "La suppression réversible retire ce projet des listes. Les charges de travail rattachées restent visibles jusqu’à leur réaffectation.",
+    "dangerZoneDescription": "La suppression réversible retire ce projet des listes. Elle est refusée tant que le projet contient des applications, des agents, des ressources gérées ou des paquets de secrets partagés.",
     "deleteProject": "Supprimer le projet",
     "close": "Fermer",
     "deleteTitle": "Supprimer le projet {team}/{project} ?",
-    "deleteDescription": "Suppression réversible : les applications et agents restent visibles jusqu’à leur réaffectation. Le slug redevient disponible.",
+    "deleteDescription": "Suppression réversible : refusée tant que le projet contient des applications, des agents, des ressources gérées ou des paquets de secrets partagés. Le slug redevient disponible.",
     "runFamily": {
       "task": "Tâche",
       "service": "Service"
@@ -198,7 +198,7 @@
     "manageTeams": "Gérer les équipes",
     "deleteTitle": "Supprimer le projet {team}/{project} ?",
     "deleteTitleGeneric": "Supprimer le projet ?",
-    "deleteDescription": "Suppression réversible : les applications restent visibles jusqu’à leur réaffectation. Le slug redevient disponible.",
+    "deleteDescription": "Suppression réversible : refusée tant que le projet contient des applications, des agents, des ressources gérées ou des paquets de secrets partagés. Le slug redevient disponible.",
     "deleteProject": "Supprimer le projet"
   },
   "opsScreen": {

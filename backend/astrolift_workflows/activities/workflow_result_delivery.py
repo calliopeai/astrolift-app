@@ -14,6 +14,8 @@ from typing import Any
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 # The wrapper's retry budget; the activity reads it to know its last attempt.
 DELIVERY_MAX_ATTEMPTS = 5
 
@@ -24,12 +26,13 @@ async def deliver_workflow_run_result(request: dict[str, Any]) -> dict[str, Any]
 
     from workflows.delivery import deliver_run
 
-    activity.heartbeat()
     final_attempt = activity.info().attempt >= DELIVERY_MAX_ATTEMPTS
-    summary = await sync_to_async(deliver_run)(
-        int(request["workflow_run_id"]),
-        outcome=str(request.get("outcome") or ""),
-        final_attempt=final_attempt,
+    summary = await heartbeat_while(
+        sync_to_async(deliver_run)(
+            int(request["workflow_run_id"]),
+            outcome=str(request.get("outcome") or ""),
+            final_attempt=final_attempt,
+        )
     )
     if summary.retrying:
         raise ApplicationError(f"{summary.retrying} delivery target(s) will be retried")

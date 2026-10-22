@@ -16,6 +16,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.dev_environment")
 
 # Resource profile → (cpu_request, memory_request, cpu_limit, memory_limit).
@@ -384,8 +386,7 @@ async def provision_dev_environment(dev_environment_id: int) -> dict:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_provision_dev_environment_sync)(dev_environment_id)
+    return await heartbeat_while(sync_to_async(_provision_dev_environment_sync)(dev_environment_id))
 
 
 def _mark_dev_environment_failed_sync(dev_environment_id: int, error: str) -> None:
@@ -406,8 +407,7 @@ async def mark_dev_environment_failed(dev_environment_id: int, error: str) -> No
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_dev_environment_failed_sync)(dev_environment_id, error)
+    await heartbeat_while(sync_to_async(_mark_dev_environment_failed_sync)(dev_environment_id, error))
 
 
 def _sync_dev_environment_files_sync(dev_environment_id: int) -> None:
@@ -478,8 +478,7 @@ async def sync_dev_environment_files(dev_environment_id: int) -> None:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_sync_dev_environment_files_sync)(dev_environment_id)
+    await heartbeat_while(sync_to_async(_sync_dev_environment_files_sync)(dev_environment_id))
 
 
 def _deploy_promoted_app_sync(dev_environment_id: int, storage_class: str) -> dict[str, Any]:
@@ -552,8 +551,7 @@ async def deploy_promoted_app(dev_environment_id: int, storage_class: str) -> di
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_deploy_promoted_app_sync)(dev_environment_id, storage_class)
+    return await heartbeat_while(sync_to_async(_deploy_promoted_app_sync)(dev_environment_id, storage_class))
 
 
 def _persist_promoted_workload(app: Any, dev: Any, storage_class: str) -> Any:
@@ -664,5 +662,6 @@ async def record_promoted_app_deployment(dev_environment_id: int, storage_class:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_record_promoted_app_deployment_sync)(dev_environment_id, storage_class)
+    return await heartbeat_while(
+        sync_to_async(_record_promoted_app_deployment_sync)(dev_environment_id, storage_class)
+    )

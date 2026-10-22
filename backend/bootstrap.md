@@ -101,6 +101,10 @@ the paired release and rollback procedure.
 - **Admin**: Inherit from `BaseCoreAdmin`
 - **Tests**: Use `schema.execute_sync()` for GraphQL, real database (no mocks)
 - **Workflows**: Temporal SDK in `workflows/temporal/`. One worker process, scales horizontally
+- **Activity heartbeats**: an activity that heartbeats awaits its work through `heartbeat_while`
+  (`astrolift_workflows/activity_heartbeat.py`), and every call that schedules it passes
+  `heartbeat_timeout=HEARTBEAT_TIMEOUT`, so a lost worker's work is retried in minutes, not at
+  `start_to_close_timeout`. `test_heartbeat_timeout_guard_2435.py` holds both (#2435)
 - **Feature toggles**: Via `config/features.py` and environment variables
 - **Domain app discovery**: Apps with `astrolift_config/settings.py` are auto-discovered
 

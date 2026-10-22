@@ -18,6 +18,7 @@ from astrolift_workflows.inputs import OnboardAppInput
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import provision_namespace
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _ACTIVITY_TIMEOUT = timedelta(minutes=10)
 
@@ -32,4 +33,5 @@ class NamespaceProvisionWorkflow:
             provision_namespace,
             input.registered_app_id,
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )

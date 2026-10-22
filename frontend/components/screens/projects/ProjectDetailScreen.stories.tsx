@@ -91,5 +91,10 @@ export const SettingsOpen: Story = {
     await userEvent.click(canvas.getByRole("button", { name: /Settings/ }));
     const body = within(canvasElement.ownerDocument.body);
     await expect(await body.findByText("Project settings")).toBeInTheDocument();
+    // Rename has shipped (#2479): the sheet points at it instead of
+    // promising it for later.
+    await expect(
+      body.getByText("Rename this project or change its slug with Edit on the Projects page.")
+    ).toBeInTheDocument();
   },
 };
