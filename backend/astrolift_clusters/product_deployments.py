@@ -468,7 +468,7 @@ def _apply(
     else:
         if row.health != health:
             what.append("health")
-        if row.images != product.images or row.running_images != running:
+        if row.images != product.images or _running_changed(row.running_images, running):
             what.append("images")
     previous_health = row.health
     for field, value in values.items():
@@ -477,6 +477,13 @@ def _apply(
     if what:
         changes.append(_change(row, cluster, what, previous_health=previous_health))
     return changes
+
+
+def _running_changed(before: dict[str, list[str]], after: dict[str, list[str]]) -> bool:
+    """Whether a component both reads saw runs other digests now. A scan that
+    could not read the workloads records no component at all (``{}``), and
+    says nothing about what runs; ``[]`` is a read that found none running."""
+    return any(before[component] != after[component] for component in before.keys() & after.keys())
 
 
 def _change(

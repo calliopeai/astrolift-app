@@ -547,7 +547,9 @@ def test_a_digest_pinned_image_is_matched_by_the_repository_its_image_id_names(
     drivers[cluster.slug] = FakeDriver(
         [_namespace(ZENTINELLE)],
         [
-            _workload("zentinelle", name, desired=2, ready=2, images=[(image, f"{image_id_prefix}{image_id}")])
+            _workload(
+                "zentinelle", name, desired=2, ready=2, images=[(image, f"{image_id_prefix}{image_id}")]
+            )
             for name, (image, image_id) in reported.items()
         ],
     )
@@ -563,7 +565,9 @@ def test_a_preloaded_image_is_matched_by_the_reference_it_runs_as(plugin, org, d
     has no repository digest: ``imageID`` is the bare local id, and only
     ``image`` names the repository."""
     cluster = _cluster(plugin, organization=org)
-    drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub(images=[(HUB_IMAGE, "sha256:b7c873bd97bd")]))
+    drivers[cluster.slug] = FakeDriver(
+        [_namespace(WORKBENCH)], _hub(images=[(HUB_IMAGE, "sha256:b7c873bd97bd")])
+    )
 
     scan(cluster)
 
@@ -781,6 +785,36 @@ def test_health_and_image_changes_are_events(plugin, org, drivers, scan):
     assert rolled.payload["changes"] == ["health", "images"]
     assert rolled.payload["running_images"] == {"hub": ["sha256:61"]}
     assert rolled.severity == "info"
+
+
+@pytest.mark.parametrize(
+    "unread",
+    [
+        {"workloads": []},
+        {"health_error": RuntimeError("apiserver unreachable")},
+    ],
+    ids=["namespace-skipped", "read-failed"],
+)
+def test_a_scan_that_cannot_read_the_workloads_does_not_say_the_images_changed(
+    plugin, org, drivers, scan, unread
+):
+    """Unread, the running images are unknown, not changed. The scan that
+    cannot read them and the one that reads them again report the health
+    they move through, and nothing about images."""
+    cluster = _cluster(plugin, organization=org)
+    driver = drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub())
+    scan(cluster)
+    for name, value in unread.items():
+        setattr(driver, name, value)
+    scan(cluster)
+    driver.workloads, driver.health_error = _hub(), None
+
+    scan(cluster)
+
+    appeared, lost, back = _events()
+    assert (lost.payload["changes"], lost.payload["health"]) == (["health"], "unknown")
+    assert (back.payload["changes"], back.payload["health"]) == (["health"], "healthy")
+    assert ProductDeployment.objects.get(cluster=cluster).running_images == {"hub": [HUB_DIGEST]}
 
 
 def test_a_reinstall_keeps_its_row_and_project(plugin, org, drivers, scan):
