@@ -393,7 +393,9 @@ def test_migration_0047_reverses_only_while_no_removal_was_settled(world):
     try:
         MigrationExecutor(connection).migrate([before])
         MigrationExecutor(connection).migrate(original_targets)
-        operator = get_user_model().objects.create(username="operator-2278c", email="operator-2278c@acme.test")
+        operator = get_user_model().objects.create(
+            username="operator-2278c", email="operator-2278c@acme.test"
+        )
         GCPNativeJournalResolution.objects.create(
             organization=w.org,
             registered_app=w.app,
@@ -411,7 +413,9 @@ def test_migration_0047_reverses_only_while_no_removal_was_settled(world):
             unresolved=[],
             attestation="checked the Endpoint policy by hand",
         )
-        with pytest.raises(RuntimeError, match="GCP_NATIVE_REMOVAL_RESOLUTION_ROLLBACK_REQUIRES_EMPTY_HISTORY"):
+        with pytest.raises(
+            RuntimeError, match="GCP_NATIVE_REMOVAL_RESOLUTION_ROLLBACK_REQUIRES_EMPTY_HISTORY"
+        ):
             MigrationExecutor(connection).migrate([before])
         assert GCPNativeJournalResolution.objects.get().deployment_id is None
     finally:
