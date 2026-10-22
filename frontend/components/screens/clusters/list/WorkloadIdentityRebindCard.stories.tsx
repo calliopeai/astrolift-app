@@ -48,6 +48,8 @@ export const Failed: Story = {
   render: () => <WorkloadIdentityRebindCard rebind={REBIND_FAILED} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    // Ten moved and two refused: every app was reached.
+    await expect(canvas.getByText("12 of 12")).toBeVisible();
     await expect(canvas.getByText("2 roles did not move")).toBeVisible();
     await expect(canvas.getByText(/not managed by the platform/)).toBeVisible();
   },
