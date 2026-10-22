@@ -1695,6 +1695,18 @@ export type AstroliftAppSettingsLastModified = {
   webhooks?: Maybe<Scalars['DateTime']['output']>;
 };
 
+export type AstroliftAppSourceChange = {
+  app: AstroliftRegisteredApp;
+  /** The repository the app pointed at before the call; app.sourceRepo when nothing changed. */
+  previousSourceRepo: Scalars['String']['output'];
+};
+
+export type AstroliftAppSourceChangeMutationResult = {
+  data?: Maybe<AstroliftAppSourceChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftAppSourceKindFilter =
   | 'ALL'
   | 'BITBUCKET'
@@ -9784,6 +9796,8 @@ export type Mutation = {
   setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
+  /** Point a GitHub app at another repository, or at its repository's new name after a rename on GitHub (#2478). The repository must be in the organization's GitHub App installation, and the name GitHub lists is stored; sourceUrl follows when it named the old repository. Autowire then runs against the repository: the CI workflow and the CI push role follow it, and the CI secrets are pushed to it, which rotates the deploy token. Audited as app.set_source. */
+  setAppSource: AstroliftAppSourceChangeMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
   setClusterAuthUserEnabled: AstroliftClusterAuthUserChangeMutationResult;
   setClusterAuthUserGroups: AstroliftClusterAuthUserChangeMutationResult;
@@ -11676,6 +11690,11 @@ export type MutationSetAppSecretArgs = {
 
 export type MutationSetAppSecretMetadataArgs = {
   input: SetAppSecretMetadataInput;
+};
+
+
+export type MutationSetAppSourceArgs = {
+  input: SetAppSourceInput;
 };
 
 
@@ -16315,6 +16334,13 @@ export type SetAppSecretMetadataInput = {
   key: Scalars['String']['input'];
   scope: InputMaybe<Scalars['String']['input']>;
   setVia: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SetAppSourceInput = {
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
+  /** The GitHub repository, as owner/name. */
+  sourceRepo: Scalars['String']['input'];
 };
 
 export type SetAppSubdomainInput = {
