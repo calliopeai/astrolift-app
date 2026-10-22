@@ -965,6 +965,53 @@ def test_a_project_of_another_organization_does_not_move_an_org_clusters_event(
     assert (down.organization_id, down.team_id, down.project_id) == (org.pk, None, None)
 
 
+def test_an_org_clusters_product_in_one_of_its_projects_is_told_to_that_project(plugin, org, drivers, scan):
+    """The deployment inherits its project's access (design section 6), so the
+    project's members see its events as well."""
+    cluster = _cluster(plugin, organization=org)
+    driver = drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub())
+    scan(cluster)
+    project = _project(org)
+    ProductDeployment.objects.filter(cluster=cluster).update(project=project)
+    driver.workloads = _hub(ready=0)
+
+    scan(cluster)
+
+    [appeared, down] = _events()
+    assert (appeared.team_id, appeared.project_id) == (None, None)
+    assert (down.organization_id, down.team_id, down.project_id) == (org.pk, project.team_id, project.pk)
+
+
+@pytest.mark.parametrize(
+    ("ready", "severity"),
+    [({}, "info"), ({"zentinelle_worker": 1}, "warn"), ({"zentinelle_worker": 0}, "error")],
+    ids=["healthy", "degraded", "down"],
+)
+def test_an_events_severity_follows_the_health_it_reports(plugin, org, drivers, scan, ready, severity):
+    cluster = _cluster(plugin, organization=org)
+    drivers[cluster.slug] = FakeDriver([_namespace(ZENTINELLE)], _zentinelle_workloads(**ready))
+
+    scan(cluster)
+
+    [appeared] = _events()
+    assert appeared.severity == severity
+
+
+def test_a_product_that_goes_is_info_whatever_its_last_health(plugin, org, drivers, scan):
+    """A teardown is not an outage: the last health read before it does not
+    make its going an error."""
+    cluster = _cluster(plugin, organization=org)
+    driver = drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub(ready=0))
+    scan(cluster)
+    driver.namespaces = []
+
+    scan(cluster)
+
+    appeared, gone = _events()
+    assert (appeared.severity, gone.payload["changes"], gone.payload["health"]) == ("error", ["gone"], "down")
+    assert gone.severity == "info"
+
+
 # ---- Astrolift never writes the contract ---------------------------------------------
 
 
