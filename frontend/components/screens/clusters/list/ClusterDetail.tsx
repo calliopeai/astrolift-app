@@ -39,6 +39,7 @@ import { lifecycleAction } from "./ClustersList";
 import { type Lifecycle, providerLabel } from "./clusters-list";
 import { useUnregisterReview } from "./use-unregister-review";
 import type { useClusterDetail } from "./use-cluster-detail";
+import { WorkloadIdentityRebindCard } from "./WorkloadIdentityRebindCard";
 
 export type ClusterDetailProps = ReturnType<typeof useClusterDetail> & {
   /** The live stats row, rendered by the caller so its polling queries stay out of this view. */
@@ -279,6 +280,11 @@ export function ClusterDetail(props: ClusterDetailProps) {
           </dl>
         </CardContent>
       </Card>
+
+      {/* ── Role trust after a re-point (#2472) ─────────────────────── */}
+      {cluster.workloadIdentityRebind && (
+        <WorkloadIdentityRebindCard rebind={cluster.workloadIdentityRebind} />
+      )}
 
       {/* ── Live stats row ──────────────────────────────────────────── */}
       {renderLiveStats(cluster.id)}

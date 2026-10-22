@@ -6,7 +6,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { ClusterDetail } from "./ClusterDetail";
 import { ClusterLiveStats } from "./ClusterLiveStats";
-import { CLUSTERS, LIVE_STATS, LONG_CLUSTER, detailProps } from "./fixtures";
+import { CLUSTERS, LIVE_STATS, LONG_CLUSTER, REBIND_FAILED, detailProps } from "./fixtures";
 
 const meta: Meta = {
   title: "Screens/Clusters/List/ClusterDetail",
@@ -46,6 +46,23 @@ export const Managing: Story = {
   render: () => (
     <ClusterDetail {...detailProps({ slug: CLUSTERS[1].slug, cluster: CLUSTERS[1] })} />
   ),
+};
+
+/** Re-pointed at another cluster by a registration: its apps' roles are moving (#2472). */
+export const RePointed: Story = {
+  render: () => (
+    <ClusterDetail
+      {...detailProps({
+        cluster: { ...CLUSTERS[0], workloadIdentityRebind: REBIND_FAILED },
+        renderLiveStats: liveStats,
+      })}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Workload identity roles")).toBeVisible();
+    await expect(canvas.getByText("2 roles did not move")).toBeVisible();
+  },
 };
 
 export const ManagementError: Story = {

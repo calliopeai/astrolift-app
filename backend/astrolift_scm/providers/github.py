@@ -265,6 +265,16 @@ def github_installation_includes_repo(connection, *, repo_full_name: str) -> boo
     Only meaningful for ``github_app_install`` connections — other kinds
     have no installation repo set and raise ``UNSUPPORTED``.
     """
+    return github_installation_repo_full_name(connection, repo_full_name=repo_full_name) is not None
+
+
+def github_installation_repo_full_name(connection, *, repo_full_name: str) -> str | None:
+    """GitHub's own spelling of ``repo_full_name`` when the App installation
+    includes it, else None. The match ignores case, as GitHub does; the App
+    webhook receiver does not, so a name that will be matched against
+    deliveries is stored as GitHub lists it (#2478). Same listing and
+    errors as :func:`github_installation_includes_repo`.
+    """
     if connection.kind != "github_app_install":
         raise GithubProviderError(
             "UNSUPPORTED",
@@ -309,15 +319,15 @@ def github_installation_includes_repo(connection, *, repo_full_name: str) -> boo
         repos = payload["repositories"]
         for raw in repos:
             if (raw.get("full_name") or "").lower() == target:
-                return True
+                return raw.get("full_name") or ""
         # A short page means we've reached the end of the listing.
         if len(repos) < 100:
-            return False
+            return None
         page += 1
         # Safety cap: 100 pages == 10k repos. Beyond that we stop
         # rather than loop unbounded on a pathological installation.
         if page > 100:
-            return False
+            return None
 
 
 def fetch_github_repo_numeric_ids(connection, *, repo_full_name: str) -> tuple[int, int]:

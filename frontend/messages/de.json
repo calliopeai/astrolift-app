@@ -11980,6 +11980,27 @@
         "podsRunning": "Laufende Pods",
         "cpu": "CPU",
         "memory": "Arbeitsspeicher"
+      },
+      "workloadIdentity": {
+        "title": "Workload-Identity-Rollen",
+        "state": {
+          "pending": "In Warteschlange",
+          "running": "Wird verschoben",
+          "succeeded": "Verschoben",
+          "failed": "Fehlgeschlagen"
+        },
+        "description": {
+          "pending": "Der Cluster wurde auf einen Cluster mit einem anderen OIDC-Aussteller umgestellt. Die IAM-Rollen seiner Apps warten darauf, dorthin verschoben zu werden.",
+          "running": "Der Cluster wurde auf einen Cluster mit einem anderen OIDC-Aussteller umgestellt. Die IAM-Rollen seiner Apps werden dorthin verschoben; ein Pod kann eine Rolle erst übernehmen, wenn sie verschoben ist.",
+          "succeeded": "Jede IAM-Rolle einer App auf diesem Cluster vertraut seinem OIDC-Aussteller.",
+          "failed": "Einige IAM-Rollen von Apps vertrauen noch dem vorherigen OIDC-Aussteller, daher können ihre Pods auf diesem Cluster sie nicht übernehmen. Ein Deployment der App verschiebt ihre Rolle; eine erneute Registrierung des Clusters wiederholt den Rest."
+        },
+        "issuer": "OIDC-Aussteller",
+        "apps": "Apps",
+        "progress": "{reached} von {total}",
+        "started": "Gestartet",
+        "finished": "Abgeschlossen",
+        "failuresTitle": "{count, plural, one {# Rolle nicht verschoben} other {# Rollen nicht verschoben}}"
       }
     }
   },
