@@ -533,7 +533,10 @@ def test_deprovision_of_an_azure_app_that_never_recorded_an_identity_calls_nothi
     assert summary["roles_deleted"] == [] and summary["roles_skipped"] == []
 
 
-@pytest.mark.parametrize("change", ["cluster_resource_group", "app_deleted"])
+@pytest.mark.parametrize(
+    "change",
+    ["cluster_resource_group", "app_deleted", "record_removed", "cluster_deleted", "cluster_not_azure"],
+)
 def test_a_change_under_the_reconcile_stops_it_before_the_next_request(
     arm: ControlledARM, change: str
 ) -> None:
@@ -544,16 +547,32 @@ def test_a_change_under_the_reconcile_stops_it_before_the_next_request(
     state = azure_app()
     app_service(state, "blobs")
     name = workload_identity_role_name(state.app)
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name="AWS", slug="aws", plugin_version="0.0.1", capabilities_manifest={}, config_schema={}
+            )
+        ],
+        ignore_conflicts=True,
+    )
+    clusters = TenantCluster.objects.filter(pk=state.cluster.pk)
+    changes = {
+        "app_deleted": lambda: RegisteredApp.objects.filter(pk=state.app.pk).update(
+            deleted_at=timezone.now()
+        ),
+        "cluster_resource_group": lambda: clusters.update(
+            provider_config={**state.cluster.provider_config, "resource_group": "rg-elsewhere"}
+        ),
+        "record_removed": lambda: AzureWorkloadIdentity.objects.update(deleted_at=timezone.now()),
+        "cluster_deleted": lambda: clusters.update(deleted_at=timezone.now()),
+        "cluster_not_azure": lambda: clusters.update(provider_plugin=ProviderPlugin.objects.get(slug="aws")),
+    }
     changed = []
 
     def hook(method: str, path: str) -> None:
         if not changed and path.casefold().endswith("/roleassignments"):
             changed.append(path)
-            if change == "app_deleted":
-                RegisteredApp.objects.filter(pk=state.app.pk).update(deleted_at=timezone.now())
-            else:
-                config = {**state.cluster.provider_config, "resource_group": "rg-elsewhere"}
-                TenantCluster.objects.filter(pk=state.cluster.pk).update(provider_config=config)
+            changes[change]()
 
     arm.hook = hook
     with pytest.raises(AzureOwnedIdentityError, match="not confirmed"):
@@ -628,10 +647,21 @@ def test_a_credential_the_cluster_cannot_use_is_a_failed_refusal_with_no_request
     assert not arm.calls
 
 
-def test_deprovision_names_an_identity_on_a_cluster_it_can_no_longer_reach_once(arm: ControlledARM) -> None:
+@pytest.mark.parametrize("lost", ["deleted", "not_azure"])
+def test_deprovision_names_an_identity_on_a_cluster_it_can_no_longer_reach_once(
+    arm: ControlledARM, lost: str
+) -> None:
     from django.utils import timezone
 
     state = azure_app()
+    ProviderPlugin.objects.bulk_create(
+        [
+            ProviderPlugin(
+                name="AWS", slug="aws", plugin_version="0.0.1", capabilities_manifest={}, config_schema={}
+            )
+        ],
+        ignore_conflicts=True,
+    )
     gone = TenantCluster.objects.create(
         organization=state.org,
         slug="aks-gone",
@@ -653,7 +683,12 @@ def test_deprovision_names_an_identity_on_a_cluster_it_can_no_longer_reach_once(
         principal_id="018f42f0-4420-7000-8000-000000000094",
         issuer=ISSUER,
     )
-    TenantCluster.objects.filter(pk=gone.pk).update(deleted_at=timezone.now())
+    if lost == "deleted":
+        TenantCluster.objects.filter(pk=gone.pk).update(deleted_at=timezone.now())
+    else:
+        TenantCluster.objects.filter(pk=gone.pk).update(
+            provider_plugin=ProviderPlugin.objects.get(slug="aws")
+        )
 
     with pytest.raises(CapabilityDeprovisionError, match="astrolift-stranded.*delete it in Azure"):
         _deprovision_identity_role_sync(registered_app_id=state.app.pk)
@@ -746,3 +781,56 @@ def test_a_grant_outside_the_clusters_subscription_fails_before_any_request(arm:
     assert not AzureWorkloadIdentity.objects.exists()
     grant = WorkloadIdentityGrant.objects.get(managed_service=store)
     assert grant.state == "failed" and elsewhere in grant.reason
+
+
+def test_a_recorded_identity_at_another_placement_is_refused_before_any_request(arm: ControlledARM) -> None:
+    state = azure_app()
+    app_service(state, "blobs")
+    reconcile(state, {"blobs": contributor("data")})
+    state.cluster.provider_config = {**state.cluster.provider_config, "resource_group": "rg-moved"}
+    state.cluster.save(update_fields=["provider_config", "updated_at", "version"])
+    requests = len(arm.calls)
+
+    with pytest.raises(AzureWorkloadIdentityError, match="no longer matches"):
+        reconcile(state, {"blobs": contributor("data")})
+
+    assert len(arm.calls) == requests
+    grant = WorkloadIdentityGrant.objects.get()
+    assert grant.state == "failed" and "no longer matches" in grant.reason
+
+
+def test_deprovision_removes_the_identity_of_an_app_whose_row_is_already_soft_deleted(
+    arm: ControlledARM,
+) -> None:
+    # Deprovision reads the app through all_objects, so removal must not
+    # require the app to be live.
+    from django.utils import timezone
+
+    state = azure_app()
+    app_service(state, "blobs")
+    reconcile(state, {"blobs": contributor("data")})
+    record = AzureWorkloadIdentity.objects.get()
+    RegisteredApp.objects.filter(pk=state.app.pk).update(deleted_at=timezone.now())
+
+    summary = _deprovision_identity_role_sync(registered_app_id=state.app.pk)
+
+    assert not arm.identities and not arm.roles
+    assert summary["roles_deleted"] == [record.resource_id]
+
+
+def test_a_cluster_missing_its_issuer_is_a_failed_refusal_with_no_request(arm: ControlledARM) -> None:
+    from core.app_deploy import AppDeployError
+
+    state = azure_app()
+    store = app_service(state, "blobs")
+    state.cluster.provider_config = {
+        key: value for key, value in state.cluster.provider_config.items() if key != "cluster_oidc_issuer"
+    }
+    state.cluster.save(update_fields=["provider_config", "updated_at", "version"])
+
+    with pytest.raises(AppDeployError, match="requires cluster_oidc_issuer"):
+        reconcile(state, {"blobs": contributor("data")})
+
+    assert not arm.calls
+    grant = WorkloadIdentityGrant.objects.get(managed_service=store)
+    assert grant.state == "failed" and "requires cluster_oidc_issuer" in grant.reason
