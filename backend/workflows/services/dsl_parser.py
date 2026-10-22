@@ -63,7 +63,7 @@ from workflows.stage_limits import DEFAULT_STAGE_ATTEMPTS, validate_stage_attemp
 _VALID_PATTERN_KINDS = frozenset(
     {"single", "chained", "fan_out", "review_loop"}
 )
-_VALID_STAGE_KINDS = frozenset({"agent_dispatch", "human_gate", "checkpoint", "aggregation", "workflow", "collection", "format_record"})
+_VALID_STAGE_KINDS = frozenset({"agent_dispatch", "human_gate", "checkpoint", "aggregation", "workflow", "collection", "format_record", "github_checks"})
 _VALID_ON_FAILURE = frozenset({"fail", "retry", "skip", "escalate"})
 
 # Default states/transitions injected when the author omits them. The
