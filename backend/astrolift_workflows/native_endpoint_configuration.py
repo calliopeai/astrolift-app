@@ -527,9 +527,21 @@ def execute_native_endpoint_configuration(input, *, ports=None):
                     if checkpoint.operation != iam_operation or checkpoint.target != iam_store.target:
                         raise NativeConfigurationError("IAM_ACCEPTANCE_CHANGED")
 
+                def iam_reservation_admitted(checkpoint):
+                    iam_admitted(checkpoint)
+                    # Teardown revokes only grants an IAM journal records (#2278),
+                    # and it can begin after the preflight. Refused on the locked
+                    # app row: an operation reserved before it is one the removal
+                    # finds, pending behind the mutexes this run holds.
+                    if checkpoint.app.provisioning_status in (
+                        RegisteredApp.ProvisioningStatus.TEARING_DOWN,
+                        RegisteredApp.ProvisioningStatus.DEREGISTERED,
+                    ):
+                        raise NativeConfigurationError("APP_TEARDOWN_IN_PROGRESS")
+
                 iam_reservation = iam_store.reserve(
                     iam_operation,
-                    checkpoint=iam_admitted,
+                    checkpoint=iam_reservation_admitted,
                     expected_version=previous_iam_row.version if previous_iam_row is not None else None,
                 )
                 iam = (iam_store, iam_reservation)

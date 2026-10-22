@@ -1609,6 +1609,40 @@ async def test_actual_namespace_reply_retains_original_uid_after_token_withdrawa
     assert await sync_to_async(GCPGKEAppApplyJournal.objects.count)() == 0
 
 
+@pytest.mark.slow
+@pytest.mark.asyncio
+async def test_teardown_begun_after_the_preflight_opens_no_iam_operation(native_world, client, temporal_env):
+    """A teardown that begins while a first configuration prepares finds no IAM
+    journal, so its removal revokes nothing: the configuration must not grant
+    behind it (#2278)."""
+    w = native_world
+    from django.db import connections
+
+    original = w.http["after_write"]
+    torn_down = []
+
+    def tear_down_after_namespace_create(method, path):
+        original(method, path)
+        if method == "POST" and w.http["objects"][path]["kind"] == "Namespace":
+            torn_down.append(path)
+            try:
+                type(w.medops_app).objects.filter(pk=w.medops_app.pk).update(
+                    provisioning_status="tearing_down"
+                )
+            finally:
+                # This server thread owns its fresh default connection only.
+                connections["default"].close()
+
+    w.http["after_write"] = tear_down_after_namespace_create
+    result, _ = await run(w, client, temporal_env)
+    assert result == {"refused": True}
+    assert len(torn_down) == 1
+    assert w.failures == [("NativeConfigurationError", "APP_TEARDOWN_IN_PROGRESS")]
+    assert not any(wire.calls for wire in w.iam_wires)
+    assert await sync_to_async(GCPWorkloadIdentityJournal.objects.count)() == 0
+    assert await sync_to_async(GCPGKEAppApplyJournal.objects.count)() == 0
+
+
 @pytest.mark.asyncio
 async def test_lost_namespace_reply_same_actual_run_refuses_name_adoption(native_world, client, temporal_env):
     w = native_world

@@ -176,9 +176,14 @@ run then removes what the settled ledger still owns.
 
 After the removal the IAM journal has moved past the last Deployment's fence,
 and the native configuration refuses an app that is tearing down or
-deregistered (`APP_TEARDOWN_IN_PROGRESS`), so no Deployment adds the grants
-back. Removing a grant from a policy does not revoke a token already issued,
-and access another grant allows is not denied.
+deregistered (`APP_TEARDOWN_IN_PROGRESS`): at its preflight, and again on the
+locked app row when it reserves its IAM operation. A configuration that was
+already running when the teardown began either reserved its IAM operation
+first, so the removal finds that journal and stays pending (`PREPARATION_BUSY`)
+until the run ends and the next teardown run revokes its grants, or is refused
+there before it grants anything. Either way no Deployment adds the grants back.
+Removing a grant from a policy does not revoke a token already issued, and
+access another grant allows is not denied.
 
 ## Rollout observation
 
