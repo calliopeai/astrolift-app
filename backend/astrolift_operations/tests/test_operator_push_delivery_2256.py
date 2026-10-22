@@ -610,6 +610,24 @@ def test_set_notification_profile_stores_an_apns_profile(permission_resolver) ->
     assert refused.errors[0].code == "VALIDATION"
 
 
+def test_a_key_pasted_into_a_profile_stays_out_of_the_mutation_log() -> None:
+    # The profile refuses a pasted key, but the mutation log keeps each
+    # operation's variables, and the keys of a config blob ("auth_key", or
+    # Notification Hubs' "shared_access_key") name no secret.
+    from config.schema import schema
+    from core.schema.audit import MutationAuditLog
+
+    pem = _p8(ec.generate_private_key(ec.SECP256R1()))
+    schema.execute_sync(
+        "mutation($in: SetNotificationProfileInput!) { setNotificationProfile(input: $in) { ok } }",
+        variable_values={"in": {"driver": "apns", "config": {**APNS_CONFIG, "auth_key": pem}}},
+        context_value=SimpleNamespace(user=None, request=None),
+    )
+
+    log = MutationAuditLog.objects.order_by("-pk").first()
+    assert log.variables == {"in": {"driver": "apns", "config": "***REDACTED***"}}
+
+
 def test_set_notification_profile_refuses_apns_without_org_update(permission_resolver) -> None:  # noqa: ARG001
     org = _org("acme")
     user = _member(org)
