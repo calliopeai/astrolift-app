@@ -257,6 +257,10 @@ def test_concurrent_org_retirement_and_first_shared_model_creation_serialize(wor
 @pytest.mark.parametrize("kind", ["app", "project", "team", "organization"])
 def test_retirement_without_unrevoked_shared_resources_keeps_existing_behavior(world, kind):
     world.model.soft_delete()  # Remove the fixture's shared model; no runtime call is made.
+    if kind == "project":
+        # A project with live apps is not deleted (#2479); the guard still
+        # locks the retired app's rows.
+        world.medops_app.soft_delete()
     target = {
         "app": world.medops_app,
         "project": world.medops_project,

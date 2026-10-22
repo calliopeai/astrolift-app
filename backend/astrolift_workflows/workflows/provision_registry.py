@@ -19,6 +19,7 @@ from astrolift_workflows.inputs import OnboardAppInput
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import provision_registry_repo
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _ACTIVITY_TIMEOUT = timedelta(minutes=10)
 
@@ -36,5 +37,6 @@ class RegistryProvisionWorkflow:
             provision_registry_repo,
             input.registered_app_id,
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return uri

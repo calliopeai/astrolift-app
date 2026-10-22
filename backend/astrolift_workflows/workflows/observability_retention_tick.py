@@ -22,6 +22,7 @@ with workflow.unsafe.imports_passed_through():
         ObservabilityRetentionSummary,
         prune_observability_data,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _TICK_TIMEOUT = timedelta(minutes=30)
@@ -37,4 +38,5 @@ class ObservabilityRetentionTickWorkflow:
         return await workflow.execute_activity(
             prune_observability_data,
             start_to_close_timeout=_TICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )

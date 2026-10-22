@@ -55,6 +55,7 @@ with workflow.unsafe.imports_passed_through():
         revoke_app_deploy_tokens,
         soft_delete_app_records,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
     from astrolift_workflows.workflows.deprovision_managed_service import (
         DeprovisionManagedServiceWorkflow,
     )
@@ -99,6 +100,7 @@ class TearDownAppWorkflow:
             mark_app_tearing_down,
             app_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
 
@@ -110,6 +112,7 @@ class TearDownAppWorkflow:
                 abort_in_flight_deploys,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — best-effort; teardown proceeds
@@ -124,6 +127,7 @@ class TearDownAppWorkflow:
                 delete_app_namespaces,
                 app_id,
                 start_to_close_timeout=_NAMESPACE_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface to operator
@@ -142,6 +146,7 @@ class TearDownAppWorkflow:
             list_app_managed_service_ids,
             app_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
 
@@ -183,6 +188,7 @@ class TearDownAppWorkflow:
             revoke_app_deploy_tokens,
             app_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
 
@@ -191,6 +197,7 @@ class TearDownAppWorkflow:
             soft_delete_app_records,
             app_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
 
@@ -199,6 +206,7 @@ class TearDownAppWorkflow:
             mark_app_deregistered,
             app_id,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
 

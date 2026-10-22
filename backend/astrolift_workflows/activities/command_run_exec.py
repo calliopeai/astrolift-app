@@ -19,6 +19,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger(__name__)
 
 #: Excerpt kept on the row. The full log lives in the cluster until the
@@ -177,24 +179,21 @@ def _finish_sync(command_run_id: int, outcome: dict[str, Any]) -> dict[str, Any]
 async def start_command_run(command_run_id: int) -> dict[str, Any]:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_start_sync)(command_run_id)
+    return await heartbeat_while(sync_to_async(_start_sync)(command_run_id))
 
 
 @activity.defn(name="astrolift.command_run.poll")
 async def poll_command_run(command_run_id: int) -> dict[str, Any]:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_poll_sync)(command_run_id)
+    return await heartbeat_while(sync_to_async(_poll_sync)(command_run_id))
 
 
 @activity.defn(name="astrolift.command_run.finish")
 async def finish_command_run(command_run_id: int, outcome: dict[str, Any]) -> dict[str, Any]:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_finish_sync)(command_run_id, outcome)
+    return await heartbeat_while(sync_to_async(_finish_sync)(command_run_id, outcome))
 
 
 def _assert_no_concurrent_sync(payload: dict[str, Any]) -> dict[str, Any]:
@@ -238,5 +237,4 @@ def _assert_no_concurrent_sync(payload: dict[str, Any]) -> dict[str, Any]:
 async def assert_no_concurrent(payload: dict[str, Any]) -> dict[str, Any]:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_assert_no_concurrent_sync)(payload)
+    return await heartbeat_while(sync_to_async(_assert_no_concurrent_sync)(payload))

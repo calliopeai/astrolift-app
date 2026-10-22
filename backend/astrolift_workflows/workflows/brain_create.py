@@ -28,6 +28,7 @@ with workflow.unsafe.imports_passed_through():
         brain_create_repo,
         brain_create_scaffold,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _RETRY = RetryPolicy(
     initial_interval=timedelta(seconds=5),
@@ -65,7 +66,11 @@ class BrainCreateWorkflow:
 
     async def _step(self, activity_fn, creation_id: int) -> str:
         result = await workflow.execute_activity(
-            activity_fn, creation_id, start_to_close_timeout=_STEP_TIMEOUT, retry_policy=_RETRY
+            activity_fn,
+            creation_id,
+            start_to_close_timeout=_STEP_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
+            retry_policy=_RETRY,
         )
         return str((result or {}).get("state") or "")
 

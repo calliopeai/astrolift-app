@@ -17,6 +17,7 @@ with workflow.unsafe.imports_passed_through():
         mark_managed_service_failed,
         update_managed_service,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _QUICK_TIMEOUT = timedelta(minutes=2)
@@ -52,6 +53,7 @@ class UpdateManagedServiceWorkflow:
                 update_managed_service,
                 args=_reviewed_args(input, [svc_id]),
                 start_to_close_timeout=_UPDATE_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_UPDATE_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -71,6 +73,7 @@ class UpdateManagedServiceWorkflow:
                     check_managed_service_ready,
                     args=_reviewed_args(input, [svc_id, handle]),
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STATUS_RETRY,
                 )
                 if state == "available":
@@ -109,6 +112,7 @@ class UpdateManagedServiceWorkflow:
             bounce_workloads_bound_to_managed_service,
             args=_reviewed_args(input, [svc_id, rebound or []]),
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
         return WorkflowResult(ok=True, message="managed service updated")

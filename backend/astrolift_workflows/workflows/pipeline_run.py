@@ -42,6 +42,7 @@ with workflow.unsafe.imports_passed_through():
         poll_pipeline_job,
         spawn_pipeline_job,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _SPAWN_TIMEOUT = timedelta(minutes=5)
@@ -126,6 +127,7 @@ class PipelineRunWorkflow:
             mark_pipeline_run_running,
             pipeline_run_id,
             start_to_close_timeout=_MARK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         self._run_status = "running"
 
@@ -137,6 +139,7 @@ class PipelineRunWorkflow:
                 mark_pipeline_run_failed,
                 args=[pipeline_run_id, definition_error],
                 start_to_close_timeout=_MARK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             self._run_status = "failure"
             return WorkflowResult(ok=False, message=definition_error)
@@ -148,6 +151,7 @@ class PipelineRunWorkflow:
                 mark_pipeline_run_success,
                 pipeline_run_id,
                 start_to_close_timeout=_MARK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             self._run_status = "success"
             return WorkflowResult(ok=True, message="no jobs to run")
@@ -164,6 +168,7 @@ class PipelineRunWorkflow:
                 mark_pipeline_run_failed,
                 args=[pipeline_run_id, str(exc)],
                 start_to_close_timeout=_MARK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             self._run_status = "failure"
             return WorkflowResult(ok=False, message=str(exc))
@@ -201,6 +206,7 @@ class PipelineRunWorkflow:
                             mark_job_run_cancelled,
                             job_run_id,
                             start_to_close_timeout=_MARK_TIMEOUT,
+                            heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         )
                     except Exception:  # noqa: BLE001 — best-effort cleanup
                         pass
@@ -209,6 +215,7 @@ class PipelineRunWorkflow:
                     mark_pipeline_run_failed,
                     args=[pipeline_run_id, f"jobs failed: {failed_jobs}"],
                     start_to_close_timeout=_MARK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 )
                 self._run_status = "failure"
                 return WorkflowResult(
@@ -230,6 +237,7 @@ class PipelineRunWorkflow:
                         mark_job_run_cancelled,
                         job_run_id,
                         start_to_close_timeout=_MARK_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     )
                 except Exception:  # noqa: BLE001 — best-effort
                     pass
@@ -238,6 +246,7 @@ class PipelineRunWorkflow:
                 mark_pipeline_run_failed,
                 args=[pipeline_run_id, "cancelled by signal"],
                 start_to_close_timeout=_MARK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             self._run_status = "cancelled"
             return WorkflowResult(ok=False, message="pipeline run cancelled")
@@ -246,6 +255,7 @@ class PipelineRunWorkflow:
             mark_pipeline_run_success,
             pipeline_run_id,
             start_to_close_timeout=_MARK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         self._run_status = "success"
         return WorkflowResult(ok=True, message="pipeline run completed successfully")
@@ -259,6 +269,7 @@ class PipelineRunWorkflow:
                 spawn_pipeline_job,
                 args=[pipeline_run_id, job["job_id"]],
                 start_to_close_timeout=_SPAWN_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
         except Exception as exc:  # noqa: BLE001
             self._job_statuses[job["job_id"]] = "failure"
@@ -272,6 +283,7 @@ class PipelineRunWorkflow:
                         cancel_pipeline_job,
                         job_run_id,
                         start_to_close_timeout=_MARK_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     )
                 except Exception:  # noqa: BLE001 — best-effort cancel
                     pass
@@ -282,6 +294,7 @@ class PipelineRunWorkflow:
                 poll_pipeline_job,
                 job_run_id,
                 start_to_close_timeout=_POLL_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
 
             if result.get("completed"):
@@ -294,6 +307,7 @@ class PipelineRunWorkflow:
                     mark_job_run_failed,
                     args=[job_run_id, result.get("exit_code")],
                     start_to_close_timeout=_MARK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 )
                 return {"failed": True, "exit_code": result.get("exit_code")}
 

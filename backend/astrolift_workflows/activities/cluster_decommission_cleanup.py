@@ -49,6 +49,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.cluster_decommission_cleanup")
 
 
@@ -201,8 +203,7 @@ async def cleanup_cluster_irsa_roles(cluster_id: int) -> dict[str, Any]:
     """Delete every per-app IRSA / Workload-Identity role on the cluster."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_cleanup_irsa_roles_sync)(cluster_id)
+    summary = await heartbeat_while(sync_to_async(_cleanup_irsa_roles_sync)(cluster_id))
     log.info(
         "cleanup_cluster_irsa_roles cluster=%s deleted=%d errors=%d skipped=%s",
         summary["cluster_slug"],
@@ -291,8 +292,7 @@ async def cleanup_cluster_ecr_repos(cluster_id: int) -> dict[str, Any]:
     """Archive every per-app container repo on the cluster's registry."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_cleanup_ecr_repos_sync)(cluster_id)
+    summary = await heartbeat_while(sync_to_async(_cleanup_ecr_repos_sync)(cluster_id))
     log.info(
         "cleanup_cluster_ecr_repos cluster=%s deleted=%d errors=%d skipped=%s",
         summary["cluster_slug"],
@@ -414,8 +414,7 @@ async def cleanup_cluster_dns_records(cluster_id: int) -> dict[str, Any]:
     """Delete every DNS record astrolift created for apps on the cluster."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_cleanup_dns_records_sync)(cluster_id)
+    summary = await heartbeat_while(sync_to_async(_cleanup_dns_records_sync)(cluster_id))
     log.info(
         "cleanup_cluster_dns_records cluster=%s deleted=%d errors=%d skipped=%s",
         summary["cluster_slug"],
@@ -498,8 +497,7 @@ async def cleanup_cluster_acm_certs(cluster_id: int) -> dict[str, Any]:
     """Revoke every auto-issued cert bound to a CustomDomain on the cluster."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_cleanup_acm_certs_sync)(cluster_id)
+    summary = await heartbeat_while(sync_to_async(_cleanup_acm_certs_sync)(cluster_id))
     log.info(
         "cleanup_cluster_acm_certs cluster=%s deleted=%d errors=%d skipped=%s",
         summary["cluster_slug"],
@@ -571,8 +569,7 @@ async def revoke_cluster_zentinelle_gateway(cluster_id: int) -> dict[str, Any]:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_revoke_zentinelle_gateway_sync)(cluster_id)
+    summary = await heartbeat_while(sync_to_async(_revoke_zentinelle_gateway_sync)(cluster_id))
     log.info(
         "revoke_cluster_zentinelle_gateway cluster=%s revoked=%d errors=%d skipped=%s",
         summary["cluster_slug"],

@@ -51,6 +51,7 @@ with workflow.unsafe.imports_passed_through():
         provision_namespace,
         provision_registry_repo,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _ACTIVITY_TIMEOUT = timedelta(minutes=10)
 
@@ -111,6 +112,7 @@ class OnboardAppWorkflow:
                 mark_app_failed,
                 args=[input.registered_app_id, f"{self._step}: {error}"],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             raise
 
@@ -120,6 +122,7 @@ class OnboardAppWorkflow:
             mark_app_provisioning,
             input.registered_app_id,
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
 
         if workflow.patched("parallel-child-provision"):
@@ -157,16 +160,19 @@ class OnboardAppWorkflow:
                 provision_registry_repo,
                 input.registered_app_id,
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             await workflow.execute_activity(
                 provision_namespace,
                 input.registered_app_id,
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             await workflow.execute_activity(
                 provision_managed_services_initial,
                 args=[input.registered_app_id, 0],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
 
         self._step = "ready"
@@ -174,6 +180,7 @@ class OnboardAppWorkflow:
             mark_app_ready,
             input.registered_app_id,
             start_to_close_timeout=_ACTIVITY_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         self._completed.append("ready")
         self._step = "completed"
