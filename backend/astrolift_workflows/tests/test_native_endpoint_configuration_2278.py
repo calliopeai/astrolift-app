@@ -462,6 +462,23 @@ async def run(
     return result, history
 
 
+async def activity_reaches(w, event, *, stalled_after=60):
+    """Wait for the activity to set ``event``, bounded by its progress, not a total.
+
+    Reaching the Namespace create takes about 575 execution checkpoints, each a
+    full re-admission of the original caller: about 90 s on a quiet machine
+    and past 120 s on a slow CI runner, so a fixed budget raced the runner
+    (#2509). Fail when the activity refuses or no checkpoint advances for
+    ``stalled_after`` seconds.
+    """
+    seen, since = w.checkpoint_calls, time.monotonic()
+    while not await sync_to_async(event.wait)(1):
+        assert not w.failures, w.failures
+        if w.checkpoint_calls != seen:
+            seen, since = w.checkpoint_calls, time.monotonic()
+        assert time.monotonic() - since < stalled_after, f"activity stalled at checkpoint {seen}"
+
+
 @pytest.mark.slow
 @pytest.mark.asyncio
 async def test_actual_registered_configuration_worker_commits_every_stage_and_returns_metadata_only(
@@ -640,7 +657,7 @@ async def test_actual_cancel_delivered_before_held_reply_release_preserves_ack_o
             assert released.wait(8), "owned native reply must remain bounded"
 
     async def cancel_before_reply(handle):
-        assert await sync_to_async(created.wait)(120)
+        await activity_reaches(w, created)
         try:
             description = await handle.describe()
             assert description.raw_description.pending_activities
