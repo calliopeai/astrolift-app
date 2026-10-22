@@ -40,6 +40,7 @@ with workflow.unsafe.imports_passed_through():
         update_secrets,
         wait_dns,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _TIMEOUT = timedelta(minutes=15)
@@ -57,21 +58,43 @@ class RollbackDeploymentWorkflow:
         )
 
         # Same apply path as DeployAppWorkflow. Reuse > duplicate.
-        await workflow.execute_activity(pre_flight, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(mark_deploying, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(render_manifests, new_id, start_to_close_timeout=_TIMEOUT)
+        await workflow.execute_activity(
+            pre_flight, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+        )
+        await workflow.execute_activity(
+            mark_deploying, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+        )
+        await workflow.execute_activity(
+            render_manifests, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+        )
         # The Secrets before the workloads that read them, for the reason
         # DeployAppWorkflow gives (#1758). Patched for replay.
         if workflow.patched("deploy-secrets-before-apply"):
-            await workflow.execute_activity(update_secrets, new_id, start_to_close_timeout=_TIMEOUT)
-            await workflow.execute_activity(apply_manifests, new_id, start_to_close_timeout=_TIMEOUT)
+            await workflow.execute_activity(
+                update_secrets, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+            )
+            await workflow.execute_activity(
+                apply_manifests, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+            )
         else:
-            await workflow.execute_activity(apply_manifests, new_id, start_to_close_timeout=_TIMEOUT)
-            await workflow.execute_activity(update_secrets, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(wait_dns, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(poll_rollout, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(health_check, new_id, start_to_close_timeout=_TIMEOUT)
-        await workflow.execute_activity(mark_running, new_id, start_to_close_timeout=_TIMEOUT)
+            await workflow.execute_activity(
+                apply_manifests, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+            )
+            await workflow.execute_activity(
+                update_secrets, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+            )
+        await workflow.execute_activity(
+            wait_dns, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+        )
+        await workflow.execute_activity(
+            poll_rollout, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+        )
+        await workflow.execute_activity(
+            health_check, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+        )
+        await workflow.execute_activity(
+            mark_running, new_id, start_to_close_timeout=_TIMEOUT, heartbeat_timeout=HEARTBEAT_TIMEOUT
+        )
 
         return WorkflowResult(
             ok=True,

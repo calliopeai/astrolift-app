@@ -61,6 +61,7 @@ with workflow.unsafe.imports_passed_through():
         request_wildcard_cert_for_zone,
         validate_ns_delegation,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _ACTIVITY_TIMEOUT = timedelta(minutes=5)
@@ -141,6 +142,7 @@ class ProvisionManagedDomainWorkflow:
                     mark_managed_domain_provision_failed,
                     args=[input.cluster_id, input.zone, step, reason],
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception:  # noqa: BLE001 - the run's own result still reports the failure
@@ -163,6 +165,7 @@ class ProvisionManagedDomainWorkflow:
                     provision_dns_zone,
                     args=[input.cluster_id, zone],
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -187,6 +190,7 @@ class ProvisionManagedDomainWorkflow:
                     delegate_parent_zone,
                     args=[input.cluster_id, zone, nameservers],
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception:  # noqa: BLE001 — recorded on the domain; never blocks provisioning
@@ -198,6 +202,7 @@ class ProvisionManagedDomainWorkflow:
                 request_wildcard_cert_for_zone,
                 args=[input.cluster_id, zone, zone_id],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ACTIVITY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -221,6 +226,7 @@ class ProvisionManagedDomainWorkflow:
                         reissue_cert,
                         args=[input.cluster_id, zone, self._cert_id, self._zone_id],
                         start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         retry_policy=_ACTIVITY_RETRY,
                     )
                 except Exception as exc:  # noqa: BLE001
@@ -242,6 +248,7 @@ class ProvisionManagedDomainWorkflow:
                     poll_cert_issuance,
                     args=[input.cluster_id, zone, self._cert_id],
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -291,6 +298,7 @@ class ProvisionManagedDomainWorkflow:
                 register_managed_domain_row,
                 args=[input.cluster_id, zone, self._zone_id, self._cert_id],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ACTIVITY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -316,6 +324,7 @@ class ProvisionManagedDomainWorkflow:
                     validate_ns_delegation,
                     args=[input.cluster_id, zone],
                     start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ACTIVITY_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -345,6 +354,7 @@ class ProvisionManagedDomainWorkflow:
                 mark_managed_domain_active,
                 args=[input.cluster_id, zone],
                 start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ACTIVITY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001

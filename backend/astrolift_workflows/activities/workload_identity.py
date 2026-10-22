@@ -38,6 +38,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.workload_identity")
 
 
@@ -706,10 +708,11 @@ async def ensure_workload_identity(
     """Activity entry — ensure the app's IRSA role + SA binding exist."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_ensure_workload_identity_sync)(
-        registered_app_id,
-        app_environment_id,
+    summary = await heartbeat_while(
+        sync_to_async(_ensure_workload_identity_sync)(
+            registered_app_id,
+            app_environment_id,
+        )
     )
     log.info(
         "ensure_workload_identity app_id=%s summary=%s",
