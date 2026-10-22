@@ -134,10 +134,33 @@ class ProjectMutations:
     def soft_delete_project(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
+        from astrolift_registry.models import RegisteredApp
+        from astrolift_services.models import ManagedService
+
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         project = _resolve_project(input.id, org_id)
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found")
+        # Apps and shared resources keep pointing at a soft-deleted project,
+        # and views that walk live projects (nav tree, project pages) drop
+        # them (#2479), so they leave first. Rows still tearing down are live.
+        apps = RegisteredApp.objects.filter(project_id=project.pk, organization_id=org_id).count()
+        resources = ManagedService.objects.filter(
+            project_id=project.pk, project__organization_id=org_id
+        ).count()
+        if apps or resources:
+            held: list[str] = []
+            steps: list[str] = []
+            if apps:
+                held.append(f"{apps} app{'' if apps == 1 else 's'}")
+                steps.append("move its apps to another project or deregister them")
+            if resources:
+                held.append(f"{resources} managed resource{'' if resources == 1 else 's'}")
+                steps.append("deprovision its managed resources")
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"project still has {' and '.join(held)}; {' and '.join(steps)} before deleting it",
+            )
         project.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))

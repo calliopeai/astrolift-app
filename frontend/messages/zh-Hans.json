@@ -132,11 +132,11 @@
     "created": "创建时间",
     "renameNote": "后端变更操作实现后将支持项目重命名；为保持现有资源引用稳定，标识符不可更改。",
     "dangerZone": "危险操作",
-    "dangerZoneDescription": "软删除会将此项目从列表中移除。关联的工作负载在重新分配前仍然可见。",
+    "dangerZoneDescription": "软删除会将此项目从列表中移除。只要项目中仍有应用、代理或托管资源，删除就会被拒绝。",
     "deleteProject": "删除项目",
     "close": "关闭",
     "deleteTitle": "删除项目 {team}/{project}？",
-    "deleteDescription": "软删除：应用和代理在您重新分配前仍然可见。该标识符可被重新使用。",
+    "deleteDescription": "软删除：只要项目中仍有应用、代理或托管资源，删除就会被拒绝。该标识符可被重新使用。",
     "runFamily": {
       "task": "任务",
       "service": "服务"
@@ -198,7 +198,7 @@
     "manageTeams": "管理团队",
     "deleteTitle": "删除项目 {team}/{project}？",
     "deleteTitleGeneric": "删除项目？",
-    "deleteDescription": "软删除：应用在您重新分配前仍然可见。该标识符可被重新使用。",
+    "deleteDescription": "软删除：只要项目中仍有应用、代理或托管资源，删除就会被拒绝。该标识符可被重新使用。",
     "deleteProject": "删除项目"
   },
   "opsScreen": {

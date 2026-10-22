@@ -132,11 +132,11 @@
     "created": "Erstellt",
     "renameNote": "Das Umbenennen wird mit der Backend-Mutation verfügbar; der Slug bleibt unveränderlich, damit Ressourcenreferenzen stabil bleiben.",
     "dangerZone": "Gefahrenbereich",
-    "dangerZoneDescription": "Vorläufiges Löschen entfernt dieses Projekt aus den Listen. Zugeordnete Workloads bleiben sichtbar, bis sie neu zugeordnet werden.",
+    "dangerZoneDescription": "Vorläufiges Löschen entfernt dieses Projekt aus den Listen. Es wird abgelehnt, solange das Projekt noch Apps, Agenten oder verwaltete Ressourcen hat.",
     "deleteProject": "Projekt löschen",
     "close": "Schließen",
     "deleteTitle": "Projekt {team}/{project} löschen?",
-    "deleteDescription": "Vorläufiges Löschen: Apps und Agenten bleiben sichtbar, bis Sie sie neu zuordnen. Der Slug kann wieder vergeben werden.",
+    "deleteDescription": "Vorläufiges Löschen: wird abgelehnt, solange das Projekt noch Apps, Agenten oder verwaltete Ressourcen hat. Der Slug kann wieder vergeben werden.",
     "runFamily": {
       "task": "Aufgabe",
       "service": "Dienst"
@@ -198,7 +198,7 @@
     "manageTeams": "Teams verwalten",
     "deleteTitle": "Projekt {team}/{project} löschen?",
     "deleteTitleGeneric": "Projekt löschen?",
-    "deleteDescription": "Vorläufiges Löschen: Apps bleiben sichtbar, bis Sie sie neu zuordnen. Der Slug kann wieder vergeben werden.",
+    "deleteDescription": "Vorläufiges Löschen: wird abgelehnt, solange das Projekt noch Apps, Agenten oder verwaltete Ressourcen hat. Der Slug kann wieder vergeben werden.",
     "deleteProject": "Projekt löschen"
   },
   "opsScreen": {
