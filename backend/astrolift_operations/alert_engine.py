@@ -96,7 +96,8 @@ def _emit_alert_event(rule: AlertRule, event: AlertEvent, event_type: str) -> No
     """Emit through the same ``Event.emit`` path the uptime prober uses.
 
     Payload keys match ``notification_dispatch``'s alert templates
-    (``rule_name`` / ``severity`` / ``summary`` / ``rule_guid``); the
+    (``rule_name`` / ``severity`` / ``summary`` / ``rule_guid``, and
+    ``alert_event_guid``, the incident a push opens, #2161); the
     org id drives recipient resolution + the no-driver no-op."""
     Event.emit(
         event_type,
@@ -105,6 +106,7 @@ def _emit_alert_event(rule: AlertRule, event: AlertEvent, event_type: str) -> No
             "severity": event.severity,
             "summary": event.summary,
             "rule_guid": str(rule.guid),
+            "alert_event_guid": str(event.guid),
         },
         resource_kind="alert_rule",
         resource_id=str(rule.guid),

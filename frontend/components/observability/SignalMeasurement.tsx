@@ -2,7 +2,10 @@
 
 import { useTranslations } from "next-intl";
 
-import type { AstroliftAppGoldenSignal } from "@/graphql/__generated__/schema";
+import type {
+  AstroliftAppGoldenSignal,
+  AstroliftAppNetworkSeries,
+} from "@/graphql/__generated__/schema";
 
 const reasonKey = (reason: string) => {
   if (["ENVIRONMENT_NOT_FOUND", "WORKLOAD_NOT_FOUND", "TARGET_NOT_OWNED"].includes(reason))
@@ -22,8 +25,13 @@ const reasonKey = (reason: string) => {
   return reason;
 };
 
-/** The server reports effective scope independently for every signal. */
-export function SignalMeasurement({ signal }: { signal: AstroliftAppGoldenSignal | undefined }) {
+/** The server reports effective scope independently for every signal and
+ *  every network direction (#2271). */
+export function SignalMeasurement({
+  signal,
+}: {
+  signal: AstroliftAppGoldenSignal | AstroliftAppNetworkSeries | undefined;
+}) {
   const t = useTranslations("apps.observability.signalMeasurement");
   const measured = signal?.measurement;
   if (!measured) return <p className="text-muted-foreground mb-3 text-xs">{t("unreported")}</p>;

@@ -227,6 +227,7 @@ from astrolift_workflows.activities.static_site import (
 )
 from astrolift_workflows.activities.supply_chain_gate import evaluate_supply_chain_gate
 from astrolift_workflows.activities.uptime import probe_uptime_tick
+from astrolift_workflows.activities.workflow_github_checks import poll_github_checks
 from astrolift_workflows.activities.workflow_run_reconcile import reconcile_workflow_runs_tick
 from astrolift_workflows.activities.workflow_stage_activities import (
     aggregate_fan_out,
@@ -370,6 +371,7 @@ __all__ = [
     "poll_agent_run_status",
     "poll_agent_run_progress",
     "poll_cert_issuance",
+    "poll_github_checks",
     "poll_pipeline_job",
     "poll_rollout",
     "poll_rollout_on_target",

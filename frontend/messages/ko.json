@@ -1865,11 +1865,12 @@
           "EDGE_PROMETHEUS": "인그레스 지표",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "없음"
         },
         "reasons": {
           "target": "선택한 대상이 사용 불가능합니다.",
-          "partial": "측정이 불완전하거나 모호하여 비율을 표시하지 않습니다.",
+          "partial": "측정이 불완전하거나 모호하여 값을 표시하지 않습니다.",
           "noData": "이 기간에 검증된 사용량 데이터가 없습니다.",
           "readError": "측정 출처를 읽을 수 없습니다.",
           "MISSING_LIMITS": "리소스 제한이 없어 포화도를 사용할 수 없습니다.",
@@ -11576,6 +11577,16 @@
       "description": "HTTP 상태 클래스별 누적 요청 비율입니다. 마우스를 올리면 클래스별 상위 개별 코드가 표시됩니다.",
       "rate": "{rate} req/s",
       "rateWithTop": "{rate} req/s (상위: {top})"
+    },
+    "network": {
+      "title": "네트워크 I/O",
+      "description": "Pod가 초당 수신하고 송신한 바이트 수로, kubelet의 cAdvisor 네트워크 카운터에서 가져옵니다.",
+      "receive": "수신",
+      "transmit": "송신",
+      "total": "이 기간 동안 {bytes}",
+      "noDataTitle": "아직 네트워크 데이터가 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 클러스터 수집기에 이 Pod의 샘플이 쌓이면 네트워크 I/O가 여기에 표시됩니다.",
+      "notConfigured": "이 클러스터에 Prometheus 엔드포인트가 없거나, 선택한 환경 또는 워크로드를 사용할 수 없습니다."
     },
     "showPromql": "PromQL 보기",
     "tryAgain": "다시 시도",

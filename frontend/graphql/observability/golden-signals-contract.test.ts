@@ -3,9 +3,14 @@ import fs from "node:fs";
 import { buildSchema, validate } from "graphql";
 import { expect, it } from "vitest";
 
-import { GET_APP_GOLDEN_SIGNALS } from "./observability.queries";
+import { GET_APP_GOLDEN_SIGNALS, GET_APP_NETWORK_METRICS } from "./observability.queries";
 
 it("validates the actual scope/source/physical resource document against the public SDL", () => {
   const schema = buildSchema(fs.readFileSync("schema.graphql", "utf8"));
   expect(validate(schema, GET_APP_GOLDEN_SIGNALS)).toEqual([]);
+});
+
+it("validates the network I/O document against the public SDL", () => {
+  const schema = buildSchema(fs.readFileSync("schema.graphql", "utf8"));
+  expect(validate(schema, GET_APP_NETWORK_METRICS)).toEqual([]);
 });

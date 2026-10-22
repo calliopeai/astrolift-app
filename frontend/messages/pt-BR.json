@@ -1865,11 +1865,12 @@
           "EDGE_PROMETHEUS": "Métricas de ingresso",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "Nenhuma"
         },
         "reasons": {
           "target": "Destino selecionado indisponível.",
-          "partial": "Medição incompleta ou ambígua; nenhuma proporção é exibida.",
+          "partial": "Medição incompleta ou ambígua; nenhum valor é exibido.",
           "noData": "Não há dados de uso verificados neste intervalo.",
           "readError": "Não foi possível ler a fonte de medição.",
           "MISSING_LIMITS": "Faltam limites de recursos; a saturação está indisponível.",
@@ -11576,6 +11577,16 @@
       "description": "Taxa de requisições empilhada por classe de status HTTP. Passe o cursor para ver os principais códigos de cada classe.",
       "rate": "{rate} req/s",
       "rateWithTop": "{rate} req/s (principais: {top})"
+    },
+    "network": {
+      "title": "E/S de rede",
+      "description": "Bytes por segundo recebidos e enviados pelos pods, segundo os contadores de rede do cAdvisor no kubelet.",
+      "receive": "Recebidos",
+      "transmit": "Enviados",
+      "total": "{bytes} neste intervalo",
+      "noDataTitle": "Ainda não há dados de rede",
+      "noDataDescription": "Nada para mostrar neste intervalo. A E/S de rede aparecerá aqui quando o coletor do cluster tiver amostras desses pods.",
+      "notConfigured": "Este cluster não tem um endpoint do Prometheus, ou o ambiente ou a carga de trabalho selecionados não estão disponíveis."
     },
     "showPromql": "Mostrar PromQL",
     "tryAgain": "Tentar novamente",

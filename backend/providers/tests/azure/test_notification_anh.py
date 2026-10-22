@@ -219,6 +219,8 @@ def test_send_push_ios_includes_apns_wire_body(driver, fake_http) -> None:
 
 
 def test_send_push_android_uses_fcmv1_format(driver, fake_http) -> None:
+    # The fcmv1 format carries an FCM HTTP v1 message, so everything sits
+    # under ``message`` and the channel under ``android.notification`` (#2161).
     driver.send(
         target=PushTarget(
             registration_id="inst-2",
@@ -229,14 +231,17 @@ def test_send_push_android_uses_fcmv1_format(driver, fake_http) -> None:
             body="b",
             data={"x": "1"},
             action_url="https://x.test/y",
+            category="deploy.failed",
         ),
     )
     _, _, headers, body = fake_http.calls[0]
     assert headers["ServiceBusNotification-Format"] == "fcmv1"
     parsed = json.loads(body)
-    assert parsed["notification"]["title"] == "t"
-    assert parsed["data"]["x"] == "1"
-    assert parsed["data"]["action_url"] == "https://x.test/y"
+    assert set(parsed) == {"message"}
+    message = parsed["message"]
+    assert message["notification"] == {"title": "t", "body": "b"}
+    assert message["data"] == {"x": "1", "action_url": "https://x.test/y"}
+    assert message["android"] == {"notification": {"channel_id": "deploy.failed"}}
 
 
 def test_send_classifies_404_as_invalid_token(driver, fake_http) -> None:
