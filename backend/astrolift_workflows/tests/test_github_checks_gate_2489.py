@@ -87,7 +87,7 @@ class FakeGitHub:
     def __init__(self):
         self.head = FIRST
         self.listings = {FIRST: [[]], SECOND: [[]]}
-        self.pull_errors: list[int] = []
+        self.pull_errors: list[int | Exception] = []
         self.token_errors: list[Exception] = []
         self.log: list[tuple[str, str]] = []
         self.observe = None
@@ -112,8 +112,10 @@ class FakeGitHub:
         assert auth == f"Bearer {INSTALLATION_TOKEN}"
         if path == f"/repos/{REPO}/pulls/7":
             if self.pull_errors:
-                status = self.pull_errors.pop(0)
-                raise urllib.error.HTTPError(request.full_url, status, "unavailable", {}, io.BytesIO(b""))
+                error = self.pull_errors.pop(0)
+                if isinstance(error, Exception):
+                    raise error
+                raise urllib.error.HTTPError(request.full_url, error, "unavailable", {}, io.BytesIO(b""))
             return self._json({"number": 7, "head": {"sha": self.head}})
         sha = path.removeprefix(f"/repos/{REPO}/commits/").removesuffix("/check-runs")
         assert urllib.parse.parse_qs(url.query)["page"] == ["1"]
@@ -233,7 +235,7 @@ def create_gate(*, timeout=600, connection=True, builder=False):
     return {"org": org, "definition": definition, "gate": gate, "run": run}
 
 
-async def run_gate(env, plan, payload, *, extra_activities=()):
+async def run_gate(env, plan, payload, *, extra_activities=(), before_result=None):
     async with temporal_worker(
         env, workflows=[WorkflowDefinitionRunWorkflow], activities=[*REGISTERED, *extra_activities]
     ):
@@ -249,6 +251,8 @@ async def run_gate(env, plan, payload, *, extra_activities=()):
             id=plan["run"].workflow_id,
             task_queue="astrolift-test",
         )
+        if before_result is not None:
+            await before_result(handle)
         result = await asyncio.wait_for(handle.result(), 60)
         history = await handle.fetch_history()
     await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
@@ -390,6 +394,34 @@ async def test_checks_still_unfinished_at_the_stage_timeout_fail_as_timed_out(te
     assert len(timers) == 5 and timers[:4] == [60, 60, 60, 60] and timers[4] <= 60
 
 
+async def test_an_abort_stops_a_waiting_gate_at_its_next_poll(temporal_env, github):
+    plan = await sync_to_async(create_gate)()
+    github.listings[FIRST] = [[check("lint", "in_progress", None)]]
+
+    async def abort_once_waiting(handle):
+        # Time skips only while the result is awaited, so the gate is still in
+        # the wait after its first poll when the signal lands.
+        for _ in range(600):
+            rows = await gate_rows(plan)
+            if rows and (rows[0].output or {}).get("github_checks", {}).get("outcome") == "pending":
+                break
+            await asyncio.sleep(0.1)
+        else:
+            raise AssertionError("the gate never recorded its first evaluation")
+        await handle.signal(WorkflowDefinitionRunWorkflow.request_abort)
+
+    result, history = await run_gate(temporal_env, plan, {"pr": 7}, before_result=abort_once_waiting)
+
+    assert not result.ok
+    assert (result.message, result.data["status"]) == ("aborted by signal", "incomplete")
+    [row] = await gate_rows(plan)
+    assert row.status == "failed"
+    # The run stopped when that wait ended, without polling GitHub again.
+    assert len(github.reads("/pulls/7")) == 1
+    assert timer_seconds(history) == [60]
+    assert (await run_row(plan)).status == "failed"
+
+
 async def test_another_organizations_github_connection_is_never_used(temporal_env, github):
     plan = await sync_to_async(create_gate)(connection=False)
     await sync_to_async(lambda: _app_connection(_org("other")))()
@@ -489,6 +521,67 @@ def test_a_retried_poll_returns_the_recorded_decision_without_reading_github(git
         "error": "the stage execution closed before its checks were decided",
     }
     assert github.log == []
+
+
+@pytest.mark.parametrize(
+    "error,outcome,message",
+    [
+        (
+            urllib.error.HTTPError(
+                f"{API}/repos/{REPO}/pulls/7", 403, "limited", {"X-RateLimit-Remaining": "0"}, io.BytesIO(b"")
+            ),
+            "pending",
+            "GitHub rate limit reached while reading pull request #7 in acme/widgets",
+        ),
+        (429, "pending", "GitHub rate limit reached while reading pull request #7 in acme/widgets"),
+        (
+            urllib.error.URLError("offline"),
+            "pending",
+            "Could not reach GitHub to read pull request #7 in acme/widgets",
+        ),
+        (502, "pending", "GitHub returned 502 while reading pull request #7 in acme/widgets"),
+        (
+            401,
+            "error",
+            "GitHub refused the credential while reading pull request #7 in acme/widgets; reconnect or rotate it",
+        ),
+        (404, "error", "GitHub could not find pull request #7 in acme/widgets"),
+    ],
+    ids=["rate-limit", "too-many-requests", "network", "server-error", "refused-credential", "unknown-pull"],
+)
+def test_a_poll_waits_out_transient_read_failures_and_decides_on_the_rest(github, error, outcome, message):
+    waiting = {
+        "outcome": "pending",
+        "repo": REPO,
+        "pull_request": 7,
+        "sha": FIRST,
+        "required": ["lint", "test"],
+        "checks": [
+            {"name": "lint", "state": "pending", "runs": []},
+            {"name": "test", "state": "missing", "runs": []},
+        ],
+    }
+    plan, row = _closed_gate({"github_checks": waiting}, status="running")
+    github.pull_errors = [error]
+
+    result = _poll_github_checks_sync(str(plan["run"].pk), str(row.pk), CONFIG, 7, False)
+
+    row.refresh_from_db()
+    recorded = row.output["github_checks"]
+    assert recorded["error"] == message
+    if outcome == "pending":
+        # Still waiting: the row keeps the last head and checks it saw.
+        assert result == {"outcome": "pending"}
+        assert row.status == "running"
+        assert (recorded["outcome"], recorded["sha"], recorded["checks"]) == (
+            "pending",
+            FIRST,
+            waiting["checks"],
+        )
+    else:
+        assert result["outcome"] == "error"
+        assert (row.status, row.error_message) == ("failed", message)
+        assert (recorded["outcome"], recorded["sha"], recorded["checks"]) == ("error", None, [])
 
 
 def test_a_poll_is_bound_to_its_own_run_and_a_github_checks_stage(github):

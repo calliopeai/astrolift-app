@@ -185,6 +185,9 @@ def test_every_run_of_a_required_name_counts():
     assert (
         evaluate_check_runs(["test"], [run("test"), run("test", conclusion="failure")])["outcome"] == "failed"
     )
+    # A failed run decides its name even while another run of it is still going.
+    still_running = [run("test", status="in_progress", conclusion=None), run("test", conclusion="failure")]
+    assert evaluate_check_runs(["test"], still_running)["outcome"] == "failed"
     pending = evaluate_check_runs(["test"], [run("test"), run("test", status="in_progress", conclusion=None)])
     assert pending["outcome"] == "pending"
     many = [run("test") for _ in range(11)] + [run("test", conclusion="failure")]
