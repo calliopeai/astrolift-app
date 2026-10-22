@@ -6193,6 +6193,8 @@ export type AstroliftTenantCluster = {
   slug: Scalars['String']['output'];
   /** The cluster permissions the viewer holds on this cluster (#1867), from the checker the mutations use; a shared cluster's writes are the platform operator's. Advisory: offer only these, the mutation still decides. */
   viewerPermissions: Array<Scalars['String']['output']>;
+  /** The latest move of this cluster's per-app workload identity roles to a new OIDC issuer (#2472), started when a registration re-points the cluster at another cluster. Null when it was never re-pointed and outside the operator view; on a shared cluster, whose apps span organizations, only the platform operator sees it. */
+  workloadIdentityRebind?: Maybe<AstroliftWorkloadIdentityRebind>;
 };
 
 
@@ -6569,6 +6571,31 @@ export type AstroliftWorkloadIdentityGrant = {
   roleName: Scalars['String']['output'];
   scope: Scalars['String']['output'];
   state: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadIdentityRebind = {
+  /** Apps whose role now trusts the issuer, or needed nothing: no role, or one another cluster holds. */
+  appsReconciled: Scalars['Int']['output'];
+  appsTotal: Scalars['Int']['output'];
+  /** Why the move could not start or stopped before reaching every app. */
+  error: Scalars['String']['output'];
+  failures: Array<AstroliftWorkloadIdentityRebindFailure>;
+  finishedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** The issuer the roles are moved to, host and path. */
+  issuer: Scalars['String']['output'];
+  previousIssuers: Array<Scalars['String']['output']>;
+  requestedAt: Scalars['DateTime']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** pending | running | succeeded | failed */
+  state: Scalars['String']['output'];
+};
+
+export type AstroliftWorkloadIdentityRebindFailure = {
+  /** The app, as <organization slug>/<app slug>. */
+  app: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  /** The IAM role whose trust was not moved. */
+  role: Scalars['String']['output'];
 };
 
 export type AstroliftWorkloadManifest = {
@@ -18102,7 +18129,7 @@ export type GetClusterQueryVariables = Exact<{
 }>;
 
 
-export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, viewerPermissions: Array<string>, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
+export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, viewerPermissions: Array<string>, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, workloadIdentityRebind?: { state: string, issuer: string, previousIssuers: Array<string>, appsTotal: number, appsReconciled: number, error: string, requestedAt: string, startedAt?: string | null, finishedAt?: string | null, failures: Array<{ app: string, role: string, error: string }> } | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
 
 export type UpdateTenantClusterMutationVariables = Exact<{
   input: UpdateTenantClusterInput;

@@ -11966,6 +11966,27 @@
         "podsRunning": "実行中のPod",
         "cpu": "CPU",
         "memory": "メモリ"
+      },
+      "workloadIdentity": {
+        "title": "ワークロード ID ロール",
+        "state": {
+          "pending": "待機中",
+          "running": "移行中",
+          "succeeded": "移行済み",
+          "failed": "失敗"
+        },
+        "description": {
+          "pending": "このクラスターは別の OIDC 発行者を持つクラスターに付け替えられました。アプリの IAM ロールはその発行者への移行を待っています。",
+          "running": "このクラスターは別の OIDC 発行者を持つクラスターに付け替えられました。アプリの IAM ロールを移行しています。移行が終わるまで、Pod はそのロールを引き受けられません。",
+          "succeeded": "このクラスター上のすべてのアプリの IAM ロールが、クラスターの OIDC 発行者を信頼しています。",
+          "failed": "一部のアプリの IAM ロールが以前の OIDC 発行者を信頼したままのため、このクラスター上の Pod はそれらを引き受けられません。アプリをデプロイするとロールが移行され、クラスターを再登録すると残りを再試行します。"
+        },
+        "issuer": "OIDC 発行者",
+        "apps": "アプリ",
+        "progress": "{total} 件中 {reached} 件",
+        "started": "開始",
+        "finished": "完了",
+        "failuresTitle": "{count, plural, other {移行できなかったロール: # 件}}"
       }
     }
   },

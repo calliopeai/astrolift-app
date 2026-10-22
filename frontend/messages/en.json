@@ -11966,6 +11966,27 @@
         "podsRunning": "Pods running",
         "cpu": "CPU",
         "memory": "Memory"
+      },
+      "workloadIdentity": {
+        "title": "Workload identity roles",
+        "state": {
+          "pending": "Queued",
+          "running": "Moving",
+          "succeeded": "Moved",
+          "failed": "Failed"
+        },
+        "description": {
+          "pending": "The cluster was re-pointed at a cluster with another OIDC issuer. Its apps' IAM roles are queued to move to it.",
+          "running": "The cluster was re-pointed at a cluster with another OIDC issuer. Its apps' IAM roles are moving to it; a pod cannot assume a role until it has moved.",
+          "succeeded": "Every app's IAM role on this cluster trusts its OIDC issuer.",
+          "failed": "Some apps' IAM roles still trust the previous OIDC issuer, so their pods on this cluster cannot assume them. Deploying an app moves its role; registering the cluster again retries the rest."
+        },
+        "issuer": "OIDC issuer",
+        "apps": "Apps",
+        "progress": "{reached} of {total}",
+        "started": "Started",
+        "finished": "Finished",
+        "failuresTitle": "{count, plural, one {# role did not move} other {# roles did not move}}"
       }
     }
   },

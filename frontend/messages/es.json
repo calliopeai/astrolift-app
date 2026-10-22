@@ -11969,6 +11969,27 @@
         "podsRunning": "Pods en ejecución",
         "cpu": "CPU",
         "memory": "Memoria"
+      },
+      "workloadIdentity": {
+        "title": "Roles de identidad de carga de trabajo",
+        "state": {
+          "pending": "En cola",
+          "running": "Moviendo",
+          "succeeded": "Movido",
+          "failed": "Error"
+        },
+        "description": {
+          "pending": "El clúster se reasignó a un clúster con otro emisor OIDC. Los roles de IAM de sus aplicaciones están en cola para pasar a él.",
+          "running": "El clúster se reasignó a un clúster con otro emisor OIDC. Los roles de IAM de sus aplicaciones están pasando a él; un pod no puede asumir un rol hasta que se haya movido.",
+          "succeeded": "Todos los roles de IAM de las aplicaciones de este clúster confían en su emisor OIDC.",
+          "failed": "Algunos roles de IAM de aplicaciones siguen confiando en el emisor OIDC anterior, así que sus pods en este clúster no pueden asumirlos. Desplegar una aplicación mueve su rol; registrar de nuevo el clúster reintenta el resto."
+        },
+        "issuer": "Emisor OIDC",
+        "apps": "Aplicaciones",
+        "progress": "{reached} de {total}",
+        "started": "Iniciado",
+        "finished": "Terminado",
+        "failuresTitle": "{count, plural, one {# rol no se movió} other {# roles no se movieron}}"
       }
     }
   },

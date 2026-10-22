@@ -245,6 +245,9 @@ from astrolift_workflows.activities.workflow_stage_activities import (
 from astrolift_workflows.activities.workload_identity import (
     ensure_workload_identity,
 )
+from astrolift_workflows.activities.workload_identity_rebind import (
+    rebind_cluster_workload_identity,
+)
 
 __all__ = [
     "app_expiry_next_step",
@@ -387,6 +390,7 @@ __all__ = [
     "prune_audit_log",
     "prune_stale_sessions",
     "reap_agent_boxes_tick",
+    "rebind_cluster_workload_identity",
     "reconcile_agent_deployments",
     "reconcile_cluster_capabilities",
     "reconcile_runs_tick",

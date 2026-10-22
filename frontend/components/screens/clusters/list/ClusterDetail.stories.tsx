@@ -6,7 +6,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { ClusterDetail } from "./ClusterDetail";
 import { ClusterLiveStats } from "./ClusterLiveStats";
-import { CLUSTERS, LIVE_STATS, LONG_CLUSTER, detailProps } from "./fixtures";
+import { CLUSTERS, LIVE_STATS, LONG_CLUSTER, REBIND_FAILED, detailProps } from "./fixtures";
 
 const meta: Meta = {
   title: "Screens/Clusters/List/ClusterDetail",
@@ -45,6 +45,18 @@ export const Registered: Story = {
 export const Managing: Story = {
   render: () => (
     <ClusterDetail {...detailProps({ slug: CLUSTERS[1].slug, cluster: CLUSTERS[1] })} />
+  ),
+};
+
+/** Re-pointed at another cluster by a registration: its apps' roles are moving (#2472). */
+export const RePointed: Story = {
+  render: () => (
+    <ClusterDetail
+      {...detailProps({
+        cluster: { ...CLUSTERS[0], workloadIdentityRebind: REBIND_FAILED },
+        renderLiveStats: liveStats,
+      })}
+    />
   ),
 };
 

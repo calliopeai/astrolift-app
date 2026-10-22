@@ -247,6 +247,9 @@ export const LIST_CLUSTERS_PAGE = gql`
  * They used to find their cluster in ``LIST_CLUSTERS``, which stops at 200
  * rows, so a cluster past the 200th read as "not found" on its own page.
  * Null when the caller cannot see the cluster.
+ *
+ * ``workloadIdentityRebind`` (#2472) is read here only: one query per
+ * cluster, so the list pages do not ask for it.
  */
 export const GET_CLUSTER = gql`
   ${CLUSTER_FIELDS}
@@ -255,6 +258,22 @@ export const GET_CLUSTER = gql`
       ...ClusterFields
       oidcAuthConfig
       viewerPermissions
+      workloadIdentityRebind {
+        state
+        issuer
+        previousIssuers
+        appsTotal
+        appsReconciled
+        failures {
+          app
+          role
+          error
+        }
+        error
+        requestedAt
+        startedAt
+        finishedAt
+      }
     }
   }
 `;

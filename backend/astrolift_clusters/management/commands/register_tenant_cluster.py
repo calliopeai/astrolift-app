@@ -69,6 +69,11 @@ resolves ``exec_plugin`` rows itself (EKS via the AWS exec plugin, AKS
 via list_cluster_admin_credentials #311, GKE via a Workload Identity
 bearer #310), reading exactly the ``auth_config`` keys written here.
 
+An upsert that moves an AWS row to a cluster with another OIDC issuer
+(the installer's region change registers the target under the old slug)
+starts moving the trust of every per-app role minted for the row to the
+new issuer (#2472, ``astrolift_clusters.workload_identity_rebind``).
+
 Skips if no slug is provided (silent no-op), so startup scripts can
 include the call unconditionally.
 """
@@ -84,6 +89,11 @@ from django.core.management.base import BaseCommand, CommandError
 
 from astrolift_clusters.ingress_modes import IngressMode
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
+from astrolift_clusters.workload_identity_rebind import (
+    cluster_issuers,
+    normalize_issuer,
+    request_workload_identity_rebind,
+)
 from astrolift_identity.models import Organization
 from astrolift_observability.prom_client import is_cluster_internal_endpoint
 
@@ -651,6 +661,11 @@ class Command(BaseCommand):
             auth_config = {
                 "cluster_name": aws_cluster_name,
                 "region": region,
+                # The key the IRSA driver reads its issuer from. Replacing
+                # auth_config without it dropped the issuer on every start,
+                # so a re-pointed row kept the old one until a deploy
+                # rediscovered it (#2472).
+                "cluster_oidc_issuer": normalize_issuer(discovered["oidc_issuer_url"]),
             }
             provider_config = {
                 "account_id": discovered["account_id"],
@@ -798,8 +813,10 @@ class Command(BaseCommand):
         # config should take a deliberate act, not a partially-configured
         # re-run that happens on every container start.
         _existing_row_pc = TenantCluster.all_objects.filter(slug=slug).first()
+        previous_issuers: set[str] = set()
         if _existing_row_pc is not None:
             provider_config = {**(_existing_row_pc.provider_config or {}), **provider_config}
+            previous_issuers = cluster_issuers(_existing_row_pc)
 
         # Upsert. all_objects to bypass soft-delete filtering so an
         # accidentally-deleted row gets restored rather than duplicated.
@@ -868,3 +885,13 @@ class Command(BaseCommand):
 
         if ensure_edge_installed(obj):
             self.stdout.write(f"started the Envoy edge install on {slug!r}")
+
+        # The installer's region change re-points this row at another cluster
+        # by registering it under the old slug (#2472). Every per-app role
+        # minted for the row still trusts the old cluster's OIDC provider.
+        rebind = request_workload_identity_rebind(obj, previous_issuers)
+        if rebind is not None:
+            self.stdout.write(
+                f"moving the workload identity roles of {slug!r} to OIDC issuer {rebind.issuer} "
+                f"({rebind.workflow_id})"
+            )
