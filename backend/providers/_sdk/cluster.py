@@ -196,6 +196,9 @@ class NamespaceState:
     labels: dict[str, str]
     annotations: dict[str, str]
     phase: str
+    uid: str = ""
+    """``metadata.uid``. A namespace deleted and created again under the
+    same name gets a new one."""
 
 
 @dataclass(frozen=True)
@@ -918,6 +921,16 @@ class CognitoUserPoolClientInfo:
 MANAGED_LOGIN_BRANDING_LIMIT = 20
 
 
+@dataclass(frozen=True, order=True)
+class RunningImage:
+    """An image a container is running (#2465), as its pod status reports
+    it: ``containerStatuses[].image`` and the digest it resolved to,
+    ``imageID``."""
+
+    image: str
+    image_id: str
+
+
 @dataclass(frozen=True)
 class WorkloadHealth:
     """Per-Deployment health row for the Cluster Status tab (#362).
@@ -942,6 +955,10 @@ class WorkloadHealth:
     last-transition time, RFC3339-stringified. Empty string when the
     Deployment has never rolled (just created) or when the condition
     isn't present (older k8s versions).
+
+    ``running_images`` is every distinct image the owned pods' containers
+    report running (init containers excepted), sorted. Empty when the
+    pods could not be listed.
     """
 
     namespace: str
@@ -950,6 +967,7 @@ class WorkloadHealth:
     ready_replicas: int
     restart_count_24h: int
     last_image_deployed_at: str
+    running_images: tuple[RunningImage, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -1046,6 +1064,16 @@ class ClusterDriver(Protocol):
     ) -> Namespace: ...
 
     def delete_namespace(self, cluster: str, name: str, *, wait: bool = True) -> None: ...
+
+    def list_namespaces(self, cluster: ClusterContext, *, label_selector: str) -> list[NamespaceState]:
+        """Namespaces whose labels match ``label_selector``, sorted by name.
+
+        Read by the product-deployment scan (#2465). Unlike the health
+        reads below, a failure raises rather than answering ``[]``: an
+        empty answer means no namespace matched, and the scan marks every
+        product it saw before as torn down.
+        """
+        ...
 
     def list_storage_classes(self, cluster: str) -> list[StorageClassInfo]:
         """Return the cluster's StorageClasses (name + whether default).

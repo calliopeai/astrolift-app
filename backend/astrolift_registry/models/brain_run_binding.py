@@ -27,6 +27,13 @@ class BrainRunBinding(BaseCoreModel):
         # Shared with the agent, read by a run nobody launched, as the agent (#2449).
         GRANT = "grant"
 
+    class LaunchCeiling(models.TextChoices):
+        # The launch's credential reached the whole organization: a session or
+        # an organization-wide API token.
+        ORGANIZATION = "organization"
+        # A team-scoped API token, the team in ``launch_team_guid``.
+        TEAM = "team"
+
     organization = models.ForeignKey(
         "astrolift_identity.Organization",
         related_name="brain_run_bindings",
@@ -56,6 +63,12 @@ class BrainRunBinding(BaseCoreModel):
     slug = models.CharField(max_length=255)
     name = models.CharField(max_length=255, blank=True, default="")
     source = models.CharField(max_length=16, choices=Source.choices)
+    # The teams a typed token for the launching person may carry (#2470).
+    # Blank on a share's binding and on rows from before typed tokens: none.
+    launch_ceiling = models.CharField(
+        max_length=16, choices=LaunchCeiling.choices, blank=True, default="", db_default=""
+    )
+    launch_team_guid = models.UUIDField(null=True, blank=True)
     revoked_at = models.DateTimeField(null=True, blank=True)
     revoked_reason = models.CharField(max_length=255, blank=True, default="")
 

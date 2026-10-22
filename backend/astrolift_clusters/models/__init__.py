@@ -9,6 +9,7 @@ from astrolift_clusters.models.managed_domain import (
     managed_domain_for_zone,
     resolve_managed_domain,
 )
+from astrolift_clusters.models.product_deployment import ProductDeployment
 from astrolift_clusters.models.provider_plugin import ProviderPlugin, ProviderPluginConfig
 from astrolift_clusters.models.tenant_cluster import TenantCluster
 
@@ -21,6 +22,7 @@ __all__ = [
     "ClusterWorkloadIdentityRebind",
     "ManagedDomain",
     "ManagedServiceCatalogEntry",
+    "ProductDeployment",
     "ProviderPlugin",
     "ProviderPluginConfig",
     "TenantCluster",

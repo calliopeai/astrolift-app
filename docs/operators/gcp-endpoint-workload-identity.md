@@ -127,8 +127,9 @@ GUID grouped by physical namespace/KSA name, plus the accepted Endpoint grants
 and source snapshot digest. This is metadata, not authority or UID observation.
 An empty Endpoint grant union removes owned Endpoint prediction permissions
 while retaining configured original GSA/KSA identity links for current subjects.
-Full identity decommission is a separate operation; detach does not remove all
-IAM rights or prove immediate revocation of externally granted access.
+App teardown is the separate empty full union: it also removes the GSA's owned
+impersonation bindings (see [teardown](gcp-native-configuration-executor.md#teardown)).
+Neither proves immediate revocation of externally granted access.
 
 ### Server-produced Endpoint-only app plan
 

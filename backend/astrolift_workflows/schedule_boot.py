@@ -69,6 +69,10 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         ScheduleKind.SCALE_TICK,
         ScheduleKind.LOOP_TICK,
         ScheduleKind.RECONCILE_CLUSTER_CAPABILITIES,
+        # The product scan ships active (#2465): it lists labelled namespaces
+        # and reads workload health, and writes only Astrolift's own rows.
+        # Held, the Workbench and Zentinelle on a cluster stay invisible.
+        ScheduleKind.RECONCILE_PRODUCT_DEPLOYMENTS,
         ScheduleKind.REHEAL_WEBHOOK_SUBSCRIPTIONS,
         # Dispatch explicitly opted into a completion callback. Recovering its
         # persisted outbox is part of delivery, including after Temporal outages.

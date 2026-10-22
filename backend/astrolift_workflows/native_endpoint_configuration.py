@@ -22,6 +22,7 @@ from astrolift_lifecycle.models import Deployment
 from astrolift_manifest.normalize import NormalizationDefaults, normalize
 from astrolift_manifest.parser import parse_raw
 from astrolift_manifest.render import render_manifests
+from astrolift_registry.models import RegisteredApp
 from astrolift_services.gcp_app_identity_plan import (
     NativeEndpointObserver,
     endpoint_app_checkpoint,
@@ -181,6 +182,12 @@ def _preflight(input, context, current):
         raise NativeConfigurationError("CONFIGURATION_REQUIRES_COMMITTED_DATABASE")
     with deployment_app_identity_authority(input.identity_authority, context) as env:
         app, cluster = env.registered_app, env.tenant_cluster
+        # Teardown revokes the app's owned grants; a Deployment must not re-add them.
+        if app.provisioning_status in (
+            RegisteredApp.ProvisioningStatus.TEARING_DOWN,
+            RegisteredApp.ProvisioningStatus.DEREGISTERED,
+        ):
+            raise NativeConfigurationError("APP_TEARDOWN_IN_PROGRESS")
         # A platform build is a legacy in-cluster effect this slice does not compose.
         if app.effective_build_strategy != "off":
             raise NativeConfigurationError("SOURCE_BUILD_UNSUPPORTED")
@@ -520,9 +527,21 @@ def execute_native_endpoint_configuration(input, *, ports=None):
                     if checkpoint.operation != iam_operation or checkpoint.target != iam_store.target:
                         raise NativeConfigurationError("IAM_ACCEPTANCE_CHANGED")
 
+                def iam_reservation_admitted(checkpoint):
+                    iam_admitted(checkpoint)
+                    # Teardown revokes only grants an IAM journal records (#2278),
+                    # and it can begin after the preflight. Refused on the locked
+                    # app row: an operation reserved before it is one the removal
+                    # finds, pending behind the mutexes this run holds.
+                    if checkpoint.app.provisioning_status in (
+                        RegisteredApp.ProvisioningStatus.TEARING_DOWN,
+                        RegisteredApp.ProvisioningStatus.DEREGISTERED,
+                    ):
+                        raise NativeConfigurationError("APP_TEARDOWN_IN_PROGRESS")
+
                 iam_reservation = iam_store.reserve(
                     iam_operation,
-                    checkpoint=iam_admitted,
+                    checkpoint=iam_reservation_admitted,
                     expected_version=previous_iam_row.version if previous_iam_row is not None else None,
                 )
                 iam = (iam_store, iam_reservation)

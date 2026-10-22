@@ -190,6 +190,18 @@ class OperationIdentity:
             raise JournalError("INVALID_OPERATION")
 
 
+def removal_authority_sha256(organization_id: str, app_id: str, cluster_id: str) -> str:
+    """Authority reference of an app teardown's removal operation (#2278).
+
+    A teardown, not a Deployment origin, accepts the removal, so the reference
+    is derived from the journal's original owners. It marks the operation as a
+    removal; its desired union is empty, so it can only take grants away.
+    """
+    for value in (organization_id, app_id, cluster_id):
+        _uuid(value)
+    return _hash(("astrolift.gcp-native-identity-removal.v1", organization_id, app_id, cluster_id))
+
+
 @dataclass(frozen=True)
 class Reservation:
     journal_id: str

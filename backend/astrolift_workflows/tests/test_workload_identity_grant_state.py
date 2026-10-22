@@ -2,9 +2,12 @@
 
 PR #1444 made Azure grants real role assignments; a binding could still report
 ready while one of those assignments was propagating or rejected. These cover
-the seam that closes it: what the driver reports per grant has to land on the
-binding that declared the grant, including on the path where the reconcile
-raises.
+the seam that closes it: what became of each grant has to land on the binding
+that declared the grant, including on the path where the reconcile raises.
+
+Since #2279 the Azure reconcile runs through the production identity port, so
+these drive it against a controlled ARM (``core.testing.azure_arm``) rather
+than a stand-in driver.
 """
 
 from __future__ import annotations
@@ -15,219 +18,113 @@ from unittest.mock import patch
 
 import pytest
 from _sdk.identity import GrantAssignment
+from azure.identity_owned import AzureIdentityRefused, AzureOwnedIdentityError
 
-from astrolift_clusters.models import ProviderPlugin, TenantCluster
-from astrolift_identity.models import Organization, Project, Team
+from astrolift_clusters.models import ProviderPlugin
 from astrolift_lifecycle.models import AppEnvironment
-from astrolift_registry.models import RegisteredApp
 from astrolift_services.models import (
-    ManagedService,
+    AzureWorkloadIdentity,
     WorkloadIdentityGrant,
     grant_state_for,
 )
 from astrolift_workflows.activities.workload_identity import (
     _ensure_workload_identity_sync,
+    _persist_grant_state,
 )
+from astrolift_workflows.tests.test_azure_workload_identity_2279 import (
+    BLOB_CONTRIBUTOR,
+    Binding,
+    Grant,
+    app_service,
+    azure_app,
+    blob_scope,
+    contributor,
+    controlled_arm,
+    owner_tags,
+    reconcile,
+)
+from core.app_deploy import workload_identity_role_name
+from core.testing.azure_arm import ControlledARM
 
 pytestmark = pytest.mark.django_db
 
-_SUB = "0000-sub"
-_BLOB_ROLE = "ba92f5b4-2d11-453d-a403-e96b0029c9fe"  # Storage Blob Data Contributor
-_BLOB_SCOPE = (
-    f"/subscriptions/{_SUB}/resourceGroups/rg/providers/Microsoft.Storage"
-    "/storageAccounts/acct/blobServices/default/containers/data"
+
+@pytest.fixture
+def arm(monkeypatch: Any) -> ControlledARM:
+    return controlled_arm(monkeypatch)
+
+
+_REDIS_SCOPE = (
+    "/subscriptions/6a1f8a52-1d9d-4c43-9f84-0c2f43a1d3b1/resourceGroups/rg-platform"
+    "/providers/Microsoft.Cache/Redis/cache"
 )
-_REDIS_SCOPE = f"/subscriptions/{_SUB}/resourceGroups/rg/providers/Microsoft.Cache/Redis/cache"
 
 
-@dataclass
-class _Grant:
-    resource: str
-    actions: list[str]
+def test_an_unconfirmed_assignment_is_pending_against_the_binding_that_declared_it(
+    arm: ControlledARM,
+) -> None:
+    state = azure_app()
+    store = app_service(state, "blobs")
+    arm.failures[("PUT", "/roleAssignments/")] = 400
 
-
-@dataclass
-class _Binding:
-    iam_grants: list[_Grant]
-
-
-@dataclass
-class _FakeIdentityDriver:
-    """Stands in for the Azure driver's reconcile outcome, not its plumbing."""
-
-    outcomes: list[GrantAssignment] = field(default_factory=list)
-    refusals: list[str] = field(default_factory=list)
-    raise_after_reconcile: Exception | None = None
-
-    def create_identity_role(self, name: str, permissions: list[dict[str, Any]]) -> str:
-        if self.raise_after_reconcile is not None:
-            raise self.raise_after_reconcile
-        return f"/subscriptions/{_SUB}/.../userAssignedIdentities/{name}"
-
-    def bind_service_account(self, cluster: str, namespace: str, sa: str, role: str) -> dict[str, str]:
-        return {"azure.workload.identity/client-id": "client-1"}
-
-    def grant_assignments(self) -> list[GrantAssignment]:
-        return list(self.outcomes)
-
-    def prune_refusals(self) -> list[str]:
-        return list(self.refusals)
-
-
-def _outcome(scope: str, state: str, *, reason: str = "") -> GrantAssignment:
-    return GrantAssignment(
-        role_definition_id=_BLOB_ROLE,
-        role_name="Storage Blob Data Contributor",
-        scope=scope,
-        assignment_name="00000000-0000-0000-0000-000000000001",
-        state=state,
-        reason=reason,
-    )
-
-
-def _environment() -> tuple[RegisteredApp, AppEnvironment]:
-    org = Organization.objects.create(name="Acme", slug="acme-wig")
-    team = Team.objects.create(organization=org, name="Eng", slug="eng-wig")
-    project = Project.objects.create(organization=org, team=team, name="Demo", slug="demo-wig")
-    ProviderPlugin.objects.bulk_create(
-        [
-            ProviderPlugin(
-                name="Azure",
-                slug="azure",
-                plugin_version="0.0.1",
-                capabilities_manifest={},
-                config_schema={},
-            ),
-        ],
-        ignore_conflicts=True,
-    )
-    cluster = TenantCluster.objects.create(
-        organization=org,
-        slug="aks-wig",
-        name="AKS",
-        provider_plugin=ProviderPlugin.objects.get(slug="azure"),
-        endpoint="https://example.invalid",
-    )
-    app = RegisteredApp.objects.create(
-        organization=org,
-        team=team,
-        project=project,
-        name="WIG App",
-        slug="wig-app",
-        provisioning_status="ready",
-    )
-    env = AppEnvironment.objects.create(
-        registered_app=app,
-        name="production",
-        tenant_cluster=cluster,
-    )
-    return app, env
-
-
-def _service(app: RegisteredApp, env: AppEnvironment, *, kind: str, name: str) -> ManagedService:
-    return ManagedService.objects.create(
-        registered_app=app,
-        app_environment=env,
-        kind=kind,
-        variant="v1",
-        name=name,
-        backend_ref=f"{kind}/{name}",
-        config={},
-    )
-
-
-def _run(app: RegisteredApp, env: AppEnvironment, driver: _FakeIdentityDriver, bindings: dict[str, Any]):
-    """Run the reconcile with each service's binding taken from ``bindings``."""
-
-    def binding_for(svc):
-        return bindings.get(svc.name)
-
-    with (
-        patch(
-            "astrolift_workflows.activities.managed_service_lifecycle._managed_binding_for",
-            side_effect=binding_for,
-        ),
-        patch(
-            "astrolift_workflows.activities.capability_deprovision._resolve_capability_driver",
-            return_value=driver,
-        ),
-    ):
-        return _ensure_workload_identity_sync(app.pk, env.pk)
-
-
-def test_a_pending_assignment_is_recorded_against_the_binding_that_declared_it() -> None:
-    app, env = _environment()
-    store = _service(app, env, kind=ManagedService.Kind.OBJECT_STORE, name="blobs")
-    driver = _FakeIdentityDriver(
-        outcomes=[_outcome(_BLOB_SCOPE, "pending", reason="principal has not replicated")],
-    )
-
-    summary = _run(
-        app,
-        env,
-        driver,
-        {"blobs": _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])])},
-    )
+    with pytest.raises(AzureOwnedIdentityError):
+        reconcile(state, {"blobs": contributor("data")})
 
     row = WorkloadIdentityGrant.objects.get(managed_service=store)
     assert row.state == WorkloadIdentityGrant.State.PENDING
-    assert "replicated" in row.reason
+    assert "did not confirm" in row.reason
     assert row.applied_at is None
     assert row.last_attempted_at is not None
-    assert row.scope == _BLOB_SCOPE
+    assert row.scope == blob_scope("data")
     assert grant_state_for([row]) == "pending"
-    assert summary["grants_pending"] == 1
 
 
-def test_an_applied_assignment_clears_the_reason_and_stamps_applied_at() -> None:
-    app, env = _environment()
-    _service(app, env, kind=ManagedService.Kind.OBJECT_STORE, name="blobs")
-    driver = _FakeIdentityDriver(outcomes=[_outcome(_BLOB_SCOPE, "applied")])
+def test_an_applied_assignment_clears_the_reason_and_stamps_applied_at(arm: ControlledARM) -> None:
+    state = azure_app()
+    app_service(state, "blobs")
+    arm.failures[("PUT", "/roleAssignments/")] = 400
+    with pytest.raises(AzureOwnedIdentityError):
+        reconcile(state, {"blobs": contributor("data")})
+    arm.failures.clear()
 
-    _run(
-        app,
-        env,
-        driver,
-        {"blobs": _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])])},
-    )
+    summary = reconcile(state, {"blobs": contributor("data")})
 
     row = WorkloadIdentityGrant.objects.get()
     assert row.state == WorkloadIdentityGrant.State.APPLIED
     assert row.reason == ""
     assert row.applied_at is not None
+    assert row.assignment_name in arm.roles
     assert grant_state_for([row]) == "applied"
+    assert (summary["grants_pending"], summary["grants_failed"]) == (0, 0)
 
 
-def test_a_control_plane_only_binding_records_nothing_and_is_not_pending_forever() -> None:
+def test_a_control_plane_only_binding_records_nothing_and_is_not_pending_forever(arm: ControlledARM) -> None:
     # The twelve Azure drivers whose grants are all control-plane work reach the
     # pod as a projected Secret. They require no role assignment, so requiring
     # one would leave them unready for good.
-    app, env = _environment()
-    _service(app, env, kind=ManagedService.Kind.REDIS, name="cache")
-    driver = _FakeIdentityDriver()
+    state = azure_app()
+    app_service(state, "cache")
 
-    _run(
-        app,
-        env,
-        driver,
-        {"cache": _Binding([_Grant(_REDIS_SCOPE, ["Microsoft.Cache/Redis/listKeys/action"])])},
-    )
+    reconcile(state, {"cache": Binding([Grant(_REDIS_SCOPE, ["Microsoft.Cache/Redis/listKeys/action"])])})
 
     assert WorkloadIdentityGrant.objects.count() == 0
+    assert not arm.roles
     assert grant_state_for([]) == "not_required"
 
 
-def test_an_assignment_the_driver_reported_nothing_about_is_pending_not_applied() -> None:
+def test_an_assignment_nothing_was_reported_about_is_pending_not_applied() -> None:
     # Silence reading as success is the whole failure shape of this issue.
-    app, env = _environment()
-    _service(app, env, kind=ManagedService.Kind.OBJECT_STORE, name="blobs")
-    driver = _FakeIdentityDriver(outcomes=[])
+    state = azure_app()
+    store = app_service(state, "blobs")
+    permission = {"role_definition_id": BLOB_CONTRIBUTOR, "role_name": "Blob", "scope": blob_scope("data")}
 
-    _run(
-        app,
-        env,
-        driver,
-        {"blobs": _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])])},
+    _persist_grant_state(
+        environment=state.env,
+        services=[store],
+        declared_by_service=[[permission]],
+        outcomes=[],
+        plugin_slug="azure",
+        identity_role_name="identity",
     )
 
     row = WorkloadIdentityGrant.objects.get()
@@ -235,66 +132,67 @@ def test_an_assignment_the_driver_reported_nothing_about_is_pending_not_applied(
     assert "reported nothing" in row.reason
 
 
-def test_a_failed_assignment_is_persisted_before_the_reconcile_raises() -> None:
-    app, env = _environment()
-    _service(app, env, kind=ManagedService.Kind.OBJECT_STORE, name="blobs")
-    driver = _FakeIdentityDriver(
-        outcomes=[_outcome(_BLOB_SCOPE, "failed", reason="scope outside the subscription")],
-        raise_after_reconcile=RuntimeError("scope outside the subscription"),
-    )
+def test_a_refused_identity_records_failed_assignments_before_the_reconcile_raises(
+    arm: ControlledARM,
+) -> None:
+    state = azure_app()
+    app_service(state, "blobs")
+    arm.seed_identity(workload_identity_role_name(state.app), tags={})
 
-    with pytest.raises(RuntimeError):
-        _run(
-            app,
-            env,
-            driver,
-            {"blobs": _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])])},
-        )
+    with pytest.raises(AzureIdentityRefused):
+        reconcile(state, {"blobs": contributor("data")})
 
     row = WorkloadIdentityGrant.objects.get()
     assert row.state == WorkloadIdentityGrant.State.FAILED
-    assert row.reason == "scope outside the subscription"
+    assert "ownership markers" in row.reason
     assert grant_state_for([row]) == "failed"
 
 
-def test_two_bindings_sharing_one_assignment_each_keep_a_row() -> None:
-    # The driver is handed the grant once; both bindings still depend on it, so
+def test_two_bindings_sharing_one_assignment_each_keep_a_row(arm: ControlledARM) -> None:
+    # The identity is granted once; both bindings still depend on it, so
     # neither may report ready while it is unapplied.
-    app, env = _environment()
-    _service(app, env, kind=ManagedService.Kind.OBJECT_STORE, name="blobs")
-    _service(app, env, kind=ManagedService.Kind.KV_STORE, name="lookups")
-    driver = _FakeIdentityDriver(outcomes=[_outcome(_BLOB_SCOPE, "pending", reason="settling")])
-    grant = _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])])
+    state = azure_app()
+    app_service(state, "blobs")
+    app_service(state, "lookups")
 
-    _run(app, env, driver, {"blobs": grant, "lookups": grant})
+    reconcile(state, {"blobs": contributor("data"), "lookups": contributor("data")})
 
-    owners = {row.managed_service.name for row in WorkloadIdentityGrant.objects.all()}
-    assert owners == {"blobs", "lookups"}
+    assert len(arm.roles) == 1
+    rows = WorkloadIdentityGrant.objects.all()
+    assert {row.managed_service.name for row in rows} == {"blobs", "lookups"}
+    assert {row.state for row in rows} == {"applied"}
 
 
-def test_a_grant_the_binding_stopped_declaring_is_soft_deleted() -> None:
-    app, env = _environment()
-    _service(app, env, kind=ManagedService.Kind.OBJECT_STORE, name="blobs")
-    applied = _FakeIdentityDriver(outcomes=[_outcome(_BLOB_SCOPE, "applied")])
-    _run(
-        app,
-        env,
-        applied,
-        {"blobs": _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])])},
-    )
+def test_a_grant_the_binding_stopped_declaring_is_soft_deleted(arm: ControlledARM) -> None:
+    state = azure_app()
+    app_service(state, "blobs")
+    reconcile(state, {"blobs": contributor("data")})
 
-    _run(app, env, _FakeIdentityDriver(), {"blobs": _Binding([])})
+    reconcile(state, {"blobs": Binding([])})
 
     assert WorkloadIdentityGrant.objects.count() == 0
     dropped = WorkloadIdentityGrant.all_objects.get()
     assert dropped.deleted_at is not None
+    assert not arm.roles
 
 
-def test_a_non_azure_cluster_records_no_grants() -> None:
+@dataclass
+class _FakeIdentityDriver:
+    """An AWS identity driver's reconcile outcome, not its plumbing."""
+
+    outcomes: list[GrantAssignment] = field(default_factory=list)
+
+    def create_identity_role(self, name: str, permissions: list[dict[str, Any]]) -> str:
+        return f"arn:aws:iam::111122223333:role/{name}"
+
+    def bind_service_account(self, cluster: str, namespace: str, sa: str, role: str) -> dict[str, str]:
+        return {"eks.amazonaws.com/role-arn": f"arn:aws:iam::111122223333:role/{role}"}
+
+
+def test_a_non_azure_cluster_records_no_grants(arm: ControlledARM) -> None:
     # AWS folds the grants into the role's own inline policy in the same call,
     # so there is no second object whose state could differ.
-    app, env = _environment()
-    cluster = env.tenant_cluster
+    state = azure_app()
     ProviderPlugin.objects.bulk_create(
         [
             ProviderPlugin(
@@ -307,52 +205,67 @@ def test_a_non_azure_cluster_records_no_grants() -> None:
         ],
         ignore_conflicts=True,
     )
-    cluster.provider_plugin = ProviderPlugin.objects.get(slug="aws")
-    cluster.auth_config = {"cluster_oidc_issuer": "https://oidc.example.invalid/id"}
-    cluster.save(update_fields=["provider_plugin", "auth_config", "updated_at", "version"])
-    _service(app, env, kind=ManagedService.Kind.OBJECT_STORE, name="blobs")
+    state.cluster.provider_plugin = ProviderPlugin.objects.get(slug="aws")
+    state.cluster.auth_config = {"cluster_oidc_issuer": "https://oidc.example.invalid/id"}
+    state.cluster.save(update_fields=["provider_plugin", "auth_config", "updated_at", "version"])
+    app_service(state, "blobs")
 
-    _run(
-        app,
-        env,
-        _FakeIdentityDriver(),
-        {"blobs": _Binding([_Grant("arn:aws:s3:::bucket/*", ["s3:GetObject"])])},
-    )
+    with (
+        patch(
+            "astrolift_workflows.activities.managed_service_lifecycle._managed_binding_for",
+            return_value=Binding([Grant("arn:aws:s3:::bucket/*", ["s3:GetObject"])]),
+        ),
+        patch(
+            "astrolift_workflows.activities.capability_deprovision._resolve_capability_driver",
+            return_value=_FakeIdentityDriver(),
+        ),
+    ):
+        _ensure_workload_identity_sync(state.app.pk, state.env.pk)
 
     assert WorkloadIdentityGrant.objects.count() == 0
+    assert not AzureWorkloadIdentity.objects.exists() and not arm.calls
 
 
 @pytest.mark.parametrize("reconcile_failed", [False, True])
-def test_union_assignment_outcomes_stay_on_each_environment_owner(reconcile_failed):
-    app, prod = _environment()
+def test_union_assignment_outcomes_stay_on_each_environment_owner(
+    arm: ControlledARM, reconcile_failed
+) -> None:
+    state = azure_app()
     preview = AppEnvironment.objects.create(
-        registered_app=app, tenant_cluster=prod.tenant_cluster, name="preview-pr-3"
+        registered_app=state.app,
+        tenant_cluster=state.cluster,
+        name="preview-pr-3",
+        k8s_namespace="web-wi-pr-3",
     )
-    production = _service(app, prod, kind=ManagedService.Kind.OBJECT_STORE, name="production-blobs")
-    branch = _service(app, preview, kind=ManagedService.Kind.OBJECT_STORE, name="preview-blobs")
-    preview_scope = _BLOB_SCOPE.replace("/containers/data", "/containers/preview")
-    state = "failed" if reconcile_failed else "pending"
-    driver = _FakeIdentityDriver(
-        outcomes=[
-            _outcome(_BLOB_SCOPE, state, reason="production outcome"),
-            _outcome(preview_scope, state, reason="preview outcome"),
-        ],
-        raise_after_reconcile=RuntimeError("reconcile failed") if reconcile_failed else None,
-    )
-    bindings = {
-        production.name: _Binding([_Grant(_BLOB_SCOPE, ["Storage Blob Data Contributor"])]),
-        branch.name: _Binding([_Grant(preview_scope, ["Storage Blob Data Contributor"])]),
-    }
+    production = app_service(state, "production-blobs")
+    branch = app_service(state, "preview-blobs", env=preview)
+    bindings = {production.name: contributor("data"), branch.name: contributor("preview")}
     if reconcile_failed:
-        with pytest.raises(RuntimeError, match="reconcile failed"):
-            _run(app, preview, driver, bindings)
+        arm.failures[("PUT", "/roleAssignments/")] = 400
+        with pytest.raises(AzureOwnedIdentityError):
+            reconcile(state, bindings, env=preview)
     else:
-        result = _run(app, preview, driver, bindings)
-        assert result["grants_pending"] == 2
+        result = reconcile(state, bindings, env=preview)
+        assert result["grants"] == 2
     rows = {row.managed_service_id: row for row in WorkloadIdentityGrant.objects.all()}
     assert set(rows) == {production.pk, branch.pk}
-    assert rows[production.pk].app_environment_id == prod.pk
-    assert rows[production.pk].reason == "production outcome"
+    assert rows[production.pk].app_environment_id == state.env.pk
+    assert rows[production.pk].scope == blob_scope("data")
     assert rows[branch.pk].app_environment_id == preview.pk
-    assert rows[branch.pk].reason == "preview outcome"
-    assert all(row.state == state for row in rows.values())
+    assert rows[branch.pk].scope == blob_scope("preview")
+    expected = "pending" if reconcile_failed else "applied"
+    assert all(row.state == expected for row in rows.values())
+    assert arm.identities[workload_identity_role_name(state.app)]["tags"] == owner_tags(state)
+
+
+def test_an_azure_cluster_never_reaches_the_legacy_identity_driver(arm: ControlledARM) -> None:
+    state = azure_app()
+    app_service(state, "blobs")
+
+    with patch(
+        "astrolift_workflows.activities.capability_deprovision._resolve_capability_driver",
+        side_effect=AssertionError("legacy driver"),
+    ):
+        reconcile(state, {"blobs": contributor("data")})
+
+    assert arm.roles

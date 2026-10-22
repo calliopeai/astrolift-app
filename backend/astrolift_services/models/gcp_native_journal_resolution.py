@@ -21,7 +21,10 @@ class GCPNativeJournalResolution(BaseCoreModel):
     organization = models.ForeignKey("astrolift_identity.Organization", on_delete=models.PROTECT)
     registered_app = models.ForeignKey("astrolift_registry.RegisteredApp", on_delete=models.PROTECT)
     tenant_cluster = models.ForeignKey("astrolift_clusters.TenantCluster", on_delete=models.PROTECT)
-    deployment = models.ForeignKey("astrolift_lifecycle.Deployment", on_delete=models.PROTECT)
+    # Empty for a teardown's grant removal (#2278), which no Deployment owns.
+    deployment = models.ForeignKey(
+        "astrolift_lifecycle.Deployment", null=True, blank=True, on_delete=models.PROTECT
+    )
     resolved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
     kind = models.CharField(max_length=16, choices=Kind.choices)
     journal_guid = models.UUIDField()

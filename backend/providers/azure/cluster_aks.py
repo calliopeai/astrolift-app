@@ -924,6 +924,12 @@ class AKSClusterDriver(ClusterDriver):
         )
 
     @driver_op(cloud="azure", driver="cluster")
+    def list_namespaces(self, cluster: ClusterContext, *, label_selector: str) -> list[NamespaceState]:
+        from _sdk._kube_health import namespaces_from_client
+
+        return namespaces_from_client(self._k8s(cluster.slug), label_selector=label_selector)
+
+    @driver_op(cloud="azure", driver="cluster")
     def list_regions(self) -> list[RegionInfo]:
         """Curated static list of Azure regions for the register picker
         (#860).

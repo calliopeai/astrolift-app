@@ -805,6 +805,16 @@ class KubernetesDynamicClient:
     # logic. CoreV1Api / AppsV1Api are built per-call (cheap — they
     # share the already-open ApiClient) so no extra state is needed.
 
+    def list_namespace(self, **kwargs: Any) -> Any:
+        """Proxy to ``CoreV1Api.list_namespace`` for the product scan (#2465).
+
+        Passes ``label_selector`` through unchanged. Token is refreshed
+        first, like the proxies below.
+        """
+        self._refresh_token()
+        core_v1 = self._client_module.CoreV1Api(self._api_client)
+        return core_v1.list_namespace(**kwargs)
+
     def list_namespaced_pod(self, *, namespace: str, **kwargs: Any) -> Any:
         """Proxy to ``CoreV1Api.list_namespaced_pod`` for health queries.
 
