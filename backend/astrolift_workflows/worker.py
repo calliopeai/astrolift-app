@@ -228,6 +228,7 @@ from astrolift_workflows.activities.native_endpoint_configuration import (
     complete_native_endpoint_deployment,
     configure_native_endpoint_deployment,
 )
+from astrolift_workflows.activities.native_endpoint_removal import remove_native_endpoint_identity
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
 from astrolift_workflows.activities.scheduled import (
     apply_observability_retention,
@@ -484,6 +485,7 @@ ACTIVITIES = (
     ensure_workload_identity,
     configure_native_endpoint_deployment,
     complete_native_endpoint_deployment,
+    remove_native_endpoint_identity,
     validate_deployment_identity_origin,
     mark_deployment_identity_refused,
     evaluate_alerts_tick,

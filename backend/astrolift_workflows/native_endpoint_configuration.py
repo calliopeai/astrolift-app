@@ -22,6 +22,7 @@ from astrolift_lifecycle.models import Deployment
 from astrolift_manifest.normalize import NormalizationDefaults, normalize
 from astrolift_manifest.parser import parse_raw
 from astrolift_manifest.render import render_manifests
+from astrolift_registry.models import RegisteredApp
 from astrolift_services.gcp_app_identity_plan import (
     NativeEndpointObserver,
     endpoint_app_checkpoint,
@@ -181,6 +182,12 @@ def _preflight(input, context, current):
         raise NativeConfigurationError("CONFIGURATION_REQUIRES_COMMITTED_DATABASE")
     with deployment_app_identity_authority(input.identity_authority, context) as env:
         app, cluster = env.registered_app, env.tenant_cluster
+        # Teardown revokes the app's owned grants; a Deployment must not re-add them.
+        if app.provisioning_status in (
+            RegisteredApp.ProvisioningStatus.TEARING_DOWN,
+            RegisteredApp.ProvisioningStatus.DEREGISTERED,
+        ):
+            raise NativeConfigurationError("APP_TEARDOWN_IN_PROGRESS")
         # A platform build is a legacy in-cluster effect this slice does not compose.
         if app.effective_build_strategy != "off":
             raise NativeConfigurationError("SOURCE_BUILD_UNSUPPORTED")

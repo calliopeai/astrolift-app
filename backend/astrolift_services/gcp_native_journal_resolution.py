@@ -9,7 +9,8 @@ send was observed and it calls no cloud or cluster API:
 - It refuses unless the owning Deployment is terminal (failed, superseded or
   rolled back), and, when a send may be on the wire (SENT/UNKNOWN), until the
   journal has not moved for ``GUARD``, which exceeds the native activity's
-  60 minute budget and every bounded RPC deadline.
+  60 minute budget and every bounded RPC deadline. A teardown's grant removal
+  has no Deployment: it is settled only while the app is tearing down.
 - It takes the same advisory mutexes as the executor, without waiting, so it
   cannot race a live worker.
 - Preparation: pending intents are dropped; recorded objects keep their UIDs.
@@ -49,6 +50,8 @@ from gcp.identity_owned import (
 )
 
 from astrolift_lifecycle.models import Deployment, DeploymentExecutionReceipt
+from astrolift_registry.models import RegisteredApp
+from astrolift_services.gcp_workload_identity_journal import removal_authority_sha256
 from astrolift_services.models import (
     GCPGKEAppApplyJournal,
     GCPGKEAppApplyOperation,
@@ -110,6 +113,15 @@ def unresolved_journals(app, cluster):
 
 
 def _owning_deployment(row):
+    removal = removal_authority_sha256(
+        str(row.organization.guid), str(row.registered_app.guid), str(row.tenant_cluster.guid)
+    )
+    if isinstance(row, GCPWorkloadIdentityJournal) and row.authority_reference_sha256 == removal:
+        # An app teardown's grant removal (#2278) has no Deployment; the
+        # teardown owns it, and the guard window covers a send on the wire.
+        if row.registered_app.provisioning_status != RegisteredApp.ProvisioningStatus.TEARING_DOWN:
+            raise JournalResolutionError("OPERATION_OWNER_UNAVAILABLE")
+        return None
     receipt = (
         DeploymentExecutionReceipt.all_objects.filter(
             operation_uuid=row.operation_id, kind=DeploymentExecutionReceipt.Kind.EXPECTED

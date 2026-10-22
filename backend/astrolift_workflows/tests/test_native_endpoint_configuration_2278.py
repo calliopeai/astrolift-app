@@ -1533,6 +1533,7 @@ async def test_actual_registered_configuration_worker_commits_every_stage_and_re
         "malformed_snapshot",
         "malformed_literals",
         "zero_replicas",
+        "teardown",
     ],
 )
 async def test_current_original_withdrawal_and_mixed_union_refuse_before_native_effects(
@@ -1560,6 +1561,9 @@ async def test_current_original_withdrawal_and_mixed_union_refuse_before_native_
             type(w.medops_app).objects.filter(pk=w.medops_app.pk).update(
                 manifest_raw=w.medops_app.manifest_raw.replace("replicas = 1", "replicas = 0")
             )
+        elif withdrawal == "teardown":
+            # Teardown revokes the app's owned grants; nothing may re-add them (#2278).
+            type(w.medops_app).objects.filter(pk=w.medops_app.pk).update(provisioning_status="tearing_down")
         else:
             ManagedService.objects.create(
                 registered_app=w.medops_app, app_environment=w.env, kind="postgres", name="unsupported"

@@ -8,6 +8,10 @@ Orchestrates the per-step ordering encoded in
      Ingresses / Secrets / ConfigMaps / PVCs across every cluster the
      app is deployed to. Soft-fails per-cluster so a single
      unreachable cluster doesn't strand the teardown.
+  2b. remove_native_endpoint_identity — revokes every grant the app's
+     native GCP IAM journals own (#2278). While it is pending the
+     teardown stops after revoking deploy tokens: no managed service is
+     deprovisioned and the rows stay, so a re-run converges.
   3. deprovision_app_managed_services — fans out one
      ``DeprovisionManagedServiceWorkflow`` (#320) per active
      ``ManagedService`` row. ``delete_data`` + ``force_destroy``
@@ -55,6 +59,7 @@ with workflow.unsafe.imports_passed_through():
         revoke_app_deploy_tokens,
         soft_delete_app_records,
     )
+    from astrolift_workflows.activities.native_endpoint_removal import remove_native_endpoint_identity
     from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
     from astrolift_workflows.workflows.deprovision_managed_service import (
         DeprovisionManagedServiceWorkflow,
@@ -63,6 +68,10 @@ with workflow.unsafe.imports_passed_through():
 
 _QUICK_TIMEOUT = timedelta(minutes=2)
 _NAMESPACE_TIMEOUT = timedelta(minutes=10)
+# One attempt (#2278): a lost reply leaves the removal pending, and a re-run
+# resumes it from its journal rather than sending again.
+_NATIVE_REMOVAL_TIMEOUT = timedelta(minutes=30)
+_NATIVE_REMOVAL_RETRY = RetryPolicy(maximum_attempts=1)
 # Each managed-service child workflow has its own internal 20-min
 # activity timeout (RDS final-snapshot etc.). The parent waits
 # generously so a fleet of bound services doesn't time out at the
@@ -139,6 +148,46 @@ class TearDownAppWorkflow:
             workflow.logger.warning(
                 "delete_app_namespaces raised: %s — continuing", exc,
             )
+
+        # Step 2b — native GCP identity (#2278): revoke every grant the app's
+        # IAM journals own while the Endpoints whose policies name the app
+        # still exist. Until it completes nothing below deletes anything: the
+        # tokens are revoked and the run stops with the services and rows
+        # kept, so a re-run converges. Patched so runs started before this
+        # step existed replay unchanged.
+        native: list[dict[str, Any]] | None = None
+        if workflow.patched("tear-down-native-identity-removal-2278"):
+            try:
+                native = await workflow.execute_activity(
+                    remove_native_endpoint_identity,
+                    app_id,
+                    start_to_close_timeout=_NATIVE_REMOVAL_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                    retry_policy=_NATIVE_REMOVAL_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001 -- the activity's fixed reason names what is pending
+                cause = getattr(exc, "cause", None)
+                pending = str(getattr(cause, "message", "") or exc)
+                tokens_revoked = await workflow.execute_activity(
+                    revoke_app_deploy_tokens,
+                    app_id,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+                return WorkflowResult(
+                    ok=False,
+                    message=_truncate(
+                        f"namespaces deleted: {len(namespaces_deleted)} | "
+                        f"native identity removal pending: {pending} | "
+                        f"tokens revoked: {tokens_revoked} | managed services and rows kept"
+                    ),
+                    data={
+                        "namespaces_deleted": namespaces_deleted,
+                        "native_identity": {"ok": False, "detail": pending},
+                        "tokens_revoked": tokens_revoked,
+                    },
+                )
 
         # Step 3 — fan out child workflows for managed-service
         # deprovision. One child per active ManagedService row.
@@ -224,13 +273,16 @@ class TearDownAppWorkflow:
             message_parts.append(
                 f"failures: {[f['message'] for f in failures]}",
             )
+        data: dict[str, Any] = {
+            "namespaces_deleted": namespaces_deleted,
+            "managed_service_results": child_results,
+            "tokens_revoked": tokens_revoked,
+            "soft_delete_summary": soft_delete_summary,
+        }
+        if native is not None:
+            data["native_identity"] = {"ok": True, "data": native}
         return WorkflowResult(
             ok=not failures,
             message=_truncate(" | ".join(message_parts)),
-            data={
-                "namespaces_deleted": namespaces_deleted,
-                "managed_service_results": child_results,
-                "tokens_revoked": tokens_revoked,
-                "soft_delete_summary": soft_delete_summary,
-            },
+            data=data,
         )
