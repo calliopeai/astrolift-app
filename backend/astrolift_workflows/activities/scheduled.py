@@ -19,6 +19,8 @@ from typing import TYPE_CHECKING
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 if TYPE_CHECKING:
     # Type-only: the runtime import stays inside the function, since
     # preview_gc is the Django-free module the workflow sandbox loads.
@@ -173,8 +175,7 @@ async def gc_stale_previews(stale_after_days: int = 14) -> int:
     """Fire TearDownPreviewWorkflow for previews idle > N days."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    n = await sync_to_async(_gc_stale_previews_sync)(stale_after_days)
+    n = await heartbeat_while(sync_to_async(_gc_stale_previews_sync)(stale_after_days))
     log.info("gc_stale_previews enqueued %d teardown workflow(s)", n)
     return n
 
@@ -197,8 +198,7 @@ def _poll_scheduled_job_runs_sync() -> int:
 async def poll_scheduled_job_runs() -> int:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_poll_scheduled_job_runs_sync)()
+    return await heartbeat_while(sync_to_async(_poll_scheduled_job_runs_sync)())
 
 
 # ---- Reconcile cluster capabilities -------------------------------
@@ -363,8 +363,7 @@ async def probe_app_dns_activity() -> int:
     """Refresh cached DNS probes for the app doctor."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_probe_app_dns_sync)()
+    return await heartbeat_while(sync_to_async(_probe_app_dns_sync)())
 
 
 def _probe_app_cronjob_runs_sync() -> int:
@@ -408,8 +407,7 @@ async def probe_app_cronjob_runs_activity() -> int:
     """Refresh cached cronjob-run probes for the app doctor."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_probe_app_cronjob_runs_sync)()
+    return await heartbeat_while(sync_to_async(_probe_app_cronjob_runs_sync)())
 
 
 @activity.defn(name="astrolift.scheduled.apply_observability_retention")
@@ -418,8 +416,7 @@ async def apply_observability_retention() -> int:
     number of log groups whose window changed."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_apply_observability_retention_sync)()
+    return await heartbeat_while(sync_to_async(_apply_observability_retention_sync)())
 
 
 @activity.defn(name="astrolift.scheduled.reconcile_cluster_capabilities")
@@ -433,8 +430,7 @@ async def reconcile_cluster_capabilities() -> int:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_reconcile_cluster_capabilities_sync)()
+    return await heartbeat_while(sync_to_async(_reconcile_cluster_capabilities_sync)())
 
 
 # ---- Drift detection ----------------------------------------------
@@ -462,8 +458,7 @@ def _detect_drift_sync() -> int:
 async def detect_drift() -> int:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_detect_drift_sync)()
+    return await heartbeat_while(sync_to_async(_detect_drift_sync)())
 
 
 # ---- Webhook reheal ----------------------------------------------
@@ -588,8 +583,7 @@ def _reheal_webhook_subscriptions_sync() -> int:
 async def reheal_webhook_subscriptions() -> int:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_reheal_webhook_subscriptions_sync)()
+    return await heartbeat_while(sync_to_async(_reheal_webhook_subscriptions_sync)())
 
 
 # ---- Audit log prune ---------------------------------------------
@@ -695,8 +689,7 @@ async def prune_audit_log(retention_days: int = 365) -> int:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_prune_audit_log_sync)(retention_days)
+    return await heartbeat_while(sync_to_async(_prune_audit_log_sync)(retention_days))
 
 
 # ---- Retired cost snapshot history compatibility (#2464) ------------
@@ -710,7 +703,6 @@ def _capture_platform_cost_snapshot_sync() -> int:
 @activity.defn(name="astrolift.scheduled.capture_platform_cost_snapshot")
 async def capture_platform_cost_snapshot() -> int:
     """Keep existing Temporal histories executable while operators retire schedules."""
-    activity.heartbeat()
     return 0
 
 
@@ -780,8 +772,7 @@ def _capture_quota_usage_snapshot_sync() -> int:
 async def capture_quota_usage_snapshot() -> int:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_capture_quota_usage_snapshot_sync)()
+    return await heartbeat_while(sync_to_async(_capture_quota_usage_snapshot_sync)())
 
 
 # ---- Stale-session prune (#498) -----------------------------------
@@ -860,8 +851,7 @@ async def prune_stale_sessions() -> int:
     """Soft-revoke AstroliftSession rows past the per-kind stale TTL."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_prune_stale_sessions_sync)()
+    return await heartbeat_while(sync_to_async(_prune_stale_sessions_sync)())
 
 
 # ---- Approval timeout sweep (#779) --------------------------------
@@ -903,8 +893,7 @@ async def expire_pending_approval_deployments() -> int:
     """Auto-fail pending_approval deployments past their magic-link expiry."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    n = await sync_to_async(_expire_pending_approval_deployments_sync)()
+    n = await heartbeat_while(sync_to_async(_expire_pending_approval_deployments_sync)())
     log.info("expire_pending_approval_deployments: transitioned %d deployment(s) to failed", n)
     return n
 

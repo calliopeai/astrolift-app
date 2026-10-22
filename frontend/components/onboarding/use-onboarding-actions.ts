@@ -4,6 +4,7 @@ import { useMutation } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { temporaryAppInput } from "@/components/screens/apps/temporary-app-model";
 import { GET_ONBOARDING_STATE } from "@/graphql/identity/identity.queries";
 import {
   CREATE_PROJECT,
@@ -16,8 +17,9 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 import { REGISTER_APP } from "@/graphql/registry/registry.mutations";
+import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
-import type { OnboardingStep, OnboardingWizardState } from "./types";
+import { registersApp, type OnboardingStep, type OnboardingWizardState } from "./types";
 
 export type OnboardingSubmitResult =
   | { ok: true }
@@ -51,7 +53,9 @@ export function useOnboardingActions(organizationId: string): OnboardingActions 
   const [createProject] = useMutation<{ createProject: MutationResult<AstroliftProject> }>(
     CREATE_PROJECT
   );
-  const [registerApp] = useMutation(REGISTER_APP);
+  const [registerApp] = useMutation<{ registerApp: MutationResult<AstroliftRegisteredApp> }>(
+    REGISTER_APP
+  );
 
   async function skip(): Promise<boolean> {
     try {
@@ -111,29 +115,38 @@ export function useOnboardingActions(organizationId: string): OnboardingActions 
       // 3. Register app (only when the operator actually picked a repo;
       //    the wizard treats the picker as optional so the team /
       //    project still land even without a repo).
-      if (state.sourceRepo && state.sourceConnectionId) {
+      if (registersApp(state)) {
         const appSlug = state.projectSlug;
-        await registerApp({
-          variables: {
-            input: {
-              projectId: project.id,
-              name: state.projectName.trim(),
-              slug: appSlug,
-              description: state.projectDescription || null,
-              sourceKind: "github",
-              sourceRepo: state.sourceRepo,
-              sourceUrl: state.sourceUrl || null,
-              defaultBranch: state.sourceDefaultBranch || null,
+        let appWarning: string | null = null;
+        try {
+          const { data } = await registerApp({
+            variables: {
+              input: {
+                projectId: project.id,
+                // Only a lifetime the operator set: a server without
+                // temporary apps has no such input fields (#2433).
+                ...(state.expiresIn.trim() ? temporaryAppInput(state) : {}),
+                name: state.projectName.trim(),
+                slug: appSlug,
+                description: state.projectDescription || null,
+                sourceKind: "github",
+                sourceRepo: state.sourceRepo,
+                sourceUrl: state.sourceUrl || null,
+                defaultBranch: state.sourceDefaultBranch || null,
+              },
             },
-          },
-        }).catch((err: unknown) => {
-          // Soft failure: the team + project landed; surface a
-          // warning but still close + mark complete so the operator
-          // can register the app manually from /apps/new without the
-          // wizard reopening on the next visit.
-          const msg = err instanceof Error ? err.message : t("toast.appWarning");
-          toast.warning(msg);
-        });
+          });
+          const result = data?.registerApp;
+          if (!result?.ok) appWarning = result?.errors?.[0]?.message ?? t("toast.appWarning");
+        } catch (err) {
+          appWarning = err instanceof Error ? err.message : t("toast.appWarning");
+        }
+        // Soft failure, whether the server refused the app (its lifetime
+        // policy, say) or the request failed: the team + project landed;
+        // surface a warning but still close + mark complete so the
+        // operator can register the app manually from /apps/new without
+        // the wizard reopening on the next visit.
+        if (appWarning) toast.warning(appWarning);
       }
 
       // 4. Mark onboarding complete (idempotent on the backend)

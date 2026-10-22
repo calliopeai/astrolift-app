@@ -25,6 +25,7 @@ with workflow.unsafe.imports_passed_through():
         poll_command_run,
         start_command_run,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _START_TIMEOUT = timedelta(seconds=60)
 _POLL_TIMEOUT = timedelta(seconds=30)
@@ -51,6 +52,7 @@ async def _run_to_completion(command_run_id: int) -> dict[str, Any]:
         start_command_run,
         command_run_id,
         start_to_close_timeout=_START_TIMEOUT,
+        heartbeat_timeout=HEARTBEAT_TIMEOUT,
     )
 
     deadline_polls = max(1, int(started["timeout"] / _POLL_INTERVAL.total_seconds()) + 12)
@@ -62,6 +64,7 @@ async def _run_to_completion(command_run_id: int) -> dict[str, Any]:
             poll_command_run,
             command_run_id,
             start_to_close_timeout=_POLL_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         if result["state"] != "running":
             outcome = result
@@ -71,6 +74,7 @@ async def _run_to_completion(command_run_id: int) -> dict[str, Any]:
         finish_command_run,
         args=[command_run_id, outcome],
         start_to_close_timeout=_START_TIMEOUT,
+        heartbeat_timeout=HEARTBEAT_TIMEOUT,
     )
 
 
@@ -99,6 +103,7 @@ class RunScheduledJobWorkflow:
                 "astrolift.command_run.assert_no_concurrent",
                 payload,
                 start_to_close_timeout=_POLL_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
         except Exception as exc:  # noqa: BLE001
             # A refused run is an answer, not a workflow failure: the caller

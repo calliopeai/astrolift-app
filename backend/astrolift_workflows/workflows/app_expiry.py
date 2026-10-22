@@ -35,6 +35,7 @@ with workflow.unsafe.imports_passed_through():
         record_app_expiry_teardown,
         sweep_app_expiry,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _QUICK = timedelta(minutes=2)
 _DEPROVISION = timedelta(minutes=30)
@@ -124,6 +125,7 @@ class AppExpiryWorkflow:
                     deprovision_managed_service,
                     args=[ms_id, True, False],
                     start_to_close_timeout=_DEPROVISION,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_CLEANUP_RETRY,
                 )
                 ok = bool(res.get("ok"))

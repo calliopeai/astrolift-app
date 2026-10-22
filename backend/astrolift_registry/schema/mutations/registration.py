@@ -687,6 +687,17 @@ class RegistrationMutations:
                 field=None,
             )
 
+        # Temporary apps (#2433): a new app takes its expiry from its manifest's
+        # ``[app] expires_in``, there being no expiry input here. One without
+        # it is permanent, which the organization's policy may refuse this
+        # caller, as on registerApp.
+        from astrolift_registry import expiry
+
+        permanent_refusal = expiry.permanent_refusal(
+            project.organization, remedy="give each new app's manifest an [app] expires_in"
+        )
+        actor_user_id = tenant.actor_user_id if tenant else None
+
         with allow_project_attach(actor_may_attach_project_services(project_id=project.pk)):
             result = _register_app_repo(
                 project=project,
@@ -697,8 +708,16 @@ class RegistrationMutations:
                 default_branch=input.default_branch or "main",
                 deploy_branch=input.deploy_branch or "",
                 default_cluster=managed_cluster,
+                permanent_refusal=permanent_refusal,
+                created_by_id=actor_user_id,
             )
 
+        if result.status == "refused":
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                result.error or "a new app would be permanent",
+                field="sourceRepo",
+            )
         if result.status == "fetch_failed":
             return gql_failure(ErrorCode.PRECONDITION.value, result.error or "repo fetch failed")
         if result.status == "no_apps":
@@ -720,6 +739,8 @@ class RegistrationMutations:
             app = RegisteredApp.objects.filter(guid=str(entry.app_guid)).first()
             if app is None:
                 continue
+            # The manifest's ``[app] expires_in`` makes it temporary (#2433).
+            expiry.started(app, actor_user_id=actor_user_id)
             try:
                 with allow_project_attach(actor_may_attach_project_services(app)):
                     _bootstrap_app_environments(app, [])

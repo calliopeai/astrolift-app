@@ -56,6 +56,7 @@ with workflow.unsafe.imports_passed_through():
         ensure_static_site_services,
         sync_static_assets,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 # Fargate cold-starts + image-pull can exceed 15m on first rollout (#359).
@@ -156,6 +157,7 @@ class DeployAppWorkflow:
                     resync_manifest_for_deploy,
                     deployment_id,
                     start_to_close_timeout=_MARK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
                 # #1553: a refused resync (``diverged`` / ``fetch_failed``)
@@ -173,10 +175,18 @@ class DeployAppWorkflow:
                         non_retryable=True,
                     )
             await workflow.execute_activity(
-                pre_flight, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
+                pre_flight,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
             )
             await workflow.execute_activity(
-                mark_deploying, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
+                mark_deploying,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
             )
 
             # Build step (#865, #867): the platform builds the container image
@@ -194,6 +204,7 @@ class DeployAppWorkflow:
                 fetch_app_build_strategy,
                 args=[input.registered_app_id],
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             if build_strategy != "off":
@@ -210,10 +221,11 @@ class DeployAppWorkflow:
                     ],
                     # Builds are the longest step — a cold dockerfile build
                     # can run 10+ minutes. Give it a wide window and a
-                    # heartbeat timeout (the kaniko driver heartbeats per
-                    # poll) so a slow build isn't mistaken for a stuck one.
+                    # heartbeat timeout (the activity beats for as long as
+                    # the build runs) so a slow build isn't mistaken for a
+                    # stuck one.
                     start_to_close_timeout=_BUILD_TIMEOUT,
-                    heartbeat_timeout=timedelta(minutes=2),
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_ROLLOUT_RETRY,
                 )
 
@@ -223,6 +235,7 @@ class DeployAppWorkflow:
                 provision_namespace,
                 args=[input.registered_app_id, input.app_environment_id],
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             # Static-site custom-domain TLS (#1010): CloudFront aliases need a
@@ -234,9 +247,11 @@ class DeployAppWorkflow:
             await workflow.execute_activity(
                 ensure_cloudfront_cert,
                 deployment_id,
-                # Self-bounded internal cert poll (~6m) < start_to_close; no
-                # heartbeat_timeout (the sync poll can't heartbeat from its thread).
+                # Self-bounded internal cert poll (~6m) < start_to_close. The
+                # sync poll can't heartbeat from its thread; the activity beats
+                # for it while it runs.
                 start_to_close_timeout=_BUILD_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             # Static-site topology (#1010): a static_site workload implies an
@@ -248,6 +263,7 @@ class DeployAppWorkflow:
                 ensure_static_site_services,
                 deployment_id,
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             # FaaS topology (#987): a faas workload implies a (faas/lambda [, cdn])
@@ -261,6 +277,7 @@ class DeployAppWorkflow:
                 ensure_faas_services,
                 deployment_id,
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             # Workload identity (#1011): create/update the app's IRSA role + bind
@@ -271,10 +288,15 @@ class DeployAppWorkflow:
                 ensure_workload_identity,
                 args=[input.registered_app_id, input.app_environment_id],
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             await workflow.execute_activity(
-                render_manifests, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
+                render_manifests,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
             )
             # The Secrets go first (#1758). A rotated literal changes the
             # pod-template digest, so apply rolls the pods, and a new pod
@@ -287,12 +309,14 @@ class DeployAppWorkflow:
                     update_secrets,
                     deployment_id,
                     start_to_close_timeout=_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
                 await workflow.execute_activity(
                     apply_manifests,
                     deployment_id,
                     start_to_close_timeout=_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
             else:
@@ -300,12 +324,14 @@ class DeployAppWorkflow:
                     apply_manifests,
                     deployment_id,
                     start_to_close_timeout=_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
                 await workflow.execute_activity(
                     update_secrets,
                     deployment_id,
                     start_to_close_timeout=_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
 
@@ -317,7 +343,7 @@ class DeployAppWorkflow:
                 sync_static_assets,
                 args=[SyncStaticAssetsInput(deployment_id=deployment_id, commit_sha=input.commit_sha)],
                 start_to_close_timeout=_BUILD_TIMEOUT,
-                heartbeat_timeout=timedelta(minutes=2),
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_ROLLOUT_RETRY,
             )
             # Static sites have no Ingress, so external-dns never sees them.
@@ -327,11 +353,16 @@ class DeployAppWorkflow:
                 ensure_static_dns,
                 deployment_id,
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
 
             await workflow.execute_activity(
-                wait_dns, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
+                wait_dns,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
             )
 
             if self._abort_requested:
@@ -345,6 +376,7 @@ class DeployAppWorkflow:
                         mark_failed,
                         args=[deployment_id, "aborted: superseded by a newer deploy or cancelled"],
                         start_to_close_timeout=_MARK_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         retry_policy=_STANDARD_RETRY,
                     )
                 return WorkflowResult(ok=False, message="aborted by signal")
@@ -354,13 +386,25 @@ class DeployAppWorkflow:
             # workload won't become healthy by re-running the deploy. One
             # attempt, then fall through to mark_failed (#1004).
             await workflow.execute_activity(
-                poll_rollout, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_ROLLOUT_RETRY
+                poll_rollout,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                retry_policy=_ROLLOUT_RETRY,
             )
             await workflow.execute_activity(
-                health_check, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_ROLLOUT_RETRY
+                health_check,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                retry_policy=_ROLLOUT_RETRY,
             )
             await workflow.execute_activity(
-                mark_running, deployment_id, start_to_close_timeout=_TIMEOUT, retry_policy=_STANDARD_RETRY
+                mark_running,
+                deployment_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                retry_policy=_STANDARD_RETRY,
             )
 
             return WorkflowResult(ok=True, message="deployed")
@@ -390,6 +434,7 @@ class DeployAppWorkflow:
                         restore_previous_secrets,
                         deployment_id,
                         start_to_close_timeout=_MARK_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                         retry_policy=_STANDARD_RETRY,
                     )
                 except Exception:  # noqa: BLE001 — best-effort, see above
@@ -400,6 +445,7 @@ class DeployAppWorkflow:
                 mark_failed,
                 args=[deployment_id, reason],
                 start_to_close_timeout=_MARK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             return WorkflowResult(ok=False, message=f"deploy failed: {reason}")
@@ -420,6 +466,7 @@ class DeployAppWorkflow:
                 mark_deploying,
                 input.deployment_id,
                 start_to_close_timeout=_MARK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             receipt = await workflow.execute_activity(

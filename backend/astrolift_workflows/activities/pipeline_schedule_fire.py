@@ -12,6 +12,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger(__name__)
 
 
@@ -74,5 +76,4 @@ def _next_run_number(pipeline) -> int:
 async def create_scheduled_pipeline_run(action: dict[str, Any]) -> dict[str, Any]:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_create_sync)(action)
+    return await heartbeat_while(sync_to_async(_create_sync)(action))

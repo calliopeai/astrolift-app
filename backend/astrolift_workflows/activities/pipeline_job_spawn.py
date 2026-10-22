@@ -49,6 +49,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.pipeline_job_spawn")
 
 # Pipeline jobs run in a dedicated namespace, separate from app namespaces.
@@ -1091,24 +1093,21 @@ async def mark_pipeline_run_running(pipeline_run_id: int) -> dict:
     """Transition PipelineRun → running; return job metadata for DAG sort."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_mark_pipeline_run_running_sync)(pipeline_run_id)
+    return await heartbeat_while(sync_to_async(_mark_pipeline_run_running_sync)(pipeline_run_id))
 
 
 @activity.defn(name="astrolift.pipeline.mark_run_success")
 async def mark_pipeline_run_success(pipeline_run_id: int) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_pipeline_run_success_sync)(pipeline_run_id)
+    await heartbeat_while(sync_to_async(_mark_pipeline_run_success_sync)(pipeline_run_id))
 
 
 @activity.defn(name="astrolift.pipeline.mark_run_failed")
 async def mark_pipeline_run_failed(pipeline_run_id: int, reason: str = "") -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_pipeline_run_failed_sync)(pipeline_run_id, reason)
+    await heartbeat_while(sync_to_async(_mark_pipeline_run_failed_sync)(pipeline_run_id, reason))
 
 
 @activity.defn(name="astrolift.pipeline.spawn_job")
@@ -1119,8 +1118,7 @@ async def spawn_pipeline_job(pipeline_run_id: int, job_id_str: str) -> int:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_spawn_pipeline_job_sync)(pipeline_run_id, job_id_str)
+    return await heartbeat_while(sync_to_async(_spawn_pipeline_job_sync)(pipeline_run_id, job_id_str))
 
 
 @activity.defn(name="astrolift.pipeline.poll_job")
@@ -1131,8 +1129,7 @@ async def poll_pipeline_job(job_run_id: int) -> dict:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_poll_pipeline_job_sync)(job_run_id)
+    return await heartbeat_while(sync_to_async(_poll_pipeline_job_sync)(job_run_id))
 
 
 @activity.defn(name="astrolift.pipeline.cancel_job")
@@ -1140,8 +1137,7 @@ async def cancel_pipeline_job(job_run_id: int) -> None:
     """Delete the K8s Job and mark the JobRun cancelled."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_cancel_pipeline_job_sync)(job_run_id)
+    await heartbeat_while(sync_to_async(_cancel_pipeline_job_sync)(job_run_id))
 
 
 @activity.defn(name="astrolift.pipeline.mark_job_run_cancelled")
@@ -1149,8 +1145,7 @@ async def mark_job_run_cancelled(job_run_id: int) -> None:
     """Mark a pending/running JobRun cancelled without a K8s call."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_job_run_cancelled_sync)(job_run_id)
+    await heartbeat_while(sync_to_async(_mark_job_run_cancelled_sync)(job_run_id))
 
 
 @activity.defn(name="astrolift.pipeline.mark_job_run_failed")
@@ -1158,5 +1153,4 @@ async def mark_job_run_failed(job_run_id: int, exit_code: int | None = None) -> 
     """Mark a JobRun as failed with an optional exit code."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_job_run_failed_sync)(job_run_id, exit_code)
+    await heartbeat_while(sync_to_async(_mark_job_run_failed_sync)(job_run_id, exit_code))
