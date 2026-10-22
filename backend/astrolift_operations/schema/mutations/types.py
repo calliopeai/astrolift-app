@@ -135,7 +135,7 @@ class SetNotificationProfileInput:
 
     driver: str
     """``aws_sns`` | ``gcp_fcm`` | ``azure_anh`` | ``otlp_webhook``
-    | ``multiplexer``."""
+    | ``apns`` | ``multiplexer``."""
 
     config: strawberry.scalars.JSON
 

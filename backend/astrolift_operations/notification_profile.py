@@ -13,11 +13,16 @@ this module is the shape contract orgs configure against.
 A NotificationProfile carries:
 
 * a primary ``driver`` (``aws_sns`` / ``gcp_fcm`` / ``azure_anh``
-  / ``otlp_webhook`` / ``multiplexer``)
+  / ``otlp_webhook`` / ``apns`` / ``multiplexer``)
 * a per-driver ``config`` blob (required keys validated against
   ``_REQUIRED_KEYS_BY_NOTIFICATION_DRIVER``)
 * a ``retention`` window on the per-send delivery audit log
   (default 30 days; max 365)
+
+Credentials stay out of the blob for ``apns`` and for ``gcp_fcm``'s
+service account (#2256): ``auth_key_secret_ref`` / ``credentials_secret_ref``
+name a file in the organization's own notification secrets directory, which
+the dispatcher reads at send time.
 
 When ``driver=multiplexer`` the ``config`` carries a ``children``
 list -- each child is itself a {driver, config} pair, recursively
@@ -28,6 +33,7 @@ multiplexers; same cycle-defense as the observability profile).
 from __future__ import annotations
 
 import dataclasses
+import re
 from collections.abc import Callable, Mapping, Sequence
 from enum import StrEnum
 
@@ -47,6 +53,7 @@ class NotificationDriverKind(StrEnum):
     GCP_FCM = "gcp_fcm"
     AZURE_ANH = "azure_anh"
     OTLP_WEBHOOK = "otlp_webhook"
+    APNS = "apns"
     MULTIPLEXER = "multiplexer"
 
 
@@ -73,8 +80,29 @@ _REQUIRED_KEYS_BY_NOTIFICATION_DRIVER: dict[NotificationDriverKind, frozenset[st
     # specific field -- that surfaces a clearer error to operators
     # who forgot to wire any sink.
     NotificationDriverKind.OTLP_WEBHOOK: frozenset({"channels"}),
+    # Direct APNs (#2256): the app's team, key, bundle ID and environment,
+    # and the file holding the .p8 key.
+    NotificationDriverKind.APNS: frozenset(
+        {"team_id", "key_id", "topic", "environment", "auth_key_secret_ref"},
+    ),
     NotificationDriverKind.MULTIPLEXER: frozenset({"primary", "secondaries"}),
 }
+
+# Bounds on the optional APNs keys: (minimum, maximum).
+_APNS_OPTIONAL_BOUNDS: dict[str, tuple[int, int]] = {
+    "default_ttl_seconds": (0, 28 * 24 * 3600),
+    "timeout_seconds": (1, 60),
+    "max_attempts": (1, 3),
+}
+APNS_ENVIRONMENTS = frozenset({"production", "sandbox"})
+_APPLE_ID = re.compile(r"[A-Z0-9]{10}")
+_BUNDLE_ID = re.compile(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
+
+# What a ``*_secret_ref`` the dispatcher reads may be: one file name inside
+# the organization's notification secrets directory. No separator and no
+# leading dot, so a ref can neither leave that directory nor name the
+# ``..data`` links of a mounted Kubernetes Secret.
+SECRET_REF_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 
 
 # ---- retention bounds ----------------------------------------------
@@ -175,6 +203,54 @@ def _validate_otlp_webhook_extras(*, config: Mapping) -> None:
             )
 
 
+def _validate_secret_ref(*, driver_label: str, key: str, value: object) -> None:
+    if not isinstance(value, str) or not SECRET_REF_PATTERN.fullmatch(value):
+        raise NotificationProfileError(
+            f"{driver_label} config.{key} must name a file in the organization's notification "
+            "secrets directory: letters, digits, '.', '_' and '-', not starting with '.', no path",
+        )
+
+
+def _validate_apns_extras(*, config: Mapping) -> None:
+    known = _REQUIRED_KEYS_BY_NOTIFICATION_DRIVER[NotificationDriverKind.APNS] | set(_APNS_OPTIONAL_BOUNDS)
+    unknown = set(config) - known
+    if unknown:
+        # A typo would otherwise fall back to a default silently, and a
+        # pasted key would sit in the profile blob.
+        raise NotificationProfileError(
+            f"apns config has unknown keys {sorted(unknown)}; the auth key is read from "
+            "the file auth_key_secret_ref names, never stored in the profile",
+        )
+    for key, what in (("team_id", "Apple Developer team id"), ("key_id", "APNs key id")):
+        if not isinstance(config[key], str) or not _APPLE_ID.fullmatch(config[key]):
+            raise NotificationProfileError(f"apns config.{key} must be the 10-character {what}")
+    if not isinstance(config["topic"], str) or not _BUNDLE_ID.fullmatch(config["topic"]):
+        raise NotificationProfileError(
+            "apns config.topic must be the app's bundle ID, e.g. com.example.astrolift",
+        )
+    if not isinstance(config["environment"], str) or config["environment"] not in APNS_ENVIRONMENTS:
+        raise NotificationProfileError(
+            "apns config.environment must be 'production' (App Store and TestFlight builds) "
+            "or 'sandbox' (development builds)",
+        )
+    _validate_secret_ref(driver_label="apns", key="auth_key_secret_ref", value=config["auth_key_secret_ref"])
+    for key, (low, high) in _APNS_OPTIONAL_BOUNDS.items():
+        if key not in config:
+            continue
+        value = config[key]
+        if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+            raise NotificationProfileError(f"apns config.{key} must be an integer from {low} to {high}")
+
+
+def _validate_gcp_fcm_extras(*, config: Mapping) -> None:
+    if "credentials_secret_ref" in config:
+        _validate_secret_ref(
+            driver_label="gcp_fcm",
+            key="credentials_secret_ref",
+            value=config["credentials_secret_ref"],
+        )
+
+
 def _validate_multiplexer_children(
     *,
     config: Mapping,
@@ -246,8 +322,12 @@ def validate_notification_driver_config(
 
     if kind == NotificationDriverKind.AWS_SNS:
         _validate_aws_sns_extras(config=config)
+    elif kind == NotificationDriverKind.GCP_FCM:
+        _validate_gcp_fcm_extras(config=config)
     elif kind == NotificationDriverKind.OTLP_WEBHOOK:
         _validate_otlp_webhook_extras(config=config)
+    elif kind == NotificationDriverKind.APNS:
+        _validate_apns_extras(config=config)
     elif kind == NotificationDriverKind.MULTIPLEXER:
         _validate_multiplexer_children(
             config=config,

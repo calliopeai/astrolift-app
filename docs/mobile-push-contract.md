@@ -83,6 +83,10 @@ the Android notification channel id.
 | `aws_sns` | `GCM` document: `notification` (channel `android_channel_id`) and `data`, which SNS maps to an FCM v1 message | `APNS` and `APNS_SANDBOX` documents: `aps.alert`, data keys beside `aps` |
 | `azure_anh` | `fcmv1` format: the FCM v1 message under `message` | `apple` format: `aps.alert`, data keys beside `aps` |
 | `otlp_webhook` | bridge envelope: `payload.title`, `payload.body`, `payload.data` | the same |
+| `apns` (#2256) | not served; pair it with `gcp_fcm` | sent to APNs directly: `aps.alert`, data keys beside `aps`; `apns-collapse-id` is the per-send `apns-id` |
+
+`apns` and `gcp_fcm` with a service-account key are the operator-hosted path;
+see [operator-hosted mobile push](operators/mobile-push-delivery.md).
 
 An Android app shows a notification whose channel it has not created in FCM's
 fallback channel. These categories carry no notification actions, and a client
@@ -144,7 +148,8 @@ on a real database:
   warnings and agent messages go through their production emitters; the kinds
   sent by nothing yet use the payload keys their templates read.
 - `deliveries`: the alert notification as each driver sends it to Android and
-  iOS.
+  iOS. Direct APNs sends to iOS only; its entry has the URL, headers and body,
+  with the provider token and the per-send `apns-id` as placeholders.
 - `routing`: the cases above, built from two installs' real payloads.
 
 Ids are fixed for the run, and `install_id` comes from `ASTROLIFT_INSTALL_ID`.

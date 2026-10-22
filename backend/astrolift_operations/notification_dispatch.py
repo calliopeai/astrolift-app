@@ -18,11 +18,16 @@ Pipeline:
    contract the mobile app routes by (#2161): see
    ``docs/mobile-push-contract.md`` and the generated
    ``contracts/push-notifications.json``.
-4. The dispatcher walks each recipient's live device registrations,
-   honours :class:`NotificationPreference`, resolves the right
-   per-cloud :class:`NotificationDriver` instance for the
-   recipient's organization, and calls
-   ``driver.send(target=PushTarget(...), payload=NotificationPayload(...))``.
+4. The dispatcher honours :class:`NotificationPreference`, resolves
+   the :class:`NotificationDriver` of the event's organization, walks
+   each recipient's live device registrations in that organization
+   (or registered with none), and calls
+   ``driver.send(target=PushTarget(...), payload=NotificationPayload(...))``
+   for each whose stamped ``driver`` is that driver (#2256). A device
+   registered in another organization belongs to that organization's
+   driver and audit log; one registered for another driver is skipped,
+   so a provider that never issued its token cannot report it invalid
+   and prune it.
 5. Each send attempt -- success, transient failure, invalid-token,
    skipped -- is written to the audit stream so a post-mortem can
    answer "did Alice get pushed about the secret reveal at 14:02?"
@@ -41,9 +46,12 @@ Driver resolution:
 * Production: per-recipient driver lookup keyed on the recipient's
   organization. The active ``NotificationProfile`` row's
   ``driver`` slug (``aws_sns`` / ``gcp_fcm`` / ``azure_anh`` /
-  ``otlp_webhook`` / ``multiplexer``) and ``config`` blob are
+  ``otlp_webhook`` / ``apns`` / ``multiplexer``) and ``config`` blob are
   threaded into a per-slug factory in
-  :func:`_build_driver_from_profile`. Same pattern the cost
+  :func:`_build_driver_from_profile`. The APNs key and the FCM
+  service-account key come from files in the organization's own
+  notification secrets directory (:func:`notification_secrets_dir`),
+  read each time a driver is built. Same pattern the cost
   estimator uses -- the notification driver's per-instance config
   shape does not match the ``_config_for`` cluster-config shape
   that ``driver_for_capability`` builds, so going through that
@@ -63,7 +71,9 @@ from __future__ import annotations
 import dataclasses
 import datetime as dt
 import logging
+import os
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
@@ -75,8 +85,11 @@ from _sdk.notification import (
     PushTarget,
     SendResult,
 )
+from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
+from astrolift_operations.notification_profile import SECRET_REF_PATTERN
 from core.events import EventEnvelope
 from core.mutations import AuditEntry, emit_audit
 
@@ -94,6 +107,7 @@ __all__ = [
     "NOTIFICATION_TEMPLATES",
     "NotificationDriver",
     "NotificationPayload",
+    "NotificationSecretError",
     "NotificationTemplate",
     "SendResult",
     "_build_driver_from_profile",
@@ -101,6 +115,7 @@ __all__ = [
     "dispatch_event",
     "emit_session_created_event",
     "iter_template_event_types",
+    "notification_secrets_dir",
     "register_geo_resolver",
     "resolve_driver_for_recipient",
     "set_driver_override_for_tests",
@@ -189,6 +204,7 @@ def resolve_driver_for_recipient(
         return _build_driver_from_profile(
             driver_slug=profile.driver,
             config=profile.config or {},
+            organization_id=organization_id,
         )
     except Exception:  # noqa: BLE001 -- driver build errors must not break emit
         log.warning(
@@ -225,10 +241,71 @@ def _resolve_secret(secret_ref: Any) -> str:
     return ""
 
 
+# A .p8 key is about 250 bytes and a service-account JSON key about 2.4 KB.
+NOTIFICATION_SECRET_MAX_BYTES = 64 * 1024
+
+
+class NotificationSecretError(ValueError):
+    """A ``*_secret_ref`` that does not resolve. Messages name the ref and
+    the directory, never the file's content."""
+
+
+def notification_secrets_dir(organization_id: int) -> Path:
+    """Where an organization's ``*_secret_ref`` files are read from:
+    ``ASTROLIFT_NOTIFICATION_SECRETS_DIR/<organization guid>`` (#2256).
+
+    The GUID, not the slug: a deleted organization's slug can be taken
+    again, its GUID never is.
+    """
+    from astrolift_identity.models import Organization
+
+    guid = Organization.all_objects.filter(pk=organization_id).values_list("guid", flat=True).first()
+    if guid is None:
+        raise NotificationSecretError(f"organization {organization_id} not found")
+    return Path(settings.ASTROLIFT_NOTIFICATION_SECRETS_DIR) / str(guid)
+
+
+def _read_notification_secret(*, organization_id: int | None, ref: object, key: str) -> str:
+    """The content of the file a profile's ``*_secret_ref`` names (#2256).
+
+    A ref is one file name (``SECRET_REF_PATTERN``) in the organization's own
+    directory, so a profile can use neither another organization's
+    credentials nor any other file the control plane can read. The file is
+    read each time a driver is built: a rotated Kubernetes Secret applies to
+    the next event, with no restart.
+    """
+    if organization_id is None:
+        raise NotificationSecretError(f"{key} needs an organization")
+    if not isinstance(ref, str) or not SECRET_REF_PATTERN.fullmatch(ref):
+        raise NotificationSecretError(
+            f"{key} must name a file in the organization's notification secrets directory"
+        )
+    directory = notification_secrets_dir(organization_id)
+    try:
+        with open(os.path.join(directory, ref), "rb") as handle:
+            content = handle.read(NOTIFICATION_SECRET_MAX_BYTES + 1)
+    except FileNotFoundError as exc:
+        raise NotificationSecretError(f"{key}: no file {ref!r} in {directory}") from exc
+    except OSError as exc:
+        raise NotificationSecretError(
+            f"{key}: {ref!r} in {directory} cannot be read ({exc.strerror or type(exc).__name__})"
+        ) from exc
+    if len(content) > NOTIFICATION_SECRET_MAX_BYTES:
+        raise NotificationSecretError(f"{key}: {ref!r} is larger than {NOTIFICATION_SECRET_MAX_BYTES} bytes")
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise NotificationSecretError(f"{key}: {ref!r} is not UTF-8 text") from None
+    if not text.strip():
+        raise NotificationSecretError(f"{key}: {ref!r} is empty")
+    return text
+
+
 def _build_driver_from_profile(
     *,
     driver_slug: str,
     config: dict[str, Any],
+    organization_id: int | None = None,
 ) -> NotificationDriver:
     """Per-slug factory.
 
@@ -238,6 +315,9 @@ def _build_driver_from_profile(
     image that doesn't ship a given cloud SDK can still load this
     module -- the missing import bubbles up as a build failure that
     :func:`resolve_driver_for_recipient` catches + audits.
+
+    ``organization_id`` locates the ``*_secret_ref`` files of ``apns`` and
+    ``gcp_fcm`` (:func:`notification_secrets_dir`).
     """
     if driver_slug == "aws_sns":
         from aws.notification_sns import (
@@ -261,20 +341,51 @@ def _build_driver_from_profile(
         )
 
     if driver_slug == "gcp_fcm":
-        from gcp.notification_fcm import FCMConfig, FCMNotificationDriver
-
-        # ``credentials_secret_ref`` in the profile blob is the
-        # operator-stored secret pointer. The dispatcher resolves
-        # it through the secrets backend before constructing the
-        # driver; the resolved token lands in ``access_token``.
-        access_token = _resolve_secret(config.get("credentials_secret_ref", "")) or str(
-            config.get("access_token", "")
+        from gcp.notification_fcm import (
+            FCMConfig,
+            FCMNotificationDriver,
+            service_account_token_provider,
         )
+
+        # ``credentials_secret_ref`` names the organization's
+        # service-account JSON key (#2256); tokens are minted from it,
+        # so FCM needs no GCP identity. Without it the profile's literal
+        # ``access_token`` is sent.
+        token_provider = None
+        if config.get("credentials_secret_ref"):
+            token_provider = service_account_token_provider(
+                _read_notification_secret(
+                    organization_id=organization_id,
+                    ref=config["credentials_secret_ref"],
+                    key="credentials_secret_ref",
+                ),
+            )
         return FCMNotificationDriver(
             config=FCMConfig(
                 project_id=str(config.get("project_id", "")),
-                access_token=access_token,
+                token_provider=token_provider,
+                access_token=str(config.get("access_token", "")),
                 timeout_seconds=int(config.get("timeout_seconds", 10)),
+            ),
+        )
+
+    if driver_slug == "apns":
+        from k8s_native.notification_apns import APNsConfig, APNsNotificationDriver
+
+        return APNsNotificationDriver(
+            config=APNsConfig(
+                team_id=str(config.get("team_id", "")),
+                key_id=str(config.get("key_id", "")),
+                topic=str(config.get("topic", "")),
+                environment=str(config.get("environment", "")),
+                auth_key=_read_notification_secret(
+                    organization_id=organization_id,
+                    ref=config.get("auth_key_secret_ref"),
+                    key="auth_key_secret_ref",
+                ),
+                default_ttl_seconds=int(config.get("default_ttl_seconds", 86400)),
+                timeout_seconds=float(config.get("timeout_seconds", 10)),
+                max_attempts=int(config.get("max_attempts", 2)),
             ),
         )
 
@@ -336,11 +447,13 @@ def _build_driver_from_profile(
         primary = _build_driver_from_profile(
             driver_slug=str(primary_spec.get("driver", "")),
             config=dict(primary_spec.get("config") or {}),
+            organization_id=organization_id,
         )
         secondaries = [
             _build_driver_from_profile(
                 driver_slug=str(child.get("driver", "")),
                 config=dict(child.get("config") or {}),
+                organization_id=organization_id,
             )
             for child in secondaries_spec
         ]
@@ -351,7 +464,7 @@ def _build_driver_from_profile(
 
     raise ValueError(
         f"unknown notification driver slug: {driver_slug!r}; "
-        "known: aws_sns, gcp_fcm, azure_anh, otlp_webhook, multiplexer",
+        "known: aws_sns, gcp_fcm, azure_anh, otlp_webhook, apns, multiplexer",
     )
 
 
@@ -986,12 +1099,20 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
             )
             continue
 
-        devices = list(
-            DeviceRegistration.objects.filter(
-                user_id=user_id,
-                stale_at__isnull=True,
-            )
+        devices_qs = DeviceRegistration.objects.filter(
+            user_id=user_id,
+            stale_at__isnull=True,
         )
+        if envelope.organization_id is not None:
+            # A device registered in another organization is that
+            # organization's: its driver sends to it and its audit log
+            # records it. Sending through this organization's driver
+            # handed its token to the wrong provider account, whose
+            # ``invalid_token`` then pruned the registration (#2256).
+            devices_qs = devices_qs.filter(
+                Q(organization_id=envelope.organization_id) | Q(organization_id__isnull=True)
+            )
+        devices = list(devices_qs)
         if not devices:
             _audit_dispatch(
                 envelope=envelope,
@@ -1028,6 +1149,22 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
                     token_last_4=device.device_token[-4:],
                     status="excluded",
                     detail="enrolled_session_self",
+                    driver_name=getattr(driver, "name", ""),
+                )
+                continue
+            if device.driver != getattr(driver, "name", ""):
+                # The token was registered while another driver was active,
+                # so it may belong to another provider, app or project. This
+                # driver's verdict on it would mean nothing, and an
+                # ``invalid_token`` would prune it; the app re-registers
+                # with the current driver the next time it starts.
+                _audit_dispatch(
+                    envelope=envelope,
+                    user_id=user_id,
+                    device_id=device.pk,
+                    token_last_4=device.device_token[-4:],
+                    status="driver_mismatch",
+                    detail=f"registered for {device.driver}",
                     driver_name=getattr(driver, "name", ""),
                 )
                 continue
@@ -1299,7 +1436,7 @@ def _audit_dispatch(
 
     Decision = ``ALLOW`` when the driver reported success
     (delivered / queued); ``DENY`` when the dispatcher skipped
-    (opt-out / excluded / no_device / no_driver) or the driver
+    (opt-out / excluded / no_device / no_driver / driver_mismatch) or the driver
     rejected (failed / unsupported / rate_limited / invalid_token).
     Either way the row carries enough provenance to reconstruct
     who got pushed (or why they didn't) months later.

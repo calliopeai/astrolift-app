@@ -93,8 +93,11 @@ k8s = [
     # 35.0.0 is what monorail-class AWS Django apps ship working in prod.
     "kubernetes>=29.0,<36",
     "PyYAML>=6.0",
-    # secrets_vault.py lazily imports httpx for the live-Vault client.
-    "httpx>=0.27",
+    # secrets_vault.py lazily imports httpx for the live-Vault client;
+    # notification_apns.py needs its HTTP/2 support (APNs refuses HTTP/1.1)
+    # and cryptography to sign ES256 provider tokens.
+    "httpx[http2]>=0.27",
+    "cryptography>=42",
 ]
 dev = [
     "pytest>=8.3",
