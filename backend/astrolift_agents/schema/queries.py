@@ -34,6 +34,7 @@ from astrolift_agents.models import (
     AgentInteraction,
     AgentSecretBundleRef,
     AgentTask,
+    AgentTaskArtifact,
     AgentTaskCallbackPolicy,
     AgentTaskEvent,
     AgentTaskInputMessage,
@@ -61,6 +62,7 @@ from astrolift_agents.schema.types import (
     AgentSecretStatusFilterInput,
     AgentSecretStatusPageType,
     AgentSecretStatusType,
+    AgentTaskArtifactContentType,
     AgentTaskBacklogItemType,
     AgentTaskBacklogType,
     AgentTaskCallbackPolicyType,
@@ -93,6 +95,7 @@ from astrolift_agents.schema.types import (
     agent_secret_bundle_attachment_to_type,
     agent_secret_bundle_to_type,
     agent_secret_status_to_type,
+    agent_task_artifact_content_to_type,
     agent_task_input_message_to_type,
     agent_task_to_type,
     agent_tasks_to_types,
@@ -1531,6 +1534,37 @@ class AgentsQuery:
             )
             for row in rows
         ]
+
+    @strawberry.field(
+        description=(
+            "One artifact a run attached to its result (#2488), by name, with its content. Null for an "
+            "unknown name, and to a caller with organization-wide agent.read for a task the organization "
+            "does not have. Any other task the caller cannot read is refused."
+        )
+    )
+    @require_permission(
+        Permission.AGENT_READ, scope=agent_task_scope("task_id"), operation=agent_task_operation("task_id")
+    )
+    @tenant_scoped()
+    def agent_task_artifact(
+        self, info: Info, org_id: strawberry.ID, task_id: strawberry.ID, name: str
+    ) -> AgentTaskArtifactContentType | None:
+        org_pk = _caller_org_id(info, org_id)
+        guid = _valid_guid(task_id)
+        if guid is None:
+            return None
+        task_pk = (
+            visible_agent_tasks(org_pk, Permission.AGENT_READ)
+            .filter(guid=guid, organization_id=org_pk)
+            .values_list("pk", flat=True)
+            .first()
+        )
+        if task_pk is None:
+            return None
+        row = AgentTaskArtifact.objects.filter(
+            organization_id=org_pk, agent_task_id=task_pk, name=name
+        ).first()
+        return agent_task_artifact_content_to_type(row) if row is not None else None
 
     @strawberry.field
     @require_permission(
