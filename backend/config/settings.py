@@ -111,6 +111,12 @@ CONVERSATION_TRANSFER_ADMISSION_SECONDS = int(
     env_str("ASTROLIFT_CONVERSATION_TRANSFER_ADMISSION_SECONDS", "1800")
 )
 ASTROLIFT_COLLECTOR_PROBE_IMAGE = env_str("ASTROLIFT_COLLECTOR_PROBE_IMAGE", "")
+# Push provider credentials (#2256). A notification profile's ``*_secret_ref``
+# names a file in ``<this directory>/<organization guid>/``: a Kubernetes
+# Secret the operator mounts into the web and worker pods.
+ASTROLIFT_NOTIFICATION_SECRETS_DIR = env_str(
+    "ASTROLIFT_NOTIFICATION_SECRETS_DIR", "/var/run/secrets/astrolift/notifications"
+)
 MANAGED_IDE_BROWSER_IMAGE = env_str("MANAGED_IDE_BROWSER_IMAGE", "")
 MANAGED_IDE_STORAGE_CLASS = env_str("MANAGED_IDE_STORAGE_CLASS", "")
 MANAGED_IDE_CSI_DRIVER = env_str("MANAGED_IDE_CSI_DRIVER", "")

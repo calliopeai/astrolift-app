@@ -14,6 +14,8 @@ must put them where its provider documents them:
   ``fcmv1`` the FCM v1 message under ``message``.
 * The webhook push bridge (``otlp_webhook``): the relay envelope's
   ``payload``.
+* Direct APNs (``apns``, #2256): ``aps.alert`` with the data keys beside
+  ``aps``, as SNS and Notification Hubs send it.
 """
 
 from __future__ import annotations
@@ -21,10 +23,14 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
 from _sdk.notification import DevicePlatform, NotificationPayload, PushTarget
 from aws.notification_sns import SNSNotificationConfig, SNSNotificationDriver
 from azure.notification_anh import AzureNotificationHubsConfig, AzureNotificationHubsDriver
 from gcp.notification_fcm import FCMConfig, FCMNotificationDriver
+from k8s_native.notification_apns import APNsConfig, APNsNotificationDriver, APNsResponse
 from k8s_native.notification_otlp import WebhookSMTPConfig, WebhookSMTPNotificationDriver
 
 ALERT_URL = "astrolift://alerts/0190a0b0-0000-7000-8000-0000000000e1"
@@ -168,6 +174,33 @@ def test_anh_fcmv1_sends_the_fcm_v1_message_envelope() -> None:
             "android": {"notification": {"channel_id": "alert.fired"}},
         }
     }
+
+
+def test_apns_puts_title_and_body_in_the_aps_alert_with_data_beside_it() -> None:
+    requests: list[dict[str, Any]] = []
+
+    class Transport:
+        def post(self, *, url: str, headers: dict[str, str], body: bytes) -> APNsResponse:
+            requests.append(json.loads(body))
+            return APNsResponse(200, "apple-id-1")
+
+    pem = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
+    )
+    driver = APNsNotificationDriver(
+        config=APNsConfig(
+            team_id="TEAM123456",
+            key_id="KEY1234567",
+            topic="com.example.astrolift",
+            environment="production",
+            auth_key=pem.decode("ascii"),
+            transport=Transport(),
+        )
+    )
+    assert _send(driver, DevicePlatform.IOS, "ab" * 32) == "delivered"
+    [body] = requests
+    assert body["aps"] == {"alert": ALERT, "category": "alert.fired", "sound": "default"}
+    assert {key: value for key, value in body.items() if key != "aps"} == DATA
 
 
 def test_webhook_bridge_relays_title_body_and_data_unchanged() -> None:

@@ -89,6 +89,10 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "RegisterTenantClusterInput.authConfig",
         "RunAstroliftAgentInput.callbackUrl",
         "RunAstroliftAgentInput.triggerPayload",
+        # A notification driver's config: Notification Hubs' shared access
+        # key, a webhook bearer, or an APNs key pasted where the profile
+        # refuses it (#2256).
+        "SetNotificationProfileInput.config",
         "StartWorkflowDefinitionInput.inputs",
     }
 )
