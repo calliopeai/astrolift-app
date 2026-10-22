@@ -139,3 +139,38 @@ def test_mutable_repository_pins_distinguish_full_digest(ecr_client):
         stubber.assert_no_pending_responses()
     assert len({pin["tag"] for pin in pins}) == 2
     assert {pin["digest"] for pin in pins} == set(digests)
+
+
+class _OneEntryPerTag:
+    """Real ECR's batch_get_image by digest: one entry per tag (moto returns one)."""
+
+    def __init__(self, client):
+        self._client = client
+
+    def __getattr__(self, name):
+        return getattr(self._client, name)
+
+    def batch_get_image(self, **kwargs):
+        response = self._client.batch_get_image(**kwargs)
+        images = response.get("images", [])
+        if images and "imageDigest" in kwargs["imageIds"][0]:
+            tags = self._client.describe_images(repositoryName=kwargs["repositoryName"], imageIds=kwargs["imageIds"])[
+                "imageDetails"
+            ][0]["imageTags"]
+            response["images"] = [{**images[0], "imageId": {**images[0]["imageId"], "imageTag": tag}} for tag in tags]
+        return response
+
+
+def test_redeploying_a_pinned_digest_pins_it_again(registry, ecr_client):
+    """A rebuild of an unchanged image asks for a digest that already carries
+    the previous deployment's pin; ECR answers with one entry per tag."""
+    _, repo, digest = registry
+    driver = ECRDriver(
+        config=ECRConfig(region="us-east-1", account_id="123456789012"), client=_OneEntryPerTag(ecr_client)
+    )
+    env = str(uuid4())
+    first = driver.retain_deployment_images([f"{repo.uri}@{digest}"], environment=env, deployment=str(uuid4()))
+    second = driver.retain_deployment_images([f"{repo.uri}@{digest}"], environment=env, deployment=str(uuid4()))
+    assert second[0]["digest"] == digest
+    tags = ecr_client.describe_images(repositoryName=repo.name)["imageDetails"][0]["imageTags"]
+    assert {first[0]["tag"], second[0]["tag"], "sha-abc"} <= set(tags)
