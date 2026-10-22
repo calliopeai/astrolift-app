@@ -650,3 +650,17 @@ def test_the_check_command_names_what_is_missing() -> None:
         call_command("notification_driver_check", organization=org.slug, stdout=StringIO())
     with pytest.raises(CommandError, match="no organization"):
         call_command("notification_driver_check", organization="nobody-here", stdout=StringIO())
+
+
+def test_the_check_command_fails_on_an_unhealthy_driver() -> None:
+    org = _org("acme")
+    # A webhook profile with no URL and no SMTP host builds, but reaches nothing.
+    NotificationProfile.objects.create(
+        organization=org, driver="otlp_webhook", config={"channels": ["webhook"]}
+    )
+    out = StringIO()
+    with pytest.raises(CommandError, match="health check failed"):
+        call_command("notification_driver_check", organization=org.slug, stdout=out)
+    assert out.getvalue().splitlines()[-1] == (
+        "health: failing -- no channels configured (webhook + smtp empty)"
+    )

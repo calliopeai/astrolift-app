@@ -488,3 +488,14 @@ def test_the_default_transport_reads_status_apns_id_and_reason() -> None:
     with pytest.raises(APNsTransportError) as raised:
         transport.post(url="https://api.push.apple.com/3/device/down", headers=headers, body=b"{}")
     assert str(raised.value) == "ConnectError"
+
+
+def test_the_device_token_stays_out_of_the_driver_log(clock, key, caplog) -> None:
+    transport = FakeTransport()
+    with caplog.at_level("INFO", logger="astrolift.providers"):
+        _driver(transport, clock, key).send_bulk(
+            targets=[PushTarget(registration_id=TOKEN, platform=DevicePlatform.IOS)], payload=PAYLOAD
+        )
+    assert len(transport.requests) == 1
+    assert any(record.getMessage() == "driver_op start" for record in caplog.records)
+    assert all(TOKEN not in repr(record.__dict__) for record in caplog.records)
