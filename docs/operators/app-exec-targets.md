@@ -79,9 +79,9 @@ Legacy connections omit both `environmentId` and a target. They open only in an
 app with exactly one nondeleted environment, using its recorded namespace; an
 invalid mapping is refused, with no fallback to the organization's default
 cluster. A preview environment counts, so an app with an open preview has more
-than one. Current policy uses that environment and its cluster region; the
-environments of a deleted app that had the same slug never count and never
-supply them. For an app with more than one environment, the `open` gets an `error`
+than one. Current policy uses that environment and its cluster region.
+Environments of a deleted app that had the same slug are neither counted nor
+read by policy. For an app with more than one environment, the `open` gets an `error`
 frame and the connection closes with 4409 before any pod is contacted or audit
 row is written. The relay never chooses the first or default environment.
 A legacy session carries no admitted `target` and no reviewed-mapping recheck
