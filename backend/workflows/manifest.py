@@ -438,7 +438,7 @@ def emit_workflow_manifest(parsed: ParsedWorkflowManifest) -> str:
     return tomli_w.dumps(doc)
 
 
-def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowManifest:
+def definition_to_manifest(definition: WorkflowDefinition, *, stage_rows=None) -> ParsedWorkflowManifest:
     """Build the structured form from a persisted ``WorkflowDefinition``.
 
     Reads the definition's ordered stages so ``emit_workflow_manifest`` can
@@ -457,7 +457,11 @@ def definition_to_manifest(definition: WorkflowDefinition) -> ParsedWorkflowMani
     )
 
     stages: list[WorkflowStageSpec] = []
-    rows = definition.stages.order_by("order").select_related("agent_definition")
+    rows = (
+        definition.stages.order_by("order").select_related("agent_definition")
+        if stage_rows is None
+        else sorted(stage_rows, key=lambda stage: stage.order)
+    )
     for stage in rows:
         agent_slug = (
             stage.agent_ref

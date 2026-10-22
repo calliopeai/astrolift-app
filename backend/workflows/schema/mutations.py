@@ -32,6 +32,11 @@ from core.schema.common import MutationResult
 from core.schema.common import ValidationError as GQLValidationError
 from core.tenancy import get_current_tenant
 from workflows.models import WorkflowDefinition, WorkflowInstance, WorkflowStage
+from workflows.schema.atomic_review_types import (
+    ActivateReviewedWorkflowScheduleInput,
+    ReviewedWorkflowScheduleApprovalReceipt,
+    approval_to_type,
+)
 from workflows.schema.reviewed_start_types import (
     StartWorkflowDefinitionInput,
     WorkflowDefinitionStartType,
@@ -43,6 +48,7 @@ from workflows.scopes import (
     definition_scope_by_slug,
     instance_scope_by_id,
     legacy_reviewed_definition_scope,
+    workflow_scope_by_guid,
 )
 
 
@@ -79,6 +85,23 @@ def _reviewed_start_audit(fn):
         if isinstance(result, AuditMutationResult) and not result.ok:
             error = result.errors[0]
             message = "Workflow start is unavailable." if error.code == ErrorCode.INTERNAL else error.message
+            return gql_failure(str(error.code), message, field=error.field)
+        return result
+
+    return wrapped
+
+
+def _reviewed_schedule_audit(fn):
+    audited = mutation_audit(action="workflow.schedule.reviewed.activate")(fn)
+
+    @wraps(audited)
+    def wrapped(*args, **kwargs):
+        result = audited(*args, **kwargs)
+        if isinstance(result, AuditMutationResult) and not result.ok:
+            error = result.errors[0]
+            message = (
+                "Schedule approval is unavailable." if error.code == ErrorCode.INTERNAL else error.message
+            )
             return gql_failure(str(error.code), message, field=error.field)
         return result
 
@@ -228,6 +251,50 @@ def _unique_clone_slug(base_slug, org):
 
 @strawberry.type
 class Mutation:
+    @strawberry.mutation(
+        description="Save explicit consent for the exact reviewed schedule; engine state remains unconfirmed."
+    )
+    @_reviewed_schedule_audit
+    @require_permission(
+        Permission.WORKFLOW_UPDATE,
+        scope=workflow_scope_by_guid("input.workflow_id"),
+        operation=agent_region_operation,
+    )
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=workflow_scope_by_guid("input.workflow_id"),
+        operation=agent_region_operation,
+    )
+    @requires_elevation(action_label="Approve a reviewed workflow schedule")
+    @tenant_scoped()
+    def activate_reviewed_workflow_schedule(
+        self,
+        info: Info,
+        input: ActivateReviewedWorkflowScheduleInput,
+    ) -> MutationResultType[ReviewedWorkflowScheduleApprovalReceipt]:
+        from workflows.atomic_review import WorkflowReviewError
+        from workflows.reviewed_schedules import (
+            ScheduleConsentDenied,
+            activate_reviewed_schedule,
+            activation_admission,
+        )
+
+        try:
+            approval = activate_reviewed_schedule(
+                workflow_id=input.workflow_id,
+                expected_digest=input.expected_schedule_review_digest,
+                request_id=input.request_id,
+                confirmed=input.confirmed,
+                admission=lambda: activation_admission(info),
+            )
+            return gql_success(approval_to_type(approval))
+        except ScheduleConsentDenied as exc:
+            return exc.result
+        except PermissionDenied:
+            return gql_failure("PERMISSION_DENIED", "Current schedule authority is required")
+        except WorkflowReviewError as exc:
+            return gql_failure("CONFLICT", str(exc))
+
     @strawberry.mutation(
         description="Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response."
     )

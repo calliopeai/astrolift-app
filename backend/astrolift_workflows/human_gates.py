@@ -13,6 +13,7 @@ from astrolift_workflows.schema.stage_temporal_types import stage_temporal_execu
 from core.permissions import Permission
 from core.tenancy import get_current_tenant
 from workflows.human_gate_protocol import GATE_UPDATE, decision_update_id, validate_gate_request
+from workflows.reviewed_runtime import stage_kind_filter
 from workflows.scopes import may_decide_human_gate, visible_runs
 
 
@@ -39,16 +40,16 @@ def find_gate(user, execution_id, stage_execution_id):
     )
     row = (
         WorkflowStageExecution.objects.filter(
+            stage_kind_filter("human_gate"),
             guid=stage_guid,
             workflow_run_id__in=runs.values("pk"),
             deleted_at__isnull=True,
-            stage__kind="human_gate",
             stage__deleted_at__isnull=True,
         )
         .select_related("stage", "workflow_run")
         .first()
     )
-    return row if row is not None and may_decide_human_gate(user, row.stage.approvers) else None
+    return row if row is not None and may_decide_human_gate(user, row.effective_stage.approvers) else None
 
 
 async def _engine_request(identity, update_id, payload=None):
@@ -131,7 +132,7 @@ def gate_state(row, user, observation=None):
     return HumanGateDecisionState(
         execution_guid=str(row.workflow_run.guid),
         stage_execution_guid=str(row.guid),
-        stage_guid=str(row.stage.guid),
+        stage_guid=str(row.effective_stage.guid),
         temporal_execution=stage_temporal_execution(row),
         stage_status=row.status,
         run_status=row.workflow_run.status,

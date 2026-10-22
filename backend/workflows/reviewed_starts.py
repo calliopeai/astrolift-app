@@ -76,13 +76,19 @@ MAX_REVIEWED_DEFINITIONS = 128
 MAX_REVIEWED_STAGES = 2048
 
 
-def _definition_graph(definition, *, stages=None, lock=False):
+def _definition_graph(definition, *, stages=None, lock=False, using=None):
     """Load visible child candidates and stages in bounded breadth-first batches."""
     from workflows.composition import MAX_WORKFLOW_NESTING_DEPTH, resolve_child_definition_from_candidates
 
-    stage_query = WorkflowStage.objects.filter(deleted_at__isnull=True).order_by("pk")
+    using = using or definition._state.db
+    stage_query = (
+        WorkflowStage.objects.using(using)
+        .filter(deleted_at__isnull=True)
+        .select_related("agent_definition__registered_app")
+        .order_by("pk")
+    )
     if lock:
-        stage_query = stage_query.select_for_update()
+        stage_query = stage_query.select_for_update(of=("self",))
     root_stages = (
         list(stage_query.filter(definition=definition)[: MAX_REVIEWED_STAGES + 1])
         if stages is None
@@ -107,8 +113,9 @@ def _definition_graph(definition, *, stages=None, lock=False):
         if missing_refs:
             query = (
                 WorkflowDefinition.visible_to_org(definition.organization_id)
+                .using(using)
                 .filter(references_filter(missing_refs), is_enabled=True, deleted_at__isnull=True)
-                .select_related("project__team")
+                .select_related("project__team", "organization")
                 .order_by("pk")
             )
             if lock:
@@ -255,6 +262,32 @@ def frozen_plan(run, definition_id: str | None) -> dict | None:
                 .get("plans", {})
                 .get(str(definition_id or current.workflow_definition_id))
             )
+        from workflows.models import ReviewedWorkflowScheduleExecution
+
+        scheduled = (
+            ReviewedWorkflowScheduleExecution.all_objects.select_related(
+                "approval__workflow", "approval__definition"
+            )
+            .filter(workflow_run_id=current.pk)
+            .first()
+        )
+        if scheduled is not None:
+            from workflows.reviewed_schedules import approved_payload
+
+            if (
+                scheduled.deleted_at is not None
+                or scheduled.organization_id != run.organization_id
+                or scheduled.approval.organization_id != run.organization_id
+            ):
+                raise ReviewedStartError("The approved schedule provenance is unavailable")
+            plan = (
+                approved_payload(scheduled.approval)
+                .get("plans", {})
+                .get(str(definition_id or current.workflow_definition_id))
+            )
+            if plan is None:
+                raise ReviewedStartError("The definition is absent from the approved schedule plan")
+            return plan
         if current.parent_run_id is None:
             return None
         current = current.parent_run
@@ -300,6 +333,7 @@ def _freeze_plans(run, definition, graph=None) -> dict:
             Q(pk__in={stage.agent_definition_id for stage in all_stages if stage.agent_definition_id})
             | references_filter({stage.agent_ref for stage in all_stages if stage.agent_ref})
         )
+        .select_related("registered_app")
         .order_by("pk")
     )
     workloads = {workload.pk: workload for workload in agents}
@@ -325,6 +359,9 @@ def _freeze_plans(run, definition, graph=None) -> dict:
             review_agent_workloads=workloads,
             review_bounded_loops=True,
         )
+        from workflows.atomic_review import freeze_stage_fields
+
+        freeze_stage_fields(plan, graph["stages"][item.pk], workloads)
         plans[str(item.pk)] = plan
         for stage in plan["stages"]:
             if stage["agent_definition_id"] is not None:
