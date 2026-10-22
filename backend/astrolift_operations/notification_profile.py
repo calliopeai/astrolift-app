@@ -16,13 +16,13 @@ A NotificationProfile carries:
   / ``otlp_webhook`` / ``apns`` / ``multiplexer``)
 * a per-driver ``config`` blob (required keys validated against
   ``_REQUIRED_KEYS_BY_NOTIFICATION_DRIVER``)
+* a ``retention`` window on the per-send delivery audit log
+  (default 30 days; max 365)
 
 Credentials stay out of the blob for ``apns`` and for ``gcp_fcm``'s
 service account (#2256): ``auth_key_secret_ref`` / ``credentials_secret_ref``
 name a file in the organization's own notification secrets directory, which
 the dispatcher reads at send time.
-* a ``retention`` window on the per-send delivery audit log
-  (default 30 days; max 365)
 
 When ``driver=multiplexer`` the ``config`` carries a ``children``
 list -- each child is itself a {driver, config} pair, recursively

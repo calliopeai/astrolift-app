@@ -237,6 +237,14 @@ def test_a_token_from_another_firebase_project_fails_naming_fcms_code() -> None:
     assert result.error == "HTTP Error 403: Forbidden (PERMISSION_DENIED SENDER_ID_MISMATCH)"
 
 
+def test_the_token_endpoint_wait_is_bounded() -> None:
+    from google.auth.transport.requests import Request
+
+    request = notification_fcm._google_request()
+    assert isinstance(request.func, Request)
+    assert request.keywords == {"timeout": 10}
+
+
 def test_a_legacy_unregistered_status_still_prunes() -> None:
     http = FakeFCMHttp(error=_FCMHttpError(message="404", status_code=404, body={"error": {"status": "UNREGISTERED"}}))
     driver = FCMNotificationDriver(config=FCMConfig(project_id="p", access_token="t", http_client=http))

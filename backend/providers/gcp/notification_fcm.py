@@ -48,6 +48,7 @@ Channel coverage in this driver:
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import re
@@ -79,6 +80,7 @@ from _sdk.notification import (
 
 _FCM_ENDPOINT_TMPL = "https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
 FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
+TOKEN_REQUEST_TIMEOUT_SECONDS = 10
 _FCM_CODE = re.compile(r"[A-Z][A-Z_]{0,63}")
 
 
@@ -153,7 +155,9 @@ def service_account_token_provider(
 def _google_request() -> Any:
     from google.auth.transport.requests import Request
 
-    return Request()
+    # google-auth waits 120 s for the token endpoint by default; pushes go
+    # out from the process that emitted the event, so the wait stays short.
+    return functools.partial(Request(), timeout=TOKEN_REQUEST_TIMEOUT_SECONDS)
 
 
 @dataclass(frozen=True)
