@@ -84,10 +84,9 @@ def _target(journal):
 
 
 def _identity(target, cluster):
-    """The original GSA, pinned by its unique ID, under the current declared credential."""
+    """The original GSA, pinned by its unique ID; every checkpoint pins the declared credential."""
     try:
-        credential = credential_for_cluster(cluster)
-        identity = NativeIdentityContext(
+        return NativeIdentityContext(
             target.organization_id,
             target.app_id,
             target.cluster_id,
@@ -96,16 +95,10 @@ def _identity(target, cluster):
             target.region,
             target.gsa_id,
             target.gsa_unique_id,
-            credential,
+            credential_for_cluster(cluster),
         )
     except Exception:
         raise NativeIdentityRemovalError("CURRENT_IDENTITY_SOURCE_UNAVAILABLE") from None
-    if (
-        identity.fingerprint != target.context_sha256
-        or _hash(asdict(credential)) != target.credential_declaration_sha256
-    ):
-        raise NativeIdentityRemovalError("CURRENT_IDENTITY_SOURCE_UNAVAILABLE")
-    return identity
 
 
 def _ledger(row):
