@@ -396,8 +396,9 @@ def test_enabling_needs_staging_an_attestation_and_a_deploy_made_after_staging(w
         enable()
     _deployed(world.brain)  # before staging: rendered without the typed settings
     brain_token_rollout.stage(world.brain, operator=world.operator, apply=True)
-    with pytest.raises(RolloutRefused, match="20 to 500 characters"):
-        enable("checked")
+    for attestation in ("checked", "x" * 501):
+        with pytest.raises(RolloutRefused, match="20 to 500 characters"):
+            enable(attestation)
     with pytest.raises(RolloutRefused, match="does not run a deployment made after staging"):
         enable()
 
@@ -417,6 +418,26 @@ def test_enabling_needs_staging_an_attestation_and_a_deploy_made_after_staging(w
         enable()
     assert [entry.action for entry in audit] == ["brain.typed_tokens.stage", "brain.typed_tokens.enable"]
     assert audit[-1].extra["attestation"] == ATTESTATION
+
+
+def test_every_served_environment_needs_a_running_deployment_made_after_staging(world):
+    staging = AppEnvironment.objects.create(
+        registered_app=world.brain,
+        tenant_cluster=world.cluster,
+        name="staging",
+        url="https://staging.acme.example",
+    )
+    brain_token_rollout.stage(world.brain, operator=world.operator, apply=True)
+    _deployed(world.brain)
+    # Production's deploy since staging failed, so nothing there runs the
+    # typed settings; staging's runs them.
+    Deployment.objects.filter(registered_app=world.brain).exclude(app_environment=staging).update(
+        status=Deployment.Status.FAILED.value
+    )
+
+    with pytest.raises(RolloutRefused, match="environment production of brain"):
+        brain_token_rollout.enable(world.brain, operator=world.operator, attestation=ATTESTATION, apply=True)
+    assert not brain_tokens.typed_issuance(world.brain)
 
 
 def test_an_unserved_brain_cannot_enable(world):

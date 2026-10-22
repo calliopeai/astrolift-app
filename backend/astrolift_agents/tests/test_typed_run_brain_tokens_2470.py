@@ -146,6 +146,21 @@ def test_a_binding_from_before_launch_ceilings_carries_no_teams(world, started, 
     assert (claims["sub_kind"], claims["email"], claims["teams"]) == ("user", world.user.email, [])
 
 
+def test_a_run_whose_launcher_was_deactivated_carries_none_of_their_teams(world, started, driver):
+    _member_of_both_teams(world)
+    kb = _brain(world, "kb")
+    typed(kb, _operator(world))
+    task, key = _launched(world, driver, brains=["kb"])
+    get_user_model().objects.filter(pk=world.user.pk).update(is_active=False)
+
+    # The run still refreshes as the person (#2432 judges reads by role
+    # bindings, which ignore the account flag), so only the typed claims stop
+    # their team memberships from going with it.
+    claims = _verify(_refresh(task, key).json()["brains"][0]["token"], kb)
+
+    assert (claims["sub_kind"], claims["email"], claims["teams"]) == ("user", world.user.email, [])
+
+
 def test_an_unattended_run_reads_a_typed_brain_as_the_typed_agent(world, started, driver):
     _member_of_both_teams(world)
     admin = _admin(world)
