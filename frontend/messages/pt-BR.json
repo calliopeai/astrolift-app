@@ -130,13 +130,13 @@
     "slug": "Slug",
     "team": "Equipe",
     "created": "Criado",
-    "renameNote": "A renomeação estará disponível com a mutação do backend; o slug permanece imutável para manter estáveis as referências aos recursos.",
+    "renameNote": "Renomeie este projeto ou altere o slug com Editar na página Projetos.",
     "dangerZone": "Zona de perigo",
-    "dangerZoneDescription": "A exclusão reversível remove este projeto das listagens. As cargas de trabalho associadas continuam visíveis até serem reatribuídas.",
+    "dangerZoneDescription": "A exclusão reversível remove este projeto das listagens. Ela é recusada enquanto o projeto ainda tiver aplicativos, agentes, recursos gerenciados ou pacotes de segredos compartilhados.",
     "deleteProject": "Excluir projeto",
     "close": "Fechar",
     "deleteTitle": "Excluir o projeto {team}/{project}?",
-    "deleteDescription": "Exclusão reversível: aplicativos e agentes continuam visíveis até você reatribuí-los. O slug volta a ficar disponível.",
+    "deleteDescription": "Exclusão reversível: recusada enquanto o projeto ainda tiver aplicativos, agentes, recursos gerenciados ou pacotes de segredos compartilhados. O slug volta a ficar disponível.",
     "runFamily": {
       "task": "Tarefa",
       "service": "Serviço"
@@ -198,7 +198,7 @@
     "manageTeams": "Gerenciar equipes",
     "deleteTitle": "Excluir o projeto {team}/{project}?",
     "deleteTitleGeneric": "Excluir o projeto?",
-    "deleteDescription": "Exclusão reversível: os aplicativos continuam visíveis até você reatribuí-los. O slug volta a ficar disponível.",
+    "deleteDescription": "Exclusão reversível: recusada enquanto o projeto ainda tiver aplicativos, agentes, recursos gerenciados ou pacotes de segredos compartilhados. O slug volta a ficar disponível.",
     "deleteProject": "Excluir projeto"
   },
   "opsScreen": {

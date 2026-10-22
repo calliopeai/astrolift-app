@@ -46,6 +46,7 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 from core.install_restrictions import WithheldCapabilityError
 
 log = logging.getLogger("astrolift_workflows.activities.provision_managed_domain")
@@ -166,8 +167,7 @@ async def provision_dns_zone(cluster_id: int, zone: str) -> dict[str, Any]:
     Returns ``{"zone_id": str, "nameservers": list[str]}``."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_provision_dns_zone_sync)(cluster_id, zone)
+    result = await heartbeat_while(sync_to_async(_provision_dns_zone_sync)(cluster_id, zone))
     log.info(
         "provision_dns_zone zone=%s zone_id=%s nameservers=%s",
         zone,
@@ -245,8 +245,7 @@ async def request_wildcard_cert_for_zone(cluster_id: int, zone: str, zone_id: st
     validation records into the zone. Returns the cert_id."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    cert_id = await sync_to_async(_request_wildcard_cert_sync)(cluster_id, zone, zone_id)
+    cert_id = await heartbeat_while(sync_to_async(_request_wildcard_cert_sync)(cluster_id, zone, zone_id))
     log.info(
         "request_wildcard_cert_for_zone zone=%s cert_id=%s",
         zone,
@@ -271,8 +270,7 @@ async def poll_cert_issuance(cluster_id: int, zone: str, cert_id: str) -> dict[s
     for ``"issued"`` / ``"pending"`` / ``"failed"``."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_poll_cert_issuance_sync)(cluster_id, zone, cert_id)
+    result = await heartbeat_while(sync_to_async(_poll_cert_issuance_sync)(cluster_id, zone, cert_id))
     log.info(
         "poll_cert_issuance zone=%s cert_id=%s status=%s",
         zone,
@@ -347,8 +345,9 @@ async def register_managed_domain_row(
     """Create or update the ManagedDomain row. Returns the row PK."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    pk = await sync_to_async(_register_managed_domain_row_sync)(cluster_id, zone, zone_id, cert_id)
+    pk = await heartbeat_while(
+        sync_to_async(_register_managed_domain_row_sync)(cluster_id, zone, zone_id, cert_id)
+    )
     log.info(
         "register_managed_domain_row zone=%s pk=%d",
         zone,
@@ -451,8 +450,7 @@ async def validate_ns_delegation(cluster_id: int, zone: str) -> dict[str, Any]:
     provisioned into a zone whose registrar still points somewhere else."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_validate_ns_delegation_sync)(cluster_id, zone)
+    result = await heartbeat_while(sync_to_async(_validate_ns_delegation_sync)(cluster_id, zone))
     log.info(
         "validate_ns_delegation zone=%s passed=%s reason=%s",
         zone,
@@ -481,8 +479,7 @@ async def mark_managed_domain_active(cluster_id: int, zone: str) -> None:
     the platform and UI treat the zone as fully provisioned."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_mark_active_sync)(cluster_id, zone)
+    await heartbeat_while(sync_to_async(_mark_active_sync)(cluster_id, zone))
     log.info(
         "mark_managed_domain_active zone=%s",
         zone,
@@ -523,8 +520,7 @@ async def mark_managed_domain_provision_failed(cluster_id: int, zone: str, step:
     workflow builds without exception text. Revalidate starts a new run."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    recorded = await sync_to_async(_mark_provision_failed_sync)(zone, step, reason)
+    recorded = await heartbeat_while(sync_to_async(_mark_provision_failed_sync)(zone, step, reason))
     log.info(
         "mark_managed_domain_provision_failed zone=%s step=%s recorded=%s",
         zone,
@@ -624,8 +620,7 @@ async def reissue_cert(
     Returns ``{"cert_id": str, "validation_records": list}``."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_reissue_cert_sync)(cluster_id, zone, cert_id, zone_id)
+    result = await heartbeat_while(sync_to_async(_reissue_cert_sync)(cluster_id, zone, cert_id, zone_id))
     log.info(
         "reissue_cert zone=%s new_cert_id=%s",
         zone,
@@ -653,7 +648,6 @@ async def delegate_parent_zone(cluster_id: int, zone: str, nameservers: list[str
     manual path; the outcome is on ``dns_config["delegation_write"]``."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_delegate_parent_zone_sync)(zone, list(nameservers))
+    result = await heartbeat_while(sync_to_async(_delegate_parent_zone_sync)(zone, list(nameservers)))
     log.info("delegate_parent_zone: zone=%s cluster=%s action=%s", zone, cluster_id, result.get("action"))
     return result

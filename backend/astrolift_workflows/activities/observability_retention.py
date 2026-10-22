@@ -25,6 +25,8 @@ import dataclasses
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 
 @dataclasses.dataclass
 class ObservabilityRetentionSummary:
@@ -46,8 +48,7 @@ async def prune_observability_data() -> ObservabilityRetentionSummary:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_prune_observability_data_sync, thread_sensitive=False)()
+    return await heartbeat_while(sync_to_async(_prune_observability_data_sync, thread_sensitive=False)())
 
 
 def _prune_observability_data_sync() -> ObservabilityRetentionSummary:

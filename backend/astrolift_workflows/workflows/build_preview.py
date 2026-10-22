@@ -34,6 +34,7 @@ with workflow.unsafe.imports_passed_through():
         provision_preview_managed_services_activity,
         provision_preview_namespace,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _STEP_TIMEOUT = timedelta(minutes=10)
@@ -49,6 +50,7 @@ class BuildPreviewWorkflow:
             mark_preview_building,
             pid,
             start_to_close_timeout=_STEP_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
 
         try:
@@ -56,6 +58,7 @@ class BuildPreviewWorkflow:
                 provision_preview_namespace,
                 pid,
                 start_to_close_timeout=_STEP_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
         except Exception as exc:  # noqa: BLE001 - workflow error envelope
             await workflow.execute_activity(
@@ -63,6 +66,7 @@ class BuildPreviewWorkflow:
                 pid,
                 f"namespace provision failed: {exc}",
                 start_to_close_timeout=_STEP_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             return WorkflowResult(ok=False, message=f"preview namespace provision failed: {exc}")
 
@@ -81,6 +85,7 @@ class BuildPreviewWorkflow:
                 provision_preview_managed_services_activity,
                 pid,
                 start_to_close_timeout=_STEP_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
         except Exception as exc:  # noqa: BLE001 - workflow error envelope
             workflow.logger.warning("preview managed services failed: %s", exc)
@@ -89,6 +94,7 @@ class BuildPreviewWorkflow:
             mark_preview_running,
             pid,
             start_to_close_timeout=_STEP_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         attached = ", ".join(services.get("attached") or []) or "none"
         return WorkflowResult(

@@ -36,6 +36,8 @@ import logging
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.migration")
 
 
@@ -80,8 +82,9 @@ async def validate_migration_target(app_environment_id: int, target_cluster_id: 
     """Refuse migration when target is the source, unmanaged, or soft-deleted."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_validate_migration_target_sync)(app_environment_id, target_cluster_id)
+    await heartbeat_while(
+        sync_to_async(_validate_migration_target_sync)(app_environment_id, target_cluster_id)
+    )
 
 
 def _ensure_target_namespace(driver, ctx, namespace: str, app, env) -> None:
@@ -120,8 +123,9 @@ async def materialize_secrets_on_target(deployment_id: int, target_cluster_id: i
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    count = await sync_to_async(_materialize_secrets_on_target_sync)(deployment_id, target_cluster_id)
+    count = await heartbeat_while(
+        sync_to_async(_materialize_secrets_on_target_sync)(deployment_id, target_cluster_id)
+    )
     log.info(
         "migrate materialize_secrets_on_target applied %d secret(s)",
         count,
@@ -176,8 +180,9 @@ async def apply_to_target_cluster(
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_apply_to_target_cluster_sync)(deployment_id, target_cluster_id)
+    summary = await heartbeat_while(
+        sync_to_async(_apply_to_target_cluster_sync)(deployment_id, target_cluster_id)
+    )
     log.info(
         "migrate apply_to_target created=%d updated=%d unchanged=%d",
         len(summary["created"]),
@@ -223,8 +228,9 @@ async def poll_rollout_on_target(deployment_id: int, target_cluster_id: int) -> 
     """Wait for every workload to roll out on the target cluster."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_poll_rollout_on_target_sync)(deployment_id, target_cluster_id)
+    return await heartbeat_while(
+        sync_to_async(_poll_rollout_on_target_sync)(deployment_id, target_cluster_id)
+    )
 
 
 def _switch_app_env_binding_sync(app_environment_id: int, target_cluster_id: int) -> int:
@@ -255,8 +261,9 @@ async def switch_app_env_binding(app_environment_id: int, target_cluster_id: int
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_switch_app_env_binding_sync)(app_environment_id, target_cluster_id)
+    return await heartbeat_while(
+        sync_to_async(_switch_app_env_binding_sync)(app_environment_id, target_cluster_id)
+    )
 
 
 def _drain_source_cluster_sync(
@@ -376,11 +383,12 @@ async def drain_source_cluster(
     """Delete the app's resources from the source cluster (best-effort)."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    errors = await sync_to_async(_drain_source_cluster_sync)(
-        registered_app_id,
-        app_environment_id,
-        source_cluster_id,
+    errors = await heartbeat_while(
+        sync_to_async(_drain_source_cluster_sync)(
+            registered_app_id,
+            app_environment_id,
+            source_cluster_id,
+        )
     )
     if errors:
         log.warning(

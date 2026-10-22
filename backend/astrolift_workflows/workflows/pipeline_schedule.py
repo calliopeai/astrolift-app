@@ -25,6 +25,7 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _CREATE_TIMEOUT = timedelta(seconds=60)
 
@@ -37,6 +38,7 @@ class PipelineScheduleWorkflow:
             create_scheduled_pipeline_run,
             action,
             start_to_close_timeout=_CREATE_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         if created.get("skipped"):
             # A trigger disabled or deleted between the schedule being
