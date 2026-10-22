@@ -352,9 +352,9 @@ def _execution_signal_target(
     expected = f"WorkflowDefinitionRunWorkflow-{row.workflow_run_id}:collection:{binding.get('owner_order')}:{row.collection_index}-parent-{parent.pk}"
     if (
         parent.status != "running"
-        or parent.stage.kind != "collection"
+        or parent.effective_stage.kind != "collection"
         or parent.workflow_run_id != row.workflow_run_id
-        or parent.stage.definition_id != row.stage.definition_id
+        or parent.effective_stage.definition_id != row.effective_stage.definition_id
         or str(row.stage_id) not in binding.get("body_stage_ids", [])
         or row.collection_workflow_id != expected
     ):
@@ -383,7 +383,7 @@ def _gate_approver_refusal(user, execution_id: str, workflow_id: str) -> str | N
         .filter(workflow_run__workflow_id=workflow_id, pk=int(execution_id))
         .first()
     )
-    approvers = getattr(getattr(row, "stage", None), "approvers", None)
+    approvers = row.effective_stage.approvers if row is not None else None
     if may_decide_human_gate(user, approvers):
         return None
     return "only one of this gate's named approvers may decide it"

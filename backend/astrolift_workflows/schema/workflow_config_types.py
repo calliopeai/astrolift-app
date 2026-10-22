@@ -292,7 +292,7 @@ def run_to_type(instance) -> WorkflowRunType:
 def definition_run_to_type(run) -> WorkflowDefinitionRunType:
     definition = run.workflow_definition
     execution = run.current_stage_execution
-    stage = execution.stage if execution is not None else None
+    stage = execution.effective_stage if execution is not None else None
     return WorkflowDefinitionRunType(
         guid=str(run.guid),
         definition_guid=str(definition.guid),
@@ -335,7 +335,7 @@ def pending_gate_to_type(execution) -> PendingHumanGateType:
     whose own denormalized link is not guaranteed for every caller of
     ``create_stage_execution``.
     """
-    stage = execution.stage
+    stage = execution.effective_stage
     definition = stage.definition
     run = execution.workflow_run
     approvers = stage.approvers if isinstance(stage.approvers, list) else []
