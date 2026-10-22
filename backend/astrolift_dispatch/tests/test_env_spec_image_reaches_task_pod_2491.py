@@ -236,8 +236,14 @@ def test_an_image_only_update_reaches_a_task_queued_before_it(
         # A digest elsewhere is looked up in the -vnc repository unchanged,
         # so that repository has to hold an image with this very digest.
         (f"ghcr.io/example/agent-toolchains@{DIGEST}", f"ghcr.io/example/agent-toolchains-vnc@{DIGEST}"),
+        # A tag beside the digest: a registry pulls by the digest alone, so
+        # the -vnc goes on the repository, never on the tag.
+        (
+            f"ghcr.io/example/agent-toolchains:rust-1.90@{DIGEST}",
+            f"ghcr.io/example/agent-toolchains-vnc:rust-1.90@{DIGEST}",
+        ),
     ],
-    ids=["tag", "vnc-repository-digest", "digest"],
+    ids=["tag", "vnc-repository-digest", "digest", "tag-and-digest"],
 )
 def test_a_vnc_spec_runs_the_vnc_repository_of_its_pinned_image(
     permission_resolver, info, org, agent, cluster, enqueued, image_tag, pod_image

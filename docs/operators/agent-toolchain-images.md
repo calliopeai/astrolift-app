@@ -24,8 +24,9 @@ The control plane does not inspect an image before it runs it. The runner, the
 harness CLI and the `agent` user must already be inside, as the agent image
 contract lists; every published agent image carries that contract as the
 `astrolift-agent-contract` script. Add a thin layer to a published runtime image,
-`docker.io/calliopeai/astrolift-agent-<runtime>`, pinned to its immutable
-`main-<commit>` tag or a digest; `latest` moves with every published build.
+`docker.io/calliopeai/astrolift-agent-<runtime>`, pinned to its `main-<commit>` tag
+or a digest; `latest` moves with every published build, and a rebuild of the same
+commit pushes its `main-<commit>` tag again, so only a digest names one exact image.
 
 ```dockerfile
 # A toolchain layer on a published agent runtime image.
@@ -126,13 +127,15 @@ fails on your machine rather than in a task.
 
 ### VNC specs
 
-A spec with `vncEnabled` runs the `-vnc` repository of its image:
-`registry/repo:tag` becomes `registry/repo-vnc:tag`. Build the same layer on the
-runtime's `-vnc` image (`astrolift-agent-<runtime>-vnc`) and push it there with the
-same tag. A digest is kept as it is: `repo@sha256:<d>` becomes `repo-vnc@sha256:<d>`,
-which resolves only if the `-vnc` repository holds that very image. So pin a VNC spec
-by digest with the `-vnc` image's own repository and digest; a repository that
-already ends in `-vnc` is used unchanged.
+A task dispatched with a `vncEnabled` spec runs the `-vnc` repository of its image
+(boxes run the image as it is): `registry/repo:tag` becomes `registry/repo-vnc:tag`.
+Build the same layer on the runtime's `-vnc` image (`astrolift-agent-<runtime>-vnc`)
+and push it there with the same tag. A digest is kept as it is: `repo@sha256:<d>`
+becomes `repo-vnc@sha256:<d>`, and `repo:tag@sha256:<d>` becomes
+`repo-vnc:tag@sha256:<d>`. A registry pulls either by the digest alone, so it resolves
+only if the `-vnc` repository holds that very image. So pin a VNC spec by digest with
+the `-vnc` image's own repository and digest; a repository that already ends in `-vnc`
+is used unchanged.
 
 ## Pin it on the spec
 
@@ -269,9 +272,10 @@ From the pod as the platform renders it, and the installer's node configuration:
   manifest do not change them. A link step past the memory limit is OOMKilled;
   `CARGO_BUILD_JOBS` in the spec's `envVars` caps cargo's parallel jobs, and with
   them its peak memory.
-- **No ephemeral storage bounds.** The pod requests and limits no ephemeral storage,
-  and a task pod mounts no volume: the checkout, `target/`, and the cargo and npm
-  caches all land in the container's writable layer on the node's root disk. A box's
+- **No ephemeral storage bounds.** The pod requests and limits no ephemeral storage.
+  A task pod mounts no volume apart from a project filesystem attached to its spec,
+  at that filesystem's mount path, so the checkout, `target/`, and the cargo and npm
+  caches land in the container's writable layer on the node's root disk. A box's
   workspace is an `emptyDir` with no `sizeLimit`, on the same disk. The scheduler
   reserves no disk for any of it. When a node runs short (by default under 10% free,
   or 15% for images), the kubelet evicts first the pods using more than they
