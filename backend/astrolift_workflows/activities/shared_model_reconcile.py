@@ -12,6 +12,7 @@ from temporalio import activity
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_services.cluster_models import available_model_clusters, live_cluster_models
 from astrolift_services.models import ManagedService, ManagedServiceAttachment
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 from core.tenancy import TenantContext, tenant_context
 
 
@@ -362,11 +363,10 @@ async def _activity(fn, *args):
     from asgiref.sync import sync_to_async
     from temporalio.exceptions import ApplicationError
 
-    activity.heartbeat()
     loop = asyncio.get_running_loop()
     try:
         with heartbeat_sink(lambda detail: loop.call_soon_threadsafe(activity.heartbeat, detail)):
-            return await sync_to_async(fn)(*args)
+            return await heartbeat_while(sync_to_async(fn)(*args))
     except Exception as exc:
         # Never serialize backend values or infrastructure tracebacks into history/API.
         raise ApplicationError(

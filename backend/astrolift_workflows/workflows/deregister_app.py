@@ -105,6 +105,7 @@ with workflow.unsafe.imports_passed_through():
         revoke_app_secret_bundle_refs,
         soft_delete_app_records,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _QUICK_TIMEOUT = timedelta(minutes=2)
 _NAMESPACE_TIMEOUT = timedelta(minutes=10)
@@ -187,6 +188,7 @@ class DeregisterAppWorkflow:
             # result hint fails activation on the real worker (#1034).
             result_type=bool,
             start_to_close_timeout=_QUICK_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_STANDARD_RETRY,
         )
 
@@ -248,6 +250,7 @@ class DeregisterAppWorkflow:
                 abort_in_flight_deploys,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             teardown["in_flight_deploys_aborted"] = _step_result(
@@ -269,6 +272,7 @@ class DeregisterAppWorkflow:
                 retire_expired_app_runtime if input.keep_managed_services else delete_app_namespaces,
                 app_id,
                 start_to_close_timeout=_NAMESPACE_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["deployments_cancelled"] = _step_result(
@@ -297,6 +301,7 @@ class DeregisterAppWorkflow:
                 list_app_managed_service_ids,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -321,6 +326,7 @@ class DeregisterAppWorkflow:
                     deprovision_managed_service,
                     args=[ms_id, delete_data, force_destroy],
                     start_to_close_timeout=_DEPROVISION_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_CLEANUP_RETRY,
                 )
                 if not res.get("ok"):
@@ -382,6 +388,7 @@ class DeregisterAppWorkflow:
                 delete_static_dns_records,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["static_dns"] = _step_result(
@@ -404,6 +411,7 @@ class DeregisterAppWorkflow:
                 retire_expired_app_runtime if input.keep_managed_services else delete_app_namespaces,
                 app_id,
                 start_to_close_timeout=_NAMESPACE_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["namespaces"] = _step_result(
@@ -431,6 +439,7 @@ class DeregisterAppWorkflow:
                 deprovision_app_registry_repo,
                 args=[app_id, archive_repo],
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["registry_repo"] = _step_result(
@@ -451,6 +460,7 @@ class DeregisterAppWorkflow:
                 deprovision_app_identity_role,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["identity_role"] = _step_result(
@@ -474,6 +484,7 @@ class DeregisterAppWorkflow:
                 list_app_secret_targets,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -498,6 +509,7 @@ class DeregisterAppWorkflow:
                     delete_secret_from_cluster,
                     target,
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_CLEANUP_RETRY,
                 )
                 errs = list(summary.get("errors", []) or [])
@@ -530,6 +542,7 @@ class DeregisterAppWorkflow:
                     revoke_app_secret_bundle_refs,
                     app_id,
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
                 teardown["materialized_secrets"] = _step_result(
@@ -561,6 +574,7 @@ class DeregisterAppWorkflow:
                 delete_app_source_webhook,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_CLEANUP_RETRY,
             )
             teardown["source_webhook"] = _step_result(
@@ -582,6 +596,7 @@ class DeregisterAppWorkflow:
                 revoke_app_deploy_tokens,
                 app_id,
                 start_to_close_timeout=_QUICK_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
             teardown["deploy_tokens"] = _step_result(
@@ -603,6 +618,7 @@ class DeregisterAppWorkflow:
                     soft_delete_app_records,
                     app_id,
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
                 teardown["platform_rows"] = _step_result(
@@ -614,6 +630,7 @@ class DeregisterAppWorkflow:
                     mark_app_deregistered,
                     app_id,
                     start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001

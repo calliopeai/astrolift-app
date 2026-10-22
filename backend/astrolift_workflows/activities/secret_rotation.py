@@ -37,6 +37,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.secret_rotation")
 
 
@@ -106,8 +108,7 @@ async def list_active_secret_bundle_targets(
     every ref soft-deleted); workflow short-circuits."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    targets = await sync_to_async(_list_targets_sync)(secret_bundle_id)
+    targets = await heartbeat_while(sync_to_async(_list_targets_sync)(secret_bundle_id))
     log.info(
         "list_active_secret_bundle_targets returned %d target(s)",
         len(targets),
@@ -249,8 +250,7 @@ async def refresh_secret_bundle_in_cluster(
     """Re-fetch + apply the bundle's Secret on one cluster. Idempotent."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_refresh_in_cluster_sync)(target)
+    summary = await heartbeat_while(sync_to_async(_refresh_in_cluster_sync)(target))
     log.info(
         "refresh_secret_bundle_in_cluster cluster=%s namespace=%s name=%s",
         summary["cluster_slug"],
@@ -359,8 +359,7 @@ async def bounce_workloads_consuming_bundle(
     bounced workloads."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    n = await sync_to_async(_bounce_workloads_sync)(target)
+    n = await heartbeat_while(sync_to_async(_bounce_workloads_sync)(target))
     log.info(
         "bounce_workloads_consuming_bundle bounced=%d",
         n,
@@ -420,8 +419,7 @@ async def delete_secret_from_cluster(target: dict[str, Any]) -> dict[str, Any]:
     cluster. Not-found is treated as success."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_delete_from_cluster_sync)(target)
+    summary = await heartbeat_while(sync_to_async(_delete_from_cluster_sync)(target))
     log.info(
         "delete_secret_from_cluster cluster=%s name=%s errors=%d",
         summary["cluster_slug"],
@@ -456,7 +454,6 @@ async def list_bundles_due_for_refresh() -> list[int]:
     IDs of every actively-referenced bundle."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    ids = await sync_to_async(_list_bundles_due_for_refresh_sync)()
+    ids = await heartbeat_while(sync_to_async(_list_bundles_due_for_refresh_sync)())
     log.info("list_bundles_due_for_refresh returned %d bundle(s)", len(ids))
     return ids

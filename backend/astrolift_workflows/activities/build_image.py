@@ -22,11 +22,11 @@ environments where build infrastructure isn't provisioned:
 
 A real build sets ``"stub": False`` and populates ``"digest"``.
 
-Heartbeat contract: the activity heartbeats on entry; the kaniko driver
-heartbeats once per poll cycle while the build Job runs (via
-``maybe_heartbeat``). Callers set ``heartbeat_timeout`` on the
-``execute_activity`` call to match the expected build duration (dockerfile
-builds on a cold runner can take 10+ minutes).
+Heartbeat contract: the activity beats through ``heartbeat_while`` for as
+long as the build runs; the kaniko driver's own polling beats cannot reach
+the server from its worker thread. Callers pass ``heartbeat_timeout`` and a
+``start_to_close_timeout`` wide enough for the build (dockerfile builds on a
+cold runner can take 10+ minutes).
 """
 
 from __future__ import annotations
@@ -38,6 +38,7 @@ import posixpath
 from temporalio import activity
 
 from astrolift_workflows.activities.image_digest import is_digest
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 
 log = logging.getLogger("astrolift_workflows.activities.build_image")
 
@@ -644,12 +645,7 @@ async def fetch_app_build_strategy(registered_app_id: int) -> str:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_fetch_app_build_strategy_sync)(registered_app_id)
-
-
-#: Well inside the workflow's two-minute heartbeat timeout for this activity.
-_HEARTBEAT_EVERY_SECONDS = 30
+    return await heartbeat_while(sync_to_async(_fetch_app_build_strategy_sync)(registered_app_id))
 
 
 @activity.defn(name="astrolift.build.build_image")
@@ -662,15 +658,6 @@ async def build_image(inp: BuildImageInput) -> dict:
     reference — callers can treat it as the image to deploy regardless of
     whether a real build ran.
     """
-    import asyncio
-
     from asgiref.sync import sync_to_async
 
-    # The build runs in a worker thread, where heartbeats do not reach the
-    # activity, so beat from here until it finishes; otherwise a build longer
-    # than the heartbeat timeout is killed as stuck.
-    build = asyncio.ensure_future(sync_to_async(_build_image_sync)(inp))
-    while not build.done():
-        activity.heartbeat()
-        await asyncio.wait({build}, timeout=_HEARTBEAT_EVERY_SECONDS)
-    return build.result()
+    return await heartbeat_while(sync_to_async(_build_image_sync)(inp))

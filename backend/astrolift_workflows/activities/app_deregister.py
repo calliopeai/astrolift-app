@@ -36,6 +36,8 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.app_deregister")
 
 
@@ -166,9 +168,10 @@ async def delete_app_source_webhook(registered_app_id: int) -> dict[str, Any]:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_delete_source_webhook_sync)(
-        registered_app_id,
+    summary = await heartbeat_while(
+        sync_to_async(_delete_source_webhook_sync)(
+            registered_app_id,
+        )
     )
     log.info(
         "delete_app_source_webhook app_id=%s status=%s hook_id=%s",
@@ -252,9 +255,10 @@ async def list_app_secret_targets(
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    rows = await sync_to_async(_list_app_secret_targets_sync)(
-        registered_app_id,
+    rows = await heartbeat_while(
+        sync_to_async(_list_app_secret_targets_sync)(
+            registered_app_id,
+        )
     )
     log.info(
         "list_app_secret_targets app_id=%s returned %d row(s)",
@@ -298,9 +302,10 @@ async def revoke_app_secret_bundle_refs(registered_app_id: int) -> int:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    n = await sync_to_async(_revoke_app_secret_bundle_refs_sync)(
-        registered_app_id,
+    n = await heartbeat_while(
+        sync_to_async(_revoke_app_secret_bundle_refs_sync)(
+            registered_app_id,
+        )
     )
     log.info(
         "revoke_app_secret_bundle_refs app_id=%s revoked=%d",

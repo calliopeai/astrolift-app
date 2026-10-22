@@ -14,6 +14,7 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 from astrolift_workflows.inputs import WorkflowDefinitionRunInput
 
 log = logging.getLogger(__name__)
@@ -101,13 +102,11 @@ def _record_start_sync(workflow_run_id: str, temporal_run_id: str) -> None:
 async def create_scheduled_workflow_run(action: dict[str, Any]) -> ScheduledWorkflowFire:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(_create_sync)(action)
+    return await heartbeat_while(sync_to_async(_create_sync)(action))
 
 
 @activity.defn(name="astrolift.configured_workflow.record_scheduled_start")
 async def record_scheduled_workflow_start(workflow_run_id: str, temporal_run_id: str) -> None:
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    await sync_to_async(_record_start_sync)(workflow_run_id, temporal_run_id)
+    await heartbeat_while(sync_to_async(_record_start_sync)(workflow_run_id, temporal_run_id))
