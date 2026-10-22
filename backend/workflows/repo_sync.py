@@ -223,9 +223,42 @@ def reconcile_repository_workflows(
     return results
 
 
+def move_repository_workflows(*, organization_id: int, from_repo: str, to_repo: str) -> int:
+    """Re-key the definitions ``from_repo`` declared to ``to_repo`` (#2478).
+
+    Definitions are keyed on the name of the repository they were reconciled
+    from, so when an app moves to another name (its repository renamed on
+    GitHub, or the app pointed elsewhere) the next reconcile under that name
+    finds the slugs held by the old one and refuses. They move only once no
+    live app of the organization names ``from_repo`` (until then those apps
+    reconcile them), and only into a name that has no definitions of its own:
+    two repositories' declarations are never merged. Retired rows move too, so
+    a workflow declared again revives its own row. Returns how many moved.
+    """
+    from astrolift_registry.models import RegisteredApp
+
+    if not from_repo or from_repo == to_repo:
+        return 0
+    if RegisteredApp.objects.filter(
+        organization_id=organization_id, source_repo=from_repo, deleted_at__isnull=True
+    ).exists():
+        return 0
+    if WorkflowDefinition.objects.filter(organization_id=organization_id, source_repo=to_repo).exists():
+        return 0
+    moved = 0
+    for definition in WorkflowDefinition.objects.filter(
+        organization_id=organization_id, source_repo=from_repo
+    ):
+        definition.source_repo = to_repo
+        definition.save(update_fields=["source_repo", "updated_at", "version"])
+        moved += 1
+    return moved
+
+
 __all__ = [
     "ReconciledWorkflow",
     "RepositoryWorkflowManifest",
     "discover_repository_workflows",
+    "move_repository_workflows",
     "reconcile_repository_workflows",
 ]

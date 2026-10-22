@@ -1809,6 +1809,21 @@ type AstroliftAppSettingsLastModified {
   observability: DateTime
 }
 
+type AstroliftAppSourceChange {
+  app: AstroliftRegisteredApp!
+
+  """
+  The repository the app pointed at before the call; app.sourceRepo when nothing changed.
+  """
+  previousSourceRepo: String!
+}
+
+type AstroliftAppSourceChangeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppSourceChange
+}
+
 enum AstroliftAppSourceKindFilter {
   ALL
   GITHUB
@@ -6719,6 +6734,11 @@ type AstroliftTenantCluster {
   The cluster permissions the viewer holds on this cluster (#1867), from the checker the mutations use; a shared cluster's writes are the platform operator's. Advisory: offer only these, the mutation still decides.
   """
   viewerPermissions: [String!]!
+
+  """
+  The latest move of this cluster's per-app workload identity roles to a new OIDC issuer (#2472), started when a registration re-points the cluster at another cluster. Null when it was never re-pointed and outside the operator view; on a shared cluster, whose apps span organizations, only the platform operator sees it.
+  """
+  workloadIdentityRebind: AstroliftWorkloadIdentityRebind
   lastBootstrapRun: AstroliftClusterBootstrapRun
   bootstrapRuns(limit: Int! = 10): [AstroliftClusterBootstrapRun!]!
 }
@@ -7129,6 +7149,37 @@ type AstroliftWorkloadIdentityGrant {
   reason: String!
   lastAttemptedAt: DateTime
   appliedAt: DateTime
+}
+
+type AstroliftWorkloadIdentityRebind {
+  """pending | running | succeeded | failed"""
+  state: String!
+
+  """The issuer the roles are moved to, host and path."""
+  issuer: String!
+  previousIssuers: [String!]!
+  appsTotal: Int!
+
+  """
+  Apps whose role now trusts the issuer, or needed nothing: no role, or one another cluster holds.
+  """
+  appsReconciled: Int!
+  failures: [AstroliftWorkloadIdentityRebindFailure!]!
+
+  """Why the move could not start or stopped before reaching every app."""
+  error: String!
+  requestedAt: DateTime!
+  startedAt: DateTime
+  finishedAt: DateTime
+}
+
+type AstroliftWorkloadIdentityRebindFailure {
+  """The app, as <organization slug>/<app slug>."""
+  app: String!
+
+  """The IAM role whose trust was not moved."""
+  role: String!
+  error: String!
 }
 
 type AstroliftWorkloadManifest {
@@ -10366,6 +10417,11 @@ type Mutation {
   The organization's policy for temporary apps (#2433): the longest an app may live, whether members may create temporary apps only, which surfaces require an expiry and how long an expired app's data is kept.
   """
   setTemporaryAppPolicy(input: TemporaryAppPolicyInput!): AstroliftTemporaryAppPolicyMutationResult!
+
+  """
+  Point a GitHub app at another repository, or at its repository's new name after a rename on GitHub (#2478). The repository must be in the organization's GitHub App installation, and the name GitHub lists is stored; sourceUrl follows when it named the old repository. Autowire then runs against the repository: the CI workflow and the CI push role follow it, and the CI secrets are pushed to it, which rotates the deploy token. Audited as app.set_source.
+  """
+  setAppSource(input: SetAppSourceInput!): AstroliftAppSourceChangeMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   setNotificationQuietHours(input: SetNotificationQuietHoursInput!): AstroliftNotificationQuietHoursMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
@@ -12478,6 +12534,14 @@ input SetAppSecretMetadataInput {
   expiresAt: DateTime = null
   setVia: String = null
   scope: String = null
+}
+
+input SetAppSourceInput {
+  id: GUID!
+
+  """The GitHub repository, as owner/name."""
+  sourceRepo: String!
+  ifMatchVersion: Int = null
 }
 
 input SetAppSubdomainInput {

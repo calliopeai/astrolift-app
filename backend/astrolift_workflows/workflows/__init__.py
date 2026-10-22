@@ -75,6 +75,9 @@ from astrolift_workflows.workflows.provision_managed_service import (
 )
 from astrolift_workflows.workflows.provision_namespace import NamespaceProvisionWorkflow
 from astrolift_workflows.workflows.provision_registry import RegistryProvisionWorkflow
+from astrolift_workflows.workflows.rebind_cluster_workload_identity import (
+    RebindClusterWorkloadIdentityWorkflow,
+)
 from astrolift_workflows.workflows.reconcile_workload_identity import ReconcileWorkloadIdentityWorkflow
 from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
 from astrolift_workflows.workflows.run_status_reconcile_tick import (
@@ -168,6 +171,7 @@ __all__ = [
     "PruneAuditLogWorkflow",
     "PruneStaleSessionsWorkflow",
     "ReconcileClusterCapabilitiesWorkflow",
+    "RebindClusterWorkloadIdentityWorkflow",
     "ReconcileWorkloadIdentityWorkflow",
     "RegistryProvisionWorkflow",
     "RehealWebhookSubscriptionsWorkflow",

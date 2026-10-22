@@ -11980,6 +11980,27 @@
         "podsRunning": "Pods en cours",
         "cpu": "CPU",
         "memory": "Mémoire"
+      },
+      "workloadIdentity": {
+        "title": "Rôles d’identité de charge de travail",
+        "state": {
+          "pending": "En file d’attente",
+          "running": "Déplacement",
+          "succeeded": "Déplacé",
+          "failed": "Échec"
+        },
+        "description": {
+          "pending": "Le cluster a été redirigé vers un cluster doté d’un autre émetteur OIDC. Les rôles IAM de ses applications attendent d’y être déplacés.",
+          "running": "Le cluster a été redirigé vers un cluster doté d’un autre émetteur OIDC. Les rôles IAM de ses applications y sont en cours de déplacement ; un pod ne peut pas assumer un rôle tant qu’il n’a pas été déplacé.",
+          "succeeded": "Chaque rôle IAM d’application de ce cluster fait confiance à son émetteur OIDC.",
+          "failed": "Certains rôles IAM d’applications font encore confiance à l’émetteur OIDC précédent ; leurs pods sur ce cluster ne peuvent donc pas les assumer. Déployer une application déplace son rôle ; réenregistrer le cluster relance le reste."
+        },
+        "issuer": "Émetteur OIDC",
+        "apps": "Applications",
+        "progress": "{reached} sur {total}",
+        "started": "Démarré",
+        "finished": "Terminé",
+        "failuresTitle": "{count, plural, one {# rôle non déplacé} other {# rôles non déplacés}}"
       }
     }
   },

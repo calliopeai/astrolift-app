@@ -11977,6 +11977,27 @@
         "podsRunning": "运行中的 Pod",
         "cpu": "CPU",
         "memory": "内存"
+      },
+      "workloadIdentity": {
+        "title": "工作负载身份角色",
+        "state": {
+          "pending": "排队中",
+          "running": "迁移中",
+          "succeeded": "已迁移",
+          "failed": "失败"
+        },
+        "description": {
+          "pending": "此集群已重新指向一个使用其他 OIDC 颁发者的集群。其应用的 IAM 角色正在排队迁移到该颁发者。",
+          "running": "此集群已重新指向一个使用其他 OIDC 颁发者的集群。正在迁移其应用的 IAM 角色；角色迁移完成前，Pod 无法代入该角色。",
+          "succeeded": "此集群上每个应用的 IAM 角色都信任集群的 OIDC 颁发者。",
+          "failed": "部分应用的 IAM 角色仍信任之前的 OIDC 颁发者，因此它们在此集群上的 Pod 无法代入这些角色。部署应用会迁移其角色；再次注册集群会重试其余角色。"
+        },
+        "issuer": "OIDC 颁发者",
+        "apps": "应用",
+        "progress": "已处理 {reached} / {total}",
+        "started": "开始时间",
+        "finished": "完成时间",
+        "failuresTitle": "{count, plural, other {# 个角色未迁移}}"
       }
     }
   },
