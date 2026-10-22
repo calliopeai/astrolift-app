@@ -365,7 +365,7 @@
       "body": "web \u2192 production",
       "category": "deploy.approved",
       "data": {
-        "action_url": "astrolift://deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "action_url": "astrolift://apps/web/deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11?environmentName=production",
         "event_kind": "deploy.approved",
         "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
         "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
@@ -380,7 +380,7 @@
       "body": "web \u2192 production",
       "category": "deploy.failed",
       "data": {
-        "action_url": "astrolift://deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "action_url": "astrolift://apps/web/deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11?environmentName=production",
         "event_kind": "deploy.failed",
         "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
         "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
@@ -395,7 +395,7 @@
       "body": "web \u2192 production",
       "category": "deploy.rejected",
       "data": {
-        "action_url": "astrolift://deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "action_url": "astrolift://apps/web/deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11?environmentName=production",
         "event_kind": "deploy.rejected",
         "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
         "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",

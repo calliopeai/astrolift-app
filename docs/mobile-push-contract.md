@@ -40,7 +40,7 @@ a revealed secret, the start of an agent's message.
 | `app.deregister_pending` | `app` | `astrolift://apps/<app slug>` | nothing yet |
 | `auth.session.created` | `session` | `astrolift://sessions/<session id>` | sign-in (#499) |
 | `cluster.bootstrap_failed` | `cluster` | `astrolift://clusters/<cluster id>` | nothing yet |
-| `deploy.approved`, `deploy.rejected`, `deploy.failed` | `deployment` | `astrolift://deployments/<deployment id>` | nothing yet |
+| `deploy.approved`, `deploy.rejected`, `deploy.failed` | `deployment` | `astrolift://apps/<app slug>/deployments/<deployment id>?environmentName=<environment>` | nothing yet |
 | `domain.cert_expiring`, `domain.cert_renewal_failed` | `custom_domain` | `astrolift://apps/<app slug>/domains` | the certificate monitor |
 | `secret.revealed` | `secret` | `astrolift://audit?filter=secret.revealed` | nothing yet |
 
@@ -51,7 +51,9 @@ no code emits the event, so no device receives them today.
 App links use the slug because apps are read by slug (`astroliftApp(slug)`).
 `target_id` is the app's GUID: a deleted app's slug can be taken by a new app,
 so compare the GUID of the app you opened before showing it as the subject of
-the notification.
+the notification. A deployment link names its app and environment too: the
+phone's deployment screen (`apps/:slug/deployments/:id`) shows a deployment
+only when both match it.
 
 ## Install identity
 
@@ -66,7 +68,9 @@ which differ per replica and per restarted container. An install without
 read it from the handshake.
 
 A database copied to stand up a second install carries the stored id. Set
-`ASTROLIFT_INSTALL_ID` on the copy so the two installs stay distinct.
+`ASTROLIFT_INSTALL_ID` on every web and worker process of the copy so the two
+installs stay distinct: a process without it reports the stored id, and the
+pushes it sends would route to the original install.
 
 ## Where the title and body go
 
@@ -125,8 +129,10 @@ changing what one means, bumps it.
 `days_until_expiry`, `target_url`, `status_code`, `message_id`, `thread_id`,
 `kind`, `expires_at`) are no longer sent. The session link moved from
 `astrolift://settings/devices?session=<id>` to `astrolift://sessions/<id>`,
-alert links carry the alert event id instead of the rule id, and
-`app.deregister_pending` links by slug instead of GUID.
+alert links carry the alert event id instead of the rule id,
+`app.deregister_pending` links by slug instead of GUID, and deploy links moved
+from `astrolift://deployments/<id>` to
+`astrolift://apps/<slug>/deployments/<id>?environmentName=<environment>`.
 
 ## The fixture
 

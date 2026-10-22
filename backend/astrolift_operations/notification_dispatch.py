@@ -65,6 +65,7 @@ import datetime as dt
 import logging
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import urlencode
 
 from _sdk.notification import (
     DevicePlatform,
@@ -487,7 +488,17 @@ def _template_deploy_event(envelope: EventEnvelope, action_label: str) -> Notifi
     env_name = str(payload.get("environment_name", "") or "")
     deploy_guid = str(payload.get("deployment_guid", "") or envelope.resource_id or "")
     body = f"{app_slug} → {env_name}" if app_slug or env_name else "Deployment update"
-    action_url = f"astrolift://deployments/{deploy_guid}" if deploy_guid else "astrolift://deployments"
+    # The phone opens a deployment inside its app, ``apps/:slug/deployments/:id``,
+    # and shows it only when the app and the ``environmentName`` it was given
+    # match the deployment it reads (#2161).
+    if app_slug and deploy_guid:
+        action_url = f"astrolift://apps/{app_slug}/deployments/{deploy_guid}"
+        if env_name:
+            action_url += "?" + urlencode({"environmentName": env_name})
+    elif app_slug:
+        action_url = f"astrolift://apps/{app_slug}/deployments"
+    else:
+        action_url = "astrolift://apps"
     return NotificationTemplate(
         title=_truncate(f"Deploy {action_label}", PUSH_TITLE_MAX),
         body=_truncate(body, PUSH_BODY_MAX),

@@ -186,7 +186,9 @@ def test_event_emit_invokes_dispatcher_after_writer(fake_driver, ensure_dispatch
     assert platform == "ios"
     assert payload.title.startswith("Deploy")
     assert "demo" in payload.body
-    assert payload.action_url == "astrolift://deployments/d-123"
+    # The phone's deployment screen lives under the app and checks the
+    # environment it is given (#2161).
+    assert payload.action_url == "astrolift://apps/demo/deployments/d-123?environmentName=production"
     # SDK payload carries the event kind via ``category`` and via
     # the ``data`` contract (#2161) so the FCM ``data`` path stays
     # addressable.

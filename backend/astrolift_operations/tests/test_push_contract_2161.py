@@ -568,6 +568,14 @@ def test_every_kind_carries_the_versioned_identity_and_no_action(
     assert (
         urls["app.deregister_pending"] == urls["app.down"] == urls["app.expiring"] == "astrolift://apps/web"
     )
+    # The phone reads a deployment under its app (``apps/:slug/deployments/:id``)
+    # and shows it only when the environment it is given matches.
+    assert (
+        urls["deploy.approved"]
+        == urls["deploy.rejected"]
+        == urls["deploy.failed"]
+        == f"astrolift://apps/web/deployments/{DEPLOYMENT}?environmentName=production"
+    )
 
 
 def test_installs_with_the_same_app_slug_differ_only_in_identity(
