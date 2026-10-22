@@ -136,12 +136,12 @@ grant nothing and are not inspected. A complete identity at the recorded name
 with another principal is a replacement: the recorded identity is gone too, so
 the result says `identity_absent` and `identity_replaced`, and the replacement
 is never stripped or deleted. Otherwise the UAMI must still carry the recorded
-IDs and owner markers; an incomplete or misnamed response refuses. Removal strips every owned federation and
-assignment through the same reconcile, then deletes the UAMI and reads it again
-to observe its absence. If a foreign federation or role assignment remains on the
-identity, removal stops after stripping the owned entries: deleting the UAMI would
-take another party's federation with it and orphan their assignments. The result
-names what is left.
+IDs and owner markers; an incomplete or misnamed response refuses. Removal
+strips every owned federation and assignment through the same reconcile, then
+deletes the UAMI and reads it again to observe its absence. If a foreign
+federation or role assignment remains on the identity, removal stops after
+stripping the owned entries: deleting the UAMI would take another party's
+federation with it and orphan their assignments. The result names what is left.
 
 A replacement of the UAMI between the last read and the DELETE is a residual race,
 as for creation. Removing an assignment or deleting the identity does not revoke
