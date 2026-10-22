@@ -246,7 +246,9 @@ def move_repository_workflows(*, organization_id: int, from_repo: str, to_repo: 
     if WorkflowDefinition.objects.filter(organization_id=organization_id, source_repo=to_repo).exists():
         return 0
     moved = 0
-    for definition in WorkflowDefinition.objects.filter(organization_id=organization_id, source_repo=from_repo):
+    for definition in WorkflowDefinition.objects.filter(
+        organization_id=organization_id, source_repo=from_repo
+    ):
         definition.source_repo = to_repo
         definition.save(update_fields=["source_repo", "updated_at", "version"])
         moved += 1
