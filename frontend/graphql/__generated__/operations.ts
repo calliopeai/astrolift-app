@@ -889,6 +889,8 @@ export type AstroliftAgentStartupDiagnostic = {
 export type AstroliftAgentTask = {
   agentName: Scalars['String']['output'];
   agentSlug: Scalars['String']['output'];
+  /** Evidence the run attached to its result (#2488), in the order it reported them. Metadata only; agentTaskArtifact returns one artifact's content. */
+  artifacts: Array<AstroliftAgentTaskArtifact>;
   brains: Array<AstroliftAgentTaskBrain>;
   callbackAttempts: Scalars['Int']['output'];
   callbackLastError?: Maybe<Scalars['String']['output']>;
@@ -917,6 +919,27 @@ export type AstroliftAgentTask = {
   updatedAt: Scalars['DateTime']['output'];
   vncEnabled: Scalars['Boolean']['output'];
   vncUrl: Scalars['String']['output'];
+};
+
+/** Evidence a run attached to its result with its terminal callback (#2488). kind is junit, coverage, conformance-json or other, and mediaType is the type the run reported. sizeBytes and sha256 describe the UTF-8 bytes of the content, which agentTaskArtifact returns. */
+export type AstroliftAgentTaskArtifact = {
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  mediaType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  sha256: Scalars['String']['output'];
+  sizeBytes: Scalars['Int']['output'];
+};
+
+/** One artifact a run attached to its result (#2488), with its UTF-8 content. */
+export type AstroliftAgentTaskArtifactContent = {
+  content: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  kind: Scalars['String']['output'];
+  mediaType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  sha256: Scalars['String']['output'];
+  sizeBytes: Scalars['Int']['output'];
 };
 
 export type AstroliftAgentTaskBacklog = {
@@ -12766,6 +12789,8 @@ export type Query = {
   agentRuntimes: Array<AstroliftAgentRuntime>;
   agentSecretBundles: Array<AstroliftAgentSecretBundle>;
   agentTask?: Maybe<AstroliftAgentTask>;
+  /** One artifact a run attached to its result (#2488), by name, with its content. Null when the task is not visible to the caller or has no artifact of that name. */
+  agentTaskArtifact?: Maybe<AstroliftAgentTaskArtifactContent>;
   agentTaskBacklog?: Maybe<AstroliftAgentTaskBacklog>;
   agentTaskByClientRequestId?: Maybe<AstroliftAgentTask>;
   agentTaskCallbackPolicy: AgentTaskCallbackPolicy;
@@ -13365,6 +13390,13 @@ export type QueryAgentSecretBundlesArgs = {
 
 export type QueryAgentTaskArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryAgentTaskArtifactArgs = {
+  name: Scalars['String']['input'];
+  orgId: Scalars['ID']['input'];
+  taskId: Scalars['ID']['input'];
 };
 
 

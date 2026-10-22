@@ -250,6 +250,31 @@ class AgentTaskBrainType:
     revoked_reason: str
 
 
+@strawberry.type(
+    name="AstroliftAgentTaskArtifact",
+    description=(
+        "Evidence a run attached to its result with its terminal callback (#2488). kind is junit, coverage, "
+        "conformance-json or other, and mediaType is the type the run reported. sizeBytes and sha256 "
+        "describe the UTF-8 bytes of the content, which agentTaskArtifact returns."
+    ),
+)
+class AgentTaskArtifactType:
+    name: str
+    kind: str
+    media_type: str
+    size_bytes: int
+    sha256: str
+    created_at: dt.datetime
+
+
+@strawberry.type(
+    name="AstroliftAgentTaskArtifactContent",
+    description="One artifact a run attached to its result (#2488), with its UTF-8 content.",
+)
+class AgentTaskArtifactContentType(AgentTaskArtifactType):
+    content: str
+
+
 @strawberry.type(name="AstroliftAgentTask")
 class AgentTaskType:
     id: GUID
@@ -313,6 +338,13 @@ class AgentTaskType:
     model: str = ""
     # The brains the run reads (#2432), its agent's own first.
     brains: list[AgentTaskBrainType] = strawberry.field(default_factory=list)
+    artifacts: list[AgentTaskArtifactType] = strawberry.field(
+        default_factory=list,
+        description=(
+            "Evidence the run attached to its result (#2488), in the order it reported them. Metadata "
+            "only; agentTaskArtifact returns one artifact's content."
+        ),
+    )
 
 
 @strawberry.type(name="AstroliftAgentInteraction")
@@ -815,18 +847,54 @@ def _agent_task_failure_message(failure) -> str | None:
     return str(failure)
 
 
+def _artifact_metadata():
+    """Task reads list artifacts without loading their content (#2488)."""
+    from django.db.models import Prefetch
+
+    from astrolift_agents.models import AgentTaskArtifact
+
+    return Prefetch("artifacts", queryset=AgentTaskArtifact.objects.defer("content").order_by("pk"))
+
+
+def agent_task_artifact_to_type(row) -> AgentTaskArtifactType:
+    return AgentTaskArtifactType(
+        name=row.name,
+        kind=row.kind,
+        media_type=row.media_type,
+        size_bytes=row.size_bytes,
+        sha256=row.sha256,
+        created_at=row.created_at,
+    )
+
+
+def agent_task_artifact_content_to_type(row) -> AgentTaskArtifactContentType:
+    return AgentTaskArtifactContentType(
+        name=row.name,
+        kind=row.kind,
+        media_type=row.media_type,
+        size_bytes=row.size_bytes,
+        sha256=row.sha256,
+        created_at=row.created_at,
+        content=row.content,
+    )
+
+
 def agent_tasks_to_types(tasks) -> list[AgentTaskType]:
     from astrolift_agents.visibility import watchable_task_ids
 
     rows = list(tasks)
     from django.db.models import prefetch_related_objects
 
-    prefetch_related_objects(rows, "completion_callback", "brain_bindings")
+    prefetch_related_objects(rows, "completion_callback", "brain_bindings", _artifact_metadata())
     watchable = watchable_task_ids(rows)
     return [agent_task_to_type(task, can_watch=task.pk in watchable) for task in rows]
 
 
 def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
+    from django.db.models import prefetch_related_objects
+
+    # A no-op when agent_tasks_to_types already prefetched the list's artifacts.
+    prefetch_related_objects([t], _artifact_metadata())
     if can_watch is None:
         from astrolift_agents.visibility import watchable_task_ids
 
@@ -884,6 +952,11 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
                 revoked_reason=row.revoked_reason,
             )
             for row in sorted(t.brain_bindings.all(), key=lambda row: row.pk)
+        ],
+        artifacts=[
+            agent_task_artifact_to_type(row)
+            for row in t.artifacts.all()
+            if row.organization_id == t.organization_id
         ],
     )
 
