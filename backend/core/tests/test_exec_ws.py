@@ -187,6 +187,9 @@ async def test_dispatcher_routes_frames_to_backend(
     async def _ok_perm(*, tenant_org_id, actor_user_id, **_kw):
         return True
 
+    async def _one_environment(*, app_slug, tenant_org_id):
+        return 1
+
     async def _noop_audit(**_kw):
         return None
 
@@ -204,6 +207,7 @@ async def test_dispatcher_routes_frames_to_backend(
     )
     monkeypatch.setattr(mod, "_check_app_in_tenant", _ok_app)
     monkeypatch.setattr(mod, "_check_exec_permission", _ok_perm)
+    monkeypatch.setattr(mod, "_app_environment_count", _one_environment)
     monkeypatch.setattr(mod, "_audit_exec_open", _noop_audit)
     monkeypatch.setattr(mod, "_exec_needs_step_up", lambda *_a: False)
 
@@ -352,6 +356,11 @@ def _patch_authed(monkeypatch, *, perm_ok: bool, audit_sink: list | None = None)
     async def _perm(*, tenant_org_id, actor_user_id, **_kw):
         return perm_ok
 
+    # Several environments are refused before dispatch; the real-database
+    # cases live in test_exec_legacy_environment_2209.
+    async def _one_environment(*, app_slug, tenant_org_id):
+        return 1
+
     async def _audit(**kw):
         if audit_sink is not None:
             audit_sink.append(kw)
@@ -360,6 +369,7 @@ def _patch_authed(monkeypatch, *, perm_ok: bool, audit_sink: list | None = None)
     monkeypatch.setattr(ws_auth_mod, "_resolve_tenant_for_user", _ok_tenant)
     monkeypatch.setattr(mod, "_check_app_in_tenant", _ok_app)
     monkeypatch.setattr(mod, "_check_exec_permission", _perm)
+    monkeypatch.setattr(mod, "_app_environment_count", _one_environment)
     monkeypatch.setattr(mod, "_audit_exec_open", _audit)
     # The action-safety gate (#2202) has its own tests below; here a session
     # is taken as freshly stepped up.
