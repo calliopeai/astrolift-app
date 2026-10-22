@@ -246,6 +246,7 @@ from astrolift_workflows.activities.workload_identity import (
     ensure_workload_identity,
 )
 from astrolift_workflows.activities.workload_identity_rebind import (
+    mark_cluster_workload_identity_rebind_failed,
     rebind_cluster_workload_identity,
 )
 
@@ -342,6 +343,7 @@ __all__ = [
     "mark_app_failed",
     "mark_app_ready",
     "mark_app_tearing_down",
+    "mark_cluster_workload_identity_rebind_failed",
     "mark_decommissioned",
     "mark_decommissioning",
     "mark_deploying",

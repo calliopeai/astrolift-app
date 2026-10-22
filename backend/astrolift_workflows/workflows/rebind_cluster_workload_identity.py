@@ -17,11 +17,15 @@ from typing import Any
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 
 from astrolift_workflows.inputs import RebindClusterWorkloadIdentityInput
 
 with workflow.unsafe.imports_passed_through():
-    from astrolift_workflows.activities import rebind_cluster_workload_identity
+    from astrolift_workflows.activities import (
+        mark_cluster_workload_identity_rebind_failed,
+        rebind_cluster_workload_identity,
+    )
     from astrolift_workflows.activities.workload_identity_rebind import REBIND_INCOMPLETE
 
 # One IAM read per app, and a write for each role still on an old issuer.
@@ -33,6 +37,15 @@ _RETRY = RetryPolicy(
     maximum_attempts=5,
     non_retryable_error_types=[REBIND_INCOMPLETE],
 )
+_MARK_TIMEOUT = timedelta(minutes=1)
+_MARK_RETRY = RetryPolicy(maximum_attempts=3)
+
+
+def _cause(exc: BaseException) -> str:
+    """The activity's own error; ``str(ActivityError)`` is only "Activity task failed"."""
+    while getattr(exc, "cause", None) is not None:
+        exc = exc.cause  # type: ignore[attr-defined]
+    return str(exc)
 
 
 @workflow.defn(name="RebindClusterWorkloadIdentityWorkflow")
@@ -41,10 +54,22 @@ class RebindClusterWorkloadIdentityWorkflow:
 
     @workflow.run
     async def run(self, input: RebindClusterWorkloadIdentityInput) -> dict[str, Any]:
-        return await workflow.execute_activity(
-            rebind_cluster_workload_identity,
-            input.rebind_id,
-            start_to_close_timeout=_TIMEOUT,
-            heartbeat_timeout=timedelta(minutes=2),
-            retry_policy=_RETRY,
-        )
+        try:
+            return await workflow.execute_activity(
+                rebind_cluster_workload_identity,
+                input.rebind_id,
+                start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY,
+            )
+        except ActivityError as exc:
+            # Attempts that ran out or timed out end the run before the walk
+            # records an outcome, leaving the request pending or running.
+            await workflow.execute_activity(
+                mark_cluster_workload_identity_rebind_failed,
+                args=[input.rebind_id, f"the move stopped before it finished: {_cause(exc)}"],
+                start_to_close_timeout=_MARK_TIMEOUT,
+                retry_policy=_MARK_RETRY,
+            )
+            # Failed, not completed: the next registration starts it again.
+            raise

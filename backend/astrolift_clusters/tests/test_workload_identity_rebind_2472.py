@@ -22,6 +22,7 @@ from django.core.management import call_command
 from astrolift_clusters.management.commands import register_tenant_cluster as cmd
 from astrolift_clusters.models import ClusterWorkloadIdentityRebind, ProviderPlugin, TenantCluster
 from astrolift_clusters.schema.queries import ClustersQuery
+from astrolift_clusters.schema.types import cluster_to_type
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
 from astrolift_clusters.workload_identity_rebind import (
     cluster_issuers,
@@ -197,6 +198,32 @@ def test_a_failed_start_stays_pending_and_the_next_registration_starts_it(aws_pl
     assert call["workflow_id"] == rebind.workflow_id
 
 
+def test_the_re_point_and_its_request_commit_together(aws_plugin, monkeypatch, starts):
+    """A registration that dies after the upsert must not leave the row on the
+    new issuer with no request: every later registration would compare the
+    new issuer with itself and the roles would never move."""
+    calls, _ = starts
+    _old_region_row(aws_plugin)
+    _discovers(monkeypatch, NEW)
+
+    def dies(**kwargs):
+        raise RuntimeError("server closed the connection unexpectedly")
+
+    with monkeypatch.context() as patched:
+        patched.setattr(ClusterWorkloadIdentityRebind.objects, "create", dies)
+        with pytest.raises(RuntimeError, match="server closed the connection"):
+            _register()
+
+    assert cluster_issuers(TenantCluster.all_objects.get(slug=SLUG)) == {OLD}
+    assert calls == []
+
+    _register()
+
+    [rebind] = _rebinds()
+    assert (rebind.issuer, rebind.previous_issuers) == (NEW, [OLD])
+    assert [call["workflow_id"] for call in calls] == [rebind.workflow_id]
+
+
 @pytest.mark.parametrize(
     ("state", "started_again"),
     [
@@ -362,6 +389,31 @@ def test_a_cluster_never_re_pointed_reads_null(world):
     _grant(world, Permission.CLUSTER_READ, Permission.CLUSTER_REGISTER)
     with _tenant(world):
         assert _read(world) is None
+
+
+def test_a_leaked_parent_does_not_reach_another_orgs_rebind(world, aws_plugin):
+    """Re-scoped by caller org, as the bootstrap history is (#1183): a parent
+    carrying another organization's cluster must not widen into its move,
+    whose failures name that organization's apps."""
+    other = ScopeWorld("rebind-2472-other")
+    theirs = TenantCluster.objects.create(
+        organization=other.org,
+        slug="theirs-rebind-2472",
+        name="theirs",
+        provider_plugin=aws_plugin,
+        auth_method="exec_plugin",
+        auth_config={"cluster_oidc_issuer": NEW},
+    )
+    ClusterWorkloadIdentityRebind.objects.create(
+        tenant_cluster=theirs,
+        issuer=NEW,
+        previous_issuers=[OLD],
+        failures=[{"app": f"{other.org.slug}/api", "role": "astrolift-other-api", "error": "AccessDenied"}],
+    )
+    _grant(world, Permission.CLUSTER_READ, Permission.CLUSTER_REGISTER)
+
+    with _tenant(world):
+        assert cluster_to_type(theirs).workload_identity_rebind(make_info(world.user)) is None
 
 
 def test_inventory_readers_do_not_see_it(world):

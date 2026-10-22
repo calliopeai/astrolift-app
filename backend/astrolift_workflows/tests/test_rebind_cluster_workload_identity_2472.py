@@ -20,6 +20,8 @@ from asgiref.sync import sync_to_async
 from aws.identity_irsa import IRSAConfig, IRSADriver
 from django.core.management import call_command
 from moto import mock_aws
+from temporalio import activity
+from temporalio.client import WorkflowFailureError
 from temporalio.exceptions import ApplicationError
 
 from astrolift_clusters.management.commands import register_tenant_cluster as cmd
@@ -29,9 +31,12 @@ from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.activities.workload_identity_rebind import (
     REBIND_INCOMPLETE,
+    _mark_failed_sync,
     _rebind_cluster_sync,
+    mark_cluster_workload_identity_rebind_failed,
     rebind_cluster_workload_identity,
 )
+from astrolift_workflows.inputs import Actor, RebindClusterWorkloadIdentityInput
 from astrolift_workflows.workflows.rebind_cluster_workload_identity import (
     RebindClusterWorkloadIdentityWorkflow,
 )
@@ -335,3 +340,64 @@ async def test_the_registration_moves_the_roles_through_the_real_workflow(
             assert await sync_to_async(_trusts)(world.roles[slug], OLD, f"{slug}-production"), slug
     await sync_to_async(rebind.refresh_from_db)()
     assert (rebind.state, rebind.apps_total, rebind.apps_reconciled) == ("succeeded", 3, 3)
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_a_run_that_ends_before_the_walk_records_it_fails_the_request(temporal_env, cluster):
+    """Attempts that run out (a database that keeps dropping, a worker that
+    keeps dying) end the run without the walk recording an outcome. The
+    request must not keep reading as a move in flight that nothing runs, and
+    the run must fail so the next registration can start it again."""
+    rebind = await sync_to_async(ClusterWorkloadIdentityRebind.objects.create)(
+        tenant_cluster=cluster,
+        issuer=NEW,
+        previous_issuers=[OLD],
+        state=ClusterWorkloadIdentityRebind.State.RUNNING,
+        apps_total=3,
+        apps_reconciled=1,
+    )
+
+    @activity.defn(name="astrolift.workload_identity.rebind_cluster")
+    async def loses_its_database(rebind_id: int) -> dict:
+        raise RuntimeError("server closed the connection unexpectedly")
+
+    async with temporal_worker(
+        temporal_env,
+        workflows=[RebindClusterWorkloadIdentityWorkflow],
+        activities=[loses_its_database, mark_cluster_workload_identity_rebind_failed],
+    ):
+        with pytest.raises(WorkflowFailureError):
+            await asyncio.wait_for(
+                temporal_env.client.execute_workflow(
+                    RebindClusterWorkloadIdentityWorkflow.run,
+                    RebindClusterWorkloadIdentityInput(
+                        rebind_id=rebind.pk, actor=Actor(kind="system", display="cluster-repoint")
+                    ),
+                    id=rebind.workflow_id,
+                    task_queue="astrolift-test",
+                ),
+                60,
+            )
+
+    await sync_to_async(rebind.refresh_from_db)()
+    assert rebind.state == ClusterWorkloadIdentityRebind.State.FAILED
+    assert "server closed the connection unexpectedly" in rebind.error
+    assert rebind.finished_at is not None
+    assert (rebind.apps_total, rebind.apps_reconciled) == (3, 1)
+
+
+@pytest.mark.parametrize(
+    "state", [ClusterWorkloadIdentityRebind.State.FAILED, ClusterWorkloadIdentityRebind.State.SUCCEEDED]
+)
+def test_a_request_the_walk_finished_keeps_its_own_record(cluster, state):
+    """A walk that ended recorded why, and which apps; the run's own failure
+    is no better a reason."""
+    failures = [{"app": "acme-test/web", "role": "astrolift-acme-test-web", "error": "AccessDenied"}]
+    rebind = ClusterWorkloadIdentityRebind.objects.create(
+        tenant_cluster=cluster, issuer=NEW, previous_issuers=[OLD], state=state, failures=failures
+    )
+
+    assert _mark_failed_sync(rebind.pk, "the move stopped before it finished: 1 of 1 app roles") is False
+
+    rebind.refresh_from_db()
+    assert (rebind.state, rebind.error, rebind.failures) == (state, "", failures)

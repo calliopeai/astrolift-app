@@ -86,6 +86,7 @@ import os
 from typing import Any
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 
 from astrolift_clusters.ingress_modes import IngressMode
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
@@ -93,6 +94,7 @@ from astrolift_clusters.workload_identity_rebind import (
     cluster_issuers,
     normalize_issuer,
     request_workload_identity_rebind,
+    start_workload_identity_rebind,
 )
 from astrolift_identity.models import Organization
 from astrolift_observability.prom_client import is_cluster_internal_endpoint
@@ -865,9 +867,17 @@ class Command(BaseCommand):
             **defaults,
             "ingress_class": (explicit_ingress_class or _DEFAULT_INGRESS_CLASS.get(plugin_slug, "nginx")),
         }
-        obj, created = TenantCluster.all_objects.update_or_create(
-            slug=slug, defaults=defaults, create_defaults=create_defaults
-        )
+        # The installer's region change re-points this row at another cluster
+        # by registering it under the old slug (#2472), and every per-app role
+        # minted for the row still trusts the old cluster's OIDC provider. The
+        # re-point and the request to move those roles commit together: a row
+        # left on the new issuer without one would never get one, since the
+        # next registration finds the issuer unchanged.
+        with transaction.atomic():
+            obj, created = TenantCluster.all_objects.update_or_create(
+                slug=slug, defaults=defaults, create_defaults=create_defaults
+            )
+            rebind = request_workload_identity_rebind(obj, previous_issuers)
 
         action = "created" if created else "updated"
         scope = f"org={org.slug}" if org else "shared"
@@ -886,11 +896,8 @@ class Command(BaseCommand):
         if ensure_edge_installed(obj):
             self.stdout.write(f"started the Envoy edge install on {slug!r}")
 
-        # The installer's region change re-points this row at another cluster
-        # by registering it under the old slug (#2472). Every per-app role
-        # minted for the row still trusts the old cluster's OIDC provider.
-        rebind = request_workload_identity_rebind(obj, previous_issuers)
         if rebind is not None:
+            start_workload_identity_rebind(rebind)
             self.stdout.write(
                 f"moving the workload identity roles of {slug!r} to OIDC issuer {rebind.issuer} "
                 f"({rebind.workflow_id})"

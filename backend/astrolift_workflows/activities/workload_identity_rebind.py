@@ -171,6 +171,28 @@ def _rebind_cluster_sync(rebind_id: int) -> dict[str, Any]:
     return summary
 
 
+def _mark_failed_sync(rebind_id: int, error: str) -> bool:
+    from astrolift_clusters.models import ClusterWorkloadIdentityRebind
+
+    rebind = ClusterWorkloadIdentityRebind.objects.filter(pk=rebind_id).first()
+    unfinished = (ClusterWorkloadIdentityRebind.State.PENDING, ClusterWorkloadIdentityRebind.State.RUNNING)
+    # A walk that failed recorded its own reason and per-app failures.
+    if rebind is None or rebind.state not in unfinished:
+        return False
+    _fail(rebind, error)
+    return True
+
+
+@activity.defn(name="astrolift.workload_identity.rebind_cluster_failed")
+async def mark_cluster_workload_identity_rebind_failed(rebind_id: int, error: str) -> bool:
+    """Activity entry: fail a request whose run ended before the walk recorded
+    an outcome (its attempts ran out, or it timed out), which the cluster page
+    would otherwise show as a move in flight with nothing running it."""
+    from asgiref.sync import sync_to_async
+
+    return await sync_to_async(_mark_failed_sync)(rebind_id, error)
+
+
 @activity.defn(name="astrolift.workload_identity.rebind_cluster")
 async def rebind_cluster_workload_identity(rebind_id: int) -> dict[str, Any]:
     """Activity entry: move the request's per-app role trust to its issuer."""

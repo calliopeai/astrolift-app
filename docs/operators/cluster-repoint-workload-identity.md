@@ -20,7 +20,9 @@ installer sets) whose OIDC issuer differs from the one the row held, it:
 1. writes the issuer to `auth_config["cluster_oidc_issuer"]`, the key the
    IRSA driver reads, and to `provider_config` as before;
 2. records a `ClusterWorkloadIdentityRebind` naming the new issuer and the
-   previous ones;
+   previous ones, in the same transaction as the re-point, so a registration
+   that dies halfway leaves the row on its old cluster and the next one
+   records both;
 3. starts `RebindClusterWorkloadIdentityWorkflow-<request guid>`.
 
 The workflow walks every live app with a live environment on the cluster, or
@@ -55,10 +57,13 @@ shared cluster, only the platform operator does.
 
 ## Retrying
 
-A move that could not start (Temporal unreachable when the control plane
-started) or that failed is started again the next time the cluster is
-registered: every control-plane start runs the command, and an operator can
-run `python manage.py register_tenant_cluster` with the same environment.
+A move that stops before it finishes (its retries ran out on a lost database
+or worker, or it timed out) is marked failed with the reason, rather than
+left showing as running. A move that could not start (Temporal unreachable
+when the control plane started) or that failed is started again the next
+time the cluster is registered: every control-plane start runs the command,
+and an operator can run `python manage.py register_tenant_cluster` with the
+same environment.
 Deploying an app also moves its role. A newer re-point supersedes an
 unfinished move and carries its issuers forward.
 

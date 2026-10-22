@@ -49,13 +49,17 @@ def current_issuer(cluster: Any) -> str:
 
 
 def request_workload_identity_rebind(cluster: Any, previous_issuers: set[str]) -> Any | None:
-    """Record and start the rebind a re-point needs, or start an unfinished one again.
+    """Record the rebind a re-point needs, or pick an unfinished one to start again.
 
     ``previous_issuers`` are the row's issuers before the upsert. A request
-    still pending, running or failed for the current issuer is started again,
-    which joins a running workflow and retries a failed one, so a control
-    plane that could not reach Temporal when the row moved catches up on its
-    next start. Returns the request started, or None.
+    still pending, running or failed for the current issuer is returned to be
+    started again, which joins a running workflow and retries a failed one, so
+    a control plane that could not reach Temporal when the row moved catches
+    up on its next start. Returns the request to start, or None.
+
+    Call it in the upsert's transaction and start the request once that
+    commits: a row left naming the new issuer without its request would never
+    get one, since the next registration finds the issuer unchanged.
     """
     from astrolift_clusters.models import ClusterWorkloadIdentityRebind
 
@@ -82,7 +86,6 @@ def request_workload_identity_rebind(cluster: Any, previous_issuers: set[str]) -
         rebind = latest
     else:
         return None
-    start_workload_identity_rebind(rebind)
     return rebind
 
 
