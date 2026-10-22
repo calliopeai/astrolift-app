@@ -171,8 +171,11 @@ def stamp_mcp_verification_env(resources: list[dict[str, Any]], app: RegisteredA
     issues no tokens, so nothing is set (and logged).
 
     A brain staged for typed tokens also gets ``TYPED_VERIFIER_ENV``, pinned
-    to its organization's GUID; on any other brain the install removes both,
-    so a manifest can neither switch typed tokens on nor pick the organization."""
+    to its organization's GUID; an ``env`` entry outranks the ``envFrom``
+    Secrets, so the manifest cannot pick the organization. On any other brain
+    the install removes both from ``env``; an ``[env]`` value or a secret
+    bundle still reaches the pod through ``envFrom``, but no typed token is
+    issued for that brain."""
     import logging
 
     from astrolift_manifest.app_kinds import BRAIN_KINDS

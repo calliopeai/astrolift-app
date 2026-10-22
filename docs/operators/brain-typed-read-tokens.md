@@ -25,8 +25,12 @@ only.
 This install refuses a typed token rather than trim it. The limits are local
 host limits, not shared contract guarantees:
 
-- more than 64 teams: `PRECONDITION` naming the limit;
+- more than 64 teams: refused, naming the limit;
 - an encoded token over 8192 bytes: the same.
+
+A person gets `PRECONDITION` from `issueBrainReadToken` and `unavailable` from
+`astrolift_connect_brain`; a run's spawn or refresh fails; a hosted app's
+deploy fails.
 
 ## The brain's verifier settings
 
@@ -36,8 +40,12 @@ Every deploy of a brain sets `BRAIN_MCP_JWKS_URL`, `BRAIN_MCP_ISSUER` and
 - `BRAIN_MCP_TYPED_PRINCIPALS=true`
 - `BRAIN_MCP_EXPECTED_ORG_GUID=<the brain's organization GUID>`
 
-On any other brain the install removes both, so a brain repository's manifest
-cannot switch typed tokens on or choose the organization.
+The install sets them in each container's own `env`, which Kubernetes ranks
+above the `envFrom` Secrets, so on a staged brain neither the manifest nor a
+secret bundle can change them. On any other brain the install removes both
+from the containers' `env`. A value from the manifest's `[env]` or a secret
+bundle still reaches the pod through `envFrom`, but no typed token is issued
+for an unstaged brain, so it cannot change what the brain admits.
 
 ## The command
 
