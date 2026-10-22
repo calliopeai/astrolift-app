@@ -11,44 +11,42 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 
 @activity.defn(name="astrolift.brain_create.repo")
 async def brain_create_repo(creation_id: int) -> dict[str, Any]:
     from astrolift_registry.brain_manage import ensure_repo
 
-    activity.heartbeat()
-    return await sync_to_async(ensure_repo)(creation_id)
+    return await heartbeat_while(sync_to_async(ensure_repo)(creation_id))
 
 
 @activity.defn(name="astrolift.brain_create.scaffold")
 async def brain_create_scaffold(creation_id: int) -> dict[str, Any]:
     from astrolift_registry.brain_manage import scaffold
 
-    activity.heartbeat()
-    return await sync_to_async(scaffold)(creation_id)
+    return await heartbeat_while(sync_to_async(scaffold)(creation_id))
 
 
 @activity.defn(name="astrolift.brain_create.register")
 async def brain_create_register(creation_id: int) -> dict[str, Any]:
     from astrolift_registry.brain_manage import register
 
-    activity.heartbeat()
-    return await sync_to_async(register)(creation_id)
+    return await heartbeat_while(sync_to_async(register)(creation_id))
 
 
 @activity.defn(name="astrolift.brain_create.deploy")
 async def brain_create_deploy(creation_id: int) -> dict[str, Any]:
     from astrolift_registry.brain_manage import deploy
 
-    activity.heartbeat()
-    return await sync_to_async(deploy)(creation_id)
+    return await heartbeat_while(sync_to_async(deploy)(creation_id))
 
 
 @activity.defn(name="astrolift.brain_create.observe")
 async def brain_create_observe(creation_id: int) -> dict[str, Any]:
     from astrolift_registry.brain_manage import observe
 
-    return await sync_to_async(observe)(creation_id)
+    return await heartbeat_while(sync_to_async(observe)(creation_id))
 
 
 @activity.defn(name="astrolift.brain_create.fail")

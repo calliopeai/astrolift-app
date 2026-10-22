@@ -44,6 +44,7 @@ with workflow.unsafe.imports_passed_through():
         load_preview_teardown_state,
         mark_preview_torn_down,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
     from astrolift_workflows.preview_teardown import (
         PreviewTeardownState,
         TeardownStep,
@@ -67,6 +68,7 @@ class TearDownPreviewWorkflow:
             load_preview_teardown_state,
             pid,
             start_to_close_timeout=_PROJECTION_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         steps = teardown_steps_to_run(state=PreviewTeardownState(**state))
         if not steps:
@@ -82,6 +84,7 @@ class TearDownPreviewWorkflow:
                         delete_preview_namespace,
                         pid,
                         start_to_close_timeout=timeout,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     )
                 except Exception as exc:  # noqa: BLE001 - workflow error envelope
                     # Bail out: everything after this step assumes the
@@ -101,18 +104,21 @@ class TearDownPreviewWorkflow:
                     cleanup_preview_managed_services_activity,
                     pid,
                     start_to_close_timeout=timeout,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 )
             elif step is TeardownStep.MARK_TORN_DOWN:
                 await workflow.execute_activity(
                     mark_preview_torn_down,
                     pid,
                     start_to_close_timeout=timeout,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 )
             elif step is TeardownStep.EMIT_EVENT:
                 await workflow.execute_activity(
                     emit_preview_torn_down_event,
                     pid,
                     start_to_close_timeout=timeout,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 )
             else:
                 skipped.append(str(step))

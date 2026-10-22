@@ -39,6 +39,7 @@ with workflow.unsafe.imports_passed_through():
         reconcile_cluster_capabilities,
         reheal_webhook_subscriptions,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 # Shared activity timeout — most scheduled work is a single sweep that
@@ -57,6 +58,7 @@ class PreviewGarbageCollectWorkflow:
         torn = await workflow.execute_activity(
             gc_stale_previews,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"gc tore down {torn} stale preview(s)")
 
@@ -70,6 +72,7 @@ class PollScheduledJobRunsWorkflow:
         updated = await workflow.execute_activity(
             poll_scheduled_job_runs,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"refreshed {updated} job run(s)")
 
@@ -83,6 +86,7 @@ class ReconcileClusterCapabilitiesWorkflow:
         n = await workflow.execute_activity(
             reconcile_cluster_capabilities,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"reconciled {n} cluster(s)")
 
@@ -96,6 +100,7 @@ class DriftDetectionWorkflow:
         drifted = await workflow.execute_activity(
             detect_drift,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"drift detected on {drifted} app(s)")
 
@@ -109,6 +114,7 @@ class RehealWebhookSubscriptionsWorkflow:
         n = await workflow.execute_activity(
             reheal_webhook_subscriptions,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"rehealed {n} webhook subscription(s)")
 
@@ -122,6 +128,7 @@ class PruneAuditLogWorkflow:
         n = await workflow.execute_activity(
             prune_audit_log,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"pruned {n} audit log entr{'y' if n == 1 else 'ies'}")
 
@@ -139,6 +146,7 @@ class ProbeAppDnsWorkflow:
         n = await workflow.execute_activity(
             probe_app_dns_activity,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"dns probe changed for {n} app(s)")
 
@@ -156,6 +164,7 @@ class ProbeAppCronjobRunsWorkflow:
         n = await workflow.execute_activity(
             probe_app_cronjob_runs_activity,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"cronjob probe changed for {n} app(s)")
 
@@ -175,6 +184,7 @@ class ApplyObservabilityRetentionWorkflow:
         n = await workflow.execute_activity(
             apply_observability_retention,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"retention applied to {n} log group(s)")
 
@@ -201,6 +211,7 @@ class CaptureQuotaUsageSnapshotWorkflow:
         n = await workflow.execute_activity(
             capture_quota_usage_snapshot,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"quota usage snapshot captured for {n} quota(s)")
 
@@ -214,6 +225,7 @@ class PruneStaleSessionsWorkflow:
         n = await workflow.execute_activity(
             prune_stale_sessions,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(
             ok=True,
@@ -230,5 +242,6 @@ class ExpirePendingApprovalDeploymentsWorkflow:
         n = await workflow.execute_activity(
             expire_pending_approval_deployments,
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
         )
         return WorkflowResult(ok=True, message=f"expired {n} pending approval deployment(s)")

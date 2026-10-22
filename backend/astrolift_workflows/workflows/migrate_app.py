@@ -38,6 +38,7 @@ with workflow.unsafe.imports_passed_through():
         switch_app_env_binding,
         validate_migration_target,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _TIMEOUT = timedelta(minutes=15)
@@ -65,6 +66,7 @@ class MigrateAppWorkflow:
                 validate_migration_target,
                 args=[input.app_environment_id, input.target_cluster_id],
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_VALIDATE_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — surface to operator
@@ -81,6 +83,7 @@ class MigrateAppWorkflow:
                     materialize_secrets_on_target,
                     args=[input.deployment_id, input.target_cluster_id],
                     start_to_close_timeout=_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_STANDARD_RETRY,
                 )
             except Exception as exc:  # noqa: BLE001 - abort before touching target workloads
@@ -95,6 +98,7 @@ class MigrateAppWorkflow:
                 apply_to_target_cluster,
                 args=[input.deployment_id, input.target_cluster_id],
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — abort before switch
@@ -109,6 +113,7 @@ class MigrateAppWorkflow:
                 poll_rollout_on_target,
                 args=[input.deployment_id, input.target_cluster_id],
                 start_to_close_timeout=_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — abort before switch
@@ -122,6 +127,7 @@ class MigrateAppWorkflow:
             switch_app_env_binding,
             args=[input.app_environment_id, input.target_cluster_id],
             start_to_close_timeout=_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_SWITCH_RETRY,
         )
 
@@ -138,6 +144,7 @@ class MigrateAppWorkflow:
                 drain_source_cluster,
                 args=[input.registered_app_id, input.app_environment_id, source_cluster_id],
                 start_to_close_timeout=_DRAIN_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_STANDARD_RETRY,
             )
         except Exception as exc:  # noqa: BLE001 — non-fatal cleanup

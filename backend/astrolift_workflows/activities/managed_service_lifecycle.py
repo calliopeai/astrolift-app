@@ -17,6 +17,7 @@ from typing import Any
 
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 from astrolift_workflows.inputs import ReviewedManagedServiceBinding
 from astrolift_workflows.managed_service_review import reviewed_service_call
 from astrolift_workflows.spanner_ownership import (
@@ -852,22 +853,25 @@ async def deprovision_managed_service(
 
     from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
 
-    if await sync_to_async(is_vertex_service)(managed_service_id):
-        return await vertex_lifecycle_call(
-            managed_service_id,
-            reviewed_binding,
-            "deprovision",
-            delete_data=delete_data,
-            force_destroy=force_destroy,
+    if await heartbeat_while(sync_to_async(is_vertex_service)(managed_service_id)):
+        return await heartbeat_while(
+            vertex_lifecycle_call(
+                managed_service_id,
+                reviewed_binding,
+                "deprovision",
+                delete_data=delete_data,
+                force_destroy=force_destroy,
+            )
         )
 
-    activity.heartbeat()
-    result = await sync_to_async(reviewed_service_call)(
-        _deprovision_sync,
-        managed_service_id,
-        reviewed_binding,
-        delete_data,
-        force_destroy,
+    result = await heartbeat_while(
+        sync_to_async(reviewed_service_call)(
+            _deprovision_sync,
+            managed_service_id,
+            reviewed_binding,
+            delete_data,
+            force_destroy,
+        )
     )
     log.info(
         "deprovision_managed_service result=%s",
@@ -1095,13 +1099,12 @@ async def update_managed_service(
 
     from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
 
-    if await sync_to_async(is_vertex_service)(managed_service_id):
-        return await vertex_lifecycle_call(managed_service_id, reviewed_binding, "update")
+    if await heartbeat_while(sync_to_async(is_vertex_service)(managed_service_id)):
+        return await heartbeat_while(vertex_lifecycle_call(managed_service_id, reviewed_binding, "update"))
 
-    activity.heartbeat()
     try:
-        result = await sync_to_async(reviewed_service_call)(
-            _update_sync, managed_service_id, reviewed_binding
+        result = await heartbeat_while(
+            sync_to_async(reviewed_service_call)(_update_sync, managed_service_id, reviewed_binding)
         )
     except (TypeError, ValueError) as exc:
         raise ApplicationError(str(exc), non_retryable=True) from exc
@@ -1133,15 +1136,14 @@ async def provision_managed_service(
 
     from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
 
-    if await sync_to_async(is_vertex_service)(managed_service_id):
-        return await vertex_lifecycle_call(managed_service_id, reviewed_binding, "provision")
+    if await heartbeat_while(sync_to_async(is_vertex_service)(managed_service_id)):
+        return await heartbeat_while(vertex_lifecycle_call(managed_service_id, reviewed_binding, "provision"))
 
-    activity.heartbeat()
     from temporalio.exceptions import ApplicationError
 
     try:
-        result = await sync_to_async(reviewed_service_call)(
-            _provision_sync, managed_service_id, reviewed_binding
+        result = await heartbeat_while(
+            sync_to_async(reviewed_service_call)(_provision_sync, managed_service_id, reviewed_binding)
         )
     except ManagedServicePreflightError as exc:
         raise ApplicationError(str(exc), non_retryable=True) from exc
@@ -1222,9 +1224,8 @@ async def check_managed_service_ready(
     until the instance is up; S3 is ``available`` immediately (#1009)."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(reviewed_service_call)(
-        _check_ready_sync, managed_service_id, reviewed_binding, handle
+    return await heartbeat_while(
+        sync_to_async(reviewed_service_call)(_check_ready_sync, managed_service_id, reviewed_binding, handle)
     )
 
 
@@ -1697,10 +1698,11 @@ async def bounce_workloads_bound_to_managed_service(
     """Restart the workloads consuming the bindings finalize just rewrote."""
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    return await sync_to_async(reviewed_service_call)(
-        _bounce_dependent_workloads_sync,
-        managed_service_id,
-        reviewed_binding,
-        rebound_binding_ids,
+    return await heartbeat_while(
+        sync_to_async(reviewed_service_call)(
+            _bounce_dependent_workloads_sync,
+            managed_service_id,
+            reviewed_binding,
+            rebound_binding_ids,
+        )
     )

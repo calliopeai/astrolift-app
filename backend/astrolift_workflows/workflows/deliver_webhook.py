@@ -23,6 +23,7 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.webhook_deliver import deliver_webhook
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _ATTEMPT_TIMEOUT = timedelta(seconds=30)
 
@@ -41,6 +42,7 @@ class DeliverWebhookWorkflow:
                 deliver_webhook,
                 {**payload, "attempt": attempt},
                 start_to_close_timeout=_ATTEMPT_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
             )
             classification = str(last.get("classification", ""))
 

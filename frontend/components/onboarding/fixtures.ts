@@ -1,4 +1,6 @@
-/** Onboarding story fixtures: a source connection, its repos, and wizard actions. */
+/** Onboarding story fixtures: a source connection, its repos, app lifetime policies, and actions. */
+import type { TemporaryAppPolicyState } from "@/components/screens/apps/temporary-app-model";
+import { TEMPORARY_RULES } from "@/components/screens/apps/temporary-app.fixtures";
 import type { AstroliftRemoteRepo, AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 
 import type { RepoStepData } from "./RepoStep";
@@ -35,6 +37,19 @@ export const REPO_DATA: RepoStepData = {
     recoverable: true,
   },
   reposLoading: false,
+};
+
+/** The organization's temporary-app policy, read: permanent apps allowed. */
+export const TEMPORARY_POLICY: TemporaryAppPolicyState = {
+  rules: TEMPORARY_RULES,
+  loading: false,
+  failed: false,
+};
+
+/** A policy that lets this member create temporary apps only. */
+export const TEMPORARY_ONLY_POLICY: TemporaryAppPolicyState = {
+  ...TEMPORARY_POLICY,
+  rules: { ...TEMPORARY_RULES, permanentAllowed: false },
 };
 
 export const ACTIONS: OnboardingActions = {

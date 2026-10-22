@@ -66,6 +66,7 @@ with workflow.unsafe.imports_passed_through():
         verify_app_hostnames,
         wait_dns,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 _PLAN_TIMEOUT = timedelta(minutes=2)
@@ -123,6 +124,7 @@ class SyncAppDomainWorkflow:
             plan_app_domain_sync,
             args=[input.registered_app_id, input.previous_subdomain],
             start_to_close_timeout=_PLAN_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_RETRY,
         )
         env_plans = plan.get("plans", []) if isinstance(plan, dict) else []
@@ -192,6 +194,7 @@ class SyncAppDomainWorkflow:
                 ensure_static_dns,
                 deployment_id,
                 start_to_close_timeout=deadline,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
             return
@@ -209,12 +212,14 @@ class SyncAppDomainWorkflow:
                     update_secrets,
                     deployment_id,
                     start_to_close_timeout=deadline,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_RETRY,
                 )
             await workflow.execute_activity(
                 apply_manifests,
                 deployment_id,
                 start_to_close_timeout=deadline,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
             return
@@ -227,6 +232,7 @@ class SyncAppDomainWorkflow:
                     env_plan.get("zone_id", ""),
                 ],
                 start_to_close_timeout=deadline,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
             return
@@ -235,6 +241,7 @@ class SyncAppDomainWorkflow:
                 wait_dns,
                 args=[deployment_id, int(deadline.total_seconds())],
                 start_to_close_timeout=deadline + timedelta(seconds=30),
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
             return
@@ -243,6 +250,7 @@ class SyncAppDomainWorkflow:
             verify_app_hostnames,
             args=[list(added), int(deadline.total_seconds())],
             start_to_close_timeout=deadline + timedelta(seconds=30),
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_RETRY,
         )
 
@@ -262,6 +270,7 @@ class SyncAppDomainWorkflow:
             revert_app_subdomain,
             args=[input.registered_app_id, input.previous_subdomain],
             start_to_close_timeout=_PLAN_TIMEOUT,
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=_RETRY,
         )
         for step in rollback_steps(progress=progress):

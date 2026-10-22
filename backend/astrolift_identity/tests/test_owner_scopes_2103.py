@@ -19,6 +19,7 @@ from astrolift_identity.schema.mutations import (
     UpdateTeamInput,
 )
 from astrolift_identity.schema.queries import IdentityQuery
+from astrolift_registry.models import RegisteredApp
 from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext, tenant_context
 from core.tests.utils.scope_world import ScopeWorld, bind_role, make_info, make_user
@@ -253,9 +254,17 @@ def _owner_denied(world, name, **kwargs):
         assert not result.ok and result.errors[0].code == "PERMISSION_DENIED", result
 
 
+def _empty_owned_project(world, name):
+    # A project that still has apps is not deleted (#2479); these cases are
+    # about who may delete one.
+    if name == "soft_delete_project":
+        RegisteredApp.objects.filter(pk=world.medops_app.pk).update(project=None)
+
+
 @pytest.mark.parametrize("name", OWNER_ROUTES)
 def test_team_binding_reaches_only_its_live_owner(world, name):
     _grant(world, "TEAM")
+    _empty_owned_project(world, name)
     with _tenant(world):
         _owner_denied(world, name, sibling=True)
         _owner_denied(world, name, missing=True)
@@ -270,6 +279,7 @@ def test_team_binding_reaches_only_its_live_owner(world, name):
 @pytest.mark.parametrize("operator", [False, True])
 def test_team_bearer_with_org_actor_stays_inside_live_team(world, name, operator):
     _grant(world)
+    _empty_owned_project(world, name)
     world.user.is_superuser = operator
     world.user.save(update_fields=["is_superuser"])
     with _tenant(world), _token(world, "team"):
@@ -288,6 +298,7 @@ def test_team_bearer_with_org_actor_stays_inside_live_team(world, name, operator
 )
 def test_project_grant_covers_its_edit_and_slug_check(world, name):
     _grant(world, "PROJECT")
+    _empty_owned_project(world, name)
     with _tenant(world):
         _owner_denied(world, name, sibling=True)
         result = _owner_invoke(world, name)

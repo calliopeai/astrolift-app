@@ -43,6 +43,10 @@ export interface OnboardingWizardState {
   sourceRepo: string;
   sourceUrl: string;
   sourceDefaultBranch: string;
+  // The registered app's lifetime (#2433); blank leaves it to the
+  // repo's manifest and the organization's policy.
+  expiresIn: string;
+  deleteDataOnExpiry: boolean;
 
   // Step 4 — deploy strategy
   deployStrategy: DeployStrategy;
@@ -66,10 +70,17 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingWizardState = {
   sourceRepo: "",
   sourceUrl: "",
   sourceDefaultBranch: "main",
+  expiresIn: "",
+  deleteDataOnExpiry: false,
   deployStrategy: "rolling",
   submitting: false,
   submitError: null,
 };
+
+/** Whether submitting registers an app: only once a repo has been picked. */
+export function registersApp(state: OnboardingWizardState): boolean {
+  return Boolean(state.sourceRepo && state.sourceConnectionId);
+}
 
 /**
  * Slugify a free-form name into a kebab-case slug suitable for

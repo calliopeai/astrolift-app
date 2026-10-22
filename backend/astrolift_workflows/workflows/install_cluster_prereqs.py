@@ -32,6 +32,7 @@ with workflow.unsafe.imports_passed_through():
         install_cluster_prereqs,
         record_cluster_bootstrap_run,
     )
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 # Manifest apply against a Kubernetes cluster typically returns in
@@ -79,6 +80,7 @@ class InstallClusterPrereqsWorkflow:
                     input.additive,
                 ],
                 start_to_close_timeout=_APPLY_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_APPLY_RETRY,
             )
         except Exception as exc:  # noqa: BLE001
@@ -99,6 +101,7 @@ class InstallClusterPrereqsWorkflow:
                         input.organization_id,
                     ],
                     start_to_close_timeout=_RECORD_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_RECORD_RETRY,
                 )
             except Exception:  # noqa: BLE001
@@ -130,6 +133,7 @@ class InstallClusterPrereqsWorkflow:
                     input.organization_id,
                 ],
                 start_to_close_timeout=_RECORD_TIMEOUT,
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RECORD_RETRY,
             )
         except Exception:  # noqa: BLE001
