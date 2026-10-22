@@ -145,6 +145,8 @@ class SourceMutations:
             return gql_failure(exc.code, exc.message, field="sourceRepo")
 
         if repo != previous:
+            from workflows.repo_sync import move_repository_workflows
+
             app.source_repo = repo
             app.source_url = _followed_source_url(app.source_url, previous, repo)
             # The verdicts were about the old repository's wiring.
@@ -153,6 +155,11 @@ class SourceMutations:
                 with transaction.atomic():
                     app.save(
                         update_fields=["source_repo", "source_url", "autowire_state", "updated_at", "version"]
+                    )
+                    # The workflows the repository declares are keyed on its
+                    # name; the next sync under the new one would refuse them.
+                    move_repository_workflows(
+                        organization_id=app.organization_id, from_repo=previous, to_repo=repo
                     )
             except IntegrityError:
                 return gql_failure(ErrorCode.CONFLICT.value, _ALREADY_REGISTERED, field="sourceRepo")

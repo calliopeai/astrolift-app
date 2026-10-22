@@ -350,6 +350,118 @@ def test_the_same_repository_for_another_manifest_or_organization_is_not_taken(w
     assert world.medops_app.source_repo == NEW
 
 
+def test_a_name_registered_in_other_case_takes_githubs_spelling(world, github, wiring):
+    # Typed by hand at registration. The App receiver matches GitHub's
+    # spelling exactly, so no push ever found this app.
+    app = world.medops_app
+    app.source_repo = OLD.lower()
+    app.save()
+    github.installed = [OLD]
+    _grant(world)
+
+    out = _set_source(world, app, OLD.upper())
+
+    assert out["ok"], out["errors"]
+    assert (out["data"]["previousSourceRepo"], out["data"]["app"]["sourceRepo"]) == (OLD.lower(), OLD)
+    assert [repo for _, repo in wiring] == [OLD] * 5
+
+
+WORKFLOW = """\
+[workflow]
+slug = "fossil-triage"
+name = "Fossil Triage"
+pattern = "chained"
+
+[[stage]]
+kind = "agent_dispatch"
+agent = "fossil-agent"
+prompt = "Collect evidence."
+output_key = "evidence"
+"""
+TRIAGE = {"workflows/triage.toml": WORKFLOW}
+INTAKE = {"workflows/intake.toml": WORKFLOW.replace("fossil-triage", "fossil-intake")}
+
+
+def _reconcile_workflows(world, repo, files=TRIAGE):
+    """Reconcile ``workflows/`` the way an agent registration, push or
+    "Resync from source" under ``repo`` does."""
+    from workflows.repo_sync import discover_repository_workflows, reconcile_repository_workflows
+
+    return reconcile_repository_workflows(
+        organization=world.org,
+        project=world.medops_project,
+        source_repo=repo,
+        source_ref="main",
+        manifests=discover_repository_workflows(files),
+    )
+
+
+def _workflow_owners(world):
+    """Each definition's repository, retired ones included."""
+    from workflows.models import WorkflowDefinition
+
+    return dict(WorkflowDefinition.objects.filter(organization=world.org).values_list("slug", "source_repo"))
+
+
+def test_the_repositorys_workflows_follow_the_last_app_off_the_old_name(world, github, wiring):
+    _reconcile_workflows(world, OLD, {**TRIAGE, **INTAKE})
+    _reconcile_workflows(world, OLD)  # retires fossil-intake
+    _grant(world)
+
+    out = _set_source(world, world.medops_app, NEW)
+
+    assert out["ok"], out["errors"]
+    assert _workflow_owners(world) == {"fossil-triage": NEW, "fossil-intake": NEW}
+    # The next sync under the new name updates the definition in place. It
+    # used to refuse, the old name still holding the slug, and so did every
+    # sync and "Resync from source" after it.
+    assert [(row.slug, row.created) for row in _reconcile_workflows(world, NEW)] == [("fossil-triage", False)]
+
+
+def test_the_workflows_stay_while_another_app_names_the_old_repository(world, github, wiring):
+    world.platform_app.source_repo = OLD
+    world.platform_app.manifest_path = "apps/gateway/astrolift.toml"
+    world.platform_app.save()
+    _reconcile_workflows(world, OLD)
+    _grant(world)
+
+    out = _set_source(world, world.medops_app, NEW)
+
+    assert out["ok"], out["errors"]
+    assert _workflow_owners(world) == {"fossil-triage": OLD}
+
+
+def test_another_organizations_apps_and_workflows_on_the_old_name_are_not_counted_or_moved(
+    world, github, wiring
+):
+    foreign = ScopeWorld("source2478workflows")
+    foreign.medops_app.source_repo = OLD
+    foreign.medops_app.save()
+    _reconcile_workflows(foreign, OLD)
+    _reconcile_workflows(foreign, NEW, INTAKE)
+    _reconcile_workflows(world, OLD)
+    _grant(world)
+
+    out = _set_source(world, world.medops_app, NEW)
+
+    assert out["ok"], out["errors"]
+    assert (_workflow_owners(world), _workflow_owners(foreign)) == (
+        {"fossil-triage": NEW},
+        {"fossil-triage": OLD, "fossil-intake": NEW},
+    )
+
+
+def test_the_workflows_are_not_merged_into_a_repository_that_declares_its_own(world, github, wiring):
+    _reconcile_workflows(world, OLD)
+    _reconcile_workflows(world, NEW, INTAKE)
+    _grant(world)
+
+    out = _set_source(world, world.medops_app, NEW)
+
+    assert out["ok"], out["errors"]
+    assert _workflow_owners(world) == {"fossil-triage": OLD, "fossil-intake": NEW}
+
+
 @pytest.mark.parametrize(
     "case,source_repo,error,asks_github",
     [

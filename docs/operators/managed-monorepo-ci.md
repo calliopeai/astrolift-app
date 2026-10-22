@@ -110,6 +110,13 @@ repository policy applies, and another app in the organization registered from
 the same repository and manifest path is a conflict. A `sourceUrl` that named
 the old repository follows it.
 
+Each app moves on its own, so after a rename change every app the organization
+registered from the repository. The workflow definitions the old repository
+declared (`workflows/*.toml`) are keyed on its name; once no other app of the
+organization names it, they follow, and the next sync updates them in place and
+retires the ones the repository no longer declares. They never merge into a
+repository that already has definitions of its own.
+
 The change then runs autowire against the repository. The workflow sync
 re-points the push role's trust and rewrites the app's workflow, whose
 ownership comment names the repository; on a protected deploy branch that is a
