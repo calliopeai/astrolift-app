@@ -73,7 +73,10 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
 
     Returns ``None`` if the app has no cluster wired — the dispatcher
     sends an error frame + exit code 2 so the UI renders the right
-    'no runtime' state.
+    'no runtime' state. An app with more than one environment also
+    resolves to ``None``: this path names no environment, and the first
+    of several is a guess (#2209). The relay refuses those opens before
+    dispatch; this keeps the backend closed if anything else calls it.
     """
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_lifecycle.visibility import cluster_owned_and_live, live_app_rows
@@ -99,14 +102,12 @@ def _resolve_target(*, app_slug: str, workload_slug: str | None) -> dict | None:
     if app is None:
         return _resolve_box_target(box_slug=app_slug, org_id=org_id)
 
-    environment = (
-        AppEnvironment.objects.filter(registered_app=app)
-        .select_related("tenant_cluster")
-        .order_by("id")
-        .first()
+    environments = list(
+        AppEnvironment.objects.filter(registered_app=app).select_related("tenant_cluster")[:2]
     )
-    if environment is None or not cluster_owned_and_live(environment.tenant_cluster, org_id):
+    if len(environments) != 1 or not cluster_owned_and_live(environments[0].tenant_cluster, org_id):
         return None
+    environment = environments[0]
     environment.registered_app = app
     return {"cluster": environment.tenant_cluster, "namespace": namespace_for_environment(environment)}
 
