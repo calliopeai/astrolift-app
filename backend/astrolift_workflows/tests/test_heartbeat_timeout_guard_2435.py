@@ -10,10 +10,11 @@ workflow modules:
 1. A call that schedules a heartbeating activity passes ``heartbeat_timeout``.
 2. A call that passes ``heartbeat_timeout`` schedules only heartbeating
    activities. A timeout on an activity that never beats kills it.
-3. A scheduled heartbeating activity beats through ``heartbeat_while``, and
-   its callers allow at least ``HEARTBEAT_TIMEOUT``. An activity that paces
-   its own beats is listed in ``SELF_PACED`` with the reason they are
-   frequent enough and the smallest timeout that reason covers.
+3. A scheduled heartbeating activity beats through ``heartbeat_while``,
+   awaits nothing outside it, and its callers allow at least
+   ``HEARTBEAT_TIMEOUT``, which holds four of the pump's beats. An activity
+   that paces its own beats is listed in ``SELF_PACED`` with the reason they
+   are frequent enough and the smallest timeout that reason covers.
 
 An activity heartbeats when its body, or a function in its module that it
 calls, calls ``activity.heartbeat``, ``heartbeat_while``, ``heartbeat_sink``
@@ -34,7 +35,7 @@ import pathlib
 from datetime import timedelta
 from functools import cache
 
-from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
+from astrolift_workflows.activity_heartbeat import HEARTBEAT_EVERY, HEARTBEAT_TIMEOUT
 from astrolift_workflows.worker import ACTIVITIES
 
 WORKFLOWS = pathlib.Path("astrolift_workflows/workflows")
@@ -108,6 +109,42 @@ def _beat_kinds(module_name: str, function: str, seen: frozenset[str] = frozense
 def _kinds(definition: str) -> set[str]:
     fn = REGISTRY[definition]
     return _beat_kinds(fn.__module__, fn.__name__)
+
+
+def _outside_the_pump(function: ast.AST):
+    """The nodes of ``function`` that run outside ``heartbeat_while``.
+
+    Skips the pump's argument, which is the pumped work, and nested functions,
+    which run only where they are called.
+    """
+    stack = list(ast.iter_child_nodes(function))
+    while stack:
+        node = stack.pop()
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda):
+            continue
+        yield node
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == PUMP:
+            continue
+        stack.extend(ast.iter_child_nodes(node))
+
+
+def _unpumped_awaits(module_name: str, function: str, seen: frozenset[str] = frozenset()) -> list[str]:
+    """Each await in a function, or in what it calls in its module, that the pump does not cover."""
+    functions = _module_functions(module_name)
+    gaps, helpers = [], set()
+    for node in _outside_the_pump(functions[function]):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in functions:
+            helpers.add(node.func.id)
+        if isinstance(node, ast.Await):
+            call = node.value
+            # Awaiting the pump, or a helper in the module, which is checked as the activity's own code.
+            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name):
+                if call.func.id == PUMP or call.func.id in functions:
+                    continue
+            gaps.append(f"{module_name}:{node.lineno} await {ast.unparse(call)}")
+    for helper in helpers - seen - {function}:
+        gaps += _unpumped_awaits(module_name, helper, seen | {function})
+    return gaps
 
 
 def _parents(tree: ast.AST) -> dict[ast.AST, ast.AST]:
@@ -261,6 +298,17 @@ def test_each_heartbeat_timeout_is_comfortably_above_the_beat_interval():
     assert short == {}
 
 
+def test_the_pump_beats_four_times_inside_the_timeout_callers_pass():
+    """The check above measures callers against ``HEARTBEAT_TIMEOUT``, so the
+    constant itself must hold four pumped beats. The SDK forwards at most one
+    beat per min(80% of the timeout, 60 s), the worker's default throttle cap,
+    which leaves the server two of them."""
+    forwarded_every = max(HEARTBEAT_EVERY, min(HEARTBEAT_TIMEOUT * 0.8, timedelta(seconds=60)))
+
+    assert HEARTBEAT_EVERY * 4 <= HEARTBEAT_TIMEOUT
+    assert forwarded_every * 2 <= HEARTBEAT_TIMEOUT
+
+
 def test_a_scheduled_heartbeating_activity_beats_on_a_timer_or_is_self_paced():
     scheduled = {a for _, _, acts, _ in SITES for a in acts if _beats(a)}
     unpaced = sorted(a for a in scheduled if "pump" not in _kinds(a) and a not in SELF_PACED)
@@ -271,6 +319,20 @@ def test_a_scheduled_heartbeating_activity_beats_on_a_timer_or_is_self_paced():
         f"heartbeat_while, or add them to SELF_PACED with the reason. {unpaced}"
     )
     assert sorted(SELF_PACED.keys() - scheduled) == [], "SELF_PACED names an activity no workflow schedules"
+
+
+def test_a_pumped_activity_awaits_nothing_outside_the_pump():
+    """The pump beats only while its own work runs. Any other await in the
+    activity goes without a beat for as long as it waits, which for a
+    ``sync_to_async`` call includes the time queued behind another activity's
+    call on the worker's shared thread."""
+    pumped = {a for _, _, acts, _ in SITES for a in acts if _beats(a)} - SELF_PACED.keys()
+    gaps = {a: _unpumped_awaits(REGISTRY[a].__module__, REGISTRY[a].__name__) for a in sorted(pumped)}
+    # Agent dispatch paces its own beats around plain awaits, so the check must see them.
+    dispatch = REGISTRY["astrolift.agent.dispatch_task"]
+
+    assert {a: g for a, g in gaps.items() if g} == {}, "await these through heartbeat_while"
+    assert _unpumped_awaits(dispatch.__module__, dispatch.__name__)
 
 
 def test_the_guard_sees_every_shape_of_activity_reference():
