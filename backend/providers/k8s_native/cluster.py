@@ -1175,6 +1175,12 @@ class K8sNativeClusterDriver(ClusterDriver):
             namespaces=default_namespaces(namespaces),
         )
 
+    @driver_op(cloud="k8s_native", driver="cluster")
+    def list_namespaces(self, cluster: ClusterContext, *, label_selector: str) -> list[NamespaceState]:
+        from _sdk._kube_health import namespaces_from_client
+
+        return namespaces_from_client(self._k8s(cluster.slug), label_selector=label_selector)
+
     # ---- internals ------------------------------------------------
 
     def _k8s(self, cluster: str) -> Any:

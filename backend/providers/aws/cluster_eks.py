@@ -2048,6 +2048,12 @@ class EKSClusterDriver(ClusterDriver):
         )
 
     @driver_op(cloud="aws", driver="cluster")
+    def list_namespaces(self, cluster: ClusterContext, *, label_selector: str) -> list[NamespaceState]:
+        from _sdk._kube_health import namespaces_from_client
+
+        return namespaces_from_client(self._k8s(cluster.slug), label_selector=label_selector)
+
+    @driver_op(cloud="aws", driver="cluster")
     def get_alb_http_metrics(
         self,
         cluster: ClusterContext,

@@ -711,7 +711,8 @@ def cluster_workload_health_dispatch(
     convert without strawberry-side coercion:
 
         [{"namespace", "name", "desired_replicas", "ready_replicas",
-          "restart_count_24h", "last_image_deployed_at"}, ...]
+          "restart_count_24h", "last_image_deployed_at",
+          "running_images": [{"image", "image_id"}, ...]}, ...]
 
     Drivers that can't reach the apiserver (no creds, network) return
     an empty list rather than raising — the UI surfaces "no workload
@@ -740,8 +741,42 @@ def cluster_workload_health_dispatch(
             "ready_replicas": int(w.ready_replicas),
             "restart_count_24h": int(w.restart_count_24h),
             "last_image_deployed_at": w.last_image_deployed_at,
+            "running_images": [{"image": i.image, "image_id": i.image_id} for i in w.running_images],
         }
         for w in rows
+    ]
+
+
+def cluster_namespaces_dispatch(*, cluster: TenantCluster, label_selector: str) -> list[dict[str, Any]]:
+    """Namespaces on ``cluster`` whose labels match ``label_selector`` (#2465).
+
+    Returns ``[{"name", "uid", "labels", "annotations", "phase"}, ...]``.
+    Unlike the health dispatches above, every failure raises
+    ``ClusterManagementError``: the product scan reads an empty list as
+    every product namespace torn down, so a read that did not happen must
+    not look like one that found nothing.
+    """
+    driver = _driver_for_cluster(cluster)
+    if not hasattr(driver, "list_namespaces"):
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: driver does not implement list_namespaces",
+        )
+    ctx = _context_for_cluster(cluster)
+    try:
+        rows = driver.list_namespaces(ctx, label_selector=label_selector)
+    except Exception as exc:  # noqa: BLE001
+        raise ClusterManagementError(
+            f"cluster {cluster.slug}: list_namespaces raised {exc}",
+        ) from exc
+    return [
+        {
+            "name": ns.name,
+            "uid": ns.uid,
+            "labels": dict(ns.labels),
+            "annotations": dict(ns.annotations),
+            "phase": ns.phase,
+        }
+        for ns in rows
     ]
 
 
@@ -833,6 +868,7 @@ __all__ = [
     "cluster_alb_http_metrics_dispatch",
     "cluster_certificates_dispatch",
     "cluster_health_dispatch",
+    "cluster_namespaces_dispatch",
     "cluster_workload_health_dispatch",
     "cognito_user_pool_clients_dispatch",
     "cognito_user_pools_dispatch",

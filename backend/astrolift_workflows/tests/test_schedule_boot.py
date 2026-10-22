@@ -166,6 +166,8 @@ def test_default_allowlist_is_phase_3a_yes_set():
         ScheduleKind.SCALE_TICK,
         ScheduleKind.LOOP_TICK,
         ScheduleKind.RECONCILE_CLUSTER_CAPABILITIES,
+        # The product scan ships active (#2465): read-only against the cluster.
+        ScheduleKind.RECONCILE_PRODUCT_DEPLOYMENTS,
         ScheduleKind.REHEAL_WEBHOOK_SUBSCRIPTIONS,
         ScheduleKind.AGENT_TASK_CALLBACK_RECONCILE,
         ScheduleKind.DRIFT_DETECTION,

@@ -100,6 +100,8 @@ NOT_API_OBJECTS = {"Config", "DeleteOptions"}
 
 #: Typed kubernetes-client methods the code calls, in RBAC terms.
 TYPED_METHODS = {
+    # The product scan lists the namespaces the installer labels (#2465).
+    "list_namespace": ("list", "", "namespaces"),
     "list_namespaced_pod": ("list", "", "pods"),
     "read_namespaced_pod_log": ("get", "", "pods/log"),
     "connect_get_namespaced_pod_exec": ("create", "", "pods/exec"),
