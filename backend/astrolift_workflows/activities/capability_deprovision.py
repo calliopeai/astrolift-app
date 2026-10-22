@@ -311,6 +311,20 @@ def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]
         "organization",
     ).get(pk=registered_app_id)
     cluster = _cluster_for_app(app)
+    if cluster.provider_plugin.slug == "azure":
+        # On Azure the platform creates only the runtime identity, and only
+        # the identity it recorded is ever removed; the build, CI-push and
+        # static-build names below are AWS roles (#2279).
+        return _deprovision_azure_identities(
+            app,
+            {
+                "cluster_slug": cluster.slug,
+                "registered_app_id": registered_app_id,
+                "role": _identity_role_name_for(app),
+                "roles_deleted": [],
+                "roles_skipped": [],
+            },
+        )
     identity_driver = _resolve_capability_driver(cluster, "identity")
     delete_role = getattr(identity_driver, "delete_identity_role", None)
     if not callable(delete_role):
@@ -353,12 +367,55 @@ def _deprovision_identity_role_sync(*, registered_app_id: int) -> dict[str, Any]
                 cluster.slug,
                 name,
             )
+    return _deprovision_azure_identities(
+        app,
+        {
+            "cluster_slug": cluster.slug,
+            "registered_app_id": registered_app_id,
+            "role": role,
+            "roles_deleted": deleted,
+            "roles_skipped": skipped,
+        },
+    )
+
+
+def _deprovision_azure_identities(app, summary: dict[str, Any]) -> dict[str, Any]:
+    """Remove the managed identities recorded for the app on Azure clusters (#2279).
+
+    Any of the app's clusters, not just its default one: the identity belongs
+    to the app on one cluster. An identity another party federated with or
+    granted to keeps everything but what the platform added, and that is a
+    refusal naming what is left rather than a report of a deletion.
+    """
+    from django.db import transaction
+
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_services.azure_workload_identity import remove_identities
+    from astrolift_services.models import AzureWorkloadIdentity
+
+    if not AzureWorkloadIdentity.objects.filter(
+        organization_id=app.organization_id, registered_app=app
+    ).exists():
+        return summary
+    with transaction.atomic():
+        # The lock the workload identity reconcile takes, so neither changes
+        # the identity while the other has it half done.
+        RegisteredApp.all_objects.select_for_update().filter(pk=app.pk).first()
+        reports, failures = remove_identities(app)
+    failures += [
+        f"{report['identity']} carries federations or role assignments the platform did not add "
+        f"({', '.join(report['foreign_federations'] + report['foreign_assignments'])}); the platform's own "
+        "were removed and the identity was left in place"
+        for report in reports
+        if not (report["deleted"] or report["absent"])
+    ]
+    if failures:
+        raise CapabilityDeprovisionError(f"app {app.slug}: " + "; ".join(failures))
     return {
-        "cluster_slug": cluster.slug,
-        "registered_app_id": registered_app_id,
-        "role": role,
-        "roles_deleted": deleted,
-        "roles_skipped": skipped,
+        **summary,
+        "roles_deleted": [*summary["roles_deleted"], *(r["identity"] for r in reports if r["deleted"])],
+        "roles_skipped": [*summary["roles_skipped"], *(r["identity"] for r in reports if r["absent"])],
+        "azure_identities": reports,
     }
 
 

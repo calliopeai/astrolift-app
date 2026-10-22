@@ -374,6 +374,7 @@ async def test_real_temporal_deregister_retries_native_runtime_and_keeps_origina
     from temporalio.worker import Replayer, UnsandboxedWorkflowRunner, Worker
 
     from astrolift_workflows.activities.app_expiry import retire_expired_app_runtime
+    from astrolift_workflows.activities.native_endpoint_removal import remove_native_endpoint_identity
     from astrolift_workflows.inputs import Actor, DeregisterAppInput
     from astrolift_workflows.workflows import deregister_app
 
@@ -384,7 +385,8 @@ async def test_real_temporal_deregister_retries_native_runtime_and_keeps_origina
         if key[0] in ("Namespace", "PersistentVolumeClaim", "postgresql.cnpg.io/v1/Cluster")
     }
     # These unrelated provider operations have no external endpoints in this
-    # fixture. Native runtime retirement keeps its production implementation.
+    # fixture. Native runtime retirement keeps its production implementation,
+    # and so does the native GCP identity removal, which finds no IAM journal (#2278).
     results = {
         "mark_app_tearing_down": True,
         "abort_in_flight_deploys": [],
@@ -413,7 +415,7 @@ async def test_real_temporal_deregister_retries_native_runtime_and_keeps_origina
 
         return run
 
-    activities = [retire_expired_app_runtime]
+    activities = [retire_expired_app_runtime, remove_native_endpoint_identity]
     activities.extend(provider_activity(attr, result) for attr, result in results.items())
     n.objects.fail_once = True
     queue = f"native-expiry-retention-{uuid4()}"

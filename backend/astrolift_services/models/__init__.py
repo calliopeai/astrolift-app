@@ -1,3 +1,4 @@
+from astrolift_services.models.azure_workload_identity import AzureWorkloadIdentity
 from astrolift_services.models.email_delivery_test import EmailDeliveryObservation, EmailDeliveryTest
 from astrolift_services.models.email_event import EmailEvent, EmailEventKind
 from astrolift_services.models.gcp_gke_preparation_journal import (
@@ -34,6 +35,7 @@ from astrolift_services.models.workload_identity_grant import (
 )
 
 __all__ = [
+    "AzureWorkloadIdentity",
     "GCPIdentityAcknowledgement",
     "GCPAppIdentitySource",
     "GCPClusterIdentitySource",

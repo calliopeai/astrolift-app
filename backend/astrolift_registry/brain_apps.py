@@ -173,10 +173,23 @@ def _deployment_key(binding: BrainAppBinding, deployment: Any) -> BrainTokenKey:
 
 
 def issue_app_token(binding: BrainAppBinding, deployment: Any, *, now: dt.datetime | None = None) -> str:
-    """A read token for the app of ``binding``, signed by this deployment's key."""
+    """A read token for the app of ``binding``, signed by this deployment's key.
+    Typed (``sub_kind`` ``app``) when the brain issues typed tokens (#2470),
+    and the key then records it."""
+    from types import SimpleNamespace
+
     import jwt
 
-    from astrolift_registry.brain_tokens import ALGORITHM, SCOPE, issuer
+    from astrolift_registry.brain_tokens import (
+        ALGORITHM,
+        SCOPE,
+        TYPED_CONTRACT,
+        TypedSubject,
+        check_typed_size,
+        issuer,
+        typed_claims,
+        typed_issuance,
+    )
     from core.secrets import EncryptedSecret, decrypt
 
     now = now or timezone.now()
@@ -196,7 +209,18 @@ def issue_app_token(binding: BrainAppBinding, deployment: Any, *, now: dt.dateti
         "exp": int((now + APP_TOKEN_TTL).timestamp()),
         "jti": secrets.token_hex(12),
     }
-    return jwt.encode(claims, pem, algorithm=ALGORITHM, headers={"kid": key.kid})
+    typed = typed_issuance(binding.brain)
+    if typed:
+        app_guid = str(binding.registered_app.guid)
+        subject = SimpleNamespace(pk=None, guid=claims["sub"], email="")
+        claims.update(typed_claims(TypedSubject("app", guid=app_guid), brain=binding.brain, user=subject))
+    token = jwt.encode(claims, pem, algorithm=ALGORITHM, headers={"kid": key.kid})
+    if typed:
+        check_typed_size(token)
+        if key.typed_contract != TYPED_CONTRACT:
+            key.typed_contract = TYPED_CONTRACT
+            key.save(update_fields=["typed_contract", "updated_at", "version"])
+    return token
 
 
 def deployer(binding: BrainAppBinding, deployment: Any) -> Any:

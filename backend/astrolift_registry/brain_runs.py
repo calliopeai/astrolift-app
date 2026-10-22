@@ -22,6 +22,10 @@ person behind them. They read the brains shared with their agent
 ``brains_allowed``, as the agent: bound at spawn, checked again on every
 refresh, revoked on unshare and published only while the share, the agent and
 the run are live.
+
+For a brain that issues typed tokens (#2470) a run's tokens are typed: the
+person's carry only their teams within the team of the credential that
+launched the run (recorded on the binding), the agent's carry its Workload GUID.
 """
 
 from __future__ import annotations
@@ -181,7 +185,22 @@ def requested_slugs(task) -> list[str]:
     )
 
 
-def bind(task, brains: list[LaunchBrain]) -> None:
+def bind(task, brains: list[LaunchBrain], *, launch_team_id: int | None) -> None:
+    """Bind ``task`` to ``brains``. ``launch_team_id`` is the team the
+    launching credential is confined to (a team-scoped API token), ``None``
+    for one that reaches the whole organization: a typed token for the run
+    carries no team outside it (#2470)."""
+    from astrolift_identity.models import Team
+
+    ceiling = BrainRunBinding.LaunchCeiling.ORGANIZATION
+    team_guid = None
+    if launch_team_id is not None:
+        ceiling = BrainRunBinding.LaunchCeiling.TEAM
+        team_guid = (
+            Team.objects.filter(pk=launch_team_id, organization_id=task.organization_id)
+            .values_list("guid", flat=True)
+            .first()
+        )
     for item in brains:
         BrainRunBinding.objects.create(
             organization_id=task.organization_id,
@@ -190,6 +209,8 @@ def bind(task, brains: list[LaunchBrain]) -> None:
             slug=item.brain.slug,
             name=item.brain.name,
             source=item.source,
+            launch_ceiling=ceiling,
+            launch_team_guid=team_guid,
         )
 
 
@@ -424,17 +445,38 @@ def _subject(row: BrainRunBinding, task):
     return SimpleNamespace(pk=None, guid=f"agent:{task.agent_definition.guid}", email="")
 
 
+def _typed_subject(row: BrainRunBinding, task):
+    """What a typed token for ``row`` says (#2470): the agent for a share,
+    else the launching person with their teams within the launch's ceiling
+    (none for a row bound before ceilings were recorded)."""
+    from astrolift_registry.brain_tokens import TypedSubject
+
+    if row.source == BrainRunBinding.Source.GRANT:
+        return TypedSubject("agent", guid=str(task.agent_definition.guid))
+    if row.launch_ceiling == BrainRunBinding.LaunchCeiling.ORGANIZATION:
+        return TypedSubject("user")
+    if row.launch_ceiling == BrainRunBinding.LaunchCeiling.TEAM and row.launch_team_guid:
+        return TypedSubject("user", team_ceiling=frozenset({str(row.launch_team_guid)}))
+    return TypedSubject("user", team_ceiling=frozenset())
+
+
 def _issue(row: BrainRunBinding, task, *, reason: str) -> tuple[str, dt.datetime]:
     from astrolift_registry.brain_tokens import BrainTokenError, issue
 
     subject = _subject(row, task)
     try:
         issued = issue(
-            user=subject, brain=row.brain, key=_binding_key(row), claims={"agent_task": str(task.guid)}
+            user=subject,
+            brain=row.brain,
+            key=_binding_key(row),
+            claims={"agent_task": str(task.guid)},
+            subject=_typed_subject(row, task),
         )
     except BrainTokenError as exc:
         raise BrainRunError("precondition", str(exc)) from exc
     extra = {"agent": task.agent_definition.slug} if subject.pk is None else {}
+    if issued.contract:
+        extra["contract"] = issued.contract
     _audit(
         "brain.token.issue",
         row,

@@ -433,6 +433,26 @@ async def reconcile_cluster_capabilities() -> int:
     return await heartbeat_while(sync_to_async(_reconcile_cluster_capabilities_sync)())
 
 
+# ---- Product deployments (#2465) ------------------------------------
+
+
+def _reconcile_product_deployments_sync() -> int:
+    from astrolift_clusters.product_deployments import scan_product_deployments
+
+    return scan_product_deployments()
+
+
+@activity.defn(name="astrolift.scheduled.reconcile_product_deployments")
+async def reconcile_product_deployments() -> int:
+    """Record the Calliope AI products the Deployment Manager runs on each
+    managed cluster, from their namespaces' labels. Read-only against the
+    clusters; one cluster's failure never stops the rest. Returns how many
+    clusters were listed."""
+    from asgiref.sync import sync_to_async
+
+    return await heartbeat_while(sync_to_async(_reconcile_product_deployments_sync)())
+
+
 # ---- Drift detection ----------------------------------------------
 
 
@@ -907,5 +927,6 @@ __all__ = [
     "prune_audit_log",
     "prune_stale_sessions",
     "reconcile_cluster_capabilities",
+    "reconcile_product_deployments",
     "reheal_webhook_subscriptions",
 ]

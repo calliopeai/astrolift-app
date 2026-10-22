@@ -404,7 +404,8 @@ class _FakeWorkflowAPI:
     """
 
     def __init__(self, *, fakes: dict[str, object]):
-        self._fakes = fakes
+        # An app with no native GCP identity has nothing to revoke (#2278).
+        self._fakes = {"remove_native_endpoint_identity": [], **fakes}
         self.calls: list[tuple[str, tuple, dict]] = []
 
     async def execute_activity(self, activity_fn, *args, **kwargs):

@@ -1,21 +1,27 @@
-"""Existing-UAMI reconciliation through fixed native ARM clients (#2279).
+"""The platform's own UAMIs, through fixed native ARM clients (#2279).
 
 This internal port is deliberately separate from the legacy injected driver.
-Its caller supplies a previously recorded identity and a fresh admission/source
-checkpoint. It cannot create/delete a UAMI or certify AKS/token propagation.
+:class:`AzureIdentityProvisioner` observes or creates the UAMI one
+org/app/cluster owner gets, after checking the AKS cluster's live OIDC issuer.
+:class:`AzureOwnedIdentityDriver` reconciles and removes an identity the caller
+recorded from that observation. Both take a fresh admission/source checkpoint.
+Neither certifies token propagation or workload rollout.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
 from dataclasses import dataclass, field
 from threading import Lock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import parse_qs, unquote, urlsplit
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from _sdk._telemetry import driver_op
+from _sdk.azure_tags import serialize_azure_arm_tags
 from azure.identity_federated import AzureManagedIdentity
 from azure.role_catalog import AZURE_BUILTIN_ROLE_IDS, subscription_of, validate_arm_scope
 
@@ -29,14 +35,30 @@ _AUDIENCE = "api://AzureADTokenExchange"
 _NAME = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_-]{2,127}\Z")
 _KSA = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?\Z")
 _GROUP = re.compile(r"[a-zA-Z0-9_().-]{1,90}\Z")
+_AKS_NAME = re.compile(r"[a-zA-Z0-9](?:[a-zA-Z0-9_-]{0,61}[a-zA-Z0-9])?\Z")
+_LOCATION = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ]{0,63}\Z")
 _MAX_BYTES = 2 * 1024 * 1024
+# A stable AKS API that carries oidcIssuerProfile and securityProfile.workloadIdentity.
+_AKS_API_VERSION = "2024-09-01"
 
 
 class AzureOwnedIdentityError(ValueError):
     """A bounded native observation or effect could not be confirmed."""
 
 
-def _guid(value: str) -> str:
+class AzureIdentityRefused(AzureOwnedIdentityError):
+    """The native state is known, and the platform will not act on it.
+
+    Raised with a fixed message the platform composed itself, never SDK or
+    response text, so it can reach an operator: a same-name identity someone
+    else owns, a recorded identity that was replaced or deleted, a cluster
+    whose live issuer is not the configured one.
+    """
+
+
+def _guid(value: object) -> str:
+    if not isinstance(value, str):
+        raise AzureOwnedIdentityError("A canonical nonzero identity GUID is required.")
     try:
         parsed = UUID(value)
     except (ValueError, TypeError, AttributeError):
@@ -73,36 +95,145 @@ class AzureIdentityContext:
             self.principal_id,
         ):
             _guid(value)
-        if not _GROUP.fullmatch(self.resource_group) or self.resource_group.endswith("."):
-            raise AzureOwnedIdentityError("An exact resource group is required.")
-        if not _NAME.fullmatch(self.identity_name):
-            raise AzureOwnedIdentityError("An exact managed identity name is required.")
-        expected = (
-            f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}"
-            f"/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{self.identity_name}"
-        )
-        if self.resource_id != expected:
+        _require_placement(self.resource_group, self.identity_name)
+        if self.resource_id != _resource_id(self.subscription_id, self.resource_group, self.identity_name):
             raise AzureOwnedIdentityError("The recorded managed identity placement is inconsistent.")
-        issuer = urlsplit(self.issuer)
-        if (
-            not 1 <= len(self.issuer) <= 512
-            or issuer.scheme != "https"
-            or not issuer.hostname
-            or issuer.username
-            or issuer.password
-            or issuer.port not in (None, 443)
-            or issuer.query
-            or issuer.fragment
-            or "%" in self.issuer
-            or any(ord(c) < 33 for c in self.issuer)
-        ):
-            raise AzureOwnedIdentityError("An exact HTTPS issuer declaration is required.")
+        _require_issuer(self.issuer)
 
     @property
     def owner_key(self) -> str:
         # The app identity is shared by its environments. Federation still binds
         # each exact namespace/KSA; role reconciliation receives the complete union.
         return f"{self.organization_id}|{self.app_id}|{self.cluster_id}"
+
+
+def _require_placement(resource_group: str, identity_name: str) -> None:
+    if not isinstance(resource_group, str) or not _GROUP.fullmatch(resource_group) or resource_group.endswith("."):
+        raise AzureOwnedIdentityError("An exact resource group is required.")
+    if not isinstance(identity_name, str) or not _NAME.fullmatch(identity_name):
+        raise AzureOwnedIdentityError("An exact managed identity name is required.")
+
+
+def _require_issuer(value: object) -> None:
+    if not isinstance(value, str):
+        raise AzureOwnedIdentityError("An exact HTTPS issuer declaration is required.")
+    issuer = urlsplit(value)
+    if (
+        not 1 <= len(value) <= 512
+        or issuer.scheme != "https"
+        or not issuer.hostname
+        or issuer.username
+        or issuer.password
+        or issuer.port not in (None, 443)
+        or issuer.query
+        or issuer.fragment
+        or "%" in value
+        or any(ord(c) < 33 for c in value)
+    ):
+        raise AzureOwnedIdentityError("An exact HTTPS issuer declaration is required.")
+
+
+def _resource_id(subscription_id: str, resource_group: str, identity_name: str) -> str:
+    return (
+        f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
+        f"/providers/Microsoft.ManagedIdentity/userAssignedIdentities/{identity_name}"
+    )
+
+
+def owner_tags(*, organization_id: str, app_id: str, cluster_id: str) -> dict[str, str]:
+    """The ARM tags that mark a UAMI as this platform's, for one owner."""
+    return serialize_azure_arm_tags(
+        {
+            "astrolift.io/managed-by": "platform",
+            "astrolift.io/organization-id": organization_id,
+            "astrolift.io/app-id": app_id,
+            "astrolift.io/cluster-id": cluster_id,
+        }
+    )
+
+
+def _owner_markers_match(tags: Any, *, organization_id: str, app_id: str, cluster_id: str) -> bool:
+    """Every recognized spelling of each owner marker carries this owner's value."""
+    if not isinstance(tags, dict) or len(tags) > 50:
+        return False
+    required = {
+        "managedby": "platform",
+        "organizationid": organization_id,
+        "appid": app_id,
+        "clusterid": cluster_id,
+    }
+    for suffix, expected in required.items():
+        matches = [
+            value
+            for key, value in tags.items()
+            if isinstance(key, str)
+            and re.sub("[^a-z0-9]", "", key.lower()) in {"astrolift" + suffix, "astroliftio" + suffix}
+        ]
+        if not matches or any(value != expected for value in matches):
+            return False
+    return True
+
+
+@dataclass(frozen=True, slots=True)
+class AzureIdentityPlacement:
+    """Where one owner's UAMI lives, and the AKS cluster that federates it.
+
+    Everything here comes from the caller's own records and configuration;
+    the native IDs come only from observing the identity.
+    """
+
+    organization_id: str
+    app_id: str
+    cluster_id: str
+    tenant_id: str
+    subscription_id: str
+    resource_group: str
+    identity_name: str
+    location: str
+    cluster_name: str
+    issuer: str
+
+    def __post_init__(self) -> None:
+        for value in (self.organization_id, self.app_id, self.cluster_id, self.tenant_id, self.subscription_id):
+            _guid(value)
+        _require_placement(self.resource_group, self.identity_name)
+        if not isinstance(self.location, str) or not _LOCATION.fullmatch(self.location):
+            raise AzureOwnedIdentityError("An exact Azure location is required.")
+        if not isinstance(self.cluster_name, str) or not _AKS_NAME.fullmatch(self.cluster_name):
+            raise AzureOwnedIdentityError("An exact AKS cluster name is required.")
+        _require_issuer(self.issuer)
+
+    @property
+    def resource_id(self) -> str:
+        return _resource_id(self.subscription_id, self.resource_group, self.identity_name)
+
+    @property
+    def cluster_resource_id(self) -> str:
+        return (
+            f"/subscriptions/{self.subscription_id}/resourceGroups/{self.resource_group}"
+            f"/providers/Microsoft.ContainerService/managedClusters/{self.cluster_name}"
+        )
+
+    @property
+    def tags(self) -> dict[str, str]:
+        return owner_tags(organization_id=self.organization_id, app_id=self.app_id, cluster_id=self.cluster_id)
+
+    def context(self, *, environment_id: str, identity: AzureManagedIdentity) -> AzureIdentityContext:
+        """The reconcile context for an identity observed at this placement."""
+        return AzureIdentityContext(
+            organization_id=self.organization_id,
+            app_id=self.app_id,
+            environment_id=environment_id,
+            cluster_id=self.cluster_id,
+            tenant_id=self.tenant_id,
+            subscription_id=self.subscription_id,
+            resource_group=self.resource_group,
+            identity_name=self.identity_name,
+            resource_id=identity.resource_id,
+            client_id=identity.client_id,
+            principal_id=identity.principal_id,
+            issuer=self.issuer,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +279,34 @@ class AzureIdentityReconcileResult:
     configuration_observed: bool = True
     workload_ready: bool = False
     propagation_verified: bool = False
+    removed_federation_names: tuple[str, ...] = ()
+    removed_assignment_names: tuple[str, ...] = ()
+    foreign_federation_names: tuple[str, ...] = ()
+    """Federations on the identity this owner does not own, left in place."""
+    foreign_assignment_names: tuple[str, ...] = ()
+    """Role assignments on the principal this owner does not own, left in place."""
+
+
+@dataclass(frozen=True, slots=True)
+class AzureIdentityRemovalResult:
+    """What a removal observably did, and what it could not claim.
+
+    Removing an assignment or deleting the identity does not revoke access a
+    token issued earlier already carries; that ends when the token expires.
+    """
+
+    identity_deleted: bool
+    identity_absent: bool = False
+    """The identity was already gone. Owned assignments on its principal, if
+    any survived it, grant nothing and are not inspected."""
+    identity_replaced: bool = False
+    """Another identity holds the recorded name, so the recorded one is gone
+    (``identity_absent`` is set too). The replacement is left untouched."""
+    removed_federation_names: tuple[str, ...] = ()
+    removed_assignment_names: tuple[str, ...] = ()
+    foreign_federation_names: tuple[str, ...] = ()
+    foreign_assignment_names: tuple[str, ...] = ()
+    propagation_verified: bool = False
 
 
 def federation_name(context: AzureIdentityContext, subject: str) -> str:
@@ -171,6 +330,31 @@ class _Budget:
     bytes_read: int = 0
     requests: int = 0
     allowed: set[tuple[str, str]] = field(default_factory=set)
+
+
+def _admitted_credential(credential: Any) -> TokenCredential:
+    """The token credential a native port may use.
+
+    Production configs carry the cluster's stamped ``CloudCredential``; for
+    Azure that is only ever the ambient identity, which is the public Entra
+    chain fixed below. An explicitly supplied token credential is a trusted
+    admitted caller port. Anything else is refused rather than guessed at.
+    """
+    from _sdk.cloud_credentials import CloudCredential
+
+    if credential is None or (
+        isinstance(credential, CloudCredential) and credential.cloud == "azure" and credential.is_ambient
+    ):
+        from azure.identity import DefaultAzureCredential
+
+        return DefaultAzureCredential(
+            authority="https://login.microsoftonline.com",
+            additionally_allowed_tenants=[],
+            exclude_interactive_browser_credential=True,
+        )
+    if isinstance(credential, CloudCredential) or not callable(getattr(credential, "get_token", None)):
+        raise AzureOwnedIdentityError("Native identity requires the ambient Azure credential or an admitted port.")
+    return cast("TokenCredential", credential)
 
 
 class _TenantCredential:
@@ -241,43 +425,35 @@ def _transport(delegate: HttpTransport[Any, Any], budget: _Budget, checkpoint: C
     return FixedARMTransport()
 
 
-class AzureOwnedIdentityDriver:
-    """Reconcile a recorded existing identity, never infer one from a name.
+class _NativeIdentityPort:
+    """Fixed, bounded ARM clients for one admitted tenant and subscription.
 
     ``checkpoint`` must revalidate current caller admission and the exact owner,
-    placement, credential, issuer and complete desired union. It is required at
-    every native request, including continuation reads. It supplies no remote CAS.
+    placement, credential and issuer. It runs before every native request and
+    after every response, including continuation reads. It supplies no remote CAS.
     """
 
     def __init__(
         self,
-        context: AzureIdentityContext,
         *,
+        tenant_id: str,
+        subscription_id: str,
         checkpoint: Callable[[], None],
-        credential: TokenCredential | None = None,
-        transport: HttpTransport[Any, Any] | None = None,
+        credential: Any,
+        transport: HttpTransport[Any, Any] | None,
     ) -> None:
         from azure.core.pipeline.transport import RequestsTransport
-        from azure.identity import DefaultAzureCredential
         from azure.mgmt.authorization import AuthorizationManagementClient
         from azure.mgmt.msi import ManagedServiceIdentityClient
 
         if not callable(checkpoint):
             raise AzureOwnedIdentityError("Fresh admission and source validation are required.")
-        self.context = context
+        self._tenant_id = tenant_id
+        self._subscription_id = subscription_id
         self._checkpoint = checkpoint
         self._lock = Lock()
         self._budget = _Budget()
-        self._credential = _TenantCredential(
-            credential
-            if credential is not None
-            else DefaultAzureCredential(
-                authority="https://login.microsoftonline.com",
-                additionally_allowed_tenants=[],
-                exclude_interactive_browser_credential=True,
-            ),
-            context.tenant_id,
-        )
+        self._credential = _TenantCredential(_admitted_credential(credential), tenant_id)
         self._transport = _transport(
             transport if transport is not None else RequestsTransport(), self._budget, checkpoint
         )
@@ -291,17 +467,218 @@ class AzureOwnedIdentityDriver:
         )
         self._msi = ManagedServiceIdentityClient(
             self._credential,
-            context.subscription_id,
+            subscription_id,
             api_version="2024-11-30",
             **common,
         )
-        self._authz = AuthorizationManagementClient(self._credential, context.subscription_id, **common)
+        self._authz = AuthorizationManagementClient(self._credential, subscription_id, **common)
 
     def close(self) -> None:
         # The declared SDK close methods have no annotations in MSI7/authz4.
         for client in (self._msi, self._authz):
             close: Callable[[], None] = client.close
             close()
+
+    def _read_json(self, path: str, api_version: str) -> tuple[int, Any]:
+        from azure.core.pipeline.transport import HttpRequest
+
+        response = self._msi._client.send_request(
+            HttpRequest("GET", f"https://management.azure.com{path}?api-version={api_version}")
+        )
+        return response.status_code, json.loads(response.body()) if response.status_code == 200 else None
+
+    def _verify_subscription(self) -> None:
+        status, subscription = self._read_json(f"/subscriptions/{self._subscription_id}", "2022-12-01")
+        if status != 200:
+            raise AzureOwnedIdentityError("Current subscription admission could not be verified.")
+        if (
+            subscription.get("subscriptionId") != self._subscription_id
+            or subscription.get("id", "").casefold() != f"/subscriptions/{self._subscription_id}"
+            or subscription.get("tenantId") != self._tenant_id
+            or subscription.get("state") != "Enabled"
+        ):
+            raise AzureIdentityRefused(
+                f"Subscription {self._subscription_id} is not an enabled subscription of tenant {self._tenant_id}."
+            )
+
+    @staticmethod
+    def _absent_or_current(method: Callable[..., Any], *args: str) -> Any:
+        from azure.core.exceptions import ResourceNotFoundError
+
+        try:
+            return method(*args)
+        except ResourceNotFoundError:
+            return None
+
+
+class AzureIdentityProvisioner(_NativeIdentityPort):
+    """Observe the UAMI one owner gets, creating it only where none exists.
+
+    A same-name identity without this owner's markers is refused, never
+    adopted or retagged. With ``recorded`` the identity must still carry the
+    native IDs the caller recorded: one that was deleted or replaced is
+    refused rather than re-created, because pods and grants were bound to
+    the old principal. Before anything, the AKS cluster's live OIDC issuer and
+    workload identity must match the placement, so nothing is ever federated
+    to an issuer the cluster does not sign with.
+
+    The MSI API offers no conditional create. An identity created under the
+    same name between the absent read and the PUT would be retagged and
+    adopted; that window is the residual race this port does not close.
+    """
+
+    def __init__(
+        self,
+        placement: AzureIdentityPlacement,
+        *,
+        checkpoint: Callable[[], None],
+        credential: Any = None,
+        transport: HttpTransport[Any, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            tenant_id=placement.tenant_id,
+            subscription_id=placement.subscription_id,
+            checkpoint=checkpoint,
+            credential=credential,
+            transport=transport,
+        )
+        self.placement = placement
+
+    @driver_op(
+        cloud="azure", driver="identity", audit=True, redact_args=("recorded",), redact_errors=True, heartbeat=False
+    )
+    def ensure(self, *, recorded: AzureManagedIdentity | None = None) -> AzureManagedIdentity:
+        if not self._lock.acquire(blocking=False):
+            raise AzureOwnedIdentityError("Concurrent use of one native identity port is unsupported.")
+        try:
+            p = self.placement
+            self._budget.bytes_read = self._budget.requests = 0
+            self._budget.allowed = {
+                ("GET", f"/subscriptions/{p.subscription_id}"),
+                ("GET", p.cluster_resource_id.casefold()),
+                ("GET", p.resource_id.casefold()),
+            }
+            return self._ensure(recorded)
+        except AzureIdentityRefused:
+            raise
+        except Exception:
+            # SDK errors can contain tokens, custom tags or native response bodies.
+            raise AzureOwnedIdentityError(
+                "Managed identity ownership was not confirmed; re-observe before retry."
+            ) from None
+        finally:
+            self._lock.release()
+
+    def _ensure(self, recorded: AzureManagedIdentity | None) -> AzureManagedIdentity:
+        p = self.placement
+        self._verify_subscription()
+        self._verify_cluster()
+        current = self._absent_or_current(self._msi.user_assigned_identities.get, p.resource_group, p.identity_name)
+        if current is None:
+            if recorded is not None:
+                raise AzureIdentityRefused(
+                    f"The recorded managed identity {p.identity_name} no longer exists in resource group "
+                    f"{p.resource_group}. The platform does not re-create a recorded identity; remove the "
+                    "app's workload identity, then deploy to create a new one."
+                )
+            self._budget.allowed.add(("PUT", p.resource_id.casefold()))
+            self._msi.user_assigned_identities.create_or_update(
+                p.resource_group, p.identity_name, {"location": p.location, "tags": p.tags}
+            )
+            current = self._msi.user_assigned_identities.get(p.resource_group, p.identity_name)
+        identity = self._owned(current)
+        if recorded is not None and (
+            identity.resource_id,
+            identity.client_id,
+            identity.principal_id,
+            identity.tenant_id,
+        ) != (recorded.resource_id, recorded.client_id, recorded.principal_id, recorded.tenant_id):
+            raise AzureIdentityRefused(
+                f"Managed identity {p.identity_name} in resource group {p.resource_group} was replaced: its "
+                "client or principal ID is not the recorded one. The platform does not adopt a replacement; "
+                "remove the app's workload identity, then deploy to create a new one."
+            )
+        return identity
+
+    def _verify_cluster(self) -> None:
+        p = self.placement
+        status, cluster = self._read_json(p.cluster_resource_id, _AKS_API_VERSION)
+        if status != 200 or not isinstance(cluster, dict):
+            raise AzureIdentityRefused(
+                f"AKS cluster {p.cluster_name} in resource group {p.resource_group} could not be read, so its "
+                "OIDC issuer and workload identity are unverified."
+            )
+        properties = cluster.get("properties") or {}
+        oidc = properties.get("oidcIssuerProfile") or {}
+        workload = (properties.get("securityProfile") or {}).get("workloadIdentity") or {}
+        if str(cluster.get("id", "")).casefold() != p.cluster_resource_id.casefold():
+            raise AzureOwnedIdentityError("The AKS cluster response named another resource.")
+        if oidc.get("enabled") is not True or workload.get("enabled") is not True:
+            raise AzureIdentityRefused(
+                f"AKS cluster {p.cluster_name} does not have both its OIDC issuer and workload identity enabled."
+            )
+        live = oidc.get("issuerURL")
+        if live != p.issuer:
+            try:
+                _require_issuer(live)
+                reported = f" {live}"
+            except AzureOwnedIdentityError:
+                reported = " another issuer"
+            raise AzureIdentityRefused(
+                f"AKS cluster {p.cluster_name} signs with OIDC issuer{reported}, not the configured {p.issuer}."
+            )
+
+    def _owned(self, row: Any) -> AzureManagedIdentity:
+        p = self.placement
+        if (
+            getattr(row, "id", None) != p.resource_id
+            or getattr(row, "name", None) != p.identity_name
+            or getattr(row, "tenant_id", None) != p.tenant_id
+        ):
+            raise AzureOwnedIdentityError("The managed identity response named another resource.")
+        if not _owner_markers_match(
+            getattr(row, "tags", None),
+            organization_id=p.organization_id,
+            app_id=p.app_id,
+            cluster_id=p.cluster_id,
+        ):
+            raise AzureIdentityRefused(
+                f"A managed identity named {p.identity_name} already exists in resource group "
+                f"{p.resource_group} without this app's ownership markers. The platform does not adopt it."
+            )
+        return AzureManagedIdentity(
+            p.identity_name,
+            p.resource_id,
+            _guid(getattr(row, "client_id", None)),
+            _guid(getattr(row, "principal_id", None)),
+            p.tenant_id,
+        )
+
+
+class AzureOwnedIdentityDriver(_NativeIdentityPort):
+    """Reconcile a recorded existing identity, never infer one from a name.
+
+    ``checkpoint`` must revalidate current caller admission and the exact owner,
+    placement, credential, issuer and complete desired union. It is required at
+    every native request, including continuation reads. It supplies no remote CAS.
+    """
+
+    def __init__(
+        self,
+        context: AzureIdentityContext,
+        *,
+        checkpoint: Callable[[], None],
+        credential: Any = None,
+        transport: HttpTransport[Any, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            tenant_id=context.tenant_id,
+            subscription_id=context.subscription_id,
+            checkpoint=checkpoint,
+            credential=credential,
+            transport=transport,
+        )
+        self.context = context
 
     def _reset(self) -> None:
         self._budget.bytes_read = self._budget.requests = 0
@@ -324,26 +701,14 @@ class AzureOwnedIdentityDriver:
             self._lock.release()
 
     def _observe(self) -> AzureManagedIdentity:
-        from azure.core.pipeline.transport import HttpRequest
-
         c = self.context
-        response = self._msi._client.send_request(
-            HttpRequest(
-                "GET",
-                f"https://management.azure.com/subscriptions/{c.subscription_id}?api-version=2022-12-01",
-            )
-        )
-        if response.status_code != 200:
-            raise AzureOwnedIdentityError("Current subscription admission could not be verified.")
-        subscription = json.loads(response.body())
-        if (
-            subscription.get("subscriptionId") != c.subscription_id
-            or subscription.get("id", "").casefold() != f"/subscriptions/{c.subscription_id}"
-            or subscription.get("tenantId") != c.tenant_id
-            or subscription.get("state") != "Enabled"
-        ):
-            raise AzureOwnedIdentityError("The current subscription identity or tenant changed.")
+        self._verify_subscription()
         row = self._msi.user_assigned_identities.get(c.resource_group, c.identity_name)
+        self._recorded(row)
+        return AzureManagedIdentity(c.identity_name, c.resource_id, c.client_id, c.principal_id, c.tenant_id)
+
+    def _recorded(self, row: Any) -> None:
+        c = self.context
         if (
             getattr(row, "id", None) != c.resource_id
             or getattr(row, "name", None) != c.identity_name
@@ -351,25 +716,20 @@ class AzureOwnedIdentityDriver:
             or getattr(row, "principal_id", None) != c.principal_id
             or getattr(row, "tenant_id", None) != c.tenant_id
         ):
-            raise AzureOwnedIdentityError("The recorded managed identity was replaced or is incomplete.")
-        tags = getattr(row, "tags", None)
-        required = {
-            "managedby": "platform",
-            "organizationid": c.organization_id,
-            "appid": c.app_id,
-            "clusterid": c.cluster_id,
-        }
-        if not isinstance(tags, dict) or len(tags) > 50:
-            raise AzureOwnedIdentityError("Current identity owner markers are unavailable.")
-        for suffix, expected in required.items():
-            matches = [
-                value
-                for key, value in tags.items()
-                if re.sub("[^a-z0-9]", "", key.lower()) in {"astrolift" + suffix, "astroliftio" + suffix}
-            ]
-            if not matches or any(value != expected for value in matches):
-                raise AzureOwnedIdentityError("Current identity owner markers conflict or are foreign.")
-        return AzureManagedIdentity(c.identity_name, c.resource_id, c.client_id, c.principal_id, c.tenant_id)
+            raise AzureIdentityRefused(
+                f"Managed identity {c.identity_name} in resource group {c.resource_group} was replaced or is "
+                "incomplete: it no longer carries the recorded native IDs."
+            )
+        if not _owner_markers_match(
+            getattr(row, "tags", None),
+            organization_id=c.organization_id,
+            app_id=c.app_id,
+            cluster_id=c.cluster_id,
+        ):
+            raise AzureIdentityRefused(
+                f"Managed identity {c.identity_name} in resource group {c.resource_group} no longer carries "
+                "this app's ownership markers."
+            )
 
     @staticmethod
     def _inventory(paged: Any, maximum: int) -> list[Any]:
@@ -388,6 +748,14 @@ class AzureOwnedIdentityDriver:
                 return rows
         raise AzureOwnedIdentityError("Native identity inventory is incomplete.")
 
+    @driver_op(
+        cloud="azure",
+        driver="identity",
+        audit=True,
+        redact_args=("federations", "grants"),
+        redact_errors=True,
+        heartbeat=False,
+    )
     def reconcile(
         self,
         *,
@@ -552,6 +920,8 @@ class AzureOwnedIdentityDriver:
                 },
             )
             self._observe()
+        removed_fics: list[str] = []
+        removed_roles: list[str] = []
         for name, row in fics.items():
             if name in desired_fic or not name.startswith(prefix):
                 continue
@@ -567,6 +937,7 @@ class AzureOwnedIdentityDriver:
             self._observe()
             self._budget.allowed.add(("DELETE", row.id.casefold()))
             self._msi.federated_identity_credentials.delete(c.resource_group, c.identity_name, name)
+            removed_fics.append(name)
             self._observe()
         for name, row in roles.items():
             if name in desired_roles or getattr(row, "description", None) != _description(c):
@@ -583,6 +954,7 @@ class AzureOwnedIdentityDriver:
             self._observe()
             self._budget.allowed.add(("DELETE", row.id.casefold()))
             self._authz.role_assignments.delete(row.scope, name)
+            removed_roles.append(name)
             self._observe()
         # Reread the complete final union. A successful PUT/DELETE alone is not
         # evidence that ARM's current view has converged.
@@ -614,7 +986,85 @@ class AzureOwnedIdentityDriver:
             (("azure.workload.identity/client-id", c.client_id), ("azure.workload.identity/tenant-id", c.tenant_id)),
             tuple(sorted(desired_fic)),
             tuple(sorted(desired_roles)),
+            removed_federation_names=tuple(sorted(removed_fics)),
+            removed_assignment_names=tuple(sorted(removed_roles)),
+            foreign_federation_names=tuple(sorted(r.name for r in final_fic if not r.name.startswith(prefix))),
+            foreign_assignment_names=tuple(
+                sorted(r.name for r in final_roles if getattr(r, "description", None) != _description(c))
+            ),
         )
+
+    @driver_op(cloud="azure", driver="identity", audit=True, redact_errors=True, heartbeat=False)
+    def remove(self) -> AzureIdentityRemovalResult:
+        """Take this owner's federations and grants off the identity, then delete it.
+
+        The identity is deleted only while it still carries the recorded IDs
+        and this owner's markers, and only once nothing foreign remains on it:
+        deleting it would take another party's federation with it and orphan
+        their assignments. Then it stays, stripped of everything this owner
+        added, and the result names what is left. An identity already gone is
+        reported absent, not deleted, and so is one replaced under its name:
+        the replacement is not this owner's to strip or delete.
+        """
+        if not self._lock.acquire(blocking=False):
+            raise AzureOwnedIdentityError("Concurrent use of one native identity port is unsupported.")
+        try:
+            self._reset()
+            return self._remove()
+        except AzureIdentityRefused:
+            raise
+        except Exception:
+            # SDK errors can contain tokens, custom tags or native response bodies.
+            raise AzureOwnedIdentityError(
+                "Owned identity removal was not confirmed; re-observe before retry."
+            ) from None
+        finally:
+            self._lock.release()
+
+    def _remove(self) -> AzureIdentityRemovalResult:
+        c = self.context
+        self._verify_subscription()
+        current = self._absent_or_current(self._msi.user_assigned_identities.get, c.resource_group, c.identity_name)
+        if current is None:
+            return AzureIdentityRemovalResult(identity_deleted=False, identity_absent=True)
+        if self._replacement(current):
+            return AzureIdentityRemovalResult(identity_deleted=False, identity_absent=True, identity_replaced=True)
+        self._recorded(current)
+        stripped = self._reconcile((), ())
+        result = AzureIdentityRemovalResult(
+            identity_deleted=False,
+            removed_federation_names=stripped.removed_federation_names,
+            removed_assignment_names=stripped.removed_assignment_names,
+            foreign_federation_names=stripped.foreign_federation_names,
+            foreign_assignment_names=stripped.foreign_assignment_names,
+        )
+        if stripped.foreign_federation_names or stripped.foreign_assignment_names:
+            return result
+        self._observe()
+        self._budget.allowed.add(("DELETE", c.resource_id.casefold()))
+        self._msi.user_assigned_identities.delete(c.resource_group, c.identity_name)
+        if self._absent_or_current(self._msi.user_assigned_identities.get, c.resource_group, c.identity_name):
+            raise AzureOwnedIdentityError("The managed identity is still present after its deletion.")
+        return dataclasses.replace(result, identity_deleted=True)
+
+    def _replacement(self, row: Any) -> bool:
+        """``row`` is a complete identity at the recorded name with another principal.
+
+        A principal is fixed for an identity's lifetime, so the recorded one was
+        deleted. Anything incomplete or misnamed is not evidence of that.
+        """
+        c = self.context
+        if (getattr(row, "id", None), getattr(row, "name", None), getattr(row, "tenant_id", None)) != (
+            c.resource_id,
+            c.identity_name,
+            c.tenant_id,
+        ):
+            return False
+        try:
+            _guid(getattr(row, "client_id", None))
+            return _guid(getattr(row, "principal_id", None)) != c.principal_id
+        except AzureOwnedIdentityError:
+            return False
 
     def _role_matches(self, row: Any, grant: AzureIdentityGrant) -> bool:
         c = self.context
@@ -631,12 +1081,3 @@ class AzureOwnedIdentityDriver:
             )
             and row.description == _description(c)
         )
-
-    @staticmethod
-    def _absent_or_current(method: Callable[..., Any], *args: str) -> Any:
-        from azure.core.exceptions import ResourceNotFoundError
-
-        try:
-            return method(*args)
-        except ResourceNotFoundError:
-            return None

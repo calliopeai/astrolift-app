@@ -31,6 +31,11 @@ Resource teardown order (each step records its result on
      ``delete_app_namespaces`` (the namespace delete cascades
      Deployments / ReplicaSets / Pods on every cluster the app is
      bound to) so subsequent steps don't race with new pods.
+  1b. ``native_identity`` — ``remove_native_endpoint_identity`` revokes
+     every grant the app's native GCP IAM journals own (#2278), while
+     the Endpoints whose policies name the app still exist. Until it
+     completes, step 2 holds the managed services instead of
+     deprovisioning them.
   2. ``managed_services`` — fan out ``deprovision_managed_service``
      for every ``ManagedService`` row with the operator's
      ``delete_data`` / ``force_destroy`` choice (default False/False —
@@ -112,11 +117,16 @@ with workflow.unsafe.imports_passed_through():
         revoke_app_secret_bundle_refs,
         soft_delete_app_records,
     )
+    from astrolift_workflows.activities.native_endpoint_removal import remove_native_endpoint_identity
     from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 _QUICK_TIMEOUT = timedelta(minutes=2)
 _NAMESPACE_TIMEOUT = timedelta(minutes=10)
 _DEPROVISION_TIMEOUT = timedelta(minutes=30)
+# One attempt (#2278): a lost reply leaves the removal pending, and re-firing
+# the deregister resumes it from its journal rather than sending again.
+_NATIVE_REMOVAL_TIMEOUT = timedelta(minutes=30)
+_NATIVE_REMOVAL_RETRY = RetryPolicy(maximum_attempts=1)
 # Up to a dozen source-host calls (reads, protection probe, review branch,
 # deletes, pull request), each with its own 10-15 s socket timeout.
 _REPO_WRITE_TIMEOUT = timedelta(minutes=5)
@@ -301,6 +311,40 @@ class DeregisterAppWorkflow:
             )
             still_live.append("deployments_cancelled")
 
+        # 1b. Native GCP identity (#2278): revoke every grant the app's IAM
+        #     journals own while the Endpoints whose policies name the app
+        #     still exist. Pending until each owned grant is observed gone;
+        #     until then the managed services below are held, not deleted.
+        #     Patched so runs started before this step existed replay unchanged.
+        native_pending = False
+        if workflow.patched("deregister-native-identity-removal-2278"):
+            try:
+                removed = await workflow.execute_activity(
+                    remove_native_endpoint_identity,
+                    app_id,
+                    start_to_close_timeout=_NATIVE_REMOVAL_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                    retry_policy=_NATIVE_REMOVAL_RETRY,
+                )
+                teardown["native_identity"] = _step_result(
+                    ok=True,
+                    detail=(
+                        f"revoked {sum(row['removed'] for row in removed)} owned grant(s) "
+                        f"on {len(removed)} cluster(s)"
+                        if removed
+                        else "no native GCP identity"
+                    ),
+                    data=removed,
+                )
+            except Exception as exc:  # noqa: BLE001 -- the activity's fixed reason names what is pending
+                cause = getattr(exc, "cause", None)
+                teardown["native_identity"] = _step_result(
+                    ok=False,
+                    detail=str(getattr(cause, "message", "") or exc),
+                )
+                still_live.append("native_identity")
+                native_pending = True
+
         # 2. Managed-service deprovision — fan out one activity per
         #    active ManagedService row. Failures collect per-id so a
         #    single stuck service doesn't strand the rest of the pass.
@@ -321,6 +365,15 @@ class DeregisterAppWorkflow:
         if input.keep_managed_services:
             # Kept for the expiry's grace period (#2433); its timer deletes them.
             ms_results = [{"ok": True, "managed_service_id": ms_id, "message": "kept"} for ms_id in ms_ids]
+            ms_ids = []
+        elif native_pending:
+            # A deleted Endpoint's policy can no longer be read, so its owned
+            # grants could never be observed gone (#2278). Held for a re-run.
+            ms_results += [
+                {"ok": False, "managed_service_id": ms_id, "message": "held for the native identity removal"}
+                for ms_id in ms_ids
+            ]
+            ms_failed = ms_failed or bool(ms_ids)
             ms_ids = []
 
         for ms_id in ms_ids:
