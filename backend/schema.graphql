@@ -933,6 +933,36 @@ type AstroliftAgentTask {
   callbackLastError: String
   model: String!
   brains: [AstroliftAgentTaskBrain!]!
+
+  """
+  Evidence the run attached to its result (#2488), in the order it reported them. Metadata only; agentTaskArtifact returns one artifact's content.
+  """
+  artifacts: [AstroliftAgentTaskArtifact!]!
+}
+
+"""
+Evidence a run attached to its result with its terminal callback (#2488). kind is junit, coverage, conformance-json or other, and mediaType is the type the run reported. sizeBytes and sha256 describe the UTF-8 bytes of the content, which agentTaskArtifact returns.
+"""
+type AstroliftAgentTaskArtifact {
+  name: String!
+  kind: String!
+  mediaType: String!
+  sizeBytes: Int!
+  sha256: String!
+  createdAt: DateTime!
+}
+
+"""
+One artifact a run attached to its result (#2488), with its UTF-8 content.
+"""
+type AstroliftAgentTaskArtifactContent {
+  name: String!
+  kind: String!
+  mediaType: String!
+  sizeBytes: Int!
+  sha256: String!
+  createdAt: DateTime!
+  content: String!
 }
 
 type AstroliftAgentTaskBacklog {
@@ -1684,6 +1714,25 @@ type AstroliftAppMetricsPoint {
   requestRate: Float!
   errorRate: Float!
   latencyP95: Float!
+}
+
+type AstroliftAppNetworkMetrics {
+  reason: AstroliftObservabilityPanelReason!
+  rangeSeconds: Int!
+  stepSeconds: Int!
+  rateWindowSeconds: Int!
+  sourcedAt: DateTime!
+  series: [AstroliftAppNetworkSeries!]!
+}
+
+type AstroliftAppNetworkSeries {
+  direction: NetworkDirection!
+  unit: String!
+  samples: [AstroliftTimeSeriesPoint!]!
+  totalBytes: Float
+  promql: String!
+  measurement: AstroliftGoldenSignalMeasurement!
+  reason: AstroliftObservabilityPanelReason!
 }
 
 type AstroliftAppPod {
@@ -8798,6 +8847,7 @@ enum GoldenSignalSource {
   EDGE_PROMETHEUS
   CLOUDWATCH_ALB
   CADVISOR_KUBE_STATE_METRICS
+  CADVISOR
   NONE
 }
 
@@ -10862,6 +10912,11 @@ enum NativeModelProtocol {
   BEDROCK
 }
 
+enum NetworkDirection {
+  RECEIVE
+  TRANSMIT
+}
+
 type NoneTypeMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
@@ -11622,6 +11677,7 @@ type Query {
   astroliftSharedModelPromptReadiness(id: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, expectedVersion: Int!): AstroliftModelPromptReadiness
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
+  astroliftAppNetworkMetrics(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppNetworkMetrics!
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!
@@ -11674,6 +11730,11 @@ type Query {
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskBacklog(orgId: ID!, taskId: ID!): AstroliftAgentTaskBacklog
   agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
+
+  """
+  One artifact a run attached to its result (#2488), by name, with its content. Null for an unknown name, and to a caller with organization-wide agent.read for a task the organization does not have. Any other task the caller cannot read is refused.
+  """
+  agentTaskArtifact(orgId: ID!, taskId: ID!, name: String!): AstroliftAgentTaskArtifactContent
   agentTaskLogsPage(id: ID!, cursor: String = null, limit: Int! = 100): AstroliftAgentTaskLogPage!
   agentTaskLogs(id: ID!, tail: Int! = 200): [String!]!
   agentEnvironmentSpecs(orgId: ID!): [AstroliftAgentEnvironmentSpec!]!

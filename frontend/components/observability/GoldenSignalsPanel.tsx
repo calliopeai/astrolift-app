@@ -5,10 +5,10 @@
  * tab (#380).
  *
  * Surfaces the four golden signals (traffic, errors, latency,
- * saturation) plus a per-HTTP-status-code stacked breakdown, all
- * wired to the cluster-side Prometheus stack via the
- * ``astroliftAppGoldenSignals`` + ``astroliftAppStatusCodeBreakdown``
- * resolvers.
+ * saturation) plus a per-HTTP-status-code stacked breakdown and the
+ * pods' network I/O, all wired to the cluster-side Prometheus stack via
+ * the ``astroliftAppGoldenSignals``, ``astroliftAppStatusCodeBreakdown``
+ * and ``astroliftAppNetworkMetrics`` resolvers.
  *
  * Each signal displays the server's effective scope and provenance.
  * Missing or failed measurements stay unavailable, while a healthy
@@ -16,7 +16,7 @@
  * their structural empty state and never imply a workload measurement.
  */
 
-import { AlertTriangleIcon, ChartSplineIcon } from "lucide-react";
+import { AlertTriangleIcon, ArrowDownUpIcon, ChartSplineIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -44,6 +44,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   AstroliftAppGoldenSignal,
+  AstroliftAppNetworkMetrics,
+  AstroliftAppNetworkSeries,
   AstroliftStatusCodeSeries,
   AstroliftTimeSeriesPoint,
   GoldenSignalKind,
@@ -57,6 +59,7 @@ import {
   STATUS_CLASS_ORDER,
   TIME_RANGE_OPTIONS,
   TimeRangeKey,
+  formatBytes,
   formatSignalValue,
 } from "./golden-signals-types";
 
@@ -72,6 +75,10 @@ export function GoldenSignalsPanel({
   statusBreakdown,
   statusLoading,
   onStatusRetry,
+  network,
+  networkReason,
+  networkLoading,
+  onNetworkRetry,
 }: GoldenSignalsPanelProps) {
   const t = useTranslations("obsGoldenSignals");
   const reasonT = useTranslations("obsPanelReason");
@@ -168,6 +175,13 @@ export function GoldenSignalsPanel({
               breakdown={statusBreakdown}
               loading={statusLoading}
               onRetry={onStatusRetry}
+            />
+            {/* #2271: pod network I/O, a family of its own, takes the full row. */}
+            <NetworkCard
+              metrics={network}
+              reason={networkReason}
+              loading={networkLoading}
+              onRetry={onNetworkRetry}
             />
           </div>
         </>
@@ -528,6 +542,132 @@ function StatusCodeCard({ breakdown, loading, onRetry }: StatusCodeCardProps) {
 }
 
 // ----------------------------------------------------------------------
+// Network I/O card (#2271)
+// ----------------------------------------------------------------------
+
+interface NetworkCardProps {
+  metrics: AstroliftAppNetworkMetrics | null;
+  /** The panel reason; ERROR also when the read itself failed. */
+  reason: ObservabilityPanelReason | null;
+  loading: boolean;
+  onRetry: () => void;
+}
+
+const EMPTY_NETWORK_SERIES: AstroliftAppNetworkSeries[] = [];
+
+const NETWORK_DIRECTIONS = [
+  { direction: "RECEIVE", copyKey: "receive", color: "var(--chart-2)", swatch: "bg-chart-2" },
+  { direction: "TRANSMIT", copyKey: "transmit", color: "var(--chart-4)", swatch: "bg-chart-4" },
+] as const;
+
+// Received and sent bytes per second, each direction with its own
+// provenance and window total. A direction the server could not measure
+// shows its reason and draws no line: a gap, never a zero.
+function NetworkCard({ metrics, reason, loading, onRetry }: NetworkCardProps) {
+  const t = useTranslations("obsGoldenSignals");
+  const reasonT = useTranslations("obsPanelReason");
+  const format = useFormatter();
+  const series = metrics?.series ?? EMPTY_NETWORK_SERIES;
+  const rows = React.useMemo(
+    () => mergeNetworkRows(series, (d) => format.dateTime(d, TIME_OF_DAY)),
+    [series, format]
+  );
+  const panelReason: ObservabilityPanelReason = reason ?? "NO_DATA_YET";
+  const empty = panelEmptyState(
+    panelReason,
+    {
+      noData: { title: t("network.noDataTitle"), description: t("network.noDataDescription") },
+      notConfigured: t("network.notConfigured"),
+    },
+    reasonT
+  );
+  const promql = series
+    .map((s) => s.promql)
+    .filter(Boolean)
+    .join("\n\n");
+
+  return (
+    <Card className="md:col-span-2">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <ArrowDownUpIcon className="size-4" /> {t("network.title")}
+        </CardTitle>
+        <CardDescription className="text-xs">{t("network.description")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!loading && series.length > 0 && (
+          <div className="grid gap-x-4 md:grid-cols-2">
+            {NETWORK_DIRECTIONS.map(({ direction, copyKey, swatch }) => {
+              const row = series.find((s) => s.direction === direction);
+              if (!row) return null;
+              return (
+                <div key={direction} data-testid={`network-${copyKey}`}>
+                  <p className="flex flex-wrap items-center gap-x-2 text-xs font-medium">
+                    <span aria-hidden className={`${swatch} size-2 rounded-full`} />
+                    {t(`network.${copyKey}`)}
+                    {row.totalBytes != null && (
+                      <span className="text-muted-foreground font-normal">
+                        {t("network.total", { bytes: formatBytes(row.totalBytes) })}
+                      </span>
+                    )}
+                  </p>
+                  <SignalMeasurement signal={row} />
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {loading ? (
+          <Skeleton className="h-40 w-full" />
+        ) : rows.length === 0 ? (
+          <NoMetricsCallout
+            title={empty.title}
+            description={empty.description}
+            onRetry={panelReason === "ERROR" ? onRetry : undefined}
+          />
+        ) : (
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={rows}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="ts"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={formatTickTs}
+                  minTickGap={32}
+                />
+                <YAxis
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(v: number) => formatSignalValue(v, "bytes_per_second")}
+                  width={88}
+                />
+                <Tooltip
+                  formatter={(v: number) => formatSignalValue(v, "bytes_per_second")}
+                  labelFormatter={(label: string) => label}
+                />
+                {NETWORK_DIRECTIONS.map(({ direction, copyKey, color }) => (
+                  <Line
+                    key={direction}
+                    type="monotone"
+                    dataKey={copyKey}
+                    name={t(`network.${copyKey}`)}
+                    stroke={color}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        <PromQLDisclosure promql={promql} />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ----------------------------------------------------------------------
 // Helpers
 // ----------------------------------------------------------------------
 
@@ -601,6 +741,30 @@ function mergeStatusRows(
   return Array.from(tsIndex.values()).sort((a, b) => String(a._key).localeCompare(String(b._key)));
 }
 
+type NetworkRow = { ts: string; _key: string; receive?: number; transmit?: number };
+
+function mergeNetworkRows(
+  series: AstroliftAppNetworkSeries[],
+  formatTime: (d: Date) => string
+): NetworkRow[] {
+  // One row per timestamp. A direction without a sample at a timestamp
+  // stays undefined, which recharts draws as a gap.
+  const byTs = new Map<string, NetworkRow>();
+  for (const s of series) {
+    const key = s.direction === "RECEIVE" ? "receive" : "transmit";
+    for (const point of s.samples) {
+      const tsKey = new Date(point.ts).toISOString();
+      let row = byTs.get(tsKey);
+      if (!row) {
+        row = { ts: formatTime(new Date(point.ts)), _key: tsKey };
+        byTs.set(tsKey, row);
+      }
+      row[key] = point.value;
+    }
+  }
+  return Array.from(byTs.values()).sort((a, b) => a._key.localeCompare(b._key));
+}
+
 function formatTickTs(ts: string): string {
   // ``ts`` is already a locale-time string; truncate to HH:MM for tick
   // density — full HH:MM:SS is too wide on a 7d range.
@@ -649,7 +813,7 @@ function NoMetricsCallout({
 }) {
   const t = useTranslations("obsGoldenSignals");
   return (
-    <div className="flex h-40 flex-col items-center justify-center gap-2 text-center">
+    <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-center">
       <EmptyState
         icon={<AlertTriangleIcon className="size-5" />}
         title={title}

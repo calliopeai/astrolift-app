@@ -24,6 +24,8 @@ pytestmark = pytest.mark.django_db
 READS = (
     ("astrolift_app_golden_signals", {}),
     ("astrolift_app_status_code_breakdown", {}),
+    ("astrolift_app_network_metrics", {}),
+    ("astrolift_app_network_metrics", {"workload_slug": "web"}),
     ("astrolift_workload_resource_usage", {"workload_slug": "web"}),
     ("astrolift_app_url_health", {"url": "not-a-url"}),
     ("astrolift_app_url_probe_history", {"url": "not-a-url"}),

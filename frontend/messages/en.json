@@ -2279,11 +2279,12 @@
           "EDGE_PROMETHEUS": "Ingress metrics",
           "CLOUDWATCH_ALB": "CloudWatch ALB",
           "CADVISOR_KUBE_STATE_METRICS": "cAdvisor + kube-state-metrics",
+          "CADVISOR": "cAdvisor",
           "NONE": "None"
         },
         "reasons": {
           "target": "Selected target unavailable.",
-          "partial": "Incomplete or ambiguous measurement; no ratio is shown.",
+          "partial": "Incomplete or ambiguous measurement; no value is shown.",
           "noData": "No verified usage data in this window.",
           "readError": "Measurement source could not be read.",
           "MISSING_LIMITS": "Resource limits are missing; saturation is unavailable.",
@@ -11576,6 +11577,16 @@
       "description": "Stacked request rate by HTTP status class. Hover for the top individual codes in each class.",
       "rate": "{rate} req/s",
       "rateWithTop": "{rate} req/s (top: {top})"
+    },
+    "network": {
+      "title": "Network I/O",
+      "description": "Bytes per second the pods received and sent, from the kubelet's cAdvisor network counters.",
+      "receive": "Received",
+      "transmit": "Sent",
+      "total": "{bytes} in this window",
+      "noDataTitle": "No network data yet",
+      "noDataDescription": "Nothing to show for this window. Network I/O will appear here once the cluster's collector has samples for these pods.",
+      "notConfigured": "This cluster has no Prometheus endpoint, or the selected environment or workload is unavailable."
     },
     "showPromql": "Show PromQL",
     "tryAgain": "Try again",

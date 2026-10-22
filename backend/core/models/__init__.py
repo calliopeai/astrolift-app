@@ -8,6 +8,7 @@ from .authorization import *  # noqa: F403
 from .common import *  # noqa: F403
 from .email import *  # noqa: F403
 from .enum import *  # noqa: F403
+from .install_identity import *  # noqa: F403
 from .interval import *  # noqa: F403
 from .library import *  # noqa: F403
 from .notification import *  # noqa: F403

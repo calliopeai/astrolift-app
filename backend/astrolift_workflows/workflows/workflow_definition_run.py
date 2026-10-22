@@ -28,6 +28,13 @@ completion, durably, honouring per-stage failure policy + timeouts:
     Merge the outputs of the immediately-preceding fan-out executions into
     one COMPLETED execution.
 
+  GITHUB_CHECKS
+    Open a RUNNING execution and poll the required GitHub check runs on
+    the head of the pull request named in the previous output, until they
+    pass, one fails, or ``stage.timeout_seconds`` elapses. Anything but a
+    pass fails the workflow unless the stage's ``output_equals`` back-edge
+    routes it (``workflows.github_checks``).
+
 FAN_OUT pattern
   When ``WorkflowDefinition.pattern_kind == FAN_OUT``, the first
   AGENT_DISPATCH stage is fanned out: ``stage.fan_out_count`` parallel
@@ -71,6 +78,7 @@ with workflow.unsafe.imports_passed_through():
         mark_workflow_run,
         poll_agent_run_progress,
         poll_agent_run_status,
+        poll_github_checks,
         record_human_gate_decision,
         record_nested_workflow_start,
         snapshot_checkpoint,
@@ -93,6 +101,12 @@ with workflow.unsafe.imports_passed_through():
         format_record,
         validate_iteration,
     )
+    from workflows.github_checks import (
+        GithubChecksContractError,
+        outcome_message,
+        pull_request_number,
+        validate_github_checks,
+    )
     from workflows.source_ports import (
         SOURCE_FORMAT,
         SourcePortContractError,
@@ -107,6 +121,7 @@ KIND_HUMAN_GATE = "human_gate"
 KIND_CHECKPOINT = "checkpoint"
 KIND_AGGREGATION = "aggregation"
 KIND_WORKFLOW = "workflow"
+KIND_GITHUB_CHECKS = "github_checks"
 
 ON_FAILURE_FAIL = "fail"
 ON_FAILURE_RETRY = "retry"
@@ -143,6 +158,13 @@ _DB_RETRY = RetryPolicy(
 # — never bare asyncio.sleep, which the sandbox forbids.
 _AGENT_POLL_INTERVAL = timedelta(seconds=30)
 _GATE_POLL_INTERVAL = timedelta(seconds=30)
+# Check runs take minutes, and a poll a minute keeps a gate well inside the
+# installation's GitHub API budget. A long stage timeout spaces polls out so
+# one gate adds at most about _MAX_GITHUB_CHECKS_POLLS polls to its history.
+_GITHUB_CHECKS_POLL_INTERVAL = timedelta(seconds=60)
+_MAX_GITHUB_CHECKS_POLLS = 1000
+# One poll reads the pull request and up to ten pages of check runs.
+_GITHUB_CHECKS_POLL_TIMEOUT = timedelta(minutes=3)
 
 
 def _parent_cancelled(exc: BaseException) -> bool:
@@ -707,6 +729,13 @@ class WorkflowDefinitionRunWorkflow:
                         failure = _WorkflowAbort(
                             "human gate rejected",
                             data={"execution_id": output["execution_id"]},
+                        )
+                elif kind == KIND_GITHUB_CHECKS:
+                    output = await self._run_github_checks(stage, previous_output)
+                    if output["github_checks"]["outcome"] != "passed":
+                        failure = _WorkflowAbort(
+                            outcome_message(output["github_checks"]),
+                            data={"execution_id": self._current_stage_execution_id},
                         )
                 elif kind == KIND_CHECKPOINT:
                     control = validate_back_edge(stage.get("back_edge") or {}, kind=kind)
@@ -1699,6 +1728,51 @@ class WorkflowDefinitionRunWorkflow:
                 data={"execution_id": execution_id},
             )
         return {"human_gate": "approved", "execution_id": execution_id}
+
+    async def _run_github_checks(self, stage: dict, previous_output: Any) -> dict:
+        """Poll the stage's required GitHub checks until they are decided.
+
+        Each poll activity records progress on the open execution and, once
+        the gate is decided, its terminal status; the last poll runs at the
+        stage timeout and decides a still-pending gate ``timed_out``.
+        """
+        try:
+            config = validate_github_checks(stage["iteration"])
+            pull_request = pull_request_number(config, previous_output)
+        except GithubChecksContractError as exc:
+            raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
+        execution_id = await self._open_execution(stage, 1)
+        timeout = timedelta(seconds=max(1, int(stage["timeout_seconds"])))
+        deadline = workflow.now() + timeout
+        interval = max(_GITHUB_CHECKS_POLL_INTERVAL, timeout / _MAX_GITHUB_CHECKS_POLLS)
+        while True:
+            if self._abort_requested:
+                raise _WorkflowAbort("aborted by signal", data={"status": "incomplete"})
+            try:
+                result = await workflow.execute_activity(
+                    poll_github_checks,
+                    args=[
+                        self._workflow_run_id,
+                        execution_id,
+                        config,
+                        pull_request,
+                        workflow.now() >= deadline,
+                    ],
+                    start_to_close_timeout=_GITHUB_CHECKS_POLL_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+            except ActivityError as exc:
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
+                raise _WorkflowAbort(
+                    "the GitHub checks poll failed",
+                    data={"execution_id": execution_id, "status": "unavailable"},
+                ) from exc
+            if result["outcome"] != "pending":
+                return {"github_checks": result}
+            remaining = deadline - workflow.now()
+            if remaining > timedelta(0):
+                await workflow.sleep(min(interval, remaining))
 
     async def _run_checkpoint(
         self,
