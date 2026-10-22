@@ -383,6 +383,41 @@ def test_settling_a_removal_requires_the_app_to_be_tearing_down(world):
     assert journal().state == "SENT" and not GCPNativeJournalResolution.objects.exists()
 
 
+@pytest.mark.rarely
+def test_migration_0047_reverses_only_while_no_removal_was_settled(world):
+    from django.db.migrations.executor import MigrationExecutor
+
+    w = world
+    before = ("astrolift_services", "0046_gcp_native_journal_resolution")
+    original_targets = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    try:
+        MigrationExecutor(connection).migrate([before])
+        MigrationExecutor(connection).migrate(original_targets)
+        operator = get_user_model().objects.create(username="operator-2278c", email="operator-2278c@acme.test")
+        GCPNativeJournalResolution.objects.create(
+            organization=w.org,
+            registered_app=w.app,
+            tenant_cluster=w.cluster,
+            deployment=None,
+            resolved_by=operator,
+            created_by=operator,
+            kind="IAM",
+            journal_guid=uuid4(),
+            operation_id=uuid4(),
+            generation=2,
+            prior_state="SENT",
+            prior_ledger_sha256="a" * 64,
+            resolved_ledger_sha256="b" * 64,
+            unresolved=[],
+            attestation="checked the Endpoint policy by hand",
+        )
+        with pytest.raises(RuntimeError, match="GCP_NATIVE_REMOVAL_RESOLUTION_ROLLBACK_REQUIRES_EMPTY_HISTORY"):
+            MigrationExecutor(connection).migrate([before])
+        assert GCPNativeJournalResolution.objects.get().deployment_id is None
+    finally:
+        MigrationExecutor(connection).migrate(original_targets)
+
+
 @pytest.mark.parametrize("phase", ["RESERVED", "SENT"])
 def test_unresolved_deployment_operation_refuses_before_any_native_call(world, phase):
     w = world
