@@ -607,6 +607,29 @@ class Route53Driver(DnsDriver):
         self._zone_cache[canonical] = zone_id
         return {"zone_id": zone_id, "nameservers": nameservers}
 
+    @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.adopt_platform_zone")
+    def adopt_platform_zone(self, zone: str) -> dict[str, Any] | None:
+        """The hosted zone ``provision_zone`` already created for ``zone``, or ``None`` (#2389).
+
+        A provisioning run whose row records no zone id (a row provisioned
+        before #1931, or a retry after the create succeeded) finds the name
+        taken, and ``provision_zone`` refuses it. The zone is adopted only when
+        it is the one hosted zone with that name and ``zone_created_by_platform``
+        proves the platform made it. ``None`` leaves the caller to
+        ``provision_zone``, which creates an absent zone and refuses a name that
+        any other zone, or more than one, holds.
+        """
+        canonical = zone.rstrip(".") + "."
+        taken = self._zone_ids_named(canonical)
+        if len(taken) != 1 or not self.zone_created_by_platform(zone, taken[0]):
+            return None
+        try:
+            delegation = self._r53.get_hosted_zone(Id=taken[0]).get("DelegationSet", {})
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        self._zone_cache[canonical] = taken[0]
+        return {"zone_id": taken[0], "nameservers": list(delegation.get("NameServers", []))}
+
     @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.deprovision_zone")
     def deprovision_zone(self, zone: str) -> dict[str, Any]:
         """Delete the hosted zone and every record set in it.
