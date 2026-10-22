@@ -248,10 +248,10 @@ def _observe(
     """Health, workload states and running images from the namespace's
     workload rows (``None`` when none could be read)."""
     if not product.workloads:
-        return ProductDeployment.Health.UNKNOWN.value, [], {}
+        return ProductDeployment.Health.UNKNOWN, [], {}
     if rows is None:
         unread = [_workload(name, found=None) for name in product.workloads]
-        return ProductDeployment.Health.UNKNOWN.value, unread, {}
+        return ProductDeployment.Health.UNKNOWN, unread, {}
 
     by_name = {row["name"]: row for row in rows}
     workloads = [
@@ -259,11 +259,11 @@ def _observe(
         for name in product.workloads
     ]
     if any(not w["found"] or w["ready_replicas"] == 0 for w in workloads):
-        health = ProductDeployment.Health.DOWN.value
+        health = ProductDeployment.Health.DOWN
     elif any(w["ready_replicas"] < w["desired_replicas"] for w in workloads):
-        health = ProductDeployment.Health.DEGRADED.value
+        health = ProductDeployment.Health.DEGRADED
     else:
-        health = ProductDeployment.Health.HEALTHY.value
+        health = ProductDeployment.Health.HEALTHY
 
     seen = [image for name in product.workloads for image in by_name.get(name, {}).get("running_images", [])]
     running: dict[str, list[str]] = {}
@@ -309,7 +309,7 @@ def scan_product_deployments(*, now: datetime | None = None) -> int:
     """
     now = now or timezone.now()
     clusters = TenantCluster.objects.filter(
-        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+        lifecycle=TenantCluster.Lifecycle.MANAGED,
         is_active=True,
     ).select_related("provider_plugin")
     listed = 0
@@ -345,8 +345,8 @@ def scan_cluster(cluster: TenantCluster, *, now: datetime | None = None) -> Clus
         return ClusterScan(listed=False, error=error)
 
     products: dict[str, ProductNamespace] = {}
-    for namespace in listed:
-        product = read_product_namespace(namespace)
+    for item in listed:
+        product = read_product_namespace(item)
         if product is not None:
             products[product.namespace] = product
     rows_by_namespace, health_error = _workload_rows(cluster, list(products.values()))
@@ -478,7 +478,7 @@ def _change(
         "namespace": row.namespace,
         "cluster_id": str(cluster.guid),
         "cluster_slug": cluster.slug,
-        "health": row.health,
+        "health": str(row.health),
         "severity": _severity(row.health, what),
     }
     if "health" in what:

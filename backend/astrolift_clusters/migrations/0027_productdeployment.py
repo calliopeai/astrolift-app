@@ -154,6 +154,7 @@ class Migration(migrations.Migration):
                             ("unknown", "Unknown"),
                         ],
                         default="unknown",
+                        help_text="As of last_seen_at: a scan that cannot list the cluster leaves it as it was.",
                         max_length=16,
                     ),
                 ),

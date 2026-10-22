@@ -98,7 +98,12 @@ class ProductDeployment(BaseCoreModel):
         help_text="Zentinelle only: the install record's enabled integration flags as of the last "
         "apply (calliope.ai/integrations). Informational.",
     )
-    health = models.CharField(max_length=16, choices=Health.choices, default=Health.UNKNOWN)
+    health = models.CharField(
+        max_length=16,
+        choices=Health.choices,
+        default=Health.UNKNOWN,
+        help_text="As of last_seen_at: a scan that cannot list the cluster leaves it as it was.",
+    )
     project = models.ForeignKey(
         "astrolift_identity.Project",
         related_name="product_deployments",
