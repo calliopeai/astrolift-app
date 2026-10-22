@@ -344,7 +344,7 @@ def dispatch_registered_agent(
                 from astrolift_agents.models import AgentTaskCompletionCallback
 
                 AgentTaskCompletionCallback.objects.create(task=task, organization=organization, **callback)
-            bind(task, brains)
+            bind(task, brains, launch_team_id=team_id)
             if conversation_transfer is not None:
                 conversation_transfer.agent_task = task
                 conversation_transfer.save(update_fields=["agent_task", "updated_at", "version"])
