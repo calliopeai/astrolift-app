@@ -132,11 +132,11 @@
     "created": "생성일",
     "renameNote": "이 프로젝트의 이름이나 슬러그는 프로젝트 페이지의 “편집”에서 변경할 수 있습니다.",
     "dangerZone": "위험 영역",
-    "dangerZoneDescription": "소프트 삭제하면 이 프로젝트가 목록에서 제거됩니다. 프로젝트에 앱, 에이전트 또는 관리형 리소스가 남아 있으면 삭제가 거부됩니다.",
+    "dangerZoneDescription": "소프트 삭제하면 이 프로젝트가 목록에서 제거됩니다. 프로젝트에 앱, 에이전트, 관리형 리소스 또는 공유 시크릿 번들이 남아 있으면 삭제가 거부됩니다.",
     "deleteProject": "프로젝트 삭제",
     "close": "닫기",
     "deleteTitle": "프로젝트 {team}/{project}을(를) 삭제할까요?",
-    "deleteDescription": "소프트 삭제: 프로젝트에 앱, 에이전트 또는 관리형 리소스가 남아 있으면 거부됩니다. 슬러그는 다시 사용할 수 있게 됩니다.",
+    "deleteDescription": "소프트 삭제: 프로젝트에 앱, 에이전트, 관리형 리소스 또는 공유 시크릿 번들이 남아 있으면 거부됩니다. 슬러그는 다시 사용할 수 있게 됩니다.",
     "runFamily": {
       "task": "작업",
       "service": "서비스"
@@ -198,7 +198,7 @@
     "manageTeams": "팀 관리",
     "deleteTitle": "프로젝트 {team}/{project}을(를) 삭제할까요?",
     "deleteTitleGeneric": "프로젝트를 삭제할까요?",
-    "deleteDescription": "소프트 삭제: 프로젝트에 앱, 에이전트 또는 관리형 리소스가 남아 있으면 거부됩니다. 슬러그는 다시 사용할 수 있게 됩니다.",
+    "deleteDescription": "소프트 삭제: 프로젝트에 앱, 에이전트, 관리형 리소스 또는 공유 시크릿 번들이 남아 있으면 거부됩니다. 슬러그는 다시 사용할 수 있게 됩니다.",
     "deleteProject": "프로젝트 삭제"
   },
   "opsScreen": {

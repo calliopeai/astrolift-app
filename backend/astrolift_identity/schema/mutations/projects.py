@@ -41,6 +41,11 @@ from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
 
+def _listed(parts: list[str]) -> str:
+    """``a``, ``a and b``, ``a, b and c``."""
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
+
+
 @strawberry.type
 class ProjectMutations:
     # ---- Project -----------------------------------------------------
@@ -135,7 +140,7 @@ class ProjectMutations:
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
         from astrolift_registry.models import RegisteredApp
-        from astrolift_services.models import ManagedService
+        from astrolift_services.models import ManagedService, SecretBundle
 
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
@@ -145,11 +150,15 @@ class ProjectMutations:
         # Apps and shared resources keep pointing at a soft-deleted project,
         # and views that walk live projects (nav tree, project pages) drop
         # them (#2479), so they leave first. Rows still tearing down are live.
+        # A shared secret bundle drops out of every bundle list with its
+        # project while attached agents and apps keep reading its values, so
+        # it is deleted first too (that refuses until it is detached).
         apps = RegisteredApp.objects.filter(project_id=project.pk, organization_id=org_id).count()
         resources = ManagedService.objects.filter(
             project_id=project.pk, project__organization_id=org_id
         ).count()
-        if apps or resources:
+        bundles = SecretBundle.objects.filter(project_id=project.pk, organization_id=org_id).count()
+        if apps or resources or bundles:
             held: list[str] = []
             steps: list[str] = []
             if apps:
@@ -158,9 +167,12 @@ class ProjectMutations:
             if resources:
                 held.append(f"{resources} managed resource{'' if resources == 1 else 's'}")
                 steps.append("deprovision its managed resources")
+            if bundles:
+                held.append(f"{bundles} secret bundle{'' if bundles == 1 else 's'}")
+                steps.append("delete its secret bundles")
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                f"project still has {' and '.join(held)}; {' and '.join(steps)} before deleting it",
+                f"project still has {_listed(held)}; {_listed(steps)} before deleting it",
             )
         project.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))

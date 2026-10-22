@@ -132,11 +132,11 @@
     "created": "Created",
     "renameNote": "Rename this project or change its slug with Edit on the Projects page.",
     "dangerZone": "Danger zone",
-    "dangerZoneDescription": "Soft delete removes this project from listings. It is refused while the project still has apps, agents or managed resources.",
+    "dangerZoneDescription": "Soft delete removes this project from listings. It is refused while the project still has apps, agents, managed resources or shared secret bundles.",
     "deleteProject": "Delete project",
     "close": "Close",
     "deleteTitle": "Delete project {team}/{project}?",
-    "deleteDescription": "Soft delete: refused while the project still has apps, agents or managed resources. The slug becomes reclaimable.",
+    "deleteDescription": "Soft delete: refused while the project still has apps, agents, managed resources or shared secret bundles. The slug becomes reclaimable.",
     "runFamily": {
       "task": "Task",
       "service": "Service"
@@ -198,7 +198,7 @@
     "manageTeams": "Manage teams",
     "deleteTitle": "Delete project {team}/{project}?",
     "deleteTitleGeneric": "Delete project?",
-    "deleteDescription": "Soft delete: refused while the project still has apps, agents or managed resources. The slug becomes reclaimable.",
+    "deleteDescription": "Soft delete: refused while the project still has apps, agents, managed resources or shared secret bundles. The slug becomes reclaimable.",
     "deleteProject": "Delete project"
   },
   "opsScreen": {

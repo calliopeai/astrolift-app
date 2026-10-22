@@ -132,11 +132,11 @@
     "created": "Creado",
     "renameNote": "Cambia el nombre de este proyecto o su slug con Editar en la página Proyectos.",
     "dangerZone": "Zona de peligro",
-    "dangerZoneDescription": "La eliminación reversible quita este proyecto de los listados. Se rechaza mientras el proyecto tenga aplicaciones, agentes o recursos gestionados.",
+    "dangerZoneDescription": "La eliminación reversible quita este proyecto de los listados. Se rechaza mientras el proyecto tenga aplicaciones, agentes, recursos gestionados o paquetes de secretos compartidos.",
     "deleteProject": "Eliminar proyecto",
     "close": "Cerrar",
     "deleteTitle": "¿Eliminar el proyecto {team}/{project}?",
-    "deleteDescription": "Eliminación reversible: se rechaza mientras el proyecto tenga aplicaciones, agentes o recursos gestionados. El slug vuelve a estar disponible.",
+    "deleteDescription": "Eliminación reversible: se rechaza mientras el proyecto tenga aplicaciones, agentes, recursos gestionados o paquetes de secretos compartidos. El slug vuelve a estar disponible.",
     "runFamily": {
       "task": "Tarea",
       "service": "Servicio"
@@ -198,7 +198,7 @@
     "manageTeams": "Gestionar equipos",
     "deleteTitle": "¿Eliminar el proyecto {team}/{project}?",
     "deleteTitleGeneric": "¿Eliminar el proyecto?",
-    "deleteDescription": "Eliminación reversible: se rechaza mientras el proyecto tenga aplicaciones, agentes o recursos gestionados. El slug vuelve a estar disponible.",
+    "deleteDescription": "Eliminación reversible: se rechaza mientras el proyecto tenga aplicaciones, agentes, recursos gestionados o paquetes de secretos compartidos. El slug vuelve a estar disponible.",
     "deleteProject": "Eliminar proyecto"
   },
   "opsScreen": {
