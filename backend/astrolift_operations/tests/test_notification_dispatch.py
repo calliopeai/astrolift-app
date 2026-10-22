@@ -187,11 +187,11 @@ def test_event_emit_invokes_dispatcher_after_writer(fake_driver, ensure_dispatch
     assert payload.title.startswith("Deploy")
     assert "demo" in payload.body
     assert payload.action_url == "astrolift://deployments/d-123"
-    # SDK payload carries the event_type via ``category`` and via
-    # the ``data`` blob (the dispatcher emits both so the FCM ``data``
-    # path stays addressable).
+    # SDK payload carries the event kind via ``category`` and via
+    # the ``data`` contract (#2161) so the FCM ``data`` path stays
+    # addressable.
     assert payload.category == "deploy.approved"
-    assert payload.data["event_type"] == "deploy.approved"
+    assert payload.data["event_kind"] == "deploy.approved"
 
 
 def test_no_template_skips_dispatch(fake_driver, ensure_dispatcher_subscribed):
@@ -250,6 +250,7 @@ def test_alert_fired_includes_severity_in_title(fake_driver, ensure_dispatcher_s
                 "severity": "critical",
                 "summary": "demo prod 5xx > 5%",
                 "rule_guid": "r-42",
+                "alert_event_guid": "e-7",
             },
             resource_kind="alert_rule",
             resource_id="r-42",
@@ -259,7 +260,8 @@ def test_alert_fired_includes_severity_in_title(fake_driver, ensure_dispatcher_s
     _t, _p, payload = fake_driver.sent[0]
     assert "CRITICAL" in payload.title
     assert "5xx surge" in payload.title
-    assert payload.action_url == "astrolift://alerts/r-42"
+    # The link opens the incident, not the rule (#2161).
+    assert payload.action_url == "astrolift://alerts/e-7"
 
 
 def test_cluster_bootstrap_failed_targets_admins_only(fake_driver, ensure_dispatcher_subscribed):

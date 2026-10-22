@@ -1,0 +1,586 @@
+{
+  "contract": "astrolift.push-notification",
+  "data_keys": {
+    "optional": [
+      "organization_id",
+      "target_id"
+    ],
+    "required": [
+      "action_url",
+      "event_kind",
+      "install_id",
+      "payload_version",
+      "target_kind"
+    ]
+  },
+  "deliveries": [
+    {
+      "driver": "gcp_fcm",
+      "platform": "android",
+      "request": {
+        "message": {
+          "android": {
+            "notification": {
+              "channel_id": "alert.fired"
+            }
+          },
+          "data": {
+            "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "event_kind": "alert.fired",
+            "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+            "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+            "payload_version": "1",
+            "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "target_kind": "alert_event"
+          },
+          "notification": {
+            "body": "5xx surge is firing",
+            "title": "CRITICAL \u00b7 5xx surge"
+          },
+          "token": "fcm-registration-token"
+        }
+      }
+    },
+    {
+      "driver": "gcp_fcm",
+      "platform": "ios",
+      "request": {
+        "message": {
+          "apns": {
+            "payload": {
+              "aps": {
+                "alert": {
+                  "body": "5xx surge is firing",
+                  "title": "CRITICAL \u00b7 5xx surge"
+                },
+                "category": "alert.fired",
+                "sound": "default"
+              }
+            }
+          },
+          "data": {
+            "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "event_kind": "alert.fired",
+            "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+            "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+            "payload_version": "1",
+            "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "target_kind": "alert_event"
+          },
+          "notification": {
+            "body": "5xx surge is firing",
+            "title": "CRITICAL \u00b7 5xx surge"
+          },
+          "token": "fcm-registration-token"
+        }
+      }
+    },
+    {
+      "driver": "aws_sns",
+      "platform": "android",
+      "request": {
+        "Message": {
+          "GCM": {
+            "data": {
+              "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+              "event_kind": "alert.fired",
+              "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+              "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+              "payload_version": "1",
+              "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+              "target_kind": "alert_event"
+            },
+            "notification": {
+              "android_channel_id": "alert.fired",
+              "body": "5xx surge is firing",
+              "title": "CRITICAL \u00b7 5xx surge"
+            }
+          },
+          "default": "5xx surge is firing"
+        },
+        "MessageStructure": "json"
+      }
+    },
+    {
+      "driver": "aws_sns",
+      "platform": "ios",
+      "request": {
+        "Message": {
+          "APNS": {
+            "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "aps": {
+              "alert": {
+                "body": "5xx surge is firing",
+                "title": "CRITICAL \u00b7 5xx surge"
+              },
+              "category": "alert.fired",
+              "sound": "default"
+            },
+            "event_kind": "alert.fired",
+            "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+            "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+            "payload_version": "1",
+            "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "target_kind": "alert_event"
+          },
+          "APNS_SANDBOX": {
+            "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "aps": {
+              "alert": {
+                "body": "5xx surge is firing",
+                "title": "CRITICAL \u00b7 5xx surge"
+              },
+              "category": "alert.fired",
+              "sound": "default"
+            },
+            "event_kind": "alert.fired",
+            "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+            "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+            "payload_version": "1",
+            "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "target_kind": "alert_event"
+          },
+          "default": "5xx surge is firing"
+        },
+        "MessageStructure": "json"
+      }
+    },
+    {
+      "driver": "azure_anh",
+      "platform": "android",
+      "request": {
+        "ServiceBusNotification-Format": "fcmv1",
+        "ServiceBusNotification-Tags": "installationId:{anh-installation-1}",
+        "body": {
+          "message": {
+            "android": {
+              "notification": {
+                "channel_id": "alert.fired"
+              }
+            },
+            "data": {
+              "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+              "event_kind": "alert.fired",
+              "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+              "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+              "payload_version": "1",
+              "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+              "target_kind": "alert_event"
+            },
+            "notification": {
+              "body": "5xx surge is firing",
+              "title": "CRITICAL \u00b7 5xx surge"
+            }
+          }
+        }
+      }
+    },
+    {
+      "driver": "azure_anh",
+      "platform": "ios",
+      "request": {
+        "ServiceBusNotification-Format": "apple",
+        "ServiceBusNotification-Tags": "installationId:{anh-installation-1}",
+        "body": {
+          "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+          "aps": {
+            "alert": {
+              "body": "5xx surge is firing",
+              "title": "CRITICAL \u00b7 5xx surge"
+            },
+            "category": "alert.fired",
+            "sound": "default"
+          },
+          "event_kind": "alert.fired",
+          "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+          "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+          "payload_version": "1",
+          "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+          "target_kind": "alert_event"
+        }
+      }
+    },
+    {
+      "driver": "otlp_webhook",
+      "platform": "android",
+      "request": {
+        "op": "send_push",
+        "payload": {
+          "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+          "body": "5xx surge is firing",
+          "data": {
+            "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "event_kind": "alert.fired",
+            "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+            "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+            "payload_version": "1",
+            "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+            "target_kind": "alert_event"
+          },
+          "title": "CRITICAL \u00b7 5xx surge"
+        },
+        "platform": "android",
+        "registration_id": "bridge-registration-1"
+      }
+    }
+  ],
+  "documentation": "docs/mobile-push-contract.md",
+  "events": [
+    {
+      "body": "Reviewed 3 alerts; none needs you.",
+      "category": "agent.message.sent",
+      "data": {
+        "action_url": "astrolift://inbox/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d71",
+        "event_kind": "agent.message.sent",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d72",
+        "target_kind": "agent_message"
+      },
+      "event_kind": "agent.message.sent",
+      "title": "Triage: Triage finished"
+    },
+    {
+      "body": "5xx surge is firing",
+      "category": "alert.fired",
+      "data": {
+        "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+        "event_kind": "alert.fired",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+        "target_kind": "alert_event"
+      },
+      "event_kind": "alert.fired",
+      "title": "CRITICAL \u00b7 5xx surge"
+    },
+    {
+      "body": "5xx surge is firing",
+      "category": "alert.resolved",
+      "data": {
+        "action_url": "astrolift://alerts/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+        "event_kind": "alert.resolved",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d32",
+        "target_kind": "alert_event"
+      },
+      "event_kind": "alert.resolved",
+      "title": "Resolved \u00b7 5xx surge"
+    },
+    {
+      "body": "App web is scheduled for deregistration.",
+      "category": "app.deregister_pending",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.deregister_pending",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "event_kind": "app.deregister_pending",
+      "title": "App deregister pending"
+    },
+    {
+      "body": "web is unreachable (HTTP 503)",
+      "category": "app.down",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.down",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "event_kind": "app.down",
+      "title": "App down: Web"
+    },
+    {
+      "body": "The temporary app web will be torn down in 1 hour. Extend it to keep it.",
+      "category": "app.expiring",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.expiring",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "event_kind": "app.expiring",
+      "title": "Web expires in 1 hour"
+    },
+    {
+      "body": "web is reachable again",
+      "category": "app.recovered",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.recovered",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "event_kind": "app.recovered",
+      "title": "App recovered: Web"
+    },
+    {
+      "body": "Pixel 9 signed in. If this wasn't you, tap to revoke.",
+      "category": "auth.session.created",
+      "data": {
+        "action_url": "astrolift://sessions/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d61",
+        "event_kind": "auth.session.created",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d61",
+        "target_kind": "session"
+      },
+      "event_kind": "auth.session.created",
+      "title": "New sign-in: Mobile app"
+    },
+    {
+      "body": "prod-us-east: IAM role missing",
+      "category": "cluster.bootstrap_failed",
+      "data": {
+        "action_url": "astrolift://clusters/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d41",
+        "event_kind": "cluster.bootstrap_failed",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d41",
+        "target_kind": "cluster"
+      },
+      "event_kind": "cluster.bootstrap_failed",
+      "title": "Cluster bootstrap failed"
+    },
+    {
+      "body": "web \u2192 production",
+      "category": "deploy.approved",
+      "data": {
+        "action_url": "astrolift://deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "event_kind": "deploy.approved",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "target_kind": "deployment"
+      },
+      "event_kind": "deploy.approved",
+      "title": "Deploy approved"
+    },
+    {
+      "body": "web \u2192 production",
+      "category": "deploy.failed",
+      "data": {
+        "action_url": "astrolift://deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "event_kind": "deploy.failed",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "target_kind": "deployment"
+      },
+      "event_kind": "deploy.failed",
+      "title": "Deploy failed"
+    },
+    {
+      "body": "web \u2192 production",
+      "category": "deploy.rejected",
+      "data": {
+        "action_url": "astrolift://deployments/019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "event_kind": "deploy.rejected",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d11",
+        "target_kind": "deployment"
+      },
+      "event_kind": "deploy.rejected",
+      "title": "Deploy rejected"
+    },
+    {
+      "body": "web.acme.example.test expires in 6 days",
+      "category": "domain.cert_expiring",
+      "data": {
+        "action_url": "astrolift://apps/web/domains",
+        "event_kind": "domain.cert_expiring",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d51",
+        "target_kind": "custom_domain"
+      },
+      "event_kind": "domain.cert_expiring",
+      "title": "Cert expiring: web.acme.example.test"
+    },
+    {
+      "body": "web.acme.example.test: renewal is failing and the cert expires in 6d.",
+      "category": "domain.cert_renewal_failed",
+      "data": {
+        "action_url": "astrolift://apps/web/domains",
+        "event_kind": "domain.cert_renewal_failed",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d51",
+        "target_kind": "custom_domain"
+      },
+      "event_kind": "domain.cert_renewal_failed",
+      "title": "Cert renewal failing: web.acme.example.test"
+    },
+    {
+      "body": "ops@example.test revealed DATABASE_URL",
+      "category": "secret.revealed",
+      "data": {
+        "action_url": "astrolift://audit?filter=secret.revealed",
+        "event_kind": "secret.revealed",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d21",
+        "target_kind": "secret"
+      },
+      "event_kind": "secret.revealed",
+      "title": "Secret reveal"
+    }
+  ],
+  "generated_by": "backend/astrolift_operations/tests/test_push_contract_2161.py",
+  "payload_version": "1",
+  "routing": [
+    {
+      "active_install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.down",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "expect": {
+        "action_url": "astrolift://apps/web",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "opens": true,
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01"
+      },
+      "installs": [
+        "install-5f0c2a9e41d7b3086ae2c41f",
+        "install-b81d40e6c2a95f17d03e6b2a"
+      ],
+      "name": "Notification from the active install"
+    },
+    {
+      "active_install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.down",
+        "install_id": "install-b81d40e6c2a95f17d03e6b2a",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d02",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1db1",
+        "target_kind": "app"
+      },
+      "expect": {
+        "action_url": "astrolift://apps/web",
+        "install_id": "install-b81d40e6c2a95f17d03e6b2a",
+        "opens": true,
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d02"
+      },
+      "installs": [
+        "install-5f0c2a9e41d7b3086ae2c41f",
+        "install-b81d40e6c2a95f17d03e6b2a"
+      ],
+      "name": "Background install whose app has the same slug"
+    },
+    {
+      "active_install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.down",
+        "install_id": "install-b81d40e6c2a95f17d03e6b2a",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d02",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1db1",
+        "target_kind": "app"
+      },
+      "expect": {
+        "opens": false,
+        "reason": "unknown_install"
+      },
+      "installs": [
+        "install-5f0c2a9e41d7b3086ae2c41f"
+      ],
+      "name": "Install this device no longer holds"
+    },
+    {
+      "active_install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.down",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "1",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "expect": {
+        "opens": false,
+        "reason": "missing_install_id"
+      },
+      "installs": [
+        "install-5f0c2a9e41d7b3086ae2c41f",
+        "install-b81d40e6c2a95f17d03e6b2a"
+      ],
+      "name": "Payload without install identity"
+    },
+    {
+      "active_install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.down",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "expect": {
+        "opens": false,
+        "reason": "unsupported_payload_version"
+      },
+      "installs": [
+        "install-5f0c2a9e41d7b3086ae2c41f",
+        "install-b81d40e6c2a95f17d03e6b2a"
+      ],
+      "name": "Payload without payload_version"
+    },
+    {
+      "active_install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+      "data": {
+        "action_url": "astrolift://apps/web",
+        "event_kind": "app.down",
+        "install_id": "install-5f0c2a9e41d7b3086ae2c41f",
+        "organization_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1d01",
+        "payload_version": "2",
+        "target_id": "019a0f3c-6b2e-7c41-8d5e-2f7a9b0c1da1",
+        "target_kind": "app"
+      },
+      "expect": {
+        "opens": false,
+        "reason": "unsupported_payload_version"
+      },
+      "installs": [
+        "install-5f0c2a9e41d7b3086ae2c41f",
+        "install-b81d40e6c2a95f17d03e6b2a"
+      ],
+      "name": "Payload from a newer major version"
+    }
+  ]
+}

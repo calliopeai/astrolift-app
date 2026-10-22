@@ -258,6 +258,21 @@ class AstroliftServerInfoTest(TestCase):
         self.assertEqual(info_a["installId"], info_b["installId"])
         self.assertTrue(info_a["installId"])
 
+    @mock.patch.dict("os.environ", {"ASTROLIFT_INSTALL_ID": ""})
+    def test_install_id_is_the_same_on_every_host(self) -> None:
+        """Web replicas and the worker that sends pushes run on different
+        hosts, and a container gets a new hostname on every restart. The id
+        a client stored at sign-in must be the one each of them reports, and
+        the one push payloads carry (#2161), so it is stored, not derived."""
+        from core.models import InstallIdentity
+
+        with mock.patch("socket.gethostname", return_value="astrolift-web-6c9f7"):
+            web = self._execute()["installId"]
+        with mock.patch("socket.gethostname", return_value="astrolift-worker-2b81d"):
+            worker = self._execute()["installId"]
+        self.assertEqual(web, worker)
+        self.assertEqual(InstallIdentity.objects.get().install_id, web)
+
     # ---- Bonus pin: authMethods always lists session_cookie --------
 
     def test_auth_methods_always_lists_session_cookie(self) -> None:
