@@ -218,6 +218,21 @@ def test_unsafe_live_issuer_is_not_echoed() -> None:
     assert "private-marker" not in str(refused.value)
 
 
+@pytest.mark.parametrize("field", ["cluster_id", "identity_id", "identity_name"])
+def test_a_response_naming_another_resource_is_unconfirmed_and_writes_nothing(field: str) -> None:
+    arm = ProvisioningARM()
+    if field == "cluster_id":
+        arm.cluster["id"] = CLUSTER.replace("aks-1", "aks-2")
+    elif field == "identity_id":
+        arm.identity["id"] = RESOURCE.replace("controlled-uami", "other-uami")
+    else:
+        arm.identity["name"] = "other-uami"
+    with pytest.raises(AzureOwnedIdentityError, match="not confirmed") as error:
+        _provisioner(arm).ensure()
+    assert not isinstance(error.value, AzureIdentityRefused)
+    assert not arm.writes
+
+
 def test_subscription_of_another_tenant_is_refused_before_the_cluster_is_read() -> None:
     arm = ProvisioningARM()
     arm.subscription["tenantId"] = guid(99)
