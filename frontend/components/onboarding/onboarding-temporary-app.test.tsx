@@ -112,13 +112,26 @@ describe("the onboarding repo step's app lifetime (#2433)", () => {
     view.unmount();
 
     const onRetry = vi.fn();
-    render(
+    const failed = render(
       <Wizard initial={PICKED} temporary={{ rules: null, loading: false, failed: true, onRetry }} />
     );
     expect(screen.getByRole("alert").textContent).toBe(copy.unavailable);
     expect(next().hasAttribute("disabled")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: copy.retry }));
     expect(onRetry).toHaveBeenCalledOnce();
+
+    // The retry reads it: Next follows the policy, not the form state alone.
+    failed.rerender(<Wizard initial={PICKED} temporary={TEMPORARY_POLICY} />);
+    expect(next().hasAttribute("disabled")).toBe(false);
+  });
+
+  it("lists no lifetime in the review when no app is registered", () => {
+    render(
+      <Wizard initial={{ ...FILLED, step: 4, expiresIn: "4h" }} temporary={TEMPORARY_POLICY} />
+    );
+    expect(screen.getByRole("button", { name: en.onboarding.finishCta })).toBeTruthy();
+    expect(screen.queryByText(copy.ttl)).toBeNull();
+    expect(screen.queryByText(copy.deleteData)).toBeNull();
   });
 });
 
