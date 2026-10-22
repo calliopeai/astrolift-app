@@ -525,9 +525,18 @@ def _severity(health: str, what: list[str]) -> str:
 
 
 def _emit(change: _Change) -> None:
-    # Event.emit fills a missing organization, team or project from the
-    # ambient tenant; a caller's tenant must not claim an event that belongs
-    # to another organization, or to none.
+    if change.organization_id is None:
+        # The event log is per organization and none owns an unassigned
+        # product on a shared cluster, so there is no one to tell.
+        log.info(
+            "product scan: %s %s on a shared cluster, unassigned: %s",
+            change.payload["kind"],
+            change.payload["namespace"],
+            ", ".join(change.payload["changes"]),
+        )
+        return
+    # Event.emit fills a missing team or project from the ambient tenant; a
+    # caller's tenant must not claim an event that is not its own.
     owner = TenantContext(
         organization_id=change.organization_id,
         team_id=change.team_id,

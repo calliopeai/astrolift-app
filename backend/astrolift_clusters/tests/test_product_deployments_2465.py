@@ -239,6 +239,22 @@ def _events(**filters):
     )
 
 
+@pytest.fixture
+def envelopes():
+    """Every ``product_deployment.changed`` envelope emitted, persisted or not."""
+    from core.events import register_event_subscriber, unregister_event_subscriber
+
+    seen = []
+
+    def capture(envelope):
+        if envelope.event_type == pd.PRODUCT_DEPLOYMENT_CHANGED:
+            seen.append(envelope)
+
+    register_event_subscriber(capture)
+    yield seen
+    unregister_event_subscriber(capture)
+
+
 # ---- reading the contract ------------------------------------------------------
 
 
@@ -812,12 +828,26 @@ def test_an_org_owned_clusters_events_go_to_its_organization(plugin, org, other_
     assert "endpoints" not in event.payload
 
 
+def test_a_callers_team_does_not_claim_an_org_clusters_event(plugin, org, drivers, scan):
+    """Event.emit fills a missing team or project from the ambient tenant,
+    which inside a request is the caller's."""
+    cluster = _cluster(plugin, organization=org)
+    drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub())
+    project = _project(org)
+
+    with as_tenant(TenantContext(organization_id=org.pk, team_id=project.team_id, project_id=project.pk)):
+        scan(cluster)
+
+    [event] = _events()
+    assert (event.organization_id, event.team_id, event.project_id) == (org.pk, None, None)
+
+
 def test_an_unassigned_product_on_a_shared_cluster_belongs_to_no_organization(
-    plugin, org, other_org, drivers, scan
+    plugin, org, other_org, drivers, scan, envelopes
 ):
     """Every organization sees a shared cluster, none of them owns what the
-    installer runs on it. A caller's tenant, as in a request, must not
-    claim the event either."""
+    installer runs on it, so nothing is emitted: not to a caller's tenant,
+    as in a request, and not to the subscribers either."""
     cluster = _cluster(plugin)
     drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub())
 
@@ -826,6 +856,7 @@ def test_an_unassigned_product_on_a_shared_cluster_belongs_to_no_organization(
 
     assert ProductDeployment.objects.filter(cluster=cluster).exists()
     assert _events() == []
+    assert envelopes == []
 
 
 def test_an_assigned_product_on_a_shared_cluster_belongs_to_its_projects_organization(
