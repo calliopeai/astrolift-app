@@ -167,8 +167,8 @@ function CreatePreviewSheet({
 /**
  * The Previews view of an app's Deployments tab (spec 44 §4.4, §5.1): the
  * per-PR (and manual) preview environments on the embedded list, sharing
- * the deployments list's view picker, with their TTL countdowns, footprint
- * and spend. Extend and tear down sit in each row's `⋯`; Create preview
+ * the deployments list's view picker, with their TTL countdowns and footprint.
+ * Extend and tear down sit in each row's `⋯`; Create preview
  * leads the toolbar. Pure.
  */
 export function AppPreviewsScreen({
@@ -183,7 +183,6 @@ export function AppPreviewsScreen({
   totalCount,
   previewCount,
   counts,
-  spend,
   stalePreviews,
   canDeploy,
   tearingDown,
@@ -342,7 +341,6 @@ export function AppPreviewsScreen({
         if (aggregate.podCount === 0) {
           return <span className="text-muted-foreground text-xs">—</span>;
         }
-        const dailyCost = p.estimatedDailyCostUsd;
         return (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -350,27 +348,9 @@ export function AppPreviewsScreen({
                 <div className="text-xs">
                   {formatCpuCores(aggregate.cpuCores)} · {formatMemoryBytes(aggregate.memoryBytes)}
                 </div>
-                <div className="text-muted-foreground text-xs">
-                  {dailyCost != null
-                    ? t("costPerDay", { cost: fmt.formatCurrency(dailyCost) })
-                    : t("costUnavailable")}
-                </div>
               </div>
             </TooltipTrigger>
-            <TooltipContent>
-              {dailyCost != null
-                ? t("costTooltip", {
-                    pods: aggregate.podCount,
-                    cost: fmt.formatCurrency(dailyCost),
-                  })
-                : t("costTooltipUnavailable", { pods: aggregate.podCount })}
-              {/* The driver's own qualifications on its own number. */}
-              {p.estimatedCostNotes.map((note) => (
-                <span key={note} className="mt-1 block max-w-xs text-xs opacity-80">
-                  {note}
-                </span>
-              ))}
-            </TooltipContent>
+            <TooltipContent>{t("resourceTooltip", { pods: aggregate.podCount })}</TooltipContent>
           </Tooltip>
         );
       },
@@ -450,10 +430,6 @@ export function AppPreviewsScreen({
             tornDown: counts.tornDown,
           })}
         </span>
-        {/* #660: preview spend roll-up, only when at least one live preview is priced. */}
-        {spend.liveCount > 0 && (spend.priced > 0 || spend.unpriced > 0) && (
-          <SpendSummary spend={spend} />
-        )}
         <div className="ml-auto">
           <CreatePreviewSheet disabled={!enabled} creating={creating} onCreate={onCreate} />
         </div>
@@ -549,41 +525,6 @@ function Notice({
         <p className="text-sm font-medium [overflow-wrap:anywhere]">{title}</p>
         <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">{description}</p>
       </div>
-    </div>
-  );
-}
-
-/** Daily spend, the month's projection, and how much of it is priced. */
-function SpendSummary({ spend }: { spend: AppPreviewsScreenProps["spend"] }) {
-  const t = useTranslations("apps.previews");
-  const fmt = useFormatters();
-  return (
-    <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1 text-xs">
-      <span>
-        <span className="text-muted-foreground">{t("spend.daily")} </span>
-        <span className="font-mono">
-          {spend.priced > 0 ? fmt.formatCurrency(spend.dailyTotal) : "—"}
-        </span>
-      </span>
-      <span className="inline-flex items-center gap-1.5">
-        <span className="text-muted-foreground">{t("spend.monthly")} </span>
-        <span className="font-mono">
-          {spend.priced > 0 ? fmt.formatCurrency(spend.monthlyProjection) : "—"}
-        </span>
-        {spend.approximate > 0 && (
-          <Badge variant="outline" className="text-2xs gap-1 uppercase">
-            <AlertTriangleIcon className="size-3" />
-            {t("spend.approximate")}
-          </Badge>
-        )}
-      </span>
-      <span className="text-muted-foreground min-w-0 [overflow-wrap:anywhere]">
-        <span className="font-mono">
-          {t("spend.priced", { priced: spend.priced, total: spend.liveCount })}
-        </span>
-        {spend.unpriced > 0 && <> · {t("spend.unpriced", { count: spend.unpriced })}</>}
-        {spend.approximate > 0 && <> · {t("spend.overcount", { count: spend.approximate })}</>}
-      </span>
     </div>
   );
 }

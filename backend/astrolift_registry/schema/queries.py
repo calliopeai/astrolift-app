@@ -38,12 +38,18 @@ from astrolift_registry.dependency_context import (
 )
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
 from astrolift_registry.schema.brain_types import (
+    BrainCellType,
     BrainCreationType,
+    BrainEditionType,
+    BrainSort,
     BrainStatusType,
     BrainType,
     brain_status_to_type,
     brain_to_type,
+    brains_to_types,
+    cells_to_types,
     creation_to_type,
+    edition_to_type,
 )
 from astrolift_registry.schema.types import (
     STALE_DEPLOY_WINDOW_DAYS,
@@ -1217,7 +1223,71 @@ class RegistryQuery:
         team shares and token ceiling as apps. Sharing a brain is sharing its app."""
         from astrolift_registry.brains import visible_brains
 
-        return [brain_to_type(app) for app in visible_brains(search=search or "")[:200]]
+        return brains_to_types(visible_brains(search=search or "")[:200])
+
+    @strawberry.field(
+        description=(
+            "Semantic layers the caller can read, one page at a time (#2444): search over name and slug, "
+            "the home team's slug, a sort, and archived ones too with includeArchived. totalCount counts "
+            "every match; nextCursor reaches the next page under the same sort."
+        )
+    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_brains_page(
+        self,
+        info: Info,
+        search: str | None = None,
+        team: str | None = None,
+        sort: BrainSort = BrainSort.NEWEST,
+        include_archived: bool = False,
+        limit: int | None = None,
+        after: str | None = None,
+    ) -> PageType[BrainType]:
+        from astrolift_registry.brains import visible_brains
+
+        qs = visible_brains(search=search or "", include_archived=include_archived)
+        if (team or "").strip():
+            qs = qs.filter(team__slug=team.strip())
+        by_name = sort in (BrainSort.NAME_ASC, BrainSort.NAME_DESC)
+        page = keyset_page(
+            qs,
+            cursor=after,
+            limit=limit,
+            default_limit=25,
+            max_limit=100,
+            sort_field="name" if by_name else "created_at",
+            descending=sort in (BrainSort.NEWEST, BrainSort.NAME_DESC),
+            cursor_scope=sort.value,
+        )
+        return PageType(
+            items=brains_to_types(page.rows), next_cursor=page.next_cursor, total_count=page.total_count
+        )
+
+    @strawberry.field(
+        description=(
+            "Every cell of Mimwell's substrate matrix with its status and reason (#2444): what createBrain "
+            "and updateBrainSubstrate accept. Follows the Mimwell commit this install's port is held to."
+        )
+    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_brain_cells(self, info: Info) -> list[BrainCellType]:
+        return cells_to_types()
+
+    @strawberry.field(
+        description=(
+            "The Mimwell edition a new semantic layer starts from (#2444): at templateRef, or the ref this "
+            "install pins; whether it has deploy.app_slug (a slug not ending in -brain needs it) and ships "
+            "the portal container. The edition is read once per ref and kept 10 minutes."
+        )
+    )
+    @require_permission(Permission.APP_CREATE, any_scope=True)
+    @tenant_scoped()
+    def astrolift_brain_edition(self, info: Info, template_ref: str | None = None) -> BrainEditionType:
+        from astrolift_registry import brain_template
+
+        return edition_to_type((template_ref or brain_template.default_ref()).strip())
 
     @strawberry.field(
         description=(

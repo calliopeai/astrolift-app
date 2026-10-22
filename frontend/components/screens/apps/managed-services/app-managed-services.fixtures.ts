@@ -10,7 +10,6 @@ import type {
 } from "@/graphql/services/services.types";
 
 import type {
-  CostPanelView,
   EmailDetailSheetViewProps,
   EngagementMetricsPanelViewProps,
   MessageLogPanelView,
@@ -292,13 +291,6 @@ export const EMAIL_SHEET: EmailDetailSheetViewProps = {
   open: true,
   onOpenChange: noop,
   detail: EMAIL_DETAIL,
-  loading: false,
-};
-
-export const COST: ComponentProps<typeof CostPanelView> = {
-  mtdSum: 1834,
-  trailingSum: 2410,
-  currency: "USD",
   loading: false,
 };
 

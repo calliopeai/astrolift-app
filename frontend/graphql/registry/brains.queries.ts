@@ -1,26 +1,108 @@
 import { gql } from "@apollo/client";
 
 /**
- * Hosted semantic layers (brain apps) the viewer can read (#2320): the same
- * visibility, team shares and token ceiling as apps.
+ * A layer's health and freshness for lists (#2444): the latest deployment
+ * now, and what the last status read found at the source host (null fields
+ * and `checkedAt` until one has).
  */
-export const LIST_BRAINS = gql`
-  query ListBrains($search: String) {
-    astroliftBrains(search: $search) {
+export const BRAIN_SUMMARY_FIELDS = gql`
+  fragment BrainSummaryFields on AstroliftBrainSummary {
+    environmentName
+    compiledAt
+    behind
+    checkedAt
+    deployment {
       id
-      slug
-      name
-      kind
-      team
-      project
-      environments {
+      status
+      imageTag
+      commitSha
+      createdAt
+    }
+    lastIngest {
+      status
+      conclusion
+      url
+      createdAt
+    }
+  }
+`;
+
+/**
+ * One page of the semantic layers the viewer can read (#2320, #2444): the
+ * same visibility, team shares and token ceiling as apps; search, home team,
+ * sort and paging on the server, archived ones with `includeArchived`.
+ */
+export const LIST_BRAINS_PAGE = gql`
+  ${BRAIN_SUMMARY_FIELDS}
+  query ListBrainsPage(
+    $search: String
+    $team: String
+    $sort: AstroliftBrainSort!
+    $includeArchived: Boolean!
+    $limit: Int
+    $after: String
+  ) {
+    astroliftBrainsPage(
+      search: $search
+      team: $team
+      sort: $sort
+      includeArchived: $includeArchived
+      limit: $limit
+      after: $after
+    ) {
+      items {
+        id
+        slug
         name
-        url
-      }
-      sharedWith {
+        kind
         team
-        access
+        project
+        archived
+        environments {
+          name
+          url
+        }
+        sharedWith {
+          team
+          access
+        }
+        summary {
+          ...BrainSummaryFields
+        }
       }
+      nextCursor
+      totalCount
+    }
+  }
+`;
+
+/** Mimwell's substrate matrix (#2444): what the create and graduation forms offer. */
+export const GET_BRAIN_CELLS = gql`
+  query GetBrainCells {
+    astroliftBrainCells {
+      authority
+      blobs
+      vectors
+      graph
+      status
+      reason
+    }
+  }
+`;
+
+/**
+ * The Mimwell edition a new layer starts from (#2444): the ref this install
+ * pins (or the one asked for) and whether it has `deploy.app_slug`.
+ */
+export const GET_BRAIN_EDITION = gql`
+  query GetBrainEdition($templateRef: String) {
+    astroliftBrainEdition(templateRef: $templateRef) {
+      templateRepo
+      ref
+      version
+      supportsAppSlug
+      shipsPortalContainer
+      error
     }
   }
 `;
@@ -58,6 +140,7 @@ export const BRAIN_SUBSTRATE_FIELDS = gql`
     persistence
     replicas
     image
+    port
     adopted
     adoptedStore
     graduationNeeded
@@ -138,6 +221,10 @@ export const GET_BRAIN = gql`
   query GetBrain($slug: String!) {
     astroliftBrain(slug: $slug) {
       ...BrainFields
+      allEnvironments {
+        name
+        served
+      }
       hostedApps {
         slug
         environment

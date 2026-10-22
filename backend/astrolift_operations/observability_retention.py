@@ -16,10 +16,8 @@ Why a separate module from ``retention.py``:
   so the eviction call is a *driver* call, not a Django ORM
   ``DELETE``. Keeping the policy logic separate makes the seam
   obvious.
-- Different defaults & override surfaces: observability retention
-  has billing implications (longer = more storage cost), so the
-  resolver exposes a ``billable_window_days`` view that the usage
-  dashboard reads directly.
+- Different defaults & override surfaces: the resolver reports the
+  effective retention days and warning window that eviction enforces.
 
 Hold windows: an org admin can declare an incident-time range
 ("keep logs for App=X between 2026-05-01..2026-05-03 indefinitely")
@@ -142,14 +140,6 @@ def is_held(
         if h.starts_at <= timestamp <= h.ends_at:
             return True
     return False
-
-
-def billable_window_days(retention: EffectiveRetention) -> int:
-    """Number of days the platform expects to retain. The usage
-    dashboard multiplies this by the stream's $/GB/day cost to show
-    the line item — the actual storage call happens in driver land,
-    but billing decisions sit in the platform."""
-    return retention.days
 
 
 def warn_threshold_for(retention: EffectiveRetention) -> int:

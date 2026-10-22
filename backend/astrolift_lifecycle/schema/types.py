@@ -393,8 +393,7 @@ class PreviewAggregateResourcesType:
     to the sum; rendered as part of the tooltip so operators can spot
     a single pod that's blowing up the budget vs many small pods.
 
-    Surfaced even when ``estimated_daily_cost_usd`` is null — the
-    resource numbers still help operators spot heavy previews."""
+    Resource observations help operators spot heavy previews."""
 
     cpu_cores: float
     memory_bytes: float
@@ -521,20 +520,6 @@ class PreviewEnvironmentType:
     when reachable; zeros when the cluster is unwired or the listing
     failed (which the FE renders as "—" rather than "0")."""
 
-    estimated_daily_cost_usd: float | None
-    # What the driver said about its own number. Every caveat it attaches
-    # used to be dropped before it reached anyone (#1509): the list-price
-    # note on all three clouds, and on GCP the APPROXIMATE label on the
-    # variants that sum every SKU in a service.
-    estimated_cost_notes: list[str]
-    # True when the figure is known to be wrong in a stated direction, so
-    # a surface can render it differently rather than as a considered one.
-    estimated_cost_approximate: bool
-    """Daily $ estimate from the cluster driver's live cost API.
-    ``None`` (not zero) when the driver doesn't implement the cost
-    capability, doesn't recognise compute pricing, or the pricing API
-    is unreachable — workspace rule forbids hard-coded fallbacks."""
-
     version: int = strawberry.field(default=0, description="Version of this exact preview binding.")
     environment_status: str = strawberry.field(
         default="unavailable",
@@ -543,7 +528,7 @@ class PreviewEnvironmentType:
     environment: PreviewEnvironmentTargetType | None = None
     runtime_status: str = strawberry.field(
         default="not_requested",
-        description="not_requested, available or unavailable; basic reads do not query pods or pricing.",
+        description="not_requested, available or unavailable; basic reads do not query pods.",
     )
 
     # Who opened it and why it failed (#2155). ``opened_by_login`` is the
@@ -1297,9 +1282,6 @@ def preview_to_type(
     p,
     *,
     aggregate_resources: PreviewAggregateResourcesType | None = None,
-    estimated_daily_cost_usd: float | None = None,
-    estimated_cost_notes: list[str] | None = None,
-    estimated_cost_approximate: bool = False,
     failure_reason: str | None = None,
     runtime_status: str = "not_requested",
 ) -> PreviewEnvironmentType:
@@ -1309,14 +1291,9 @@ def preview_to_type(
     resolver passes the latest deployment's reason for failed rows that
     recorded none.
 
-    ``aggregate_resources`` + ``estimated_daily_cost_usd`` are injected
-    by the resolver (rather than computed here) so the cluster + cost
-    API call surface stays at the resolver boundary — keeping
-    serialization pure means tests + admin / shell call sites don't
-    drag in the runtime-cluster lookup.
-
-    Defaults: zero resources + null cost. Mirrors the "cluster unwired"
-    UX — the FE renders empty/dash rather than fabricating numbers.
+    ``aggregate_resources`` is injected at the resolver boundary so ordinary
+    serialization never performs runtime cluster reads. Defaults are zero
+    resources with runtime_status="not_requested"; callers must honor status.
     """
     from astrolift_lifecycle.preview_targets import preview_binding
 
@@ -1379,9 +1356,6 @@ def preview_to_type(
         source_url=source_url,
         pr_url=pr_url,
         aggregate_resources=aggregate_resources,
-        estimated_daily_cost_usd=estimated_daily_cost_usd,
-        estimated_cost_notes=list(estimated_cost_notes or []),
-        estimated_cost_approximate=estimated_cost_approximate,
         opened_by_login=getattr(p, "opened_by_login", "") or "",
         opened_by_user_id=str(opener_id) if opener_id else None,
         opened_by_me=_viewer_started(opener_id),

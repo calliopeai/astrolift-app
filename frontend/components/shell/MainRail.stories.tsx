@@ -3,7 +3,7 @@ import * as React from "react";
 import { expect, within } from "storybook/test";
 
 import { MainRail } from "@/components/shell/MainRail";
-import { NAV, type ModuleKey, visibleNav } from "@/lib/shell/nav-model";
+import { NAV, type ModuleKey, type NavRequirement, visibleNav } from "@/lib/shell/nav-model";
 
 /** The main rail (spec 44 §4.1, §4.2), for each kind of access. */
 const meta: Meta = { title: "Shell/MainRail", parameters: { layout: "fullscreen" } };
@@ -16,20 +16,22 @@ const allowed =
 
 function Frame({
   modules,
+  live = [],
   activeFn = "runs",
   area = "agents",
   startCollapsed = false,
 }: {
   modules: ModuleKey[];
+  live?: NavRequirement[];
   activeFn?: string;
-  area?: "home" | "agents" | "apps" | "admin";
+  area?: "home" | "agents" | "apps" | "secure" | "admin";
   startCollapsed?: boolean;
 }) {
   const [collapsed, setCollapsed] = React.useState(startCollapsed);
   return (
     <div className="bg-background flex h-[640px]">
       <MainRail
-        nav={visibleNav(NAV, allowed(...modules))}
+        nav={visibleNav(NAV, allowed(...modules), new Set(live))}
         active={{ area, fn: activeFn }}
         collapsed={collapsed}
         onCollapsedChange={setCollapsed}
@@ -80,5 +82,28 @@ export const OperationalPages: StoryObj = {
     ]) {
       await expect(canvas.getByRole("link", { name })).toBeVisible();
     }
+  },
+};
+
+const ALL: ModuleKey[] = ["apps", "agents", "workflows", "models", "admin"];
+
+/** Zentinelle connected: Secure › Zentinelle sits between Apps and Admin. */
+export const ZentinelleConnected: StoryObj = {
+  render: () => <Frame modules={ALL} live={["zentinelle"]} area="secure" activeFn="zentinelle" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("link", { name: "Zentinelle" })).toHaveAttribute(
+      "href",
+      "/secure/zentinelle"
+    );
+  },
+};
+
+/** Not connected (or revoked): no Secure area, no dead link. */
+export const ZentinelleNotConnected: StoryObj = {
+  render: () => <Frame modules={ALL} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole("link", { name: "Zentinelle" })).not.toBeInTheDocument();
   },
 };

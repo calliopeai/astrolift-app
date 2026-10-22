@@ -86,13 +86,12 @@ class ScheduleKind(StrEnum):
     groups (#1602). A policy, not a delete: AWS ages the data out."""
 
     CAPTURE_PLATFORM_COST_SNAPSHOT = "capture_platform_cost_snapshot"
-    """Daily — platform-wide cost snapshot for billing reports."""
+    """Retired name retained for old schedule/history compatibility; never registered."""
 
     CAPTURE_QUOTA_USAGE_SNAPSHOT = "capture_quota_usage_snapshot"
     """Daily — append-only per-quota usage snapshot so the quota detail
-    view can plot usage-vs-limit over time (#1182). Ships HELD (opt-in)
-    like the cost snapshot: only meaningful once quota reconciliation
-    populates ``current_usage``."""
+    view can plot usage-vs-limit over time (#1182). Ships HELD (opt-in):
+    meaningful once quota reconciliation populates ``current_usage``."""
 
     CRON_DEPLOY_TICK = "cron_deploy_tick"
     """Every 1 min — re-reads RegisteredApp rows with
@@ -410,15 +409,6 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.APPLY_OBSERVABILITY_RETENTION,
         ),
         description="Apply configured log retention to CloudWatch log groups",
-    ),
-    ScheduleDefinition(
-        kind=ScheduleKind.CAPTURE_PLATFORM_COST_SNAPSHOT,
-        workflow_name="CapturePlatformCostSnapshotWorkflow",
-        interval_seconds=24 * 60 * 60,
-        schedule_id=schedule_id_for(
-            kind=ScheduleKind.CAPTURE_PLATFORM_COST_SNAPSHOT,
-        ),
-        description="Daily platform cost snapshot for billing",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.CAPTURE_QUOTA_USAGE_SNAPSHOT,

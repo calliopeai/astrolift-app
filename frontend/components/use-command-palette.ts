@@ -11,6 +11,7 @@ import { LIST_APPS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { useModules } from "@/graphql/user/user.hooks";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useLiveIntegrations } from "@/lib/shell/use-live-integrations";
 
 // `SHOW_RECENT_DEPLOYS` mirrors the step-1 IA gate for the dynamic "Recent
 // deploys" group (deployments are off-nav), so the query is not even issued.
@@ -30,6 +31,7 @@ export function useCommandPalette() {
   const router = useRouter();
   const { can, loading: permsLoading } = useMyPermissions();
   const { canView, loading: modulesLoading } = useModules();
+  const live = useLiveIntegrations();
 
   // Lazily load the org's apps so first-load doesn't pay for it. We
   // pre-fetch on first palette open and then keep the cache warm with
@@ -121,11 +123,12 @@ export function useCommandPalette() {
         // holds. Module `canView` gates only the permission-less
         // entries — matching the pre-change Can/useMyPermissions
         // semantics.
+        if (r.requires && !live.has(r.requires)) return false;
         if (r.permission) return permsLoading || can(r.permission);
         if (r.module) return modulesLoading || canView(r.module);
         return true;
       }),
-    [allEntries, can, permsLoading, canView, modulesLoading]
+    [allEntries, can, permsLoading, canView, modulesLoading, live]
   );
 
   return {

@@ -80,7 +80,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "previews.reviewed_routes",
     "previews.reviewed_live_logs",
     "previews.reviewed_log_exports",
-    "previews.explicit_runtime_cost",
+    "previews.explicit_runtime_resources",
     # Deploy pipeline (start/promote/rollback/teardown).
     "deploys.start",
     "deploys.promote",

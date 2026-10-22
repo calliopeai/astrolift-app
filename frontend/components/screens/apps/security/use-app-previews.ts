@@ -68,8 +68,8 @@ const STALE_THRESHOLD_MS = STALE_DAYS * 24 * 60 * 60 * 1000;
 /**
  * Both the teardown and the TTL-extend paths refresh two documents: the
  * table's paginated one by operation name, so it re-runs with the cursor
- * and search currently in effect, and the flat summary query the spend
- * roll-up and stale sweep read.
+ * and search currently in effect, and the flat summary query the status
+ * counts and stale sweep read.
  */
 function refetchFor(appSlug: string) {
   return [
@@ -100,12 +100,8 @@ export function useAppPreviews(slug: string) {
   const firstPage = state.after === null;
 
   /**
-   * Summary chrome — the status counts, the stale sweep (#431) and the
-   * monthly spend roll-up (#660) — answers questions about the app's
-   * *whole* preview set, and `astroliftPreviewEnvironmentsPage` exposes
-   * no aggregate. Summing the page in hand would make "$X/day across N
-   * previews" quietly mean "across this page", so the summary stays on
-   * the flat field while the table below pages on the server.
+   * Status counts and the stale sweep describe the whole preview set. The
+   * paginated table exposes no aggregate, so these remain on the flat read.
    */
   const summary = useQuery<PreviewsResp>(LIST_PREVIEW_ENVIRONMENTS, {
     variables: { appSlug: slug },
@@ -159,41 +155,6 @@ export function useAppPreviews(slug: string) {
     }),
     [all]
   );
-
-  // #660 — monthly preview-spend roll-up. estimatedDailyCostUsd is
-  // null for previews the cost driver can't price (e.g. clusters
-  // without a billing plugin), so we sum only what's available and
-  // surface the count of unpriced rows next to the dollar figure.
-  const spend = React.useMemo(() => {
-    const live = all.filter((p) => p.status !== "torn_down");
-    let dailySum = 0;
-    let priced = 0;
-    let unpriced = 0;
-    // A roll-up inherits the weakest estimate in it. Some GCP variants
-    // total by summing every SKU in a service, an over-count by
-    // construction, so a projection built partly from those is one too
-    // and has to say so (#1509).
-    let approximate = 0;
-    for (const p of live) {
-      if (typeof p.estimatedDailyCostUsd === "number") {
-        dailySum += p.estimatedDailyCostUsd;
-        priced += 1;
-        if (p.estimatedCostApproximate) approximate += 1;
-      } else {
-        unpriced += 1;
-      }
-    }
-    const today = new Date();
-    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-    return {
-      dailyTotal: dailySum,
-      monthlyProjection: dailySum * daysInMonth,
-      priced,
-      unpriced,
-      approximate,
-      liveCount: live.length,
-    };
-  }, [all]);
 
   const stalePreviews = all.filter((p) => p.status !== "torn_down").filter(isStale);
 
@@ -254,7 +215,6 @@ export function useAppPreviews(slug: string) {
     totalCount: pageData?.totalCount ?? null,
     previewCount: all.length,
     counts,
-    spend,
     stalePreviews,
     canDeploy: can("app.deploy"),
     tearingDown: tearState.loading,

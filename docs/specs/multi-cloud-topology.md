@@ -202,12 +202,15 @@ deployed to. Cluster-specific overrides are not supported in this
 version — if different clouds need different values, use separate app
 registrations or environment-variable override in the manifest.
 
-### Cost allocation
+### Resource usage and infrastructure attribution
 
-Astrolift's cost estimation is provider-specific. For each cluster,
-cost estimates use the provider driver's pricing API for that cloud.
-Cross-cloud aggregate cost reports sum the estimates from all clusters
-in the org. Accuracy depends on each provider's pricing API coverage.
+Resource quotas and workload CPU/memory observations remain scoped to their
+organization and cluster. Astrolift does not expose provider pricing estimates
+or cross-cloud monetary reports. Private provider-native infrastructure actual
+adapters remain unused by public APIs and collectors; their raw tags do not
+establish project ownership or complete attribution. See the
+[monetary retirement procedure](../operators/retire-costing.md) for retained
+historical records and the required worker/schedule transition.
 
 ---
 

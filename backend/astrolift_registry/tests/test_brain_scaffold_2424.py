@@ -48,7 +48,7 @@ def edition_zip(*, files=None, tamper=None, drop=None, extra=None, link=None) ->
             "README.md": b"# Mimwell\n",
             "client.config.json": json.dumps(CONFIG).encode(),
             brain_template.CONFIG_SCHEMA: config_schema(*OLD_DEPLOY, "app_slug"),
-            "extensions/portal-container/Dockerfile": b"FROM nginx\n",
+            "runtime/portal-container/Dockerfile": b"FROM nginx\n",
             "scripts/build.sh": b"#!/bin/sh\n",
             "assets/mark.png": b"\x89PNG\x00\x01binary",
             "astrolift.toml": b'name = "theirs"\n',
@@ -101,7 +101,7 @@ def test_one_bad_file_refuses_the_whole_edition(kwargs, says):
 def test_an_edition_without_the_container_dockerfile_needs_an_image():
     files = {"client.config.json": json.dumps(CONFIG).encode(), "README.md": b"x"}
     edition = brain_template.read_edition(edition_zip(files=files), ref="main")
-    with pytest.raises(brain_template.TemplateError, match="extensions/portal-container/Dockerfile"):
+    with pytest.raises(brain_template.TemplateError, match="runtime/portal-container/Dockerfile"):
         brain_template.scaffold(edition, slug="acme-brain", name="Acme", selection=Selection())
     given = brain_template.scaffold(
         edition, slug="acme-brain", name="Acme", selection=Selection(image="ghcr.io/a/b:1")

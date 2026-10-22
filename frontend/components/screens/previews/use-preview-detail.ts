@@ -25,7 +25,7 @@ type Logs = GetPreviewLogsQuery["astroliftAppLogs"];
 type Deployments = GetPreviewDeploymentsPageQuery["astroliftPreviewDeploymentsPage"];
 type Snapshot<T> = { key: string; data: T | null; error: { message: string } | null };
 
-/** Exact metadata lookup; resource/pricing and bound logs/history are explicit reads. */
+/** Exact metadata lookup; resources and bound logs/history are explicit reads. */
 export function usePreviewDetail(id: string) {
   const { org } = useActiveOrg();
   const { user } = useMe();
@@ -52,12 +52,12 @@ export function usePreviewDetail(id: string) {
   );
 
   const loadMetadata = React.useCallback(
-    async (includeRuntimeCost = false) => {
+    async (includeRuntimeResources = false) => {
       if (!scopeKey || currentScope.current !== scopeKey) return;
       const generation = ++metadataGeneration.current;
       try {
         const result = await getPreview({
-          variables: { id, includeRuntimeCost },
+          variables: { id, includeRuntimeResources },
           context: { queryDeduplication: false },
         });
         if (currentScope.current !== scopeKey || generation !== metadataGeneration.current) return;

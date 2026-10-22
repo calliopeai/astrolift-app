@@ -6,7 +6,9 @@ run's tokens are issued as that person and signed by a key of this binding's
 own (``BrainTokenKey.run_binding``), published only while the run is in
 flight. Ending or cancelling the run, archiving the brain, or the person
 losing read access revokes the binding and deletes its key, so the edge
-stops admitting the run's token.
+stops admitting the run's token. A run nobody launched is bound at spawn
+to the brains shared with its agent (``grant``, #2449); its tokens are the
+agent's, and unsharing or deleting the agent revokes them.
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ class BrainRunBinding(BaseCoreModel):
         DEFAULT = "default"
         # Asked for by the launch (``brainSlugs``).
         REQUESTED = "requested"
+        # Shared with the agent, read by a run nobody launched, as the agent (#2449).
+        GRANT = "grant"
 
     organization = models.ForeignKey(
         "astrolift_identity.Organization",
@@ -36,6 +40,14 @@ class BrainRunBinding(BaseCoreModel):
     brain = models.ForeignKey(
         "astrolift_registry.RegisteredApp",
         related_name="agent_run_bindings",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    # The share a ``GRANT`` binding reads through; its tokens' subject is the agent.
+    grant = models.ForeignKey(
+        "astrolift_registry.BrainAgentGrant",
+        related_name="run_bindings",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

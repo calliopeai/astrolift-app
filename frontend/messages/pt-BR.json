@@ -130,7 +130,7 @@
     "slug": "Slug",
     "team": "Equipe",
     "created": "Criado",
-    "renameNote": "A renomeação de projetos chega quando a mutação do backend estiver disponível; o slug é imutável de propósito para que a alocação de custos posterior continue estável após renomear.",
+    "renameNote": "A renomeação estará disponível com a mutação do backend; o slug permanece imutável para manter estáveis as referências aos recursos.",
     "dangerZone": "Zona de perigo",
     "dangerZoneDescription": "A exclusão reversível remove este projeto das listagens. As cargas de trabalho associadas continuam visíveis até serem reatribuídas.",
     "deleteProject": "Excluir projeto",
@@ -188,13 +188,13 @@
     "team": "Equipe",
     "created": "Criado",
     "title": "Projetos",
-    "context": "Agrupe aplicativos que compartilham cadência de implantação, domínio ou stack. Os relatórios de custo são consolidados neste nível.",
+    "context": "Agrupe apps que compartilham uma cadência de implantação, um domínio ou uma stack.",
     "newProject": "Novo projeto",
     "edit": "Editar",
     "delete": "Excluir",
     "empty": "Ainda não há projetos",
     "emptyNoTeams": "Crie uma equipe primeiro; os projetos ficam dentro das equipes.",
-    "emptyDescription": "Agrupe seus aplicativos em um projeto para consolidar custos e cotas.",
+    "emptyDescription": "Agrupe apps relacionados em um projeto e gerencie o acesso compartilhado.",
     "manageTeams": "Gerenciar equipes",
     "deleteTitle": "Excluir o projeto {team}/{project}?",
     "deleteTitleGeneric": "Excluir o projeto?",
@@ -369,6 +369,7 @@
       "apps": "Aplicativos",
       "agents": "Agentes",
       "workflows": "Fluxos de trabalho",
+      "zentinelle": "Zentinelle",
       "clusters": "Clusters",
       "domains": "Domínios",
       "providers": "Provedores",
@@ -877,7 +878,7 @@
     "exampleSenior": "Apenas engenheiros seniores podem implantar em apps chamados <code>prod-*</code>.",
     "exampleNight": "Ninguém pode gravar segredos entre 22:00 e 06:00 UTC, a menos que tenha sido acionado.",
     "exampleMfa": "Implantações de pré-produção exigem um fator de MFA com menos de 60 minutos.",
-    "exampleContractors": "Terceirizados podem ler tudo em um projeto, mas não podem alterar nada que envolva faturamento.",
+    "exampleContractors": "Prestadores podem ler tudo em um projeto, mas não podem alterar as cotas de recursos.",
     "prerequisitesTitle": "Pré-requisitos",
     "prereqPermission": "<strong>Permissão.</strong> <code>policy.create</code> (Owner e Admin têm).",
     "prereqModel": "<strong>Modelo mental de ABAC vs. RBAC.</strong> O RBAC pergunta “a função deste usuário inclui esta permissão?”. O ABAC pergunta “dados os atributos desta solicitação (quem, o quê, quando, onde), alguma política diz <em>negar</em>?”. Uma solicitação só é bem-sucedida se o RBAC a permitir e nenhuma política a negar.",
@@ -1679,10 +1680,6 @@
         "1d": "+1 dia",
         "7d": "+7 dias"
       },
-      "costPerDay": "{cost}/dia",
-      "costUnavailable": "Custo indisponível",
-      "costTooltip": "{pods, plural, one {# pod} other {# pods}} · {cost}/dia com preços atuais da nuvem",
-      "costTooltipUnavailable": "{pods, plural, one {# pod} other {# pods}} · API de custos indisponível para este cluster",
       "staleBadge": "Desatualizada",
       "tearDown": "Remover",
       "footer": "Cada app mantém {count, plural, one {# ambiente ativo} other {# ambientes ativos}} de prévia · limite de inatividade: {days, number} dias.",
@@ -1752,14 +1749,7 @@
         "hoursMinutes": "{hours, number}h {minutes, number}min",
         "minutes": "{minutes, number}min"
       },
-      "spend": {
-        "daily": "Gasto diário",
-        "monthly": "Este mês (projeção)",
-        "approximate": "Aproximado",
-        "priced": "{priced, number} de {total, number} prévias com preço",
-        "unpriced": "{count, number} sem preço pelo driver deste cluster",
-        "overcount": "{count, number} calculadas somando todos os SKUs do serviço; o total está superestimado"
-      }
+      "resourceTooltip": "Recursos: {pods, plural, one {# pod} other {# pods}}"
     },
     "observability": {
       "scope": {
@@ -5542,12 +5532,10 @@
         "cpu": "vCPU (total)",
         "memory": "Memória (total)",
         "pods": "Pods",
-        "dailyCost": "Custo diário estimado",
-        "approximate": "aproximado",
         "environment": "Ambiente",
-        "loadResources": "Carregar recursos e custo",
-        "resourcesUnavailable": "O uso atual de recursos e o custo estimado estão indisponíveis.",
-        "resourcesNotRequested": "Carregue o uso atual de recursos e o custo estimado quando precisar.",
+        "loadResources": "Carregar recursos",
+        "resourcesUnavailable": "O uso atual de recursos está indisponível.",
+        "resourcesNotRequested": "Carregue o uso atual de recursos quando necessário.",
         "previewLogs": "Logs da prévia",
         "loadLogs": "Carregar logs",
         "logsEmpty": "Nenhuma linha de log neste intervalo.",
@@ -7379,12 +7367,6 @@
       "recipeSlug": "Slug da receita de agente",
       "consumerContext": "Os consumidores devem pertencer ao mesmo projeto e cluster deste recurso.",
       "attach": "Vincular",
-      "costUnavailable": "O preço está indisponível.",
-      "costMonthly": "{amount} por mês",
-      "costApproximate": "Aproximadamente {amount} por mês",
-      "costFetched": "Preço consultado em {at}",
-      "costSource": "Fonte do preço",
-      "costPreview": "Estimar custo",
       "reprovision": "Reprovisionar",
       "deprovision": "Desprovisionar",
       "actionRefused": "A ação foi recusada. Revise o recurso e suas permissões atuais.",
@@ -7579,14 +7561,6 @@
       "sentToday": "Enviados hoje",
       "ofQuota": "{pct}% da cota de 24 h",
       "nearCeiling": "{pct}% da cota de 24 h, perto do limite diário"
-    },
-    "cost": {
-      "title": "Custo",
-      "empty": "Ainda não há dados de custo atribuídos a este serviço. Os custos aparecem depois que o driver de custos executa a próxima reconciliação.",
-      "thisMonth": "Este mês",
-      "monthToDate": "Acumulado do mês",
-      "last30": "Últimos 30 dias",
-      "trailing30": "Gasto dos últimos 30 dias"
     },
     "identity": {
       "title": "Verificação de identidade",
@@ -8351,7 +8325,7 @@
           "provider_plugin": "provedores",
           "scm": "controle de versão",
           "audit_log": "o registro de auditoria",
-          "billing": "faturamento",
+          "billing": "cotas de recursos",
           "zentinelle": "Zentinelle",
           "admin": "administração"
         }
@@ -9406,7 +9380,6 @@
         "metricsReadUnavailable": "Não foi possível ler os dados de uso.",
         "metricsScope": "Totais da implantação entre consumidores; não representam tráfego por app.",
         "metricsSetup": "Configurar métricas",
-        "costUnavailable": "O custo está indisponível sem uso medido e preços.",
         "selectApp": "Selecionar um aplicativo",
         "appSearch": "Buscar aplicativos",
         "appsEmpty": "Nenhum aplicativo elegível",
@@ -9439,7 +9412,7 @@
         "empty": "Não há amostras de tráfego neste intervalo.",
         "unconfigured": "A coleta de tráfego desta assinatura não está configurada.",
         "bytes": "Bytes de resposta aceitos pelo aplicativo que serve o modelo; não são tokens nem entrega de rede confirmada.",
-        "unsupported": "Tokens de entrada/saída e custo não são suportados.",
+        "unsupported": "As observações de tokens de entrada e saída não são compatíveis aqui.",
         "boundary": "Fluxos que falham podem contar como erros mesmo com status HTTP 200.",
         "requests": "Solicitações por segundo",
         "errors": "Solicitações com erro por segundo",
@@ -9608,8 +9581,8 @@
         "inferenceUnknown": "O acesso à inferência não foi verificado.",
         "traffic": "Tráfego e latência dos aplicativos",
         "trafficUnsupported": "As observações de tráfego e latência de modelos nativos não são compatíveis aqui. A ausência de observações não significa tráfego zero.",
-        "tokensCost": "Tokens e custo",
-        "tokensCostUnsupported": "As observações de uso de tokens e custo não são compatíveis aqui."
+        "tokens": "Tokens",
+        "tokensUnsupported": "As observações de uso de tokens não são compatíveis aqui."
       },
       "bindingHelp": "As vinculações de aplicativos nativos usam identidade na nuvem. As revisões aplicadas não verificam o acesso à inferência do modelo.",
       "connect": {
@@ -10529,7 +10502,7 @@
       },
       "agents": {
         "title": "Agentes",
-        "description": "Para criar e executar agentes: execuções com falha e em andamento, seus agentes e gastos."
+        "description": "Para criar e executar agentes: execuções com falha e ativas, e seus agentes."
       },
       "builder": {
         "title": "Desenvolvimento",
@@ -10537,7 +10510,7 @@
       },
       "operator": {
         "title": "Operações",
-        "description": "Para manter a plataforma: alertas, clusters, atividade da plataforma e cota."
+        "description": "Para manter a plataforma: alertas, clusters e atividade da plataforma."
       }
     },
     "panels": {
@@ -10549,15 +10522,14 @@
       "failed-runs": "Execuções com falha",
       "running-now": "Em execução",
       "my-agents": "Meus agentes",
-      "runs-spend": "Execuções e gastos",
+      "runs-spend": "Histórico de execuções",
       "activity": "Atividade",
       "kpis": "Indicadores",
       "deployments": "Implantações",
       "agent-runs": "Execuções de agentes",
       "alerts": "Alertas",
       "clusters": "Clusters",
-      "platform-activity": "Atividade da plataforma",
-      "spend-quota": "Gastos e cota"
+      "platform-activity": "Atividade da plataforma"
     },
     "copy": {
       "auditLog": "Registro de auditoria",
@@ -10617,16 +10589,7 @@
       "noRunReason": "Nenhum motivo foi registrado para esta execução.",
       "timedOut": "Tempo esgotado.",
       "noReason": "Nenhum motivo foi registrado.",
-      "monthToDate": "Mês até agora",
-      "ofBudget": "de {amount} · {percentage}",
-      "spent": "Gasto",
-      "projected": "Projetado",
-      "budget": "Orçamento",
       "legend": "Legenda",
-      "budgetReadFailed": "O orçamento não carregou: {message}",
-      "noBudget": "Nenhum orçamento da organização foi definido, então não há cota para comparar os gastos.",
-      "spendAgainstBudget": "{panel}: gastos em relação ao orçamento",
-      "spendBudgetValue": "{spent} de {budget}",
       "last24Hours": "Últimas 24 horas",
       "app": "Aplicativo",
       "pickApp": "Escolha um app",
@@ -10647,14 +10610,12 @@
       "last7Days": "Últimos 7 dias",
       "runsPerDay": "Execuções de agentes por dia",
       "failedPerDay": "Execuções com falha por dia",
-      "spendPerDay": "Gastos da organização por dia",
       "sevenDays": "7 dias",
-      "spendReadFailed": "Os gastos não carregaram: {message}",
       "cappedRuns": "Contado a partir das execuções mais recentes; há mais na semana.",
-      "kpiWindow": "últimos {count, number} dias · gastos do mês até agora",
+      "kpiWindow": "últimos {count, number} dias",
       "kpiAria": "{panel}, últimos {count, number} dias",
       "noKpisTitle": "Sem indicadores para seu acesso",
-      "noKpisDescription": "Indicadores de implantação, execução e gastos aparecem para as áreas que você pode ver.",
+      "noKpisDescription": "Os números de implantações e execuções aparecem nas áreas às quais você tem acesso.",
       "noProject": "Sem projeto"
     },
     "health": {
@@ -10703,11 +10664,9 @@
       "runs": "Execuções",
       "success": "Sucesso",
       "p95": "p95",
-      "spend": "Gastos",
       "runsHint": "execuções de agentes",
       "successHint": "das implantações",
-      "p95Hint": "tempo de implantação",
-      "spendHint": "mês até agora"
+      "p95Hint": "tempo de implantação"
     },
     "period": {
       "monthly": "mensal",
@@ -14665,7 +14624,7 @@
   },
   "zentinelleScreen": {
     "title": "Proteger · Zentinelle",
-    "description": "Conecte esta organização ao Zentinelle para governança de agentes, uso e custo, políticas e auditoria.",
+    "description": "Conecte esta organização ao Zentinelle para governança de agentes, uso de tokens, políticas e auditoria.",
     "noAccess": "Sem acesso ao Zentinelle",
     "noAccessBody": "Suas funções não concedem nada no Zentinelle aqui. Peça uma permissão do Zentinelle a um administrador da organização.",
     "error": "Não foi possível ler a conexão com o Zentinelle",
@@ -14676,7 +14635,7 @@
     "tabs": {
       "overview": "Visão geral",
       "clusters": "Clusters",
-      "usage": "Uso e custo",
+      "usage": "Uso",
       "policies": "Políticas",
       "audit": "Auditoria"
     },
@@ -14728,7 +14687,6 @@
       "gatewaysValue": "{healthy} de {total}",
       "agents": "Agentes observados neste mês",
       "requests": "Requisições ao modelo, últimas 24 horas",
-      "spend": "Gasto neste mês",
       "usageError": "Não foi possível ler o uso do Zentinelle",
       "clustersTitle": "Saúde do gateway por cluster",
       "clustersDescription": "O gateway do Zentinelle de cada cluster registrado.",
@@ -14737,10 +14695,6 @@
       "serverVersion": "Versão do Zentinelle",
       "blocks": "Bloqueios, últimas 24 horas",
       "approvals": "Aprovações pendentes",
-      "budget": "Orçamento deste mês",
-      "budgetValue": "{percent}% usado",
-      "budgetFooter": "{spend} de {limit} ({name})",
-      "noBudget": "Nenhum orçamento definido",
       "notAvailable": "Não disponível",
       "countsError": "Não foi possível ler o estado do Zentinelle",
       "reportNotAvailable": "Versão e último sinal não disponíveis",
@@ -14786,7 +14740,6 @@
       "error": "Não foi possível ler o uso do Zentinelle",
       "requests": "Requisições ao modelo",
       "tokens": "Tokens usados",
-      "cost": "Custo de modelos",
       "title": "Por agente e modelo",
       "empty": "Nenhum uso de modelo neste período.",
       "noAgent": "(sem agente)",
@@ -15703,6 +15656,7 @@
     "none": "nenhum",
     "notServed": "Ainda não servida",
     "notShared": "Somente a equipe proprietária",
+    "archived": "Arquivada",
     "shareTitle": "{team}: {access}",
     "emptyTitle": "Nenhuma camada semântica",
     "emptyDescription": "Apps declarados com [app] kind = \"mimwell\" que você pode ler aparecem aqui.",
@@ -15744,8 +15698,8 @@
     "columnFreshness": "Atualidade",
     "new": "Nova camada semântica",
     "status": {
-      "unavailable": "Indisponível",
       "unknown": "Desconhecido",
+      "notChecked": "Ainda não lido do host de origem; abra a camada para verificar.",
       "never": "Nunca",
       "noEnvironment": "Sem ambiente {environment}",
       "notDeployed": "Não implantada",
@@ -15808,6 +15762,7 @@
       "templateRef": "Referência do modelo",
       "templateRefHelp": "Uma tag, branch ou commit da edição do Mimwell. Deixe em branco para usar a edição fixada nesta instalação.",
       "pinnedEdition": "A edição fixada nesta instalação",
+      "pinnedEditionRef": "A edição fixada nesta instalação ({ref})",
       "name": "Nome",
       "nameHelp": "Exibido nas listas. Em branco, usa o slug.",
       "namePlaceholder": "Conhecimento da plataforma",
@@ -15849,6 +15804,7 @@
         "repoFormat": "Use owner/name: letras, dígitos, pontos, hifens e sublinhados.",
         "refFormat": "Um nome de tag, branch ou commit, sem espaços nem pontos seguidos.",
         "slugFormat": "Letras minúsculas, dígitos e hifens, começando com letra e terminando com letra ou dígito, até 63 caracteres.",
+        "needsAppSlug": "Esta edição não tem deploy.app_slug, então o slug precisa terminar em -brain.",
         "envFormat": "Um nome curto em minúsculas: letras, dígitos e hifens, até 32 caracteres.",
         "long": "Até 255 caracteres."
       }
@@ -15869,13 +15825,6 @@
         "graph": "Onde fica a projeção do grafo."
       },
       "supported": "Compatível com o Mimwell:",
-      "reasons": {
-        "d1Authority": "d1 é um destino de projeção, nunca uma autoridade.",
-        "dbBlobNeedsDatabase": "db-blob guarda os blobs no banco de dados da autoridade, e esta autoridade não tem um.",
-        "inDbVectorsMongo": "Os vetores in-db são colunas vetoriais SQL, e o mongo não tem nenhuma.",
-        "inDbVectorsNeedSql": "Os vetores in-db ficam no banco de dados da autoridade, e esta autoridade não tem um.",
-        "ageNeedsPostgres": "age é uma extensão do Postgres, então exige a autoridade postgres."
-      },
       "persistence": "Persistência",
       "persistenceHelp": "O que o Astrolift anexa à camada. O repositório sempre está lá.",
       "persistenceKinds": {
@@ -15896,8 +15845,7 @@
       "imageFormat": "Uma referência de imagem não tem espaços.",
       "imageKept": "A camada mantém a imagem que executa.",
       "port": "Porta",
-      "portRange": "De 1 a 65535.",
-      "portGraduate": "A API não informa a porta atual: mantenha aquela em que a camada atende."
+      "portRange": "De 1 a 65535."
     },
     "creation": {
       "listCrumb": "Camadas semânticas",
@@ -16215,12 +16163,14 @@
       "deployment-approvals": "Aprovações de implantação",
       "jobs": "Jobs agendados",
       "environments": "Ambientes",
-      "previews": "Prévias"
+      "previews": "Prévias",
+      "zentinelle": "Zentinelle"
     },
     "areas": {
       "home": "Início",
       "agents": "Agentes",
       "apps": "Aplicativos",
+      "secure": "Proteger",
       "admin": "Administração"
     },
     "groups": {
@@ -16628,7 +16578,8 @@
     "brains": {
       "search": "Buscar nomes e slugs…",
       "views": {
-        "all": "Todas"
+        "all": "Todas",
+        "archived": "Com arquivadas"
       },
       "fields": {
         "team": "Equipe"

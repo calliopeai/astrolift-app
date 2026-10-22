@@ -33,6 +33,7 @@ from astrolift_scm.ci_templates import (
 )
 from astrolift_scm.services.workflow_sync import (
     github_workflow_path_for,
+    render_astrolift_agent_ci_workflow,
     render_astrolift_bitbucket_pipeline,
     render_astrolift_ci_workflow,
     render_astrolift_gitea_ci_workflow,
@@ -79,7 +80,7 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 10
+PINNED_TEMPLATE_VERSION = 11
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
@@ -89,12 +90,32 @@ PINNED_TEMPLATE_VERSION = 10
 # and a 2xx status assertion; the GitHub template additionally gained the
 # skip-if-built ECR probe. The deploy-only render (blank registry_repo_uri)
 # is covered by ``test_deploy_only_workflow.py`` instead.
+# v11 (#2473): GitHub uses checkout@v6 and configure-aws-credentials@v6
+# for Node 24. Non-GitHub renderers keep their host-specific runner actions.
 PINNED_CONTENT_HASHES = {
-    "github": "630aa557283580ea8d401f61779e2ba36f5a2991ebeebb3bd0db0812a8bfc479",
+    "github": "dcba53023f1835c0df726cc680b24ca3fc9e8ad2f91a9932dccfe19d3d8dfc35",
     "gitlab": "77f0d228c7b159e6040b7ec10a348b039f94ef188a565ea901b7c422b6dbcbc8",
     "gitea": "d370f2cf4f0080e7c04ad7e00ee735163c688a4222f8415114d894f6a9b83170",
     "bitbucket": "7821f3ac5724b4b30b3e48473652c39eb3f1edff8d771dcdad7e89b10e43e213",
 }
+
+
+def test_github_managed_workflows_use_node24_actions(settings):
+    settings.PLATFORM_API_URL = GOLDEN_API_URL
+    app = _golden_app()
+    workflow = _RENDERERS["github"](app)
+
+    assert "actions/checkout@v6" in workflow
+    assert "aws-actions/configure-aws-credentials@v6" in workflow
+    assert "actions/checkout@v4" not in workflow
+    assert "aws-actions/configure-aws-credentials@v4" not in workflow
+
+    app.is_agent = True
+    app.manifest_path = "agents/example/astrolift.toml"
+    agent_workflow = render_astrolift_agent_ci_workflow(app)
+    assert "actions/checkout@v6" in agent_workflow
+    assert "actions/checkout@v4" not in agent_workflow
+
 
 _BUMP_HINT = (
     "A managed CI-workflow body changed. If that's intentional, bump "

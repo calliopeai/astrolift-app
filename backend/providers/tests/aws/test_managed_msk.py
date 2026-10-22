@@ -652,14 +652,12 @@ def test_msk_networking_honors_pinned_resources_without_cloud_calls():
     )
 
 
-def test_plugin_cost_and_schema_surfaces_are_wired():
+def test_plugin_and_schema_surfaces_are_wired():
     from _sdk.availability import MATRIX
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     assert PLUGIN.managed_service_drivers[("event_stream", "msk")] is MSKProvisionedDriver
     assert PLUGIN.managed_service_drivers[("event_stream", "msk_serverless")] is MSKServerlessDriver
-    assert SERVICE_CODE_BY_VARIANT[("event_stream", "msk")] == "AmazonMSK"
     for variant in ("msk", "msk_serverless"):
         entry = next(
             item

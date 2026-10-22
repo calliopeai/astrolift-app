@@ -4,7 +4,6 @@ import type { ActivityFeedProps } from "@/components/ActivityFeed";
 import { LONG_ARN, LONG_SHA, LONG_URL } from "@/components/panel/fixtures";
 import { EVENTS, LONG_EVENT } from "@/components/screens/alerts/alerts.fixtures";
 import { cluster, LONG_CLUSTER } from "@/components/screens/clusters/list/fixtures";
-import type { AstroliftBudget, AstroliftCostForecast } from "@/graphql/billing/billing.types";
 import type { AstroliftDeploymentMetrics } from "@/graphql/lifecycle/lifecycle.types";
 import type {
   AstroliftActivityItem,
@@ -92,15 +91,6 @@ export const METRICS: AstroliftDeploymentMetrics = {
   dailyMeanDurationSeconds: [],
 };
 
-export const FORECAST: AstroliftCostForecast = {
-  mtdCents: 124_000,
-  previousMonthCents: 180_000,
-  deltaPct: -31.1,
-  projectedMonthlyCents: 191_000,
-  confidence: "HIGH" as AstroliftCostForecast["confidence"],
-  currency: "USD",
-};
-
 const task = (id: string, patch: Partial<HomeAgentTask> = {}): HomeAgentTask => ({
   id,
   agentSlug: "support-bot",
@@ -149,7 +139,6 @@ export const KPIS: KpisPanelData = {
   figures: kpiFigures({
     metrics: METRICS,
     runs: { runs: AGENT_RUNS, capped: false, now: NOW },
-    forecast: FORECAST,
     windowDays: 30,
   }),
   ...READY,
@@ -161,13 +150,12 @@ export const KPIS_LOADING: KpisPanelData = {
   figures: kpiFigures({
     metrics: null,
     runs: { runs: [], capped: false, now: NOW, loading: true },
-    forecast: null,
     windowDays: 30,
   }),
   ...LOADING,
 };
 
-/** Only Agents: deploy figures and spend are left out. */
+/** Only Agents: deploy figures are left out. */
 export const KPIS_AGENTS_ONLY: KpisPanelData = {
   windowDays: 30,
   figures: kpiFigures({
@@ -190,7 +178,6 @@ export const KPIS_EMPTY: KpisPanelData = {
       p95DurationSeconds: null,
     },
     runs: { runs: [], capped: false, now: NOW },
-    forecast: { ...FORECAST, mtdCents: 0, projectedMonthlyCents: 0 },
     windowDays: 30,
   }),
   ...READY,
@@ -264,19 +251,3 @@ export const PLATFORM_RUNS_LONG: AstroliftWorkflowRun[] = [
     failure: json({ message: `AccessDenied: ${LONG_ARN} is not authorized` }),
   }),
 ];
-
-// ---------------------------------------------------------------- spend & quota
-
-export const BUDGET: AstroliftBudget = {
-  id: "b-org",
-  scopeKind: "ORG",
-  scopeId: "org-1",
-  amountCents: 200_000,
-  currency: "USD",
-  period: "monthly",
-  currentSpendCents: 124_000,
-  alertsAtPct: [80, 100],
-};
-
-export const BUDGET_NEAR = { ...BUDGET, amountCents: 140_000 };
-export const BUDGET_OVER = { ...BUDGET, amountCents: 100_000 };

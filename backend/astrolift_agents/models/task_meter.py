@@ -1,15 +1,13 @@
 """
 TaskMeteringRecord — compute usage snapshot for one AgentRun (#56).
 
-Written exactly once, on the Task's terminal transition, by the Dispatch
-Service via POST /api/dispatch/v1/tasks/<id>/meter/. The record is
-append-only; the Dispatch Service is the authoritative source, but the
-Controller will backfill a wall-time estimate if the Dispatch Service
-misses the write (crash, network partition).
-
-Aggregation queries (by org, date range, agent variant) are the read path.
-The GQL ``agentUsageSummary`` resolver reads from this table. Billing and
-quota enforcement are out of scope for this model (#56).
+The dispatcher-authenticated POST /api/dispatch/v1/tasks/<id>/meter/ accepts
+an operational usage report for a run in the dispatcher's organization.
+One record per run is enforced by the model; completion callbacks can use
+its reported token counts when the task's completion metadata lacks them.
+The retired ``agentUsageSummary`` API no longer reads this table. A stored
+record does not establish complete runtime collection, automatic backfill,
+monetary attribution or quota enforcement.
 """
 
 from __future__ import annotations

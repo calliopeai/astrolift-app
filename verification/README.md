@@ -210,12 +210,14 @@ Phase 3 will see.
    `gcp/managed/object_store_gcs.py` and `gcp/managed/queue_pubsub.py` build
    their label sets without the `astrolift-extra-*` pass every other GCP driver
    has. Fixing (1) alone would still leave buckets and topics untagged.
-3. **The spend gate refuses most of the per-kind cells.**
-   `_cert/billing.py` classifies AWS *preview* variants only, so `postgres:rds`,
-   `redis:elasticache`, `queue:sqs` and `object_store:s3` — the whole AWS happy
-   path — raise `UnclassifiedVariant`, and GCP and Azure have no table at all.
-   Classifying them is a decision, not a transcription, so it needs its own
-   ticket before the switch-on gate.
+3. **Resource reviews remain explicit.**
+   `_cert/resource_policy.py` admits only reviewed preview/experimental cloud
+   variants; unknown variants and unsupported lifecycles refuse. Reviewed
+   capacity resources additionally require `--allow-capacity-resources`.
+   This is operator resource authorization, not an observed-capacity,
+   provider-permission or financial-bound claim. The monetary estimate gate
+   and `--estimate-logged` flag are retired. `--i-have-credentials`, exact
+   project selection, lifecycle assertions and orphan/teardown checks remain.
 4. **Ownership gates are Azure-deep and thin elsewhere.** 23 Azure managed
    drivers route through `_sdk/azure_ownership.py`; on AWS only EFS, FSx and the
    WebSocket API gateway have one, and `postgres_rds.py`, `object_store_s3.py`

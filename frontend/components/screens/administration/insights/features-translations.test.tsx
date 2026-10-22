@@ -18,18 +18,18 @@ const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 
 describe("feature controls in the selected language", () => {
   it.each([
-    ["es", "Cambiar admin.cost_enabled", "Activar función", "Activar Admin · Cost Enabled"],
+    ["es", "Cambiar admin.quotas_enabled", "Activar función", "Activar Admin · Quotas Enabled"],
     [
       "fr",
-      "Basculer admin.cost_enabled",
+      "Basculer admin.quotas_enabled",
       "Activer la fonctionnalité",
-      "Activer Admin · Cost Enabled",
+      "Activer Admin · Quotas Enabled",
     ],
     [
       "ja",
-      "admin.cost_enabledを切り替える",
+      "admin.quotas_enabledを切り替える",
       "機能を有効にする",
-      "Admin · Cost Enabledを有効にしますか",
+      "Admin · Quotas Enabledを有効にしますか",
     ],
   ] as const)(
     "keeps a failed %s confirmation open and retries the same flag",
@@ -75,8 +75,8 @@ describe("feature controls in the selected language", () => {
         keyof typeof en.administration.features
       >) {
         const translated = t.rich(key, {
-          key: "admin.cost_enabled",
-          env: "ASTROLIFT_COST",
+          key: "admin.quotas_enabled",
+          env: "ASTROLIFT_QUOTAS",
           code: (chunks) => chunks,
         });
         expect(translated).toBeTruthy();

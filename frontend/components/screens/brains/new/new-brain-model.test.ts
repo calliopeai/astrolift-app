@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { CELLS } from "../brain-cells.fixtures";
 import { CONNECTIONS, DRAFT, PROJECTS } from "./new-brain.fixtures";
 import {
   createInput,
@@ -57,6 +58,21 @@ describe("the create request's checks", () => {
       slug: "slugFormat",
       environmentName: "envFormat",
     });
+  });
+
+  it("asks for a -brain slug when the edition has no deploy.app_slug (#2444)", () => {
+    const noAppSlug = { ...context, supportsAppSlug: false };
+    expect(draftProblems({ ...DRAFT, slug: "handbook" }, noAppSlug).slug).toBe("needsAppSlug");
+    expect(draftProblems({ ...DRAFT, slug: "handbook-brain" }, noAppSlug).slug).toBeUndefined();
+    // Unknown until the edition is read: the server still checks.
+    expect(draftProblems({ ...DRAFT, slug: "handbook" }, context).slug).toBeUndefined();
+  });
+
+  it("refuses an unsupported cell once the matrix is in hand", () => {
+    const cell = { ...DRAFT.substrate.cell, authority: "d1" as const };
+    const draft = { ...DRAFT, substrate: { ...DRAFT.substrate, cell } };
+    expect(draftProblems(draft, { ...context, matrix: CELLS }).substrate).toBe("required");
+    expect(draftProblems(draft, context).substrate).toBeUndefined();
   });
 
   it("refuses a project of another team: a layer belongs to its project's team", () => {

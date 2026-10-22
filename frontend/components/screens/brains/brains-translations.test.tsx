@@ -14,27 +14,18 @@ import pt from "@/messages/pt-BR.json";
 import zh from "@/messages/zh-Hans.json";
 
 import { brainMcpConfig } from "./brain-connection";
-import type { BrainStatus } from "./brain-status-model";
-import {
-  BEHIND,
-  DEPLOY_FAILED,
-  HEALTHY,
-  NOT_DEPLOYED,
-  UNKNOWN_VALUES,
-} from "./brain-status.fixtures";
-import { BRAINS, CONNECTION, HOST_PROJECTS } from "./brains.fixtures";
+import type { BrainSummary } from "./brain-status-model";
+import { BEHIND, DEPLOY_FAILED, HEALTHY, summaryOf, UNKNOWN_VALUES } from "./brain-status.fixtures";
+import { ARCHIVED_BRAIN, BRAINS, CONNECTION, HOST_PROJECTS } from "./brains.fixtures";
 import { BRAINS_LIST } from "./brains-list";
 import { BrainsScreen } from "./BrainsScreen";
-import { type BrainStatusResult, BrainStatusCell } from "./BrainStatusCell";
 import type { HostBrainAppValues } from "./HostBrainAppDialog";
 
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 
-const ready = (status: BrainStatus | null): BrainStatusResult => ({ state: "ready", status });
-
 function Screen({
   rows = BRAINS,
-  statuses = { "leo-brain": ready(HEALTHY), "sales-brain": ready(NOT_DEPLOYED) },
+  summaries,
   connection = null,
   onConnect = async () => {},
   hostingSlug = null,
@@ -43,7 +34,8 @@ function Screen({
   canCreate = true,
 }: {
   rows?: typeof BRAINS;
-  statuses?: Record<string, BrainStatusResult>;
+  /** Each row's cached summary by slug, over the fixture's. */
+  summaries?: Record<string, BrainSummary | null>;
   connection?: typeof CONNECTION | null;
   onConnect?: (slug: string) => Promise<void>;
   hostingSlug?: string | null;
@@ -55,8 +47,9 @@ function Screen({
   return (
     <BrainsScreen
       list={list}
-      rows={rows}
+      rows={rows.map((r) => (summaries ? { ...r, summary: summaries[r.slug] ?? null } : r))}
       totalCount={rows.length}
+      nextCursor={null}
       loading={false}
       stale={false}
       error={null}
@@ -72,13 +65,6 @@ function Screen({
       onHost={onHost}
       onDismissHost={() => {}}
       onSubmitHost={onSubmitHost}
-      statusCell={(row, part) => (
-        <BrainStatusCell
-          part={part}
-          result={statuses[row.slug] ?? ready(null)}
-          environment="production"
-        />
-      )}
     />
   );
 }
@@ -104,10 +90,12 @@ describe("semantic layers list (#2320, #2427)", () => {
         onError={onError}
       >
         <Screen
+          rows={[...BRAINS, ARCHIVED_BRAIN]}
           connection={CONNECTION}
-          statuses={{
-            "leo-brain": ready(BEHIND),
-            "sales-brain": { state: "error", message: "HTTP 502" },
+          summaries={{
+            "leo-brain": summaryOf(BEHIND),
+            "sales-brain": summaryOf(HEALTHY, false),
+            "old-brain": summaryOf(HEALTHY),
           }}
         />
       </NextIntlClientProvider>
@@ -117,8 +105,9 @@ describe("semantic layers list (#2320, #2427)", () => {
     expect(screen.getByText(copy.columnHealth)).toBeInTheDocument();
     expect(screen.getByText(copy.columnFreshness)).toBeInTheDocument();
     expect(screen.getByText(copy.status.behind)).toBeInTheDocument();
-    expect(screen.getByText(copy.status.unavailable)).toBeInTheDocument();
-    expect(screen.getByText(copy.notShared)).toBeInTheDocument();
+    expect(screen.getByTitle(copy.status.notChecked)).toHaveTextContent(copy.status.unknown);
+    expect(screen.getByText(copy.archived)).toBeInTheDocument();
+    expect(screen.getAllByText(copy.notShared).length).toBeGreaterThan(0);
     if (locale !== "en") expect(copy.context).not.toBe(en.brains.context);
     expect(onError).not.toHaveBeenCalled();
   });
@@ -139,10 +128,13 @@ describe("semantic layers list (#2320, #2427)", () => {
     expect(screen.getByRole("link", { name: "Leo's brain leo-brain" })).toBeInTheDocument();
   });
 
-  it("shows each row's health, last rebuild and freshness from its own status read", () => {
+  it("shows each row's health, last rebuild and freshness from its cached summary", () => {
     inEnglish(
       <Screen
-        statuses={{ "leo-brain": ready(DEPLOY_FAILED), "sales-brain": ready(UNKNOWN_VALUES) }}
+        summaries={{
+          "leo-brain": summaryOf(DEPLOY_FAILED),
+          "sales-brain": summaryOf(UNKNOWN_VALUES),
+        }}
       />
     );
     const failed = within(screen.getByRole("row", { name: /Leo's brain/ }));
@@ -156,8 +148,17 @@ describe("semantic layers list (#2320, #2427)", () => {
   });
 
   it("says a row's environment does not exist rather than guessing its health", () => {
-    inEnglish(<Screen statuses={{}} />);
+    inEnglish(<Screen summaries={{}} />);
     expect(screen.getAllByText("No production environment")).toHaveLength(2);
+  });
+
+  it("lists an archived layer with a badge, its page a click away, and nothing to connect", () => {
+    inEnglish(<Screen rows={[ARCHIVED_BRAIN]} />);
+    const row = within(screen.getByRole("row", { name: /Old brain/ }));
+    expect(row.getByText(en.brains.archived)).toBeInTheDocument();
+    expect(row.getAllByRole("link")[0]).toHaveAttribute("href", "/brains/old-brain");
+    expect(row.getByRole("button", { name: en.brains.connect })).toBeDisabled();
+    expect(row.getByRole("button", { name: en.brains.host })).toBeDisabled();
   });
 
   it("connects a served layer and not one that is not served", () => {

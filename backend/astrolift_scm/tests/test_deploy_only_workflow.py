@@ -123,9 +123,10 @@ def test_github_unconfigured_deploy_only_keeps_checkout_without_aws(settings):
     settings.PLATFORM_API_URL = "https://platform.astrolift.test"
     body = render_astrolift_ci_workflow(_app(registry_repo_uri="", source_kind="github"))
 
-    assert "actions/checkout@v4" in body
+    assert "actions/checkout@v6" in body
     assert "Configure AWS credentials (OIDC)" not in body
     assert "aws-actions/configure-aws-credentials@v4" not in body
+    assert "aws-actions/configure-aws-credentials@v6" not in body
     assert "aws-actions/amazon-ecr-login" not in body  # only needed for the build
     assert "Build and push image" not in body
     # Deploy-only notifies with the bare commit SHA as the wildcard tag.

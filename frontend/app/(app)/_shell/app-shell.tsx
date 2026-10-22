@@ -33,6 +33,7 @@ import { clearToken } from "@/lib/auth/token-store";
 import { setSentryUser } from "@/lib/sentry";
 import { activeFor, NAV, visibleNav } from "@/lib/shell/nav-model";
 import { projectsFromNavTree } from "@/lib/shell/projects-from-nav-tree";
+import { useLiveIntegrations } from "@/lib/shell/use-live-integrations";
 import { useRailState } from "@/lib/shell/use-rail-state";
 
 import { PlatformIncidentBannerContainer } from "./platform-incident-banner";
@@ -44,6 +45,7 @@ import { PlatformIncidentBannerContainer } from "./platform-incident-banner";
 export function AppShellContainer({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "/";
   const { canView } = useModules();
+  const live = useLiveIntegrations();
   const { org, loading: orgLoading } = useActiveOrg();
   const { user } = useMe();
   const { data: profileData } = useQuery<{ astroliftMyProfile: AstroliftMyProfile | null }>(
@@ -72,7 +74,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
     setSentryUser(user ?? null);
   }, [user]);
 
-  const nav = React.useMemo(() => visibleNav(NAV, canView), [canView]);
+  const nav = React.useMemo(() => visibleNav(NAV, canView, live), [canView, live]);
   const projects = React.useMemo(
     () => projectsFromNavTree(treeData?.astroliftNavTree, canView),
     [treeData, canView]

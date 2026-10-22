@@ -17,9 +17,12 @@ from astrolift_registry.visibility import visible_registry_apps
 from core.permissions import Permission
 
 
-def visible_brains(*, search: str = ""):
-    """The caller's readable brain apps, newest first."""
-    qs = RegisteredApp.objects.filter(app_kind__in=BRAIN_KINDS, archived_at__isnull=True)
+def visible_brains(*, search: str = "", include_archived: bool = False):
+    """The caller's readable brain apps, newest first; archived ones only
+    when asked (for Restore, #2444)."""
+    qs = RegisteredApp.objects.filter(app_kind__in=BRAIN_KINDS)
+    if not include_archived:
+        qs = qs.filter(archived_at__isnull=True)
     term = search.strip()
     if term:
         from django.db.models import Q

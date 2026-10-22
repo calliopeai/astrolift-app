@@ -1275,10 +1275,13 @@
       ]
     },
     {
-      "description": "Stop sharing a semantic layer with a team. Never removes the home team or an owner.",
+      "description": "Stop sharing a semantic layer with a team (team_slug) or an agent (agent_slug); name one. Never removes the home team or an owner. Unsharing with an agent revokes its runs' tokens.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "agent_slug": {
+            "type": "string"
+          },
           "slug": {
             "type": "string"
           },
@@ -1287,8 +1290,7 @@
           }
         },
         "required": [
-          "slug",
-          "team_slug"
+          "slug"
         ],
         "type": "object"
       },
@@ -1303,7 +1305,7 @@
       ]
     },
     {
-      "description": "Share a semantic layer with a team as viewer or deployer. Refused for agents unless the organization's brain.share rule allows agents; then approval rules still apply.",
+      "description": "Share a semantic layer with a team (team_slug) as viewer or deployer, or with an agent (agent_slug) as viewer, whose runs nobody launched then read it as the agent; name one. Refused for agents unless the organization's brain.share rule allows agents; then approval rules still apply.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
@@ -1312,6 +1314,9 @@
               "viewer",
               "deployer"
             ],
+            "type": "string"
+          },
+          "agent_slug": {
             "type": "string"
           },
           "slug": {
@@ -1323,7 +1328,6 @@
         },
         "required": [
           "slug",
-          "team_slug",
           "access"
         ],
         "type": "object"
@@ -1738,29 +1742,6 @@
         "type": "object"
       },
       "name": "astrolift_list_project_resources",
-      "required_permissions": [
-        "project.read"
-      ],
-      "required_scopes": [
-        "mcp:read",
-        "read:apps"
-      ]
-    },
-    {
-      "description": "Preview one shared resource through the provider's live pricing API.",
-      "inputSchema": {
-        "additionalProperties": false,
-        "properties": {
-          "managed_service_id": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "managed_service_id"
-        ],
-        "type": "object"
-      },
-      "name": "astrolift_preview_project_resource_cost",
       "required_permissions": [
         "project.read"
       ],

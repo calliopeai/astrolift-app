@@ -300,9 +300,3 @@ export const RUN_DAYS: RunDay[] = [
 ];
 
 export const QUIET_DAYS: RunDay[] = RUN_DAYS.map((d) => ({ ...d, runs: 0, failed: 0 }));
-
-export const SPEND = {
-  perDay: [1830, 1710, 2040, 1990, 820, 760, 1410],
-  totalCents: 10560,
-  currency: "USD",
-};

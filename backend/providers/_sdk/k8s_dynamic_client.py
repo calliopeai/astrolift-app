@@ -401,7 +401,11 @@ class KubernetesDynamicClient:
             for entry in fields
             if "f:replicas" in ((entry.get("fieldsV1") or {}).get("f:spec") or {})
         }
-        if not owners or any(not isinstance(owner, str) or not owner for owner in owners):
+        # No owner at all is not unknown ownership. A Deployment created without
+        # replicas keeps it for good: the count was defaulted, and the apiserver
+        # records no owner for /scale writes to an unowned field. Omission only
+        # removes what Astrolift owns, so that count is left alone (#2495).
+        if any(not isinstance(owner, str) or not owner for owner in owners):
             raise ValueError("cannot safely transfer HPA replicas with unknown field ownership")
 
         if owners == {"astrolift"}:

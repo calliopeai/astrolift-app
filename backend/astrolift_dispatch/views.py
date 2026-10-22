@@ -822,7 +822,8 @@ def agent_brains(request: HttpRequest, task_id: str) -> JsonResponse:
 
     The run's ``BRAINS`` index names this URL. Only the run's own callback
     key gets an answer, never a dispatcher key. Each brain is checked again
-    as the person who launched the run: ``brains`` carries a new 15-minute
+    as the person who launched the run, or for a run nobody launched against
+    the agent's shares (#2449): ``brains`` carries a new 15-minute
     token for each one still readable (its index entry plus ``token``), and
     ``revoked`` each brain the run lost and why, so the run is told. Once the
     run has ended or a cancel was asked for, the answer is 409 with

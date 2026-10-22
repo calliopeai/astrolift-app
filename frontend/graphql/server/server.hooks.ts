@@ -10,7 +10,6 @@ import { SERVER_INFO } from "./server.queries";
 // (`core/schema/types/server_info.py::_PUBLIC_FEATURE_FLAGS`). Only the
 // ones the UI actually gates on are named here.
 export const FEATURE_FLAG_ZENTINELLE = "zentinelle.enabled";
-export const FEATURE_FLAG_ADMIN_COST = "admin.cost_enabled";
 export const FEATURE_FLAG_ADMIN_QUOTAS = "admin.quotas_enabled";
 export const FEATURE_FLAG_ADMIN_PERMISSIONS = "admin.permissions_enabled";
 export const FEATURE_FLAG_SUPPORT = "support.enabled";

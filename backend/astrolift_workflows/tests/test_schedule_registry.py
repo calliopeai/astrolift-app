@@ -116,13 +116,13 @@ def test_default_schedules_complete():
     #1971 adds the moved-conversation admission expiry sweep.
     #2433 adds the temporary-app expiry timer sweep.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 30
+    assert len(DEFAULT_SCHEDULES) == 29
 
 
 def test_default_schedules_include_all_kinds():
-    """Every ScheduleKind enum value should appear in catalog."""
+    """Every active kind appears; the retired cost name is history-only."""
     catalog_kinds = {s.kind for s in DEFAULT_SCHEDULES}
-    enum_kinds = set(ScheduleKind)
+    enum_kinds = set(ScheduleKind) - {ScheduleKind.CAPTURE_PLATFORM_COST_SNAPSHOT}
     assert catalog_kinds == enum_kinds
 
 

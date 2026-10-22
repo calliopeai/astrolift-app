@@ -308,9 +308,6 @@ export const PREVIEWS: AstroliftPreviewEnvironment[] = [
     lastDeployedAt: "2026-09-28T07:42:00Z",
     tornDownAt: null,
     aggregateResources: { cpuCores: 0.75, memoryBytes: 805306368, podCount: 3 },
-    estimatedDailyCostUsd: 1.24,
-    estimatedCostApproximate: false,
-    estimatedCostNotes: [],
   },
   {
     version: 1,
@@ -338,9 +335,6 @@ export const PREVIEWS: AstroliftPreviewEnvironment[] = [
     lastDeployedAt: null,
     tornDownAt: null,
     aggregateResources: { cpuCores: 0, memoryBytes: 0, podCount: 0 },
-    estimatedDailyCostUsd: null,
-    estimatedCostApproximate: false,
-    estimatedCostNotes: [],
   },
   {
     version: 1,
@@ -368,9 +362,6 @@ export const PREVIEWS: AstroliftPreviewEnvironment[] = [
     lastDeployedAt: "2026-09-18T09:00:00Z",
     tornDownAt: "2026-09-20T10:00:00Z",
     aggregateResources: { cpuCores: 0, memoryBytes: 0, podCount: 0 },
-    estimatedDailyCostUsd: null,
-    estimatedCostApproximate: false,
-    estimatedCostNotes: [],
   },
   {
     version: 1,
@@ -398,12 +389,6 @@ export const PREVIEWS: AstroliftPreviewEnvironment[] = [
     lastDeployedAt: "2026-09-27T18:30:00Z",
     tornDownAt: null,
     aggregateResources: { cpuCores: 2.5, memoryBytes: 4294967296, podCount: 6 },
-    estimatedDailyCostUsd: 9.87,
-    estimatedCostApproximate: true,
-    estimatedCostNotes: [
-      "GCP variant: node pool cost is summed per pod, so this is an over-count.",
-      "Egress is not included.",
-    ],
   },
 ];
 
@@ -416,7 +401,4 @@ export const LONG_PREVIEW: AstroliftPreviewEnvironment = {
   branch: "release/2026-q4-hotfix-for-the-payment-gateway-timeout-regression-and-retry-storm",
   hostname: `pr-123456.${LONG_NAME}.preview.acme-enterprise-holdings.example.com`,
   status: "running",
-  estimatedCostNotes: [
-    "GCP variant: node pool cost is summed per pod rather than per node, so the total here is an over-count by construction and may be out by an order of magnitude on dense pools.",
-  ],
 };

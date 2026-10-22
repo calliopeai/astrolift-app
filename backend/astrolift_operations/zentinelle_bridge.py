@@ -78,7 +78,6 @@ ACTION_EVENT_TYPES: dict[str, ZentinelleEventType] = {
     "agents.env_spec.delete": _T.AGENT_ENV_SPEC_CHANGED,
     "workflow.stage.changed": _T.AGENT_WORKFLOW_STAGE_CHANGED,
     "workflow.gate.decided": _T.AGENT_WORKFLOW_GATE_DECIDED,
-    "agents.model_spend": _T.AGENT_MODEL_SPEND,
 }
 
 
@@ -124,7 +123,6 @@ def build_payload(entry: AuditEntry, event_type: ZentinelleEventType) -> dict[st
         "model_id": extra.get("model_id") or extra.get("model"),
         "input_tokens": extra.get("input_tokens", 0),
         "output_tokens": extra.get("output_tokens", 0),
-        "estimated_usd": extra.get("estimated_usd", 0),
     }
     for key in REQUIRED_PAYLOAD_KEYS[event_type]:
         payload.setdefault(key, known.get(key))
@@ -208,24 +206,6 @@ def emit_agent_task_transition(task: Any, status: str) -> None:
             "failed": _T.AGENT_TASK_FAILED,
         }.get(status, _T.AGENT_TASK_LAUNCHED)
         events = [(event_type, base)]
-        if status == "completed":
-            result = task.result if isinstance(task.result, dict) else {}
-            usage = result.get("usage") if isinstance(result.get("usage"), dict) else result
-            events.append(
-                (
-                    _T.AGENT_MODEL_SPEND,
-                    {
-                        "task_id": str(task.guid),
-                        "provider": usage.get("provider") or "unknown",
-                        "model_id": usage.get("model_id") or usage.get("model") or "unknown",
-                        "input_tokens": int(usage.get("input_tokens") or usage.get("prompt_tokens") or 0),
-                        "output_tokens": int(
-                            usage.get("output_tokens") or usage.get("completion_tokens") or 0
-                        ),
-                        "estimated_usd": usage.get("estimated_usd", usage.get("cost_usd", 0)),
-                    },
-                )
-            )
         for kind, payload in events:
             validate_payload(event_type=kind, payload=payload)
             event_id = str(uuid7())

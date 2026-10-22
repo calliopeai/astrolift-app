@@ -1,41 +1,54 @@
 /**
  * Apps › Semantic layers (#2320, #2427): the brain apps the viewer can read.
- * The server answers the search; `astroliftBrains` takes no team, sort or
- * paging argument and returns at most 200 rows, so the team filter, the
- * order and the pages are made from the rows in hand (`selectRows`). Pages
- * stay short because each visible row reads its own status. Pure.
+ * `astroliftBrainsPage` (#2444) answers the search, the home team, the order
+ * and the cursor on the server, and lists archived layers in the "With
+ * archived" view so Restore is a row away. Pure.
  */
+import type { SortState } from "@/components/data-table";
 import type { CopiedListDefinition, ListDefinition } from "@/components/list/list-state";
-import type { SelectRowsSpec } from "@/components/list/select-rows";
-import type { ListBrainsQuery } from "@/graphql/__generated__/operations";
+import type {
+  AstroliftBrainSort,
+  ListBrainsPageQuery,
+  ListBrainsPageQueryVariables,
+} from "@/graphql/__generated__/operations";
 
-export type BrainRow = ListBrainsQuery["astroliftBrains"][number];
+export type BrainRow = ListBrainsPageQuery["astroliftBrainsPage"]["items"][number];
 
 export const BRAINS_LIST: CopiedListDefinition = {
   id: "apps.brains",
   copy: "brains",
-  // Options are the teams of the rows in hand (`withTeamOptions`).
+  // Options are the teams the viewer can see (`withTeamOptions`).
   fields: [{ key: "team", label: "Team" }],
   searchPlaceholder: "Search names and slugs…",
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: [{ key: "all", label: "All", filters: {} }],
-  paging: "numbered",
-  pageSizes: [10, 25],
+  views: [
+    { key: "all", label: "All", filters: {} },
+    { key: "archived", label: "With archived", filters: { archived: "1" } },
+  ],
+  paging: "cursor",
+  pageSizes: [25, 50, 100],
 };
 
-export const BRAINS_SELECT: SelectRowsSpec<BrainRow> = {
-  filter: { team: (row, value) => row.team === value },
-  text: (row) => [row.name, row.slug],
-  sort: {
-    name: (row) => row.name.toLocaleLowerCase(),
-    team: (row) => `${row.team}/${row.project}`.toLocaleLowerCase(),
-  },
-  id: (row) => row.id,
-};
+/** The server's order for the list's sort: by name either way, else newest first. */
+export function brainSort(sort: readonly SortState[]): AstroliftBrainSort {
+  const first = sort[0];
+  if (first?.key !== "name") return "NEWEST";
+  return first.dir === "desc" ? "NAME_DESC" : "NAME_ASC";
+}
 
-/** The teams the rows belong to, once each, in order. */
-export function brainTeams(rows: readonly BrainRow[]): string[] {
-  return [...new Set(rows.map((r) => r.team).filter(Boolean))].sort();
+/** `astroliftBrainsPage`'s variables for the list state. */
+export function brainsVariables(
+  filters: Record<string, string>,
+  state: { q: string; sort: readonly SortState[]; pageSize: number; after: string | null }
+): ListBrainsPageQueryVariables {
+  return {
+    search: state.q.trim() || null,
+    team: filters.team || null,
+    sort: brainSort(state.sort),
+    includeArchived: filters.archived === "1",
+    limit: state.pageSize,
+    after: state.after,
+  };
 }
 
 /** The declaration with the team filter offering `teams`. */

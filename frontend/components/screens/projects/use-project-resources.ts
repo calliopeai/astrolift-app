@@ -60,19 +60,6 @@ interface ResourcesData {
 interface CatalogData {
   astroliftProjectManagedServiceCatalog: AstroliftManagedServiceCatalogEntry[];
 }
-export interface ManagedServiceCostPreview {
-  managedServiceId: string;
-  available: boolean;
-  reason: string;
-  message: string;
-  monthlyTotal: number | null;
-  currency: string;
-  pricingSourceUrl: string;
-  pricingFetchedAt: string;
-  notes: string[];
-  approximate: boolean;
-}
-
 /** The project fields the resources screen reads. */
 export type ProjectResourcesProject = Pick<AstroliftProject, "id" | "slug" | "name">;
 /** The cluster fields the resources screen reads. */
@@ -138,7 +125,7 @@ export function useProjectResources(slug: string) {
     variables: { appSlug: null },
     skip: !projectId || !(canUpdate || canWriteSecrets),
   });
-  const managedReads = useManagedResourceReads(projectId, canUpdate, permissions.can("app.read"));
+  const managedReads = useManagedResourceReads(projectId, canUpdate);
   const refetchResources = () => {
     managedReads.refreshResources();
     return resources.refetch({ projectId });

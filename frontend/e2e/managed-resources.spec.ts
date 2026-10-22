@@ -12,28 +12,11 @@ test("metadata list retains paged total and unknown provider states", async ({ p
   await expect(page.getByText("provider_phase_v2", { exact: true })).toBeVisible();
 });
 
-test("changed context requires another exact review before writes or cost", async ({ page }) => {
+test("changed context requires another exact review before writes", async ({ page }) => {
   await story(page, "managedresourcedetail--changed-context");
   await expect(page.getByRole("button", { name: "Review again" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Reprovision", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Preview cost", exact: true })).toHaveCount(0);
-});
-
-test("missing pricing evidence is unavailable rather than a zero price", async ({ page }) => {
-  await story(page, "managedresourcecost--missing-amount");
-  await expect(page.getByText("Pricing is unavailable.", { exact: true })).toBeVisible();
-  await expect(page.getByText(/\$0\.00/)).toHaveCount(0);
-  await story(page, "managedresourcecost--invalid-source");
-  await expect(page.getByRole("link")).toHaveCount(0);
-});
-
-test("explicit zero has evidence and a safe pricing source", async ({ page }) => {
-  await story(page, "managedresourcecost--zero-with-evidence");
-  await expect(page.getByText(/\$0\.00/)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Pricing source" })).toHaveAttribute(
-    "href",
-    "https://prices.example.test/redis"
-  );
 });
 
 test("read-only resource detail has no write or cost controls", async ({ page }) => {

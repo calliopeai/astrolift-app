@@ -197,6 +197,7 @@ async def test_production_activity_posts_tls_and_keeps_bodies_out_of_history_and
     assert body["correlation_id"] == "origin-result-2234"
     assert body["status"] == "completed"
     assert body["usage"]["input_tokens"] == 12
+    assert "total_cost_usd" not in body["usage"]
     assert body["usage"]["duration_ms"] >= 12000
     assert ("result" in body) == (mode == "FULL")
     if mode == "FULL":

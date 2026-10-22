@@ -5,6 +5,7 @@ import * as React from "react";
 
 import type { AstroliftPermission } from "@/lib/permissions/astrolift-permissions";
 import type { ModuleKey } from "@/graphql/user/user.hooks";
+import type { NavRequirement } from "@/lib/shell/nav-model";
 
 export interface PaletteEntry {
   label: string;
@@ -22,6 +23,8 @@ export interface PaletteEntry {
    */
   module?: ModuleKey;
   permission?: AstroliftPermission;
+  /** Shown only while this integration is live for the viewer, as in the rail. */
+  requires?: NavRequirement;
   keywords?: string[];
 }
 
@@ -100,6 +103,15 @@ export const PAGES: PaletteEntry[] = [
     group: "Pages",
     module: "workflows",
     keywords: ["definitions", "runs", "stages"],
+  },
+
+  {
+    label: "Zentinelle",
+    labelKey: "zentinelle",
+    href: "/secure/zentinelle",
+    group: "Pages",
+    requires: "zentinelle",
+    keywords: ["secure", "governance", "gateway", "policies", "usage"],
   },
 
   // Admin — Infra.

@@ -28,10 +28,13 @@ def _deliver_sync(payload: dict[str, Any]) -> dict[str, Any]:
         post_webhook,
     )
 
-    subscription_id = int(payload["subscription_id"])
-    attempt = int(payload.get("attempt", 1))
     envelope = payload.get("envelope") or {}
     event_type = str(payload.get("event_type") or envelope.get("event_type") or "")
+    # Old queued histories keep their input; only this exact retired route stops.
+    if "AUDIT.agent.model_spend" in (payload.get("event_type"), envelope.get("event_type")):
+        return {"classification": "dropped", "reason": "event retired"}
+    subscription_id = int(payload["subscription_id"])
+    attempt = int(payload.get("attempt", 1))
 
     sub = WebhookSubscription.objects.filter(pk=subscription_id, deleted_at__isnull=True).first()
     if sub is None:

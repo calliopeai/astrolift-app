@@ -79,7 +79,8 @@ ID_TOKEN_HEADER = "X-Astrolift-Id-Token"
 # A brain read token (#2320): minted by the control plane for one caller and
 # one brain app, sent by machine clients (Chat Studio, cykick) in place of a
 # browser session. Not stripped at the listener (the JWT filter reads it);
-# stripped on every route so the app never sees it.
+# kept on the routes of a brain app, whose container verifies it again for
+# its MCP endpoint (#2441), and stripped on every other route.
 BRAIN_TOKEN_HEADER = "X-Astrolift-Brain-Token"
 BRAIN_JWT_PROVIDER_NAME = "astrolift-brain"
 
@@ -1026,10 +1027,13 @@ def render_app_routes(
     paused: bool,
     gateway_secret: str = "",
     gateway_secret_header: str = "",
+    brain: bool = False,
 ) -> list[dict[str, Any]]:
     """The HTTPRoutes and ReferenceGrant that put one environment on the edge.
 
     ``workloads`` maps a workload's Service name to its hostnames and port.
+    ``brain`` keeps ``BRAIN_TOKEN_HEADER`` on the routes: the app is a brain,
+    the token's audience, and verifies it itself (#2441).
     Routes live in the edge namespace, where only the platform writes; the
     ReferenceGrant in the app's namespace is what lets them reach its
     Services, and it names each Service rather than the whole namespace.
@@ -1076,7 +1080,7 @@ def render_app_routes(
                 ]
             }
         else:
-            modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]}
+            modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER] if brain else [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]}
             if header_set:
                 modifier["set"] = header_set
             rule = {

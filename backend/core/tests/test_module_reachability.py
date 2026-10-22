@@ -481,7 +481,7 @@ KNOWN_TEST_ONLY: frozenset[str] = frozenset(
         "astrolift_manifest.env_overrides",
         "astrolift_manifest.portability",
         "astrolift_manifest.portability_surfacing",
-        "astrolift_operations.llm_usage",
+        "astrolift_operations.llm_usage",  # Pure key/token contracts; no pricing or production collector.
         "astrolift_operations.metrics_logs_api",
         "astrolift_operations.synthetic_checks",
         "astrolift_operations.trace_explorer",

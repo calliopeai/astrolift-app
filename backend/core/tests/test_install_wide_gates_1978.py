@@ -137,7 +137,7 @@ def _as(world, user, *, team=None):
 
 OPS = {
     "setFeatureFlag": lambda info: FeatureFlagMutations().set_feature_flag(
-        info, key="admin.cost_enabled", enabled=True
+        info, key="admin.quotas_enabled", enabled=True
     ),
     "resyncAllAstroliftCiWorkflows": lambda info: ScmMutation().resync_all_astrolift_ci_workflows(info),
     "scanCloudOrphans": lambda info: LifecycleQuery().scan_cloud_orphans(info),

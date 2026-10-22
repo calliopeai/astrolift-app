@@ -125,6 +125,7 @@ export function useBrainSharing(framed: FramedBrainValue): BrainSharingTabProps 
               input: {
                 slug: brain.slug,
                 teamSlug,
+                agentSlug: null,
                 access: to === "deployer" ? "DEPLOYER" : "VIEWER",
               },
             },
@@ -191,8 +192,11 @@ export function useBrainSharing(framed: FramedBrainValue): BrainSharingTabProps 
     onUnshare: async (row: ShareRow) => {
       const outcome = await gatedWrite(
         async () =>
-          (await unshareBrain({ variables: { input: { slug: brain.slug, teamSlug: row.team } } }))
-            .data?.unshareBrain,
+          (
+            await unshareBrain({
+              variables: { input: { slug: brain.slug, teamSlug: row.team, agentSlug: null } },
+            })
+          ).data?.unshareBrain,
         t("unshareFailed")
       );
       if (!outcome.ok) {

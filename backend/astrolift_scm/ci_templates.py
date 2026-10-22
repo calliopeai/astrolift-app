@@ -74,7 +74,9 @@ import re
 # (v9's double quotes failed every run at parse time), and ci_pushed reads
 # the manifest's primary-container dockerfile_path/build_context for any
 # field the app left at its default, as the platform build does.
-TEMPLATE_VERSION = 10
+# v11 (#2473): GitHub-managed workflows use Node 24 action majors for
+# checkout and AWS OIDC credentials; GitHub runners began warning on Node 20.
+TEMPLATE_VERSION = 11
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

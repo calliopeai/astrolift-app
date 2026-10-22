@@ -158,6 +158,9 @@ CONSTANCE_ADDITIONAL_FIELDS = {
     # uid/gid 0 is root, which runAsNonRoot refuses.
     "posix_id": ["django.forms.IntegerField", {"min_value": 1, "max_value": 2147483647}],
     "vllm_frontend": ["django.forms.ChoiceField", {"choices": (("rust", "Rust"), ("python", "Python"))}],
+    # The gateway's autoscaler keeps two replicas, and Kubernetes refuses a
+    # maxReplicas below minReplicas.
+    "gateway_max_replicas": ["django.forms.IntegerField", {"min_value": 2}],
 }
 CONSTANCE_DATABASE_CACHE_BACKEND = "default"
 
@@ -616,7 +619,8 @@ CONSTANCE_CONFIG = {
     ),
     "ZENTINELLE_GATEWAY_ENABLED": (
         False,
-        "Deploy the Zentinelle gateway (Deployment + Service zentinelle-gateway in astrolift-system) "
+        "Deploy the Zentinelle gateway (Deployment, Service and HorizontalPodAutoscaler "
+        "zentinelle-gateway in astrolift-system) "
         "into clusters an organization registered with its Zentinelle connection, and let fenced "
         "agent pods reach it. Off deploys nothing new; turning it off does not remove a running "
         "gateway (turn the cluster's gateway off, or disconnect).",
@@ -626,6 +630,13 @@ CONSTANCE_CONFIG = {
         "Zentinelle gateway image, pinned. Point it at a mirror or a digest for private registries. "
         "Needs a build that reads its credential from /var/run/zentinelle (calliopeai/zentinelle#387). "
         "Applies to gateways deployed after the change.",
+    ),
+    "ZENTINELLE_GATEWAY_MAX_REPLICAS": (
+        6,
+        "Most replicas the Zentinelle gateway's HorizontalPodAutoscaler runs in a cluster. It keeps 2 and "
+        "adds replicas while their CPU averages over 60% of what they request; 2 holds the gateway at two. "
+        "Applies to gateways deployed after the change.",
+        "gateway_max_replicas",
     ),
     "TEMPORAL_ENABLED": (
         ASTROLIFT_TEMPORAL_ENABLED,
@@ -727,15 +738,10 @@ CONSTANCE_CONFIG = {
         "body size. The file is shipped in a private artifact and seeded into the data volume.",
     ),
     # ---- Admin console surfaces (feature flipper) ----
-    # Runtime gates for the platform-admin cost / quotas / permissions
+    # Runtime gates for the platform-admin quotas / permissions
     # screens. Default OFF — the screens ship dark and each gates itself
     # on its flag once the underlying implementation lands. Flip on from
     # /administration/features (the in-app feature flipper) or here.
-    "ADMIN_COST_ENABLED": (
-        False,
-        "Enable the platform-admin Cost console (/administration/cost). Default OFF until the "
-        "cost aggregation surface is production-ready; toggle from the in-app feature flipper.",
-    ),
     "ADMIN_QUOTAS_ENABLED": (
         False,
         "Enable the platform-admin Quotas console (/administration/quotas). Default OFF until "
@@ -915,7 +921,12 @@ CONSTANCE_CONFIG_FIELDSETS = {
     "Support": {"fields": ("SUPPORT_ENABLED",), "collapse": False},
     "Model hosting": {"fields": ("VLLM_FRONTEND_DEFAULT",), "collapse": False},
     "Zentinelle": {
-        "fields": ("ZENTINELLE_ENABLED", "ZENTINELLE_GATEWAY_ENABLED", "ZENTINELLE_GATEWAY_IMAGE"),
+        "fields": (
+            "ZENTINELLE_ENABLED",
+            "ZENTINELLE_GATEWAY_ENABLED",
+            "ZENTINELLE_GATEWAY_IMAGE",
+            "ZENTINELLE_GATEWAY_MAX_REPLICAS",
+        ),
         "collapse": False,
     },
     "Organization modules": {
@@ -933,7 +944,6 @@ CONSTANCE_CONFIG_FIELDSETS = {
     },
     "Admin screens": {
         "fields": (
-            "ADMIN_COST_ENABLED",
             "ADMIN_QUOTAS_ENABLED",
             "ADMIN_PERMISSIONS_ENABLED",
         ),

@@ -1,7 +1,7 @@
 /**
  * Home's registries (spec 44 §4.3, decisions 4 and 7): one Home, built from
  * one set of panels; a layout is an arrangement of them. A new layout (an
- * approver's, a finance view) is one entry in HOME_LAYOUTS plus any new
+ * approver's view) is one entry in HOME_LAYOUTS plus any new
  * panels in HOME_PANELS, with no change to Home itself: the Layout menu and
  * the first-sign-in question list whatever `offeredLayouts` returns.
  *
@@ -34,8 +34,7 @@ import { MyAppsPanel } from "./panels/MyAppsPanel";
 import { PlatformActivityPanel } from "./panels/PlatformActivityPanel";
 import { RecentDeploymentsPanel } from "./panels/RecentDeploymentsPanel";
 import { RunningNowPanel } from "./panels/RunningNowPanel";
-import { RunsSpendPanel } from "./panels/RunsSpendPanel";
-import { SpendQuotaPanel } from "./panels/SpendQuotaPanel";
+import { RunsHistoryPanel } from "./panels/RunsHistoryPanel";
 import { TrafficErrorsPanel } from "./panels/TrafficErrorsPanel";
 import { WaitingPanel } from "./panels/WaitingPanel";
 import { PlaceholderPanel } from "./PlaceholderPanel";
@@ -79,7 +78,6 @@ export const HOME_PANEL_KEYS = [
   "alerts",
   "clusters",
   "platform-activity",
-  "spend-quota",
 ] as const;
 
 export type HomePanelKey = (typeof HOME_PANEL_KEYS)[number];
@@ -200,8 +198,8 @@ export const HOME_PANELS: Record<HomePanelKey, HomePanelDef> = {
   }),
   "runs-spend": panel({
     key: "runs-spend",
-    component: RunsSpendPanel,
-    title: "Runs & spend",
+    component: RunsHistoryPanel,
+    title: "Run history",
     requires: { modules: "agents", permissions: "agent.read" },
     span: 6,
     kind: "chart",
@@ -266,18 +264,9 @@ export const HOME_PANELS: Record<HomePanelKey, HomePanelDef> = {
     component: PlatformActivityPanel,
     title: "Platform activity",
     requires: { modules: "admin", permissions: "audit_log.read" },
-    span: 6,
+    span: 12,
     kind: "feed",
     href: "/platform-activity",
-  }),
-  "spend-quota": panel({
-    key: "spend-quota",
-    component: SpendQuotaPanel,
-    title: "Spend & quota",
-    requires: { permissions: "billing.read" },
-    span: 6,
-    kind: "chart",
-    href: "/administration/metrics",
   }),
 };
 
@@ -293,7 +282,8 @@ export const HOME_LAYOUTS: Record<HomeLayoutKey, HomeLayoutDef> = {
   agents: {
     key: "agents",
     title: "Agents",
-    description: "For building and running agents: failed and live runs, your agents and spend.",
+    description:
+      "For building and running agents: failed and live runs, your agents and run history.",
     requires: { modules: "agents" },
     panels: ["waiting", "failed-runs", "running-now", "my-agents", "runs-spend"],
   },
@@ -307,9 +297,9 @@ export const HOME_LAYOUTS: Record<HomeLayoutKey, HomeLayoutDef> = {
   operator: {
     key: "operator",
     title: "Operator",
-    description: "For keeping the platform running: alerts, clusters, platform activity and quota.",
+    description: "For keeping the platform running: alerts, clusters and platform activity.",
     requires: { modules: "admin" },
-    panels: ["alerts", "clusters", "waiting", "platform-activity", "spend-quota"],
+    panels: ["alerts", "clusters", "waiting", "platform-activity"],
   },
 };
 

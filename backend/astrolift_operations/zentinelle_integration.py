@@ -100,6 +100,7 @@ class ZentinelleEventType(StrEnum):
     AGENT_ENV_SPEC_CHANGED = "AUDIT.agent.env_spec.changed"
     AGENT_WORKFLOW_STAGE_CHANGED = "AUDIT.agent.workflow.stage_changed"
     AGENT_WORKFLOW_GATE_DECIDED = "AUDIT.agent.workflow.gate_decided"
+    # Historical vocabulary only; emitters, subscriptions and delivery are retired.
     AGENT_MODEL_SPEND = "AUDIT.agent.model_spend"
     AGENT_SESSION_EVENT = "AUDIT.agent.session.event"
 
@@ -107,7 +108,9 @@ class ZentinelleEventType(StrEnum):
 # Event types that Zentinelle's default subscription template
 # subscribes to. Operator can override but starting set is
 # 'everything we currently consider compliance evidence.'
-DEFAULT_SUBSCRIBED_EVENTS = tuple(t.value for t in ZentinelleEventType)
+DEFAULT_SUBSCRIBED_EVENTS = tuple(
+    t.value for t in ZentinelleEventType if t is not ZentinelleEventType.AGENT_MODEL_SPEND
+)
 
 
 # ---- per-event payload schema -------------------------------------
