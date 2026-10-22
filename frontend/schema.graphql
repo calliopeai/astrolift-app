@@ -11650,7 +11650,7 @@ type Query {
   agentTaskEvents(orgId: ID!, taskId: ID!, after: Int! = 0, limit: Int! = 100): [AstroliftAgentTaskEvent!]!
 
   """
-  One artifact a run attached to its result (#2488), by name, with its content. Null when the task is not visible to the caller or has no artifact of that name.
+  One artifact a run attached to its result (#2488), by name, with its content. Null for an unknown name, and to a caller with organization-wide agent.read for a task the organization does not have. Any other task the caller cannot read is refused.
   """
   agentTaskArtifact(orgId: ID!, taskId: ID!, name: String!): AstroliftAgentTaskArtifactContent
   agentTaskLogsPage(id: ID!, cursor: String = null, limit: Int! = 100): AstroliftAgentTaskLogPage!

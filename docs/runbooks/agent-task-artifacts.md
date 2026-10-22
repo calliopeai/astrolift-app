@@ -88,9 +88,11 @@ query Artifact($org: ID!, $task: ID!, $name: String!) {
 
 `agentTaskArtifact` requires `agent.read` on the task, with the same token
 ceiling, owner-operation policy and organization visibility as
-`agentTaskEvents`. It returns null for a task the caller cannot see, a malformed
-task ID or an unknown name. An `orgId` other than the caller's active
-organization is refused.
+`agentTaskEvents`. A caller whose `agent.read` covers only some teams, projects
+or apps is refused any task outside them with a permission error, as `agentTask`
+is. A caller with `agent.read` across the organization gets null for a task the
+organization does not have or a malformed task ID. Every caller gets null for an
+unknown name. An `orgId` other than the caller's active organization is refused.
 
 The completion webhook (`agent_task.finished`) does not carry artifacts; its
 receiver reads them through the API. MCP `astrolift_get_task` does not list

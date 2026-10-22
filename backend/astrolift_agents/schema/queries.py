@@ -1537,8 +1537,9 @@ class AgentsQuery:
 
     @strawberry.field(
         description=(
-            "One artifact a run attached to its result (#2488), by name, with its content. Null when the "
-            "task is not visible to the caller or has no artifact of that name."
+            "One artifact a run attached to its result (#2488), by name, with its content. Null for an "
+            "unknown name, and to a caller with organization-wide agent.read for a task the organization "
+            "does not have. Any other task the caller cannot read is refused."
         )
     )
     @require_permission(

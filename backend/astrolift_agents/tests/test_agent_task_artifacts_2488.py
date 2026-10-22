@@ -19,7 +19,7 @@ from graphql import GraphQLError
 
 from astrolift_agents.models import AgentTask, AgentTaskArtifact, DispatcherInstance
 from astrolift_agents.schema.queries import AgentsQuery
-from astrolift_agents.schema.types import agent_tasks_to_types
+from astrolift_agents.schema.types import agent_task_to_type, agent_tasks_to_types
 from astrolift_agents.services.agent_task_artifacts import (
     MAX_ARTIFACT_BYTES,
     MAX_ARTIFACTS,
@@ -74,10 +74,10 @@ def conformance():
     return artifact("conformance-report.json", "conformance-json", "application/json", CONFORMANCE)
 
 
-def post(task, body, key=CALLBACK_KEY):
+def post(task, body, key=CALLBACK_KEY, *, ensure_ascii=True):
     return Client().post(
         f"/api/dispatch/v1/agents/{task.guid}/callback/",
-        data=json.dumps(body),
+        data=json.dumps(body, ensure_ascii=ensure_ascii),
         content_type="application/json",
         HTTP_AUTHORIZATION=f"Bearer {key}",
     )
@@ -196,6 +196,8 @@ def test_empty_list_probes_support_without_writing(task):
         [artifact(media_type="xml")],
         [artifact(media_type="application/xml; charset=utf-8\r\nX-Injected: 1")],
         [artifact(media_type="application/" + "x" * 250)],
+        # Matches the media type pattern but is longer than the 255 characters the column holds.
+        [artifact(media_type="text/plain; " + "a=b; " * 60)],
         [artifact(content={"tests": 1})],
         [artifact(content="before\x00after")],
         [artifact(content="\ud800")],
@@ -205,6 +207,15 @@ def test_empty_list_probes_support_without_writing(task):
         [artifact(sha256=hashlib.sha256(b"something else").hexdigest())],
         [artifact("conformance-report.json", "conformance-json", "application/json", '{"passed": 4')],
         [artifact("conformance-report.json", "conformance-json", "application/json", '{"score": NaN}')],
+        # Nested deeper than the JSON parser recurses.
+        [
+            artifact(
+                "conformance-report.json",
+                "conformance-json",
+                "application/json",
+                "[" * 100_000 + "]" * 100_000,
+            )
+        ],
         [artifact(f"report-{index}.xml") for index in range(MAX_ARTIFACTS + 1)],
     ],
 )
@@ -235,6 +246,18 @@ def test_total_limit_spans_every_artifact(task):
     _assert_nothing_recorded(task)
 
 
+def test_total_limit_counts_utf8_bytes(task):
+    # Each part is within its own limit. Together they are fewer characters than the total
+    # limit but more UTF-8 bytes. Raw UTF-8 keeps the body under its own 2 MiB limit.
+    part = "é" * (MAX_TASK_ARTIFACT_BYTES // 6 + 1)
+    sent = [artifact(f"part-{index}.txt", "other", "text/plain", part) for index in range(3)]
+    response = post(task, {"status": "completed", "artifacts": sent}, ensure_ascii=False)
+
+    assert response.status_code == 413
+    assert "in total" in response.json()["error"]
+    _assert_nothing_recorded(task)
+
+
 def test_artifacts_at_the_limits_are_accepted(task):
     full = "x" * MAX_ARTIFACT_BYTES
     sent = [artifact(f"part-{index}.txt", "other", "text/plain", full) for index in range(2)]
@@ -244,6 +267,15 @@ def test_artifacts_at_the_limits_are_accepted(task):
 
     assert response.status_code == 200, response.content
     assert response.json()["artifact_count"] == 2
+
+
+def test_the_most_artifacts_a_task_holds_are_accepted(task):
+    sent = [artifact(f"report-{index}.xml") for index in range(MAX_ARTIFACTS)]
+
+    response = post(task, {"status": "completed", "artifacts": sent})
+
+    assert response.status_code == 200, response.content
+    assert response.json()["artifact_count"] == MAX_ARTIFACTS
 
 
 def test_a_refused_result_stores_no_artifacts(task):
@@ -405,3 +437,16 @@ def test_task_lists_carry_artifact_metadata_without_loading_content(task):
     assert '."content"' not in reads[0]
     assert [item.name for item in shaped[0].artifacts] == ["test-report.xml", "conformance-report.json"]
     assert shaped[1].artifacts == []
+
+
+def test_a_single_task_read_carries_artifact_metadata_without_loading_content(task):
+    assert post(task, {"status": "completed", "artifacts": [artifact(), conformance()]}).status_code == 200
+    row = AgentTask.objects.get(pk=task.pk)
+
+    with CaptureQueriesContext(connection) as queries:
+        shaped = agent_task_to_type(row)
+
+    reads = [query["sql"] for query in queries.captured_queries if "agenttaskartifact" in query["sql"]]
+    assert len(reads) == 1
+    assert '."content"' not in reads[0]
+    assert [item.name for item in shaped.artifacts] == ["test-report.xml", "conformance-report.json"]
