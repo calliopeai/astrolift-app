@@ -14,6 +14,7 @@ import {
 } from "@/components/onboarding/types";
 import { useOnboardingActions } from "@/components/onboarding/use-onboarding-actions";
 import { useRepoStepData } from "@/components/onboarding/use-repo-step-data";
+import { useTemporaryAppRules } from "@/components/screens/apps/use-temporary-app-rules";
 
 interface OnboardingStateResp {
   astroliftOrganizations: Array<{
@@ -125,6 +126,9 @@ export function OnboardingHost() {
 
   const actions = useOnboardingActions(org?.id ?? "");
   const repo = useRepoStepData(wizardState.sourceConnectionId);
+  // Read only while the wizard is open: the dashboard mounts this host on
+  // every visit, and the policy matters only to the app the wizard registers.
+  const temporary = useTemporaryAppRules({ skip: !wizardOpen });
 
   if (org == null) return null;
 
@@ -143,6 +147,7 @@ export function OnboardingHost() {
         setState={setWizardState}
         actions={actions}
         repo={repo}
+        temporary={temporary}
         onComplete={() => {
           // onComplete fires AFTER the dialog has been closed by
           // the wizard itself; handleWizardClose already armed the
