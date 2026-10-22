@@ -58,10 +58,11 @@ is what makes the ASGI server reject the handshake at HTTP level with a
 WS code, so the pre-accept ordering is load-bearing: moving any of these
 closes after accept would silently change what ``astro exec`` prints.
 
-One close comes after accept: 4409 answers an ``open`` that names no
-environment (no ``environmentId``, no reviewed ``target``) for an app
-with more than one. An ``error`` frame first says how to select one; the
-relay never picks the first environment for the caller (#2209).
+Closes after accept: a failed recheck on a client frame closes 4401 or
+4403, and 4409 answers an ``open`` that names no environment (no
+``environmentId``, no reviewed ``target``) for an app with more than
+one. An ``error`` frame first says how to select one; the relay never
+picks the first environment for the caller (#2209).
 
 Production wiring: the connection-time backend resolution looks up the
 app's reviewed environment mapping (or, for a legacy caller naming no
@@ -325,9 +326,13 @@ def _check_exec_permission(
     from astrolift_lifecycle.scopes import live_app_scope
     from core.permissions import Permission
 
+    # Only the live app's environments: a deleted app that had this slug keeps
+    # its environment rows, and policy read on one of them would judge an
+    # open that runs in the live app's environment (#2209).
     environments = AppEnvironment.objects.filter(
         registered_app__slug=app_slug,
         registered_app__organization_id=tenant_org_id,
+        registered_app__deleted_at__isnull=True,
     ).select_related("tenant_cluster")
     if environment_guid is not None:
         from core.scope_args import read_guid
