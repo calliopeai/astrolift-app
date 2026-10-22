@@ -668,6 +668,7 @@ class DeregisterAppWorkflow:
                     remove_app_ci_workflow,
                     app_id,
                     start_to_close_timeout=_REPO_WRITE_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
                     retry_policy=_CLEANUP_RETRY,
                 )
                 teardown["ci_workflow"] = _step_result(

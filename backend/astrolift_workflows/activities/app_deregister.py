@@ -209,8 +209,7 @@ async def remove_app_ci_workflow(registered_app_id: int) -> dict[str, Any]:
     """
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    summary = await sync_to_async(_remove_ci_workflow_sync)(registered_app_id)
+    summary = await heartbeat_while(sync_to_async(_remove_ci_workflow_sync)(registered_app_id))
     log.info(
         "remove_app_ci_workflow app_id=%s status=%s removed=%s retained=%s",
         registered_app_id,
