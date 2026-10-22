@@ -437,6 +437,59 @@ def test_one_failed_direction_leaves_the_other_measured(world, collector):
     assert series["TRANSMIT"]["samples"] == [] and series["TRANSMIT"]["totalBytes"] is None
 
 
+def test_a_failed_direction_beside_an_empty_one_is_an_error_panel(world, collector):
+    collector.fail_when = lambda query: TX in query
+    data, series = panel(read(world))
+    assert (series["RECEIVE"]["reason"], series["TRANSMIT"]["reason"]) == ("NO_DATA_YET", "ERROR")
+    assert data["reason"] == "ERROR"
+
+
+@pytest.mark.parametrize(
+    "case,unavailable,basis",
+    [
+        ("environment-not-recorded", "ENVIRONMENT_NOT_FOUND", "UNRESOLVED"),
+        ("cluster-of-another-org", "TARGET_NOT_OWNED", "UNRESOLVED"),
+        ("no-endpoint", "NOT_CONFIGURED", "UNRESOLVED"),
+        ("no-samples", "NO_DATA_YET", "NAMESPACE"),
+        ("collector-error", "QUERY_ERROR", "NAMESPACE"),
+    ],
+)
+def test_an_environment_read_claims_a_namespace_aggregate_only_once_it_reads_one(
+    world, collector, case, unavailable, basis
+):
+    """As for the golden signals, a missing or unowned target, or one with no
+    collector, is UNRESOLVED: no namespace was read, so none is claimed."""
+    environment = "production"
+    if case == "environment-not-recorded":
+        environment = "staging"
+    elif case == "cluster-of-another-org":
+        world.cluster.organization = Organization.objects.create(name="Other", slug="other-net2271")
+        world.cluster.save(update_fields=["organization"])
+    elif case == "no-endpoint":
+        world.cluster.provider_config = {}
+        world.cluster.save(update_fields=["provider_config"])
+    elif case == "collector-error":
+        collector.fail_when = lambda query: True
+    _, series = panel(read(world, environment=environment))
+    for row in series.values():
+        measured = row["measurement"]
+        assert (measured["effectiveScope"], measured["unavailableReason"]) == ("APP_ENVIRONMENT", unavailable)
+        assert measured["identityBasis"] == basis
+
+
+def test_a_cluster_whose_plugin_has_no_cluster_driver_is_not_supported(world, collector, monkeypatch):
+    """The real driver lookup, not the membership double: the test cluster's
+    plugin registers no cluster driver, so no membership and no query."""
+    for name in ("_POD_BACKEND_OVERRIDE", "_LOG_BACKEND_OVERRIDE", "_EVENTS_BACKEND_OVERRIDE"):
+        monkeypatch.setattr(f"core.cluster_observability.{name}", None)
+    data, series = panel(read(world, workload="api"))
+    assert data["reason"] == "NOT_SUPPORTED_BY_PROVIDER"
+    for row in series.values():
+        assert row["measurement"]["unavailableReason"] == "NOT_SUPPORTED_BY_PROVIDER"
+        assert row["samples"] == [] and row["totalBytes"] is None
+    assert collector.requests == []
+
+
 @pytest.mark.parametrize(
     "case,panel_reason,unavailable,queried",
     [
@@ -444,6 +497,8 @@ def test_one_failed_direction_leaves_the_other_measured(world, collector):
         ("environment-not-recorded", "NOT_CONFIGURED", "ENVIRONMENT_NOT_FOUND", False),
         ("workload-not-found", "NOT_CONFIGURED", "WORKLOAD_NOT_FOUND", False),
         ("replaced-workload", "ERROR", "OWNERSHIP_UNVERIFIED", False),
+        ("malformed-pod-uid", "ERROR", "OWNERSHIP_UNVERIFIED", False),
+        ("pod-name-with-two-uids", "ERROR", "OWNERSHIP_UNVERIFIED", False),
         ("cluster-of-another-org", "NOT_CONFIGURED", "TARGET_NOT_OWNED", False),
         ("cluster-deleted", "NOT_CONFIGURED", "TARGET_NOT_OWNED", False),
         ("provider-without-membership", "NOT_SUPPORTED_BY_PROVIDER", "NOT_SUPPORTED_BY_PROVIDER", False),
@@ -453,6 +508,7 @@ def test_one_failed_direction_leaves_the_other_measured(world, collector):
         ("membership-denied", "ERROR", "PERMISSION_DENIED", False),
         ("membership-provider-error", "ERROR", "PROVIDER_ERROR", False),
         ("no-samples", "NO_DATA_YET", "NO_DATA_YET", True),
+        ("workload-no-samples", "NO_DATA_YET", "NO_DATA_YET", True),
         ("collector-error", "ERROR", "QUERY_ERROR", True),
     ],
 )
@@ -474,6 +530,14 @@ def test_every_unavailable_state_is_explicit_and_never_zero(
         world.workload.save(update_fields=["deleted_at"])
         Workload.objects.create(registered_app=world.app, slug="api", name="Replacement", kind="deployment")
         membership.error = MetricMembershipUnavailable("OWNERSHIP_UNVERIFIED")
+    elif case == "malformed-pod-uid":
+        # Not a UID: in the cgroup pattern it would bind every pod's sandbox.
+        membership.members = (container((POD_A[0], ".*"), started_at=time.time() - 7200),)
+    elif case == "pod-name-with-two-uids":
+        membership.members = (
+            container(POD_A, started_at=time.time() - 7200),
+            container((POD_A[0], POD_B[1]), started_at=time.time() - 7200, name="sidecar"),
+        )
     elif case == "cluster-of-another-org":
         world.cluster.organization = Organization.objects.create(name="Other", slug="other-net2271")
         world.cluster.save(update_fields=["organization"])

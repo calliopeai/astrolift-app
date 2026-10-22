@@ -85,11 +85,11 @@ astro api graphql --file network.graphql \
 
 ## Scope
 
-| Selection                      | Effective scope              | Identity basis     | Reads                                        |
-| ------------------------------ | ---------------------------- | ------------------ | -------------------------------------------- |
-| No workload                    | `APP_ENVIRONMENT`            | `NAMESPACE`        | Every pod in the environment's own namespace |
-| A workload                     | `WORKLOAD`                   | `VERIFIED_RUNTIME` | Only the workload's current, verified pods   |
-| Missing or unverifiable target | Requested scope, unavailable | `UNRESOLVED`       | Nothing                                      |
+| Selection                                                 | Effective scope              | Identity basis     | Reads                                        |
+| --------------------------------------------------------- | ---------------------------- | ------------------ | -------------------------------------------- |
+| No workload                                               | `APP_ENVIRONMENT`            | `NAMESPACE`        | Every pod in the environment's own namespace |
+| A workload                                                | `WORKLOAD`                   | `VERIFIED_RUNTIME` | Only the workload's current, verified pods   |
+| Missing or unverifiable target, or no Prometheus endpoint | Requested scope, unavailable | `UNRESOLVED`       | Nothing                                      |
 
 A workload's pods come from the same membership read as workload CPU and
 memory (#2263): identity labels and the controller chain. Every series must
@@ -99,8 +99,11 @@ in its cgroup `id` (`pod<uid>/...` under the cgroupfs driver,
 pod, or of an earlier pod with the same name, refuses the read
 (`INVALID_DATA`); two series for one pod refuse it (`AMBIGUOUS_SERIES`); a
 pod with no series, or a gap at any step, makes it `PARTIAL_DATA`. The
-measurement starts once the newest pod has a full rate window. A workload
-never falls back to the namespace total.
+measurement starts once the newest current container has a full rate window,
+as for workload CPU and memory: a container restart moves `measurementStart`
+even though the pod's network counters carry on, and until one rate window
+has passed the read is `NO_DATA_YET`. A workload never falls back to the
+namespace total.
 
 ## Reasons
 

@@ -299,10 +299,13 @@ export const NetworkOwnershipUnverified: Story = {
   ),
 };
 
+/** No Prometheus endpoint: no namespace was read, so none is claimed. */
 export const NetworkNotConfigured: Story = {
   render: () => (
     <Controlled
-      network={unavailableNetwork("NOT_CONFIGURED", "NOT_CONFIGURED")}
+      network={unavailableNetwork("NOT_CONFIGURED", "NOT_CONFIGURED", {
+        identityBasis: "UNRESOLVED",
+      })}
       networkReason="NOT_CONFIGURED"
     />
   ),

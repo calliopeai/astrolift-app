@@ -326,9 +326,7 @@ def network_metrics_for_app(*, app, environment_name, workload_slug, seconds, no
                 if workload_slug
                 else GoldenSignalScope.APP_ENVIRONMENT,
                 source=GoldenSignalSource.CADVISOR,
-                identity_basis=GoldenSignalIdentityBasis.UNRESOLVED
-                if workload_slug
-                else GoldenSignalIdentityBasis.NAMESPACE,
+                identity_basis=GoldenSignalIdentityBasis.UNRESOLVED,
                 available=False,
                 target=target,
             ),
@@ -351,7 +349,11 @@ def network_metrics_for_app(*, app, environment_name, workload_slug, seconds, no
         ).strip()
         if not endpoint:
             raise ResourceUnavailable("NOT_CONFIGURED")
-        if workload is not None:
+        # As for the golden signals: a namespace aggregate only once one is read.
+        if workload is None:
+            for row in series:
+                row.measurement.identity_basis = GoldenSignalIdentityBasis.NAMESPACE
+        else:
             members = _members(
                 cluster=cluster, namespace=namespace, app=app, environment=environment, workload=workload
             )
