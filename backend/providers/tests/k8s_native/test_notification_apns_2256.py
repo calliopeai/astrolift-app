@@ -490,6 +490,22 @@ def test_the_default_transport_reads_status_apns_id_and_reason() -> None:
     assert str(raised.value) == "ConnectError"
 
 
+def test_the_device_token_stays_out_of_the_httpx_request_log(caplog) -> None:
+    # httpx logs every request URL at INFO, and an APNs URL's path is the
+    # device token. Other hosts' URLs are left as they are.
+    transport = notification_apns._HttpxTransport(timeout=1)
+    transport._client.close()
+    transport._client = httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200)))
+    with caplog.at_level("INFO", logger="httpx"):
+        transport.post(url=f"https://api.sandbox.push.apple.com/3/device/{TOKEN}", headers={}, body=b"{}")
+        transport._client.get("https://example.test/3/device/kept")
+
+    assert [record.getMessage() for record in caplog.records if record.name == "httpx"] == [
+        'HTTP Request: POST https://api.sandbox.push.apple.com/3/device/[redacted] "HTTP/1.1 200 OK"',
+        'HTTP Request: GET https://example.test/3/device/kept "HTTP/1.1 200 OK"',
+    ]
+
+
 def test_the_device_token_stays_out_of_the_driver_log(clock, key, caplog) -> None:
     transport = FakeTransport()
     with caplog.at_level("INFO", logger="astrolift.providers"):

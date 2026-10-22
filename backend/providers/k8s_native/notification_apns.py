@@ -50,6 +50,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import re
 import threading
 import time
@@ -483,6 +484,24 @@ def _load_auth_key(pem: str) -> EllipticCurvePrivateKey:
     if not isinstance(key, ec.EllipticCurvePrivateKey) or not isinstance(key.curve, ec.SECP256R1):
         raise APNsConfigError("auth key must be a P-256 key, as Apple issues APNs .p8 keys")
     return key
+
+
+class _DeviceTokenLogFilter(logging.Filter):
+    """httpx logs every request's URL at INFO, and an APNs request's path is the
+    device token, so the token is replaced before the record is emitted."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) > 1:
+            url = str(args[1])
+            for endpoint in APNS_ENDPOINTS.values():
+                if url.startswith(f"{endpoint}/3/device/"):
+                    record.args = (args[0], f"{endpoint}/3/device/[redacted]", *args[2:])
+                    break
+        return True
+
+
+logging.getLogger("httpx").addFilter(_DeviceTokenLogFilter())
 
 
 class _HttpxTransport:

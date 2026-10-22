@@ -245,6 +245,21 @@ def test_the_token_endpoint_wait_is_bounded() -> None:
     assert request.keywords == {"timeout": 10}
 
 
+def test_the_registration_token_stays_out_of_the_driver_log(caplog) -> None:
+    # The driver's telemetry logs each call's arguments at INFO; an FCM
+    # registration token addresses the device, as an APNs token does.
+    http = FakeFCMHttp()
+    driver = FCMNotificationDriver(config=FCMConfig(project_id="p", access_token="t", http_client=http))
+    with caplog.at_level("INFO", logger="astrolift.providers"):
+        driver.send_bulk(
+            targets=[PushTarget(registration_id="fcm-token-1", platform=DevicePlatform.ANDROID)],
+            payload=NotificationPayload(title="t", body="b"),
+        )
+    assert len(http.posts) == 1
+    assert [record.getMessage() for record in caplog.records].count("driver_op start") == 2
+    assert all("fcm-token-1" not in repr(record.__dict__) for record in caplog.records)
+
+
 def test_a_legacy_unregistered_status_still_prunes() -> None:
     http = FakeFCMHttp(error=_FCMHttpError(message="404", status_code=404, body={"error": {"status": "UNREGISTERED"}}))
     driver = FCMNotificationDriver(config=FCMConfig(project_id="p", access_token="t", http_client=http))

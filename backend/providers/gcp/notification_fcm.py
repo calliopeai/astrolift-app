@@ -225,7 +225,7 @@ class FCMNotificationDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
-    @driver_op(cloud="gcp", driver="notification")
+    @driver_op(cloud="gcp", driver="notification", redact_args=("target",))
     def send(
         self,
         *,
@@ -246,7 +246,7 @@ class FCMNotificationDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
-    @driver_op(cloud="gcp", driver="notification")
+    @driver_op(cloud="gcp", driver="notification", redact_args=("targets",))
     def send_bulk(
         self,
         *,
