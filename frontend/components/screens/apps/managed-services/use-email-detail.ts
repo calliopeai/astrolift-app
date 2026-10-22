@@ -11,8 +11,6 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { GET_COST_BY_BINDING } from "@/graphql/billing/billing.queries";
-import type { AstroliftCostAttribution } from "@/graphql/billing/billing.types";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   CREATE_ALERT_RULE,
@@ -85,58 +83,6 @@ export function useAppManagedServiceConfig(
   });
   const row = data?.astroliftAppManagedService;
   return row && row.id === managedServiceId ? (row.config ?? {}) : null;
-}
-
-// ── Cost-per-period tile (#630) ────────────────────────────────────
-
-interface CostByBindingResp {
-  astroliftCostByBinding: AstroliftCostAttribution;
-}
-
-function sumForService(
-  data: CostByBindingResp | undefined,
-  managedServiceId: string
-): number | null {
-  const rows = data?.astroliftCostByBinding?.attributedRows;
-  if (!rows) return null;
-  const matches = rows.filter((r) => r.managedServiceId === managedServiceId);
-  if (matches.length === 0) return 0;
-  return matches.reduce((sum, r) => sum + r.amountCents, 0);
-}
-
-/** Month-to-date and trailing 30-day spend attributed to this service. */
-export function useEmailCost(managedServiceId: string, appSlug: string, open: boolean) {
-  const mtdQuery = useQuery<CostByBindingResp>(GET_COST_BY_BINDING, {
-    variables: { window: "MTD", registeredAppSlug: appSlug },
-    skip: !open || !appSlug,
-    fetchPolicy: "cache-and-network",
-  });
-  const trailingQuery = useQuery<CostByBindingResp>(GET_COST_BY_BINDING, {
-    variables: { days: 30, registeredAppSlug: appSlug },
-    skip: !open || !appSlug,
-    fetchPolicy: "cache-and-network",
-  });
-
-  const mtdSum = React.useMemo(
-    () => sumForService(mtdQuery.data, managedServiceId),
-    [mtdQuery.data, managedServiceId]
-  );
-  const trailingSum = React.useMemo(
-    () => sumForService(trailingQuery.data, managedServiceId),
-    [trailingQuery.data, managedServiceId]
-  );
-
-  const currency =
-    mtdQuery.data?.astroliftCostByBinding?.currency ??
-    trailingQuery.data?.astroliftCostByBinding?.currency ??
-    "USD";
-
-  return {
-    mtdSum,
-    trailingSum,
-    currency,
-    loading: mtdQuery.loading || trailingQuery.loading,
-  };
 }
 
 // ── Suppression list (#631) ────────────────────────────────────────

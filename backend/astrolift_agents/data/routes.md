@@ -231,7 +231,7 @@ direct URL show `—`.
 | `/resources/drivers` | redirect → `/documentation/drivers` | — | thin server alias |
 | `/resources/help` | redirect → `/documentation/help` | — | thin server alias |
 | `/resources/manifest` | redirect → `/documentation/manifest` | — | thin server alias |
-| `/secure/zentinelle` | page | — |  |
+| `/secure/zentinelle` | page | nav + palette |  |
 | `/settings` | redirect → `/administration/organization` | — | thin server alias |
 | `/settings/appearance` | page | — |  |
 | `/settings/home` | page | — |  |

@@ -358,3 +358,49 @@ def test_zone_exists_reports_a_name_already_in_the_account(driver_with_zone) -> 
 def test_zone_exists_is_insensitive_to_a_trailing_dot(driver_with_zone) -> None:
     driver, _ = driver_with_zone
     assert driver.zone_exists("acme.platform.example.") is True
+
+
+# ---- #2389: a run with no recorded zone id adopts the zone the platform made --
+
+
+def _hosted_zones_named(route53_client, zone: str) -> list[str]:
+    zones = route53_client.list_hosted_zones_by_name(DNSName=f"{zone}.")["HostedZones"]
+    return [z["Id"].rsplit("/", 1)[-1] for z in zones if z["Name"] == f"{zone}."]
+
+
+def test_a_zone_provision_zone_created_is_adopted_with_its_nameservers(route53_client) -> None:
+    created = Route53Driver(config=Route53Config(), client=route53_client).provision_zone("shop.example")
+    nameservers = route53_client.get_hosted_zone(Id=created["zone_id"])["DelegationSet"]["NameServers"]
+
+    adopted = Route53Driver(config=Route53Config(), client=route53_client).adopt_platform_zone("shop.example")
+
+    assert nameservers
+    assert adopted == {"zone_id": created["zone_id"], "nameservers": nameservers}
+    assert _hosted_zones_named(route53_client, "shop.example") == [created["zone_id"]]
+
+
+def test_a_zone_with_a_foreign_caller_reference_is_not_adopted(route53_client) -> None:
+    from aws._errors import ConflictError
+
+    route53_client.create_hosted_zone(Name="corp.example.", CallerReference="someone-else")
+    driver = Route53Driver(config=Route53Config(), client=route53_client)
+
+    assert driver.adopt_platform_zone("corp.example") is None
+    with pytest.raises(ConflictError):
+        driver.provision_zone("corp.example")
+
+
+def test_two_zones_with_the_name_are_not_adopted(route53_client) -> None:
+    """Even when both carry the platform's CallerReference: by name, either one could be meant."""
+    driver = Route53Driver(config=Route53Config(), client=route53_client)
+    driver.provision_zone("shop.example")
+    route53_client.create_hosted_zone(Name="shop.example.", CallerReference="astrolift-shop.example-1")
+
+    assert Route53Driver(config=Route53Config(), client=route53_client).adopt_platform_zone("shop.example") is None
+
+
+def test_an_absent_zone_is_not_adopted_and_nothing_is_created(route53_client) -> None:
+    driver = Route53Driver(config=Route53Config(), client=route53_client)
+
+    assert driver.adopt_platform_zone("nobody-has-this.example") is None
+    assert _hosted_zones_named(route53_client, "nobody-has-this.example") == []

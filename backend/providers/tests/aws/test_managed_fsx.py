@@ -732,12 +732,11 @@ def test_networking_converges_remaining_rules_when_one_rule_already_exists():
     assert ec2.authorize_security_group_ingress.call_count == 2
 
 
-def test_config_plugin_cost_encryption_and_catalogue_are_wired():
+def test_config_plugin_encryption_and_catalogue_are_wired():
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
     from _sdk.storage_encryption import POLICIES
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     provider_config = {
@@ -762,7 +761,6 @@ def test_config_plugin_cost_encryption_and_catalogue_are_wired():
         assert config.subnet_ids == SUBNETS and config.security_group_ids == GROUPS
         assert config.kms_key_id == "alias/platform-fsx"
         assert PLUGIN.managed_service_drivers[("filesystem", variant)] is driver_class
-        assert SERVICE_CODE_BY_VARIANT[("filesystem", variant)] == "AmazonFSx"
         assert POLICIES[("aws", "filesystem", variant)].cmek_supported
         entry = next(item for item in MATRIX.managed_services if item.plugin_id == "aws" and item.variant == variant)
         assert entry.status == "preview"

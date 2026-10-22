@@ -758,11 +758,10 @@ def test_mq_networking_discovers_three_azs_and_all_tls_protocol_ports():
     ] == [443, 5671, 61614, 61617, 61619, 8883]
 
 
-def test_managed_config_plugin_cost_and_catalogue_are_wired():
+def test_managed_config_plugin_and_catalogue_are_wired():
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     cluster = SimpleNamespace(
@@ -787,7 +786,6 @@ def test_managed_config_plugin_cost_and_catalogue_are_wired():
         assert cfg.engine_version_default == version
         assert cfg.subnet_ids == ("subnet-a", "subnet-b", "subnet-c")
         assert PLUGIN.managed_service_drivers[("mq", variant)] is driver_cls
-        assert SERVICE_CODE_BY_VARIANT[("mq", variant)] == "AmazonMQ"
         entry = next(item for item in MATRIX.managed_services if item.plugin_id == "aws" and item.variant == variant)
         assert entry.status == "preview"
         assert "MQ_ENDPOINT" in entry.binding_envs

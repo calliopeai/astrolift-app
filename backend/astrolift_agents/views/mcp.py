@@ -158,9 +158,6 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_provision_project_resource": services_project_scope_by_guid(
         permissions=(Permission.PROJECT_UPDATE,)
     ),
-    "astrolift_preview_project_resource_cost": managed_service_scope_by_guid(
-        permissions=(Permission.PROJECT_READ,)
-    ),
     "astrolift_attach_project_resource": managed_service_scope_by_guid(
         permissions=(Permission.PROJECT_UPDATE,)
     ),
@@ -207,7 +204,6 @@ def _operation_for_tool(name: str, args: dict[str, Any]):
 
         return _creation_operation({"input": args})[0]
     if name in {
-        "astrolift_preview_project_resource_cost",
         "astrolift_attach_project_resource",
         "astrolift_update_project_resource",
         "astrolift_reprovision_project_resource",
@@ -662,6 +658,7 @@ def _share_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
         ShareBrainInput(
             slug=str(args.get("slug") or ""),
             team_slug=str(args.get("team_slug") or ""),
+            agent_slug=str(args.get("agent_slug") or ""),
             access=BrainShareAccess(str(args.get("access") or "")),
         ),
     )
@@ -674,7 +671,11 @@ def _unshare_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]
         request,
         "unshare_brain",
         None,
-        UnshareBrainInput(slug=str(args.get("slug") or ""), team_slug=str(args.get("team_slug") or "")),
+        UnshareBrainInput(
+            slug=str(args.get("slug") or ""),
+            team_slug=str(args.get("team_slug") or ""),
+            agent_slug=str(args.get("agent_slug") or ""),
+        ),
     )
 
 
@@ -704,7 +705,15 @@ def _get_agent(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
             f"agent slug {slug!r} is ambiguous; make agent workload slugs unique",
             code="conflict",
         )
-    return _serialize_agent(matches[0], include_package=True)
+    from astrolift_registry.brain_runs import visible_agent_grants
+
+    data = _serialize_agent(matches[0], include_package=True)
+    # Semantic layers shared with the agent that the caller can read (#2449).
+    data["run"]["brain_grants"] = [
+        {"slug": g.brain.slug, "name": g.brain.name, "granted_at": _iso(g.created_at)}
+        for g in visible_agent_grants(matches[0])
+    ]
+    return data
 
 
 def _task_rows(permission=Permission.AGENT_READ):
@@ -1265,15 +1274,6 @@ def _list_project_resources(_request: HttpRequest, args: dict[str, Any]) -> dict
     }
 
 
-def _preview_project_resource_cost(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
-    from dataclasses import asdict
-
-    from astrolift_services.cost_preview import preview_managed_service_cost
-
-    service = _project_service_for_request(str(args.get("managed_service_id") or ""))
-    return {"managed_service_id": str(service.guid), **asdict(preview_managed_service_cost(service))}
-
-
 def _provision_project_resource(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     from astrolift_graphql import GUID
     from astrolift_services.schema.mutations import ProvisionProjectManagedServiceInput, ServicesMutation
@@ -1449,7 +1449,6 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_project_resource_clusters": _list_project_resource_clusters,
     "astrolift_list_project_resource_catalog": _list_project_resource_catalog,
     "astrolift_list_project_resources": _list_project_resources,
-    "astrolift_preview_project_resource_cost": _preview_project_resource_cost,
     "astrolift_provision_project_resource": _provision_project_resource,
     "astrolift_attach_project_resource": _attach_project_resource,
     "astrolift_detach_project_resource": _detach_project_resource,

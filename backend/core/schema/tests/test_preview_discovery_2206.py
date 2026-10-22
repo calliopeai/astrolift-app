@@ -17,19 +17,19 @@ def context():
     return StrawberryContext(request)
 
 
-def test_preview_identity_and_cost_controls_are_discoverable_but_not_authority():
+def test_preview_identity_and_resource_controls_are_discoverable_but_not_authority():
     public = schema.execute_sync("{ astroliftServerInfo { capabilities } }", context_value=context())
     assert not public.errors
     assert {
         "previews.exact_identity",
         "previews.reviewed_routes",
-        "previews.explicit_runtime_cost",
+        "previews.explicit_runtime_resources",
         "previews.reviewed_live_logs",
         "previews.reviewed_log_exports",
     } <= set(public.data["astroliftServerInfo"]["capabilities"])
     refused = schema.execute_sync(
         """{
-      astroliftPreviewEnvironment(id: "11111111-1111-4111-8111-111111111111", includeRuntimeCost: true) {
+      astroliftPreviewEnvironment(id: "11111111-1111-4111-8111-111111111111", includeRuntimeResources: true) {
         id environmentStatus runtimeStatus environment { environmentId }
       }
     }""",

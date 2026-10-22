@@ -1186,6 +1186,16 @@ class AgentSkillType:
     tool_defs: list[ToolDefType]
 
 
+@strawberry.type(name="AstroliftAgentBrainGrant")
+class AgentBrainGrantType:
+    """A semantic layer shared with the agent (#2449): runs nobody launched
+    read it as the agent when the agent also lists it."""
+
+    brain_slug: str
+    brain_name: str
+    granted_at: str
+
+
 @strawberry.type(name="AstroliftAgentDetail")
 class AgentDetailType:
     """Full read bundle for one ``kind: agent`` :class:`Workload` (spec
@@ -1238,6 +1248,13 @@ class AgentDetailType:
         description=(
             "Brains a launch may add with brainSlugs (#2432). Null accepts any brain the launcher can read; "
             "empty accepts none."
+        ),
+    )
+    brain_grants: list[AgentBrainGrantType] = strawberry.field(
+        default_factory=list,
+        description=(
+            "Semantic layers shared with the agent that the caller can read (#2449). A run nobody "
+            "launched reads those the agent also lists in brains or brainsAllowed."
         ),
     )
 
@@ -1415,6 +1432,8 @@ def agent_detail_to_type(w) -> AgentDetailType:
     ``containers``) is select_/prefetch_related by the resolver so this
     builder issues no further queries regardless of skill/tool count.
     """
+    from astrolift_registry.brain_runs import visible_agent_grants
+
     app = w.registered_app
     container = _primary_container(w)
     skills: list[AgentSkillType] = []
@@ -1456,6 +1475,12 @@ def agent_detail_to_type(w) -> AgentDetailType:
         scale_down_cron=getattr(w, "scale_down_cron", "") or "",
         brains=list(getattr(w, "brains", None) or []),
         brains_allowed=(list(w.brains_allowed) if getattr(w, "brains_allowed", None) is not None else None),
+        brain_grants=[
+            AgentBrainGrantType(
+                brain_slug=g.brain.slug, brain_name=g.brain.name, granted_at=g.created_at.isoformat()
+            )
+            for g in visible_agent_grants(w)
+        ],
     )
 
 

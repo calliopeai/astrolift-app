@@ -135,8 +135,9 @@ def test_native_http_reports_actual_zero_and_no_data_separately_without_inventin
     assert values["latency_p95"].state == State.NO_DATA and values["latency_p95"].value is None
     assert all(
         values[key].state == State.UNSUPPORTED and values[key].value is None
-        for key in ("input_tokens", "output_tokens", "cost_usd")
+        for key in ("input_tokens", "output_tokens")
     )
+    assert "cost_usd" not in values
     assert len(world.http_calls) == 1
     path, body = world.http_calls[0]
     assert path == "/api/v1/query_range" and len(body) <= 32_768

@@ -31,7 +31,6 @@ vi.mock("@/components/screens/apps/managed-services/EmailDetailSheet", () => {
   return {
     EmailDetailSheetView: view,
     AlertRulesPanelView: view,
-    CostPanelView: view,
     EngagementMetricsPanelView: view,
     MessageLogPanelView: view,
     SenderConfigPanelView: view,

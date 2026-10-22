@@ -86,15 +86,16 @@ describe("shares and hosted apps", () => {
 });
 
 describe("environments", () => {
-  it("are the served ones, or production before anything is served", () => {
+  it("are every environment, served or not, or production before there is one", () => {
     expect(environmentNames(BRAIN)).toEqual(["production", "staging"]);
     expect(environmentNames(NOT_SERVED)).toEqual(["production"]);
+    expect(environmentNames({ allEnvironments: [{ name: "qa", served: false }] })).toEqual(["qa"]);
   });
 
   it("follow ?env= when the layer has it, else production", () => {
     expect(pickEnvironment(BRAIN, "staging")).toBe("staging");
     expect(pickEnvironment(BRAIN, "qa")).toBe("production");
-    expect(pickEnvironment({ environments: [{ name: "staging", url: "x" }] }, null)).toBe(
+    expect(pickEnvironment({ allEnvironments: [{ name: "staging", served: false }] }, null)).toBe(
       "staging"
     );
   });

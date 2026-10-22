@@ -51,7 +51,6 @@ const english = {
   metricsReadUnavailable: "Usage data could not be read.",
   metricsScope: "Deployment totals across consumers; not per-app traffic.",
   metricsSetup: "Metrics setup",
-  costUnavailable: "Cost is unavailable without measured usage and pricing.",
   selectApp: "Select an app",
   appSearch: "Search apps",
   appsEmpty: "No eligible apps",

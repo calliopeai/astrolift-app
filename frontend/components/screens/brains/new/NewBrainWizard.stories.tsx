@@ -4,6 +4,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 
 import type { CreateBrainInput } from "@/graphql/__generated__/operations";
 
+import { CELLS } from "../brain-cells.fixtures";
 import {
   CONNECTIONS,
   CREATION_DEPLOYING,
@@ -37,7 +38,12 @@ function Live({
 }: { onCreate: (input: CreateBrainInput) => void } & Partial<NewBrainWizardProps>) {
   const [step, setStep] = React.useState<NewBrainStep>(1);
   const [own, setOwn] = React.useState(EMPTY_DRAFT);
-  const context = { connections: CONNECTIONS, projects: PROJECTS };
+  const context = {
+    connections: CONNECTIONS,
+    projects: PROJECTS,
+    matrix: CELLS,
+    supportsAppSlug: true,
+  };
   const draft = withDefaults(own, context);
   const problems = draftProblems(draft, context);
   const project = PROJECTS.find((p) => p.id === draft.projectId);
@@ -114,7 +120,25 @@ export const CreateFilesLayer: Story = {
 export const Source: Story = { args: wizardProps(1) };
 export const Details: Story = { args: wizardProps(2) };
 export const Substrate: Story = { args: wizardProps(3) };
-export const Review: Story = { args: wizardProps(4) };
+/** Review names the edition this install pins (`astroliftBrainEdition`). */
+export const Review: Story = {
+  args: wizardProps(4),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText("The edition this install pins (v2026.10.1)")
+    ).toBeInTheDocument();
+  },
+};
+
+/** The pinned edition has no deploy.app_slug: a slug not ending in -brain is refused before Create. */
+export const SlugNeedsAppSlug: Story = {
+  args: wizardProps(2, { problems: { slug: "needsAppSlug" } }),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/has no deploy.app_slug/)).toBeInTheDocument();
+  },
+};
 
 /** The server refused the slug: back on Details, with its message on the field. */
 export const SlugRefused: Story = {

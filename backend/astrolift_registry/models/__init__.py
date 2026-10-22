@@ -1,4 +1,5 @@
 from astrolift_registry.models.app_team_access import AppTeamAccess
+from astrolift_registry.models.brain_agent_grant import BrainAgentGrant
 from astrolift_registry.models.brain_app_binding import BrainAppBinding
 from astrolift_registry.models.brain_creation import BrainCreation, BrainSubstrate
 from astrolift_registry.models.brain_run_binding import BrainRunBinding
@@ -11,6 +12,7 @@ from astrolift_registry.models.template import Template
 from astrolift_registry.models.workload import Workload
 
 __all__ = [
+    "BrainAgentGrant",
     "BrainAppBinding",
     "BrainCreation",
     "BrainRunBinding",

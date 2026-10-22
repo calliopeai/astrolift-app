@@ -2,12 +2,11 @@
  * A semantic layer's substrate in Mimwell's own terms (#2424, the backing
  * model of #2427): a cell of four placements plus what the host attaches.
  *
- * `cellStatus` follows `knowledge_store.cell_status()` as the backend's port
- * (`astrolift_registry/brain_substrate.py`, pinned to mimwell-pvt 7e103f9)
- * states it, so the create and graduation forms only offer supported cells.
- * The server checks the same matrix on every write and its refusal is shown
- * on the field it names; no query exposes the matrix yet, which is why this
- * copy exists. Pure.
+ * `cellStatus` reads Mimwell's matrix as `astroliftBrainCells` returns it
+ * (#2444), so the create and graduation forms only offer supported cells.
+ * Until the matrix arrives nothing is refused here; the server checks the
+ * same matrix on every write and its refusal is shown on the field it names.
+ * Pure.
  */
 import type {
   BrainAuthority,
@@ -52,40 +51,35 @@ export function heldPersistence(current: readonly string[]): Persistence[] {
 export const MAX_REPLICAS = 20;
 export const DEFAULT_PORT = 8080;
 
-const DATABASE_DRIVERS: readonly string[] = ["sqlite", "postgres", "mysql"];
-const BLOB_DATABASE_DRIVERS: readonly string[] = [...DATABASE_DRIVERS, "mongo"];
+/** Mimwell's matrix, one row per cell, as `astroliftBrainCells` returns it. */
+export type CellMatrix = readonly {
+  authority: string;
+  blobs: string;
+  vectors: string;
+  graph: string;
+  status: string;
+  reason: string;
+}[];
 
-/** Why a cell cannot be hosted; each is a `brains.substrate.reasons` message. */
-export type UnsupportedReason =
-  | "d1Authority"
-  | "dbBlobNeedsDatabase"
-  | "inDbVectorsMongo"
-  | "inDbVectorsNeedSql"
-  | "ageNeedsPostgres";
+/** Supported, or not with Mimwell's reason as the server words it. */
+export type CellVerdict = { supported: true } | { supported: false; reason: string };
 
-export type CellVerdict = { supported: true } | { supported: false; reason: UnsupportedReason };
-
-export function cellStatus(cell: Cell): CellVerdict {
-  const { authority } = cell;
-  if (authority === "d1") return { supported: false, reason: "d1Authority" };
-  if (cell.blobs === "db-blob" && !BLOB_DATABASE_DRIVERS.includes(authority))
-    return { supported: false, reason: "dbBlobNeedsDatabase" };
-  if (cell.vectors === "in-db" && authority === "mongo")
-    return { supported: false, reason: "inDbVectorsMongo" };
-  if (cell.vectors === "in-db" && !DATABASE_DRIVERS.includes(authority))
-    return { supported: false, reason: "inDbVectorsNeedSql" };
-  if (cell.graph === "age" && authority !== "postgres")
-    return { supported: false, reason: "ageNeedsPostgres" };
-  return { supported: true };
+/** `cell`'s verdict in `matrix`; null while the matrix has not arrived. */
+export function cellStatus(cell: Cell, matrix: CellMatrix | null): CellVerdict | null {
+  if (!matrix) return null;
+  const row = matrix.find((c) => AXIS_ORDER.every((axis) => c[axis] === cell[axis]));
+  if (row?.status === "supported") return { supported: true };
+  return { supported: false, reason: row?.reason ?? "" };
 }
 
 /** The verdict for `cell` with one placement changed: what a picker option would make. */
 export function optionStatus<A extends Axis>(
   cell: Cell,
   axis: A,
-  value: (typeof AXES)[A][number]
-): CellVerdict {
-  return cellStatus({ ...cell, [axis]: value });
+  value: (typeof AXES)[A][number],
+  matrix: CellMatrix | null
+): CellVerdict | null {
+  return cellStatus({ ...cell, [axis]: value }, matrix);
 }
 
 /** The persistence a cell cannot be hosted without, and the placement that asks for it. */
@@ -157,9 +151,12 @@ export const DEFAULT_SUBSTRATE: SubstrateDraft = {
 export type SubstrateProblem = "cell" | "replicas" | "image" | "port";
 
 /** What keeps a draft from being sent, as the field that says so. */
-export function substrateProblems(draft: SubstrateDraft): SubstrateProblem[] {
+export function substrateProblems(
+  draft: SubstrateDraft,
+  matrix: CellMatrix | null
+): SubstrateProblem[] {
   const out: SubstrateProblem[] = [];
-  if (!cellStatus(draft.cell).supported) out.push("cell");
+  if (cellStatus(draft.cell, matrix)?.supported === false) out.push("cell");
   if (!Number.isInteger(draft.replicas) || draft.replicas < 1 || draft.replicas > MAX_REPLICAS)
     out.push("replicas");
   if (/\s/.test(draft.image.trim())) out.push("image");
@@ -192,11 +189,7 @@ export function substrateInput(
   };
 }
 
-/**
- * The form a graduation starts from: the cell and persistence the layer has
- * now. The API does not report the port, so it starts at Mimwell's default
- * and the form says to keep the one the layer serves on.
- */
+/** The form a graduation starts from: the cell, persistence and port the layer has now. */
 export function draftFromSubstrate(
   substrate: {
     authority: string;
@@ -205,6 +198,7 @@ export function draftFromSubstrate(
     graph: string;
     persistence: readonly string[];
     replicas: number;
+    port: number;
   } | null
 ): SubstrateDraft {
   return {
@@ -212,7 +206,7 @@ export function draftFromSubstrate(
     persistence: persistenceOf(substrate?.persistence ?? []),
     replicas: substrate?.replicas ?? 1,
     image: "",
-    port: DEFAULT_PORT,
+    port: substrate?.port ?? DEFAULT_PORT,
   };
 }
 

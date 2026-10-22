@@ -1,3 +1,4 @@
+import { CELLS } from "../brain-cells.fixtures";
 import { BRAINS } from "../brains.fixtures";
 import type { BrainCreation } from "./BrainCreationProgress";
 import type { WizardConnection } from "./BrainSourceStep";
@@ -79,6 +80,8 @@ const STEP_PROPS = {
   problems: {},
   serverErrors: {},
   substrateError: null,
+  matrix: CELLS,
+  pinnedRef: "v2026.10.1",
   generalError: null,
   connections: CONNECTIONS,
   connectionsLoading: false,

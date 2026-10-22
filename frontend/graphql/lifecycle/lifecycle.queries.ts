@@ -735,11 +735,6 @@ export const LIST_PREVIEW_ENVIRONMENTS = gql`
         memoryBytes
         podCount
       }
-      estimatedDailyCostUsd
-      estimatedCostNotes
-      estimatedCostApproximate
-      estimatedCostNotes
-      estimatedCostApproximate
     }
   }
 `;
@@ -789,17 +784,14 @@ const PREVIEW_ENVIRONMENT_FIELDS = gql`
       memoryBytes
       podCount
     }
-    estimatedDailyCostUsd
-    estimatedCostNotes
-    estimatedCostApproximate
   }
 `;
 
 /** Exact identity lookup: basic reads never query runtime pods or pricing. */
 export const GET_PREVIEW_ENVIRONMENT = gql`
   ${PREVIEW_ENVIRONMENT_FIELDS}
-  query GetPreviewEnvironment($id: GUID!, $includeRuntimeCost: Boolean! = false) {
-    astroliftPreviewEnvironment(id: $id, includeRuntimeCost: $includeRuntimeCost) {
+  query GetPreviewEnvironment($id: GUID!, $includeRuntimeResources: Boolean! = false) {
+    astroliftPreviewEnvironment(id: $id, includeRuntimeResources: $includeRuntimeResources) {
       ...PreviewEnvironmentFields
     }
   }

@@ -28,7 +28,7 @@ export const Empty: Story = {
 
 /** One flag mid-toggle: its switch spins, the others lock. */
 export const Toggling: Story = {
-  render: () => <FeaturesScreen {...FEATURES} pendingKey="admin.cost_enabled" />,
+  render: () => <FeaturesScreen {...FEATURES} pendingKey="admin.quotas_enabled" />,
 };
 
 /**
@@ -46,7 +46,7 @@ export const Error: Story = {
   ),
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
-    await userEvent.click(c.getByRole("switch", { name: "Toggle admin.cost_enabled" }));
+    await userEvent.click(c.getByRole("switch", { name: "Toggle admin.quotas_enabled" }));
     const dialog = await within(document.body).findByRole("alertdialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "Enable flag" }));
     await expect(within(document.body).getByRole("alertdialog")).toBeInTheDocument();
@@ -96,7 +96,7 @@ export const SpanishWidth768: Story = {
   ),
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
-    await userEvent.click(c.getByRole("switch", { name: "Cambiar admin.cost_enabled" }));
+    await userEvent.click(c.getByRole("switch", { name: "Cambiar admin.quotas_enabled" }));
     const dialog = await within(document.body).findByRole("alertdialog");
     await expect(within(dialog).getByRole("button", { name: "Activar función" })).toBeVisible();
   },
@@ -107,7 +107,7 @@ export const AcceptedRefreshFailed: Story = {
     <FeaturesScreen
       {...FEATURES}
       controlsDisabled
-      recovery={{ kind: "accepted", key: "admin.cost_enabled", enabled: true }}
+      recovery={{ kind: "accepted", key: "admin.quotas_enabled", enabled: true }}
       error={new globalThis.Error("Read unavailable")}
     />
   ),
@@ -117,7 +117,7 @@ export const UncertainWrite: Story = {
     <FeaturesScreen
       {...FEATURES}
       controlsDisabled
-      recovery={{ kind: "uncertain", key: "admin.cost_enabled", enabled: true }}
+      recovery={{ kind: "uncertain", key: "admin.quotas_enabled", enabled: true }}
     />
   ),
 };

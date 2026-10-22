@@ -18,6 +18,8 @@ export interface BrainReviewStepProps {
   projectSlug: string;
   canDeploy: boolean;
   onEdit: (step: NewBrainStep) => void;
+  /** The ref the install pins (`astroliftBrainEdition`), when the draft names none. */
+  pinnedRef?: string | null;
   /** A refusal the server tied to no field, verbatim. */
   serverError?: string | null;
 }
@@ -35,6 +37,7 @@ export function BrainReviewStep({
   projectSlug,
   canDeploy,
   onEdit,
+  pinnedRef,
   serverError,
 }: BrainReviewStepProps) {
   const t = useTranslations("brains.wizard");
@@ -61,7 +64,9 @@ export function BrainReviewStep({
               term: t("templateRef"),
               description: draft.templateRef.trim()
                 ? mono(draft.templateRef.trim())
-                : t("pinnedEdition"),
+                : pinnedRef
+                  ? t("pinnedEditionRef", { ref: pinnedRef })
+                  : t("pinnedEdition"),
             },
           ]}
         />

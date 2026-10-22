@@ -131,19 +131,13 @@ def test_basic_projection_never_selects_sensitive_columns_or_nested_grants(world
     assert not any("workloadidentitygrant" in row["sql"].lower() for row in captured)
 
 
-def test_project_permission_does_not_implicitly_grant_app_or_cost_reads(world):
+def test_project_permission_does_not_implicitly_grant_app_reads(world):
     grant(world, Permission.PROJECT_READ)
     with subject(world):
         assert detail(world)
         assert attachments(world).total_count == 0
         with pytest.raises(PermissionDenied):
             query.astrolift_managed_service(make_info(world.user), id=GUID(str(world.service.guid)))
-        from astrolift_services.schema.queries import ServicesQuery
-
-        with pytest.raises(PermissionDenied):
-            ServicesQuery().astrolift_managed_service_cost_preview(
-                make_info(world.user), managed_service_id=GUID(str(world.service.guid))
-            )
 
 
 def test_same_name_deleted_target_never_resolves_replacement(world):

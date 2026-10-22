@@ -1031,9 +1031,6 @@ class ObservabilityRetentionType:
     this org has actually set anything, rather than presenting an inherited
     default as a choice."""
 
-    billable_window_days: int
-    """What the usage dashboard bills against."""
-
     warn_threshold_days: int
     """When to warn an admin before retention closes on a row."""
 

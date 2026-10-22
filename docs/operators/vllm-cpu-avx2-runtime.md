@@ -35,6 +35,20 @@ an actual bounded chat completion. Failure, including out of memory, prevents
 publication. The smoke never supplies Hugging Face or cloud credentials.
 A successful runner smoke is still not actual cluster readiness or inference.
 
+The server runs under a cgroup parent of its own, fresh for each run, which
+sets no limit and outlives the container. At the end of the smoke, before the
+container is removed, the proof's `memory_evidence` records the parent's
+`peak_bytes` (`memory.peak`), `current_bytes` (`memory.current`) and the
+`max`, `oom`, `oom_kill` and `oom_group_kill` counts from `memory.events`, as
+integers only. `oom` counts the container reaching its own 4 GiB limit, where
+the parent's peak sits at or a few KiB above 4 GiB; an `oom_kill` without an
+`oom` is the host's OOM killer. `max` counts reclaim at the limit, so a passing
+run with `max` above zero reached 4 GiB and stayed up by reclaiming. Both byte
+values include page cache, and after a stop `current_bytes` is only what the
+exited processes left charged. A host without readable cgroup v2 files records
+`{"unavailable": "<exception type>"}`; the smoke's result never depends on the
+evidence.
+
 Before installing a produced digest, inspect actual node CPU flags (AVX2 and
 F16C), allocatable CPU/memory, current requests, image pull access and the
 storage prerequisites. A nominal 8 GiB node does not have 8 GiB allocatable.

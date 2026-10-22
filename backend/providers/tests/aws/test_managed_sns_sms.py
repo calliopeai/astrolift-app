@@ -425,18 +425,16 @@ def test_native_requests_match_current_botocore_shapes() -> None:
         validate_parameters(sns.kwargs_for(method), model.operation_model(operation).input_shape)
 
 
-def test_schema_registration_cost_availability_and_runtime_config() -> None:
+def test_schema_registration_availability_and_runtime_config() -> None:
     from core.cluster_observability import managed_config_for
 
     from _sdk.availability import MATRIX
-    from aws.cost import SERVICE_CODE_BY_VARIANT
     from aws.plugin import PLUGIN
 
     driver, _ = _driver()
     assert driver.config_schema()["additionalProperties"] is False
     assert "SMS_PROVIDER" in driver.binding_schema().env_vars
     assert ("sms", "sns_sms") in PLUGIN.managed_service_drivers
-    assert SERVICE_CODE_BY_VARIANT[("sms", "sns_sms")] == "AmazonSNS"
     entry = next(
         item
         for item in MATRIX.managed_services

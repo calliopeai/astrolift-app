@@ -5,10 +5,21 @@
  * status this build does not know reads as itself and never as a message
  * key.
  */
-import type { BrainStatusFieldsFragment } from "@/graphql/__generated__/operations";
+import type {
+  BrainStatusFieldsFragment,
+  BrainSummaryFieldsFragment,
+} from "@/graphql/__generated__/operations";
 import type { StatusTone } from "@/lib/status-tones";
 
 export type BrainStatus = BrainStatusFieldsFragment;
+/** The cached summary a list row carries (#2444): no host reads. */
+export type BrainSummary = BrainSummaryFieldsFragment;
+
+/** One status read: in flight, refused or failed, or the answer (null: no such environment). */
+export type BrainStatusResult =
+  | { state: "loading" }
+  | { state: "error"; message: string }
+  | { state: "ready"; status: BrainStatus | null };
 
 /** Deployment states DeploymentStatusPill knows (`apps.deployments.statuses`). */
 export const DEPLOYMENT_STATUSES = [
@@ -47,7 +58,7 @@ export type Health =
   | { kind: "other"; status: string };
 
 /** The latest deployment's state in the environment, or why there is none. */
-export function healthOf(status: BrainStatus | null): Health {
+export function healthOf(status: Pick<BrainStatus, "deployment"> | null): Health {
   if (!status) return { kind: "noEnvironment" };
   const deployment = status.deployment;
   if (!deployment) return { kind: "notDeployed" };
@@ -87,7 +98,11 @@ export interface Freshness {
   warnings: string[];
 }
 
-export function freshnessOf(status: BrainStatus): Freshness {
+export function freshnessOf(
+  status: Pick<BrainStatus, "compiledAt" | "behind" | "lastIngest"> & {
+    warnings?: readonly string[];
+  }
+): Freshness {
   return {
     compiledAt: status.compiledAt ?? null,
     behind: status.behind ?? null,
@@ -98,7 +113,7 @@ export function freshnessOf(status: BrainStatus): Freshness {
           url: status.lastIngest.url,
         }
       : null,
-    warnings: status.warnings,
+    warnings: [...(status.warnings ?? [])],
   };
 }
 

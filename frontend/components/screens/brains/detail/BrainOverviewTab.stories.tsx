@@ -10,7 +10,7 @@ import {
   NOT_DEPLOYED,
   UNKNOWN_VALUES,
 } from "../brain-status.fixtures";
-import type { BrainStatusResult } from "../BrainStatusCell";
+import type { BrainStatusResult } from "../brain-status-model";
 import { BRAIN, NOT_SERVED, ONE_ENV } from "./brain-detail.fixtures";
 import { BrainOverviewTab } from "./BrainOverviewTab";
 

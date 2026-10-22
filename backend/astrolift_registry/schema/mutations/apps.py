@@ -66,6 +66,21 @@ class AppMutations:
         if mismatch is not None:
             return mismatch
 
+        # Registration never leaves an app nameless, so neither may a rename
+        # (#2477); an over-long name is refused here rather than by Postgres.
+        name: str | None = None
+        if input.name is not None:
+            name = input.name.strip()
+            if not name:
+                return gql_failure(ErrorCode.VALIDATION.value, "name must not be empty", field="name")
+            max_length = RegisteredApp._meta.get_field("name").max_length
+            if len(name) > max_length:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"name must be at most {max_length} characters",
+                    field="name",
+                )
+
         # Resolve the effective post-update trigger_mode + cron_expression
         # together so we can enforce the 'cron mode requires expression'
         # invariant whether the operator is flipping mode, expression,
@@ -162,8 +177,9 @@ class AppMutations:
         if build_context_err is not None:
             return build_context_err
 
+        if name is not None:
+            app.name = name
         for field in (
-            "name",
             "description",
             "source_url",
             "manifest_path",

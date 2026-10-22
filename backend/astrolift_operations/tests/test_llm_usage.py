@@ -1,19 +1,14 @@
-"""Tests for LLM token-usage detection + cost (#30 LLM extension)."""
+"""Tests for preserved LLM key detection and token-source contracts."""
 
 from __future__ import annotations
 
 import pytest
 
 from astrolift_operations.llm_usage import (
-    DEFAULT_FALLBACK,
-    DEFAULT_PRICING,
     LLMProvider,
-    ModelPricing,
     TokenUsage,
-    cost_for_usage,
     detect_llm_keys,
     fetch_usage,
-    lookup_pricing,
     register_usage_source,
     unregister_usage_source,
 )
@@ -187,103 +182,6 @@ def test_token_usage_rejects_negative_tokens():
         )
 
 
-# ---- pricing lookup + cost calculation -----------------------------
-
-
-def test_lookup_pricing_known_model():
-    p = lookup_pricing(provider=LLMProvider.OPENAI, model="gpt-4o")
-    assert p.input_per_million_usd == 2.50
-    assert p.output_per_million_usd == 10.00
-
-
-def test_lookup_pricing_anthropic_models():
-    p = lookup_pricing(provider=LLMProvider.ANTHROPIC, model="claude-opus-4-7")
-    assert p.input_per_million_usd == 15.00
-    assert p.output_per_million_usd == 75.00
-
-
-def test_lookup_pricing_unknown_falls_back_high():
-    """Critical invariant: missing model entries must NOT cost $0
-    on the dashboard. Fall back to a deliberately-conservative
-    rate so unknown spend is overestimated, not invisible."""
-    p = lookup_pricing(provider=LLMProvider.OPENAI, model="gpt-99-future")
-    assert p is DEFAULT_FALLBACK
-
-
-def test_lookup_pricing_org_override_wins():
-    override = ModelPricing(
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        input_per_million_usd=1.00,
-        output_per_million_usd=4.00,
-    )
-    p = lookup_pricing(
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        overrides=[override],
-    )
-    assert p is override
-
-
-def test_cost_for_usage_simple():
-    usage = TokenUsage(
-        period_yyyy_mm="2026-05",
-        org_id=1,
-        app_id=1,
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        input_tokens=1_000_000,
-        output_tokens=500_000,
-    )
-    cost = cost_for_usage(usage)
-    # 1M input @ $2.50 + 0.5M output @ $10/M = $5.00
-    assert cost == 7.50
-
-
-def test_cost_for_usage_zero_tokens_zero_cost():
-    usage = TokenUsage(
-        period_yyyy_mm="2026-05",
-        org_id=1,
-        app_id=1,
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        input_tokens=0,
-        output_tokens=0,
-    )
-    assert cost_for_usage(usage) == 0.0
-
-
-def test_cost_for_usage_with_override():
-    usage = TokenUsage(
-        period_yyyy_mm="2026-05",
-        org_id=1,
-        app_id=1,
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        input_tokens=1_000_000,
-        output_tokens=0,
-    )
-    override = ModelPricing(
-        provider=LLMProvider.OPENAI,
-        model="gpt-4o",
-        input_per_million_usd=1.00,
-        output_per_million_usd=4.00,
-    )
-    assert cost_for_usage(usage, overrides=[override]) == 1.00
-
-
-def test_default_pricing_includes_major_anthropic_models():
-    """Lock-test: the seed table must include the models we
-    actively use so 'unknown model' fallback isn't constantly
-    triggered."""
-    models = {(p.provider, p.model) for p in DEFAULT_PRICING}
-    assert (LLMProvider.ANTHROPIC, "claude-opus-4-7") in models
-    assert (LLMProvider.ANTHROPIC, "claude-sonnet-4-6") in models
-    assert (LLMProvider.ANTHROPIC, "claude-haiku-4-5") in models
-    assert (LLMProvider.OPENAI, "gpt-4o") in models
-    assert (LLMProvider.GEMINI, "gemini-1.5-pro") in models
-
-
 # ---- usage source registry -----------------------------------------
 
 
@@ -328,4 +226,11 @@ def test_fetch_usage_dispatches_to_registered_source():
     assert captured["called_with"] == (LLMProvider.OPENAI, 7, "2026-05")
     assert len(out) == 1
     assert out[0].input_tokens == 100_000
-    assert cost_for_usage(out[0]) == 0.75  # 100k @ $2.50/M + 50k @ $10/M = 0.25 + 0.5
+    assert out[0].output_tokens == 50_000
+
+
+def test_monetary_scaffold_is_retired():
+    from astrolift_operations import llm_usage
+
+    for name in ("ModelPricing", "DEFAULT_PRICING", "DEFAULT_FALLBACK", "lookup_pricing", "cost_for_usage"):
+        assert not hasattr(llm_usage, name)

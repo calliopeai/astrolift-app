@@ -78,7 +78,7 @@ def test_one_frozen_event_for_every_terminal_transition(configured, state):
     assert body["correlation_id"] == row.correlation_id
     assert body["usage"]["input_tokens"] == 7
     assert body["usage"]["output_tokens"] == 11
-    assert body["usage"]["total_cost_usd"] == 0.015
+    assert "total_cost_usd" not in body["usage"]
     assert body["usage"]["duration_ms"] >= 3000
     assert row.generation == 1
     event_id, encrypted = row.final_event_id, bytes(row.payload_ciphertext)
@@ -295,7 +295,6 @@ def test_unknown_usage_remains_unknown_and_invalid_values_are_not_fabricated():
     ) == {
         "input_tokens": None,
         "output_tokens": None,
-        "total_cost_usd": None,
         "model": None,
     }
 
@@ -364,7 +363,7 @@ def test_manual_replay_refuses_erased_failure_content(configured):
 
 
 def test_oversized_reported_cost_cannot_interrupt_task_completion():
-    assert normalized_usage({"total_cost_usd": 10**1000})["total_cost_usd"] is None
+    assert "total_cost_usd" not in normalized_usage({"total_cost_usd": 10**1000})
 
 
 def test_global_http_debug_diagnostics_cannot_print_callback_bodies(configured, monkeypatch, capsys):
@@ -407,3 +406,91 @@ def test_delivery_lease_does_not_lock_task_and_invert_replay_lock_order(configur
     assert outcome["state"] == "finished"
     row.refresh_from_db()
     assert row.status == "delivered" and len(receiver.requests) == 1
+
+
+def test_historical_money_is_projected_only_on_wire_with_identical_signed_retry_bytes(configured):
+    from astrolift_agents.completion_webhook import encoded_body
+    from core.secrets import encrypt_at_rest
+
+    task, row, receiver = task_with_callback(configured)
+    # Arbitrary user result JSON is neither a ledger nor a schema-owned usage field.
+    task.result = {"exit_code": 0, "total_cost_usd": 789, "text": MARKER}
+    task.save()
+    task.transition_to("completed")
+    row.refresh_from_db()
+    legacy = payload(row)
+    legacy["usage"]["total_cost_usd"] = 12.5
+    sealed = encrypt_at_rest(encoded_body(legacy))
+    row.payload_backend_kind, row.payload_ciphertext = sealed.backend_kind, sealed.backend_ref
+    row.event_metadata["usage"]["total_cost_usd"] = 12.5
+    row.save()
+    original_ciphertext = bytes(row.payload_ciphertext)
+    original_metadata = json.loads(json.dumps(row.event_metadata))
+    original_usage = dict(task.completion_usage)
+    event_id, start = row.final_event_id, row.retry_started_at
+    receiver.responses[:] = [503, 200, 200]
+    deliver_attempt(row.pk, row.generation, now=start, jitter=0.5)
+    row.refresh_from_db()
+    assert row.status == "pending"
+    assert bytes(row.payload_ciphertext) == original_ciphertext
+    assert row.event_metadata == original_metadata
+    deliver_attempt(row.pk, row.generation, now=start + timedelta(seconds=30), jitter=0.5)
+    assert receiver.requests[0][1] == receiver.requests[1][1]
+    for headers, raw in receiver.requests:
+        assert verify_signature(
+            KEY.encode(),
+            headers["X-Astrolift-Timestamp"],
+            raw,
+            headers["X-Astrolift-Signature"],
+            now=int(time.time()),
+        )
+        projected = json.loads(raw)
+        assert "total_cost_usd" not in projected["usage"]
+        assert projected["usage"]["input_tokens"] == 7
+        assert projected["result"]["total_cost_usd"] == 789
+    replay = redeliver_callback(task)
+    assert replay.final_event_id == event_id
+    assert replay.event_metadata == original_metadata
+    deliver_attempt(replay.pk, replay.generation)
+    assert "total_cost_usd" not in json.loads(receiver.requests[-1][1])["usage"]
+    task.refresh_from_db()
+    assert task.completion_usage == original_usage
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b"not json",
+        b'{"event":"agent_task.finished","usage":[]}',
+        b'{"event":"agent_task.finished","task_id":"bad","usage":{}}',
+        b'{"event":"agent_task.finished","event":"agent_task.finished"}',
+        b'{"event":"agent_task.finished","usage":{"total_cost_usd":NaN}}',
+    ],
+)
+def test_malformed_historical_envelope_fails_closed_without_body_telemetry(configured, raw, caplog):
+    from core.secrets import encrypt_at_rest
+
+    task, row, receiver = task_with_callback(configured)
+    task.transition_to("completed")
+    row.refresh_from_db()
+    sealed = encrypt_at_rest(raw)
+    row.payload_backend_kind, row.payload_ciphertext = sealed.backend_kind, sealed.backend_ref
+    row.save()
+    metadata = dict(row.event_metadata)
+    deliver_attempt(row.pk, row.generation)
+    row.refresh_from_db()
+    assert receiver.requests == []
+    assert row.status == "failed" and row.last_error == "callback destination or envelope is unavailable"
+    assert row.event_metadata == metadata
+    assert MARKER not in caplog.text and raw.decode() not in caplog.text
+
+
+def test_callback_wire_projection_bounds_before_parsing(monkeypatch):
+    from astrolift_agents import completion_webhook as contract
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("oversized body was parsed")
+
+    monkeypatch.setattr(contract.json, "loads", forbidden)
+    with pytest.raises(CallbackConfigurationError, match="callback envelope is unavailable"):
+        contract.callback_wire_body(b"x" * (contract.MAX_CALLBACK_BODY_BYTES + 1))

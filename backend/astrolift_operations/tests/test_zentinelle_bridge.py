@@ -126,7 +126,7 @@ def test_generic_format_posts_the_inner_envelope():
 
 
 @pytest.mark.django_db
-def test_agent_task_terminal_emits_lifecycle_and_spend_events():
+def test_agent_task_terminal_emits_only_lifecycle_event():
     from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
 
     org = Organization.objects.create(name="Agent Events", slug="agent-events")
@@ -153,7 +153,6 @@ def test_agent_task_terminal_emits_lifecycle_and_spend_events():
         unregister_event_subscriber(seen.append)
     assert [event.event_type for event in seen] == [
         "AUDIT.agent.task.completed",
-        "AUDIT.agent.model_spend",
     ]
-    assert seen[1].payload["payload"]["output_tokens"] == 8
-    assert seen[1].payload["idempotency_key"].startswith(f"zentinelle-{org.pk}-")
+    assert seen[0].payload["idempotency_key"].startswith(f"zentinelle-{org.pk}-")
+    assert "usage" not in seen[0].payload["payload"]

@@ -1,6 +1,5 @@
-"""Astrolift billing + quotas app.
+"""Resource quotas plus retained historical monetary models (#2464).
 
-Quota, Budget, CostSnapshot. Cost data is approximated from
-provider-estimate APIs and platform meters; this app does not call
-billing systems directly.
+Only quota APIs remain active. Historical Budget/CostSnapshot rows are retained;
+no product costing, pricing or actuals collection is performed.
 """

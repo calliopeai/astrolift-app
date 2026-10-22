@@ -17,7 +17,11 @@ refresh tells the run which and why. Ending the run, cancelling it and
 archiving the brain revoke too.
 
 Runs started by a schedule, a loop, a webhook or a workflow stage have no
-person behind them and read no brains.
+person behind them. They read the brains shared with their agent
+(``BrainAgentGrant``, #2449) that the agent also lists in ``brains`` or
+``brains_allowed``, as the agent: bound at spawn, checked again on every
+refresh, revoked on unshare and published only while the share, the agent and
+the run are live.
 """
 
 from __future__ import annotations
@@ -30,9 +34,10 @@ import re
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
-from astrolift_registry.models import BrainRunBinding, BrainTokenKey, RegisteredApp
+from astrolift_registry.models import BrainAgentGrant, BrainRunBinding, BrainTokenKey, RegisteredApp
 
 MAX_RUN_BRAINS = 10
 INDEX_ENV = "BRAINS"
@@ -44,6 +49,11 @@ ENDED = "the run ended"
 CANCELLED = "the run was cancelled"
 ACCESS_LOST = "the person who launched the run can no longer read this brain"
 BRAIN_GONE = "the brain was archived or deleted"
+UNSHARED = "the brain is no longer shared with the agent"
+
+#: How a run nobody launched starts (``core.run_trigger``): a schedule or a
+#: loop tick, a webhook, a workflow stage.
+UNATTENDED_TRIGGERS = ("schedule", "webhook", "parent")
 
 
 class BrainRunError(Exception):
@@ -184,10 +194,19 @@ def bind(task, brains: list[LaunchBrain]) -> None:
 
 
 def live_run_bindings():
-    """Bindings of runs still in flight, not revoked, to live brains."""
+    """Bindings of runs still in flight, not revoked, to live brains; one
+    made from a share also needs the share and the agent live."""
     from astrolift_agents.models import AgentTask
 
+    shared = Q(
+        source=BrainRunBinding.Source.GRANT,
+        grant__isnull=False,
+        grant__deleted_at__isnull=True,
+        agent_task__agent_definition__deleted_at__isnull=True,
+        agent_task__agent_definition__registered_app__deleted_at__isnull=True,
+    )
     return BrainRunBinding.objects.filter(
+        Q(source__in=(BrainRunBinding.Source.DEFAULT, BrainRunBinding.Source.REQUESTED)) | shared,
         revoked_at__isnull=True,
         agent_task__deleted_at__isnull=True,
         agent_task__status__in=AgentTask.NON_TERMINAL_STATUSES,
@@ -244,6 +263,78 @@ def revoke_run(task, reason: str) -> list[BrainRunBinding]:
     return _revoke(list(rows.select_related("agent_task")), reason)
 
 
+def revoke_grant(grant: BrainAgentGrant) -> list[BrainRunBinding]:
+    """Revoke every run's binding made from ``grant``: it was unshared."""
+    rows = BrainRunBinding.objects.filter(grant=grant, revoked_at__isnull=True)
+    return _revoke(list(rows.select_related("agent_task")), UNSHARED)
+
+
+def agent_grants(workload):
+    """The live shares of live brains with agent ``workload``, in its organization."""
+    return BrainAgentGrant.objects.filter(
+        agent=workload,
+        organization_id=workload.registered_app.organization_id,
+        brain__organization_id=workload.registered_app.organization_id,
+        deleted_at__isnull=True,
+        brain__deleted_at__isnull=True,
+        brain__archived_at__isnull=True,
+    )
+
+
+def visible_agent_grants(workload):
+    """``workload``'s shares whose brain the caller can read, by brain slug."""
+    from astrolift_registry.brains import visible_brains
+
+    return (
+        agent_grants(workload)
+        .filter(brain__in=visible_brains().values("pk"))
+        .select_related("brain")
+        .order_by("brain__slug")
+    )
+
+
+def _agent_lists(workload) -> list[str]:
+    """The brains ``workload`` lists: ``brains``, then ``brains_allowed``."""
+    out = list(workload.brains or [])
+    return out + [slug for slug in workload.brains_allowed or [] if slug not in out]
+
+
+def bind_unattended(task) -> None:
+    """Bind a run nobody launched to the brains shared with its agent that the
+    agent also lists and some environment serves, at most ``MAX_RUN_BRAINS``.
+    Nothing for a launched run or one already bound."""
+    from astrolift_registry.brain_apps import mcp_urls
+
+    workload = task.agent_definition
+    if task.trigger_kind not in UNATTENDED_TRIGGERS or workload is None:
+        return
+    if BrainRunBinding.objects.filter(agent_task_id=task.pk).exists():
+        return
+    listed = _agent_lists(workload)
+    grants = {
+        grant.brain.slug: grant
+        for grant in agent_grants(workload).filter(brain__slug__in=listed).select_related("brain")
+    }
+    names: set[str] = set()
+    for slug in [slug for slug in listed if slug in grants][:MAX_RUN_BRAINS]:
+        grant = grants[slug]
+        name = env_names(slug)["token"]
+        if name in names or not mcp_urls(grant.brain):
+            continue
+        names.add(name)
+        BrainRunBinding.objects.get_or_create(
+            agent_task=task,
+            slug=slug,
+            defaults={
+                "organization_id": task.organization_id,
+                "brain": grant.brain,
+                "name": grant.brain.name,
+                "source": BrainRunBinding.Source.GRANT,
+                "grant": grant,
+            },
+        )
+
+
 def revoke_brain(brain_id: int) -> list[BrainRunBinding]:
     """Revoke every run's binding to brain ``brain_id``: it is being archived or deleted."""
     rows = BrainRunBinding.objects.filter(brain_id=brain_id, revoked_at__isnull=True)
@@ -267,25 +358,49 @@ def _readable(user, organization_id: int, row: BrainRunBinding) -> bool:
     return brain is not None and brain.pk == row.brain_id
 
 
+def _still_shared(row: BrainRunBinding) -> bool:
+    """Whether the share ``row`` reads through is live, its agent is, and the
+    agent still lists the brain."""
+    grant = row.grant
+    agent = row.agent_task.agent_definition
+    return (
+        grant is not None
+        and grant.deleted_at is None
+        and agent is not None
+        and grant.agent_id == agent.pk
+        and agent.deleted_at is None
+        and agent.registered_app.deleted_at is None
+        and row.slug in _agent_lists(agent)
+    )
+
+
 def recheck(task) -> list[BrainRunBinding]:
     """Revoke every live binding of ``task`` whose brain the person who
-    launched it can no longer read, or that is gone; returns those revoked
-    now."""
+    launched it can no longer read, that is no longer shared with its agent
+    (a run nobody launched), or that is gone; returns those revoked now."""
     rows = list(
         BrainRunBinding.objects.filter(agent_task_id=task.pk, revoked_at__isnull=True).select_related(
-            "brain", "agent_task", "agent_task__triggered_by_user"
+            "brain",
+            "grant",
+            "agent_task",
+            "agent_task__triggered_by_user",
+            "agent_task__agent_definition__registered_app",
         )
     )
     if not rows:
         return []
     user = rows[0].agent_task.triggered_by_user
     gone = [row for row in rows if row.brain is None or row.brain.deleted_at or row.brain.archived_at]
+    shared = [row for row in rows if row not in gone and row.source == BrainRunBinding.Source.GRANT]
+    unshared = [row for row in shared if not _still_shared(row)]
     lost = [
         row
         for row in rows
-        if row not in gone and (user is None or not _readable(user, task.organization_id, row))
+        if row not in gone
+        and row not in shared
+        and (user is None or not _readable(user, task.organization_id, row))
     ]
-    return _revoke(gone, BRAIN_GONE) + _revoke(lost, ACCESS_LOST)
+    return _revoke(gone, BRAIN_GONE) + _revoke(unshared, UNSHARED) + _revoke(lost, ACCESS_LOST)
 
 
 def _binding_key(row: BrainRunBinding) -> BrainTokenKey:
@@ -299,22 +414,35 @@ def _binding_key(row: BrainRunBinding) -> BrainTokenKey:
         return BrainTokenKey.objects.filter(run_binding=locked).first() or _new_key(run_binding=locked)
 
 
-def _issue(row: BrainRunBinding, task, user, *, reason: str) -> tuple[str, dt.datetime]:
+def _subject(row: BrainRunBinding, task):
+    """Who ``row``'s tokens are issued to: the agent for a share (``sub``
+    ``agent:<guid>``, no email), else the person who launched the run."""
+    if row.source != BrainRunBinding.Source.GRANT:
+        return task.triggered_by_user
+    from types import SimpleNamespace
+
+    return SimpleNamespace(pk=None, guid=f"agent:{task.agent_definition.guid}", email="")
+
+
+def _issue(row: BrainRunBinding, task, *, reason: str) -> tuple[str, dt.datetime]:
     from astrolift_registry.brain_tokens import BrainTokenError, issue
 
+    subject = _subject(row, task)
     try:
         issued = issue(
-            user=user, brain=row.brain, key=_binding_key(row), claims={"agent_task": str(task.guid)}
+            user=subject, brain=row.brain, key=_binding_key(row), claims={"agent_task": str(task.guid)}
         )
     except BrainTokenError as exc:
         raise BrainRunError("precondition", str(exc)) from exc
+    extra = {"agent": task.agent_definition.slug} if subject.pk is None else {}
     _audit(
         "brain.token.issue",
         row,
         task,
-        actor_user_id=user.pk,
+        actor_user_id=subject.pk,
         reason=reason,
         expires_at=issued.expires_at.isoformat(),
+        **extra,
     )
     return issued.token, issued.expires_at
 
@@ -352,7 +480,7 @@ def _tokens(task, *, reason: str, served: bool) -> tuple[list[tuple], list[Brain
     recheck(task)
     rows = list(
         BrainRunBinding.objects.filter(agent_task_id=task.pk)
-        .select_related("brain", "agent_task__triggered_by_user")
+        .select_related("brain", "agent_task__triggered_by_user", "agent_task__agent_definition")
         .order_by("pk")
     )
     live = [(row, mcp_urls(row.brain)) for row in rows if row.revoked_at is None]
@@ -361,7 +489,7 @@ def _tokens(task, *, reason: str, served: bool) -> tuple[list[tuple], list[Brain
         raise BrainRunError("precondition", f"brain {unserved[0]!r} is not served in any environment")
     issued = []
     for row, urls in live:
-        token, expires_at = _issue(row, task, row.agent_task.triggered_by_user, reason=reason)
+        token, expires_at = _issue(row, row.agent_task, reason=reason)
         issued.append((row, urls, token, expires_at))
     return issued, [row for row in rows if row.revoked_at is not None]
 
@@ -375,6 +503,7 @@ def spawn_wiring(task) -> RunWiring | None:
 
     if not isinstance(task, AgentTask) or task.pk is None:
         return None
+    bind_unattended(task)
     if not BrainRunBinding.objects.filter(agent_task_id=task.pk).exists():
         return None
     issued, revoked = _tokens(task, reason="launch", served=True)

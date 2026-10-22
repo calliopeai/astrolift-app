@@ -18,6 +18,10 @@ export const BRAIN: FramedBrain = {
     { name: "production", url: "https://platform-brain.apps.example.test" },
     { name: "staging", url: "https://platform-brain.staging.example.test" },
   ],
+  allEnvironments: [
+    { name: "production", served: true },
+    { name: "staging", served: true },
+  ],
   sharedWith: [
     { team: "medops", access: "viewer" },
     { team: "sales", access: "deployer" },
@@ -31,7 +35,11 @@ export const BRAIN: FramedBrain = {
   substrate: FILES,
 };
 
-export const ONE_ENV: FramedBrain = { ...BRAIN, environments: [BRAIN.environments[0]!] };
+export const ONE_ENV: FramedBrain = {
+  ...BRAIN,
+  environments: [BRAIN.environments[0]!],
+  allEnvironments: [BRAIN.allEnvironments[0]!],
+};
 
 /** Registered and owned, nothing served yet, shared with no one. */
 export const NOT_SERVED: FramedBrain = {
@@ -39,6 +47,7 @@ export const NOT_SERVED: FramedBrain = {
   slug: "draft-brain",
   name: "Draft layer",
   environments: [],
+  allEnvironments: [],
   sharedWith: [],
   hostedApps: [],
 };

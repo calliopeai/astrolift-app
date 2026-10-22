@@ -82,9 +82,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-reproduce", action="store_true", help="run one pass only; step 7 reports as skipped")
     parser.add_argument("--no-rollback", action="store_true", help="skip the rollback assertion inside UPDATE")
     parser.add_argument(
-        "--estimate-logged",
+        "--allow-capacity-resources",
         action="store_true",
-        help="assert that every selected class-C variant has a live-pricing estimate logged on the campaign issue",
+        help=(
+            "authorize reviewed capacity resources; does not prove observed capacity, "
+            "provider permission or a financial bound"
+        ),
     )
     parser.add_argument("--json", metavar="PATH", default="", help="also write the grid as JSON")
     parser.add_argument(
@@ -126,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
             ),
             update_image_ref=args.update_image,
             include_rollback=not args.no_rollback,
-            estimate_logged=args.estimate_logged,
+            capacity_resources_authorized=args.allow_capacity_resources,
         )
         grid.add(runner.run_cell(cell, reproduce=not args.no_reproduce))
 

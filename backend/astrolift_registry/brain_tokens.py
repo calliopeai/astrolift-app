@@ -54,6 +54,38 @@ def jwks_uri() -> str:
     return issuer() + JWKS_PATH
 
 
+#: What a brain's container verifies read tokens with (#2441): this
+#: install's JWKS and issuer, and the brain's own guid as the audience.
+MCP_VERIFICATION_ENV = ("BRAIN_MCP_JWKS_URL", "BRAIN_MCP_ISSUER", "BRAIN_MCP_AUDIENCE")
+
+
+def stamp_mcp_verification_env(resources: list[dict[str, Any]], app: RegisteredApp) -> None:
+    """Set ``MCP_VERIFICATION_ENV`` on every container of ``app``'s long-running
+    workloads when ``app`` is a brain. The values come from the install and
+    replace any the brain's own manifest sets. An install with no https URL
+    issues no tokens, so nothing is set (and logged)."""
+    import logging
+
+    from astrolift_manifest.app_kinds import BRAIN_KINDS
+
+    if getattr(app, "app_kind", "") not in BRAIN_KINDS:
+        return
+    try:
+        values = dict(zip(MCP_VERIFICATION_ENV, (jwks_uri(), issuer(), str(app.guid)), strict=True))
+    except BrainTokenError:
+        logging.getLogger(__name__).warning(
+            "%s is a brain but the install has no https URL for tokens", app.slug
+        )
+        return
+    for resource in resources:
+        if resource.get("kind") not in ("Deployment", "StatefulSet"):
+            continue
+        pod = ((resource.get("spec") or {}).get("template") or {}).get("spec") or {}
+        for container in pod.get("containers") or []:
+            env = [e for e in container.get("env") or [] if e.get("name") not in values]
+            container["env"] = env + [{"name": k, "value": v} for k, v in values.items()]
+
+
 def _new_key(**owner: Any) -> BrainTokenKey:
     from core.secrets import encrypt_at_rest
 

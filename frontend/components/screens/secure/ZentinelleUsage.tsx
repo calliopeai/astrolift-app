@@ -1,6 +1,6 @@
 "use client";
 
-import { ActivityIcon, CircleDollarSignIcon, CoinsIcon } from "lucide-react";
+import { ActivityIcon, HashIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { QueryError } from "@/components/QueryError";
@@ -17,12 +17,11 @@ export interface ZentinelleUsageProps {
   usage: ReadState<ZentinelleUsageRow[]>;
 }
 
-/** Model usage and cost from Zentinelle's gateway metering, per agent and model. */
+/** Model requests and tokens from Zentinelle's gateway, per agent and model. */
 export function ZentinelleUsage({ filter, usage }: ZentinelleUsageProps) {
   const t = useTranslations("zentinelleScreen.usage");
   const format = useFormatter();
   const totals = usageTotals(usage.data);
-  const usd = (n: number) => format.number(n, { style: "currency", currency: "USD" });
 
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -31,7 +30,7 @@ export function ZentinelleUsage({ filter, usage }: ZentinelleUsageProps) {
         <QueryError title={t("error")} error={usage.error} onRetry={usage.onRetry} />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <StatTile
               label={t("requests")}
               value={format.number(totals.requests)}
@@ -41,13 +40,7 @@ export function ZentinelleUsage({ filter, usage }: ZentinelleUsageProps) {
             <StatTile
               label={t("tokens")}
               value={format.number(totals.inputTokens + totals.outputTokens)}
-              icon={CoinsIcon}
-              loading={usage.loading}
-            />
-            <StatTile
-              label={t("cost")}
-              value={usd(totals.costUsd)}
-              icon={CircleDollarSignIcon}
+              icon={HashIcon}
               loading={usage.loading}
             />
           </div>
@@ -80,9 +73,6 @@ export function ZentinelleUsage({ filter, usage }: ZentinelleUsageProps) {
                           input: format.number(row.inputTokens),
                           output: format.number(row.outputTokens),
                         })}
-                      </span>
-                      <span className="w-24 text-right text-sm font-medium tabular-nums">
-                        {usd(row.costUsd)}
                       </span>
                     </div>
                   ))

@@ -3,7 +3,6 @@
 import { AppWindowIcon, BrainCircuitIcon, PlugIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import type * as React from "react";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -12,20 +11,13 @@ import { Button } from "@/components/ui/button";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";
 
-import type { BrainStatusPart } from "./BrainStatusCell";
+import { BrainStatusCell } from "./BrainStatusCell";
 import { ConnectBrainDialog } from "./ConnectBrainDialog";
 import { brainHref } from "./detail/brain-tabs-model";
 import { HostBrainAppDialog } from "./HostBrainAppDialog";
 import type { BrainRow, BrainsState } from "./use-brains";
 
-export type BrainsScreenProps = BrainsState & {
-  /**
-   * One status column of a row: Health, Last rebuild or Freshness. The route
-   * gives each visible row its own status read (BrainRowStatus); stories and
-   * tests pass the pure cell.
-   */
-  statusCell: (row: BrainRow, part: BrainStatusPart) => React.ReactNode;
-};
+export type BrainsScreenProps = BrainsState;
 
 // The row's link is an ::after overlay across the row; a control in a cell
 // has to sit above it to be reachable.
@@ -33,8 +25,9 @@ const ABOVE_ROW_LINK = "relative z-10";
 
 /**
  * Apps › Semantic layers (#2320, #2427): the layers the viewer can read,
- * with their team, health, last rebuild, freshness and shares. A row opens
- * the layer. Connect issues the viewer a short-lived read token and shows it
+ * with their team, health, last rebuild, freshness (each row's cached
+ * summary, #2444) and shares. A row opens the layer; an archived one opens
+ * its page, which offers Restore. Connect issues the viewer a short-lived read token and shows it
  * once as an MCP client config; Host an app creates an app on the layer from
  * the brain-app template (#2243). Pure view; data from useBrains.
  */
@@ -42,6 +35,7 @@ export function BrainsScreen({
   list,
   rows,
   totalCount,
+  nextCursor,
   loading,
   stale,
   error,
@@ -58,7 +52,6 @@ export function BrainsScreen({
   onHost,
   onDismissHost,
   onSubmitHost,
-  statusCell,
 }: BrainsScreenProps) {
   const t = useTranslations("brains");
   const columns: Column<BrainRow>[] = [
@@ -69,8 +62,15 @@ export function BrainsScreen({
       cellClassName: "max-w-72",
       cell: (b) => (
         <span className="block min-w-0">
-          <span className="block truncate font-medium" title={b.name}>
-            {b.name}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-medium" title={b.name}>
+              {b.name}
+            </span>
+            {b.archived && (
+              <Badge variant="outline" className="text-muted-foreground shrink-0">
+                {t("archived")}
+              </Badge>
+            )}
           </span>{" "}
           <span className="text-muted-foreground block truncate font-mono text-xs" title={b.slug}>
             {b.slug}
@@ -81,7 +81,6 @@ export function BrainsScreen({
     {
       id: "owner",
       header: t("columnOwner"),
-      sortKey: "team",
       cellClassName: "max-w-56",
       cell: (b) => (
         <span className="block truncate font-mono text-xs" title={`${b.team} / ${b.project}`}>
@@ -92,18 +91,18 @@ export function BrainsScreen({
     {
       id: "health",
       header: t("columnHealth"),
-      cell: (b) => statusCell(b, "health"),
+      cell: (b) => <BrainStatusCell part="health" summary={b.summary ?? null} />,
     },
     {
       id: "rebuilt",
       header: t("columnRebuilt"),
-      cell: (b) => statusCell(b, "rebuilt"),
+      cell: (b) => <BrainStatusCell part="rebuilt" summary={b.summary ?? null} />,
     },
     {
       id: "freshness",
       header: t("columnFreshness"),
       cellClassName: "max-w-56",
-      cell: (b) => statusCell(b, "freshness"),
+      cell: (b) => <BrainStatusCell part="freshness" summary={b.summary ?? null} />,
     },
     {
       id: "shared",
@@ -137,7 +136,7 @@ export function BrainsScreen({
           <Button
             variant="ghost"
             size="sm"
-            disabled={connecting || !b.environments.length}
+            disabled={connecting || b.archived || !b.environments.length}
             title={b.environments.length ? undefined : t("notServed")}
             onClick={() => void onConnect(b.slug)}
           >
@@ -148,7 +147,7 @@ export function BrainsScreen({
             <Button
               variant="ghost"
               size="sm"
-              disabled={!b.environments.length}
+              disabled={b.archived || !b.environments.length}
               title={b.environments.length ? t("hostTitle") : t("notServed")}
               onClick={() => onHost(b.slug)}
             >
@@ -193,6 +192,7 @@ export function BrainsScreen({
           ...(canCreate ? { actionHref: "/brains/new", actionLabel: t("new") } : {}),
         }}
         totalCount={totalCount}
+        nextCursor={nextCursor}
       />
       <ConnectBrainDialog connection={connection} onDismiss={onDismissConnection} />
       <HostBrainAppDialog

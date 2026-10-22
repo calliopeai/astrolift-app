@@ -1,4 +1,4 @@
-import type { BrainStatus } from "./brain-status-model";
+import type { BrainStatus, BrainSummary } from "./brain-status-model";
 
 /** Hand-typed `astroliftBrainStatus` answers, one per state the screens draw. */
 
@@ -11,6 +11,7 @@ const FILES_SUBSTRATE: BrainStatus["substrate"] = {
   persistence: [],
   replicas: 1,
   image: "",
+  port: 8080,
   adopted: false,
   adoptedStore: "",
   graduationNeeded: false,
@@ -26,6 +27,7 @@ export const POSTGRES_SUBSTRATE: BrainStatus["substrate"] = {
   persistence: ["postgres", "s3"],
   replicas: 2,
   image: "",
+  port: 8080,
   adopted: true,
   adoptedStore: "postgres",
   graduationNeeded: false,
@@ -216,11 +218,22 @@ export const UNKNOWN_VALUES: BrainStatus = {
   },
 };
 
-/** The list's status per row, keyed by slug. */
-export const ROW_STATUSES: Record<string, BrainStatus | null> = {
-  "leo-brain": HEALTHY,
-  "sales-brain": NOT_DEPLOYED,
-};
+/**
+ * The summary a list row carries for `status` (#2444): its deployment now,
+ * and what the last status read found, unless `checked` is false (no read
+ * has run, or it expired).
+ */
+export function summaryOf(status: BrainStatus | null, checked = true): BrainSummary | null {
+  if (!status) return null;
+  return {
+    environmentName: status.environmentName,
+    deployment: status.deployment,
+    compiledAt: checked ? status.compiledAt : null,
+    behind: checked ? status.behind : null,
+    lastIngest: checked ? status.lastIngest : null,
+    checkedAt: checked ? "2026-10-16T08:00:00Z" : null,
+  };
+}
 
 /** A substrate as the API sends it, `__typename`s and all, for Apollo mocks. */
 export function typedSubstrate(substrate: BrainStatus["substrate"]) {
