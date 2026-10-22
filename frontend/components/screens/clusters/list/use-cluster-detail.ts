@@ -34,15 +34,19 @@ export function useClusterDetail(slug: string) {
   });
   const cluster = data?.astroliftCluster ?? undefined;
   const lifecycle = cluster?.lifecycle ?? "registered";
+  // A re-point's role move reports its progress here too (#2472).
+  const rebindState = cluster?.workloadIdentityRebind?.state;
+  const inFlight =
+    lifecycle === "managing" || rebindState === "pending" || rebindState === "running";
 
   React.useEffect(() => {
-    if (lifecycle === "managing") {
+    if (inFlight) {
       startPolling(POLL_INTERVAL_MS);
       return () => stopPolling();
     }
     stopPolling();
     return undefined;
-  }, [lifecycle, startPolling, stopPolling]);
+  }, [inFlight, startPolling, stopPolling]);
 
   const router = useRouter();
   const t = useTranslations("clusters.unregister");

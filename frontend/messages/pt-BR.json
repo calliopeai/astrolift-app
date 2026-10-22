@@ -11966,6 +11966,27 @@
         "podsRunning": "Pods em execução",
         "cpu": "CPU",
         "memory": "Memória"
+      },
+      "workloadIdentity": {
+        "title": "Funções de identidade de carga de trabalho",
+        "state": {
+          "pending": "Na fila",
+          "running": "Movendo",
+          "succeeded": "Movido",
+          "failed": "Falhou"
+        },
+        "description": {
+          "pending": "O cluster foi reapontado para um cluster com outro emissor OIDC. As funções do IAM dos aplicativos estão na fila para passar para ele.",
+          "running": "O cluster foi reapontado para um cluster com outro emissor OIDC. As funções do IAM dos aplicativos estão passando para ele; um pod não pode assumir uma função até que ela tenha sido movida.",
+          "succeeded": "Todas as funções do IAM dos aplicativos deste cluster confiam no emissor OIDC dele.",
+          "failed": "Algumas funções do IAM de aplicativos ainda confiam no emissor OIDC anterior, então os pods delas neste cluster não podem assumi-las. Implantar um aplicativo move a função dele; registrar o cluster de novo tenta o restante novamente."
+        },
+        "issuer": "Emissor OIDC",
+        "apps": "Aplicativos",
+        "progress": "{reached} de {total}",
+        "started": "Iniciado",
+        "finished": "Concluído",
+        "failuresTitle": "{count, plural, one {# função não movida} other {# funções não movidas}}"
       }
     }
   },

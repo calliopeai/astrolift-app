@@ -26,6 +26,35 @@ class ClusterBootstrapRunType:
     triggered_by_username: str | None
 
 
+@strawberry.type(name="AstroliftWorkloadIdentityRebindFailure")
+class WorkloadIdentityRebindFailureType:
+    app: str = strawberry.field(description="The app, as <organization slug>/<app slug>.")
+    role: str = strawberry.field(description="The IAM role whose trust was not moved.")
+    error: str
+
+
+@strawberry.type(name="AstroliftWorkloadIdentityRebind")
+class WorkloadIdentityRebindType:
+    """Moving a cluster's per-app workload identity roles to its new OIDC
+    issuer, after a registration re-pointed the cluster row at another
+    cluster (#2472)."""
+
+    state: str = strawberry.field(description="pending | running | succeeded | failed")
+    issuer: str = strawberry.field(description="The issuer the roles are moved to, host and path.")
+    previous_issuers: list[str]
+    apps_total: int
+    apps_reconciled: int = strawberry.field(
+        description="Apps whose role now trusts the issuer, or needed nothing: no role, or one another cluster holds."
+    )
+    failures: list[WorkloadIdentityRebindFailureType]
+    error: str = strawberry.field(
+        description="Why the move could not start or stopped before reaching every app."
+    )
+    requested_at: dt.datetime
+    started_at: dt.datetime | None
+    finished_at: dt.datetime | None
+
+
 @strawberry.type(name="AstroliftTenantCluster")
 class TenantClusterType:
     id: GUID
@@ -91,6 +120,39 @@ class TenantClusterType:
         from astrolift_clusters.viewer_permissions import cluster_viewer_permissions
 
         return cluster_viewer_permissions(info, shared=self.shared)
+
+    @strawberry.field(
+        description=(
+            "The latest move of this cluster's per-app workload identity roles to a new OIDC "
+            "issuer (#2472), started when a registration re-points the cluster at another "
+            "cluster. Null when it was never re-pointed and outside the operator view; on a "
+            "shared cluster, whose apps span organizations, only the platform operator sees it."
+        )
+    )
+    def workload_identity_rebind(self, info: strawberry.Info) -> WorkloadIdentityRebindType | None:
+        from django.db.models import Q
+
+        from astrolift_clusters.models import ClusterWorkloadIdentityRebind, TenantCluster
+        from core.permissions import is_platform_operator
+        from core.tenancy import get_current_tenant
+
+        # Re-scoped by caller org, as last_bootstrap_run is.
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None or not self.operator_view:
+            return None
+        if self.shared:
+            request = getattr(info.context, "request", None)
+            if not is_platform_operator(getattr(request, "user", None)):
+                return None
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=org_id) | Q(organization_id__isnull=True),
+            guid=str(self.id),
+        ).first()
+        if cluster is None:
+            return None
+        rebind = ClusterWorkloadIdentityRebind.objects.filter(tenant_cluster=cluster).order_by("-pk").first()
+        return workload_identity_rebind_to_type(rebind) if rebind is not None else None
 
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
@@ -341,6 +403,28 @@ def redact_oidc_auth_config(config: dict | None) -> dict | None:
     view["client_secret_set"] = bool(config.get("client_secret"))
     view["gateway_secret_set"] = bool(config.get("gateway_secret"))
     return view
+
+
+def workload_identity_rebind_to_type(rebind) -> WorkloadIdentityRebindType:
+    return WorkloadIdentityRebindType(
+        state=rebind.state,
+        issuer=rebind.issuer,
+        previous_issuers=list(rebind.previous_issuers or []),
+        apps_total=rebind.apps_total,
+        apps_reconciled=rebind.apps_reconciled,
+        failures=[
+            WorkloadIdentityRebindFailureType(
+                app=str(failure.get("app", "")),
+                role=str(failure.get("role", "")),
+                error=str(failure.get("error", "")),
+            )
+            for failure in rebind.failures or []
+        ],
+        error=rebind.error,
+        requested_at=rebind.created_at,
+        started_at=rebind.started_at,
+        finished_at=rebind.finished_at,
+    )
 
 
 def cluster_to_type(cluster, *, operator_view: bool = True) -> TenantClusterType:

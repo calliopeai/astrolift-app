@@ -26,6 +26,7 @@ the canonical pattern.
 
 from __future__ import annotations
 
+import copy
 import json
 from contextlib import suppress
 from dataclasses import dataclass
@@ -763,6 +764,62 @@ class IRSADriver(WorkloadIdentityDriver):
         except Exception as exc:
             raise map_client_error(exc) from exc
 
+    @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.rebind_issuer")
+    def rebind_trust_issuer(self, role: str, previous_issuers: list[str], owner: dict[str, str]) -> str:
+        """Move a role's OIDC trust from the cluster's previous issuer to its current one (#2472).
+
+        A tenant cluster row re-pointed at another cluster (the installer's
+        region change registers the target under the old slug) keeps the roles
+        Astrolift minted for it, still trusting the old cluster's OIDC
+        provider. Each statement federated to one of ``previous_issuers`` is
+        moved to this driver's issuer, with its ``<issuer>:<claim>`` condition
+        keys; subjects, audiences and the role's policies stay as they are. A
+        statement federated to any other provider is left alone, so a role
+        another cluster last bound stays with it.
+
+        Returns ``rebound``, ``current`` (it already trusts this issuer),
+        ``unrelated`` (it trusts neither) or ``absent``. Refuses a role the
+        platform does not manage, or one whose ``astrolift.io/<key>-id`` tags
+        name an owner other than ``owner``.
+        """
+        issuer = self._config.cluster_oidc_issuer
+        previous = {value for value in previous_issuers if value} - {issuer}
+        if not issuer or not previous:
+            raise ValueError("rebinding a role's trust needs the cluster's issuer and a different previous one")
+        try:
+            trust_doc = self._iam.get_role(RoleName=role)["Role"]["AssumeRolePolicyDocument"]
+        except self._iam.exceptions.NoSuchEntityException:
+            return "absent"
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        if isinstance(trust_doc, str):
+            from urllib.parse import unquote
+
+            trust_doc = json.loads(unquote(trust_doc))
+
+        rebound, moved, current = _rebind_trust_document(trust_doc, previous, issuer)
+        if not moved:
+            return "current" if current else "unrelated"
+        self._refuse_foreign_role(role, owner)
+        try:
+            self._iam.update_assume_role_policy(RoleName=role, PolicyDocument=json.dumps(rebound))
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        return "rebound"
+
+    def _refuse_foreign_role(self, role: str, owner: dict[str, str]) -> None:
+        try:
+            tags = self._iam.list_role_tags(RoleName=role).get("Tags", [])
+        except Exception as exc:
+            raise map_client_error(exc) from exc
+        observed = {tag.get("Key"): tag.get("Value") for tag in tags}
+        if observed.get("astrolift.io/managed-by") != "platform":
+            raise ValueError(f"role {role} is not managed by the platform; its trust was left unchanged")
+        for key, value in owner.items():
+            tagged = observed.get(f"astrolift.io/{key}-id")
+            if tagged is not None and tagged != value:
+                raise ValueError(f"role {role} belongs to another {key} ({tagged}); its trust was left unchanged")
+
     # ---- observability reads (#377) -------------------------------
 
     @driver_op(cloud="aws", driver="identity")
@@ -986,6 +1043,70 @@ def discover_oidc_issuer(
         return ""
     issuer = (((cluster.get("identity") or {}).get("oidc") or {}).get("issuer")) or ""
     return issuer.removeprefix("https://")
+
+
+def _rebind_trust_document(
+    document: dict[str, Any],
+    previous: set[str],
+    issuer: str,
+) -> tuple[dict[str, Any], bool, bool]:
+    """A copy of ``document`` with each statement federated to a ``previous``
+    issuer moved to ``issuer``, whether any moved, and whether any already
+    trusted ``issuer``.
+
+    A moved statement's condition keys are renamed with it. Where a key for
+    ``issuer`` is already there (``_ensure_trust_includes`` adds one beside a
+    principal it never changes), the two keys' values are merged.
+    """
+    rebound = copy.deepcopy(document)
+    statements = rebound.get("Statement") or []
+    if isinstance(statements, dict):
+        statements = [statements]
+    moved = current = False
+    for statement in statements:
+        principal = statement.get("Principal")
+        if not isinstance(principal, dict):
+            continue
+        federated = principal.get("Federated")
+        providers = federated if isinstance(federated, list) else [federated]
+        renamed = []
+        hit = False
+        for provider in providers:
+            head, separator, provider_issuer = str(provider or "").partition(":oidc-provider/")
+            if separator and provider_issuer in previous:
+                renamed.append(f"{head}:oidc-provider/{issuer}")
+                hit = True
+            else:
+                current = current or bool(separator and provider_issuer == issuer)
+                renamed.append(provider)
+        if not hit:
+            continue
+        moved = True
+        principal["Federated"] = list(dict.fromkeys(renamed)) if isinstance(federated, list) else renamed[0]
+        conditions = statement.get("Condition")
+        if not isinstance(conditions, dict):
+            continue
+        for block in conditions.values():
+            if not isinstance(block, dict):
+                continue
+            for key in list(block):
+                key_issuer, separator, claim = key.rpartition(":")
+                if separator and key_issuer in previous:
+                    value = block.pop(key)
+                    target = f"{issuer}:{claim}"
+                    block[target] = _merged_condition(block.get(target), value)
+    return rebound, moved, current
+
+
+def _merged_condition(existing: Any, value: Any) -> Any:
+    if existing is None:
+        return value
+    values = [
+        *(existing if isinstance(existing, list) else [existing]),
+        *(value if isinstance(value, list) else [value]),
+    ]
+    unique = list(dict.fromkeys(values))
+    return unique[0] if len(unique) == 1 else unique
 
 
 def _summarize_trust(trust_doc: dict[str, Any], oidc_issuer: str) -> str:
