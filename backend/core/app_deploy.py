@@ -243,8 +243,13 @@ def _inject_workload_identity(
     namespace: str,
     role_arn: str | None = None,
     annotations: dict[str, str] | None = None,
+    pod_labels: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Inject a provider-annotated Kubernetes ServiceAccount into workloads."""
+    """Inject a provider-annotated Kubernetes ServiceAccount into workloads.
+
+    ``pod_labels`` go on every pod template that runs as it, for a provider
+    whose admission webhook acts only on labelled pods (AKS).
+    """
     if annotations is None:
         if not role_arn:
             raise AppDeployError("workload identity requires provider annotations")
@@ -252,17 +257,19 @@ def _inject_workload_identity(
     for r in resources:
         kind = r.get("kind", "")
         if kind == "CronJob":
-            pod_spec = (
+            template = (
                 r.setdefault("spec", {})
                 .setdefault("jobTemplate", {})
                 .setdefault("spec", {})
                 .setdefault("template", {})
-                .setdefault("spec", {})
             )
-            pod_spec["serviceAccountName"] = sa_name
         elif kind in _POD_TEMPLATE_KINDS:
-            pod_spec = r.setdefault("spec", {}).setdefault("template", {}).setdefault("spec", {})
-            pod_spec["serviceAccountName"] = sa_name
+            template = r.setdefault("spec", {}).setdefault("template", {})
+        else:
+            continue
+        template.setdefault("spec", {})["serviceAccountName"] = sa_name
+        if pod_labels:
+            template.setdefault("metadata", {}).setdefault("labels", {}).update(pod_labels)
 
     service_account = {
         "apiVersion": "v1",
@@ -1386,18 +1393,27 @@ def render_resources_for_deployment(
         ac = getattr(cluster, "auth_config", None) or {}
         plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
         sa_name = workload_identity_role_name(app)
-        annotations = _workload_identity_annotations(
-            plugin_slug=plugin_slug,
-            provider_config=pc,
-            auth_config=ac,
-            role_name=sa_name,
-        )
+        pod_labels: dict[str, str] = {}
+        if plugin_slug == "azure":
+            from astrolift_services.azure_workload_identity import render_identity
+
+            # The client ID is minted by Azure, so it comes from the identity the
+            # workload identity step recorded, never from configuration (#2279).
+            annotations, pod_labels = render_identity(app, cluster)
+        else:
+            annotations = _workload_identity_annotations(
+                plugin_slug=plugin_slug,
+                provider_config=pc,
+                auth_config=ac,
+                role_name=sa_name,
+            )
         if annotations:
             resources = _inject_workload_identity(
                 resources,
                 sa_name=sa_name,
                 namespace=namespace,
                 annotations=annotations,
+                pod_labels=pod_labels,
             )
 
     if literals:

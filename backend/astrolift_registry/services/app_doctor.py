@@ -264,10 +264,25 @@ def _check_identity(app) -> DoctorCheck:
     check, because the AWS branch returns `{}` when `account_id` is absent,
     which means pods deploy with no identity at all and every AWS call they
     make fails at runtime, from a cluster row that looks configured.
+
+    Azure is the exception (#2279): the client ID is minted by Azure, so the
+    render reads the identity the workload identity step recorded, and so
+    does this check.
     """
     cluster = getattr(app, "default_tenant_cluster", None)
     if cluster is None:
         return DoctorCheck(CHECK_IDENTITY, "skip", "no cluster bound, so no pod identity applies yet")
+    if getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "azure":
+        from astrolift_services.azure_workload_identity import render_identity
+
+        if render_identity(app, cluster)[0]:
+            return DoctorCheck(CHECK_IDENTITY, "pass", "pod identity recorded")
+        return DoctorCheck(
+            CHECK_IDENTITY,
+            "skip",
+            f"no managed identity recorded on cluster {getattr(cluster, 'slug', '?')!r} yet; the next deploy "
+            "that binds a managed service creates it",
+        )
 
     from core.app_deploy import _workload_identity_annotations
 

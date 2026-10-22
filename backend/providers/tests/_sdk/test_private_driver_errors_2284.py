@@ -19,6 +19,7 @@ from _sdk import _telemetry
 from _sdk._telemetry import driver_op
 from aws.identity_irsa import IRSAConfig, IRSADriver
 from azure.identity_federated import AzureFederatedIdentityDriver
+from azure.identity_owned import AzureIdentityProvisioner, AzureOwnedIdentityDriver
 
 CANARY = "synthetic-private-identity-2284"
 
@@ -33,13 +34,29 @@ def test_owned_aws_operations_redact_every_argument(method):
     assert context.audit is (method is IRSADriver.reconcile_managed_identity)
 
 
-def test_azure_owned_factory_has_no_effect_heartbeat_or_audit():
-    method = AzureFederatedIdentityDriver.owned_reconciler
+@pytest.mark.parametrize(
+    "method", [AzureFederatedIdentityDriver.owned_reconciler, AzureFederatedIdentityDriver.owned_provisioner]
+)
+def test_azure_owned_factory_has_no_effect_heartbeat_or_audit(method):
     context = method.__astrolift_driver_op__
     assert set(inspect.signature(method).parameters) == {"self"}
     assert context.redact_errors is True
     assert context.audit is False
     assert context.heartbeat is False
+
+
+@pytest.mark.parametrize(
+    "method", [AzureIdentityProvisioner.ensure, AzureOwnedIdentityDriver.reconcile, AzureOwnedIdentityDriver.remove]
+)
+def test_owned_azure_effects_audit_and_redact_every_argument(method):
+    # The native writes the legacy driver audited (identity.create_role and
+    # identity.delete_role) are audited here too, with nothing private in them.
+    context = method.__astrolift_driver_op__
+    parameters = inspect.signature(method).parameters
+    assert set(parameters) - {"self"} == set(context.redact_args)
+    assert all(value.kind is inspect.Parameter.KEYWORD_ONLY for name, value in parameters.items() if name != "self")
+    assert context.redact_errors is True
+    assert context.audit is True
 
 
 @pytest.mark.parametrize("method", ["reconcile_managed_identity", "verify_managed_identity"])

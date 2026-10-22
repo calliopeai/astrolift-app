@@ -393,8 +393,19 @@ def _ensure_workload_identity_locked(
         raise ValueError("workload identity cluster is not live in the app organization")
     groups = _identity_services_by_environment(app, cluster)
     plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
-    if not reconcile_empty and not next(
-        (services for env, services in groups if env.pk == environment.pk), []
+    if plugin_slug == "azure":
+        from astrolift_services.azure_workload_identity import recorded_identity
+
+        # A recorded Azure identity keeps each federation and assignment until a
+        # reconcile drops it, so the environment whose last binding was detached
+        # still reconciles the union the app's other environments need (#2279).
+        withdraw_azure = recorded_identity(app, cluster) is not None
+    else:
+        withdraw_azure = False
+    if (
+        not reconcile_empty
+        and not withdraw_azure
+        and not next((services for env, services in groups if env.pk == environment.pk), [])
     ):
         # The environment's last binding may be the one just detached, and its
         # log view grant is not taken back unless the reconcile names it (#2099).
@@ -463,6 +474,16 @@ def _ensure_workload_identity_locked(
             strict=True,
         )
     )
+    if plugin_slug == "azure":
+        return _ensure_azure_workload_identity(
+            app,
+            environment,
+            cluster,
+            groups=groups,
+            permissions=permissions,
+            declared_by_id=declared_by_id,
+            unprovisioned=unprovisioned,
+        )
 
     def persist_states():
         counts: dict[str, int] = {}
@@ -471,7 +492,7 @@ def _ensure_workload_identity_locked(
                 environment=env,
                 services=group,
                 declared_by_service=[declared_by_id[service.pk] for service in group],
-                driver=identity_driver,
+                outcomes=list(getattr(identity_driver, "grant_assignments", list)()),
                 plugin_slug=plugin_slug,
                 identity_role_name=role_name,
             )
@@ -575,6 +596,126 @@ def _ensure_workload_identity_locked(
     }
 
 
+_AZURE_UNCONFIRMED_REASON = "Azure did not confirm the workload identity reconcile; the next reconcile observes this assignment again."
+
+
+def _ensure_azure_workload_identity(
+    app: Any,
+    environment: Any,
+    cluster: Any,
+    *,
+    groups: list[tuple[Any, list[Any]]],
+    permissions: list[dict[str, Any]],
+    declared_by_id: dict[int, list[dict[str, Any]]],
+    unprovisioned: list[str],
+) -> dict[str, Any]:
+    """Observe or create the app's identity on ``cluster``, record it, then
+    reconcile the federation and grant union of all its environments there (#2279).
+
+    Every namespace whose pods run as the app's ServiceAccount is federated,
+    and nothing else this owner added survives the reconcile. An assignment
+    is recorded ``applied`` only once the final native inventory shows it. A
+    refusal an operator has to resolve, such as a foreign or replaced identity,
+    a changed issuer or a cluster without workload identity, records it
+    ``failed`` with the reason. A reconcile Azure did not confirm records it
+    ``pending``, and the activity's retry observes it again.
+    """
+    from _sdk.identity import GRANT_APPLIED, GRANT_FAILED, GRANT_PENDING, GrantAssignment
+    from azure.identity_owned import AzureIdentityGrant, AzureIdentityRefused, assignment_name
+
+    from astrolift_services.azure_workload_identity import AzureWorkloadIdentityError, ensure_identity
+    from core.app_deploy import AppDeployError, namespace_for_environment, workload_identity_role_name
+    from core.cluster_credentials import CREDENTIAL_REFUSALS
+
+    role_name = workload_identity_role_name(app)
+    namespaces = sorted({namespace_for_environment(env) for env, group in groups if group})
+
+    def outcomes(state: str, reason: str = "", context: Any = None) -> list[GrantAssignment]:
+        return [
+            GrantAssignment(
+                role_definition_id=str(permission["role_definition_id"]),
+                role_name=str(permission.get("role_name", "") or ""),
+                scope=str(permission["scope"]),
+                assignment_name=(
+                    assignment_name(
+                        context,
+                        AzureIdentityGrant(str(permission["role_definition_id"]), str(permission["scope"])),
+                    )
+                    if context is not None
+                    else ""
+                ),
+                state=state,
+                reason=reason,
+            )
+            for permission in permissions
+        ]
+
+    def persist(rows: list[GrantAssignment]) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for env, group in groups:
+            states = _persist_grant_state(
+                environment=env,
+                services=group,
+                declared_by_service=[declared_by_id[service.pk] for service in group],
+                outcomes=rows,
+                plugin_slug="azure",
+                identity_role_name=role_name,
+            )
+            for state, count in states.items():
+                counts[state] = counts.get(state, 0) + count
+        return counts
+
+    try:
+        record, context, result = ensure_identity(
+            app, environment, cluster, namespaces=namespaces, permissions=permissions
+        )
+    except (AzureIdentityRefused, AzureWorkloadIdentityError, AppDeployError, *CREDENTIAL_REFUSALS) as exc:
+        persist(outcomes(GRANT_FAILED, str(exc)))
+        raise
+    except Exception:
+        persist(outcomes(GRANT_PENDING, _AZURE_UNCONFIRMED_REASON))
+        raise
+    states = persist(outcomes(GRANT_APPLIED, context=context))
+    _retire_detached_grants(groups)
+    return {
+        "registered_app_id": app.pk,
+        "role": role_name,
+        "role_arn": record.resource_id,
+        "namespace": namespace_for_environment(environment),
+        "cluster_slug": cluster.slug,
+        "grants": len(permissions),
+        "unprovisioned_services": sorted(unprovisioned),
+        "grants_pending": states.get(GRANT_PENDING, 0),
+        "grants_failed": states.get(GRANT_FAILED, 0),
+        "prune_refusals": 0,
+        "annotation": dict(result.annotations),
+        "federations": list(result.federation_names),
+        "foreign_federations": len(result.foreign_federation_names),
+        "foreign_assignments": len(result.foreign_assignment_names),
+        # ARM shows the configuration; no running pod's token exchange is observed here.
+        "propagation_verified": result.propagation_verified,
+        "unavailable_native_services": [],
+        "withdrawn_log_views": [],
+    }
+
+
+def _retire_detached_grants(groups: list[tuple[Any, list[Any]]]) -> None:
+    """Soft-delete the assignment rows of bindings no longer on each environment.
+
+    Called once a reconcile confirmed the union without them. Their assignment
+    is gone unless a binding still on the identity declares it, and that
+    binding keeps its own row.
+    """
+    from astrolift_services.models import WorkloadIdentityGrant
+
+    for env, group in groups:
+        detached = WorkloadIdentityGrant.objects.filter(app_environment=env).exclude(
+            managed_service_id__in=[service.pk for service in group]
+        )
+        for row in detached:
+            row.soft_delete()
+
+
 def _retired_log_views(
     app: Any,
     cluster: Any,
@@ -629,7 +770,7 @@ def _persist_grant_state(
     environment: Any,
     services: list[Any],
     declared_by_service: list[list[dict[str, Any]]],
-    driver: Any,
+    outcomes: list[Any],
     plugin_slug: str,
     identity_role_name: str,
 ) -> dict[str, int]:
@@ -652,10 +793,7 @@ def _persist_grant_state(
     if plugin_slug != "azure":
         return counts
 
-    outcomes = {
-        (str(o.role_definition_id).lower(), str(o.scope).rstrip("/")): o
-        for o in getattr(driver, "grant_assignments", list)()
-    }
+    by_grant = {(str(o.role_definition_id).lower(), str(o.scope).rstrip("/")): o for o in outcomes}
     now = timezone.now()
     for service, permissions in zip(services, declared_by_service, strict=True):
         declared: set[tuple[str, str]] = set()
@@ -665,7 +803,7 @@ def _persist_grant_state(
             if not guid or not scope:
                 continue
             declared.add((guid, scope))
-            outcome = outcomes.get((guid, scope))
+            outcome = by_grant.get((guid, scope))
             state = getattr(outcome, "state", WorkloadIdentityGrant.State.PENDING.value)
             reason = getattr(
                 outcome,

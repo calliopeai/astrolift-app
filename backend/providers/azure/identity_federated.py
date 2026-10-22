@@ -36,7 +36,12 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from azure.identity_owned import AzureIdentityContext, AzureOwnedIdentityDriver
+    from azure.identity_owned import (
+        AzureIdentityContext,
+        AzureIdentityPlacement,
+        AzureIdentityProvisioner,
+        AzureOwnedIdentityDriver,
+    )
 
 from _sdk._telemetry import driver_op
 from _sdk.azure_tags import serialize_azure_arm_tags
@@ -114,7 +119,8 @@ class FederatedIdentityConfig:
 
     msi_client: Any | None = None
     """Explicit legacy compatibility port. Ambient writes are not enabled by
-    constructing a production client; use ``owned_reconciler`` instead."""
+    constructing a production client; use ``owned_provisioner`` and
+    ``owned_reconciler`` instead."""
 
     graph_client: Any | None = None
     """Microsoft Graph client for AAD Application CRUD. Injected
@@ -134,11 +140,15 @@ class FederatedIdentityConfig:
     owned_context: AzureIdentityContext | None = None
     """Recorded existing-UAMI owner/native identity. No name-only adoption."""
 
+    owned_placement: AzureIdentityPlacement | None = None
+    """Owner and placement of the UAMI ``owned_provisioner`` observes or creates."""
+
     native_checkpoint: Callable[[], None] | None = None
     """Current admission/source validation before each owned native request."""
 
     credential: Any | None = field(default=None, repr=False, compare=False)
-    """Private admitted Azure credential for the owned port; never app binding data."""
+    """Private admitted Azure credential for the owned port; never app binding data.
+    The cluster's stamped ambient ``CloudCredential`` or an explicit token port."""
 
 
 class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
@@ -169,6 +179,27 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         ):
             raise RuntimeError("Recorded owned identity and current admission/source checkpoint required")
         return AzureOwnedIdentityDriver(context, checkpoint=checkpoint, credential=self._config.credential)
+
+    @driver_op(cloud="azure", driver="identity", heartbeat=False, redact_errors=True)
+    def owned_provisioner(self) -> AzureIdentityProvisioner:
+        """Build the MSI7 port that observes or creates one owner's UAMI."""
+        from azure.identity_owned import AzureIdentityProvisioner
+
+        placement = self._config.owned_placement
+        checkpoint = self._config.native_checkpoint
+        if (
+            placement is None
+            or checkpoint is None
+            or (
+                placement.tenant_id != self._config.tenant_id
+                or placement.subscription_id != self._config.subscription_id
+                or placement.resource_group != self._config.resource_group
+                or placement.location != self._config.location
+                or placement.issuer != self._config.cluster_oidc_issuer
+            )
+        ):
+            raise RuntimeError("Owned identity placement and current admission/source checkpoint required")
+        return AzureIdentityProvisioner(placement, checkpoint=checkpoint, credential=self._config.credential)
 
     @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(

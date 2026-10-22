@@ -1,36 +1,52 @@
-# Existing Azure workload identity reconciliation
+# Azure workload identity through owned native ports
 
-This provider-only #2279/#2269 foundation supplies real MSI7 and Authorization
-SDK clients for a recorded, existing User-Assigned Managed Identity (UAMI).
-It is not connected to app deployment or a public model-connection mutation yet.
-The old injected `AzureFederatedIdentityDriver` compatibility path remains
-unchanged. Its ambient create/bind/delete calls still refuse without an explicit
-legacy client; constructing the new port does not enable name-only legacy writes.
+Two provider ports in `azure/identity_owned.py` supply real MSI7 and Authorization
+SDK clients for the User-Assigned Managed Identity (UAMI) the platform keeps per
+app per AKS cluster (#2279, #2269):
+
+- `AzureIdentityProvisioner` observes that UAMI, or creates it where none exists.
+- `AzureOwnedIdentityDriver` reconciles the recorded UAMI's federations and role
+  assignments, and removes them and the UAMI.
+
+App deployment uses both: `ensure_workload_identity` on an Azure cluster, the
+deploy render and identity deprovisioning (`backend/astrolift_services/azure_workload_identity.py`;
+operator view in `docs/operators/azure-workload-identity.md`). The old injected
+`AzureFederatedIdentityDriver` compatibility path is unchanged and unused in
+production. Its create/bind/delete calls still refuse without an explicit legacy
+client, and constructing either port does not enable name-only legacy writes.
 
 ## Caller and identity contract
 
-`AzureOwnedIdentityDriver` accepts a frozen `AzureIdentityContext` and a mandatory
-fresh admission/source checkpoint. `FederatedIdentityConfig.owned_reconciler()`
-constructs that port after comparing the context's tenant, subscription, resource
-group and issuer with configuration. An admitted credential stays private; when
-absent, the factory uses the Azure Identity SDK's `DefaultAzureCredential` chain
-with the public Entra authority fixed and additional tenants/interactive login
-disabled. An explicitly supplied credential is a trusted admitted caller port.
-No credential or token is returned in app bindings.
+`FederatedIdentityConfig.owned_provisioner()` builds the provisioner for an
+`AzureIdentityPlacement`. `owned_reconciler()` builds the reconciler for a frozen
+`AzureIdentityContext`. Each factory first checks the placement or context
+tenant, subscription, resource group and issuer against the configuration, and
+the provisioner also checks the location. Both need a fresh admission/source
+checkpoint.
+
+The credential stays private. The config carries the cluster's stamped
+`CloudCredential`; for Azure that is only ever the ambient identity, which the
+ports turn into the Azure Identity SDK's `DefaultAzureCredential` chain, with the
+public Entra authority fixed and additional tenants and interactive login
+disabled. An explicitly supplied token credential is a trusted admitted caller
+port. Any other credential, such as another cloud's or a non-ambient mode, is
+refused before a client is built. No credential or token is returned in app
+bindings.
 
 The caller must serialize the app's complete grant/federation union, retain the
 recorded identity independently of the cloud response, and check current actor,
 organization, app/environment/cluster, credential, desired union and issuer at
 every checkpoint. The provider executes this callback before every native request
 and after every returned response, including the final observation, subsequent
-SDK pages and writes. The callback is a required integration
-port, not an implementation of web authorization, DB locking or audit persistence.
+SDK pages and writes. The callback is a required integration port, not an
+implementation of web authorization, DB locking or audit persistence.
 
-Context requires canonical nonzero organization/app/environment/cluster GUIDs,
-tenant/subscription GUIDs, exact resource group/UAMI name/full ARM ID, and recorded
-client/principal GUIDs. Current authenticated ARM subscription reads must return
-the same enabled subscription and tenant. Current UAMI reads must return every
-recorded native ID and these existing trusted owner markers:
+A placement requires canonical nonzero organization/app/cluster/tenant/subscription
+GUIDs, an exact resource group, UAMI name, location and AKS cluster name, and an
+HTTPS issuer. A context requires those plus an environment GUID, the full ARM ID
+and the recorded client/principal GUIDs. Current authenticated ARM subscription
+reads must return the same enabled subscription and tenant. Current UAMI reads
+must return every recorded native ID and these existing trusted owner markers:
 
 | Serialized ARM tag | Required value |
 | --- | --- |
@@ -43,13 +59,42 @@ Recognized punctuation/case variants must all agree; missing or conflicting
 aliases refuse. Environment identity belongs to the caller's desired-union
 checkpoint, while the UAMI is shared by that app's environments. Tags and derived
 names are integrity checks for a trusted platform owner, not unforgeable authority.
-The port never writes tags or fabricates missing native IDs.
+The ports never retag or update an existing UAMI and never fabricate missing
+native IDs.
 
 The credential wrapper requests only `https://management.azure.com/.default`
 in the declared tenant. Subscription/UAMI ARM responses verify native placement
 and tenant; they do not prove the credential's principal identity, application
-invocation access, or the issuer's current AKS/token behavior. Only public Azure
+invocation access, or the issuer's current token behavior. Only public Azure
 ARM is supported. Sovereign clouds require a separate admitted contract.
+
+## Provisioning
+
+`ensure(recorded=None)` reads the subscription, then the AKS managed cluster at
+the placement's resource group and cluster name. It refuses unless the cluster has
+`oidcIssuerProfile.enabled` and `securityProfile.workloadIdentity.enabled`, and
+its `oidcIssuerProfile.issuerURL` is exactly the placement issuer. Nothing is
+federated to an issuer the cluster does not sign with.
+
+Then it reads the UAMI by name:
+
+- **Absent, nothing recorded.** It creates the UAMI with the four owner tags and
+  the placement location, then reads it back.
+- **Absent, `recorded` given.** It refuses. A recorded identity that was deleted
+  is not re-created, because pods and grants were bound to its principal.
+- **Present.** The UAMI must carry this owner's markers. A same-name identity
+  without them is refused, never adopted or retagged. With `recorded`, its
+  resource, client, principal and tenant IDs must be the recorded ones; a
+  replacement is refused.
+
+Refusals raise `AzureIdentityRefused` with a fixed message the platform composed,
+naming the identity and resource group, safe to show an operator. Every other
+failure, including any SDK error, is the generic "not confirmed" error.
+
+The MSI APIs document create-or-update rather than conditional creation and expose
+no ETag precondition in this contract. A same-name UAMI created between the absent
+read and the PUT would be retagged and adopted; that window is the residual race
+provisioning does not close.
 
 ## Reconcile and recovery
 
@@ -76,16 +121,28 @@ response returns a generic unconfirmed error. A subsequent admitted reconciliati
 first reobserves native state; matching entries need no second PUT. There is no
 automatic transport retry or invented rollback. Owned detach preserves remaining
 desired/foreign entries and the UAMI itself. Azure principal-replication failures
-remain unconfirmed; they are not silently reported as applied.
+remain unconfirmed; they are not silently reported as applied. The result names
+the owned federations and assignments it removed and the foreign ones it left.
 
-The MSI APIs document create-or-update rather than conditional creation and expose
-no ETag precondition in this contract. These observations cannot prevent an Azure
-operator from replacing/changing a resource between the last read and a write,
-including a same-name FIC appearing after an absent GET but before its PUT.
-UAMI create/update/delete is therefore deliberately absent, and no remote atomic
-incarnation guarantee is claimed. Changed issuers/ownership require explicit
-operator recovery with the original recorded identity; this port never retags or
-blindly adopts a replacement.
+An owned federation whose issuer is not the context's refuses the reconcile, so a
+changed issuer is never followed by moving a federation. The caller recovers by
+removing the identity under its recorded issuer and provisioning a new one.
+
+## Removal
+
+`remove()` reads the UAMI. If it is already gone, the result says
+`identity_absent`; owned assignments that outlived it name a deleted principal,
+grant nothing and are not inspected. Otherwise the UAMI must still carry the
+recorded IDs and owner markers. Removal strips every owned federation and
+assignment through the same reconcile, then deletes the UAMI and reads it again
+to observe its absence. If a foreign federation or role assignment remains on the
+identity, removal stops after stripping the owned entries: deleting the UAMI would
+take another party's federation with it and orphan their assignments. The result
+names what is left.
+
+A replacement of the UAMI between the last read and the DELETE is a residual race,
+as for creation. Removing an assignment or deleting the identity does not revoke
+an access token issued before; `propagation_verified` stays false.
 
 ## Configuration is not workload acceptance
 
@@ -93,18 +150,16 @@ Successful reconciliation returns `configuration_observed=true`, KSA client/tena
 annotations, and observed desired FIC/assignment names. `workload_ready=false` and
 `propagation_verified=false` remain explicit. This is not model inference proof.
 
-Remaining #2279 work includes durable reviewed caller/union integration and audit
-events, supported UAMI creation/lifecycle, live AKS OIDC/workload-identity-profile
-verification, current KSA annotations plus pod-template
-`azure.workload.identity/use: "true"`, and rollout/token volume/environment and
-actual token-exchange acceptance. PostgreSQL/Temporal/workload tests belong to
-that integration. Removal here observes owned ARM configuration only; cached
-access tokens, external grants and Azure propagation can retain access afterward.
+Still open under #2279: observing rollout facts on running pods (the projected token
+volume, `AZURE_*` environment) and an actual token exchange, and audit events for
+the native writes beyond the driver telemetry.
 
-Native MSI7.1.0/Authorization4 HTTP tests cover factory construction, tenant/source
-withdrawal, replacement, complete pagination, collisions, partial effects,
-foreign preservation, repeated reconciliation, detach and sanitized errors.
-They use controlled transports, no Azure calls or credentials.
+Native MSI7.1.0/Authorization4 HTTP tests cover factory construction, credential
+admission, tenant/source withdrawal, AKS issuer and workload identity checks,
+creation, foreign and replaced identities, complete pagination, collisions,
+partial effects, foreign preservation, repeated reconciliation, detach, removal
+and sanitized errors. They use controlled transports, no Azure calls or
+credentials.
 
 Primary contracts:
 [MSI create-or-update](https://learn.microsoft.com/en-us/rest/api/managedidentity/user-assigned-identities/create-or-update?view=rest-managedidentity-2024-11-30),
