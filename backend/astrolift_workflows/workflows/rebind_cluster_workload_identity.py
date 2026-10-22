@@ -27,6 +27,7 @@ with workflow.unsafe.imports_passed_through():
         rebind_cluster_workload_identity,
     )
     from astrolift_workflows.activities.workload_identity_rebind import REBIND_INCOMPLETE
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 # One IAM read per app, and a write for each role still on an old issuer.
 _TIMEOUT = timedelta(hours=1)
@@ -59,7 +60,7 @@ class RebindClusterWorkloadIdentityWorkflow:
                 rebind_cluster_workload_identity,
                 input.rebind_id,
                 start_to_close_timeout=_TIMEOUT,
-                heartbeat_timeout=timedelta(minutes=2),
+                heartbeat_timeout=HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
         except ActivityError as exc:

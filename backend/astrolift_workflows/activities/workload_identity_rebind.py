@@ -20,10 +20,11 @@ from typing import Any
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.workload_identity_rebind")
 
 REBIND_INCOMPLETE = "WorkloadIdentityRebindIncomplete"
-_HEARTBEAT_EVERY_SECONDS = 30
 
 
 def _apps_on_cluster(cluster: Any) -> list[Any]:
@@ -196,16 +197,8 @@ async def mark_cluster_workload_identity_rebind_failed(rebind_id: int, error: st
 @activity.defn(name="astrolift.workload_identity.rebind_cluster")
 async def rebind_cluster_workload_identity(rebind_id: int) -> dict[str, Any]:
     """Activity entry: move the request's per-app role trust to its issuer."""
-    import asyncio
-
     from asgiref.sync import sync_to_async
 
-    # The walk runs in a worker thread, where heartbeats do not reach the
-    # activity, so beat from here until it finishes.
-    walk = asyncio.ensure_future(sync_to_async(_rebind_cluster_sync)(rebind_id))
-    while not walk.done():
-        activity.heartbeat()
-        await asyncio.wait({walk}, timeout=_HEARTBEAT_EVERY_SECONDS)
-    summary = walk.result()
+    summary = await heartbeat_while(sync_to_async(_rebind_cluster_sync)(rebind_id))
     log.info("rebind_cluster_workload_identity rebind=%s summary=%s", rebind_id, summary)
     return summary
