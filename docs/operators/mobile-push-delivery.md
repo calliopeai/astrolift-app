@@ -259,7 +259,10 @@ collapse id, so a copy Apple accepted twice shows once.
   delete the old key in Google Cloud. The next event mints tokens from the new
   key.
 - **Stopping a driver.** Remove the file: sends fail as `no_driver` and no
-  registration is touched.
+  registration is touched. A `multiplexer` profile is built whole, so a
+  missing or unreadable file under either driver stops both platforms. To
+  stop one platform, set the profile to the other driver alone; as after any
+  driver change, each device then waits for its app to register again.
 - **A device.** `revokeMobileDevice` (the app calls it when an install is
   removed from the device) soft-deletes the registration.
 
