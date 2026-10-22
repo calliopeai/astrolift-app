@@ -58,6 +58,11 @@ export const RePointed: Story = {
       })}
     />
   ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Workload identity roles")).toBeVisible();
+    await expect(canvas.getByText("2 roles did not move")).toBeVisible();
+  },
 };
 
 export const ManagementError: Story = {
