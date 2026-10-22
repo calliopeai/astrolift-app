@@ -5,7 +5,7 @@ The workflow re-uses the per-step activities the platform already
 ships (``delete_app_namespaces``, ``revoke_app_deploy_tokens``,
 ``soft_delete_app_records``, ``deprovision_app_registry_repo``,
 ``deprovision_app_identity_role``, ``deprovision_managed_service``).
-The two operations the existing surface didn't cover are wired here:
+The operations the existing surface didn't cover are wired here:
 
 * ``delete_app_source_webhook`` — DELETE the push-event webhook the
   source-webhook install path (``astrolift_scm.services.webhooks``)
@@ -14,6 +14,10 @@ The two operations the existing surface didn't cover are wired here:
   not a per-repo hook), and apps with no source repo all short-
   circuit cleanly. Clears the platform's ``source_webhook_*``
   bookkeeping so a future install starts fresh.
+
+* ``remove_app_ci_workflow`` — remove the managed CI workflow file the
+  platform committed to the source repo (#2480), which can only fail
+  once the app's push role and deploy token are gone.
 
 * ``delete_app_materialized_secrets`` — fan out
   ``delete_secret_from_cluster`` for every (cluster, app, env) where
@@ -182,6 +186,41 @@ async def delete_app_source_webhook(registered_app_id: int) -> dict[str, Any]:
     return summary
 
 
+# ---- Managed CI workflow file (#2480) -----------------------------
+
+
+def _remove_ci_workflow_sync(registered_app_id: int) -> dict[str, Any]:
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_scm.services.workflow_sync import remove_workflow_file_from_repo
+
+    # all_objects: this runs after the platform rows were soft-deleted.
+    app = RegisteredApp.all_objects.select_related("organization").get(pk=registered_app_id)
+    return remove_workflow_file_from_repo(app)
+
+
+@activity.defn(name="astrolift.app.remove_ci_workflow")
+async def remove_app_ci_workflow(registered_app_id: int) -> dict[str, Any]:
+    """Remove the managed CI workflow file from the app's source repo.
+
+    Only a file that provably belongs to this app is deleted (a direct commit,
+    or a pull request on a protected deploy branch); anything else is named
+    in the summary. Host errors propagate so Temporal retries them; the last
+    one names the paths to delete by hand.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    summary = await sync_to_async(_remove_ci_workflow_sync)(registered_app_id)
+    log.info(
+        "remove_app_ci_workflow app_id=%s status=%s removed=%s retained=%s",
+        registered_app_id,
+        summary["status"],
+        summary["removed"],
+        summary["retained"],
+    )
+    return summary
+
+
 # ---- Materialized cluster secrets ---------------------------------
 
 
@@ -318,8 +357,10 @@ async def revoke_app_secret_bundle_refs(registered_app_id: int) -> int:
 __all__ = [
     "_delete_source_webhook_sync",
     "_list_app_secret_targets_sync",
+    "_remove_ci_workflow_sync",
     "_revoke_app_secret_bundle_refs_sync",
     "delete_app_source_webhook",
     "list_app_secret_targets",
+    "remove_app_ci_workflow",
     "revoke_app_secret_bundle_refs",
 ]

@@ -120,7 +120,15 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
         zone_id = existing_zone_id
         nameservers = list(existing.provision_nameservers or [])
     else:
-        result = dns_driver.provision_zone(zone)
+        # A row provisioned before #1931 records no zone id, and neither does
+        # a retry whose create succeeded before the row was saved, so the zone
+        # exists and provision_zone refuses its name (#2389). Adopt it when the
+        # driver proves the platform created it; any other zone stays refused.
+        # Without a live row there is nothing to bind an adopted zone to.
+        adopt = getattr(dns_driver, "adopt_platform_zone", None) if existing is not None else None
+        result = adopt(zone) if adopt is not None else None
+        if result is None:
+            result = dns_driver.provision_zone(zone)
         zone_id = result.get("zone_id", "")
         nameservers = result.get("nameservers", [])
         created_zone_id = zone_id

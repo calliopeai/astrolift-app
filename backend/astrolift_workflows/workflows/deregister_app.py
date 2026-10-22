@@ -65,6 +65,12 @@ Resource teardown order (each step records its result on
      active tokens so CI / cron pointed at the app fails loudly.
   9. ``platform_rows`` — ``soft_delete_app_records`` ONLY after every
      prior step succeeded or was explicitly skipped.
+ 10. ``ci_workflow`` — ``remove_app_ci_workflow`` removes the managed CI
+     workflow file from the source repo (#2480): a commit, or a pull
+     request on a protected deploy branch. It runs after the rows are
+     gone so its own push can neither redeploy the app nor be undone by
+     the CI resync sweep. A failure names the files to delete by hand and
+     does not reopen the finished teardown.
 
 Partial failure semantics: each step is wrapped in a try/except so
 one failure doesn't strand the rest of the teardown. The workflow
@@ -100,6 +106,7 @@ with workflow.unsafe.imports_passed_through():
         list_app_secret_targets,
         mark_app_deregistered,
         mark_app_tearing_down,
+        remove_app_ci_workflow,
         retire_expired_app_runtime,
         revoke_app_deploy_tokens,
         revoke_app_secret_bundle_refs,
@@ -110,6 +117,9 @@ with workflow.unsafe.imports_passed_through():
 _QUICK_TIMEOUT = timedelta(minutes=2)
 _NAMESPACE_TIMEOUT = timedelta(minutes=10)
 _DEPROVISION_TIMEOUT = timedelta(minutes=30)
+# Up to a dozen source-host calls (reads, protection probe, review branch,
+# deletes, pull request), each with its own 10-15 s socket timeout.
+_REPO_WRITE_TIMEOUT = timedelta(minutes=5)
 
 # Grace-period window the workflow holds before the first destructive
 # activity runs. The FE renders a live countdown banner on the app
@@ -644,6 +654,35 @@ class DeregisterAppWorkflow:
                 ok=False,
                 detail=("skipped: prior steps still live — soft-delete is gated on a clean teardown pass"),
             )
+
+        # 10. The managed CI workflow in the source repo (#2480). Last, on a
+        #     clean pass only: the removal is a push to the deploy branch, and
+        #     while the app row was live that push could redeploy it
+        #     (auto_on_push) or the CI resync sweep could put the file back.
+        #     The teardown is finished, so a failure is reported with the
+        #     paths to delete by hand rather than marked still live.
+        #     Patched so runs started before this step existed replay unchanged.
+        if not still_live and workflow.patched("deregister-removes-ci-workflow-2480"):
+            try:
+                ci_summary = await workflow.execute_activity(
+                    remove_app_ci_workflow,
+                    app_id,
+                    start_to_close_timeout=_REPO_WRITE_TIMEOUT,
+                    retry_policy=_CLEANUP_RETRY,
+                )
+                teardown["ci_workflow"] = _step_result(
+                    ok=True,
+                    detail=str(ci_summary.get("detail", "")),
+                    data=ci_summary,
+                )
+            except Exception as exc:  # noqa: BLE001 -- the files are named; nothing can retry them
+                # An activity failure arrives as ActivityError; the message
+                # naming the files is its cause's (str() would prefix a type).
+                cause = getattr(exc, "cause", None)
+                teardown["ci_workflow"] = _step_result(
+                    ok=False,
+                    detail=str(getattr(cause, "message", "") or exc),
+                )
 
         ok = not still_live
         message_parts = [
