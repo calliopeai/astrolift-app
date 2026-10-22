@@ -7,6 +7,7 @@ from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.builder_brain_source import build_brain_source
+    from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
 
 @workflow.defn(name="BuilderBrainSourceBuildWorkflow")
@@ -18,6 +19,6 @@ class BuilderBrainSourceBuildWorkflow:
             intent_id,
             start_to_close_timeout=timedelta(minutes=35),
             schedule_to_close_timeout=timedelta(minutes=40),
-            heartbeat_timeout=timedelta(seconds=90),
+            heartbeat_timeout=HEARTBEAT_TIMEOUT,
             retry_policy=RetryPolicy(maximum_attempts=3, initial_interval=timedelta(seconds=2)),
         )

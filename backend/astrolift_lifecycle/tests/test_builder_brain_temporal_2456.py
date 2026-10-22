@@ -170,7 +170,7 @@ async def test_long_native_build_keeps_activity_heartbeat_alive(world, temporal_
     import time
 
     from astrolift_lifecycle import builder_brain_source
-    from astrolift_workflows.activities import builder_brain_source as build_activity
+    from astrolift_workflows import activity_heartbeat
 
     calls = []
 
@@ -183,7 +183,7 @@ async def test_long_native_build_keeps_activity_heartbeat_alive(world, temporal_
     assert await sync_to_async(create)(world)
     intent_id = await sync_to_async(lambda: BuilderBrainBuild.objects.get().pk)()
     monkeypatch.setattr(builder_brain_source, "build", bounded_native_control)
-    monkeypatch.setattr(build_activity, "HEARTBEAT_SECONDS", 0.03)
+    monkeypatch.setattr(activity_heartbeat, "HEARTBEAT_EVERY", timedelta(seconds=0.03))
     queue = "builder-brain-heartbeat-2456-" + str(uuid4())
     async with Worker(
         temporal_env.client,

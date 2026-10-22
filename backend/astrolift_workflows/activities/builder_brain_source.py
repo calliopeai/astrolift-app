@@ -1,23 +1,13 @@
 """Only the durable intent ID enters workflow history; no archive/bearer grant."""
 
-import asyncio
-
 from asgiref.sync import sync_to_async
 from temporalio import activity
 
-HEARTBEAT_SECONDS = 30
+from astrolift_workflows.activity_heartbeat import heartbeat_while
 
 
 @activity.defn(name="astrolift.builder.brain_source_build")
 async def build_brain_source(intent_id: int) -> dict:
     from astrolift_lifecycle.builder_brain_source import build
 
-    pending = asyncio.create_task(sync_to_async(build, thread_sensitive=False)(intent_id))
-    try:
-        while not pending.done():
-            activity.heartbeat()
-            await asyncio.wait({pending}, timeout=HEARTBEAT_SECONDS)
-        return await pending
-    finally:
-        if not pending.done():
-            pending.cancel()
+    return await heartbeat_while(sync_to_async(build, thread_sensitive=False)(intent_id))
