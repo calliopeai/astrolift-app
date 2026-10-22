@@ -1450,6 +1450,9 @@ TWILIO_CALLBACK = os.getenv("TWILIO_CALLBACK", "")
 # The default archive store is shared across API/worker replicas without a new
 # service. Operators can replace this alias with a private object-store backend.
 BUILDER_ARTIFACT_BASE_URL = env_str("BUILDER_ARTIFACT_BASE_URL", PLATFORM_API_URL)
+# Explicit per-project, preprovisioned isolated archive-build targets (#2456).
+# JSON is validated at admission; absent/malformed config refuses source builds.
+BUILDER_BRAIN_BUILD_TARGETS = env_str("BUILDER_BRAIN_BUILD_TARGETS", "{}")
 STORAGES = globals().get(
     "STORAGES",
     {

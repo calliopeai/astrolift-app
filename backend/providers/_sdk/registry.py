@@ -13,6 +13,15 @@ class Repo:
 
 
 @dataclass(frozen=True)
+class BuildRepositoryObservation:
+    """Read-only identity/immutability of an operator-provisioned build repo."""
+
+    name: str
+    uri: str
+    immutable_tags: bool
+
+
+@dataclass(frozen=True)
 class Tag:
     name: str
     digest: str
@@ -48,6 +57,11 @@ class ImageRegistryDriver(Protocol):
     """
 
     def ensure_repo(self, name: str) -> Repo: ...
+
+    def observe_build_repository(self, name: str) -> BuildRepositoryObservation:
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("read-only immutable build repository observation is unsupported")
 
     def delete_repo(self, name: str, *, archive: bool = True) -> None: ...
 

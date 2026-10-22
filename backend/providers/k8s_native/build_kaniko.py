@@ -271,6 +271,9 @@ class KanikoBuildDriver:
         sleep: Any = time.sleep,
         clock: Any = time.monotonic,
         log_observer: Any = None,
+        manage_service_account: bool = True,
+        manifest_observer: Any = None,
+        manifest_guard: Any = None,
     ) -> None:
         self._cluster_driver = cluster_driver
         self._cluster_slug = cluster_slug
@@ -286,6 +289,9 @@ class KanikoBuildDriver:
         self._sleep = sleep
         self._clock = clock
         self._log_observer = log_observer
+        self._manage_service_account = manage_service_account
+        self._manifest_observer = manifest_observer
+        self._manifest_guard = manifest_guard
         self._previous_output: list[str] = []
         self._redactions: list[str] = [git_password] if git_password else []
         self._log_read_warning = False
@@ -298,13 +304,26 @@ class KanikoBuildDriver:
         # A private repo needs a clone credential; a public one must not
         # get a Secret it does not use (#1685).
         secret_name = git_secret_name(job_name) if self._git_password else ""
-        manifests = [
-            render_build_service_account(
-                name=self._service_account,
-                namespace=self._namespace,
-                role_arn=self._sa_role_arn,
-            ),
-        ]
+        manifests = (
+            [
+                render_build_service_account(
+                    name=self._service_account,
+                    namespace=self._namespace,
+                    role_arn=self._sa_role_arn,
+                ),
+            ]
+            if self._manage_service_account
+            else []
+        )
+        archive_secret = ""
+        if spec.context_archive is not None:
+            from k8s_native.build_archive import render_archive_secret
+
+            self._redactions.append(spec.context_archive.token)
+            archive_secret = f"{job_name}-archive"
+            manifests.append(
+                render_archive_secret(spec.context_archive, name=archive_secret, namespace=self._namespace)
+            )
         if secret_name:
             manifests.append(
                 render_git_credentials_secret(
@@ -319,8 +338,8 @@ class KanikoBuildDriver:
                 job_name=job_name,
                 namespace=self._namespace,
                 service_account=self._service_account,
-                context=kaniko_context(spec.source_uri),
-                dockerfile=spec.dockerfile_path or "Dockerfile",
+                context="dir:///workspace" if spec.context_archive else kaniko_context(spec.source_uri),
+                dockerfile="platform/Dockerfile" if spec.context_archive else spec.dockerfile_path or "Dockerfile",
                 destination=destination,
                 context_sub_path=spec.context_path or "",
                 build_args=dict(spec.build_args or {}),
@@ -328,10 +347,23 @@ class KanikoBuildDriver:
                 git_secret=secret_name,
             )
         )
+        if archive_secret:
+            from k8s_native.build_archive import attach_archive_context
+
+            attach_archive_context(manifests[-1], secret_name=archive_secret)
+        if self._manifest_guard is not None:
+            self._manifest_guard(manifests)
 
         started = self._clock()
         try:
-            apply_result = self._cluster_driver.apply_manifests(self._cluster_slug, self._namespace, manifests)
+            apply_result = self._cluster_driver.apply_manifests(
+                self._cluster_slug,
+                self._namespace,
+                manifests,
+                **({"create_only": True} if spec.context_archive else {}),
+            )
+            if self._manifest_observer is not None:
+                self._manifest_observer(manifests, apply_result)
             if not getattr(apply_result, "ok", False):
                 errors = apply_result.summary() if hasattr(apply_result, "summary") else ["apply failed"]
                 return BuildResult(

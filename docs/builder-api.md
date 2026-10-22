@@ -1,5 +1,9 @@
 # Builder API
 
+For source deployment into a selected project and existing brain, use the
+[two-step source-build/brain-hosting protocol](operators/builder-brain-source.md).
+The legacy team promotion route below does not enroll an app on a brain.
+
 The App Builder REST surface: create a dev environment from a file tree,
 sync new files into it, and promote it to a registered app that Astrolift
 serves. Clients include the Calliope App Builder and Chat Studio's

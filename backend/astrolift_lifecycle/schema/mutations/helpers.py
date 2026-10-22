@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextvars
 import re
+from contextlib import contextmanager
 
 from django.db import transaction
 from django.utils import timezone
@@ -38,6 +40,19 @@ from astrolift_workflows.inputs import (
 from config.features import Feature, is_enabled
 from core.mutations import ErrorCode
 from core.tenancy import get_current_tenant
+
+_source_dispatch = contextvars.ContextVar("builder_brain_deployment_dispatch", default=None)
+
+
+@contextmanager
+def source_deployment_dispatch(dispatch):
+    """Internal exact-source consumer; public deployment admission is unchanged."""
+    marker = _source_dispatch.set(dispatch)
+    try:
+        yield
+    finally:
+        _source_dispatch.reset(marker)
+
 
 _VALID_TRIGGER_KINDS = {k.value for k in Deployment.TriggerKind}
 
@@ -263,6 +278,17 @@ def _start_deploy_workflow_on_commit(
     from astrolift_services.native_identity_authority import current_app_identity_authority
     from core.run_trigger import deployment_run_trigger
 
+    source_dispatch = _source_dispatch.get()
+    if source_dispatch is None:
+        from astrolift_lifecycle.builder_brain_dispatch import Capture
+        from astrolift_lifecycle.models import BuilderBrainBuild
+
+        source_build = BuilderBrainBuild.objects.filter(
+            deployment_id=deployment.pk, organization_id=organization_id
+        ).first()
+        if source_build is not None:
+            source_dispatch = Capture(source_build)
+
     # Read while the request is still current: the mirror row is written on
     # commit, and a token-started manual deploy is ``api`` (#2152).
     origin = deployment_origin(deployment)
@@ -282,6 +308,19 @@ def _start_deploy_workflow_on_commit(
         deployment.trigger_kind,
         via_token=origin.credential_kind == "api_token" if origin else get_current_api_token() is not None,
     )
+    if source_dispatch is not None:
+        source_dispatch.capture(
+            deployment=deployment,
+            workflow_kind=workflow_kind,
+            workflow_id=workflow_id,
+            args=args,
+            organization_id=organization_id,
+            registered_app_id=registered_app_id,
+            app_environment_id=app_environment_id,
+            actor=actor,
+            run_trigger=run_trigger,
+        )
+        return
 
     def _start() -> None:
         if origin is not None:

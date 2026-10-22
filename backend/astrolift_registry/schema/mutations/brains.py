@@ -159,83 +159,7 @@ class BrainMutations:
     )
     @tenant_scoped()
     def host_app_on_brain(self, info: Info, input: HostAppOnBrainInput) -> MutationResultType[BrainAppType]:
-        from astrolift_graphql.results import MutationResultType as Result
-        from astrolift_registry import brain_apps
-        from astrolift_registry.brains import visible_brains
-        from astrolift_registry.models import RegisteredApp
-        from astrolift_registry.schema.mutations.registration import RegistrationMutations
-        from astrolift_registry.schema.mutations.types import RegisterAppInput
-        from core.tenancy import get_current_tenant
-
-        tenant = get_current_tenant()
-        org_id = tenant.organization_id if tenant else None
-        slug = input.brain_slug.strip()
-        brain = (
-            visible_brains().filter(organization_id=org_id, slug=slug).first()
-            if slug and org_id is not None
-            else None
-        )
-        if brain is None:
-            return gql_failure(ErrorCode.NOT_FOUND.value, "brain not found", field="brainSlug")
-        user = _actor()
-        if user is None:
-            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "an app is hosted on a brain by a person")
-        if not brain_apps.mcp_urls(brain):
-            return gql_failure(
-                ErrorCode.PRECONDITION.value, f"brain {slug!r} is not served yet", field="brainSlug"
-            )
-        image = input.image.strip()
-        if not image or any(ch.isspace() for ch in image):
-            return gql_failure(ErrorCode.VALIDATION.value, "image must be an image reference", field="image")
-        port = input.port if input.port is not None else brain_apps.DEFAULT_PORT
-        if not 1 <= port <= 65535:
-            return gql_failure(ErrorCode.VALIDATION.value, "port must be between 1 and 65535", field="port")
-        app_slug = (input.slug or "").strip()
-        if app_slug and RegisteredApp.objects.filter(organization_id=org_id, slug=app_slug).exists():
-            return gql_failure(
-                ErrorCode.CONFLICT.value,
-                f"app with slug {app_slug!r} already exists in this organization",
-                field="slug",
-            )
-        if not app_slug:
-            from astrolift_identity.models import Organization
-            from astrolift_registry.schema.mutations.helpers import _generate_unique_app_slug
-
-            app_slug = _generate_unique_app_slug(Organization.objects.get(pk=org_id))
-        # The undecorated resolver: this call already checked APP_CREATE on
-        # the same project and is the one audit row (with the app in extras).
-        import inspect
-
-        registered = inspect.unwrap(RegistrationMutations.register_app)(
-            self,
-            info,
-            input=RegisterAppInput(
-                project_id=input.project_id,
-                name=input.name,
-                slug=app_slug,
-                source_repo="",
-                build_mode=RegisteredApp.BuildMode.NONE.value,
-                manifest_raw=brain_apps.brain_app_manifest(
-                    slug=app_slug, brain_slug=slug, image=image, port=port
-                ),
-                expires_in=input.expires_in,
-                expires_at=input.expires_at,
-                delete_data_on_expiry=input.delete_data_on_expiry,
-            ),
-        )
-        if not registered.ok or registered.data is None:
-            return Result(ok=False, errors=registered.errors, data=None)
-        app = RegisteredApp.objects.get(organization_id=org_id, slug=registered.data.slug)
-        brain_apps.bind(app=app, brain=brain, granted_by=user)
-        return gql_success(
-            BrainAppType(
-                app=registered.data,
-                brain_slug=slug,
-                template=brain_apps.TEMPLATE_KEY,
-                environment_name="production",
-                env_keys=list(brain_apps.ENV_KEYS),
-            )
-        )
+        return host_app_record(info, input)
 
 
 # ---------------------------------------------------------------------------
@@ -979,3 +903,84 @@ def _share_extras(result) -> dict:
     if data is not None:
         out["shared_with"] = [{"team": s.team, "access": s.access} for s in data.shared_with]
     return out
+
+
+def host_app_record(info: Info, input: HostAppOnBrainInput, *, cluster=None, manifest_raw=None):
+    """Shared template/binding path; no browser-facing cluster or source override."""
+    from core.permissions import check_permission
+
+    scope = registration_project_scope("input.project_id", permission=Permission.APP_CREATE)({"input": input})
+    check_permission(Permission.APP_CREATE, scope=scope)
+    from astrolift_graphql.results import MutationResultType as Result
+    from astrolift_registry import brain_apps
+    from astrolift_registry.brains import visible_brains
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.schema.mutations.registration import register_app_record
+    from astrolift_registry.schema.mutations.types import RegisterAppInput
+    from core.tenancy import get_current_tenant
+
+    tenant = get_current_tenant()
+    org_id = tenant.organization_id if tenant else None
+    slug = input.brain_slug.strip()
+    brain = (
+        visible_brains().filter(organization_id=org_id, slug=slug).first()
+        if slug and org_id is not None
+        else None
+    )
+    if brain is None:
+        return gql_failure(ErrorCode.NOT_FOUND.value, "brain not found", field="brainSlug")
+    user = _actor()
+    if user is None:
+        return gql_failure(ErrorCode.PERMISSION_DENIED.value, "an app is hosted on a brain by a person")
+    if not brain_apps.mcp_urls(brain):
+        return gql_failure(
+            ErrorCode.PRECONDITION.value, f"brain {slug!r} is not served yet", field="brainSlug"
+        )
+    image = input.image.strip()
+    if not image or any(ch.isspace() for ch in image):
+        return gql_failure(ErrorCode.VALIDATION.value, "image must be an image reference", field="image")
+    port = input.port if input.port is not None else brain_apps.DEFAULT_PORT
+    if not 1 <= port <= 65535:
+        return gql_failure(ErrorCode.VALIDATION.value, "port must be between 1 and 65535", field="port")
+    app_slug = (input.slug or "").strip()
+    if app_slug and RegisteredApp.objects.filter(organization_id=org_id, slug=app_slug).exists():
+        return gql_failure(
+            ErrorCode.CONFLICT.value,
+            f"app with slug {app_slug!r} already exists in this organization",
+            field="slug",
+        )
+    if not app_slug:
+        from astrolift_identity.models import Organization
+        from astrolift_registry.schema.mutations.helpers import _generate_unique_app_slug
+
+        app_slug = _generate_unique_app_slug(Organization.objects.get(pk=org_id))
+    registered = register_app_record(
+        info,
+        cluster=cluster,
+        defer_workflow=cluster is not None,
+        input=RegisterAppInput(
+            project_id=input.project_id,
+            name=input.name,
+            slug=app_slug,
+            source_repo="",
+            build_mode=RegisteredApp.BuildMode.NONE.value,
+            manifest_raw=manifest_raw
+            or brain_apps.brain_app_manifest(slug=app_slug, brain_slug=slug, image=image, port=port),
+            expires_in=input.expires_in,
+            expires_at=input.expires_at,
+            delete_data_on_expiry=input.delete_data_on_expiry,
+        ),
+    )
+    if not registered.ok or registered.data is None:
+        return Result(ok=False, errors=registered.errors, data=None)
+    app = RegisteredApp.objects.get(organization_id=org_id, slug=registered.data.slug)
+    brain_apps.bind(app=app, brain=brain, granted_by=user)
+    return gql_success(
+        BrainAppType(
+            app=registered.data,
+            brain_slug=slug,
+            template=brain_apps.TEMPLATE_KEY,
+            environment_name="production",
+            env_keys=list(brain_apps.ENV_KEYS),
+        )
+    )
