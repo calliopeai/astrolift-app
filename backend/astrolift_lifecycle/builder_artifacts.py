@@ -64,6 +64,17 @@ def reference(dev):
     token = signing.dumps(
         {"dev": str(dev.guid), "org": dev.organization_id, "key": key, "sha256": digest}, salt=SALT
     )
+    base = reference_base_url()
+    return {
+        "url": base + f"/api/builder/v1/dev-environments/{dev.guid}/artifact/",
+        "token": token,
+        "sha256": digest,
+        "bytes": len(raw),
+        "expanded_bytes": sum(e.file_size for e in zipfile.ZipFile(io.BytesIO(raw)).infolist()),
+    }
+
+
+def reference_base_url():
     base = settings.BUILDER_ARTIFACT_BASE_URL.rstrip("/")
     parsed = urlsplit(base)
     if (
@@ -74,13 +85,7 @@ def reference(dev):
         or parsed.username
     ):
         raise ValueError("BUILDER_ARTIFACT_BASE_URL must be an operator-configured HTTP(S) origin")
-    return {
-        "url": base + f"/api/builder/v1/dev-environments/{dev.guid}/artifact/",
-        "token": token,
-        "sha256": digest,
-        "bytes": len(raw),
-        "expanded_bytes": sum(e.file_size for e in zipfile.ZipFile(io.BytesIO(raw)).infolist()),
-    }
+    return base
 
 
 @require_GET

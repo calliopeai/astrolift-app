@@ -16,11 +16,42 @@ from __future__ import annotations
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
-from astrolift_lifecycle import builder_artifacts, builder_views, cli_views, domain_handoff_views
+from astrolift_lifecycle import (
+    builder_artifacts,
+    builder_brain_views,
+    builder_views,
+    cli_views,
+    domain_handoff_views,
+)
 
 app_name = "astrolift_lifecycle"
 
 urlpatterns = [
+    path(
+        "api/builder/v1/dev-environments/<str:guid>/source/",
+        builder_brain_views.descriptor,
+        name="builder-brain-source",
+    ),
+    path(
+        "api/builder/v1/dev-environments/<str:guid>/brain-source-builds/",
+        csrf_exempt(builder_brain_views.create),
+        name="builder-brain-build-create",
+    ),
+    path(
+        "api/builder/v1/brain-source-builds/<str:intent_guid>/",
+        builder_brain_views.status,
+        name="builder-brain-build-status",
+    ),
+    path(
+        "api/builder/v1/brain-source-builds/<str:intent_guid>/host/",
+        csrf_exempt(builder_brain_views.host),
+        name="builder-brain-build-host",
+    ),
+    path(
+        "api/builder/v1/brain-source-builds/<str:intent_guid>/archive/",
+        builder_brain_views.archive,
+        name="builder-brain-build-archive",
+    ),
     path("api/builder/v1/capabilities/", builder_views.capabilities, name="builder-capabilities"),
     path(
         "api/builder/v1/dev-environments/<str:guid>/artifact/",

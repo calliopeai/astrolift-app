@@ -72,6 +72,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "domains.cloudflare_connections",
     "apps.dependency_context",
     "apps.temporary_expiry",
+    "builder.brain_source_artifacts",
     "providers.reference_read",
     "domains.managed_diagnostics",
     "workloads.environment_targets",

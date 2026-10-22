@@ -208,6 +208,7 @@ from astrolift_workflows.activities.brain_create import (
     brain_create_scaffold,
 )
 from astrolift_workflows.activities.build_image import build_image
+from astrolift_workflows.activities.builder_brain_source import build_brain_source
 from astrolift_workflows.activities.command_run_exec import (
     assert_no_concurrent,
     finish_command_run,
@@ -309,6 +310,7 @@ from astrolift_workflows.workflows import (
     WorkflowRunReconcileTickWorkflow,
 )
 from astrolift_workflows.workflows.brain_create import BrainCreateWorkflow
+from astrolift_workflows.workflows.builder_brain_source import BuilderBrainSourceBuildWorkflow
 from astrolift_workflows.workflows.conversation_transfer import (
     ConversationTransferExpiryTickWorkflow,
     ValidateConversationTransferWorkflow,
@@ -318,6 +320,7 @@ from astrolift_workflows.workflows.install_cluster_agent import InstallClusterAg
 from astrolift_workflows.workflows.install_cluster_log_collector import InstallClusterLogCollectorWorkflow
 
 WORKFLOWS = (
+    BuilderBrainSourceBuildWorkflow,
     BrainCreateWorkflow,
     ManagedDomainAppRouteWorkflow,
     InstallClusterAgentWorkflow,
@@ -396,6 +399,7 @@ WORKFLOWS = (
 )
 
 ACTIVITIES = (
+    build_brain_source,
     brain_create_repo,
     brain_create_scaffold,
     brain_create_register,

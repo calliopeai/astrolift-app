@@ -20,6 +20,7 @@ from astrolift_workflows.workflows.bring_cluster_into_management import (
     BringClusterIntoManagementWorkflow,
 )
 from astrolift_workflows.workflows.build_preview import BuildPreviewWorkflow
+from astrolift_workflows.workflows.builder_brain_source import BuilderBrainSourceBuildWorkflow
 from astrolift_workflows.workflows.cert_expiry_tick import CertExpiryTickWorkflow
 from astrolift_workflows.workflows.ci_workflow_resync_tick import (
     CiWorkflowResyncTickWorkflow,
@@ -117,6 +118,7 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 from astrolift_workflows.workflows.workflow_run_reconcile_tick import WorkflowRunReconcileTickWorkflow
 
 __all__ = [
+    "BuilderBrainSourceBuildWorkflow",
     "NativeModelConnectionReconcileWorkflow",
     "AgentTaskCallbackReconcileWorkflow",
     "DeliverAgentTaskCallbackWorkflow",

@@ -721,7 +721,7 @@ def _pod_spec(
     image_digest: str,
     env_from_secret_refs: list[str] | None = None,
 ) -> dict[str, Any]:
-    return {
+    pod = {
         **gpu_scheduling(w),
         "containers": [
             _render_container(
@@ -735,6 +735,59 @@ def _pod_spec(
             for c in w.containers
         ],
     }
+    if w.kind == "deployment" or (w.kind == "agent" and w.run_family == "service"):
+        _mount_empty_directories(pod, w)
+    return pod
+
+
+def _mount_empty_directories(pod: dict[str, Any], workload: WorkloadManifest) -> None:
+    """Render declared scratch volumes, without introducing Secret/PVC adoption.
+
+    Nonempty declarations previously existed only in the model. Limit this
+    addition to emptyDir: a caller must not gain access to an arbitrary
+    platform Secret by naming a volume. StatefulSet PVC rendering is separate.
+    """
+    import re
+    from pathlib import PurePosixPath
+
+    from astrolift_manifest.security_volumes import (
+        parse_volume,
+        render_pod_volume,
+        render_volume_mount,
+    )
+
+    volumes = []
+    names: set[str] = set()
+    mounts: set[str] = set()
+    for raw in workload.volumes:
+        if raw.get("kind") != "empty_dir":
+            continue
+        volume = parse_volume(raw)
+        path = PurePosixPath(volume.mount_path)
+        protected = ("/proc", "/sys", "/dev", "/var/run", "/run")
+        if (
+            not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", volume.name)
+            or volume.name in names
+            or volume.mount_path in mounts
+            or str(path) != volume.mount_path
+            or ".." in path.parts
+            or str(path) == "/"
+            or any(
+                str(path) == p or str(path).startswith(p + "/") or p.startswith(str(path) + "/")
+                for p in protected
+            )
+        ):
+            raise ValueError("invalid or duplicate empty_dir name or mount path")
+        names.add(volume.name)
+        mounts.add(volume.mount_path)
+        volumes.append(volume)
+    if not volumes:
+        return
+    pod["volumes"] = [render_pod_volume(volume) for volume in volumes]
+    if workload.fs_group is not None:
+        pod.setdefault("securityContext", {})["fsGroup"] = workload.fs_group
+    for container in pod["containers"]:
+        container.setdefault("volumeMounts", []).extend(render_volume_mount(volume) for volume in volumes)
 
 
 def _platform_image(*, image_repository: str, image_tag: str, image_digest: str) -> str:

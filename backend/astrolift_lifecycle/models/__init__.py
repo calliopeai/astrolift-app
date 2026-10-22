@@ -1,6 +1,7 @@
 from astrolift_lifecycle.models.agent_run import AgentRun
 from astrolift_lifecycle.models.app_environment import AppEnvironment
 from astrolift_lifecycle.models.builder_artifact import BuilderArtifact
+from astrolift_lifecycle.models.builder_brain_build import BuilderBrainBuild
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_approval import DeploymentApproval
@@ -26,6 +27,7 @@ from astrolift_lifecycle.models.task_run import TaskRun
 
 __all__ = [
     "BuilderArtifact",
+    "BuilderBrainBuild",
     "ManagedDomainAppBinding",
     "DomainSessionHandoff",
     "AgentRun",
