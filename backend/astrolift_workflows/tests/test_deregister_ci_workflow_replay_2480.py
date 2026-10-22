@@ -217,6 +217,11 @@ async def test_a_fresh_deregister_removes_the_ci_workflow_last_and_replays(tempo
         "astrolift.app.remove_ci_workflow",
     ]
     assert calls == [7]
+    assert result.data["teardown"]["native_identity"] == {
+        "ok": True,
+        "detail": "no native GCP identity",
+        "data": [],
+    }
     assert result.data["teardown"]["ci_workflow"] == {
         "ok": True,
         "detail": removed["detail"],

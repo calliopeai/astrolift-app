@@ -331,6 +331,8 @@ class DeregisterAppWorkflow:
                     detail=(
                         f"revoked {sum(row['removed'] for row in removed)} owned grant(s) "
                         f"on {len(removed)} cluster(s)"
+                        if removed
+                        else "no native GCP identity"
                     ),
                     data=removed,
                 )
