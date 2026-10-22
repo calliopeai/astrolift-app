@@ -229,6 +229,10 @@ export const GOLDEN_SIGNALS: ComponentProps<typeof GoldenSignalsPanel> = {
   statusBreakdown: null,
   statusLoading: false,
   onStatusRetry: () => undefined,
+  network: null,
+  networkReason: "NOT_CONFIGURED",
+  networkLoading: false,
+  onNetworkRetry: () => undefined,
 };
 export const ENDPOINT_METRICS: ComponentProps<typeof EndpointMetricsPanel> = {
   metrics: [],

@@ -236,6 +236,10 @@ export const GOLDEN_SIGNALS: GoldenSignalsPanelProps = {
   statusBreakdown: null,
   statusLoading: false,
   onStatusRetry: () => undefined,
+  network: null,
+  networkReason: "NO_DATA_YET",
+  networkLoading: false,
+  onNetworkRetry: () => undefined,
 };
 
 export const FUNCTION: FunctionHomeScreenProps = {

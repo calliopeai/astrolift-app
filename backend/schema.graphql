@@ -1716,6 +1716,25 @@ type AstroliftAppMetricsPoint {
   latencyP95: Float!
 }
 
+type AstroliftAppNetworkMetrics {
+  reason: AstroliftObservabilityPanelReason!
+  rangeSeconds: Int!
+  stepSeconds: Int!
+  rateWindowSeconds: Int!
+  sourcedAt: DateTime!
+  series: [AstroliftAppNetworkSeries!]!
+}
+
+type AstroliftAppNetworkSeries {
+  direction: NetworkDirection!
+  unit: String!
+  samples: [AstroliftTimeSeriesPoint!]!
+  totalBytes: Float
+  promql: String!
+  measurement: AstroliftGoldenSignalMeasurement!
+  reason: AstroliftObservabilityPanelReason!
+}
+
 type AstroliftAppPod {
   name: String!
   workload: String!
@@ -8777,6 +8796,7 @@ enum GoldenSignalSource {
   EDGE_PROMETHEUS
   CLOUDWATCH_ALB
   CADVISOR_KUBE_STATE_METRICS
+  CADVISOR
   NONE
 }
 
@@ -10836,6 +10856,11 @@ enum NativeModelProtocol {
   BEDROCK
 }
 
+enum NetworkDirection {
+  RECEIVE
+  TRANSMIT
+}
+
 type NoneTypeMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
@@ -11596,6 +11621,7 @@ type Query {
   astroliftSharedModelPromptReadiness(id: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, expectedVersion: Int!): AstroliftModelPromptReadiness
   astroliftAppGoldenSignals(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppGoldenSignalsResult!
   astroliftAppStatusCodeBreakdown(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftStatusCodeBreakdown
+  astroliftAppNetworkMetrics(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): AstroliftAppNetworkMetrics!
   astroliftWorkloadResourceUsage(appSlug: String!, workloadSlug: String!, environmentName: String = null): AstroliftWorkloadResourceUsage
   astroliftAppUrlHealth(appSlug: String!, url: String!, forceRefresh: Boolean! = false): AstroliftAppUrlHealth
   astroliftAppUrlProbeHistory(appSlug: String!, url: String!, limit: Int! = 5): [AstroliftAppUrlHealth!]!

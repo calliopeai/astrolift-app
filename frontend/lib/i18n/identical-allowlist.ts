@@ -43,6 +43,7 @@ export const IDENTICAL_EVERYWHERE: readonly string[] = [
   "Azure Communication Services",
   "Bitbucket OAuth App",
   "Bitbucket PAT",
+  "cAdvisor",
   "cAdvisor + kube-state-metrics",
   "CI",
   "CLI",

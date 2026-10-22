@@ -41,6 +41,7 @@ from astrolift_observability.schema.types import (
     AppGoldenSignal,
     AppGoldenSignalsResult,
     AppMetricNamesResult,
+    AppNetworkMetrics,
     AppTrace,
     AppUrlHealth,
     ExecutePromqlResult,
@@ -550,6 +551,52 @@ class GoldenSignalsQuery:
             range_seconds=seconds,
             series=series_out,
             promql=plan.promql,
+        )
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ, scope=app_scope_by_slug("app_slug", permission=Permission.APP_READ)
+    )
+    @tenant_scoped()
+    def astrolift_app_network_metrics(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+        range_seconds: int | None = None,
+        workload_slug: str | None = None,
+    ) -> AppNetworkMetrics:
+        """Bytes per second the pods received and sent, and the bytes
+        moved in the window (#2271), from cAdvisor's pod network counters.
+
+        Without ``workload_slug``: the environment's namespace. With it:
+        only the workload's verified current pods, each series bound to
+        its pod UID; an unverifiable workload is unavailable, never the
+        namespace total. Each direction reports its own reason:
+        NOT_CONFIGURED (no Prometheus endpoint, or the environment,
+        workload or cluster is not this app's), NOT_SUPPORTED_BY_PROVIDER
+        (the driver cannot verify membership), NO_DATA_YET (no pods or no
+        samples) or ERROR (collector, transport or ownership failure).
+        """
+        from astrolift_observability.network_metrics import network_metrics_for_app
+
+        seconds = _clamp_range(range_seconds or _DEFAULT_RANGE_SECONDS)
+        tenant = get_current_tenant()
+        app = (
+            RegisteredApp.objects.filter(
+                slug=app_slug,
+                organization_id=tenant.organization_id,
+                deleted_at__isnull=True,
+            )
+            .select_related("organization")
+            .first()
+        )
+        return network_metrics_for_app(
+            app=app,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+            seconds=seconds,
+            now=_now_utc(),
         )
 
     # -- Per-workload live resource usage (#430, #2263) --------------
