@@ -232,7 +232,7 @@ def test_an_event_reaches_only_the_devices_registered_in_its_organization(apple)
     _member(org_b, person)
     device_a = _device(person, org_a, TOKEN_A)
     device_b = _device(person, org_b, TOKEN_B)
-    # Org A's provider account calls every token it is handed unregistered.
+    # Apple answers Unregistered for any token org A's key sends to.
     apple.answers = {
         TOKEN_A: APNsResponse(410, reason="Unregistered"),
         TOKEN_B: APNsResponse(410, reason="Unregistered"),
