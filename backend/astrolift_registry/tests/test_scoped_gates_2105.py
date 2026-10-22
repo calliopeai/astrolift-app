@@ -418,6 +418,7 @@ OBJECT_MUTATIONS = [
     "register_app_repo",
     "update_app",
     "set_app_subdomain",
+    "set_app_source",
     "soft_delete_app",
     "tear_down_app",
     "transfer_app",

@@ -1753,6 +1753,21 @@ type AstroliftAppSettingsLastModified {
   observability: DateTime
 }
 
+type AstroliftAppSourceChange {
+  app: AstroliftRegisteredApp!
+
+  """
+  The repository the app pointed at before the call; app.sourceRepo when nothing changed.
+  """
+  previousSourceRepo: String!
+}
+
+type AstroliftAppSourceChangeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAppSourceChange
+}
+
 enum AstroliftAppSourceKindFilter {
   ALL
   GITHUB
@@ -10309,6 +10324,11 @@ type Mutation {
   The organization's policy for temporary apps (#2433): the longest an app may live, whether members may create temporary apps only, which surfaces require an expiry and how long an expired app's data is kept.
   """
   setTemporaryAppPolicy(input: TemporaryAppPolicyInput!): AstroliftTemporaryAppPolicyMutationResult!
+
+  """
+  Point a GitHub app at another repository, or at its repository's new name after a rename on GitHub (#2478). The repository must be in the organization's GitHub App installation, and the name GitHub lists is stored; sourceUrl follows when it named the old repository. Autowire then runs against the repository: the CI workflow and the CI push role follow it, and the CI secrets are pushed to it, which rotates the deploy token. Audited as app.set_source.
+  """
+  setAppSource(input: SetAppSourceInput!): AstroliftAppSourceChangeMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   setNotificationQuietHours(input: SetNotificationQuietHoursInput!): AstroliftNotificationQuietHoursMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
@@ -12371,6 +12391,14 @@ input SetAppSecretMetadataInput {
   expiresAt: DateTime = null
   setVia: String = null
   scope: String = null
+}
+
+input SetAppSourceInput {
+  id: GUID!
+
+  """The GitHub repository, as owner/name."""
+  sourceRepo: String!
+  ifMatchVersion: Int = null
 }
 
 input SetAppSubdomainInput {

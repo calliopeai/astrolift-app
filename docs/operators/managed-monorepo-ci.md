@@ -93,6 +93,33 @@ signature or permission grant. GitLab, Gitea and Bitbucket retain their existing
 host-specific paths and contracts; this change does not certify equivalent
 multi-app isolation for those hosts.
 
+## Change the source repository
+
+A repository renamed on GitHub keeps its webhook, workflow file and Actions
+secrets, but the app keeps the old `owner/name`, and everything that matches by
+name stops matching: the GitHub App webhook receiver finds apps by repository
+name, the per-repository receiver refuses a delivery from any other
+repository, and the push role trusts `repo:<owner>/<name>:*`. The
+`setAppSource(input: {id, sourceRepo, ifMatchVersion})` mutation points the app
+at the new name, or at a different repository (#2478). It needs `app.update` on
+the app and is audited as `app.set_source` with both names.
+
+The repository must be in the organization's GitHub App installation on its
+owner; the app stores the name as GitHub lists it. The organization's
+repository policy applies, and another app in the organization registered from
+the same repository and manifest path is a conflict. A `sourceUrl` that named
+the old repository follows it.
+
+The change then runs autowire against the repository. The workflow sync
+re-points the push role's trust and rewrites the app's workflow, whose
+ownership comment names the repository; on a protected deploy branch that is a
+review pull request to merge. The CI secrets are pushed to the repository,
+which rotates the deploy token, so restart runs holding the old one. After a
+move to a different repository the old repository keeps its workflow file, but
+it can no longer assume the push role or deploy. The manifest is not read
+again: run **Resync from source** when the new repository's differs. The
+returned app's `autowire` names any step that needs attention.
+
 ## Deregister removes the app's workflow
 
 Deregistering an app removes its managed GitHub workflow from the source
