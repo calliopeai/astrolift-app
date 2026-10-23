@@ -104,7 +104,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
-    @driver_op(cloud="k8s_native", driver="notification")
+    @driver_op(cloud="k8s_native", driver="notification", redact_args=("request",))
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -121,7 +121,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
             provider_metadata=dict(request.provider_metadata),
         )
 
-    @driver_op(cloud="k8s_native", driver="notification")
+    @driver_op(cloud="k8s_native", driver="notification", redact_args=("registration_id",))
     def revoke_device(self, *, registration_id: str) -> None:
         # Best-effort: ping the bridge so it can drop the device.
         if not self._config.push_webhook_url or not registration_id:
@@ -143,7 +143,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
-    @driver_op(cloud="k8s_native", driver="notification")
+    @driver_op(cloud="k8s_native", driver="notification", redact_args=("target",))
     def send(
         self,
         *,
@@ -173,7 +173,7 @@ class WebhookSMTPNotificationDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
-    @driver_op(cloud="k8s_native", driver="notification")
+    @driver_op(cloud="k8s_native", driver="notification", redact_args=("targets",))
     def send_bulk(
         self,
         *,

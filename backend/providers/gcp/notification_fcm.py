@@ -194,7 +194,7 @@ class FCMNotificationDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
-    @driver_op(cloud="gcp", driver="notification")
+    @driver_op(cloud="gcp", driver="notification", redact_args=("request",))
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -216,7 +216,7 @@ class FCMNotificationDriver(NotificationDriver):
             },
         )
 
-    @driver_op(cloud="gcp", driver="notification")
+    @driver_op(cloud="gcp", driver="notification", redact_args=("registration_id",))
     def revoke_device(self, *, registration_id: str) -> None:
         # FCM has no server-side revoke -- the next send to a stale
         # token returns ``UNREGISTERED`` and the dispatcher marks
