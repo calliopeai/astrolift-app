@@ -1233,7 +1233,13 @@ class GKEIdentityRuntimeObserver:
         original_checkpoint = checkpoint
 
         def bounded_checkpoint() -> None:
+            # The deadline bounds this observer's reads. Time inside the
+            # caller's checkpoint is the caller's own admission work (a native
+            # deployment re-admits its caller and run there, about 80 times per
+            # observation, #2509), so it moves the deadline instead of spending it.
+            started = time.monotonic()
             _checkpoint(original_checkpoint)
+            self._deadline += time.monotonic() - started
             if time.monotonic() > self._deadline:
                 raise GKEObservationError("RUNTIME_READ_BOUND_EXCEEDED")
 

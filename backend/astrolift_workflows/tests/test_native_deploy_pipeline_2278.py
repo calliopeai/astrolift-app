@@ -90,11 +90,11 @@ async def deploy(
     w.starts.clear()
     # The local fixture makes thousands of fresh PostgreSQL admissions; on a
     # shared, loaded machine the per-stage wall-clock budgets can expire before
-    # any native latency exists. Production budgets are unchanged.
+    # any native latency exists. Production budgets are unchanged. The rollout
+    # read deadline needs no override: admission time does not spend it (#2509).
     for name in (
         "astrolift_services.gcp_identity_source.MAX_SOURCE_SECONDS",
         "astrolift_services.gcp_app_identity_plan.MAX_SOURCE_SECONDS",
-        "gcp.gke_identity_runtime.DEADLINE_SECONDS",
     ):
         w.monkeypatch.setattr(name, 900)
     runner = {} if sandboxed else {"workflow_runner": UnsandboxedWorkflowRunner()}

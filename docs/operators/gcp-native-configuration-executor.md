@@ -188,11 +188,14 @@ access another grant allows is not denied.
 ## Rollout observation
 
 Rollout is observed up to 10 times, 15 seconds apart, each read under its own
-60-second budget. A pending rollout or an exceeded read budget is observed
-again; any other observation failure stops. Configuration alone never completes
-a Deployment: without an observed rollout the completion step refuses with
-`NATIVE_ROLLOUT_UNOBSERVED`. `invocation_verified` stays false: Pod and Node
-readback does not prove token exchange or a successful prediction.
+60-second budget. The budget counts the Kubernetes and GKE reads only: the
+original caller and run are re-admitted before and after every read, about 80
+times in one observation, and that time does not spend it. A pending rollout or
+an exceeded read budget is observed again; any other observation failure stops.
+Configuration alone never completes a Deployment: without an observed rollout
+the completion step refuses with `NATIVE_ROLLOUT_UNOBSERVED`.
+`invocation_verified` stays false: Pod and Node readback does not prove token
+exchange or a successful prediction.
 
 ## Not in this slice
 
