@@ -47,4 +47,7 @@ team shares, approver teams and repository registration answer a foreign guid
 with the `NOT_FOUND` a guid that does not exist gets, and write nothing. An
 app's approver list names only active members of its organization, the people
 the approval picker offers; a pending deploy neither shows nor counts anyone
-else stored on it (#1866).
+else stored on it (#1866). An approver team counts only those of its members
+who are active members of the organization. When the list or the team leaves
+nobody who can approve, every approver is refused and the deploy waits on
+nobody; fix the approver policy to release it.

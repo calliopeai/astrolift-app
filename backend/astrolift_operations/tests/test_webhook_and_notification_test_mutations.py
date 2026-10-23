@@ -284,7 +284,8 @@ def test_notification_test_unknown_org_returns_not_found(permission_resolver):
 
 def test_notification_test_rejects_cross_org_target(permission_resolver):
     """A user acting in org_a cannot send a test notification scoped
-    to org_b even if they technically hold org.update grants."""
+    to org_b even if they technically hold org.update grants; org_b reads
+    like an org that does not exist (#1866)."""
     org_a, user, _ = _scaffold()
     org_b = Organization.objects.create(name="Other", slug="other")
     permission_resolver.grant(Permission.ORG_UPDATE)
@@ -294,7 +295,9 @@ def test_notification_test_rejects_cross_org_target(permission_resolver):
             _info(user), input=TestNotificationInput(id=str(org_b.guid))
         )
     assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].message == "organization not found"
+    assert not Notification.objects.filter(organization=org_b).exists()
 
 
 def test_notification_test_requires_permission(permission_resolver):

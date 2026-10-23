@@ -389,7 +389,8 @@ def test_another_tenant_cannot_read_the_artifacts(task, permission_resolver):
     foreign = Organization.objects.create(name="Other", slug="other")
 
     assert read_artifact(task, "test-report.xml", tenant=foreign) is None
-    with pytest.raises(GraphQLError, match="organization mismatch"):
+    # Another org's id reads like one that does not exist (#1866).
+    with pytest.raises(GraphQLError, match="organization not found"):
         read_artifact(task, "test-report.xml", tenant=foreign, org=task.organization)
 
 

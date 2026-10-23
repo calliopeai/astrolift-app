@@ -370,3 +370,84 @@ def test_a_list_with_no_member_left_refuses_everyone(world, people, pending):
     assert not _is_eligible_approver(world.medops_app, user_id=world.user.pk)
     assert not _is_eligible_approver(world.medops_app, user_id=people.member.pk)
     assert people.foreign.email not in {a.email for a in deployment_to_type(pending).awaiting_approvers}
+
+
+# ---- the approver team, and a policy nobody can satisfy ----------------
+
+
+@pytest.fixture
+def holder(world):
+    """An org member holding ``app.approve_deploy`` at the org: the person
+    awaited, and admitted, while the app names no approver at all."""
+    user = make_user("xorg-holder")
+    _org_member(user, world.org)
+    bind_role(
+        user,
+        permissions=(Permission.APP_APPROVE_DEPLOY,),
+        kind="ORG",
+        scope_id=world.org.pk,
+        slug="xorg-1866-approver",
+    )
+    return user
+
+
+def _on_team(person, team):
+    Member.objects.create(user=person, scope_kind=Member.ScopeKind.TEAM, scope_id=team.pk)
+
+
+def _awaiting(pending):
+    return [int(a.user_id) for a in deployment_to_type(pending).awaiting_approvers]
+
+
+def test_an_approver_team_counts_only_the_organizations_active_members(world, people, pending):
+    # SCIM deprovisioning deactivates the ORG row and leaves the TEAM rows,
+    # so a person who left the org is still on the team.
+    app = world.medops_app
+    for name, person in vars(people).items():
+        if name != "team_only":  # already on MedOps
+            _on_team(person, world.medops)
+    app.approver_team = world.medops
+    app.save(update_fields=["approver_team"])
+
+    assert _awaiting(pending) == [people.member.pk]
+    assert _is_eligible_approver(app, user_id=people.member.pk)
+    for name, person in vars(people).items():
+        if name != "member":
+            assert not _is_eligible_approver(app, user_id=person.pk), name
+
+
+def _outsiders_listed(world, people):
+    world.medops_app.approver_users.set([people.foreign, people.removed])
+
+
+def _disabled_listed(world, people):
+    world.medops_app.approver_users.set([people.disabled, people.deactivated])
+
+
+def _empty_team(world, people):
+    world.medops_app.approver_team = world.platform
+    world.medops_app.save(update_fields=["approver_team"])
+
+
+def _team_of_leavers(world, people):
+    _on_team(people.deactivated, world.platform)
+    _on_team(people.removed, world.platform)
+    _empty_team(world, people)
+
+
+@pytest.mark.parametrize(
+    "policy", [_outsiders_listed, _disabled_listed, _empty_team, _team_of_leavers], ids=lambda f: f.__name__
+)
+def test_a_policy_nobody_can_satisfy_awaits_nobody(world, people, pending, holder, policy):
+    """The gate refuses every approver here, the org's approve_deploy
+    holders included, so the widget awaits nobody and says to check the
+    policy, rather than asking those holders for a vote it would refuse."""
+    app = world.medops_app
+    # Control: with no list and no team the holder is awaited and admitted.
+    assert _awaiting(pending) == [holder.pk]
+    assert _is_eligible_approver(app, user_id=holder.pk)
+
+    policy(world, people)
+
+    assert _awaiting(pending) == []
+    assert not _is_eligible_approver(app, user_id=holder.pk)

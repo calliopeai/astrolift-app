@@ -196,15 +196,11 @@ def _resolve_clone_org(org_id):
             )
         return org, None
     org = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
-    if org is None:
+    # Another org's guid reads exactly like one that does not exist (#1866).
+    if org is None or (user_org is not None and org.pk != user_org):
         return None, CloneWorkflowDefinitionResult(
             ok=False,
             errors=[GQLValidationError(field="orgId", messages=["organization not found"])],
-        )
-    if user_org is not None and org.pk != user_org:
-        return None, CloneWorkflowDefinitionResult(
-            ok=False,
-            errors=[GQLValidationError(field="orgId", messages=["PERMISSION_DENIED: organization mismatch"])],
         )
     return org, None
 

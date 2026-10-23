@@ -205,7 +205,8 @@ def test_register_unknown_source_kind_rejected(permission_resolver, org, with_te
 
 def test_register_foreign_org_id_rejected(permission_resolver, org, other_org, with_tenant_org):
     """Passing another org's GUID while tenant-bound to ``org`` is rejected
-    (the source can't be written into a foreign org)."""
+    (the source can't be written into a foreign org), exactly like a GUID
+    that does not exist (#1866)."""
     _grant_write(permission_resolver)
     with with_tenant_org(org):
         result = AgentsMutation().register_org_skill_repo(
@@ -221,7 +222,8 @@ def test_register_foreign_org_id_rejected(permission_resolver, org, other_org, w
             org_id=str(other_org.guid),
         )
     assert result.ok is False
-    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].message == "organization not found"
     assert OrgSkillRepo.objects.filter(organization=other_org).count() == 0
 
 

@@ -190,13 +190,11 @@ EXEMPT: dict[str, str] = {
     # --- Org self-resolution helpers: resolve the caller's OWN org (a
     #     guid the caller supplied is verified against the tenant's org
     #     pk right after the fetch — cross-org guid reads as not-found).
-    "astrolift_agents::_resolve_org": (
-        "resolves the caller's own org: after fetching by the supplied "
-        "guid it asserts ``org.pk == active`` (the tenant's org) or fails."
-    ),
     "astrolift_agents::_caller_org_id": (
         "resolves the caller's own org: fetch-by-guid then ``org.pk`` is "
-        "checked against the tenant org; a foreign guid raises."
+        "checked against the tenant org; a foreign guid raises the same "
+        "'organization not found' a missing one does (#1866). Superusers "
+        "bypass the match, so the org cannot sit in the lookup."
     ),
     "astrolift_workflows::_resolve_caller_org": (
         "#1042 deny-by-default: fetches the caller's own org by its "
@@ -236,7 +234,9 @@ EXEMPT: dict[str, str] = {
         "the by-guid fetch — a foreign team reads as empty."
     ),
     "astrolift_operations::NotificationMutations.test_notification_channel": (
-        "post-check: ``if tenant.organization_id != org.id`` after the " "by-guid org fetch."
+        "post-check: ``if tenant.organization_id != org.id`` after the "
+        "by-guid org fetch, answered with the NOT_FOUND a missing guid gets "
+        "(#1866)."
     ),
     "astrolift_lifecycle::EnvironmentSettingMutations.set_environment_setting": (
         "post-check: ``if env.registered_app.organization_id != "
@@ -799,8 +799,8 @@ def test_marker_is_scoped_to_its_function() -> None:
 
 def test_exempt_key_clears() -> None:
     """An ``app::qualname`` in EXEMPT clears; a real entry is exercised."""
-    src = "def _resolve_org(org_id):\n    return Organization.objects.filter(guid=str(org_id)).first()\n"
+    src = "def _caller_org_id(info, org_id):\n    return Organization.objects.filter(guid=str(org_id)).first()\n"
     # Not exempt under a synthetic app label…
     assert len(_residuals_in_source(src, app_label="synthetic")) == 1
-    # …but the real ``astrolift_agents::_resolve_org`` entry clears it.
+    # …but the real ``astrolift_agents::_caller_org_id`` entry clears it.
     assert _residuals_in_source(src, app_label="astrolift_agents") == []

@@ -449,16 +449,18 @@ def _is_eligible_approver(app: RegisteredApp, *, user_id: int) -> bool:
     empty set with ``requires_approval`` on means 'any approver-
     permission holder', which the permission gate already covers.
 
-    A listed user counts only while an active member of the app's
-    organization (#1866). Any listed user, counted or not, still keeps
-    the set from reading as empty, so a list nobody on it can satisfy
-    refuses everyone rather than opening to every permission holder.
+    A listed user, or a member of the approver team, counts only while an
+    active member of the app's organization (#1866). Any listed user,
+    counted or not, still keeps the set from reading as empty, so a list
+    nobody on it can satisfy refuses everyone rather than opening to
+    every permission holder.
     """
     from astrolift_identity.api_tokens import active_org_member_users
 
     if not app.requires_approval:
         return True
-    if app.approver_users.filter(pk=user_id, pk__in=active_org_member_users(app.organization_id)).exists():
+    members = active_org_member_users(app.organization_id)
+    if app.approver_users.filter(pk=user_id, pk__in=members).exists():
         return True
     if app.approver_team_id is None:
         # No team and no user set → fall through to permission gate.
@@ -471,6 +473,7 @@ def _is_eligible_approver(app: RegisteredApp, *, user_id: int) -> bool:
         scope_id=app.approver_team_id,
         is_active=True,
         deleted_at__isnull=True,
+        user_id__in=members,
     ).exists()
 
 

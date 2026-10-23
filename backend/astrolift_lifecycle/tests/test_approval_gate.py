@@ -144,6 +144,7 @@ def test_app_approver_team_member_can_approve(
         is_active=True,
         lifecycle=Member.Lifecycle.ACTIVE,
     )
+    _org_member(other_actor, org)
 
     mut = LifecycleMutation()
     with _tenant_for(org, actor):

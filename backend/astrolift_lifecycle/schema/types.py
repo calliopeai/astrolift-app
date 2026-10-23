@@ -858,13 +858,12 @@ def _eligible_approver_user_ids(app) -> list[int]:
         # required_approvals deploys.
         return _org_approver_user_ids(app)
 
-    # Only the app's organization's active members: the list once took any
-    # user on the install, and the widget shows each name and email (#1866).
-    explicit_user_ids = list(
-        app.approver_users.filter(pk__in=active_org_member_users(app.organization_id)).values_list(
-            "pk", flat=True
-        )
-    )
+    # Only the app's organization's active members, listed or on the approver
+    # team: the list once took any user on the install, SCIM deprovisioning
+    # leaves a person's team rows, and the widget shows each name and email
+    # (#1866).
+    members = active_org_member_users(app.organization_id)
+    explicit_user_ids = list(app.approver_users.filter(pk__in=members).values_list("pk", flat=True))
     team_user_ids: list[int] = []
     if app.approver_team_id is not None:
         team_user_ids = list(
@@ -873,12 +872,19 @@ def _eligible_approver_user_ids(app) -> list[int]:
                 scope_id=app.approver_team_id,
                 is_active=True,
                 deleted_at__isnull=True,
+                user_id__in=members,
             ).values_list("user_id", flat=True)
         )
 
     combined = explicit_user_ids + team_user_ids
     if combined:
         return _dedup_preserve_order(combined)
+
+    if app.requires_approval and (app.approver_team_id is not None or app.approver_users.exists()):
+        # A list or team nobody on can satisfy refuses every approver
+        # (``_is_eligible_approver`` fails closed), so nobody is awaited
+        # and the widget says to check the policy (#1866).
+        return []
 
     # ``requires_approval`` is True but no explicit set was configured
     # — surface the org-scope permission holders so the widget isn't
