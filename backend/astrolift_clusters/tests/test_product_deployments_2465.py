@@ -13,6 +13,7 @@ real.
 from __future__ import annotations
 
 import ast
+import dataclasses
 import datetime as dt
 import pathlib
 import uuid
@@ -104,6 +105,8 @@ def _listed(document: str, **kwargs) -> dict:
 
 
 def _workload(namespace: str, name: str, *, desired: int = 1, ready: int = 1, images=()) -> WorkloadHealth:
+    """``images=None`` is a Deployment whose pods could not be listed."""
+    running = None if images is None else tuple(RunningImage(image=i, image_id=d) for i, d in images)
     return WorkloadHealth(
         namespace=namespace,
         name=name,
@@ -111,7 +114,7 @@ def _workload(namespace: str, name: str, *, desired: int = 1, ready: int = 1, im
         ready_replicas=ready,
         restart_count_24h=0,
         last_image_deployed_at="",
-        running_images=tuple(RunningImage(image=i, image_id=d) for i, d in images),
+        running_images=running,
     )
 
 
@@ -479,6 +482,16 @@ def test_the_health_dispatch_carries_the_running_images(plugin, drivers):
     assert rows[1]["running_images"] == []
 
 
+def test_the_health_dispatch_says_when_the_pods_were_not_listed(plugin, drivers):
+    """``None``, never ``[]``: the scan reads ``[]`` as nothing running."""
+    cluster = _cluster(plugin)
+    drivers[cluster.slug] = FakeDriver(workloads=_hub(images=None))
+
+    hub, proxy = cluster_management.cluster_workload_health_dispatch(cluster=cluster, namespaces=["junohub"])
+
+    assert (hub["running_images"], proxy["running_images"]) == (None, [])
+
+
 # ---- the scan ----------------------------------------------------------------------
 
 
@@ -815,6 +828,97 @@ def test_a_scan_that_cannot_read_the_workloads_does_not_say_the_images_changed(
     assert (lost.payload["changes"], lost.payload["health"]) == (["health"], "unknown")
     assert (back.payload["changes"], back.payload["health"]) == (["health"], "healthy")
     assert ProductDeployment.objects.get(cluster=cluster).running_images == {"hub": [HUB_DIGEST]}
+
+
+def test_a_pod_list_that_fails_and_recovers_does_not_say_the_images_changed(plugin, org, drivers, scan):
+    """The Deployment still reads, so the health holds; its pods do not, so
+    what runs is unknown, not nothing. Neither the failed list nor the good
+    one after it is an image change; a rollout between two good reads is."""
+    cluster = _cluster(plugin, organization=org)
+    driver = drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH)], _hub())
+    scan(cluster)
+    driver.workloads = _hub(images=None)
+
+    scan(cluster)
+
+    row = ProductDeployment.objects.get(cluster=cluster)
+    assert (row.health, row.running_images) == (ProductDeployment.Health.HEALTHY, {})
+    assert row.last_scan_error == "could not list the pods of deployment/hub"
+
+    driver.workloads = _hub()
+    scan(cluster)
+
+    row.refresh_from_db()
+    assert (row.running_images, row.last_scan_error) == ({"hub": [HUB_DIGEST]}, "")
+    assert [e.payload["changes"] for e in _events()] == [["appeared"]]
+
+    driver.workloads = _hub(images=[(HUB_IMAGE, "ghcr.io/calliopeai/junohub@sha256:61")])
+    scan(cluster)
+
+    appeared, rolled = _events()
+    assert (rolled.payload["changes"], rolled.payload["running_images"]) == (
+        ["images"],
+        {"hub": ["sha256:61"]},
+    )
+
+
+def test_a_declared_workload_whose_pods_were_not_listed_leaves_the_running_images_unread(
+    plugin, org, drivers, scan
+):
+    """The backend image runs in the backend and the worker, so the backend's
+    pods alone do not say what that component runs. The scan names only the
+    Deployments whose pods it could not list."""
+    cluster = _cluster(plugin, organization=org)
+    unlisted = ("zentinelle-worker", "zentinelle-frontend")
+    drivers[cluster.slug] = FakeDriver(
+        [_namespace(ZENTINELLE)],
+        [
+            dataclasses.replace(w, running_images=None) if w.name in unlisted else w
+            for w in _zentinelle_workloads()
+        ],
+    )
+
+    scan(cluster)
+
+    row = ProductDeployment.objects.get(cluster=cluster)
+    assert (row.health, row.running_images) == (ProductDeployment.Health.HEALTHY, {})
+    assert row.last_scan_error == (
+        "could not list the pods of deployment/zentinelle-worker, deployment/zentinelle-frontend"
+    )
+
+
+def test_an_undeclared_workload_whose_pods_were_not_listed_changes_nothing(plugin, org, drivers, scan):
+    """The chart's proxy is not declared, so its pods say nothing about the product."""
+    cluster = _cluster(plugin, organization=org)
+    hub, proxy = _hub()
+    drivers[cluster.slug] = FakeDriver(
+        [_namespace(WORKBENCH)], [hub, dataclasses.replace(proxy, running_images=None)]
+    )
+
+    scan(cluster)
+
+    row = ProductDeployment.objects.get(cluster=cluster)
+    assert (row.running_images, row.last_scan_error) == ({"hub": [HUB_DIGEST]}, "")
+
+
+def test_a_declared_workload_that_does_not_exist_runs_nothing_rather_than_going_unread(
+    plugin, org, drivers, scan
+):
+    """Only a Deployment the scan found can have pods it could not list. A
+    missing one runs nothing, so its component reads ``[]``, the others
+    still read, and no pod list is reported as failed."""
+    cluster = _cluster(plugin, organization=org)
+    workloads = [w for w in _zentinelle_workloads() if w.name != "zentinelle-frontend"]
+    drivers[cluster.slug] = FakeDriver([_namespace(ZENTINELLE)], workloads)
+
+    scan(cluster)
+
+    row = ProductDeployment.objects.get(cluster=cluster)
+    assert row.health == ProductDeployment.Health.DOWN
+    assert (row.running_images, row.last_scan_error) == (
+        {"backend": ["sha256:8cc9..."], "frontend": []},
+        "",
+    )
 
 
 def test_a_reinstall_keeps_its_row_and_project(plugin, org, drivers, scan):
