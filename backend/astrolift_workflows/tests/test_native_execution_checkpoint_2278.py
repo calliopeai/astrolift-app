@@ -1,6 +1,8 @@
 """Actual activity context reaches SDK metadata threads and fresh source transitions."""
 
+import asyncio
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import timedelta
@@ -23,7 +25,10 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.worker import Replayer, UnsandboxedWorkflowRunner, Worker
 
-from astrolift_lifecycle.deployment_execution_checkpoint import deployment_execution_checkpoint
+from astrolift_lifecycle.deployment_execution_checkpoint import (
+    _ScopedDeploymentExecutionCheckpoint,
+    deployment_execution_checkpoint,
+)
 from astrolift_lifecycle.deployment_execution_receipt import (
     DeploymentExecutionError,
     admitted_deployment_execution,
@@ -61,7 +66,8 @@ class NativeCheckpointWorkflow:
             return await workflow.execute_activity(
                 "checkpoint_native_boundary",
                 input,
-                start_to_close_timeout=timedelta(seconds=90),
+                # A backstop only: run_activity bounds the wait by progress.
+                start_to_close_timeout=timedelta(seconds=900),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
         except ActivityError:
@@ -84,6 +90,26 @@ def bind_and_checkpoint(input):
         yield current
 
 
+async def result_while_admitting(handle, admissions, *, stalled_after=60):
+    """The workflow's result, bounded by the activity's progress, not a total.
+
+    A source bootstrap with its context recovery is several hundred execution
+    admissions, about 55 s on a fast CI runner and past the old fixed 90 s on a
+    slow one (#2509). Fail when no admission advances for ``stalled_after`` s;
+    the longest gap between them is a few seconds.
+    """
+    pending = asyncio.ensure_future(handle.result())
+    seen, since = admissions[0], time.monotonic()
+    try:
+        while not (await asyncio.wait({pending}, timeout=1))[0]:
+            if admissions[0] != seen:
+                seen, since = admissions[0], time.monotonic()
+            assert time.monotonic() - since < stalled_after, f"activity stalled after {seen} admissions"
+    finally:
+        pending.cancel()
+    return pending.result()
+
+
 async def run_activity(world, client, temporal_env, implementation, *, cancel_started=None):
     await sync_to_async(dispatch_context)(world, client)
     payload = world.starts[0]
@@ -92,7 +118,15 @@ async def run_activity(world, client, temporal_env, implementation, *, cancel_st
         kind="EXPECTED",
     )
     queue = "native-checkpoint-" + uuid4().hex
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    admissions = [0]
+    admitted = _ScopedDeploymentExecutionCheckpoint._admitted
+
+    def counted(self):
+        admissions[0] += 1
+        return admitted(self)
+
+    with pytest.MonkeyPatch.context() as patch, ThreadPoolExecutor(max_workers=2) as executor:
+        patch.setattr(_ScopedDeploymentExecutionCheckpoint, "_admitted", counted)
         async with Worker(
             temporal_env.client,
             task_queue=queue,
@@ -111,7 +145,7 @@ async def run_activity(world, client, temporal_env, implementation, *, cancel_st
                 assert await sync_to_async(cancel_started.wait)(10)
                 await handle.cancel()
             try:
-                result = await handle.result()
+                result = await result_while_admitting(handle, admissions)
             except WorkflowFailureError:
                 if cancel_started is None:
                     raise
