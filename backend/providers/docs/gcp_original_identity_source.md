@@ -141,6 +141,9 @@ TLS gRPC server. These fixtures are not production cloud acceptance.
 
 Bootstrap and read-only context recovery use a cumulative 120-second monotonic
 budget, including setup, committed reservation, create and repeated readback.
+Time inside their checkpoint calls does not count: in a native deployment each
+call re-admits the original caller and run and rereads the source fences, a
+few hundred times per stage.
 Native calls retain their 10-second per-RPC timeout; expiration stops subsequent
 stages and sends but does not cancel an already running SDK call. Full current
 provider/auth configuration and complete application source snapshots remain
