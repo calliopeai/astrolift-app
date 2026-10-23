@@ -73,21 +73,21 @@ class TeamAccessMutations:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
+        # Another organization's team reads exactly like a missing one, so
+        # the guid tells the caller nothing (#1866).
         target = (
             Team.objects.select_related("organization")
-            .filter(guid=str(input.target_team_id), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.target_team_id),
+                organization_id=app.organization_id,
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if target is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "target team not found",
-                field="targetTeamId",
-            )
-        if target.organization_id != app.organization_id:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "cross-organization move is not permitted",
                 field="targetTeamId",
             )
 
@@ -159,20 +159,15 @@ class TeamAccessMutations:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
+        # Another organization's team reads exactly like a missing one, so
+        # the guid tells the caller nothing (#1866).
         team = (
             Team.objects.select_related("organization")
-            .filter(guid=str(input.team_id), deleted_at__isnull=True)
+            .filter(guid=str(input.team_id), organization_id=app.organization_id, deleted_at__isnull=True)
             .first()
         )
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found", field="teamId")
-
-        if team.organization_id != app.organization_id:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "team must belong to the same organization as the app",
-                field="teamId",
-            )
 
         access = (
             AppTeamAccess.objects.select_related("registered_app", "team")
@@ -225,9 +220,11 @@ class TeamAccessMutations:
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appId")
 
+        # Another organization's team reads as "team not found", not as a
+        # team that merely holds no grant here (#1866).
         team = (
             Team.objects.select_related("organization")
-            .filter(guid=str(input.team_id), deleted_at__isnull=True)
+            .filter(guid=str(input.team_id), organization_id=app.organization_id, deleted_at__isnull=True)
             .first()
         )
         if team is None:

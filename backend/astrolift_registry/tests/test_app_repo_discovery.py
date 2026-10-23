@@ -517,8 +517,10 @@ def test_register_app_repo_mutation_rejects_foreign_org_project(
             ),
         )
 
+    # Another org's project reads exactly like a missing one (#1866).
     assert result.ok is False
-    assert result.errors[0].code == ErrorCode.PERMISSION_DENIED.value
+    assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+    assert result.errors[0].message == "project not found"
     assert RegisteredApp.objects.filter(deleted_at__isnull=True).count() == 0
 
 

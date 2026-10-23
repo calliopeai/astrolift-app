@@ -39,6 +39,11 @@ def _tenant_for(org, actor):
     return tenant_context(TenantContext(organization_id=org.id, actor_user_id=actor.id))
 
 
+def _org_member(user, org):
+    # A listed approver counts only as an active member of the app's org (#1866).
+    Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.id)
+
+
 # ---------------------------------------------------------------------------
 # Happy path: deploy succeeds when an approver approves
 # ---------------------------------------------------------------------------
@@ -89,6 +94,7 @@ def test_app_approver_user_can_approve_and_workflow_starts(
     app.minimum_approvals = 1
     app.save(update_fields=["requires_approval", "minimum_approvals"])
     app.approver_users.set([other_actor.pk])
+    _org_member(other_actor, org)
 
     mut = LifecycleMutation()
     with _tenant_for(org, actor):
@@ -237,6 +243,8 @@ def test_minimum_approvals_two_holds_after_first_vote(
     app.minimum_approvals = 2
     app.save(update_fields=["requires_approval", "minimum_approvals"])
     app.approver_users.set([other_actor.pk, approver_b.pk])
+    _org_member(other_actor, org)
+    _org_member(approver_b, org)
 
     mut = LifecycleMutation()
     with _tenant_for(org, actor):
@@ -283,6 +291,7 @@ def test_reject_deployment_marks_failed(
     app.minimum_approvals = 1
     app.save(update_fields=["requires_approval", "minimum_approvals"])
     app.approver_users.set([other_actor.pk])
+    _org_member(other_actor, org)
 
     mut = LifecycleMutation()
     with _tenant_for(org, actor):

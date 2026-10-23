@@ -849,6 +849,7 @@ def _eligible_approver_user_ids(app) -> list[int]:
     RoleBinding holders of ``app.approve_deploy``. Returns a
     deduplicated, deterministically-ordered list.
     """
+    from astrolift_identity.api_tokens import active_org_member_users
     from astrolift_identity.models import Member
 
     if not app.requires_approval and not app.approver_users.exists() and app.approver_team_id is None:
@@ -857,7 +858,13 @@ def _eligible_approver_user_ids(app) -> list[int]:
         # required_approvals deploys.
         return _org_approver_user_ids(app)
 
-    explicit_user_ids = list(app.approver_users.filter(is_active=True).values_list("pk", flat=True))
+    # Only the app's organization's active members: the list once took any
+    # user on the install, and the widget shows each name and email (#1866).
+    explicit_user_ids = list(
+        app.approver_users.filter(pk__in=active_org_member_users(app.organization_id)).values_list(
+            "pk", flat=True
+        )
+    )
     team_user_ids: list[int] = []
     if app.approver_team_id is not None:
         team_user_ids = list(

@@ -233,21 +233,21 @@ class AppSettingMutations:
                 app.save(update_fields=["project", "updated_at", "version"])
             return gql_success(app_to_type(app, info=info))
 
+        # Another organization's project reads exactly like a missing one,
+        # so the guid tells the caller nothing (#1866).
         project = (
             Project.objects.select_related("organization", "team")
-            .filter(guid=str(input.project_guid), deleted_at__isnull=True)
+            .filter(
+                guid=str(input.project_guid),
+                organization_id=app.organization_id,
+                deleted_at__isnull=True,
+            )
             .first()
         )
         if project is None:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "project not found",
-                field="projectGuid",
-            )
-        if project.organization_id != app.organization_id:
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "project must belong to the same organization as the app",
                 field="projectGuid",
             )
 
