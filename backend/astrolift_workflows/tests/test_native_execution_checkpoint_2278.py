@@ -96,7 +96,7 @@ async def result_while_admitting(handle, admissions, *, stalled_after=60):
     A source bootstrap with its context recovery is several hundred execution
     admissions, about 55 s on a fast CI runner and past the old fixed 90 s on a
     slow one (#2509). Fail when no admission advances for ``stalled_after`` s;
-    the longest gap between them is a few seconds.
+    the longest gap measured between them is under half a second.
     """
     pending = asyncio.ensure_future(handle.result())
     seen, since = admissions[0], time.monotonic()
