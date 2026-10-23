@@ -188,7 +188,9 @@ class DnsDriver(Protocol):
         sans: list[str] | None = None,
     ) -> dict[str, Any]:
         """Request a wildcard cert for *.<zone> via the cloud cert service. Returns
-        cert metadata and DNS validation records to write into the zone.
+        cert metadata and DNS validation records to write into the zone: the
+        record of every domain on the cert, one per record name. A driver that
+        cannot read them all raises instead of returning a partial list (#2519).
 
         ``sans`` is the full SubjectAltName list to request. ``*.<zone>`` matches
         exactly one label deeper (RFC 6125), so a caller that issues hostnames
@@ -204,7 +206,9 @@ class DnsDriver(Protocol):
 
     def poll_cert_status(self, zone: str, cert_id: str) -> dict[str, Any]:
         """Poll the issuance status of a cert by its cert_id. Returns status
-        ('pending'/'issued'/'failed') and the final cert identifier once issued."""
+        ('pending'/'issued'/'failed') and the final cert identifier once issued.
+        While pending, ``validation_records`` lists the DNS records the cert
+        authority is waiting on, in ``request_wildcard_cert``'s shape (#2519)."""
         from _sdk import UnsupportedOperationError
 
         raise UnsupportedOperationError(

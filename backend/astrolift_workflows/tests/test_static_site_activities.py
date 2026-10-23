@@ -335,6 +335,35 @@ def test_cloudfront_cert_resumes_pending_without_reminting(monkeypatch, app, env
     assert md.dns_config["cloudfront_certificate_arn"] == "arn:pending/p"
 
 
+def test_cloudfront_cert_resume_writes_the_records_a_parked_cert_never_got(monkeypatch, app, env, org):
+    """Until #2519 a request could return before ACM published the cert's
+    validation records: none were written, the ARN was parked, and every retry
+    resumed a cert that could not validate. Resuming writes what ACM lists."""
+    _attach(app, env, org, with_domain=False)
+    md = _domain_without_cert(
+        org, env, dns_config={"zone_id": "Z1", "cloudfront_certificate_pending_arn": "arn:pending/p"}
+    )
+    record = {"name": "_acme.apps.example.com.", "type": "CNAME", "value": "_x.acm-validations.aws."}
+    fake = _FakeCertDns(
+        statuses=[
+            {"status": "pending", "cert_arn": None, "validation_records": [record]},
+            {"status": "issued", "cert_arn": "arn:pending/p"},
+        ]
+    )
+    monkeypatch.setattr(static_site, "_us_east_1_dns_driver", lambda: fake)
+    monkeypatch.setattr(static_site.time, "sleep", lambda _s: None)
+    dep = _deployment(app, env)
+
+    static_site._ensure_cloudfront_cert_sync(dep.pk)
+
+    assert fake.requested == 0
+    assert fake.validation_written == [
+        ("apps.example.com", "_acme.apps.example.com", "CNAME", "_x.acm-validations.aws.")
+    ]
+    md.refresh_from_db()
+    assert md.dns_config["cloudfront_certificate_arn"] == "arn:pending/p"
+
+
 def test_cloudfront_cert_stub_without_managed_domain(monkeypatch, app, env, org):
     _attach(app, env, org, with_domain=False)  # no managed domain
     monkeypatch.setattr(static_site, "_us_east_1_dns_driver", lambda: _FakeCertDns(statuses=[]))

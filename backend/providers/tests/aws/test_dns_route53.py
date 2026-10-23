@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
-from aws._errors import NotFoundError
+from aws._errors import NotFoundError, ThrottledError, TransientError
 from aws.dns_route53 import Route53Config, Route53Driver
 
 
@@ -404,3 +406,140 @@ def test_an_absent_zone_is_not_adopted_and_nothing_is_created(route53_client) ->
 
     assert driver.adopt_platform_zone("nobody-has-this.example") is None
     assert _hosted_zones_named(route53_client, "nobody-has-this.example") == []
+
+
+# ---- #2519: every validation record, once ACM has published it ------------
+
+_ZONE = "acme.platform.example"
+_SANS = [_ZONE, f"*.{_ZONE}", f"*.pr.{_ZONE}"]
+_ARN = "arn:aws:acm:us-east-1:123456789012:certificate/0f3c2f1e-8d1b-4c3a-9a51-2c0e5b7d9e10"
+# ACM validates an apex and its wildcard through one CNAME.
+_APEX = {"Name": f"_a1.{_ZONE}.", "Type": "CNAME", "Value": "_b1.acm-validations.aws."}
+_PREVIEW = {"Name": f"_c2.pr.{_ZONE}.", "Type": "CNAME", "Value": "_d2.acm-validations.aws."}
+_RECORDS = {_ZONE: _APEX, f"*.{_ZONE}": _APEX, f"*.pr.{_ZONE}": _PREVIEW}
+
+
+class _Acm:
+    """ACM after ``RequestCertificate``: it lists every domain at once and fills in
+    their ``ResourceRecord`` later. Each describe publishes the next stage of
+    ``published`` (the domains whose record is out); the last stage repeats."""
+
+    def __init__(self, published, *, status="PENDING_VALIDATION", describe_error=None):
+        self._published = list(published)
+        self._status = status
+        self._describe_error = describe_error
+        self.describes = 0
+        self.deleted: list[str] = []
+
+    def request_certificate(self, **kwargs):
+        return {"CertificateArn": _ARN}
+
+    def describe_certificate(self, **kwargs):
+        assert kwargs == {"CertificateArn": _ARN}
+        self.describes += 1
+        if self._describe_error is not None:
+            raise self._describe_error
+        published = self._published.pop(0) if len(self._published) > 1 else self._published[0]
+        options = []
+        for domain, record in _RECORDS.items():
+            option = {"DomainName": domain, "ValidationMethod": "DNS"}
+            if domain in published:
+                option["ResourceRecord"] = record
+            options.append(option)
+        return {"Certificate": {"CertificateArn": _ARN, "Status": self._status, "DomainValidationOptions": options}}
+
+    def delete_certificate(self, **kwargs):
+        self.deleted.append(kwargs["CertificateArn"])
+
+
+@pytest.fixture
+def clock(monkeypatch) -> list[float]:
+    """The driver's clock, faked: each pause advances ``monotonic`` and is recorded."""
+    import aws.dns_route53 as module
+
+    now = [0.0]
+    pauses: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        pauses.append(seconds)
+        now[0] += seconds
+
+    monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: now[0], sleep=sleep, time=module.time.time))
+    return pauses
+
+
+def _driver(acm: _Acm) -> Route53Driver:
+    driver = Route53Driver(client=None)
+    driver._acm = acm
+    return driver
+
+
+def _record(record: dict[str, str]) -> dict[str, str]:
+    return {"name": record["Name"], "type": record["Type"], "value": record["Value"]}
+
+
+def test_request_wildcard_cert_waits_until_acm_has_published_every_record(clock) -> None:
+    """One read a second after the request found none of the records, or some:
+    the ones never written kept the certificate pending until it expired."""
+    acm = _Acm([(), (), (_ZONE, f"*.{_ZONE}"), tuple(_RECORDS)])
+
+    result = _driver(acm).request_wildcard_cert(_ZONE, "Z1", sans=_SANS)
+
+    assert result == {"cert_id": _ARN, "validation_records": [_record(_APEX), _record(_PREVIEW)]}
+    assert acm.describes == 4
+    assert sum(clock) <= 60
+    assert acm.deleted == []
+
+
+def test_a_record_the_apex_and_its_wildcard_share_is_listed_once(driver_with_zone, acm_client, clock) -> None:
+    """Listed per domain, the shared CNAME was written twice."""
+    driver, zone_id = driver_with_zone
+    driver._acm = acm_client
+
+    plain = driver.request_wildcard_cert(_ZONE, zone_id)["validation_records"]
+    preview = driver.request_wildcard_cert(_ZONE, zone_id, sans=_SANS)["validation_records"]
+
+    assert len(plain) == 1
+    assert len(preview) == len({record["name"] for record in preview}) == 2
+
+
+def test_a_certificate_whose_records_never_all_appear_is_deleted_and_retried(clock) -> None:
+    """At the deadline the request fails retriably instead of handing back a
+    partial list, and the certificate the caller will never learn of is deleted."""
+    acm = _Acm([(_ZONE, f"*.{_ZONE}")])
+
+    with pytest.raises(TransientError, match="every domain"):
+        _driver(acm).request_wildcard_cert(_ZONE, "Z1", sans=_SANS)
+
+    assert acm.deleted == [_ARN]
+    assert sum(clock) == 60
+    assert acm.describes == len(clock)
+
+
+def test_a_certificate_that_cannot_be_read_back_is_deleted(clock) -> None:
+    from botocore.exceptions import ClientError
+
+    throttled = ClientError({"Error": {"Code": "ThrottlingException", "Message": "slow down"}}, "DescribeCertificate")
+    acm = _Acm([tuple(_RECORDS)], describe_error=throttled)
+
+    with pytest.raises(ThrottledError):
+        _driver(acm).request_wildcard_cert(_ZONE, "Z1", sans=_SANS)
+
+    assert acm.deleted == [_ARN]
+
+
+def test_a_certificate_acm_already_failed_is_returned_for_the_poll_to_report(clock) -> None:
+    acm = _Acm([()], status="FAILED")
+
+    assert _driver(acm).request_wildcard_cert(_ZONE, "Z1", sans=_SANS) == {"cert_id": _ARN, "validation_records": []}
+    assert acm.describes == 1
+    assert acm.deleted == []
+
+
+def test_poll_cert_status_lists_what_a_pending_certificate_waits_on() -> None:
+    """So the caller can write a record its request never wrote."""
+    pending = _driver(_Acm([(_ZONE, f"*.{_ZONE}")])).poll_cert_status(_ZONE, _ARN)
+    issued = _driver(_Acm([tuple(_RECORDS)], status="ISSUED")).poll_cert_status(_ZONE, _ARN)
+
+    assert pending == {"status": "pending", "cert_arn": None, "validation_records": [_record(_APEX)]}
+    assert issued == {"status": "issued", "cert_arn": _ARN}
