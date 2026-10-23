@@ -416,6 +416,21 @@ def test_an_approver_team_counts_only_the_organizations_active_members(world, pe
             assert not _is_eligible_approver(app, user_id=person.pk), name
 
 
+def test_with_no_policy_only_active_members_holding_the_grant_are_awaited(world, people, pending, holder):
+    # A role binding outlives SCIM deprovisioning and member removal, so
+    # the people who left still hold the grant.
+    for name in ("deactivated", "removed", "disabled"):
+        bind_role(
+            getattr(people, name),
+            permissions=(Permission.APP_APPROVE_DEPLOY,),
+            kind="ORG",
+            scope_id=world.org.pk,
+            slug=f"xorg-1866-approver-{name}",
+        )
+
+    assert _awaiting(pending) == [holder.pk]
+
+
 def _outsiders_listed(world, people):
     world.medops_app.approver_users.set([people.foreign, people.removed])
 

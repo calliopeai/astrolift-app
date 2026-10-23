@@ -901,6 +901,7 @@ def _org_approver_user_ids(app) -> list[int]:
     rest, and the widget would render an opaque "Group: …" entry
     which doesn't help approver nudges.
     """
+    from astrolift_identity.api_tokens import active_org_member_users
     from astrolift_identity.models import Role, RoleBinding
 
     org_id = app.organization_id
@@ -921,6 +922,9 @@ def _org_approver_user_ids(app) -> list[int]:
             scope_kind=RoleBinding.ScopeKind.ORG,
             scope_id=org_id,
             deleted_at__isnull=True,
+            # A binding outlives SCIM deprovisioning and member removal:
+            # its holder counts only while an active member (#1866).
+            user_id__in=active_org_member_users(org_id),
         ).values_list("user_id", flat=True)
     )
     return _dedup_preserve_order(user_ids)
