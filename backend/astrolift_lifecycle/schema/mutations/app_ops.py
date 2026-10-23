@@ -341,15 +341,18 @@ class AppOpsMutations:
         The receiver URL shape is
         ``{PLATFORM_API_URL}/api/webhooks/github/{app.guid}/`` — keyed
         on the app's GUID so deliveries route without grepping the
-        payload. The HMAC secret is rotated on every call (created or
-        refreshed) and persisted on the picked SourceConnection's
-        ``webhook_secret_*`` columns.
+        payload. The HMAC secret is the picked SourceConnection's
+        ``webhook_secret_*``, shared by every per-repo hook that
+        connection installed. It is reused, and minted and stored only
+        when the connection has none it can decrypt (#2478).
 
         Status codes:
         * ``created`` — a brand-new hook landed on the host; ``hook_id``
           is the host-side identifier.
-        * ``refreshed`` — same URL already registered on the host; we
-          rotated the secret and advanced the ``installed_at`` marker.
+        * ``refreshed`` — same URL already registered on the host; the
+          host accepted the connection's secret on that hook and the
+          ``installed_at`` marker advanced. A refused update is a
+          PRECONDITION failure, like any other host error.
         * ``app_delivers`` — the connection is a github_app_install and
           the org App is installed on the repo, so its own webhook
           already delivers pushes. No per-repo hook exists, so
@@ -362,7 +365,7 @@ class AppOpsMutations:
         )
 
         # Org-scope the app lookup to the caller's tenant before the webhook
-        # install side effect (SCM call, rotates the HMAC secret). Slugs are
+        # install side effect (SCM call, may mint the HMAC secret). Slugs are
         # unique only within an org. Fails closed (NOT_FOUND) when org_id is
         # None (#1183).
         tenant = get_current_tenant()

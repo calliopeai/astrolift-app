@@ -712,7 +712,10 @@ def cluster_workload_health_dispatch(
 
         [{"namespace", "name", "desired_replicas", "ready_replicas",
           "restart_count_24h", "last_image_deployed_at",
-          "running_images": [{"image", "image_id"}, ...]}, ...]
+          "running_images": [{"image", "image_id"}, ...] or None}, ...]
+
+    ``running_images`` is ``None`` when the Deployment's pods could not be
+    listed, never ``[]``: the product scan reads ``[]`` as nothing running.
 
     Drivers that can't reach the apiserver (no creds, network) return
     an empty list rather than raising — the UI surfaces "no workload
@@ -741,7 +744,11 @@ def cluster_workload_health_dispatch(
             "ready_replicas": int(w.ready_replicas),
             "restart_count_24h": int(w.restart_count_24h),
             "last_image_deployed_at": w.last_image_deployed_at,
-            "running_images": [{"image": i.image, "image_id": i.image_id} for i in w.running_images],
+            "running_images": (
+                None
+                if w.running_images is None
+                else [{"image": i.image, "image_id": i.image_id} for i in w.running_images]
+            ),
         }
         for w in rows
     ]

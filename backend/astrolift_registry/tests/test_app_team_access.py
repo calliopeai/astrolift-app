@@ -101,8 +101,10 @@ def test_move_app_to_team_refuses_cross_org(permission_resolver):
             input=MoveAppToTeamInput(app_id=str(app.guid), target_team_id=str(other_team.guid)),
         )
 
+    # Another org's team reads exactly like a missing one (#1866).
     assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].message == "target team not found"
     assert result.errors[0].field == "targetTeamId"
 
 
@@ -238,8 +240,11 @@ def test_grant_team_access_refuses_cross_org(permission_resolver):
             ),
         )
 
+    # Another org's team reads exactly like a missing one (#1866).
     assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].message == "team not found"
+    assert not AppTeamAccess.objects.filter(registered_app=app, team=other_team).exists()
 
 
 # ---- revokeTeamAccessFromApp ------------------------------------------

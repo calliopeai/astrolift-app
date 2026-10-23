@@ -299,6 +299,8 @@ def test_quorum_surface_explicit_approver_set(
     _grant_all(permission_resolver)
     User = get_user_model()
     second_approver = User.objects.create(username="approver-2", email="approver-2@test")
+    # A listed approver counts only as an active member of the app's org (#1866).
+    Member.objects.create(user=second_approver, scope_kind=Member.ScopeKind.ORG, scope_id=org.id)
 
     app.requires_approval = True
     app.minimum_approvals = 2

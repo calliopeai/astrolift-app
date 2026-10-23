@@ -47,21 +47,25 @@ from astrolift_scm.providers.github import (
     fetch_github_branch_head,
     fetch_github_file,
     fetch_github_zipball,
+    find_github_webhook,
     github_installation_includes_repo,
     github_webhook_exists,
     install_github_webhook,
     list_github_repos,
     open_github_pull_request,
     put_github_file,
+    update_github_webhook_secret,
 )
 from astrolift_scm.providers.gitlab import (
     GitlabProviderError,
     fetch_gitlab_file,
     fetch_gitlab_zipball,
+    find_gitlab_webhook,
     install_gitlab_webhook,
     list_gitlab_projects,
     open_gitlab_merge_request,
     put_gitlab_file,
+    update_gitlab_webhook_secret,
 )
 
 
@@ -716,4 +720,92 @@ def webhook_exists(
     raise ProviderError(
         "UNSUPPORTED",
         f"webhook existence check for {connection.kind!r} not implemented yet",
+    )
+
+
+def find_webhook(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    target_url: str,
+) -> str | None:
+    """Return the id of the per-repo hook that delivers to ``target_url``,
+    or None when the repo has none.
+
+    A host that refuses a second hook for a URL does not say which hook
+    holds it, so a refresh that has no hook id on record finds it here
+    (#2478). GitHub and GitLab only; GitHub-App-install connections own no
+    per-repo hook and raise UNSUPPORTED, as do the other hosts.
+    """
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            return find_github_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                target_url=target_url,
+            )
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITLAB_KINDS:
+        try:
+            return find_gitlab_webhook(
+                connection,
+                repo_full_name=repo_full_name,
+                target_url=target_url,
+            )
+        except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"webhook lookup for {connection.kind!r} not implemented yet",
+    )
+
+
+def update_webhook_secret(
+    connection: SourceConnection,
+    *,
+    repo_full_name: str,
+    hook_id: str,
+    target_url: str,
+    secret: str,
+) -> bool:
+    """Give per-repo hook ``hook_id`` the secret ``secret``. Returns False
+    when the repo has no such hook.
+
+    Every per-repo hook a connection installs is verified against the one
+    secret stored on the connection, so a hook still signing with an
+    earlier secret has to be given the current one (#2478). Both hosts
+    take the hook's URL with the secret: GitHub replaces the hook's whole
+    config and GitLab requires the URL. GitHub-App-install connections own
+    no per-repo hook and raise UNSUPPORTED, as do the other hosts.
+    """
+    if connection.kind in _GITHUB_KINDS:
+        try:
+            return update_github_webhook_secret(
+                connection,
+                repo_full_name=repo_full_name,
+                hook_id=hook_id,
+                target_url=target_url,
+                secret=secret,
+            )
+        except GithubProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    if connection.kind in _GITLAB_KINDS:
+        try:
+            return update_gitlab_webhook_secret(
+                connection,
+                repo_full_name=repo_full_name,
+                hook_id=hook_id,
+                target_url=target_url,
+                secret=secret,
+            )
+        except GitlabProviderError as exc:
+            raise ProviderError(exc.code, exc.message, recoverable=exc.recoverable) from exc
+
+    raise ProviderError(
+        "UNSUPPORTED",
+        f"webhook update for {connection.kind!r} not implemented yet",
     )

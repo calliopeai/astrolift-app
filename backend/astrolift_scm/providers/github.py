@@ -783,6 +783,153 @@ def github_webhook_exists(connection, *, repo_full_name: str, hook_id: str) -> b
         raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
 
+def find_github_webhook(connection, *, repo_full_name: str, target_url: str) -> str | None:
+    """Return the id of the hook on ``repo_full_name`` that delivers to
+    ``target_url``, or None.
+
+    ``GET /repos/{owner}/{repo}/hooks``, page by page. GitHub answers a
+    second install for the same URL with "Hook already exists" but no id,
+    so a refresh with no recorded id finds the hook here (#2478).
+    """
+    if connection.kind == "github_app_install":
+        raise GithubProviderError(
+            "UNSUPPORTED",
+            "github_app_install connections have no per-repo hook to find",
+        )
+    token = _token(connection)
+    base = _api_base(connection)
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+
+    page = 1
+    while True:
+        qs = urllib.parse.urlencode({"per_page": "100", "page": str(page)})
+        req = urllib.request.Request(
+            f"{base}/repos/{safe_repo}/hooks?{qs}",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "astrolift",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                raise GithubProviderError(
+                    "AUTH_FAILED",
+                    github_auth_error_message(
+                        exc.code,
+                        connection.kind,
+                        operation="list the repo webhooks",
+                        permission="Webhooks (repository_hooks): read",
+                    ),
+                    recoverable=True,
+                ) from exc
+            if exc.code == 404:
+                raise GithubProviderError(
+                    "NOT_FOUND",
+                    f"GitHub couldn't find {repo_full_name}. Check repo access.",
+                    recoverable=True,
+                ) from exc
+            raise GithubProviderError("API_ERROR", f"GitHub returned {exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+
+        if not isinstance(payload, list):
+            raise GithubProviderError(
+                "UNEXPECTED_SHAPE", "GitHub returned a non-list payload for the repo hooks"
+            )
+        for hook in payload:
+            config = hook.get("config") if isinstance(hook, dict) else None
+            if isinstance(config, dict) and config.get("url") == target_url and hook.get("id") is not None:
+                return str(hook["id"])
+        # A short page is the end of the listing; the cap stops a host
+        # that never sends one.
+        if len(payload) < 100 or page >= 10:
+            return None
+        page += 1
+
+
+def update_github_webhook_secret(
+    connection,
+    *,
+    repo_full_name: str,
+    hook_id: str,
+    target_url: str,
+    secret: str,
+) -> bool:
+    """``PATCH /repos/{owner}/{repo}/hooks/{hook_id}`` with ``secret``.
+
+    Returns False when the repo has no such hook (404). GitHub replaces a
+    hook's whole ``config`` on update, so the URL, content type and TLS
+    setting the install gave it go along with the secret; the hook's
+    events and active flag are left alone.
+    """
+    if connection.kind == "github_app_install":
+        raise GithubProviderError(
+            "UNSUPPORTED",
+            "github_app_install connections have no per-repo hook to update",
+        )
+    if not hook_id:
+        raise GithubProviderError("VALIDATION", "hook_id is required to update a webhook")
+
+    token = _token(connection)
+    base = _api_base(connection)
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    safe_hook = urllib.parse.quote(str(hook_id), safe="")
+    body = {
+        "config": {
+            "url": target_url,
+            "content_type": "json",
+            "secret": secret,
+            "insecure_ssl": "0",
+        },
+    }
+    req = urllib.request.Request(
+        f"{base}/repos/{safe_repo}/hooks/{safe_hook}",
+        data=json.dumps(body).encode("utf-8"),
+        method="PATCH",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return False
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GithubProviderError(
+                "AUTH_FAILED",
+                github_auth_error_message(
+                    exc.code,
+                    connection.kind,
+                    operation="update the repo webhook",
+                    permission="Webhooks (repository_hooks): write",
+                ),
+                recoverable=True,
+            ) from exc
+        raise GithubProviderError(
+            "API_ERROR",
+            f"GitHub returned {exc.code}: {body_text}",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise GithubProviderError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
+    return True
+
+
 def _github_contents_url(base: str, repo_full_name: str, path: str) -> str:
     safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
     safe_path = "/".join(urllib.parse.quote(p, safe="") for p in path.split("/"))

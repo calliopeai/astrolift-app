@@ -254,9 +254,15 @@ def _digest(image_id: str) -> str:
 def _observe(
     product: ProductNamespace,
     rows: list[dict[str, Any]] | None,
+    problems: list[str],
 ) -> tuple[str, list[dict[str, Any]], dict[str, list[str]]]:
     """Health, workload states and running images from the namespace's
-    workload rows (``None`` when none could be read)."""
+    workload rows (``None`` when none could be read).
+
+    Running images are unread (``{}``) unless every declared Deployment's
+    pods were listed: one image can run in several of them, so the pods
+    that were read do not say what all of a component's pods run.
+    """
     if not product.workloads:
         return ProductDeployment.Health.UNKNOWN, [], {}
     if rows is None:
@@ -275,6 +281,12 @@ def _observe(
     else:
         health = ProductDeployment.Health.HEALTHY
 
+    unlisted = [
+        name for name in product.workloads if name in by_name and by_name[name]["running_images"] is None
+    ]
+    if unlisted:
+        problems.append("could not list the pods of " + ", ".join(f"deployment/{name}" for name in unlisted))
+        return health, workloads, {}
     seen = [image for name in product.workloads for image in by_name.get(name, {}).get("running_images", [])]
     running: dict[str, list[str]] = {}
     for component, reference in product.images.items():
@@ -427,7 +439,7 @@ def _apply(
     now: datetime,
 ) -> list[_Change]:
     """Create or update the row for one listed product namespace."""
-    health, workloads, running = _observe(product, rows)
+    health, workloads, running = _observe(product, rows, problems)
     values = {
         "kind": product.kind,
         "deployment_name": product.deployment_name,
@@ -481,8 +493,9 @@ def _apply(
 
 def _running_changed(before: dict[str, list[str]], after: dict[str, list[str]]) -> bool:
     """Whether a component both reads saw runs other digests now. A scan that
-    could not read the workloads records no component at all (``{}``), and
-    says nothing about what runs; ``[]`` is a read that found none running."""
+    could not read the workloads, or all of their pods, records no component
+    at all (``{}``), and says nothing about what runs; ``[]`` is a read that
+    found none running."""
     return any(before[component] != after[component] for component in before.keys() & after.keys())
 
 

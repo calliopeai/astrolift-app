@@ -3801,7 +3801,7 @@
         "webhookTitle": "Quellcode-Webhook",
         "installed": "installiert · {relative}",
         "notInstalled": "nicht installiert",
-        "webhookDescription": "Registriert den Push-Webhook im Quellcode-Repository mit der Empfangs-URL der Plattform. Erneutes Ausführen rotiert das HMAC-Secret, ohne einen weiteren Webhook anzulegen.",
+        "webhookDescription": "Registriert den Push-Webhook im Quellcode-Repository mit der Empfangs-URL der Plattform. Erneutes Ausführen setzt das HMAC-Secret, mit dem die Plattform prüft, erneut am Webhook, ohne einen weiteren Webhook anzulegen.",
         "refreshWebhook": "Webhook aktualisieren",
         "installWebhook": "Webhook installieren",
         "providers": {

@@ -957,8 +957,10 @@ class WorkloadHealth:
     isn't present (older k8s versions).
 
     ``running_images`` is every distinct image the owned pods' containers
-    report running (init containers excepted), sorted. Empty when the
-    pods could not be listed.
+    report running (init containers excepted), sorted. ``None`` when the
+    pods were not read (their list failed), so a failed read never looks
+    like ``()``, pods listed with nothing running. ``restart_count_24h``
+    is then ``0``.
     """
 
     namespace: str
@@ -967,7 +969,7 @@ class WorkloadHealth:
     ready_replicas: int
     restart_count_24h: int
     last_image_deployed_at: str
-    running_images: tuple[RunningImage, ...] = ()
+    running_images: tuple[RunningImage, ...] | None = None
 
 
 @dataclass(frozen=True)

@@ -176,13 +176,11 @@ def _caller_org_id(info: Info, org_id: strawberry.ID) -> int:
     from astrolift_identity.models import Organization
 
     requested = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
-    if requested is None:
-        raise GraphQLError("organization not found")
-
     user = getattr(getattr(info.context, "request", None), "user", None)
     is_super = bool(getattr(user, "is_superuser", False))
-    if requested.pk != org and not is_super:
-        raise GraphQLError("organization mismatch")
+    # Another org's guid reads exactly like one that does not exist (#1866).
+    if requested is None or (requested.pk != org and not is_super):
+        raise GraphQLError("organization not found")
     return requested.pk
 
 

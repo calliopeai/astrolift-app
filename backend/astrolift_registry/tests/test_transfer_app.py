@@ -179,8 +179,10 @@ def test_transfer_cross_org_refused(permission_resolver):
                 target_project_id=str(other_project.guid),
             ),
         )
+    # Another org's team reads exactly like a missing one (#1866).
     assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].field == "targetTeamId"
 
 
 def test_transfer_no_permission_denied(permission_resolver):

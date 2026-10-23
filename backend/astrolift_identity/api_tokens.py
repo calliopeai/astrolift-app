@@ -524,6 +524,25 @@ def is_active_org_member(user_id: int, organization_id: int) -> bool:
     return active_member_organizations(user_id).filter(pk=organization_id).exists()
 
 
+def active_org_member_users(organization_id: int):
+    """The users who belong to ``organization_id`` by the same rule: active
+    accounts with a live, active ORG ``Member`` row there. They are the people
+    ``astroliftOrgMembersForApprovalPicker`` offers, and the only ones an app's
+    approver list counts, so a user of another organization reads exactly like
+    one that does not exist (#1866)."""
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import Member
+
+    memberships = Member.objects.filter(
+        scope_kind=Member.ScopeKind.ORG,
+        scope_id=organization_id,
+        is_active=True,
+        deleted_at__isnull=True,
+    ).values("user_id")
+    return get_user_model().objects.filter(is_active=True, pk__in=memberships)
+
+
 def verify_token(plaintext: str):
     """Hash-lookup a presented plaintext bearer.
 

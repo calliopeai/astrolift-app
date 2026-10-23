@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from astrolift_clusters.models import TenantCluster
 from astrolift_graphql import failure as gql_failure
+from astrolift_identity.api_tokens import active_org_member_users
 from astrolift_identity.models import Team
 from astrolift_registry.models import AppTeamAccess, RegisteredApp
 from core.friendly_name import generate_friendly_slug
@@ -110,18 +111,16 @@ def _resolve_approval_inputs(
     'leave untouched'), ``minimum_approvals`` (int). On failure,
     ``error`` is the MutationResult failure envelope.
 
-    Each cross-org reference (team / user) is refused with a clear
-    field-tagged validation error rather than silently dropped — the
-    wizard surfaces these inline.
+    A team or user outside the app's organization is refused exactly
+    like one that does not exist, with a field-tagged NOT_FOUND the
+    wizard surfaces inline (#1866).
     """
-    from django.contrib.auth import get_user_model
-
-    User = get_user_model()
-
     team = None
     if approver_team_id is not None:
         team = (
-            Team.objects.filter(guid=str(approver_team_id), deleted_at__isnull=True)
+            Team.objects.filter(
+                guid=str(approver_team_id), organization_id=organization.id, deleted_at__isnull=True
+            )
             .select_related("organization")
             .first()
         )
@@ -129,12 +128,6 @@ def _resolve_approval_inputs(
             return None, gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "approver team not found",
-                field="approverTeamId",
-            )
-        if team.organization_id != organization.id:
-            return None, gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "approver team must belong to the same organization as the app",
                 field="approverTeamId",
             )
 
@@ -155,7 +148,12 @@ def _resolve_approval_inputs(
                     field="approverUserIds",
                 )
         if parsed:
-            found = set(User.objects.filter(pk__in=parsed).values_list("pk", flat=True))
+            # Only the organization's active members, the people the picker
+            # offers. Anyone else reads as unknown: a pending deploy shows its
+            # approvers' names and emails, and pks are sequential (#1866).
+            found = set(
+                active_org_member_users(organization.id).filter(pk__in=parsed).values_list("pk", flat=True)
+            )
             missing = [pk for pk in parsed if pk not in found]
             if missing:
                 return None, gql_failure(

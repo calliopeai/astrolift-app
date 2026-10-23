@@ -3807,7 +3807,7 @@
         "webhookTitle": "소스 웹훅",
         "installed": "설치됨 · {relative}",
         "notInstalled": "설치되지 않음",
-        "webhookDescription": "소스 저장소의 푸시 웹훅이 플랫폼 수신 URL을 가리키도록 등록합니다. 다시 실행하면 웹훅을 중복 생성하지 않고 HMAC 시크릿을 교체합니다.",
+        "webhookDescription": "소스 저장소의 푸시 웹훅이 플랫폼 수신 URL을 가리키도록 등록합니다. 다시 실행하면 웹훅을 중복 생성하지 않고 플랫폼이 검증에 사용하는 HMAC 시크릿을 다시 적용합니다.",
         "refreshWebhook": "웹훅 새로고침",
         "installWebhook": "웹훅 설치",
         "providers": {
