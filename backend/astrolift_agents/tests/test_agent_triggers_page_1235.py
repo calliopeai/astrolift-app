@@ -312,13 +312,14 @@ def test_disabled_triggers_are_still_listed(permission_resolver, info, org):
 
 def test_foreign_org_id_argument_is_rejected(permission_resolver, info, org, other_org):
     """``_caller_org_id`` RAISES on a mismatched ``orgId`` — the page field
-    must keep that gate, not silently fall back to the tenant's org."""
+    must keep that gate, not silently fall back to the tenant's org. Another
+    org's id reads like one that does not exist (#1866)."""
     permission_resolver.grant(Permission.AGENT_READ)
     agent = _agent(org)
     _hook(agent, org, "ours")
 
     with tenant_context(TenantContext(organization_id=org.id)):
-        with pytest.raises(GraphQLError, match="organization mismatch"):
+        with pytest.raises(GraphQLError, match="organization not found"):
             AgentsQuery().agent_triggers_page(info, org_id=str(other_org.guid), agent_slug=agent.slug)
 
 

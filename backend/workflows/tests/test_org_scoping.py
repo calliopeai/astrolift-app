@@ -211,8 +211,9 @@ def test_clone_foreign_org_id_rejected(member, org, other_org, permission_resolv
     # Caller's tenant is org, but they pass other_org's id.
     with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
         res = m.clone_workflow_definition(_info(member), slug="g-foreign", org_id=str(other_org.guid))
+    # Another org's id reads like one that does not exist (#1866).
     assert not res.ok
-    assert any("mismatch" in msg for e in res.errors for msg in e.messages)
+    assert [msg for e in res.errors for msg in e.messages] == ["organization not found"]
 
 
 # --------------------------------------------------------------------------

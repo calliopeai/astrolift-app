@@ -190,13 +190,11 @@ EXEMPT: dict[str, str] = {
     # --- Org self-resolution helpers: resolve the caller's OWN org (a
     #     guid the caller supplied is verified against the tenant's org
     #     pk right after the fetch — cross-org guid reads as not-found).
-    "astrolift_agents::_resolve_org": (
-        "resolves the caller's own org: after fetching by the supplied "
-        "guid it asserts ``org.pk == active`` (the tenant's org) or fails."
-    ),
     "astrolift_agents::_caller_org_id": (
         "resolves the caller's own org: fetch-by-guid then ``org.pk`` is "
-        "checked against the tenant org; a foreign guid raises."
+        "checked against the tenant org; a foreign guid raises the same "
+        "'organization not found' a missing one does (#1866). Superusers "
+        "bypass the match, so the org cannot sit in the lookup."
     ),
     "astrolift_workflows::_resolve_caller_org": (
         "#1042 deny-by-default: fetches the caller's own org by its "
@@ -236,43 +234,9 @@ EXEMPT: dict[str, str] = {
         "the by-guid fetch — a foreign team reads as empty."
     ),
     "astrolift_operations::NotificationMutations.test_notification_channel": (
-        "post-check: ``if tenant.organization_id != org.id`` after the " "by-guid org fetch."
-    ),
-    "astrolift_registry::_resolve_approval_inputs": (
-        "post-check: the approver team is fetched by guid then required to "
-        "match ``organization.id`` (the app's org) — cross-org team is a "
-        "field-tagged PRECONDITION."
-    ),
-    "astrolift_registry::RegistrationMutations.register_agent_repo": (
-        "post-check: ``if project.organization_id != active_org_id`` — same "
-        "org boundary as register_app; the repo is fetched via the org's "
-        "own source connection."
-    ),
-    "astrolift_registry::RegistrationMutations.register_app_repo": (
-        "post-check: project (and team) resolved by guid then required to "
-        "belong to the caller's active org before any app is created."
-    ),
-    "astrolift_registry::AppMutations.transfer_app": (
-        "source app is org-scoped (organization_id=org_id); the target "
-        "team/project fetched by guid are then required to match "
-        "``app.organization_id`` — cross-org transfer is refused."
-    ),
-    "astrolift_registry::TeamAccessMutations.move_app_to_team": (
-        "source app is org-scoped (organization_id=org_id); the target team "
-        "fetched by guid must match ``app.organization_id`` — cross-org "
-        "move refused."
-    ),
-    "astrolift_registry::TeamAccessMutations.grant_team_access_to_app": (
-        "source app is org-scoped (organization_id=org_id); the team fetched "
-        "by guid must match ``app.organization_id`` before the grant."
-    ),
-    "astrolift_registry::TeamAccessMutations.revoke_team_access_from_app": (
-        "source app is org-scoped (organization_id=org_id); the team fetched "
-        "by guid must match ``app.organization_id`` before the revoke."
-    ),
-    "astrolift_registry::AppSettingMutations.assign_astrolift_app_to_project": (
-        "app + target project are org-checked against the caller's tenant "
-        "before the reassignment (foreign guids read as not-found)."
+        "post-check: ``if tenant.organization_id != org.id`` after the "
+        "by-guid org fetch, answered with the NOT_FOUND a missing guid gets "
+        "(#1866)."
     ),
     "astrolift_lifecycle::EnvironmentSettingMutations.set_environment_setting": (
         "post-check: ``if env.registered_app.organization_id != "
@@ -835,8 +799,8 @@ def test_marker_is_scoped_to_its_function() -> None:
 
 def test_exempt_key_clears() -> None:
     """An ``app::qualname`` in EXEMPT clears; a real entry is exercised."""
-    src = "def _resolve_org(org_id):\n    return Organization.objects.filter(guid=str(org_id)).first()\n"
+    src = "def _caller_org_id(info, org_id):\n    return Organization.objects.filter(guid=str(org_id)).first()\n"
     # Not exempt under a synthetic app label…
     assert len(_residuals_in_source(src, app_label="synthetic")) == 1
-    # …but the real ``astrolift_agents::_resolve_org`` entry clears it.
+    # …but the real ``astrolift_agents::_caller_org_id`` entry clears it.
     assert _residuals_in_source(src, app_label="astrolift_agents") == []

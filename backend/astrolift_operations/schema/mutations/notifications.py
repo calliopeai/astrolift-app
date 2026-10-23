@@ -65,17 +65,12 @@ class NotificationMutations:
             )
 
         org = Organization.objects.filter(guid=str(input.id), deleted_at__isnull=True).first()
-        if org is None:
+        # Acting tenant must match the target org: operators can't send
+        # themselves a test notification scoped to a different tenant than
+        # the one they're currently in. Another org reads exactly like one
+        # that does not exist (#1866).
+        if org is None or (tenant.organization_id is not None and tenant.organization_id != org.id):
             return gql_failure(ErrorCode.NOT_FOUND.value, "organization not found", field="id")
-        if tenant.organization_id is not None and tenant.organization_id != org.id:
-            # Acting tenant must match the target org: operators can't
-            # send themselves a test notification scoped to a different
-            # tenant than the one they're currently in.
-            return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                "active tenant does not match target organization",
-                field="id",
-            )
 
         body = (input.message or "").strip() or (
             "This is a test notification from the Astrolift control plane. "

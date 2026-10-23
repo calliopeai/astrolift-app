@@ -155,8 +155,8 @@ def test_assign_to_same_project_is_noop(permission_resolver):
 
 
 def test_cross_org_target_refused(permission_resolver):
-    """A project in a different org → PRECONDITION, not silent
-    cross-tenant re-parenting."""
+    """A project in a different org reads exactly like a missing one
+    (NOT_FOUND, #1866), not silent cross-tenant re-parenting."""
     org, _, _, _, _, app, role = _scaffold()
     user = _user("operator")
     _grant_org_access(role, user, org)
@@ -175,7 +175,8 @@ def test_cross_org_target_refused(permission_resolver):
             ),
         )
     assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].message == "project not found"
     assert result.errors[0].field == "projectGuid"
 
 

@@ -116,22 +116,17 @@ class RegistrationMutations:
         if active_org_id is None:
             return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
 
+        # The project must be in the caller's active tenant, or a caller could
+        # register agents into another org by passing its project GUID (the
+        # decorator only asserts a context exists). Another org's project
+        # reads exactly like a missing one, as on register_app (#1866).
         project = (
             Project.objects.select_related("organization", "team")
-            .filter(guid=str(input.project_id), deleted_at__isnull=True)
+            .filter(guid=str(input.project_id), organization_id=active_org_id, deleted_at__isnull=True)
             .first()
         )
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
-        # The project's org must be the caller's active tenant — otherwise a
-        # caller could register agents into another org by passing its
-        # project GUID (the decorator only asserts a context exists).
-        if project.organization_id != active_org_id:
-            return gql_failure(
-                ErrorCode.PERMISSION_DENIED.value,
-                "project belongs to another organization",
-                field="projectId",
-            )
 
         if not (input.source_repo or "").strip():
             return gql_failure(ErrorCode.VALIDATION.value, "sourceRepo is required", field="sourceRepo")
@@ -242,19 +237,15 @@ class RegistrationMutations:
         if active_org_id is None:
             return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
 
+        # Another org's project reads exactly like a missing one, as on
+        # register_app (#1866).
         project = (
             Project.objects.select_related("organization", "team")
-            .filter(guid=str(input.project_id), deleted_at__isnull=True)
+            .filter(guid=str(input.project_id), organization_id=active_org_id, deleted_at__isnull=True)
             .first()
         )
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
-        if project.organization_id != active_org_id:
-            return gql_failure(
-                ErrorCode.PERMISSION_DENIED.value,
-                "project belongs to another organization",
-                field="projectId",
-            )
 
         if not (input.source_repo or "").strip():
             return gql_failure(ErrorCode.VALIDATION.value, "sourceRepo is required", field="sourceRepo")
@@ -335,7 +326,9 @@ class RegistrationMutations:
         for entry in result.apps:
             if not entry.created:
                 continue
-            app = RegisteredApp.objects.filter(guid=str(entry.app_guid)).first()
+            app = RegisteredApp.objects.filter(
+                guid=str(entry.app_guid), organization_id=active_org_id
+            ).first()
             if app is None:
                 continue
             # The manifest's ``[app] expires_in`` makes it temporary (#2433).

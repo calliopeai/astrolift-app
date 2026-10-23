@@ -1418,7 +1418,8 @@ def test_a_box_cannot_be_ensured_from_another_orgs_agent(
 def test_ensuring_into_another_org_by_id_is_refused(
     permission_resolver, info, org, other_org, with_tenant_org, cluster
 ):
-    """The org_id argument must agree with the caller's active tenant."""
+    """The org_id argument must agree with the caller's active tenant; another
+    org's id reads like one that does not exist (#1866)."""
     permission_resolver.grant(Permission.AGENT_DISPATCH)
     _spec(other_org, slug="their-spec")
 
@@ -1430,7 +1431,8 @@ def test_ensuring_into_another_org_by_id_is_refused(
         )
 
     assert result.ok is False
-    assert result.errors[0].code == ErrorCode.PERMISSION_DENIED.value
+    assert result.errors[0].code == ErrorCode.NOT_FOUND.value
+    assert result.errors[0].message == "organization not found"
     assert AgentBox.objects.count() == 0
 
 

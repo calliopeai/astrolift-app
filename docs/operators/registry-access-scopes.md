@@ -41,3 +41,14 @@ keeps the home team. Cross-organization moves remain refused.
 These checks change authorization only; request/response fields and mutation
 error envelopes stay the same. Operators correcting stale ownership need an
 organization grant and an organization-scoped credential.
+
+Another organization's team or project reads exactly like a missing one. Moves,
+team shares, approver teams and repository registration answer a foreign guid
+with the `NOT_FOUND` a guid that does not exist gets, and write nothing. An
+app's approver list names only active members of its organization, the people
+the approval picker offers; a pending deploy neither shows nor counts anyone
+else stored on it (#1866). An approver team counts only those of its members
+who are active members of the organization, and so, with neither a list nor a
+team, do the organization's `app.approve_deploy` holders. When the list or the
+team leaves nobody who can approve, every approver is refused and the deploy
+waits on nobody; fix the approver policy to release it.

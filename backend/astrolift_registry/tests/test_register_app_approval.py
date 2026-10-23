@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 
-from astrolift_identity.models import Organization, Project, Team
+from astrolift_identity.models import Member, Organization, Project, Team
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.schema.mutations import (
     RegisterAppInput,
@@ -64,9 +64,13 @@ def project(org, team):
 
 
 @pytest.fixture
-def approver_users():
+def approver_users(org):
+    # Approvers are the org's active members, the people the picker offers (#1866).
     User = get_user_model()
-    return [User.objects.create(username=f"approver-{i}", email=f"approver-{i}@test") for i in range(2)]
+    users = [User.objects.create(username=f"approver-{i}", email=f"approver-{i}@test") for i in range(2)]
+    for user in users:
+        Member.objects.create(user=user, scope_kind=Member.ScopeKind.ORG, scope_id=org.id)
+    return users
 
 
 def _tenant(org, actor):
@@ -151,9 +155,12 @@ def test_register_app_rejects_cross_org_team(org, project, actor, info, permissi
                 approver_team_id=other_team.guid,
             ),
         )
+    # Another org's team reads exactly like a missing one (#1866).
     assert not result.ok
-    assert result.errors[0].code == "PRECONDITION"
+    assert result.errors[0].code == "NOT_FOUND"
+    assert result.errors[0].message == "approver team not found"
     assert result.errors[0].field == "approverTeamId"
+    assert not RegisteredApp.objects.filter(slug="x-app-approval").exists()
 
 
 def test_register_app_rejects_unknown_approver_user(org, project, actor, info, permission_resolver):

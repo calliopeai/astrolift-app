@@ -497,21 +497,19 @@ def _content_hash(content: str) -> str:
 
 
 def _resolve_org(org_id: strawberry.ID) -> tuple[Organization | None, object | None]:
-    """Resolve ``org_id`` to an Organization, asserting it matches the
-    caller's active tenant (superusers bypass). Returns
-    ``(org, None)`` on success or ``(None, failure_envelope)``."""
+    """Resolve ``org_id`` to the caller's active Organization. Returns
+    ``(org, None)`` on success or ``(None, failure_envelope)``.
+
+    The decorator established a tenant context; an ``org_id`` that points
+    elsewhere must not let a caller write into a foreign org by passing its
+    GUID, and reads exactly like one that does not exist (#1866)."""
     tenant = get_current_tenant()
-    active = tenant.organization_id if tenant else None
-    if active is None:
+    active_org_id = tenant.organization_id if tenant else None
+    if active_org_id is None:
         return None, gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
-    org = Organization.objects.filter(guid=str(org_id), deleted_at__isnull=True).first()
+    org = Organization.objects.filter(guid=str(org_id), pk=active_org_id, deleted_at__isnull=True).first()
     if org is None:
         return None, gql_failure(ErrorCode.NOT_FOUND.value, "organization not found", field="orgId")
-    if org.pk != active:
-        # The decorator established a tenant context; reject an org_id
-        # that points elsewhere so a caller can't write into a foreign
-        # org by passing its GUID.
-        return None, gql_failure(ErrorCode.PERMISSION_DENIED.value, "organization mismatch", field="orgId")
     return org, None
 
 

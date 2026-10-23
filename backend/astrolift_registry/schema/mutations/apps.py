@@ -493,10 +493,16 @@ class AppMutations:
         next_team = app.team
         next_project = app.project
 
+        # Another organization's team or project reads exactly like a
+        # missing one, so the guid tells the caller nothing (#1866).
         if input.target_team_id is not None:
             team = (
                 Team.objects.select_related("organization")
-                .filter(guid=str(input.target_team_id), deleted_at__isnull=True)
+                .filter(
+                    guid=str(input.target_team_id),
+                    organization_id=app.organization_id,
+                    deleted_at__isnull=True,
+                )
                 .first()
             )
             if team is None:
@@ -505,30 +511,22 @@ class AppMutations:
                     "target team not found",
                     field="targetTeamId",
                 )
-            if team.organization_id != app.organization_id:
-                return gql_failure(
-                    ErrorCode.PRECONDITION.value,
-                    "cross-organization transfer is not permitted",
-                    field="targetTeamId",
-                )
             next_team = team
 
         if input.target_project_id is not None:
             project = (
                 Project.objects.select_related("organization", "team")
-                .filter(guid=str(input.target_project_id), deleted_at__isnull=True)
+                .filter(
+                    guid=str(input.target_project_id),
+                    organization_id=app.organization_id,
+                    deleted_at__isnull=True,
+                )
                 .first()
             )
             if project is None:
                 return gql_failure(
                     ErrorCode.NOT_FOUND.value,
                     "target project not found",
-                    field="targetProjectId",
-                )
-            if project.organization_id != app.organization_id:
-                return gql_failure(
-                    ErrorCode.PRECONDITION.value,
-                    "cross-organization transfer is not permitted",
                     field="targetProjectId",
                 )
             next_project = project
