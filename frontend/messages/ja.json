@@ -3807,7 +3807,7 @@
         "webhookTitle": "ソース Webhook",
         "installed": "設定済み · {relative}",
         "notInstalled": "未設定",
-        "webhookDescription": "ソースリポジトリのプッシュ Webhook を、プラットフォームの受信 URL に向けて登録します。再実行すると Webhook を重複作成せずに HMAC シークレットを更新します。",
+        "webhookDescription": "ソースリポジトリのプッシュ Webhook を、プラットフォームの受信 URL に向けて登録します。再実行すると Webhook を重複作成せずに、プラットフォームが検証に使う HMAC シークレットを再適用します。",
         "refreshWebhook": "Webhook を更新",
         "installWebhook": "Webhook を設定",
         "providers": {

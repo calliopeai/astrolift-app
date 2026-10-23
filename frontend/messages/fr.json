@@ -3801,7 +3801,7 @@
         "webhookTitle": "Webhook source",
         "installed": "installé · {relative}",
         "notInstalled": "non installé",
-        "webhookDescription": "Enregistre le webhook de push du dépôt vers l’URL de réception de la plateforme. Répétez l’opération pour renouveler le secret HMAC sans créer de webhook supplémentaire.",
+        "webhookDescription": "Enregistre le webhook de push du dépôt vers l’URL de réception de la plateforme. Répétez l’opération pour réappliquer le secret HMAC avec lequel la plateforme vérifie, sans créer de webhook supplémentaire.",
         "refreshWebhook": "Actualiser le webhook",
         "installWebhook": "Installer le webhook",
         "providers": {

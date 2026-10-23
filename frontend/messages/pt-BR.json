@@ -3807,7 +3807,7 @@
         "webhookTitle": "Webhook de origem",
         "installed": "instalado · {relative}",
         "notInstalled": "não instalado",
-        "webhookDescription": "Registra o webhook de push no repositório, apontando para a URL de recebimento da plataforma. Repita a operação para rotacionar o segredo HMAC sem criar um webhook duplicado.",
+        "webhookDescription": "Registra o webhook de push no repositório, apontando para a URL de recebimento da plataforma. Repita a operação para reaplicar o segredo HMAC que a plataforma usa na verificação, sem criar um webhook duplicado.",
         "refreshWebhook": "Atualizar webhook",
         "installWebhook": "Instalar webhook",
         "providers": {

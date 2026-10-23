@@ -10,39 +10,49 @@ org and runs.
 
 Idempotency:
 * GitHub returns 422 with "Hook already exists" when the same URL is
-  registered. We treat that as ``status="refreshed"``: we rotate the
-  shared HMAC secret + persist a fresh ``installed_at`` so the FE
-  reflects the operator's confirmation, without spawning a duplicate
-  hook on the host. The hook id stays whatever the previous run
-  recorded (we don't bother re-fetching from the host).
+  registered. We treat that as ``status="refreshed"``: the existing hook
+  is given the connection's current HMAC secret (the one the receiver
+  verifies against) and ``installed_at`` advances so the FE reflects the
+  operator's confirmation, without spawning a duplicate hook on the
+  host. The hook is found by its recorded id, or by its URL when none
+  is recorded (#2478).
 * Re-running after a successful first install simply re-creates the
   hook — GitHub keeps the URL unique and 422s; the refresh branch
   handles that path.
 
-GitLab / Bitbucket are gated as ``NotImplementedError`` at the
-dispatcher so the resolver can map the gap to a clean PRECONDITION.
+Bitbucket, Gitea and plain git URLs are gated as ``NotImplementedError``
+at the dispatcher so the resolver can map the gap to a clean PRECONDITION.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import logging
 import secrets
 import urllib.parse
 
+from cryptography.fernet import InvalidToken
 from django.conf import settings as django_settings
 from django.db import transaction
 from django.utils import timezone
 
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
-from astrolift_scm.providers import ProviderError, install_webhook
+from astrolift_scm.providers import (
+    ProviderError,
+    find_webhook,
+    install_webhook,
+    update_webhook_secret,
+)
 from astrolift_scm.providers import webhook_exists as provider_webhook_exists
 from astrolift_scm.providers.github import (
     GithubProviderError,
     github_installation_includes_repo,
 )
 from astrolift_scm.services.connection_resolver import covering_repo_owner
-from core.secrets import encrypt_at_rest
+from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Result type
@@ -56,10 +66,10 @@ class InstallSourceWebhookResult:
     ``status`` codes:
     * ``created``: a brand-new hook landed on the host; ``hook_id``
       is the host-side identifier.
-    * ``refreshed``: a hook with the same URL already existed; we
-      rotated the HMAC secret + advanced ``installed_at``. ``hook_id``
-      is whatever the app row carried before (the host's id stays
-      the same).
+    * ``refreshed``: a hook with the same URL already existed; the host
+      accepted the connection's current HMAC secret on it and
+      ``installed_at`` advanced. ``hook_id`` is that hook's id, the one
+      the app row recorded or, when it had none, the one found by URL.
     * ``app_delivers``: the connection is a github_app_install and the
       org App is installed on the target repo — its own webhook already
       delivers pushes, so no per-repo hook exists (``hook_id`` is empty
@@ -104,7 +114,8 @@ class InstallSourceWebhookResult:
 # to: it resolves the connection that OWNS a repo's webhook, and the
 # webhook secret lifecycle is a closed loop over one connection —
 #
-#   install  → mints + persists ``webhook_secret_*`` on the picked row
+#   install  → reuses ``webhook_secret_*`` on the picked row (mints +
+#              persists one only when none is usable, #2478)
 #   ingest   → webhook_views re-picks the same row to HMAC-verify a
 #              delivery (astrolift_scm/webhook_views.py)
 #   teardown → app_deregister re-picks it to delete the hook
@@ -227,16 +238,18 @@ def _receiver_url(app: RegisteredApp) -> str:
 def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhookResult:
     """Register (or refresh) the push-event webhook on ``app``'s source repo.
 
-    GitHub-first. GitLab and the other source kinds raise
+    GitHub and GitLab. Bitbucket, Gitea and plain git URLs raise
     ``NotImplementedError`` at the dispatcher so the resolver maps
     them to a clean PRECONDITION envelope rather than a 500.
 
-    Mints a fresh HMAC secret on each call, encrypts it via
-    ``core.secrets.encrypt_at_rest``, and persists it on the picked
-    connection's existing ``webhook_secret_*`` columns. The secret
-    is shared at the connection level (not per-hook) so a single
-    receiver-side verifier can authenticate every delivery the
-    connection drives.
+    The HMAC secret is shared at the connection level (not per-hook):
+    the receiver verifies every per-repo hook the connection installed
+    against the one in its ``webhook_secret_*`` columns. So the stored
+    secret is reused, one is minted only when none is stored or it
+    cannot be decrypted, and a minted one is stored only once the host
+    accepted a hook carrying it. Minting on every call left each earlier
+    hook on the connection signing with a secret the receiver no longer
+    had (#2478).
     """
     if not app.source_repo:
         return InstallSourceWebhookResult(
@@ -279,7 +292,7 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
                 f"FRONTEND_URL) to the address this install is served at, then retry."
             ),
         )
-    secret = secrets.token_urlsafe(32)
+    secret, minted = _hook_secret(connection)
 
     try:
         result = install_webhook(
@@ -290,27 +303,8 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
         )
     except ProviderError as exc:
         if exc.code == "ALREADY_EXISTS":
-            # Refresh branch: GitHub already has a hook for this URL.
-            # Rotate the shared secret + advance the timestamp so the
-            # operator's "click to refresh" is observable in the UI.
-            # The hook id stays whatever was previously recorded; we
-            # never minted a new one, so the host-side id hasn't
-            # moved.
-            _persist_secret(connection, secret)
-            now = timezone.now()
-            with transaction.atomic():
-                app.source_webhook_installed_at = now
-                app.save(
-                    update_fields=[
-                        "source_webhook_installed_at",
-                        "updated_at",
-                        "version",
-                    ]
-                )
-            return InstallSourceWebhookResult(
-                status="refreshed",
-                hook_id=app.source_webhook_id or "",
-                receiver_url=target_url,
+            return _refresh_existing_hook(
+                app, connection, target_url=target_url, secret=secret, minted=minted
             )
         if exc.code == "APP_DELIVERS":
             # github_app_install and the App IS installed on this repo:
@@ -348,9 +342,10 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
             error=exc.message,
         )
 
-    _persist_secret(connection, secret)
     now = timezone.now()
     with transaction.atomic():
+        if minted:
+            _persist_secret(connection, secret)
         app.source_webhook_id = result.hook_id
         app.source_webhook_installed_at = now
         app.save(
@@ -364,6 +359,79 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
     return InstallSourceWebhookResult(
         status="created",
         hook_id=result.hook_id,
+        receiver_url=target_url,
+    )
+
+
+def _refresh_existing_hook(
+    app: RegisteredApp,
+    connection: SourceConnection,
+    *,
+    target_url: str,
+    secret: str,
+    minted: bool,
+) -> InstallSourceWebhookResult:
+    """The host already has a hook for ``target_url``: give it ``secret``.
+
+    A hook installed before #2478 can still sign with a secret a later
+    install replaced on the connection, so the refresh re-applies the
+    connection's secret instead of trusting the hook. The recorded hook id
+    is tried first; with none, or one the repo no longer has, the hook is
+    found by its URL and that id is recorded. Only an update the host
+    accepted counts as ``refreshed``.
+    """
+    hook_id = app.source_webhook_id
+    try:
+        updated = bool(hook_id) and update_webhook_secret(
+            connection,
+            repo_full_name=app.source_repo,
+            hook_id=hook_id,
+            target_url=target_url,
+            secret=secret,
+        )
+        if not updated:
+            hook_id = find_webhook(connection, repo_full_name=app.source_repo, target_url=target_url) or ""
+            updated = bool(hook_id) and update_webhook_secret(
+                connection,
+                repo_full_name=app.source_repo,
+                hook_id=hook_id,
+                target_url=target_url,
+                secret=secret,
+            )
+    except ProviderError as exc:
+        return InstallSourceWebhookResult(
+            status="fetch_failed",
+            receiver_url=target_url,
+            error=exc.message,
+        )
+    if not updated:
+        host_label = "GitLab" if app.source_kind == "gitlab" else "GitHub"
+        return InstallSourceWebhookResult(
+            status="fetch_failed",
+            receiver_url=target_url,
+            error=(
+                f"{host_label} says {app.source_repo} already has a webhook for {target_url}, but it "
+                "is not among the webhooks this connection can list, so its secret was not updated."
+            ),
+        )
+
+    now = timezone.now()
+    with transaction.atomic():
+        if minted:
+            _persist_secret(connection, secret)
+        app.source_webhook_id = hook_id
+        app.source_webhook_installed_at = now
+        app.save(
+            update_fields=[
+                "source_webhook_id",
+                "source_webhook_installed_at",
+                "updated_at",
+                "version",
+            ]
+        )
+    return InstallSourceWebhookResult(
+        status="refreshed",
+        hook_id=hook_id,
         receiver_url=target_url,
     )
 
@@ -464,6 +532,40 @@ def reconcile_source_webhook_state(app: RegisteredApp) -> str:
         return "live"
     _clear_webhook_markers(app)
     return "repaired_missing"
+
+
+def _hook_secret(connection: SourceConnection) -> tuple[str, bool]:
+    """The secret a per-repo hook on ``connection`` must carry, and whether
+    it was minted here. The stored one when it decrypts, else a new one,
+    which the caller stores once the host accepts a hook carrying it.
+
+    A github_app_install connection never gets that far: the App's own
+    webhook delivers, and ``install_webhook`` answers APP_DELIVERS or
+    APP_NOT_INSTALLED for it, so the App's secret is never replaced here.
+    """
+    if connection.webhook_secret_backend_kind and connection.webhook_secret_ciphertext:
+        try:
+            stored = decrypt(
+                EncryptedSecret(
+                    backend_kind=connection.webhook_secret_backend_kind,
+                    backend_ref=bytes(connection.webhook_secret_ciphertext),
+                )
+            ).decode("utf-8")
+        except (InvalidToken, UnicodeDecodeError, RuntimeError) as exc:
+            # The receiver cannot verify anything with it either, so a new
+            # one costs no working hook. The other hooks on this connection
+            # verify again once each app's webhook is refreshed.
+            logger.warning(
+                "source webhook: the webhook secret on connection %s cannot be decrypted (%s); "
+                "a hook installed or refreshed through it gets a new one",
+                connection.guid,
+                type(exc).__name__,
+            )
+        else:
+            # An empty secret verifies nothing: the receiver refuses it.
+            if stored:
+                return stored, False
+    return secrets.token_urlsafe(32), True
 
 
 def _persist_secret(connection: SourceConnection, plaintext: str) -> None:
