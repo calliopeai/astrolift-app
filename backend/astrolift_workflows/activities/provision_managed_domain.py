@@ -11,7 +11,8 @@ Six-step provisioning sequence for a platform-managed DNS zone:
    cert authority can verify ownership.
 3. ``poll_cert_issuance`` — Poll ``DnsDriver.poll_cert_status`` until
    status transitions to ``"issued"`` (or the workflow times out after
-   max_attempts).
+   max_attempts). A pending cert's validation records that never reached
+   the row are written then (#2519).
 4. ``register_managed_domain_row`` — Upsert the ``ManagedDomain`` row
    with ``dns_config`` populated (zone_id + certificate ARN); row
    starts inactive so the health-check gate controls activation.
@@ -88,6 +89,34 @@ def _wildcard_cert_sans(zone: str, domain: Any) -> list[str]:
     return list(scope.sans)
 
 
+def _write_validation_records(dns_driver: Any, zone: str, records: list, *, step: str) -> None:
+    """Write each DNS-01 CNAME the cert authority requires into ``zone``.
+
+    The driver returns them as ``{"name": str, "value": str}`` dicts (the
+    CNAME target). When the install withholds DNS (installer #447) the guard
+    refuses before any Route53 call, so nothing is written: the caller still
+    records the cert and its records on the row for the operator to publish.
+    """
+    for record in records:
+        try:
+            dns_driver.ensure_record(
+                zone=zone,
+                name=record["name"].rstrip("."),
+                type="CNAME",
+                value=record["value"],
+                ttl=300,
+            )
+        except WithheldCapabilityError as exc:
+            log.info("%s: validation records left to the operator: %s", step, exc)
+            break
+        except Exception as exc:  # noqa: BLE001
+            log.warning("%s: failed to write validation record %s: %s", step, record.get("name"), exc)
+
+
+def _record_key(record: dict) -> tuple[str, str]:
+    return str(record.get("name", "")).rstrip(".").lower(), str(record.get("value", "")).rstrip(".").lower()
+
+
 def pin_managed_zone(dns_driver: Any, domain: Any) -> None:
     """Bind ``dns_driver`` to the hosted zone the platform created for ``domain`` (#1931).
 
@@ -138,9 +167,21 @@ def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
         config = dict(existing.dns_config or {})
         config["provision_cluster_id"] = cluster_id
         existing.provision_state = ZoneRegistrationStep.VALIDATE_NS_DELEGATION.value
+        # A run that moves the row on is no longer stalled where the last one
+        # ended (#2519): the API kept reporting that run's step and reason.
+        existing.provision_failed_step = ""
+        existing.provision_failure_reason = ""
         existing.provision_nameservers = nameservers
         existing.dns_config = config
-        fields = ["provision_state", "provision_nameservers", "dns_config", "updated_at", "version"]
+        fields = [
+            "provision_state",
+            "provision_failed_step",
+            "provision_failure_reason",
+            "provision_nameservers",
+            "dns_config",
+            "updated_at",
+            "version",
+        ]
         if created_zone_id:
             existing.provision_zone_id = created_zone_id
             fields.append("provision_zone_id")
@@ -195,42 +236,23 @@ def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str
     )
     cert_id: str = result.get("cert_id", "")
     validation_records: list = result.get("validation_records", [])
-
-    # Write each DNS-01 CNAME validation record the cert authority
-    # requires. The driver returns them as a list of
-    # {"name": str, "value": str} dicts (CNAME target).
-    for record in validation_records:
-        try:
-            dns_driver.ensure_record(
-                zone=zone,
-                name=record["name"].rstrip("."),
-                type="CNAME",
-                value=record["value"],
-                ttl=300,
-            )
-        except WithheldCapabilityError as exc:
-            # The install withholds DNS (installer #447): the guard refused
-            # before any Route53 call. The cert and its records are still
-            # persisted below for the operator to publish; the poll waits.
-            log.info("request_wildcard_cert_for_zone: validation records left to the operator: %s", exc)
-            break
-        except Exception as exc:  # noqa: BLE001
-            log.warning(
-                "request_wildcard_cert_for_zone: failed to write validation record %s: %s",
-                record.get("name"),
-                exc,
-            )
+    _write_validation_records(dns_driver, zone, validation_records, step="request_wildcard_cert_for_zone")
 
     # Persist cert state so the UI can surface CNAME records immediately.
     if domain is not None:
         domain.provision_cert_id = cert_id
         domain.provision_validation_records = validation_records
         domain.provision_state = ZoneRegistrationStep.CONFIGURE_CERT_POLICY.value
+        # Where a run on a zone the caller owns starts (#2519).
+        domain.provision_failed_step = ""
+        domain.provision_failure_reason = ""
         domain.save(
             update_fields=[
                 "provision_cert_id",
                 "provision_validation_records",
                 "provision_state",
+                "provision_failed_step",
+                "provision_failure_reason",
                 "updated_at",
                 "version",
             ]
@@ -255,12 +277,46 @@ async def request_wildcard_cert_for_zone(cluster_id: int, zone: str, zone_id: st
     return cert_id
 
 
+def _heal_validation_records(dns_driver: Any, domain: Any, zone: str, cert_id: str, poll: dict) -> None:
+    """Write the records a pending cert waits on that its request never wrote (#2519).
+
+    Until #2519 the driver read a new cert once, a second after requesting it,
+    usually before ACM had published any validation record: the request step
+    wrote none, recorded none, and the cert stayed pending. The poll lists what
+    the cert waits on, so records the row lacks are written now and recorded,
+    and the next poll writes nothing. Only the row's own cert is healed, and
+    never a zone a reviewed domain route manages (the request step refuses it).
+    """
+    if poll.get("status") != "pending" or domain is None or domain.provision_cert_id != cert_id:
+        return
+    wanted = list(poll.get("validation_records") or [])
+    recorded = {_record_key(record) for record in domain.provision_validation_records or []}
+    missing = [record for record in wanted if _record_key(record) not in recorded]
+    if not missing:
+        return
+    from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+    try:
+        require_unbound_zone(zone=zone)
+    except DomainAppRouteError:
+        return
+    log.info(
+        "poll_cert_issuance: writing %d validation record(s) zone=%s cert_id=%s", len(missing), zone, cert_id
+    )
+    _write_validation_records(dns_driver, zone, missing, step="poll_cert_issuance")
+    domain.provision_validation_records = wanted
+    domain.save(update_fields=["provision_validation_records", "updated_at", "version"])
+
+
 def _poll_cert_issuance_sync(cluster_id: int, zone: str, cert_id: str) -> dict[str, Any]:
     from astrolift_clusters.models import ManagedDomain
 
     _, dns_driver = _get_cluster_and_dns_driver(cluster_id)
-    pin_managed_zone(dns_driver, ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first())
-    return dns_driver.poll_cert_status(zone, cert_id)
+    domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    pin_managed_zone(dns_driver, domain)
+    result = dns_driver.poll_cert_status(zone, cert_id)
+    _heal_validation_records(dns_driver, domain, zone, cert_id, result)
+    return result
 
 
 @activity.defn(name="astrolift.managed_domain.poll_cert_issuance")
@@ -470,7 +526,18 @@ def _mark_active_sync(cluster_id: int, zone: str) -> None:
         deleted_at__isnull=True,
     ).get()
     domain.provision_state = ZoneRegistrationStep.MARK_ACTIVE.value
-    domain.save(update_fields=["provision_state", "updated_at", "version"])
+    # Covers runs that started before #2519 cleared the stall at their start.
+    domain.provision_failed_step = ""
+    domain.provision_failure_reason = ""
+    domain.save(
+        update_fields=[
+            "provision_state",
+            "provision_failed_step",
+            "provision_failure_reason",
+            "updated_at",
+            "version",
+        ]
+    )
 
 
 @activity.defn(name="astrolift.managed_domain.mark_active")
@@ -565,26 +632,7 @@ def _reissue_cert_sync(
 
     # For platform-managed zones write each DNS-01 CNAME into the zone.
     if domain is not None and domain.is_wildcard_managed:
-        for record in validation_records:
-            try:
-                dns_driver.ensure_record(
-                    zone=zone,
-                    name=record["name"].rstrip("."),
-                    type="CNAME",
-                    value=record["value"],
-                    ttl=300,
-                )
-            except WithheldCapabilityError as exc:
-                # As in request_wildcard_cert_for_zone: nothing was written,
-                # the new cert and its records are persisted for the operator.
-                log.info("reissue_cert: validation records left to the operator: %s", exc)
-                break
-            except Exception as exc:  # noqa: BLE001
-                log.warning(
-                    "reissue_cert: failed to write validation record %s: %s",
-                    record.get("name"),
-                    exc,
-                )
+        _write_validation_records(dns_driver, zone, validation_records, step="reissue_cert")
 
         domain.provision_cert_id = new_cert_id
         domain.provision_validation_records = validation_records

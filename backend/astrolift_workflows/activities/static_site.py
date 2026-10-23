@@ -311,21 +311,26 @@ def _ensure_cloudfront_cert_sync(deployment_id: int) -> dict[str, Any]:
         return {"stub": False, "cert_arn": issued, "reused": True}
 
     # An in-flight request from a prior (timed-out) attempt -> resume polling it
-    # rather than minting a duplicate cert.
+    # rather than minting a duplicate cert. Its records are written again: until
+    # #2519 the request often came back before ACM had published any, so a
+    # parked cert may never have had them.
     cert_id = str(dns_config.get("cloudfront_certificate_pending_arn", ""))
-    if not cert_id:
+    if cert_id:
+        validation_records = cf_dns.poll_cert_status(zone, cert_id).get("validation_records") or []
+    else:
         result = cf_dns.request_wildcard_cert(zone, zone_id)
         cert_id = result["cert_id"]
         _store("cloudfront_certificate_pending_arn", cert_id)
-        # Write the ACM DNS-validation CNAME(s) so issuance can proceed.
-        for rec in result.get("validation_records", []) or []:
-            cf_dns.ensure_record(
-                zone=zone,
-                name=str(rec["name"]).rstrip("."),
-                type=str(rec.get("type", "CNAME")),
-                value=str(rec["value"]),
-                ttl=300,
-            )
+        validation_records = result.get("validation_records", []) or []
+    # Write the ACM DNS-validation CNAME(s) so issuance can proceed.
+    for rec in validation_records:
+        cf_dns.ensure_record(
+            zone=zone,
+            name=str(rec["name"]).rstrip("."),
+            type=str(rec.get("type", "CNAME")),
+            value=str(rec["value"]),
+            ttl=300,
+        )
 
     # Self-bounded poll (≈6m) runs well under the activity's start_to_close,
     # so no mid-loop heartbeat is needed — and calling activity.heartbeat()

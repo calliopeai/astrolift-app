@@ -9,6 +9,7 @@ HostedZoneId once + caches per-instance.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -16,11 +17,39 @@ from typing import TYPE_CHECKING, Any
 from _sdk import UnsupportedOperationError  # noqa: F401 (re-exported via raises)
 from _sdk._telemetry import driver_op
 from _sdk.dns import AliasRouteObservation, DnsDriver, DnsRecord, ExactAliasRoute, Record, ReviewedDnsHostname
-from aws._errors import ConflictError, NotFoundError, map_client_error
+from aws._errors import ConflictError, NotFoundError, TransientError, map_client_error
 from aws.session import aws_client
 
 if TYPE_CHECKING:
     from _sdk.cloud_credentials import CloudCredential
+
+log = logging.getLogger("astrolift_providers.aws.dns_route53")
+
+#: How long ``request_wildcard_cert`` waits for ACM to publish the DNS validation
+#: record of every domain on a new certificate (#2519).
+_VALIDATION_RECORDS_WAIT_SECONDS = 60.0
+#: The pauses between its reads of the certificate; the last one repeats.
+_VALIDATION_RECORDS_BACKOFF_SECONDS = (1.0, 2.0, 3.0, 5.0)
+
+
+def _validation_records(certificate: dict[str, Any]) -> tuple[list[dict[str, str]], bool]:
+    """``certificate``'s DNS validation records, one per name, and whether every domain has one yet.
+
+    ACM fills each ``DomainValidationOptions`` entry's ``ResourceRecord`` some
+    seconds after ``RequestCertificate``, so a new certificate lists its domains
+    before their records (#2519). An apex and its wildcard validate through one
+    CNAME, so the records are deduplicated by name.
+    """
+    options = certificate.get("DomainValidationOptions", []) or []
+    records: dict[str, dict[str, str]] = {}
+    for option in options:
+        record = option.get("ResourceRecord")
+        if record:
+            records.setdefault(
+                record["Name"].rstrip(".").lower(),
+                {"name": record["Name"], "type": record["Type"], "value": record["Value"]},
+            )
+    return list(records.values()), bool(options) and all(option.get("ResourceRecord") for option in options)
 
 
 @dataclass
@@ -676,6 +705,13 @@ class Route53Driver(DnsDriver):
         zone_id: str,
         sans: list[str] | None = None,
     ) -> dict[str, Any]:
+        """Request a DNS-validated wildcard certificate; return its ARN and validation records.
+
+        ``validation_records`` holds the record of every domain on the
+        certificate (see ``_await_validation_records``). When they cannot be
+        read, the certificate is deleted before the error propagates: the
+        caller never learns its ARN, and its retry requests a new one.
+        """
         acm = self._acm_client()
         san_list = list(sans) if sans else [zone, f"*.{zone}"]
         try:
@@ -687,23 +723,45 @@ class Route53Driver(DnsDriver):
         except Exception as exc:
             raise map_client_error(exc) from exc
         cert_arn: str = cert_response["CertificateArn"]
-        # ACM needs a moment to populate DomainValidationOptions.
-        time.sleep(1)
         try:
-            desc = acm.describe_certificate(CertificateArn=cert_arn)
-        except Exception as exc:
-            raise map_client_error(exc) from exc
-        options = desc.get("Certificate", {}).get("DomainValidationOptions", []) or []
-        validation_records = [
-            {
-                "name": r["ResourceRecord"]["Name"],
-                "type": r["ResourceRecord"]["Type"],
-                "value": r["ResourceRecord"]["Value"],
-            }
-            for r in options
-            if "ResourceRecord" in r
-        ]
+            validation_records = self._await_validation_records(acm, cert_arn)
+        except Exception:
+            try:
+                acm.delete_certificate(CertificateArn=cert_arn)
+            except Exception as cleanup:
+                log.warning("request_wildcard_cert: certificate %s left behind: %s", cert_arn, cleanup)
+            raise
         return {"cert_id": cert_arn, "validation_records": validation_records}
+
+    def _await_validation_records(self, acm: Any, cert_arn: str) -> list[dict[str, str]]:
+        """The validation records of every domain on ``cert_arn``, once ACM has published them all.
+
+        Reads the certificate with a short backoff for up to
+        ``_VALIDATION_RECORDS_WAIT_SECONDS``. A certificate ACM has already
+        moved out of ``PENDING_VALIDATION`` (failed) is returned as it stands,
+        for the caller's poll to report. One still missing a record at the
+        deadline raises ``TransientError``, so the caller retries rather than
+        writing a partial set: a domain without its record never validates.
+        """
+        deadline = time.monotonic() + _VALIDATION_RECORDS_WAIT_SECONDS
+        pauses = iter(_VALIDATION_RECORDS_BACKOFF_SECONDS)
+        pause = 0.0
+        while True:
+            pause = next(pauses, pause)
+            time.sleep(min(pause, max(0.0, deadline - time.monotonic())))
+            try:
+                desc = acm.describe_certificate(CertificateArn=cert_arn)
+            except Exception as exc:
+                raise map_client_error(exc) from exc
+            certificate = desc.get("Certificate", {}) or {}
+            records, complete = _validation_records(certificate)
+            if complete or certificate.get("Status", "PENDING_VALIDATION") != "PENDING_VALIDATION":
+                return records
+            if time.monotonic() >= deadline:
+                raise TransientError(
+                    f"ACM had not published a DNS validation record for every domain on {cert_arn} "
+                    f"after {_VALIDATION_RECORDS_WAIT_SECONDS:.0f} s"
+                )
 
     @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.revoke_cert")
     def revoke_cert(self, zone: str, cert_id: str) -> None:
@@ -722,7 +780,8 @@ class Route53Driver(DnsDriver):
             desc = acm.describe_certificate(CertificateArn=cert_id)
         except Exception as exc:
             raise map_client_error(exc) from exc
-        raw_status: str = desc.get("Certificate", {}).get("Status", "")
+        certificate = desc.get("Certificate", {}) or {}
+        raw_status: str = certificate.get("Status", "")
         if raw_status == "ISSUED":
             status = "issued"
         elif raw_status == "PENDING_VALIDATION":
@@ -730,10 +789,15 @@ class Route53Driver(DnsDriver):
         else:
             # FAILED, EXPIRED, REVOKED, INACTIVE, VALIDATION_TIMED_OUT, …
             status = "failed"
-        return {
+        result: dict[str, Any] = {
             "status": status,
             "cert_arn": cert_id if status == "issued" else None,
         }
+        if status == "pending":
+            # What the certificate waits on, so a caller can write a record
+            # that never reached the zone (#2519).
+            result["validation_records"] = _validation_records(certificate)[0]
+        return result
 
     # ---- internals ------------------------------------------------
 
