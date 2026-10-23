@@ -627,8 +627,9 @@ class InstallSourceWebhookPayload:
     ``status`` is one of:
     * ``created`` — the host registered a brand-new hook.
     * ``refreshed`` — a hook with the same URL already existed on the
-      host; we rotated the shared HMAC secret and advanced the
-      ``installed_at`` timestamp so the operator's click is observable.
+      host; it was given the connection's shared HMAC secret again and
+      the ``installed_at`` timestamp advanced so the operator's click is
+      observable.
     * ``app_delivers`` — the connection is a github_app_install and the
       org App is installed on the repo; its own webhook already delivers
       pushes. There is no per-repo hook, so ``hook_id`` is empty by

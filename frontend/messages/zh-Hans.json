@@ -3807,7 +3807,7 @@
         "webhookTitle": "源码 Webhook",
         "installed": "已安装 · {relative}",
         "notInstalled": "未安装",
-        "webhookDescription": "在源码仓库中注册指向平台接收 URL 的推送 Webhook。再次执行会轮换 HMAC 密钥，不会重复创建 Webhook。",
+        "webhookDescription": "在源码仓库中注册指向平台接收 URL 的推送 Webhook。再次执行会重新应用平台用于校验的 HMAC 密钥，不会重复创建 Webhook。",
         "refreshWebhook": "刷新 Webhook",
         "installWebhook": "安装 Webhook",
         "providers": {

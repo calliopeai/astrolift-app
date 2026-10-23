@@ -573,6 +573,116 @@ def install_gitlab_webhook(
     return GitlabInstallWebhookResult(hook_id=str(hook_id), webhook_url=target_url)
 
 
+def find_gitlab_webhook(connection, *, repo_full_name: str, target_url: str) -> str | None:
+    """Return the id of the hook on project ``repo_full_name`` that
+    delivers to ``target_url``, or None.
+
+    ``GET /api/v4/projects/{id}/hooks``, page by page. Lets a refresh with
+    no recorded hook id find the hook the host already holds (#2478).
+    """
+    token = _token(connection)
+    base = _api_base(connection)
+    project_path = urllib.parse.quote(repo_full_name, safe="")
+
+    page = 1
+    while True:
+        qs = urllib.parse.urlencode({"per_page": "100", "page": str(page)})
+        req = urllib.request.Request(
+            f"{base}/api/v4/projects/{project_path}/hooks?{qs}",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "User-Agent": "astrolift",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403):
+                raise GitlabProviderError(
+                    "AUTH_FAILED",
+                    f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                    recoverable=True,
+                ) from exc
+            if exc.code == 404:
+                raise GitlabProviderError(
+                    "NOT_FOUND",
+                    f"GitLab couldn't find project {repo_full_name}",
+                    recoverable=True,
+                ) from exc
+            raise GitlabProviderError("API_ERROR", f"GitLab returned {exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+
+        if not isinstance(payload, list):
+            raise GitlabProviderError("UNEXPECTED_SHAPE", "GitLab returned a non-list payload for the hooks")
+        for hook in payload:
+            if isinstance(hook, dict) and hook.get("url") == target_url and hook.get("id") is not None:
+                return str(hook["id"])
+        # A short page is the end of the listing; the cap stops a host
+        # that never sends one.
+        if len(payload) < 100 or page >= 10:
+            return None
+        page += 1
+
+
+def update_gitlab_webhook_secret(
+    connection,
+    *,
+    repo_full_name: str,
+    hook_id: str,
+    target_url: str,
+    secret: str,
+) -> bool:
+    """``PUT /api/v4/projects/{id}/hooks/{hook_id}`` with ``secret`` as the
+    hook's token.
+
+    Returns False when the project has no such hook (404). GitLab requires
+    the URL on every edit; parameters left out, such as the event flags,
+    keep their values.
+    """
+    if not hook_id:
+        raise GitlabProviderError("VALIDATION", "hook_id is required to update a webhook")
+
+    token = _token(connection)
+    base = _api_base(connection)
+    project_path = urllib.parse.quote(repo_full_name, safe="")
+    safe_hook = urllib.parse.quote(str(hook_id), safe="")
+    req = urllib.request.Request(
+        f"{base}/api/v4/projects/{project_path}/hooks/{safe_hook}",
+        data=json.dumps({"url": target_url, "token": secret}).encode("utf-8"),
+        method="PUT",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            resp.read()
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return False
+        body_text = ""
+        try:
+            body_text = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            pass
+        if exc.code in (401, 403):
+            raise GitlabProviderError(
+                "AUTH_FAILED",
+                f"GitLab rejected the token ({exc.code}). Reconnect or rotate.",
+                recoverable=True,
+            ) from exc
+        raise GitlabProviderError("API_ERROR", f"GitLab returned {exc.code}: {body_text}") from exc
+    except urllib.error.URLError as exc:
+        raise GitlabProviderError("NETWORK", f"Couldn't reach GitLab: {exc.reason}") from exc
+    return True
+
+
 def _gitlab_blob_url(*, base: str, repo_full_name: str, branch: str, file_path: str) -> str:
     """Best-effort blob URL for ``file_path`` on ``branch``. GitLab's
     file endpoint doesn't return a web URL; we synthesize one from the

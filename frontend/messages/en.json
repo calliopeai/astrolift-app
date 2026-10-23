@@ -1975,7 +1975,7 @@
         "webhookTitle": "Source webhook",
         "installed": "installed · {relative}",
         "notInstalled": "not installed",
-        "webhookDescription": "Registers the push-event webhook on the source repo pointing at the platform's receiver URL. Re-click to rotate the HMAC secret without spawning a duplicate hook.",
+        "webhookDescription": "Registers the push-event webhook on the source repo pointing at the platform's receiver URL. Re-click to re-apply the HMAC secret the platform verifies against, without spawning a duplicate hook.",
         "refreshWebhook": "Refresh webhook",
         "installWebhook": "Install webhook",
         "providers": {

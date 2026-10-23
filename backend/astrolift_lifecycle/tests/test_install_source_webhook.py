@@ -152,6 +152,85 @@ def test_install_github_org_oauth_user_creates_hook(
     assert app_with_repo.source_webhook_installed_at is not None
 
 
+def test_install_refresh_puts_the_connections_secret_on_the_existing_hook(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_repo,
+    github_connection,
+    settings,
+):
+    """Re-clicking re-applies the connection's stored secret to the hook
+    GitHub already has, rather than storing a new one GitHub never sees
+    (#2478)."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    settings.PLATFORM_API_URL = "https://api.astrolift.example.com"
+    stored = encrypt_at_rest(b"whsec-current")
+    github_connection.webhook_secret_backend_kind = stored.backend_kind
+    github_connection.webhook_secret_ciphertext = stored.backend_ref
+    github_connection.save(update_fields=["webhook_secret_backend_kind", "webhook_secret_ciphertext"])
+    app_with_repo.source_webhook_id = "4242"
+    app_with_repo.save(update_fields=["source_webhook_id", "updated_at", "version"])
+
+    patched: dict = {}
+
+    def fake_urlopen(req, timeout=15):
+        if req.get_method() == "POST":
+            raise _http_error(422, b'{"message": "Hook already exists on this repository"}', req.full_url)
+        patched["url"] = req.full_url
+        patched["body"] = json.loads(req.data.decode("utf-8"))
+        return _Response201(hook_id=4242)
+
+    monkeypatch.setattr("astrolift_scm.providers.github.urllib.request.urlopen", fake_urlopen)
+
+    with _ctx(org):
+        result = LifecycleMutation().install_astrolift_source_webhook(
+            _info(),
+            input=InstallSourceWebhookInput(app_slug=app_with_repo.slug),
+        )
+
+    assert result.ok, result.errors
+    assert result.data.status == "refreshed"
+    assert result.data.hook_id == "4242"
+    assert patched["url"].endswith("/repos/acme/api/hooks/4242")
+    assert patched["body"]["config"]["secret"] == "whsec-current"
+
+
+def test_install_refresh_refused_by_the_host_is_precondition(
+    monkeypatch,
+    permission_resolver,
+    org,
+    app_with_repo,
+    github_connection,
+    settings,
+):
+    """A refresh only counts once the host accepted the secret on the hook;
+    a refused update is reported, not shown as refreshed (#2478)."""
+    permission_resolver.grant(Permission.APP_UPDATE)
+    settings.PLATFORM_API_URL = "https://api.astrolift.example.com"
+    app_with_repo.source_webhook_id = "4242"
+    app_with_repo.save(update_fields=["source_webhook_id", "updated_at", "version"])
+
+    def fake_urlopen(req, timeout=15):
+        if req.get_method() == "POST":
+            raise _http_error(422, b'{"message": "Hook already exists on this repository"}', req.full_url)
+        raise _http_error(403, b'{"message": "Resource not accessible"}', req.full_url)
+
+    monkeypatch.setattr("astrolift_scm.providers.github.urllib.request.urlopen", fake_urlopen)
+
+    with _ctx(org):
+        result = LifecycleMutation().install_astrolift_source_webhook(
+            _info(),
+            input=InstallSourceWebhookInput(app_slug=app_with_repo.slug),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert "403" in result.errors[0].message
+    app_with_repo.refresh_from_db()
+    assert app_with_repo.source_webhook_installed_at is None
+
+
 # ---------------------------------------------------------------------------
 # Real per-repo-hook create + persistence (GitLab: the hosts with no
 # App-install analogue still create an actual hook and return a real
