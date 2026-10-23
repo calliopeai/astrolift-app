@@ -24,7 +24,7 @@ from urllib.parse import urlsplit
 import pytest
 
 from _sdk._kube_health import namespaces_from_client, workload_health_from_client
-from _sdk.cluster import ClusterContext, NamespaceState, RunningImage
+from _sdk.cluster import ClusterContext, NamespaceState, RunningImage, WorkloadHealth
 
 SELECTOR = "calliope.ai/product-contract,calliope.ai/product in (workbench,zentinelle)"
 
@@ -253,6 +253,21 @@ def test_workload_health_has_empty_running_images_when_the_pods_list_empty():
     [row] = workload_health_from_client(client, namespaces=["zentinelle"])
 
     assert row.running_images == ()
+
+
+def test_a_row_that_leaves_the_running_images_out_has_not_read_them():
+    """A driver that does not fill ``running_images`` read no pods, so the
+    default must not be ``()``, pods listed with nothing running."""
+    row = WorkloadHealth(
+        namespace="zentinelle",
+        name="zentinelle-backend",
+        desired_replicas=1,
+        ready_replicas=1,
+        restart_count_24h=0,
+        last_image_deployed_at="",
+    )
+
+    assert row.running_images is None
 
 
 # ---- every cloud driver -----------------------------------------------------

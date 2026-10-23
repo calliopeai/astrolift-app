@@ -901,6 +901,26 @@ def test_an_undeclared_workload_whose_pods_were_not_listed_changes_nothing(plugi
     assert (row.running_images, row.last_scan_error) == ({"hub": [HUB_DIGEST]}, "")
 
 
+def test_a_declared_workload_that_does_not_exist_runs_nothing_rather_than_going_unread(
+    plugin, org, drivers, scan
+):
+    """Only a Deployment the scan found can have pods it could not list. A
+    missing one runs nothing, so its component reads ``[]``, the others
+    still read, and no pod list is reported as failed."""
+    cluster = _cluster(plugin, organization=org)
+    workloads = [w for w in _zentinelle_workloads() if w.name != "zentinelle-frontend"]
+    drivers[cluster.slug] = FakeDriver([_namespace(ZENTINELLE)], workloads)
+
+    scan(cluster)
+
+    row = ProductDeployment.objects.get(cluster=cluster)
+    assert row.health == ProductDeployment.Health.DOWN
+    assert (row.running_images, row.last_scan_error) == (
+        {"backend": ["sha256:8cc9..."], "frontend": []},
+        "",
+    )
+
+
 def test_a_reinstall_keeps_its_row_and_project(plugin, org, drivers, scan):
     cluster = _cluster(plugin, organization=org)
     driver = drivers[cluster.slug] = FakeDriver([_namespace(WORKBENCH, uid="first")], _hub())
