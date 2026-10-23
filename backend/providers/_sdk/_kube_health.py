@@ -147,7 +147,8 @@ def workload_health_from_client(
     Clients that surface ``restart_count`` but not termination
     timestamps contribute their full ``restart_count`` (best-effort);
     the UI surfaces this as a single integer either way.
-    ``running_images`` comes from the same pods' container statuses.
+    ``running_images`` comes from the same pods' container statuses, and
+    is ``None`` when they could not be listed.
 
     ``last_image_deployed_at`` reads the Deployment's Progressing
     condition with reason ``NewReplicaSetAvailable`` — the canonical
@@ -189,7 +190,7 @@ def workload_health_from_client(
                 namespace=ns,
                 label_selector=selector_str,
             )
-            restart_count_24h = _restart_count_24h(pods, window_start=window_start)
+            restart_count_24h = _restart_count_24h(pods or [], window_start=window_start)
             last_deployed = _last_image_deployed_at(status)
 
             out.append(
@@ -227,9 +228,9 @@ def _pods_for_deployment(
     *,
     namespace: str,
     label_selector: str,
-) -> list[Any]:
-    """Pods matched by ``label_selector`` in ``namespace``; empty when
-    they cannot be listed."""
+) -> list[Any] | None:
+    """Pods matched by ``label_selector`` in ``namespace``; ``None`` when
+    they cannot be listed, which is not the same as no pods."""
     try:
         pods = k8s_client.list_namespaced_pod(
             namespace=namespace,
@@ -240,14 +241,17 @@ def _pods_for_deployment(
         try:
             pods = k8s_client.list_namespaced_pod(namespace=namespace)
         except Exception:
-            return []
+            return None
     except Exception:
-        return []
+        return None
     return list(getattr(pods, "items", []) or [])
 
 
-def _running_images(pods: list[Any]) -> tuple[RunningImage, ...]:
-    """Distinct images the pods' containers report running, sorted."""
+def _running_images(pods: list[Any] | None) -> tuple[RunningImage, ...] | None:
+    """Distinct images the pods' containers report running, sorted;
+    ``None`` when the pods were not read."""
+    if pods is None:
+        return None
     seen: set[RunningImage] = set()
     for pod in pods:
         status = getattr(pod, "status", None)

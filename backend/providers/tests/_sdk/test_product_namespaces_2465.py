@@ -9,7 +9,9 @@ properties matter more than the shapes:
   product it no longer finds as torn down, so an unreachable apiserver must
   not look like an empty cluster.
 * The running images come from the pods the restart count already lists,
-  the pod status's ``image`` and ``imageID`` for each container.
+  the pod status's ``image`` and ``imageID`` for each container. A pod list
+  that fails gives ``None``, not ``()``, which the scan reads as nothing
+  running.
 """
 
 from __future__ import annotations
@@ -214,16 +216,43 @@ def test_workload_health_carries_the_distinct_images_the_pods_run():
     assert row.restart_count_24h == 2
 
 
-def test_workload_health_has_no_running_images_when_the_pods_cannot_be_listed():
-    client = _HealthClient(
-        {"zentinelle": [_deployment("zentinelle-backend", replicas=1, ready=1)]},
-        {},
-        pods_error=RuntimeError("forbidden"),
-    )
+class _OlderHealthClient:
+    """A client whose pod list takes no ``label_selector``: the helper lists
+    again without it, and here that fails too."""
+
+    def list_namespaced_deployment(self, *, namespace):
+        return SimpleNamespace(items=[_deployment("zentinelle-backend", replicas=1, ready=1)])
+
+    def list_namespaced_pod(self, *, namespace):
+        raise RuntimeError("forbidden")
+
+
+@pytest.mark.parametrize(
+    "client",
+    [
+        _HealthClient(
+            {"zentinelle": [_deployment("zentinelle-backend", replicas=1, ready=1)]},
+            {},
+            pods_error=RuntimeError("forbidden"),
+        ),
+        _OlderHealthClient(),
+    ],
+    ids=["list-fails", "older-client-list-fails"],
+)
+def test_workload_health_has_no_running_images_when_the_pods_cannot_be_listed(client):
+    """Not read, which is not ``()``: the scan would take that for a
+    Deployment running nothing. The ready count comes from the Deployment."""
+    [row] = workload_health_from_client(client, namespaces=["zentinelle"])
+
+    assert (row.ready_replicas, row.restart_count_24h, row.running_images) == (1, 0, None)
+
+
+def test_workload_health_has_empty_running_images_when_the_pods_list_empty():
+    client = _HealthClient({"zentinelle": [_deployment("zentinelle-backend", replicas=0, ready=0)]}, {})
 
     [row] = workload_health_from_client(client, namespaces=["zentinelle"])
 
-    assert (row.ready_replicas, row.restart_count_24h, row.running_images) == (1, 0, ())
+    assert row.running_images == ()
 
 
 # ---- every cloud driver -----------------------------------------------------
