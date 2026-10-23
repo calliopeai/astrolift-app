@@ -575,10 +575,11 @@ export const SCALE_WORKLOAD = gql`
 //
 // Registers (or refreshes) the push-event webhook on the app's
 // configured source repo pointing at the platform's receiver URL.
-// Status comes back as either ``created`` (a brand-new hook landed)
-// or ``refreshed`` (same URL was already registered, or the App's
-// own webhook covers this repo; the shared HMAC secret rotates and
-// ``installedAt`` advances either way).
+// Status comes back as ``created`` (a brand-new hook landed),
+// ``refreshed`` (same URL was already registered; the connection's
+// shared HMAC secret is re-applied to that hook) or ``app_delivers``
+// (the App's own webhook covers this repo). ``installedAt`` advances
+// in each case.
 
 export const INSTALL_SOURCE_WEBHOOK = gql`
   mutation InstallAstroliftSourceWebhook($input: InstallSourceWebhookInput!) {
