@@ -241,7 +241,10 @@ never the token.
 | `opt_out`, `quiet_hours`, `excluded` | The recipient's preference, agent-message quiet hours, the device that just signed in |
 | `error` | The driver raised; the log has the traceback |
 
-Only `invalid_token` prunes. A `failed` or `rate_limited` send marked
+Only `invalid_token` prunes, and a Notification Hubs (`azure_anh`) send never
+returns it: a hub send targets a tag, so its 400, 403, 404, 410 and 413 are
+`failed` with what to check (a 404 means no such hub: check `namespace` and
+`hub_name`). A `failed` or `rate_limited` send marked
 retriable is not sent again later: there is no delivery queue yet. Apple asks
 providers to wait 15 minutes before repeating a `5xx`. Within one send, the
 driver repeats only a request that got no answer, or one answered

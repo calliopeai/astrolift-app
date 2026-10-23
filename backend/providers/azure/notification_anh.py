@@ -101,7 +101,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
-    @driver_op(cloud="azure", driver="notification")
+    @driver_op(cloud="azure", driver="notification", redact_args=("request",))
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -147,7 +147,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
             provider_metadata=provider_metadata,
         )
 
-    @driver_op(cloud="azure", driver="notification")
+    @driver_op(cloud="azure", driver="notification", redact_args=("registration_id",))
     def revoke_device(self, *, registration_id: str) -> None:
         if not registration_id:
             return
@@ -160,7 +160,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
-    @driver_op(cloud="azure", driver="notification")
+    @driver_op(cloud="azure", driver="notification", redact_args=("target",))
     def send(
         self,
         *,
@@ -181,7 +181,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
-    @driver_op(cloud="azure", driver="notification")
+    @driver_op(cloud="azure", driver="notification", redact_args=("targets",))
     def send_bulk(
         self,
         *,
@@ -260,11 +260,15 @@ class AzureNotificationHubsDriver(NotificationDriver):
         target: PushTarget,
         exc: _AnhHttpError,
     ) -> SendResult:
-        if exc.status_code in (404, 410):
+        # A send addresses a tag, never a device, so no answer here says a
+        # device is gone; ``invalid_token`` would prune every registration
+        # on a wrong hub name.
+        hint = _SEND_CONFIGURATION_ERRORS.get(exc.status_code)
+        if hint is not None:
             return SendResult(
                 target=target,
-                status="invalid_token",
-                error=str(exc),
+                status="failed",
+                error=f"{exc} ({hint})",
                 retriable=False,
             )
         if exc.status_code == 429:
@@ -274,7 +278,7 @@ class AzureNotificationHubsDriver(NotificationDriver):
                 error=str(exc),
                 retriable=True,
             )
-        if exc.status_code in (401, 403):
+        if exc.status_code == 401:
             return SendResult(
                 target=target,
                 status="failed",
@@ -385,6 +389,17 @@ class AzureNotificationHubsDriver(NotificationDriver):
 
 
 # ---- helpers --------------------------------------------------------
+
+
+# What to check for each refusal Microsoft's REST reference lists for a send.
+# 410 is not listed; the URL names only the hub, so it reads as a 404.
+_SEND_CONFIGURATION_ERRORS = {
+    400: "the hub refused the request as malformed",
+    403: "the hub's quota is used up or the message is too large",
+    404: "no hub at this address: check the profile's namespace and hub_name",
+    410: "no hub at this address: check the profile's namespace and hub_name",
+    413: "the message is larger than the hub accepts",
+}
 
 
 def _installation_id_for(*, user_id: str, token: str) -> str:

@@ -7,7 +7,7 @@ import hashlib
 from datetime import datetime, timedelta
 
 import strawberry
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, F, Prefetch, Q
 from django.utils import timezone
 from strawberry.types import Info
 
@@ -1296,15 +1296,17 @@ class OperationsQuery(
 
         Auth via tenant binding: caller sees only their own
         DeviceRegistration rows, never another user's tokens.
-        Order: most recently used first so the surface is useful
-        for "which device did I last log in on" debugging."""
+        Order: most recently seen first, rows never seen after them,
+        then newest registration first. Nothing writes
+        ``last_seen_at`` yet, so the order is newest registration
+        first."""
         tenant = get_current_tenant()
         if tenant is None or tenant.actor_user_id is None:
             return []
         qs = DeviceRegistration.objects.filter(
             user_id=tenant.actor_user_id,
             deleted_at__isnull=True,
-        ).order_by("-last_used_at", "-created_at")
+        ).order_by(F("last_seen_at").desc(nulls_last=True), "-registered_at")
         return [device_registration_to_type(d) for d in qs]
 
     @strawberry.field

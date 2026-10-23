@@ -117,7 +117,7 @@ class SNSNotificationDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
-    @driver_op(cloud="aws", driver="notification")
+    @driver_op(cloud="aws", driver="notification", redact_args=("request",))
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -174,7 +174,7 @@ class SNSNotificationDriver(NotificationDriver):
             provider_metadata=provider_metadata,
         )
 
-    @driver_op(cloud="aws", driver="notification")
+    @driver_op(cloud="aws", driver="notification", redact_args=("registration_id",))
     def revoke_device(self, *, registration_id: str) -> None:
         if not registration_id or registration_id.startswith("unmapped:"):
             return
@@ -188,7 +188,7 @@ class SNSNotificationDriver(NotificationDriver):
 
     # ---- send ------------------------------------------------------
 
-    @driver_op(cloud="aws", driver="notification")
+    @driver_op(cloud="aws", driver="notification", redact_args=("target",))
     def send(
         self,
         *,
@@ -215,7 +215,7 @@ class SNSNotificationDriver(NotificationDriver):
             error=f"unknown target type {type(target).__name__}",
         )
 
-    @driver_op(cloud="aws", driver="notification")
+    @driver_op(cloud="aws", driver="notification", redact_args=("targets",))
     def send_bulk(
         self,
         *,

@@ -222,7 +222,7 @@ class APNsNotificationDriver(NotificationDriver):
 
     # ---- registration ----------------------------------------------
 
-    @driver_op(cloud="k8s_native", driver="notification")
+    @driver_op(cloud="k8s_native", driver="notification", redact_args=("request",))
     def register_device(
         self,
         request: RegisterDeviceRequest,
@@ -242,7 +242,7 @@ class APNsNotificationDriver(NotificationDriver):
             },
         )
 
-    @driver_op(cloud="k8s_native", driver="notification")
+    @driver_op(cloud="k8s_native", driver="notification", redact_args=("registration_id",))
     def revoke_device(self, *, registration_id: str) -> None:
         # Nothing to revoke at Apple: a dead token answers 410 and the
         # dispatcher prunes its registration.

@@ -244,10 +244,23 @@ def test_send_push_android_uses_fcmv1_format(driver, fake_http) -> None:
     assert message["android"] == {"notification": {"channel_id": "deploy.failed"}}
 
 
-def test_send_classifies_404_as_invalid_token(driver, fake_http) -> None:
+@pytest.mark.parametrize(
+    ("status_code", "hint"),
+    [
+        (400, "the hub refused the request as malformed"),
+        (403, "the hub's quota is used up or the message is too large"),
+        (404, "no hub at this address: check the profile's namespace and hub_name"),
+        (410, "no hub at this address: check the profile's namespace and hub_name"),
+        (413, "the message is larger than the hub accepts"),
+    ],
+)
+def test_send_refusals_fail_with_what_to_check_and_never_prune(driver, fake_http, status_code, hint) -> None:
+    # A send targets a tag, so no answer says a device is gone (#2256).
+    # Microsoft documents 404 as "No message branch at the URI": a wrong hub
+    # name, which as ``invalid_token`` pruned every registration at once.
     fake_http.canned_post_error = _AnhHttpError(
-        message="not found",
-        status_code=404,
+        message=f"HTTP Error {status_code}",
+        status_code=status_code,
     )
     result = driver.send(
         target=PushTarget(
@@ -256,8 +269,28 @@ def test_send_classifies_404_as_invalid_token(driver, fake_http) -> None:
         ),
         payload=NotificationPayload(title="t", body="b"),
     )
-    assert result.status == "invalid_token"
-    assert result.retriable is False
+    assert (result.status, result.retriable) == ("failed", False)
+    assert result.error == f"anh http {status_code}: HTTP Error {status_code} ({hint})"
+
+
+@pytest.mark.parametrize("status_code", [0, 500, 503])
+def test_send_server_and_network_errors_stay_retriable(driver, fake_http, status_code) -> None:
+    fake_http.canned_post_error = _AnhHttpError(
+        message="unavailable",
+        status_code=status_code,
+    )
+    result = driver.send(
+        target=PushTarget(
+            registration_id="inst-1",
+            platform=DevicePlatform.IOS,
+        ),
+        payload=NotificationPayload(title="t", body="b"),
+    )
+    assert (result.status, result.error, result.retriable) == (
+        "failed",
+        f"anh http {status_code}: unavailable",
+        True,
+    )
 
 
 def test_send_classifies_429_as_rate_limited(driver, fake_http) -> None:
