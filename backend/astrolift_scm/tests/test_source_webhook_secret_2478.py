@@ -20,10 +20,14 @@ import io
 import itertools
 import json
 import re
+import threading
+import time
 import urllib.error
 import urllib.parse
 
 import pytest
+from django.db import connection as db
+from django.db import connections
 from django.test import Client
 
 from astrolift_identity.models import Organization, Team
@@ -421,17 +425,24 @@ def test_a_hook_the_connection_cannot_list_is_not_reported_as_refreshed(team, gi
     assert web.source_webhook_installed_at is None
 
 
-def test_a_minted_secret_is_stored_only_after_the_host_accepts_the_hook(team, github):
+def test_a_secret_minted_for_a_refused_hook_is_the_one_the_retry_installs(team, github):
+    """The new secret is stored before the host call, so the retry after a
+    refusal installs that one instead of minting another."""
     connection = _connection(team, "github_oauth_user")
     web = _app(team, "web", "acme/web")
     github.refuse["POST"] = 403
 
-    result = install_astrolift_source_webhook(web)
+    assert install_astrolift_source_webhook(web).status == "fetch_failed"
 
-    assert result.status == "fetch_failed"
-    connection.refresh_from_db()
-    assert connection.webhook_secret_backend_kind == ""
-    assert bytes(connection.webhook_secret_ciphertext) == b""
+    minted = _stored_secret(connection)
+    web.refresh_from_db()
+    assert web.source_webhook_installed_at is None
+
+    del github.refuse["POST"]
+    assert install_astrolift_source_webhook(web).status == "created"
+
+    assert github.secret_for("acme/web", _receiver(web)) == minted
+    assert _stored_secret(connection) == minted
 
 
 @pytest.mark.parametrize(
@@ -462,10 +473,13 @@ def test_a_stored_secret_that_verifies_nothing_is_replaced_by_the_one_the_new_ho
     assert _stored_secret(connection) == held
 
 
+@pytest.mark.parametrize("stored", ["whsec-before", None], ids=["reused", "minted"])
 @pytest.mark.parametrize("hook_exists", [False, True], ids=["created", "refreshed"])
-def test_an_install_never_writes_back_a_secret_it_did_not_mint(team, github, monkeypatch, hook_exists):
-    """A rotation that lands while the host call is in flight stands."""
-    connection = _connection(team, "github_oauth_user", webhook_secret="whsec-before")
+def test_a_rotation_that_lands_during_the_host_call_stands(team, github, monkeypatch, hook_exists, stored):
+    """Nothing writes the secret after the host call, so a rotation landing
+    meanwhile stands, whether the install reused the stored secret or minted
+    one because there was none."""
+    connection = _connection(team, "github_oauth_user", webhook_secret=stored)
     web = _app(team, "web", "acme/web")
     if hook_exists:
         _record_hook(web, github.add_hook("acme/web", _receiver(web), "whsec-before"))
@@ -486,6 +500,92 @@ def test_an_install_never_writes_back_a_secret_it_did_not_mint(team, github, mon
     assert _stored_secret(connection) == "whsec-rotated"
 
 
+def test_a_first_install_completing_during_anothers_host_call_leaves_both_hooks_verifying(
+    team, github, monkeypatch
+):
+    """Two first installs on a connection with no secret. The second runs to
+    completion while the first waits on GitHub; it must not leave either
+    hook on a secret the receiver no longer has."""
+    _connection(team, "github_oauth_user")
+    web = _app(team, "web", "acme/web")
+    api = _app(team, "api", "acme/api")
+    answer = github.urlopen
+    started: list[bool] = []
+    other_install: list[str] = []
+
+    def api_installs_meanwhile(req, timeout=None):
+        # Only web's POST starts api's install; api's own POST goes straight on.
+        if req.get_method() == "POST" and not started:
+            started.append(True)
+            other_install.append(install_astrolift_source_webhook(api).status)
+        return answer(req, timeout)
+
+    monkeypatch.setattr("astrolift_scm.providers.github.urllib.request.urlopen", api_installs_meanwhile)
+
+    assert install_astrolift_source_webhook(web).status == "created"
+    assert other_install == ["created"]
+
+    for app in (web, api):
+        response = _push(app, signed_with=github.secret_for(app.source_repo, _receiver(app)))
+        assert response.status_code == 200, (app.slug, response.content)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_minting_install_waits_for_a_concurrent_one_and_reuses_its_secret(team, monkeypatch):
+    """Two installs on a connection with no secret, on two database
+    connections. The second reads the row while the first holds it, about
+    to store the secret it minted: the second has to wait, then reuse that
+    secret instead of storing its own over it."""
+    from astrolift_scm.services import webhooks
+
+    row = _connection(team, "github_oauth_user")
+    first_holds_the_row = threading.Event()
+    release = threading.Event()
+    persist = webhooks._persist_secret
+    stored: list[str] = []
+
+    def persist_once_released(locked, plaintext):
+        stored.append(plaintext)
+        if len(stored) == 1:
+            first_holds_the_row.set()
+            release.wait(30)
+        persist(locked, plaintext)
+
+    monkeypatch.setattr(webhooks, "_persist_secret", persist_once_released)
+    secrets_used: dict[str, str] = {}
+
+    def install(name: str) -> None:
+        try:
+            secrets_used[name] = webhooks._hook_secret(SourceConnection.objects.get(pk=row.pk))
+        finally:
+            connections.close_all()
+
+    first = threading.Thread(target=install, args=("first",))
+    second = threading.Thread(target=install, args=("second",))
+    waited = False
+    first.start()
+    try:
+        assert first_holds_the_row.wait(30)
+        second.start()
+        deadline = time.monotonic() + 30
+        while second.is_alive() and not waited and time.monotonic() < deadline:
+            with db.cursor() as cursor:
+                cursor.execute(
+                    "SELECT count(*) FROM pg_stat_activity "
+                    "WHERE datname = current_database() AND wait_event_type = 'Lock'"
+                )
+                waited = cursor.fetchone()[0] > 0
+            time.sleep(0.05)
+    finally:
+        release.set()
+        first.join(30)
+        second.join(30)
+
+    assert secrets_used["first"] == secrets_used["second"] == _stored_secret(row)
+    assert len(stored) == 1
+    assert waited
+
+
 def test_an_undecryptable_stored_secret_is_replaced_by_the_one_a_refresh_applies(team, github):
     connection = _connection(
         team,
@@ -504,7 +604,7 @@ def test_an_undecryptable_stored_secret_is_replaced_by_the_one_a_refresh_applies
     assert _push(web, signed_with=held).status_code == 200
 
 
-def test_a_minted_secret_is_not_stored_when_the_host_refuses_the_update(team, github):
+def test_a_secret_minted_for_a_refused_update_is_the_one_the_retry_applies(team, github):
     connection = _connection(
         team,
         "github_oauth_user",
@@ -517,12 +617,20 @@ def test_a_minted_secret_is_not_stored_when_the_host_refuses_the_update(team, gi
 
     assert install_astrolift_source_webhook(web).status == "fetch_failed"
 
-    connection.refresh_from_db()
-    assert bytes(connection.webhook_secret_ciphertext) == b"not-a-fernet-token"
+    minted = _stored_secret(connection)
+    assert github.secret_for("acme/web", _receiver(web)) == "whsec-lost-with-the-old-key"
+
+    del github.refuse["PATCH"]
+    assert install_astrolift_source_webhook(web).status == "refreshed"
+
+    assert github.secret_for("acme/web", _receiver(web)) == minted
+    assert _push(web, signed_with=minted).status_code == 200
 
 
-def test_an_app_installation_never_stores_a_webhook_secret_here(team, monkeypatch):
-    """The App's deliveries are signed with the App's own secret."""
+@pytest.mark.parametrize("app_secret", ["app-whsec", None], ids=["stored", "none-stored"])
+def test_an_app_installation_never_stores_a_webhook_secret_here(team, monkeypatch, app_secret):
+    """The App's deliveries are signed with the App's own secret, so none is
+    minted onto its connection, even when the platform holds none for it."""
     monkeypatch.setattr(
         "astrolift_scm.providers.github_app.installation_token",
         lambda connection: "ghs_installation_token",
@@ -534,12 +642,14 @@ def test_an_app_installation_never_stores_a_webhook_secret_here(team, monkeypatc
         return _Response({"total_count": 1, "repositories": [{"full_name": "acme/web"}]})
 
     monkeypatch.setattr("astrolift_scm.providers.github.urllib.request.urlopen", urlopen)
-    connection = _connection(team, "github_app_install", webhook_secret="app-whsec", installation_id="987")
+    connection = _connection(team, "github_app_install", webhook_secret=app_secret, installation_id="987")
+    before = (connection.webhook_secret_backend_kind, bytes(connection.webhook_secret_ciphertext))
     web = _app(team, "web", "acme/web")
 
     assert install_astrolift_source_webhook(web).status == "app_delivers"
 
-    assert _stored_secret(connection) == "app-whsec"
+    connection.refresh_from_db()
+    assert (connection.webhook_secret_backend_kind, bytes(connection.webhook_secret_ciphertext)) == before
     assert calls == [("GET", "/installation/repositories")]
 
 

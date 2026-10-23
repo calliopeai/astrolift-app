@@ -245,11 +245,10 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
     The HMAC secret is shared at the connection level (not per-hook):
     the receiver verifies every per-repo hook the connection installed
     against the one in its ``webhook_secret_*`` columns. So the stored
-    secret is reused, one is minted only when none is stored or it
-    cannot be decrypted, and a minted one is stored only once the host
-    accepted a hook carrying it. Minting on every call left each earlier
-    hook on the connection signing with a secret the receiver no longer
-    had (#2478).
+    secret is reused, and one is minted and stored, before the host call,
+    only when none is stored or it cannot be decrypted. Minting on every
+    call left each earlier hook on the connection signing with a secret
+    the receiver no longer had (#2478).
     """
     if not app.source_repo:
         return InstallSourceWebhookResult(
@@ -292,7 +291,10 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
                 f"FRONTEND_URL) to the address this install is served at, then retry."
             ),
         )
-    secret, minted = _hook_secret(connection)
+    # A github_app_install connection's deliveries are signed with the App's
+    # own secret, and install_webhook only checks the App covers the repo, so
+    # no per-repo secret is resolved or minted onto it.
+    secret = "" if connection.kind == "github_app_install" else _hook_secret(connection)
 
     try:
         result = install_webhook(
@@ -303,9 +305,7 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
         )
     except ProviderError as exc:
         if exc.code == "ALREADY_EXISTS":
-            return _refresh_existing_hook(
-                app, connection, target_url=target_url, secret=secret, minted=minted
-            )
+            return _refresh_existing_hook(app, connection, target_url=target_url, secret=secret)
         if exc.code == "APP_DELIVERS":
             # github_app_install and the App IS installed on this repo:
             # its own org-level webhook already delivers pushes. There is
@@ -344,8 +344,6 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
 
     now = timezone.now()
     with transaction.atomic():
-        if minted:
-            _persist_secret(connection, secret)
         app.source_webhook_id = result.hook_id
         app.source_webhook_installed_at = now
         app.save(
@@ -369,7 +367,6 @@ def _refresh_existing_hook(
     *,
     target_url: str,
     secret: str,
-    minted: bool,
 ) -> InstallSourceWebhookResult:
     """The host already has a hook for ``target_url``: give it ``secret``.
 
@@ -417,8 +414,6 @@ def _refresh_existing_hook(
 
     now = timezone.now()
     with transaction.atomic():
-        if minted:
-            _persist_secret(connection, secret)
         app.source_webhook_id = hook_id
         app.source_webhook_installed_at = now
         app.save(
@@ -534,38 +529,53 @@ def reconcile_source_webhook_state(app: RegisteredApp) -> str:
     return "repaired_missing"
 
 
-def _hook_secret(connection: SourceConnection) -> tuple[str, bool]:
-    """The secret a per-repo hook on ``connection`` must carry, and whether
-    it was minted here. The stored one when it decrypts, else a new one,
-    which the caller stores once the host accepts a hook carrying it.
+def _hook_secret(connection: SourceConnection) -> str:
+    """The secret a per-repo hook on ``connection`` must carry: the one
+    stored on the connection, or, when none is usable, a new one, stored
+    before any host sees it.
 
-    A github_app_install connection never gets that far: the App's own
-    webhook delivers, and ``install_webhook`` answers APP_DELIVERS or
-    APP_NOT_INSTALLED for it, so the App's secret is never replaced here.
+    The row is read under a lock, so installs racing on a connection with
+    no secret agree on one: the install that waited reuses what the other
+    stored. Storing a minted secret after the host call instead let the
+    last install overwrite the one the other's hook already carried, or a
+    rotation that landed meanwhile (#2478). If the host then refuses the
+    hook, the new secret stays: nothing could verify against the missing
+    or undecryptable one it replaced, and a retry reuses it.
     """
-    if connection.webhook_secret_backend_kind and connection.webhook_secret_ciphertext:
-        try:
-            stored = decrypt(
-                EncryptedSecret(
-                    backend_kind=connection.webhook_secret_backend_kind,
-                    backend_ref=bytes(connection.webhook_secret_ciphertext),
-                )
-            ).decode("utf-8")
-        except (InvalidToken, UnicodeDecodeError, RuntimeError) as exc:
-            # The receiver cannot verify anything with it either, so a new
-            # one costs no working hook. The other hooks on this connection
-            # verify again once each app's webhook is refreshed.
-            logger.warning(
-                "source webhook: the webhook secret on connection %s cannot be decrypted (%s); "
-                "a hook installed or refreshed through it gets a new one",
-                connection.guid,
-                type(exc).__name__,
+    with transaction.atomic():
+        locked = SourceConnection.all_objects.select_for_update(no_key=True).get(pk=connection.pk)
+        stored = _stored_hook_secret(locked)
+        if stored:
+            return stored
+        minted = secrets.token_urlsafe(32)
+        _persist_secret(locked, minted)
+    return minted
+
+
+def _stored_hook_secret(connection: SourceConnection) -> str:
+    """The connection's stored webhook secret, or "" when it has none the
+    receiver could verify a delivery with: none stored, one that cannot be
+    decrypted, or an empty one, which the receiver refuses."""
+    if not (connection.webhook_secret_backend_kind and connection.webhook_secret_ciphertext):
+        return ""
+    try:
+        return decrypt(
+            EncryptedSecret(
+                backend_kind=connection.webhook_secret_backend_kind,
+                backend_ref=bytes(connection.webhook_secret_ciphertext),
             )
-        else:
-            # An empty secret verifies nothing: the receiver refuses it.
-            if stored:
-                return stored, False
-    return secrets.token_urlsafe(32), True
+        ).decode("utf-8")
+    except (InvalidToken, UnicodeDecodeError, RuntimeError) as exc:
+        # The receiver cannot verify anything with it either, so a new
+        # one costs no working hook. The other hooks on this connection
+        # verify again once each app's webhook is refreshed.
+        logger.warning(
+            "source webhook: the webhook secret on connection %s cannot be decrypted (%s); "
+            "a hook installed or refreshed through it gets a new one",
+            connection.guid,
+            type(exc).__name__,
+        )
+        return ""
 
 
 def _persist_secret(connection: SourceConnection, plaintext: str) -> None:
