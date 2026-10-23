@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
 import time
 from dataclasses import asdict, dataclass, replace
 
@@ -43,6 +44,43 @@ _ROLE = re.compile(r"projects/([a-z][a-z0-9-]{4,28}[a-z0-9])/roles/([A-Za-z0-9_.
 
 class EndpointAppPlanError(ValueError):
     """Fixed reasons only; no provider/configuration bodies escape this seam."""
+
+
+class SourceBudget:
+    """A native source stage's wall-clock budget; its checkpoint calls do not spend it.
+
+    A native deployment's checkpoint re-admits the original caller and run and
+    rereads the stage's fences, before and after every native call: a few
+    hundred calls per stage, most of the stage's time (#2509). That checking is
+    not the native work the budget bounds, so time inside an ``unspent`` call
+    moves the deadline. ``clock`` is the caller module's ``time.monotonic``.
+    """
+
+    def __init__(self, seconds, *, clock):
+        self._clock = clock
+        self._deadline = clock() + seconds
+        self._lock = threading.Lock()
+        self._calls = threading.local()
+
+    def unspent(self, checkpoint):
+        def call():
+            if getattr(self._calls, "since", None) is not None:
+                return checkpoint()
+            self._calls.since = self._clock()
+            try:
+                return checkpoint()
+            finally:
+                with self._lock:
+                    self._deadline += self._clock() - self._calls.since
+                self._calls.since = None
+
+        return call
+
+    def expired(self):
+        # Inside a checkpoint call, the call so far is not spent either.
+        since = getattr(self._calls, "since", None)
+        with self._lock:
+            return (self._clock() if since is None else since) >= self._deadline
 
 
 def _hash(value):
@@ -539,14 +577,14 @@ def refresh_endpoint_app_sources(plan, *, observer_factory=NativeEndpointObserve
     if connection.in_atomic_block or not connection.get_autocommit():
         raise EndpointAppPlanError("NATIVE_OBSERVATION_REQUIRES_COMMITTED_DATABASE")
     current = endpoint_app_checkpoint(plan, execution_checkpoint=execution_checkpoint)
-    deadline = time.monotonic() + MAX_SOURCE_SECONDS
+    budget = SourceBudget(MAX_SOURCE_SECONDS, clock=time.monotonic)
 
     def checkpoint():
-        if time.monotonic() >= deadline:
+        if budget.expired():
             raise EndpointAppPlanError("NATIVE_SOURCE_DEADLINE_EXCEEDED")
         current()
 
-    checkpoint = compose_execution_checkpoint(execution_checkpoint, checkpoint)
+    checkpoint = budget.unspent(compose_execution_checkpoint(execution_checkpoint, checkpoint))
     checkpoint()
     if not plan.snapshot.endpoints:
         if (
@@ -589,16 +627,16 @@ def produce_endpoint_app_plan(
         raise EndpointAppPlanError("NATIVE_OBSERVATION_REQUIRES_COMMITTED_DATABASE")
     _execution_current(execution_checkpoint)
     snapshot = endpoint_app_snapshot(authority, identity, deployment_context=deployment_context)
-    deadline = time.monotonic() + MAX_SOURCE_SECONDS
+    budget = SourceBudget(MAX_SOURCE_SECONDS, clock=time.monotonic)
 
     def checkpoint():
         _execution_current(execution_checkpoint)
-        if time.monotonic() >= deadline:
+        if budget.expired():
             raise EndpointAppPlanError("NATIVE_SOURCE_DEADLINE_EXCEEDED")
         if endpoint_app_snapshot(authority, identity, deployment_context=deployment_context) != snapshot:
             raise EndpointAppPlanError("ACCEPTED_APP_SOURCE_CHANGED")
 
-    checkpoint = compose_execution_checkpoint(execution_checkpoint, checkpoint)
+    checkpoint = budget.unspent(compose_execution_checkpoint(execution_checkpoint, checkpoint))
     checkpoint()
     if not snapshot.endpoints:
         return AcceptedEndpointAppPlan(

@@ -435,6 +435,39 @@ def test_available_replica_observation_does_not_change_accepted_routing_identity
     refresh_endpoint_app_sources(p, observer_factory=world.source.observer)
 
 
+def test_slow_checkpoints_do_not_spend_the_native_source_budget_but_native_reads_do(world, monkeypatch):
+    from types import SimpleNamespace
+
+    from astrolift_services import gcp_app_identity_plan as module
+
+    now = [0.0]
+    monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    composed = module.compose_execution_checkpoint
+
+    def readmitting(execution_checkpoint, checks):
+        # A deployment's composed checkpoint re-admits its caller and run each call (#2509).
+        current = composed(execution_checkpoint, checks)
+
+        def slow():
+            now[0] += module.MAX_SOURCE_SECONDS + 1
+            return current()
+
+        return slow
+
+    monkeypatch.setattr(module, "compose_execution_checkpoint", readmitting)
+    p = plan(world)
+    refresh_endpoint_app_sources(p, observer_factory=world.source.observer)
+    assert now[0] > 10 * module.MAX_SOURCE_SECONDS
+
+    def held(name):
+        if name == "GetEndpoint":
+            now[0] += module.MAX_SOURCE_SECONDS + 1
+
+    world.source.after = held
+    with pytest.raises(EndpointAppPlanError, match="NATIVE_SOURCE_DEADLINE_EXCEEDED"):
+        refresh_endpoint_app_sources(p, observer_factory=world.source.observer)
+
+
 def test_manual_outer_transaction_refuses_native_construction_before_any_read(world):
     p = plan(world)
     world.source.calls.clear()

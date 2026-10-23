@@ -718,6 +718,40 @@ def test_read_only_context_budget_expiry_stops_at_held_native_response(world, mo
     assert GCPAppIdentitySource.objects.get().state == "OBSERVED"
 
 
+def test_slow_checkpoints_do_not_spend_the_cumulative_budget_but_native_reads_do(world, monkeypatch):
+    from types import SimpleNamespace
+
+    from astrolift_services import gcp_identity_source as module
+
+    now = [0.0]
+    monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    composed = module.compose_execution_checkpoint
+
+    def readmitting(execution_checkpoint, checks):
+        # A deployment's composed checkpoint re-admits its caller and run each call (#2509).
+        current = composed(execution_checkpoint, checks)
+
+        def slow():
+            now[0] += module.MAX_SOURCE_SECONDS + 1
+            return current()
+
+        return slow
+
+    monkeypatch.setattr(module, "compose_execution_checkpoint", readmitting)
+    assert bootstrap(world).identity.service_account_unique_id == UID
+    original_identity_context(world.authority, native_factory=world.factory)
+    assert now[0] > 10 * module.MAX_SOURCE_SECONDS
+
+    def held(name):
+        if name == "GetServiceAccount":
+            now[0] += module.MAX_SOURCE_SECONDS + 1
+
+    world.native.after = held
+    with pytest.raises(IdentitySourceError, match="SOURCE_DEADLINE_EXCEEDED"):
+        original_identity_context(world.authority, native_factory=world.factory)
+    assert GCPAppIdentitySource.objects.get().state == "OBSERVED"
+
+
 def test_read_only_context_complete_current_union_change_stops_after_response(world):
     bootstrap(world)
     reads = []

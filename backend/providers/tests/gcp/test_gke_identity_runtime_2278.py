@@ -412,6 +412,55 @@ def test_before_adc_withdrawal_and_read_bound_zero_native_workload(monkeypatch, 
     assert not kube.get_calls
 
 
+class _Clock:
+    """The observer module's monotonic clock, moved only by the test; nothing sleeps."""
+
+    def __init__(self):
+        self.now = 1_000.0
+
+    def monotonic(self):
+        return self.now
+
+
+def test_caller_checkpoint_time_does_not_spend_the_read_deadline(monkeypatch, runtime):
+    # A native deployment re-admits its caller and run inside every checkpoint:
+    # about 80 per observation at about 0.6 s each (#2509). That is the caller's
+    # database work; it used to expire the read deadline before a read was slow.
+    clock = _Clock()
+    monkeypatch.setattr(module, "time", clock)
+    _, kube, observer = runtime()
+    calls = []
+
+    def slow_caller():
+        calls.append(clock.now)
+        clock.now += module.DEADLINE_SECONDS
+
+    result = observer.observe(checkpoint=slow_caller)
+    assert result.configuration_observed and result.workload_ready, result.reason
+    assert len(calls) > 1 and kube.get_calls
+
+
+def test_native_read_time_still_exceeds_the_read_deadline(monkeypatch, runtime):
+    clock = _Clock()
+    monkeypatch.setattr(module, "time", clock)
+    _, kube, observer = runtime()
+    reads = []
+
+    def slow_caller():
+        clock.now += module.DEADLINE_SECONDS
+
+    def slow_read(path):
+        reads.append(path)
+        clock.now += module.DEADLINE_SECONDS * 0.4
+
+    kube.after_get = slow_read
+    result = observer.observe(checkpoint=slow_caller)
+    assert not result.workload_ready and result.reason == "RUNTIME_READ_BOUND_EXCEEDED"
+    # Two reads (0.8 of the deadline) fit between the slow checkpoints; the
+    # third crosses it and the next checkpoint refuses.
+    assert len(reads) == 3
+
+
 @pytest.fixture
 def runtime_tls(request):
     server, state, cert = request.getfixturevalue("tls_server")

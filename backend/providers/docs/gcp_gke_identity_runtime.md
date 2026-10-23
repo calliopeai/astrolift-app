@@ -81,6 +81,9 @@ proxy, user continuation/URL, redirect, retry, exec, write or credential output 
 used. Namespace-wide Pod/ReplicaSet/Job inventories are capped at 256 items;
 continuation/remaining counts or overflow refuse rather than report healthy empty.
 There are at most 512 runtime reads and an aggregate checked 60-second deadline.
+Time inside the caller's checkpoint does not count against the deadline: it is
+the caller's own work, such as a native deployment re-admitting its original
+caller and run before and after every read.
 Native SDK/HTTP response limits remain 2 MiB with 10-second native RPC/socket/read
 bounds; an already blocked socket may consume one additional socket timeout before
 the aggregate checkpoint can refuse. Bodies, PodSpecs, tokens and response errors

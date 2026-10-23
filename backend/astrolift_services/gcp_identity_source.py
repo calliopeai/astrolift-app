@@ -37,6 +37,7 @@ from astrolift_registry.models import RegisteredApp
 from astrolift_services.gcp_app_identity_plan import (
     MAX_SOURCE_SECONDS,
     ObservedEndpoint,
+    SourceBudget,
     _validate_observations,
     pre_identity_endpoint_snapshot,
 )
@@ -575,7 +576,7 @@ def bootstrap_original_identity(
     with source_mutex(
         authority, deployment_context=deployment_context, execution_checkpoint=execution_checkpoint
     ) as store:
-        deadline = time.monotonic() + MAX_SOURCE_SECONDS
+        budget = SourceBudget(MAX_SOURCE_SECONDS, clock=time.monotonic)
         declaration, physical = _declaration(authority, deployment_context=deployment_context)
         configuration = _configuration_sha256(authority, deployment_context=deployment_context)
         with store._locked():
@@ -583,7 +584,7 @@ def bootstrap_original_identity(
 
         def source_current():
             _execution_current(execution_checkpoint)
-            if time.monotonic() >= deadline:
+            if budget.expired():
                 raise IdentitySourceError("SOURCE_DEADLINE_EXCEEDED")
             if (
                 _declaration(authority, deployment_context=deployment_context) != (declaration, physical)
@@ -591,7 +592,7 @@ def bootstrap_original_identity(
             ):
                 raise IdentitySourceError("CURRENT_REGISTERED_SOURCE_CHANGED")
 
-        source_current = compose_execution_checkpoint(execution_checkpoint, source_current)
+        source_current = budget.unspent(compose_execution_checkpoint(execution_checkpoint, source_current))
         source_current()
         native = native_factory(declaration)
         try:
@@ -607,7 +608,9 @@ def bootstrap_original_identity(
                 ):
                     raise IdentitySourceError("CURRENT_COMPLETE_UNION_CHANGED")
 
-            complete_current = compose_execution_checkpoint(execution_checkpoint, complete_current)
+            complete_current = budget.unspent(
+                compose_execution_checkpoint(execution_checkpoint, complete_current)
+            )
             rows = native.observe_endpoints(scope, snapshot, cluster_pin=pin, current=complete_current)
             _validate_observations(
                 snapshot, tuple(ObservedEndpoint(name, (values,)) for name, values in rows)
@@ -621,7 +624,7 @@ def bootstrap_original_identity(
                 source_current()
                 store.validate(reservation, scope=scope, physical=physical, snapshot=snapshot)
 
-            current = compose_execution_checkpoint(execution_checkpoint, current)
+            current = budget.unspent(compose_execution_checkpoint(execution_checkpoint, current))
             if state in ("SENT", "UNKNOWN"):
                 raise IdentitySourceError("ACCOUNT_CREATE_UNKNOWN_REQUIRES_REVIEW")
             if state == "UNSENT":
@@ -667,7 +670,7 @@ def original_identity_context(
             if row is None or row.state != "OBSERVED":
                 raise IdentitySourceError("ORIGINAL_OBSERVED_SOURCE_REQUIRED")
             reservation, request, uid = store._reservation(row), store._request(row), row.unique_id
-        deadline = time.monotonic() + MAX_SOURCE_SECONDS
+        budget = SourceBudget(MAX_SOURCE_SECONDS, clock=time.monotonic)
         declaration, physical = _declaration(authority, deployment_context=deployment_context)
         configuration = _configuration_sha256(authority, deployment_context=deployment_context)
 
@@ -675,7 +678,7 @@ def original_identity_context(
 
         def current():
             _execution_current(execution_checkpoint)
-            if time.monotonic() >= deadline:
+            if budget.expired():
                 raise IdentitySourceError("SOURCE_DEADLINE_EXCEEDED")
             with store._locked() as (_, _, _, _, pin, latest):
                 store._bound(latest, reservation)
@@ -697,7 +700,7 @@ def original_identity_context(
             ):
                 raise IdentitySourceError("CURRENT_COMPLETE_UNION_CHANGED")
 
-        current = compose_execution_checkpoint(execution_checkpoint, current)
+        current = budget.unspent(compose_execution_checkpoint(execution_checkpoint, current))
         current()
         native = native_factory(declaration)
         try:
