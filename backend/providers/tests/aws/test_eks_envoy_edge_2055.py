@@ -67,3 +67,45 @@ def test_envoy_cluster_enables_the_edge_behind_an_alb():
     assert ingress["metadata"]["namespace"] == "astrolift-system"
     assert ingress["spec"]["rules"][0]["host"] == "*.astro.example.net"
     assert [m for m in edge.post_install_manifests if m["kind"] == "SecurityPolicy"]
+
+
+def test_the_recipe_renders_the_rows_access_rules_into_the_shared_policy():
+    """The recipe is built from a ClusterContext, so the rules must ride on it.
+
+    Before, the context had no ``edge_access_rules`` and every recipe run
+    re-applied the shared policy with none: no restriction enforced, no brain
+    token admitted (a brain's /mcp answered the browser login).
+    """
+    from core.cluster_management import _context_for_cluster
+
+    brain = {
+        "name": "kb-ns",
+        "hosts": ["kb.astro.example.net"],
+        "groups": [],
+        "users": [],
+        "brain_audience": "01a14f99-0000-7000-a000-000000000001",
+        "brain_issuer": "https://astro.example.net",
+        "brain_jwks_uri": "https://astro.example.net/api/brains/v1/jwks.json",
+    }
+    row = MagicMock(
+        slug="c",
+        auth_method="exec_plugin",
+        auth_config={},
+        endpoint="",
+        ca_cert="",
+        ingress_class="envoy",
+        provider_plugin_id=None,
+        oidc_auth_config=COGNITO,
+        edge_access_rules={"guid/ns": brain},
+    )
+    ctx = _context_for_cluster(row)
+    assert ctx.edge_access_rules == {"guid/ns": brain}
+
+    [policy] = [
+        m
+        for m in _component(ctx).post_install_manifests
+        if m["kind"] == "SecurityPolicy" and m["metadata"]["name"] == "edge-oidc"
+    ]
+    assert policy["spec"]["oidc"]["passThroughAuthHeader"] is True
+    assert [p["name"] for p in policy["spec"]["jwt"]["providers"]] == ["idp", "astrolift-brain"]
+    assert policy["spec"]["jwt"]["providers"][1]["audiences"] == [brain["brain_audience"]]

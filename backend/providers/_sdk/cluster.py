@@ -559,6 +559,14 @@ class ClusterContext:
     Not part of ``to_auth()`` -- this configures what the cluster runs,
     not how the platform authenticates to it."""
 
+    edge_access_rules: dict[str, Any] = field(default_factory=dict)
+    """The row's per-app edge rules (#2132), brain token audiences included
+    (#2320), keyed as ``core.edge_access`` records them.
+
+    Carried so the edge recipe renders the shared SecurityPolicy with them.
+    Without it a recipe run re-applies a policy with no access rules, and
+    a full-RBAC cluster never enforces a restriction or admits a brain token."""
+
     def to_auth(self) -> ClusterAuth:
         """Project this context onto the ``ClusterAuth`` shape used by
         ``build_api_client``. Workflow + driver share the conversion
