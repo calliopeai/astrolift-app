@@ -155,8 +155,11 @@ def test_queries_cannot_invent_a_cell_or_a_fallback(cell):
 
 
 @pytest.mark.parametrize("authority", [{"store": "canon"}, None])
-def test_direct_config_rewrite_refuses_explicit_native_authority_without_mutating_input(authority):
-    config = {"brain": {"authority": authority}, "deploy": {"persistence": ["sqlite-volume"]}}
+@pytest.mark.parametrize("declaration", ["authority", "collectionAuthority"])
+def test_direct_config_rewrite_refuses_explicit_native_authority_without_mutating_input(
+    authority, declaration
+):
+    config = {"brain": {declaration: authority}, "deploy": {"persistence": ["sqlite-volume"]}}
     original = deepcopy(config)
     with pytest.raises(bs.SubstrateError, match="owner-reviewed native manifest") as refused:
         bs.apply_to_config(config, bs.Selection(replicas=3), slug="acme-brain")

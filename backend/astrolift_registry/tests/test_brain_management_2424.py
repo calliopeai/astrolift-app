@@ -948,7 +948,10 @@ def test_an_unsupported_graduation_is_refused_by_cell(world, repo):
     assert not repo.commits
 
 
-@pytest.mark.parametrize("marker", ["authority", "authority-empty", "contract", "contract-invalid"])
+@pytest.mark.parametrize(
+    "marker",
+    ["authority", "authority-empty", "collections", "collections-empty", "contract", "contract-invalid"],
+)
 @pytest.mark.parametrize("replicas", [1, 3])
 def test_native_declarations_refuse_legacy_rewrite_before_scm_or_platform_effects(
     world, repo, started, marker, replicas
@@ -972,6 +975,20 @@ def test_native_declarations_refuse_legacy_rewrite_before_scm_or_platform_effect
         )
     elif marker == "authority-empty":
         config["brain"]["authority"] = {}
+    elif marker == "collections":
+        config["brain"].update(
+            collectionAuthority={
+                "format": "studio-collection-authority/v1",
+                "store": "canon",
+                "binding": "a" * 64,
+                "principalsByUid": {"10001": "owner"},
+                "operatorUids": ["10001"],
+                "collections": {"apps": "studio.app", "components": "studio.component"},
+            },
+            stores=[{"id": "canon", "dsn": {"env": "BRAIN_CANON_DSN"}}],
+        )
+    elif marker == "collections-empty":
+        config["brain"]["collectionAuthority"] = {}
     elif marker == "contract":
         repo.files["contract.json"] = json.dumps(
             {

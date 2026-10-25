@@ -324,13 +324,15 @@ def refuse_native_substrate_update(
     """The legacy selector cannot rewrite an explicitly declared native route.
 
     A reserved root contract is a declaration, not proof of adoption. Its
-    presence, or any explicit brain.authority value, requires the native
+    presence, or any explicit brain.authority/collectionAuthority value, requires the native
     owner workflow rather than guessing a mount, replica count or cutover.
     Ordinary files-cell configs with only compiled projections keep their
     existing behavior.
     """
     brain = config.get("brain") or {}
-    if native_contract_declared or isinstance(brain, dict) and "authority" in brain:
+    if native_contract_declared or isinstance(brain, dict) and (
+        "authority" in brain or "collectionAuthority" in brain
+    ):
         raise SubstrateError(
             "This brain declares a native authority or contract; the legacy substrate selector cannot "
             "rewrite its private storage or replicas. Use the brain's owner-reviewed native manifest "
