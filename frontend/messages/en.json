@@ -16104,6 +16104,7 @@
       "token": "Read token",
       "tokenDescription": "Connect issues you a read token for 15 minutes and shows it once, with an MCP client config to paste. Connect again for a new one; closing the dialog drops it.",
       "connect": "Connect",
+        "openPortal": "Open portal",
       "notServed": "Not served yet",
       "notServedDescription": "A client connects to an environment with a URL; the first deploy gives it one.",
       "endpoints": "MCP endpoints",

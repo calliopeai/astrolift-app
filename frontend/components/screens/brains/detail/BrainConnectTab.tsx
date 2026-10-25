@@ -17,6 +17,7 @@ export interface BrainConnectTabProps {
   connecting: boolean;
   /** Issue the viewer a read token and show it once (the frame's Connect dialog). */
   onConnect: () => void;
+  onOpenPortal?: (endpoint: string) => void;
 }
 
 /**
@@ -25,7 +26,7 @@ export interface BrainConnectTabProps {
  * Connect dialog as a client config. Opening this tab issues nothing; only
  * the button does. The CLI and hosted apps get theirs the same way. Pure.
  */
-export function BrainConnectTab({ slug, endpoints, connecting, onConnect }: BrainConnectTabProps) {
+export function BrainConnectTab({ slug, endpoints, connecting, onConnect, onOpenPortal }: BrainConnectTabProps) {
   const t = useTranslations("brains.connectTab");
   const served = endpoints.length > 0;
   return (
@@ -68,6 +69,12 @@ export function BrainConnectTab({ slug, endpoints, connecting, onConnect }: Brai
               <p className="bg-muted rounded-sm px-2 py-1 font-mono text-xs break-all">
                 {mcpUrl(env.url)}
               </p>
+              {onOpenPortal && (
+                <Button disabled={connecting} onClick={() => onOpenPortal(env.url)}>
+                  <AppWindowIcon className="size-4" />
+                  {t("openPortal")}
+                </Button>
+              )}
             </li>
           ))}
         </ul>

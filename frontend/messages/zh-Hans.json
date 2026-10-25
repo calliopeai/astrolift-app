@@ -16104,6 +16104,7 @@
       "token": "读取令牌",
       "tokenDescription": "“连接”会为你签发有效期 15 分钟的读取令牌并仅显示一次，同时附上可粘贴的 MCP 客户端配置。如需新令牌，请再次连接；关闭对话框即会丢弃该令牌。",
       "connect": "连接",
+        "openPortal": "打开门户",
       "notServed": "尚未提供服务",
       "notServedDescription": "客户端连接的是拥有 URL 的环境；首次部署后环境即会获得 URL。",
       "endpoints": "MCP 端点",

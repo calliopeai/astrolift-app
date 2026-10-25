@@ -23,6 +23,7 @@ import { useAppCan } from "@/lib/permissions/app-permissions";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import type { BrainConnection } from "../brain-connection";
+import { openBrainBrowser } from "../brain-browser-connection";
 import { BRAIN_KINDS, type BrainCan, type FramedBrain } from "./brain-detail-model";
 import type { BrainFrameProps } from "./BrainFrame";
 
@@ -38,6 +39,7 @@ export interface FramedBrainValue {
   refetch: () => Promise<unknown>;
   connecting: boolean;
   onConnect: () => void;
+  onOpenPortal?: (endpoint: string) => void;
 }
 
 /** What the viewer may do to the framing layer; strict until its own permissions load. */
@@ -108,6 +110,39 @@ export function useBrainFrame(slug: string): {
     else toast.error(result?.errors[0]?.message ?? t("connectFailed"));
   }, [issue, slug, t]);
 
+  const browserAttempt = React.useRef<AbortController | null>(null);
+  React.useEffect(() => () => browserAttempt.current?.abort(), [slug, brain?.id]);
+  const onOpenPortal = React.useCallback(
+    (endpoint: string) => {
+      if (
+        process.env.NEXT_PUBLIC_BRAIN_BROWSER_CONNECT !== "1" ||
+        !brain ||
+        !brain.environments.some((env) => env.url === endpoint)
+      ) return;
+      browserAttempt.current?.abort();
+      const attempt = new AbortController();
+      browserAttempt.current = attempt;
+      void openBrainBrowser({
+        signal: attempt.signal,
+        brainId: brain.id,
+        slug,
+        endpoint,
+        issue: async (signal) => {
+          const { data } = await issue({
+            variables: { slug },
+            context: { fetchOptions: { signal } },
+          });
+          const result = data?.issueBrainReadToken;
+          if (!result?.ok || !result.data) throw new Error("Connection refused");
+          return result.data;
+        },
+      }).catch(() => toast.error(t("connectFailed"))).finally(() => {
+        if (browserAttempt.current === attempt) browserAttempt.current = null;
+      });
+    },
+    [brain, issue, slug, t]
+  );
+
   const { refetch } = query;
   const denied =
     CombinedGraphQLErrors.is(query.error) &&
@@ -121,9 +156,10 @@ export function useBrainFrame(slug: string): {
             refetch: () => refetch(),
             connecting: issueState.loading,
             onConnect: () => void onConnect(),
+            onOpenPortal: process.env.NEXT_PUBLIC_BRAIN_BROWSER_CONNECT === "1" ? onOpenPortal : undefined,
           }
         : null,
-    [brain, can, refetch, issueState.loading, onConnect]
+    [brain, can, refetch, issueState.loading, onConnect, onOpenPortal]
   );
 
   return {
