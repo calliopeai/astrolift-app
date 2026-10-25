@@ -94,6 +94,7 @@ def test_only_a_brains_mcp_route_keeps_the_token():
     def app(kind):
         return SimpleNamespace(
             slug="kb",
+            guid="01a0-kb",
             app_kind=kind,
             manifest_normalized={},
             organization_id=1,
