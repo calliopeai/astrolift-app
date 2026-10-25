@@ -303,10 +303,28 @@ def test_a_brain_token_opens_only_the_brain_it_names():
     assert deny == {
         "name": "brain-token-elsewhere",
         "action": "Deny",
-        "principal": {"jwt": {"provider": "astrolift-brain"}},
+        "principal": {
+            "jwt": {
+                "provider": "astrolift-brain",
+                "claims": [{"name": "iss", "values": ["https://astrolift.example.net"]}],
+            }
+        },
     }
     # The ordinary per-app rules follow, unchanged.
     assert any(r["name"].startswith("shop-production") for r in rules[2:])
+
+
+def test_every_jwt_principal_names_a_claim_or_scope():
+    """Envoy Gateway's CRD refuses a JWT principal with neither (#2524).
+
+    The brain deny rule named only its provider, so the API server answered
+    422 to every write of the shared policy on a cluster with a brain.
+    """
+    rules = _policy([BRAIN_RULE, OPEN_APP_RULE])["authorization"]["rules"]
+    for rule in rules:
+        jwt = rule["principal"].get("jwt")
+        if jwt is not None:
+            assert jwt.get("claims") or jwt.get("scopes"), rule["name"]
 
 
 # ---- sign-out (#1727) ------------------------------------------------------

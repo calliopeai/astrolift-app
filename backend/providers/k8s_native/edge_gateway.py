@@ -175,11 +175,18 @@ def edge_authorization(
             )
     if brains:
         # A brain token opens only the brain it names; anywhere else it is refused.
+        # Matched on its issuer, which every brain token carries: Envoy Gateway
+        # rejects a JWT principal that names no claim or scope (#2524).
         rules.append(
             {
                 "name": "brain-token-elsewhere",
                 "action": "Deny",
-                "principal": {"jwt": {"provider": BRAIN_JWT_PROVIDER_NAME}},
+                "principal": {
+                    "jwt": {
+                        "provider": BRAIN_JWT_PROVIDER_NAME,
+                        "claims": [{"name": "iss", "values": [brains["issuer"]]}],
+                    }
+                },
             }
         )
     for access in access_rules or []:
