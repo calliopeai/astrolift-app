@@ -47,6 +47,7 @@ class _Cluster:
     ca_cert = ""
     ingress_class = "nginx"
     oidc_auth_config: dict = {}
+    edge_access_rules: dict = {}
     provider_plugin_id = 1
     provider_plugin = type("P", (), {"slug": "k8s_native"})()
 
