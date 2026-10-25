@@ -262,7 +262,13 @@ BRAIN = {
     "brain_jwks_uri": "https://astrolift.example.net/api/brains/v1/jwks.json",
 }
 # A stored rule from before #2526 still carries the brain fields.
-BRAIN_RULE = {"name": "leo-brain-production", "hosts": ["leo-brain.astro.example.net"], "groups": [], "users": [], **BRAIN}
+BRAIN_RULE = {
+    "name": "leo-brain-production",
+    "hosts": ["leo-brain.astro.example.net"],
+    "groups": [],
+    "users": [],
+    **BRAIN,
+}
 OPEN_APP_RULE = {"name": "shop-production", "hosts": ["shop.astro.example.net"], "groups": ["eng"], "users": []}
 
 
