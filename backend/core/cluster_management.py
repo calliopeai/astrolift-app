@@ -88,6 +88,7 @@ def _context_for_cluster(cluster: TenantCluster) -> Any:
         ingress_class=cluster.ingress_class or "",
         provider_plugin_slug=cluster.provider_plugin.slug if cluster.provider_plugin_id else "",
         oidc_auth_config=cluster.oidc_auth_config or {},
+        edge_access_rules=cluster.edge_access_rules or {},
     )
 
 
