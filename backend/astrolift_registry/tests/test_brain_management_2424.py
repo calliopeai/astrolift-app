@@ -948,6 +948,95 @@ def test_an_unsupported_graduation_is_refused_by_cell(world, repo):
     assert not repo.commits
 
 
+@pytest.mark.parametrize("marker", ["authority", "authority-empty", "contract", "contract-invalid"])
+@pytest.mark.parametrize("replicas", [1, 3])
+def test_native_declarations_refuse_legacy_rewrite_before_scm_or_platform_effects(
+    world, repo, started, marker, replicas
+):
+    from astrolift_registry import brain_substrate as bs
+    from astrolift_registry.models import BrainSubstrate
+    from astrolift_registry.schema import brain_types as bt
+    from astrolift_services.models import ManagedService
+
+    app = _brain(world, build_mode="platform_build")
+    config = json.loads(repo.files["client.config.json"])
+    if marker == "authority":
+        config["brain"].update(
+            authority={
+                "store": "canon",
+                "binding": "a" * 64,
+                "principalsByUid": {"10001": "owner"},
+                "operatorUids": ["10001"],
+            },
+            stores=[{"id": "canon", "dsn": {"env": "BRAIN_CANON_DSN"}}],
+        )
+    elif marker == "authority-empty":
+        config["brain"]["authority"] = {}
+    elif marker == "contract":
+        repo.files["contract.json"] = json.dumps(
+            {
+                "protocolVersion": "1.0",
+                "id": "native-test",
+                "version": "1.0.0",
+                "authority": "canon",
+                "stores": [{"id": "canon", "driver": "sqlite", "roles": ["records", "journal"]}],
+                "collections": [],
+                "history": {"mode": "complete-since-import", "priorHistory": "unknown"},
+            }
+        )
+    else:
+        repo.files["contract.json"] = "{"
+    repo.files["client.config.json"] = json.dumps(config)
+    private_manifest = bs.render_manifest(
+        bs.Selection(persistence=("sqlite-volume",)), slug=app.slug, display_name="Native"
+    ).replace('mount_path = "/data"', 'mount_path = "/srv/brain/_internal"')
+    repo.files["astrolift.toml"] = private_manifest
+    app.manifest_raw = private_manifest
+    app.save(update_fields=["manifest_raw"])
+    original_files = dict(repo.files)
+    original_services = list(ManagedService.objects.values_list("pk", flat=True))
+
+    result = _graduate(
+        world,
+        app.slug,
+        authority=bt.BrainAuthority.SQLITE,
+        persistence=[bt.BrainPersistence.SQLITE_VOLUME],
+        replicas=replicas,
+    )
+
+    assert not result.ok
+    assert (result.errors[0].code, result.errors[0].field) == ("PRECONDITION", "authority")
+    assert "owner-reviewed native manifest" in result.errors[0].message
+    assert repo.files == original_files and not repo.commits
+    assert not started
+    app.refresh_from_db()
+    assert app.manifest_raw == private_manifest
+    assert not BrainSubstrate.objects.filter(brain=app).exists()
+    assert list(ManagedService.objects.values_list("pk", flat=True)) == original_services
+
+
+def test_ordinary_compiled_sqlite_projection_keeps_legacy_volume_and_multiple_replicas(world, repo):
+    import tomllib
+
+    from astrolift_registry.schema import brain_types as bt
+
+    app = _brain(world, build_mode="platform_build")
+    result = _graduate(
+        world,
+        app.slug,
+        authority=bt.BrainAuthority.SQLITE,
+        persistence=[bt.BrainPersistence.SQLITE_VOLUME],
+        replicas=3,
+    )
+    assert result.ok, result.errors
+    [commit] = repo.commits
+    config = json.loads(commit["files"]["client.config.json"])
+    assert "authority" not in config["brain"] and "contract.json" not in repo.files
+    [workload] = tomllib.loads(commit["files"]["astrolift.toml"])["workloads"]
+    assert workload["replicas"] == 3
+    assert workload["volumes"][0]["mount_path"] == "/data"
+
+
 def test_graduating_a_brain_named_without_brain_writes_app_slug_only_where_mimwell_has_it(world, repo):
     from astrolift_registry.schema import brain_types as bt
     from astrolift_registry.tests.test_brain_scaffold_2424 import OLD_DEPLOY, config_schema

@@ -1,12 +1,13 @@
-"""Astrolift's port of Mimwell's substrate model stays Mimwell's (#2424).
+"""Public cell consumption preserves the historical 192-cell behavior (#2424).
 
 The fixtures are the real outputs at the pinned commits
-(``brain_substrate.MIMWELL_SOURCE``): every cell from
+(``brain_substrate.MIMWELL_RENDER_SOURCE``): every cell from
 ``knowledge_store.cell_status()`` and ``scripts/gen-astrolift.py``'s
 ``render()`` for a set of configs, and (``MIMWELL_APP_SLUG_SOURCE``) its
 ``render()`` of a config with ``deploy.app_slug`` and its slug rule.
-Regenerate them from mimwell-pvt when a pin moves; a drift here means the
-port has to follow."""
+These historical outputs remain regression evidence. Cell selection now uses
+the separately pinned published JSON table; changing that table requires its
+own public provenance review, without regenerating private fixture data."""
 
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ def _load(name):
 
 def test_every_cell_has_mimwells_status():
     data = _load("mimwell_cells.json")
-    assert bs.MIMWELL_SOURCE.split()[-1] in data["source"]
+    assert bs.MIMWELL_RENDER_SOURCE.split()[-1] in data["source"]
     assert len(data["cells"]) == 192
     for row in data["cells"]:
         cell = {axis: row[axis] for axis in bs.AXES}
@@ -38,7 +39,7 @@ def test_every_cell_has_mimwells_status():
 #: Each gen-astrolift.py fixture and the pin it was rendered at: the configs
 #: without deploy.app_slug at the substrate pin, the one with it at its own.
 RENDERS = {
-    "mimwell_gen_astrolift.json": bs.MIMWELL_SOURCE,
+    "mimwell_gen_astrolift.json": bs.MIMWELL_RENDER_SOURCE,
     "mimwell_gen_astrolift_app_slug.json": bs.MIMWELL_APP_SLUG_SOURCE,
 }
 

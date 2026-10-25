@@ -12,12 +12,11 @@ and what a host attaches with ``deploy.persistence`` (``sqlite-volume``,
 ``efs``, ``postgres``, ``s3``; ``d1``, ``kv`` and ``none`` are the Worker
 path's) and ``deploy.replicas``.
 
-Astrolift does not invent a model of its own. ``cell_status`` is a port of
-``knowledge_store.cell_status()`` (the one source of the statuses), and
-``render_manifest`` is a port of ``scripts/gen-astrolift.py``'s mapping, with
-``app_slug`` its naming of the app. They are pinned to Mimwell commits and held
-to them by parity tests against the real function's table and the real
-script's output; Astrolift never runs template code.
+``cell_status`` consumes Mimwell's exact published public JSON table, without a
+local copy of its status algorithm. The separate ``render_manifest`` mapping
+retains its historical generator pin; a supported cell does not prove that its
+storage, credentials or native authority are installed. Astrolift never runs
+template code.
 
 A brain takes any slug. One ending in ``-brain`` keeps Mimwell's default name,
 ``<client.slug>-brain``; any other is written to ``client.config.json`` as
@@ -33,11 +32,26 @@ and reports whether the brain has adopted it.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import itertools
+import json
+import os
 import re
+import stat
+from collections.abc import Mapping
+from functools import lru_cache
+from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
-#: The Mimwell commit the ports below are held to.
-MIMWELL_SOURCE = "mimwell-pvt 7e103f9"
+#: The public released table, separately pinned from the historical renderer.
+MIMWELL_SOURCE = "ConflictHQ/mimwell v0.3.6 e59de019b3d10564fdc1301caef06842ab84256d"
+MIMWELL_RENDER_SOURCE = "mimwell-pvt 7e103f9"
+SUBSTRATE_TABLE_SHA256 = "0c30ad508da54934cb42787f137c28d5e4aebbbb9c3199ae32ac29e560acfcb5"
+SUBSTRATE_TABLE_PATH = (
+    Path(__file__).resolve().parent / "contracts/mimwell_substrate_v1/substrate-cells.json"
+)
+MAX_SUBSTRATE_TABLE_BYTES = 64 * 1024
 #: ``app_slug`` (``deploy.app_slug``) is held to the commit that added it.
 MIMWELL_APP_SLUG_SOURCE = "mimwell-pvt 416dbf5"
 #: An Astrolift app slug, and the rule Mimwell holds ``deploy.app_slug`` to: a
@@ -54,10 +68,6 @@ AXES: dict[str, tuple[str, ...]] = {
     "graph": ("edges-table", "age"),
 }
 DEFAULT_CELL = {"authority": "files", "blobs": "fs", "vectors": "local", "graph": "edges-table"}
-DATABASE_DRIVERS = ("sqlite", "postgres", "mysql")
-BLOB_DATABASE_DRIVERS = (*DATABASE_DRIVERS, "mongo")
-#: Placements with no driver yet, and the Mimwell issue that makes them supported.
-PLANNED: dict[tuple[str, str], int] = {}
 
 #: ``deploy.persistence`` values (client.config.schema.json) and the ones an
 #: Astrolift host renders; the rest belong to the Worker path.
@@ -86,27 +96,124 @@ def cell_name(cell: dict[str, str]) -> str:
     return ", ".join(f"{axis}={cell[axis]}" for axis in AXES)
 
 
-def cell_status(cell: dict[str, str]) -> tuple[str, str]:
-    """(status, reason) of one matrix cell: supported, planned or unsupported.
-    A port of Mimwell's ``knowledge_store.cell_status``."""
-    authority = cell["authority"]
-    if authority == "d1":
-        return "unsupported", "d1 is a projection target, never an authority"
-    if cell["blobs"] == "db-blob" and authority not in BLOB_DATABASE_DRIVERS:
-        return "unsupported", f"db-blob keeps blobs in the authority database and {authority} has none"
-    if cell["vectors"] == "in-db" and authority == "mongo":
-        return (
-            "unsupported",
-            "in-db vectors are SQL vector columns (sqlite-vec, pgvector, MySQL) and mongo has none",
+def _unique_contract_object(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("duplicate contract key")
+        value[key] = item
+    return value
+
+
+def _reject_contract_constant(_value):
+    raise ValueError("non-JSON constant")
+
+
+def _parse_substrate_cells(raw: bytes) -> Mapping[tuple[str, ...], tuple[str, str]]:
+    if not isinstance(raw, bytes) or len(raw) > MAX_SUBSTRATE_TABLE_BYTES:
+        raise SubstrateError("Published substrate contract exceeds its byte bound", field="authority")
+    try:
+        value = json.loads(
+            raw, object_pairs_hook=_unique_contract_object, parse_constant=_reject_contract_constant
         )
-    if cell["vectors"] == "in-db" and authority not in DATABASE_DRIVERS:
-        return "unsupported", f"in-db vectors live in the authority database and {authority} has none"
-    if cell["graph"] == "age" and authority != "postgres":
-        return "unsupported", "age is a Postgres extension"
-    issues = sorted({PLANNED[(axis, cell[axis])] for axis in AXES if (axis, cell[axis]) in PLANNED})
-    if issues:
-        return "planned", " ".join(f"#{issue}" for issue in issues)
-    return "supported", ""
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"schemaVersion", "axes", "cells"}
+            or type(value["schemaVersion"]) is not int
+            or value["schemaVersion"] != 1
+            or not isinstance(value["axes"], dict)
+            or set(value["axes"]) != set(AXES)
+            or any(value["axes"][axis] != list(choices) for axis, choices in AXES.items())
+            or not isinstance(value["cells"], list)
+            or len(value["cells"]) != 192
+        ):
+            raise ValueError("invalid contract shape")
+        cells = {}
+        for row in value["cells"]:
+            if (
+                not isinstance(row, dict)
+                or set(row) != {"cell", "status", "reason"}
+                or not isinstance(row["cell"], dict)
+                or set(row["cell"]) != set(AXES)
+                or any(
+                    not isinstance(row["cell"][axis], str) or row["cell"][axis] not in choices
+                    for axis, choices in AXES.items()
+                )
+                or row["status"] not in ("supported", "planned", "unsupported")
+                or not isinstance(row["reason"], str)
+                or len(row["reason"].encode("utf-8")) > 1024
+            ):
+                raise ValueError("invalid contract cell")
+            key = tuple(row["cell"][axis] for axis in AXES)
+            if key in cells:
+                raise ValueError("duplicate contract cell")
+            cells[key] = (row["status"], row["reason"])
+        if set(cells) != set(itertools.product(*AXES.values())):
+            raise ValueError("incomplete contract")
+    except (ValueError, TypeError, KeyError, UnicodeError, RecursionError) as exc:
+        raise SubstrateError("Published substrate contract is invalid or incomplete", field="authority") from exc
+    return MappingProxyType(cells)
+
+
+def _load_substrate_cells(path: Path) -> Mapping[tuple[str, ...], tuple[str, str]]:
+    descriptor = None
+    try:
+        descriptor = os.open(
+            path,
+            os.O_RDONLY
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_NONBLOCK", 0)
+            | getattr(os, "O_CLOEXEC", 0),
+        )
+        before = os.fstat(descriptor)
+        if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_SUBSTRATE_TABLE_BYTES:
+            raise ValueError("unsafe or oversized contract")
+        chunks, remaining = [], MAX_SUBSTRATE_TABLE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, remaining)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        after, named = os.fstat(descriptor), path.stat(follow_symlinks=False)
+
+        def identity(info):
+            return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
+
+        if (
+            len(raw) != before.st_size
+            or len(raw) > MAX_SUBSTRATE_TABLE_BYTES
+            or identity(before) != identity(after)
+            or identity(after) != identity(named)
+            or hashlib.sha256(raw).hexdigest() != SUBSTRATE_TABLE_SHA256
+        ):
+            raise ValueError("changed or unpinned contract")
+    except (OSError, ValueError) as exc:
+        raise SubstrateError("Published substrate contract is unavailable or unpinned", field="authority") from exc
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    return _parse_substrate_cells(raw)
+
+
+@lru_cache(maxsize=1)
+def _published_cells() -> Mapping[tuple[str, ...], tuple[str, str]]:
+    return _load_substrate_cells(SUBSTRATE_TABLE_PATH)
+
+
+def cell_status(cell: dict[str, str]) -> tuple[str, str]:
+    """Return the exact published status/reason; no local algorithm or fallback."""
+    if (
+        not isinstance(cell, dict)
+        or set(cell) != set(AXES)
+        or any(not isinstance(cell[axis], str) for axis in AXES)
+    ):
+        raise SubstrateError("Invalid substrate cell", field="authority")
+    try:
+        return _published_cells()[tuple(cell[axis] for axis in AXES)]
+    except KeyError as exc:
+        raise SubstrateError("Unknown substrate cell", field="authority") from exc
 
 
 @dataclasses.dataclass(frozen=True)
@@ -211,6 +318,27 @@ def dropped_data(before: Selection, after: Selection) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def refuse_native_substrate_update(
+    config: dict[str, Any], *, native_contract_declared: bool = False
+) -> None:
+    """The legacy selector cannot rewrite an explicitly declared native route.
+
+    A reserved root contract is a declaration, not proof of adoption. Its
+    presence, or any explicit brain.authority value, requires the native
+    owner workflow rather than guessing a mount, replica count or cutover.
+    Ordinary files-cell configs with only compiled projections keep their
+    existing behavior.
+    """
+    brain = config.get("brain") or {}
+    if native_contract_declared or isinstance(brain, dict) and "authority" in brain:
+        raise SubstrateError(
+            "This brain declares a native authority or contract; the legacy substrate selector cannot "
+            "rewrite its private storage or replicas. Use the brain's owner-reviewed native manifest "
+            "and authority workflow; no migration or cutover was performed.",
+            field="authority",
+        )
+
+
 def apply_to_config(
     config: dict[str, Any], selection: Selection, *, slug: str, name: str | None = None
 ) -> dict[str, Any]:
@@ -223,6 +351,7 @@ def apply_to_config(
     ``-brain`` sets ``client.slug`` to the rest and drops ``deploy.app_slug``;
     any other is both ``client.slug`` and ``deploy.app_slug``. A config that
     already names it keeps its ``client.slug``, the brain's identity."""
+    refuse_native_substrate_update(config)
     data = dict(config)
     deploy = dict(data.get("deploy") or {})
     if not _names(data, slug):

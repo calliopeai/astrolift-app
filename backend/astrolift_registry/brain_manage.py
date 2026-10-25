@@ -866,11 +866,22 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
     branch = app.deploy_branch or app.default_branch or "main"
     try:
         config = _read_json(connection, app, "client.config.json", branch)
-        current_manifest = fetch_file_at(connection, app, "astrolift.toml", branch) or app.manifest_raw or ""
     except ProviderError as exc:
         raise SubstrateChangeError("PRECONDITION", exc.message) from exc
     if not isinstance(config, dict):
         raise SubstrateChangeError("PRECONDITION", "the repository has no readable client.config.json")
+    try:
+        bs.refuse_native_substrate_update(config)
+        # Root contract.json is the native topology declaration, including a
+        # declaration not adopted yet or one too malformed to interpret safely.
+        # Do not infer native status from the requested cell or a /data volume.
+        contract = fetch_file_at(connection, app, "contract.json", branch)
+        bs.refuse_native_substrate_update(config, native_contract_declared=contract is not None)
+        current_manifest = fetch_file_at(connection, app, "astrolift.toml", branch) or app.manifest_raw or ""
+    except bs.SubstrateError as exc:
+        raise SubstrateChangeError("PRECONDITION", exc.message, field=exc.field) from exc
+    except ProviderError as exc:
+        raise SubstrateChangeError("PRECONDITION", exc.message) from exc
     before = current_selection(app, config)
     try:
         after = bs.validate(requested)
