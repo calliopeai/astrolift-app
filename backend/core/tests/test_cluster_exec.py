@@ -251,3 +251,117 @@ def _aio_none():
         return None
 
     return _inner()
+
+
+@pytest.mark.asyncio
+async def test_exit_waits_for_pending_stdout_and_stderr_delivery() -> None:
+    from core.cluster_exec import _BackendSession
+
+    release = asyncio.Event()
+    entered = [asyncio.Event(), asyncio.Event()]
+    exited = asyncio.Event()
+    events = []
+
+    class FinishedSession:
+        def __init__(self):
+            self.reads = [0, 0]
+            self.closes = 0
+
+        async def read_stdout(self):
+            self.reads[0] += 1
+            if self.reads[0] == 1:
+                return "last stdout"
+            raise StopAsyncIteration
+
+        async def read_stderr(self):
+            self.reads[1] += 1
+            if self.reads[1] == 1:
+                return "last stderr"
+            raise StopAsyncIteration
+
+        async def wait_exit(self):
+            return 7
+
+        async def close(self):
+            self.closes += 1
+
+    async def deliver(index, text):
+        entered[index].set()
+        await release.wait()
+        events.append((index, text))
+
+    async def finish(code):
+        events.append(("exit", code))
+        exited.set()
+
+    sdk = FinishedSession()
+    session = _BackendSession(
+        sdk_session=sdk,
+        send_stdout=lambda text: deliver(0, text),
+        send_stderr=lambda text: deliver(1, text),
+        send_exit=finish,
+    )
+    session.start_readers()
+    try:
+        await asyncio.wait_for(asyncio.gather(*(item.wait() for item in entered)), 1)
+        # The exit status is already available while the output callbacks wait.
+        await asyncio.sleep(0)
+        assert not exited.is_set()
+        release.set()
+        await asyncio.wait_for(exited.wait(), 1)
+        assert set(events[:-1]) == {(0, "last stdout"), (1, "last stderr")}
+        assert events[-1] == ("exit", 7)
+    finally:
+        release.set()
+        await session.close()
+    assert sdk.closes == 1
+    assert all(task.done() for task in session._tasks)
+
+
+@pytest.mark.asyncio
+async def test_disconnect_cancels_output_drain_without_sending_exit() -> None:
+    from core.cluster_exec import _BackendSession
+
+    blocked = asyncio.Event()
+    entered = asyncio.Event()
+    exits = []
+
+    class FinishedSession:
+        def __init__(self):
+            self.closes = 0
+
+        async def read_stdout(self):
+            entered.set()
+            await blocked.wait()
+            raise StopAsyncIteration
+
+        async def read_stderr(self):
+            raise StopAsyncIteration
+
+        async def wait_exit(self):
+            return 0
+
+        async def close(self):
+            self.closes += 1
+
+    async def finish(code):
+        exits.append(code)
+
+    sdk = FinishedSession()
+    session = _BackendSession(
+        sdk_session=sdk,
+        send_stdout=lambda text: _aio_none(),
+        send_stderr=lambda text: _aio_none(),
+        send_exit=finish,
+    )
+    session.start_readers()
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        await asyncio.sleep(0)
+        await asyncio.wait_for(session.close(), 1)
+        assert exits == []
+        assert sdk.closes == 1
+        assert all(task.done() for task in session._tasks)
+    finally:
+        blocked.set()
+        await session.close()

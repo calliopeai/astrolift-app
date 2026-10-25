@@ -809,33 +809,56 @@ class InteractiveExecSession:
             if not self._closed.is_set():
                 logger.exception("interactive_exec: drain loop failed")
         finally:
-            self._exit_q.put(self._exit_code())
+            code = self._exit_code()
             # Sentinels unblock any reader parked on an empty queue.
             self._stdout_q.put(None)
             self._stderr_q.put(None)
+            self._exit_q.put(code)
 
     def _exit_code(self) -> int:
+        def unavailable() -> int:
+            self._stderr_q.put("exec status unavailable; process exit is not established\n")
+            return 1
+
         try:
             payload = self._resp.read_channel(_EXEC_ERROR_CHANNEL)
-        except Exception:
-            return 0
-        if not payload:
-            return 0
-        try:
             parsed = json.loads(payload)
-        except (ValueError, TypeError):
-            return 0
+        except Exception:
+            return unavailable()
+        if not isinstance(parsed, dict):
+            return unavailable()
         if parsed.get("status") == "Success":
             return 0
         if parsed.get("status") == "Failure":
-            for cause in parsed.get("details", {}).get("causes", []) or []:
-                if cause.get("reason") == "ExitCode":
-                    try:
-                        return int(cause.get("message", "1"))
-                    except (ValueError, TypeError):
-                        return 1
+            details = parsed.get("details")
+            causes = details.get("causes") if isinstance(details, dict) else None
+            if causes is not None and not isinstance(causes, list):
+                return unavailable()
+            for cause in causes or []:
+                if isinstance(cause, dict) and cause.get("reason") == "ExitCode":
+                    value = cause.get("message")
+                    if (
+                        not isinstance(value, str)
+                        or not 1 <= len(value) <= 10
+                        or value[0] == "0"
+                        or any(char not in "0123456789" for char in value)
+                    ):
+                        return unavailable()
+                    code = int(value)
+                    return code if code <= 0xFFFFFFFF else unavailable()
+            # Runtime messages can echo argv or credentials. Forward categories,
+            # never the message itself, even on this authorized exec connection.
+            message = parsed.get("message")
+            sample = message[:1024].casefold() if isinstance(message, str) else ""
+            if "not found" in sample or "no such file" in sample:
+                diagnostic = "executable or path unavailable"
+            elif "permission denied" in sample:
+                diagnostic = "runtime permission refused"
+            else:
+                diagnostic = "runtime failure"
+            self._stderr_q.put(f"exec runtime failure without process ExitCode: {diagnostic}\n")
             return 1
-        return 0
+        return unavailable()
 
     async def read_stdout(self) -> str:
         data = await self._stdout_q.get()
