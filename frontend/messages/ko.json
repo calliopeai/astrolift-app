@@ -16104,7 +16104,7 @@
       "token": "읽기 토큰",
       "tokenDescription": "연결하면 15분 동안 유효한 읽기 토큰이 발급되며, 붙여 넣을 MCP 클라이언트 구성과 함께 한 번만 표시됩니다. 새 토큰이 필요하면 다시 연결하세요. 대화 상자를 닫으면 토큰이 사라집니다.",
       "connect": "연결",
-        "openPortal": "포털 열기",
+      "openPortal": "포털 열기",
       "notServed": "아직 제공되지 않음",
       "notServedDescription": "클라이언트는 URL이 있는 환경에 연결하며, URL은 첫 배포에서 부여됩니다.",
       "endpoints": "MCP 엔드포인트",

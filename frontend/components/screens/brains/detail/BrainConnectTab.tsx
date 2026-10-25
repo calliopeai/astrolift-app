@@ -26,7 +26,13 @@ export interface BrainConnectTabProps {
  * Connect dialog as a client config. Opening this tab issues nothing; only
  * the button does. The CLI and hosted apps get theirs the same way. Pure.
  */
-export function BrainConnectTab({ slug, endpoints, connecting, onConnect, onOpenPortal }: BrainConnectTabProps) {
+export function BrainConnectTab({
+  slug,
+  endpoints,
+  connecting,
+  onConnect,
+  onOpenPortal,
+}: BrainConnectTabProps) {
   const t = useTranslations("brains.connectTab");
   const served = endpoints.length > 0;
   return (

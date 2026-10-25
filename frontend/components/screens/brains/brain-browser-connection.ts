@@ -46,7 +46,8 @@ export function openBrainBrowser(
   },
   view: Window = window
 ): Promise<void> {
-  if (selection.signal?.aborted) return Promise.reject(new Error("Brain browser connection unavailable"));
+  if (selection.signal?.aborted)
+    return Promise.reject(new Error("Brain browser connection unavailable"));
   const target = brainBrowserOrigin(selection.endpoint);
   if (target === view.location.origin) {
     return Promise.reject(new Error("Brain browser connection unavailable"));
@@ -76,7 +77,8 @@ export function openBrainBrowser(
     };
     const cancel = () => finish(false);
     const receive = async (event: MessageEvent<unknown>) => {
-      if (!popup || event.origin !== target || event.source !== popup || !closedMessage(event.data)) return;
+      if (!popup || event.origin !== target || event.source !== popup || !closedMessage(event.data))
+        return;
       const value = event.data;
       if (value.brainId !== selection.brainId || value.returnPath !== "/") return;
       if (phase === "sent") {

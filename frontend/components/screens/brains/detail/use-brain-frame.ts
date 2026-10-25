@@ -118,7 +118,8 @@ export function useBrainFrame(slug: string): {
         process.env.NEXT_PUBLIC_BRAIN_BROWSER_CONNECT !== "1" ||
         !brain ||
         !brain.environments.some((env) => env.url === endpoint)
-      ) return;
+      )
+        return;
       browserAttempt.current?.abort();
       const attempt = new AbortController();
       browserAttempt.current = attempt;
@@ -136,9 +137,11 @@ export function useBrainFrame(slug: string): {
           if (!result?.ok || !result.data) throw new Error("Connection refused");
           return result.data;
         },
-      }).catch(() => toast.error(t("connectFailed"))).finally(() => {
-        if (browserAttempt.current === attempt) browserAttempt.current = null;
-      });
+      })
+        .catch(() => toast.error(t("connectFailed")))
+        .finally(() => {
+          if (browserAttempt.current === attempt) browserAttempt.current = null;
+        });
     },
     [brain, issue, slug, t]
   );
@@ -156,7 +159,8 @@ export function useBrainFrame(slug: string): {
             refetch: () => refetch(),
             connecting: issueState.loading,
             onConnect: () => void onConnect(),
-            onOpenPortal: process.env.NEXT_PUBLIC_BRAIN_BROWSER_CONNECT === "1" ? onOpenPortal : undefined,
+            onOpenPortal:
+              process.env.NEXT_PUBLIC_BRAIN_BROWSER_CONNECT === "1" ? onOpenPortal : undefined,
           }
         : null,
     [brain, can, refetch, issueState.loading, onConnect, onOpenPortal]
