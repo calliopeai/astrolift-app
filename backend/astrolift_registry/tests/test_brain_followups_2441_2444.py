@@ -57,12 +57,20 @@ def _clean_cache():
 # ---------------------------------------------------------------------------
 
 
-def _removed(out):
-    [route] = [r for r in out if r["kind"] == "HTTPRoute"]
+def _removed(out, name=None):
+    [route] = [r for r in out if r["kind"] == "HTTPRoute" and (name is None or r["metadata"]["name"] == name)]
     return route["spec"]["rules"][0]["filters"][0]["requestHeaderModifier"]["remove"]
 
 
-def test_a_brains_routes_keep_the_token_and_every_other_route_strips_it():
+BRAIN = {
+    "brain_audience": "01a0-kb",
+    "brain_issuer": "https://astrolift.acme.test",
+    "brain_jwks_uri": "https://astrolift.acme.test/api/brains/v1/jwks.json",
+}
+
+
+def test_only_a_brains_mcp_route_keeps_the_token():
+    """The token reaches the container on ``/mcp`` alone (#2526); every app route strips it."""
     common = {
         "app_slug": "kb",
         "namespace": "acme-kb",
@@ -70,7 +78,9 @@ def test_a_brains_routes_keep_the_token_and_every_other_route_strips_it():
         "gated": True,
         "paused": False,
     }
-    assert _removed(render_app_routes(**common, brain=True)) == [ID_TOKEN_HEADER]
+    out = render_app_routes(**common, brain=BRAIN)
+    assert _removed(out, "acme-kb-brain-mcp") == [ID_TOKEN_HEADER]
+    assert _removed(out, "acme-kb-brain") == [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]
     assert _removed(render_app_routes(**common)) == [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]
 
     cluster = SimpleNamespace(
@@ -90,11 +100,12 @@ def test_a_brains_routes_keep_the_token_and_every_other_route_strips_it():
             organization=SimpleNamespace(slug="acme"),
         )
 
-    for kind, removed in (("mimwell", [ID_TOKEN_HEADER]), ("", [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER])):
+    # No gate on the cluster: nothing to pass, so no MCP route either.
+    for kind in ("mimwell", ""):
         out = envoy_edge_routes(
             app(kind), namespace="ns", workloads={"web": (["a.z.example"], 80)}, cluster=cluster, paused=False
         )
-        assert _removed(out) == removed
+        assert _removed(out) == [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]
 
 
 BRAIN_MANIFEST = """

@@ -78,11 +78,12 @@ ID_TOKEN_HEADER = "X-Astrolift-Id-Token"
 
 # A brain read token (#2320): minted by the control plane for one caller and
 # one brain app, sent by machine clients (Chat Studio, cykick) in place of a
-# browser session. Not stripped at the listener (the JWT filter reads it);
-# kept on the routes of a brain app, whose container verifies it again for
-# its MCP endpoint (#2441), and stripped on every other route.
+# browser session. Admitted only on a brain's own MCP route, which has a
+# policy of its own (#2526); kept there for the container to verify again
+# (#2441), and stripped on every other route.
 BRAIN_TOKEN_HEADER = "X-Astrolift-Brain-Token"
 BRAIN_JWT_PROVIDER_NAME = "astrolift-brain"
+BRAIN_MCP_PATH = "/mcp"
 
 USER_HEADER = "X-Auth-Request-User"
 EMAIL_HEADER = "X-Auth-Request-Email"
@@ -155,33 +156,6 @@ def edge_authorization(
     """
     claim = groups_claim(oidc_auth_config)
     rules: list[dict[str, Any]] = []
-    brains = brain_audiences(access_rules)
-    for access in access_rules or []:
-        audience = str(access.get("brain_audience") or "")
-        hosts = sorted({str(h) for h in access.get("hosts") or [] if h})
-        if audience and hosts:
-            rules.append(
-                {
-                    "name": _rule_name(str(access.get("name") or hosts[0]), "brain"),
-                    "action": "Allow",
-                    "principal": {
-                        "headers": [{"name": ":authority", "values": hosts}],
-                        "jwt": {
-                            "provider": BRAIN_JWT_PROVIDER_NAME,
-                            "claims": [{"name": "aud", "values": [audience]}],
-                        },
-                    },
-                }
-            )
-    if brains:
-        # A brain token opens only the brain it names; anywhere else it is refused.
-        rules.append(
-            {
-                "name": "brain-token-elsewhere",
-                "action": "Deny",
-                "principal": {"jwt": {"provider": BRAIN_JWT_PROVIDER_NAME}},
-            }
-        )
     for access in access_rules or []:
         hosts = sorted({str(h) for h in access.get("hosts") or [] if h})
         groups = sorted({str(g) for g in access.get("groups") or [] if g})
@@ -222,22 +196,6 @@ def edge_authorization(
     if not rules:
         return None
     return {"defaultAction": "Allow", "rules": rules}
-
-
-def brain_audiences(access_rules: list[dict[str, Any]] | None) -> dict[str, Any]:
-    """``{"issuer", "jwks_uri", "audiences"}`` for the brain token provider, or ``{}``.
-
-    Every brain entry carries the control plane's issuer and JWKS URI; they
-    are one install's, so the first entry's are used.
-    """
-    entries = [a for a in access_rules or [] if a.get("brain_audience") and a.get("hosts")]
-    if not entries:
-        return {}
-    return {
-        "issuer": str(entries[0]["brain_issuer"]),
-        "jwks_uri": str(entries[0]["brain_jwks_uri"]),
-        "audiences": sorted({str(a["brain_audience"]) for a in entries}),
-    }
 
 
 def edge_access_denied_policy() -> dict[str, Any]:
@@ -313,7 +271,6 @@ def edge_security_policy(
 ) -> dict[str, Any]:
     """The one OIDC + JWT policy every gated route shares."""
     config = oidc_auth_config
-    brain = brain_audiences(access_rules)
     issuer = issuer_from_discovery_url(str(config["discovery_url"]))
     auth_host = str(config["auth_proxy_host"])
     return _manifest(
@@ -347,9 +304,9 @@ def edge_security_policy(
                 "cookieNames": {"accessToken": ACCESS_TOKEN_COOKIE, "idToken": ID_TOKEN_COOKIE},
                 "scopes": ["openid", "email", "profile"],
                 "forwardIDToken": {"header": ID_TOKEN_HEADER},
-                # A request carrying a brain token skips the browser login and
-                # goes to the JWT filter (#2320); every other request is unchanged.
-                **({"passThroughAuthHeader": True} if brain else {}),
+                # Never passThroughAuthHeader: on this one shared policy it let
+                # every request past the login, token or not (#2526). A brain
+                # token is admitted on the brain's own MCP route instead.
             },
             "jwt": {
                 "providers": [
@@ -367,23 +324,6 @@ def edge_security_policy(
                             {"claim": "email", "header": EMAIL_HEADER},
                         ],
                     },
-                    *(
-                        [
-                            {
-                                "name": BRAIN_JWT_PROVIDER_NAME,
-                                "issuer": brain["issuer"],
-                                "audiences": brain["audiences"],
-                                "remoteJWKS": {"uri": brain["jwks_uri"]},
-                                "extractFrom": {"headers": [{"name": BRAIN_TOKEN_HEADER}]},
-                                "claimToHeaders": [
-                                    {"claim": "sub", "header": USER_HEADER},
-                                    {"claim": "email", "header": EMAIL_HEADER},
-                                ],
-                            }
-                        ]
-                        if brain
-                        else []
-                    ),
                 ]
             },
             **({"authorization": authz} if (authz := edge_authorization(access_rules, config)) else {}),
@@ -1018,6 +958,84 @@ def _route(
     return route
 
 
+def brain_mcp_route(
+    name: str,
+    hostnames: list[str],
+    *,
+    backend: dict[str, Any],
+    header_set: list[dict[str, str]],
+    brain: dict[str, str],
+    labels: dict[str, str],
+) -> list[dict[str, Any]]:
+    """A brain's MCP path, admitted by its read token alone (#2320, #2526).
+
+    Its own HTTPRoute, outside the shared gate (no ``GATE_LABEL``), so the
+    browser login never sees it, and its own SecurityPolicy: a token is
+    required, it must verify against the control plane's brain keys, and its
+    audience must be this brain. A request without one is refused here; it
+    never falls through to the app. The longer path wins over the app's
+    route for the same hosts, so the rest of the brain stays behind the login.
+    The token stays on the request for the container to verify again (#2441).
+    """
+    modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER]}
+    if header_set:
+        modifier["set"] = header_set
+    route = _route(
+        name,
+        hostnames,
+        gated=False,
+        rules=[
+            {
+                "matches": [{"path": {"type": "PathPrefix", "value": BRAIN_MCP_PATH}}],
+                "backendRefs": [backend],
+                "filters": [{"type": "RequestHeaderModifier", "requestHeaderModifier": modifier}],
+            }
+        ],
+        labels=labels,
+    )
+    policy = _manifest(
+        "gateway.envoyproxy.io/v1alpha1",
+        "SecurityPolicy",
+        name,
+        EDGE_NAMESPACE,
+        spec={
+            "targetRefs": [{"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": name}],
+            "jwt": {
+                "providers": [
+                    {
+                        "name": BRAIN_JWT_PROVIDER_NAME,
+                        "issuer": brain["brain_issuer"],
+                        "audiences": [brain["brain_audience"]],
+                        "remoteJWKS": {"uri": brain["brain_jwks_uri"]},
+                        "extractFrom": {"headers": [{"name": BRAIN_TOKEN_HEADER}]},
+                        "claimToHeaders": [
+                            {"claim": "sub", "header": USER_HEADER},
+                            {"claim": "email", "header": EMAIL_HEADER},
+                        ],
+                    }
+                ]
+            },
+            "authorization": {
+                "defaultAction": "Deny",
+                "rules": [
+                    {
+                        "name": "brain-token",
+                        "action": "Allow",
+                        "principal": {
+                            "jwt": {
+                                "provider": BRAIN_JWT_PROVIDER_NAME,
+                                "claims": [{"name": "aud", "values": [brain["brain_audience"]]}],
+                            }
+                        },
+                    }
+                ],
+            },
+        },
+    )
+    policy["metadata"]["labels"].update(labels)
+    return [route, policy]
+
+
 def render_app_routes(
     *,
     app_slug: str,
@@ -1027,13 +1045,15 @@ def render_app_routes(
     paused: bool,
     gateway_secret: str = "",
     gateway_secret_header: str = "",
-    brain: bool = False,
+    brain: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """The HTTPRoutes and ReferenceGrant that put one environment on the edge.
 
     ``workloads`` maps a workload's Service name to its hostnames and port.
-    ``brain`` keeps ``BRAIN_TOKEN_HEADER`` on the routes: the app is a brain,
-    the token's audience, and verifies it itself (#2441).
+    ``brain`` (``brain_audience``, ``brain_issuer``, ``brain_jwks_uri``) marks
+    the app as a brain: a gated environment gets a route of its own for
+    ``/mcp`` that admits a brain read token and nothing else
+    (:func:`brain_mcp_route`).
     Routes live in the edge namespace, where only the platform writes; the
     ReferenceGrant in the app's namespace is what lets them reach its
     Services, and it names each Service rather than the whole namespace.
@@ -1080,13 +1100,24 @@ def render_app_routes(
                 ]
             }
         else:
-            modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER] if brain else [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]}
+            modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]}
             if header_set:
                 modifier["set"] = header_set
             rule = {
                 "backendRefs": [{"name": workload, "namespace": namespace, "port": port}],
                 "filters": [{"type": "RequestHeaderModifier", "requestHeaderModifier": modifier}],
             }
+            if brain and gated:
+                out.extend(
+                    brain_mcp_route(
+                        route_name(namespace, f"{workload}-mcp"),
+                        hostnames,
+                        backend={"name": workload, "namespace": namespace, "port": port},
+                        header_set=header_set,
+                        brain=brain,
+                        labels=labels,
+                    )
+                )
         out.append(_route(route_name(namespace, workload), hostnames, gated=gated, rules=[rule], labels=labels))
     if workloads and not paused:
         grant = _manifest(

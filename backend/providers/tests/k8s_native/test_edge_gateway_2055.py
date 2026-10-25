@@ -254,17 +254,15 @@ def test_app_alb_rule_joins_the_apps_group_and_points_at_the_edge():
     assert ingress["spec"]["tls"] == [{"hosts": ["veruus-demo.astro.example.net"]}]
 
 
-# ---- brain read tokens (#2320) -------------------------------------------
+# ---- brain read tokens (#2320, #2526) --------------------------------------
 
-BRAIN_RULE = {
-    "name": "leo-brain-production",
-    "hosts": ["leo-brain.astro.example.net"],
-    "groups": [],
-    "users": [],
+BRAIN = {
     "brain_audience": "01a0-brain-guid",
     "brain_issuer": "https://astrolift.example.net",
-    "brain_jwks_uri": "https://astrolift.example.net/.well-known/astrolift-jwks.json",
+    "brain_jwks_uri": "https://astrolift.example.net/api/brains/v1/jwks.json",
 }
+# A stored rule from before #2526 still carries the brain fields.
+BRAIN_RULE = {"name": "leo-brain-production", "hosts": ["leo-brain.astro.example.net"], "groups": [], "users": [], **BRAIN}
 OPEN_APP_RULE = {"name": "shop-production", "hosts": ["shop.astro.example.net"], "groups": ["eng"], "users": []}
 
 
@@ -274,39 +272,87 @@ def _policy(access_rules):
     return policy["spec"]
 
 
-def test_no_brain_leaves_the_policy_as_it_was():
-    spec = _policy([OPEN_APP_RULE])
-    assert "passThroughAuthHeader" not in spec["oidc"]
-    assert "astrolift-brain" not in [p["name"] for p in spec["jwt"]["providers"]]
-    assert len(spec["jwt"]["providers"]) == 1
+def test_the_shared_gate_never_lets_a_request_past_the_login():
+    """#2526: passThroughAuthHeader on the shared policy opened every app.
 
-
-def test_a_brain_adds_a_token_provider_that_skips_the_browser_login():
+    Applied on CONFLICT it served every gated host to a request with no
+    session and no token. The shared policy carries no brain provider, no
+    pass-through and no brain rule, whatever the stored rules say.
+    """
     spec = _policy([BRAIN_RULE, OPEN_APP_RULE])
-    assert spec["oidc"]["passThroughAuthHeader"] is True
-    [brain] = [p for p in spec["jwt"]["providers"] if p["name"] == "astrolift-brain"]
-    assert brain["issuer"] == "https://astrolift.example.net"
-    assert brain["audiences"] == ["01a0-brain-guid"]
-    assert brain["extractFrom"] == {"headers": [{"name": BRAIN_TOKEN_HEADER}]}
-    assert brain["remoteJWKS"]["uri"].endswith("/.well-known/astrolift-jwks.json")
+    assert "passThroughAuthHeader" not in spec["oidc"]
+    assert [p["name"] for p in spec["jwt"]["providers"]] == ["idp"]
+    assert [r["name"] for r in spec["authorization"]["rules"]] == [
+        "shop-production-groups",
+        "shop-production-deny",
+    ]
 
 
-def test_a_brain_token_opens_only_the_brain_it_names():
-    rules = _policy([BRAIN_RULE, OPEN_APP_RULE])["authorization"]["rules"]
-    allow, deny = rules[0], rules[1]
-    assert allow["action"] == "Allow"
-    assert allow["principal"]["headers"] == [{"name": ":authority", "values": ["leo-brain.astro.example.net"]}]
-    assert allow["principal"]["jwt"] == {
-        "provider": "astrolift-brain",
-        "claims": [{"name": "aud", "values": ["01a0-brain-guid"]}],
-    }
-    assert deny == {
-        "name": "brain-token-elsewhere",
-        "action": "Deny",
-        "principal": {"jwt": {"provider": "astrolift-brain"}},
-    }
-    # The ordinary per-app rules follow, unchanged.
-    assert any(r["name"].startswith("shop-production") for r in rules[2:])
+def _brain_routes(**over):
+    kwargs = dict(
+        app_slug="leo-brain",
+        namespace="leo-brain-production",
+        workloads={"web": (["leo-brain.astro.example.net"], 8080)},
+        gated=True,
+        paused=False,
+        gateway_secret="s3cret",
+        brain=BRAIN,
+    )
+    kwargs.update(over)
+    return render_app_routes(**kwargs)
+
+
+def test_a_brain_gets_an_mcp_route_outside_the_gate():
+    routes = {r["metadata"]["name"]: r for r in _by_kind(_brain_routes(), "HTTPRoute")}
+    app, mcp = routes["leo-brain-production-web"], routes["leo-brain-production-web-mcp"]
+    assert app["metadata"]["labels"][GATE_LABEL] == "gated"
+    assert GATE_LABEL not in mcp["metadata"]["labels"]
+    assert mcp["spec"]["hostnames"] == ["leo-brain.astro.example.net"]
+    [rule] = mcp["spec"]["rules"]
+    assert rule["matches"] == [{"path": {"type": "PathPrefix", "value": "/mcp"}}]
+    modifier = rule["filters"][0]["requestHeaderModifier"]
+    assert modifier["remove"] == [ID_TOKEN_HEADER]
+    assert modifier["set"] == [{"name": "X-Astrolift-Gateway-Secret", "value": "s3cret"}]
+    # The app's own route still strips a brain token.
+    app_modifier = app["spec"]["rules"][0]["filters"][0]["requestHeaderModifier"]
+    assert app_modifier["remove"] == [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]
+
+
+def test_the_mcp_route_requires_a_token_for_this_brain():
+    [policy] = _by_kind(_brain_routes(), "SecurityPolicy")
+    spec = policy["spec"]
+    assert policy["metadata"]["name"] == "leo-brain-production-web-mcp"
+    assert policy["metadata"]["labels"]["astrolift.dev/namespace"] == "leo-brain-production"
+    assert spec["targetRefs"] == [
+        {"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "leo-brain-production-web-mcp"}
+    ]
+    assert "oidc" not in spec
+    [provider] = spec["jwt"]["providers"]
+    assert provider["issuer"] == BRAIN["brain_issuer"]
+    assert provider["audiences"] == [BRAIN["brain_audience"]]
+    assert provider["remoteJWKS"] == {"uri": BRAIN["brain_jwks_uri"]}
+    assert provider["extractFrom"] == {"headers": [{"name": BRAIN_TOKEN_HEADER}]}
+    assert "optional" not in provider
+    assert spec["authorization"]["defaultAction"] == "Deny"
+    [allow] = spec["authorization"]["rules"]
+    assert allow["principal"]["jwt"]["claims"] == [{"name": "aud", "values": [BRAIN["brain_audience"]]}]
+
+
+def test_no_mcp_route_without_a_gate_a_brain_or_while_paused():
+    for over in ({"gated": False}, {"brain": None}, {"paused": True}):
+        names = [r["metadata"]["name"] for r in _by_kind(_brain_routes(**over), "HTTPRoute")]
+        assert names == ["leo-brain-production-web"], over
+        assert not _by_kind(_brain_routes(**over), "SecurityPolicy"), over
+
+
+def test_every_jwt_principal_names_a_claim_or_scope():
+    """Envoy Gateway's CRD refuses a JWT principal with neither (#2524)."""
+    policies = [_policy([BRAIN_RULE, OPEN_APP_RULE]), *(p["spec"] for p in _by_kind(_brain_routes(), "SecurityPolicy"))]
+    for spec in policies:
+        for rule in spec["authorization"]["rules"]:
+            jwt = rule["principal"].get("jwt")
+            if jwt is not None:
+                assert jwt.get("claims") or jwt.get("scopes"), rule["name"]
 
 
 # ---- sign-out (#1727) ------------------------------------------------------

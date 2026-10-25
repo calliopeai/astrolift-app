@@ -120,14 +120,12 @@ def record_environment(cluster: Any, app: Any, namespace: str, rendered: list[di
             and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/namespace") == namespace
             and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/custom-domain")
         ]
-        brain = brain_fields(app) if hosts else {}
-        if (hosts and (is_restricted(access) or brain)) or custom_routes:
+        if (hosts and is_restricted(access)) or custom_routes:
             rules[key] = {
                 "name": f"{app.slug}-{namespace}",
                 "hosts": hosts,
                 **access,
                 **({"custom_routes": custom_routes} if custom_routes else {}),
-                **brain,
             }
         else:
             rules.pop(key, None)
@@ -165,7 +163,7 @@ def set_app_access(app: Any, *, groups: Any, users: Any, source: str) -> dict[st
         if not ours:
             continue
         for key, entry in ours.items():
-            if is_restricted(access) or entry.get("custom_routes") or entry.get("brain_audience"):
+            if is_restricted(access) or entry.get("custom_routes"):
                 rules[key] = {**entry, **access}
             else:
                 rules.pop(key)

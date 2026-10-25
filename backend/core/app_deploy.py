@@ -1797,7 +1797,7 @@ def envoy_edge_routes(
     an app's authentication must not depend on which path ran.
     """
     from astrolift_clusters.edge_install import edge_support_refusal
-    from astrolift_manifest.app_kinds import BRAIN_KINDS
+    from core.edge_access import brain_fields
     from core.ingress_reconcile import _edge_config
     from providers.k8s_native.edge_gateway import render_app_routes
 
@@ -1823,7 +1823,7 @@ def envoy_edge_routes(
         paused=paused,
         gateway_secret=oidc_auth.gateway_secret if oidc_auth is not None else "",
         gateway_secret_header=str(edge.get("gateway_secret_header") or ""),
-        brain=getattr(app, "app_kind", "") in BRAIN_KINDS,
+        brain=brain_fields(app) or None,
     )
     front = _edge_alb_front_for_app(app, namespace=namespace, workloads=workloads, cluster=cluster)
     return [*out, front] if front else out
