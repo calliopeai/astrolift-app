@@ -13,14 +13,18 @@ import { afterAll, afterEach } from "vitest";
 const realSetTimeout = globalThis.setTimeout;
 const realClearTimeout = globalThis.clearTimeout;
 const pendingTimers = new Set<ReturnType<typeof realSetTimeout>>();
-globalThis.setTimeout = ((handler: (...args: unknown[]) => void, delay?: number, ...args: unknown[]) => {
+globalThis.setTimeout = ((
+  handler: (...args: unknown[]) => void,
+  delay?: number,
+  ...args: unknown[]
+) => {
   const id = realSetTimeout(
     (...callArgs: unknown[]) => {
       pendingTimers.delete(id);
       handler(...callArgs);
     },
     delay,
-    ...args,
+    ...args
   );
   pendingTimers.add(id);
   return id;
