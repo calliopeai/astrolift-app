@@ -13,6 +13,7 @@
  */
 
 const COOKIE_NAME = "astrolift_active_org";
+export const ACTIVE_ORG_CHANGED_EVENT = "astrolift:active-org-changed";
 const ONE_YEAR_SECONDS = 365 * 24 * 60 * 60;
 
 export function getActiveOrgGuid(): string | null {
@@ -33,9 +34,11 @@ export function setActiveOrgGuid(guid: string): void {
     `Max-Age=${ONE_YEAR_SECONDS}`,
     "SameSite=Lax",
   ].join("; ");
+  window.dispatchEvent(new Event(ACTIVE_ORG_CHANGED_EVENT));
 }
 
 export function clearActiveOrgGuid(): void {
   if (typeof document === "undefined") return;
   document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
+  window.dispatchEvent(new Event(ACTIVE_ORG_CHANGED_EVENT));
 }

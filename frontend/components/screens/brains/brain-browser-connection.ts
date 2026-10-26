@@ -4,6 +4,27 @@ const LOGIN = "/__astrolift/brain-browser/login";
 const NONCE = /^[a-f0-9]{64}$/;
 const MAX_TOKEN = 3500;
 
+export async function issueBrainBrowserForPerson(
+  selection: {
+    personId: number;
+    readPerson: (signal: AbortSignal) => Promise<number | null>;
+    issue: (signal: AbortSignal) => Promise<BrainConnection>;
+    isCurrent: () => boolean;
+  },
+  signal: AbortSignal
+): Promise<BrainConnection> {
+  const verify = async () => {
+    if (signal.aborted || !selection.isCurrent()) throw new Error("Connection refused");
+    const person = await selection.readPerson(signal);
+    if (person !== selection.personId || signal.aborted || !selection.isCurrent())
+      throw new Error("Connection refused");
+  };
+  await verify();
+  const connection = await selection.issue(signal);
+  await verify();
+  return connection;
+}
+
 export function brainBrowserOrigin(endpoint: string): string {
   const url = new URL(endpoint);
   if (
@@ -36,17 +57,25 @@ function closedMessage(value: unknown): value is {
 }
 
 /** One explicit browser Connect; no token URL, storage, cache or background refresh. */
-export function openBrainBrowser(
+export async function openBrainBrowser(
   selection: {
     brainId: string;
     slug: string;
     endpoint: string;
     issue: (signal: AbortSignal) => Promise<BrainConnection>;
+    isCurrent: () => boolean;
     signal?: AbortSignal;
   },
   view: Window = window
 ): Promise<void> {
-  if (selection.signal?.aborted)
+  const isCurrent = () => {
+    try {
+      return selection.isCurrent();
+    } catch {
+      return false;
+    }
+  };
+  if (selection.signal?.aborted || !isCurrent())
     return Promise.reject(new Error("Brain browser connection unavailable"));
   const target = brainBrowserOrigin(selection.endpoint);
   if (target === view.location.origin) {
@@ -81,6 +110,10 @@ export function openBrainBrowser(
         return;
       const value = event.data;
       if (value.brainId !== selection.brainId || value.returnPath !== "/") return;
+      if (!isCurrent()) {
+        finish(false);
+        return;
+      }
       if (phase === "sent") {
         if (value.kind === "astrolift-brain-connected/v1" && value.nonce === nonce) finish(true);
         return;
@@ -94,6 +127,7 @@ export function openBrainBrowser(
         const connection = await selection.issue(abort.signal);
         if (phase !== "issuing") return;
         if (
+          !isCurrent() ||
           connection.id !== selection.brainId ||
           connection.slug !== selection.slug ||
           connection.header !== "X-Astrolift-Brain-Token" ||
@@ -120,7 +154,7 @@ export function openBrainBrowser(
     selection.signal?.addEventListener("abort", cancel, { once: true });
     timeout = view.setTimeout(() => finish(false), 120_000);
     closed = view.setInterval(() => {
-      if (popup?.closed) finish(false);
+      if (popup?.closed || !isCurrent()) finish(false);
     }, 250);
     // Keep the opener only for this exact-origin/WindowProxy handshake. The
     // host clears it before navigating, after the one-use token POST succeeds.

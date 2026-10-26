@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 import { signInReturnPath } from "@/lib/auth/sign-in-return";
+import { setClientToken } from "@/lib/auth/token-store";
 
 const apiRoot = process.env.NEXT_PUBLIC_API_ROOT ?? "";
 
@@ -80,7 +81,7 @@ export function useAuthCallback() {
         return;
       }
       // Store in localStorage for client-side Apollo
-      localStorage.setItem("jwt", token);
+      setClientToken(token);
 
       // Store in httpOnly cookie for server-side token reads
       fetch("/api/auth/store-token", {

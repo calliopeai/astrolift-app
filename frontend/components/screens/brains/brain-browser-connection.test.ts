@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BrainConnection } from "./brain-connection";
-import { brainBrowserOrigin, openBrainBrowser } from "./brain-browser-connection";
+import {
+  brainBrowserOrigin,
+  issueBrainBrowserForPerson,
+  openBrainBrowser,
+} from "./brain-browser-connection";
 
 const ID = "6f1c2a8e-0000-4000-8000-00000000b001";
 const ORIGIN = "https://brain.example.test";
@@ -58,11 +62,52 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 describe("explicit person browser Connect", () => {
+  it("refuses a native person change during mint even if the same brain stays visible", async () => {
+    const b = browser();
+    let person = 1;
+    let answer: ((value: BrainConnection) => void) | undefined;
+    const mint = vi.fn(
+      () =>
+        new Promise<BrainConnection>((resolve) => {
+          answer = resolve;
+        })
+    );
+    const readPerson = vi.fn(async () => person);
+    const pending = openBrainBrowser(
+      {
+        brainId: ID,
+        slug: "synthetic",
+        endpoint: ORIGIN,
+        isCurrent: () => true,
+        issue: (signal) =>
+          issueBrainBrowserForPerson(
+            {
+              personId: person,
+              readPerson,
+              issue: mint,
+              isCurrent: () => true,
+            },
+            signal
+          ),
+      },
+      b.view
+    );
+    const failure = expect(pending).rejects.toThrow("unavailable");
+    const delivery = b.send(ready);
+    await vi.waitFor(() => expect(mint).toHaveBeenCalledTimes(1));
+    person = 2;
+    answer?.(connection());
+    await delivery;
+    await failure;
+    expect(readPerson).toHaveBeenCalledTimes(2);
+    expect(b.popup.postMessage).not.toHaveBeenCalled();
+  });
+
   it("waits for selected OIDC popup before mint, binds returned endpoint and waits for acknowledgement", async () => {
     const b = browser();
     const issue = vi.fn(async () => connection());
     const pending = openBrainBrowser(
-      { brainId: ID, slug: "synthetic", endpoint: ORIGIN, issue },
+      { brainId: ID, slug: "synthetic", endpoint: ORIGIN, isCurrent: () => true, issue },
       b.view
     );
     expect(issue).not.toHaveBeenCalled();
@@ -91,7 +136,14 @@ describe("explicit person browser Connect", () => {
     const issue = vi.fn(async () => connection());
     const abort = new AbortController();
     const pending = openBrainBrowser(
-      { brainId: ID, slug: "synthetic", endpoint: ORIGIN, issue, signal: abort.signal },
+      {
+        brainId: ID,
+        slug: "synthetic",
+        endpoint: ORIGIN,
+        isCurrent: () => true,
+        issue,
+        signal: abort.signal,
+      },
       b.view
     );
     const failure = expect(pending).rejects.toThrow("unavailable");
@@ -124,7 +176,7 @@ describe("explicit person browser Connect", () => {
       const b = browser();
       const issue = vi.fn(async () => ({ ...connection(), ...change }));
       const pending = openBrainBrowser(
-        { brainId: ID, slug: "synthetic", endpoint: ORIGIN, issue },
+        { brainId: ID, slug: "synthetic", endpoint: ORIGIN, isCurrent: () => true, issue },
         b.view
       );
       const failure = expect(pending).rejects.toThrow("unavailable");
@@ -141,7 +193,7 @@ describe("explicit person browser Connect", () => {
       throw new Error("PRIVATE_CANARY");
     });
     const pending = openBrainBrowser(
-      { brainId: ID, slug: "synthetic", endpoint: ORIGIN, issue },
+      { brainId: ID, slug: "synthetic", endpoint: ORIGIN, isCurrent: () => true, issue },
       b.view
     );
     const failure = expect(pending).rejects.toThrow("Brain browser connection unavailable");
@@ -163,7 +215,7 @@ describe("explicit person browser Connect", () => {
       });
     });
     const pending = openBrainBrowser(
-      { brainId: ID, slug: "synthetic", endpoint: ORIGIN, issue },
+      { brainId: ID, slug: "synthetic", endpoint: ORIGIN, isCurrent: () => true, issue },
       b.view
     );
     const failure = expect(pending).rejects.toThrow("unavailable");
@@ -188,7 +240,7 @@ describe("explicit person browser Connect", () => {
         });
       const issue = vi.fn(async () => connection());
       const pending = openBrainBrowser(
-        { brainId: ID, slug: "synthetic", endpoint: ORIGIN, issue },
+        { brainId: ID, slug: "synthetic", endpoint: ORIGIN, isCurrent: () => true, issue },
         b.view
       );
       const failure = expect(pending).rejects.toThrow("unavailable");
@@ -200,6 +252,65 @@ describe("explicit person browser Connect", () => {
       expect(issue).not.toHaveBeenCalled();
       expect(b.listeners.size).toBe(0);
     }
+  });
+
+  it.each(["person", "issuer", "epoch", "organization"])(
+    "never delivers a delayed token after the selected %s changes",
+    async (field) => {
+      const b = browser();
+      const identity: Record<string, string> = {
+        person: "native-person-a",
+        issuer: "https://astro.example.test",
+        epoch: "1",
+        organization: "org-a",
+      };
+      const selected = JSON.stringify(identity);
+      let answer: ((value: BrainConnection) => void) | undefined;
+      const issue = vi.fn(
+        () =>
+          new Promise<BrainConnection>((resolve) => {
+            answer = resolve;
+          })
+      );
+      const pending = openBrainBrowser(
+        {
+          brainId: ID,
+          slug: "synthetic",
+          endpoint: ORIGIN,
+          issue,
+          isCurrent: () => JSON.stringify(identity) === selected,
+        },
+        b.view
+      );
+      const failure = expect(pending).rejects.toThrow("unavailable");
+      const delivery = b.send(ready);
+      identity[field] = "changed";
+      answer?.(connection());
+      await delivery;
+      await failure;
+      expect(b.popup.postMessage).not.toHaveBeenCalled();
+      expect(b.listeners.size).toBe(0);
+      expect(b.popup.closed).toBe(true);
+    }
+  );
+
+  it("refuses a changed identity before opening or minting", async () => {
+    const b = browser();
+    const issue = vi.fn(async () => connection());
+    await expect(
+      openBrainBrowser(
+        {
+          brainId: ID,
+          slug: "synthetic",
+          endpoint: ORIGIN,
+          issue,
+          isCurrent: () => false,
+        },
+        b.view
+      )
+    ).rejects.toThrow("unavailable");
+    expect(b.raw.open).not.toHaveBeenCalled();
+    expect(issue).not.toHaveBeenCalled();
   });
 
   it("rejects nonHTTPS, credentials, nested origins, queries and fragment selectors", () => {

@@ -111,4 +111,32 @@ describe("the client token", () => {
     localStorage.setItem("jwt", "Session signed-in-elsewhere");
     expect(await getClientToken()).toBe("Session signed-in-elsewhere");
   });
+
+  it("invalidates a captured session across logout and re-login even with the same token", async () => {
+    const { captureClientSession, setClientToken, clearToken } = await freshStore();
+    expect(captureClientSession()).toBeNull();
+    setClientToken("Session original");
+    const current = captureClientSession();
+    expect(current?.()).toBe(true);
+    clearToken();
+    setClientToken("Session original");
+    expect(current?.()).toBe(false);
+  });
+
+  it("notifies pending handoffs on local and cross-tab session changes, then cleans up", async () => {
+    const { watchClientSessionChanges, setClientToken, clearToken } = await freshStore();
+    const changed = vi.fn();
+    const stop = watchClientSessionChanges(changed);
+    setClientToken("Session first");
+    clearToken();
+    window.dispatchEvent(new StorageEvent("storage", { key: "jwt" }));
+    window.dispatchEvent(new StorageEvent("storage", { key: null }));
+    window.dispatchEvent(new Event("astrolift:session-expired"));
+    window.dispatchEvent(new StorageEvent("storage", { key: "unrelated" }));
+    expect(changed).toHaveBeenCalledTimes(5);
+    stop();
+    setClientToken("Session next");
+    window.dispatchEvent(new StorageEvent("storage", { key: "jwt" }));
+    expect(changed).toHaveBeenCalledTimes(5);
+  });
 });

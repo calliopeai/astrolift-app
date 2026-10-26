@@ -1,4 +1,6 @@
 const TOKEN_KEY = "jwt";
+export const SESSION_CHANGED_EVENT = "astrolift:session-changed";
+let sessionEpoch = 0;
 
 // In dev-login mode the browser authenticates via Django's sessionid
 // cookie (set by /app/auth1/dev-login), not via a backend_jwt. If a
@@ -25,7 +27,7 @@ async function requestToken(): Promise<string | null> {
     if (!res.ok) return null;
     const data = await res.json();
     const token: string | null = data.Authorization ?? null;
-    if (token) localStorage.setItem(TOKEN_KEY, token);
+    if (token) setClientToken(token);
     return token;
   } catch {
     return null;
@@ -50,5 +52,37 @@ export async function getClientToken(): Promise<string | null> {
 export function clearToken(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);
+    sessionEpoch++;
+    window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
   }
+}
+
+export function setClientToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+  noSession = false;
+  sessionEpoch++;
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
+}
+
+/** A disclosure fence, never an authorization decision or decoded-claim check. */
+export function captureClientSession(): (() => boolean) | null {
+  if (typeof window === "undefined" || DEV_LOGIN) return null;
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token || token === "undefined" || token === "null") return null;
+  const epoch = sessionEpoch;
+  return () => sessionEpoch === epoch && localStorage.getItem(TOKEN_KEY) === token;
+}
+
+export function watchClientSessionChanges(changed: () => void): () => void {
+  const storage = (event: StorageEvent) => {
+    if (event.key === null || event.key === TOKEN_KEY) changed();
+  };
+  window.addEventListener(SESSION_CHANGED_EVENT, changed);
+  window.addEventListener("astrolift:session-expired", changed);
+  window.addEventListener("storage", storage);
+  return () => {
+    window.removeEventListener(SESSION_CHANGED_EVENT, changed);
+    window.removeEventListener("astrolift:session-expired", changed);
+    window.removeEventListener("storage", storage);
+  };
 }

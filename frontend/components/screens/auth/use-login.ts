@@ -47,7 +47,7 @@ export function useLogin() {
       // sessionid cookie, and a leftover Bearer JWT will trip the
       // backend's Auth0SessionMiddleware and 401 every GraphQL call.
       try {
-        window.localStorage.removeItem("jwt");
+        clearToken();
       } catch {
         // localStorage may be unavailable in some browser modes.
       }

@@ -1,7 +1,7 @@
 "use client";
 
 import { CombinedGraphQLErrors } from "@apollo/client";
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import * as React from "react";
@@ -12,18 +12,22 @@ import type {
   GetBrainArchiveStateQueryVariables,
   GetBrainQuery,
   GetBrainQueryVariables,
+  GetMyProfileQuery,
   IssueBrainReadTokenMutation,
   IssueBrainReadTokenMutationVariables,
 } from "@/graphql/__generated__/operations";
 import type { MutationResult } from "@/graphql/identity/identity.types";
+import { GET_MY_PROFILE } from "@/graphql/identity/identity.queries";
 import { ISSUE_BRAIN_READ_TOKEN } from "@/graphql/registry/brains.mutations";
 import { GET_BRAIN, GET_BRAIN_ARCHIVE_STATE } from "@/graphql/registry/brains.queries";
 import { RESTORE_APP } from "@/graphql/registry/registry.mutations";
+import { captureClientSession, watchClientSessionChanges } from "@/lib/auth/token-store";
+import { ACTIVE_ORG_CHANGED_EVENT, getActiveOrgGuid } from "@/lib/identity/active-org";
 import { useAppCan } from "@/lib/permissions/app-permissions";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import type { BrainConnection } from "../brain-connection";
-import { openBrainBrowser } from "../brain-browser-connection";
+import { issueBrainBrowserForPerson, openBrainBrowser } from "../brain-browser-connection";
 import { BRAIN_KINDS, type BrainCan, type FramedBrain } from "./brain-detail-model";
 import type { BrainFrameProps } from "./BrainFrame";
 
@@ -76,6 +80,12 @@ export function useBrainFrame(slug: string): {
   framed: FramedBrainValue | null;
 } {
   const t = useTranslations("brains.frame");
+  const client = useApolloClient();
+  const profile = useQuery<GetMyProfileQuery>(GET_MY_PROFILE, {
+    fetchPolicy: "cache-and-network",
+    skip: process.env.NEXT_PUBLIC_BRAIN_BROWSER_CONNECT !== "1",
+  });
+  const personId = profile.data?.astroliftMyProfile?.userId ?? null;
   const pathname = usePathname() ?? `/brains/${slug}`;
   const can = useBrainCan();
   const query = useQuery<GetBrainQuery, GetBrainQueryVariables>(GET_BRAIN, {
@@ -111,7 +121,7 @@ export function useBrainFrame(slug: string): {
   }, [issue, slug, t]);
 
   const browserAttempt = React.useRef<AbortController | null>(null);
-  React.useEffect(() => () => browserAttempt.current?.abort(), [slug, brain?.id]);
+  React.useEffect(() => () => browserAttempt.current?.abort(), [slug, brain?.id, personId]);
   const onOpenPortal = React.useCallback(
     (endpoint: string) => {
       if (
@@ -120,30 +130,75 @@ export function useBrainFrame(slug: string): {
         !brain.environments.some((env) => env.url === endpoint)
       )
         return;
+      const sessionIsCurrent = captureClientSession();
+      if (!personId || !sessionIsCurrent) {
+        toast.error(t("connectFailed"));
+        return;
+      }
       browserAttempt.current?.abort();
       const attempt = new AbortController();
       browserAttempt.current = attempt;
+      const issuerOrigin = window.location.origin;
+      const orgGuid = getActiveOrgGuid();
+      const isCurrent = () => {
+        const currentBrain = client.readQuery<GetBrainQuery>({
+          query: GET_BRAIN,
+          variables: { slug },
+        })?.astroliftBrain;
+        const currentPerson = client.readQuery<GetMyProfileQuery>({ query: GET_MY_PROFILE });
+        return (
+          sessionIsCurrent() &&
+          window.location.origin === issuerOrigin &&
+          getActiveOrgGuid() === orgGuid &&
+          currentPerson?.astroliftMyProfile?.userId === personId &&
+          currentBrain?.id === brain.id &&
+          currentBrain.environments.some((env) => env.url === endpoint)
+        );
+      };
+      const cancel = () => attempt.abort();
+      const stopWatchingSession = watchClientSessionChanges(cancel);
+      window.addEventListener(ACTIVE_ORG_CHANGED_EVENT, cancel);
+      const readPerson = async (signal: AbortSignal) => {
+        const { data } = await client.query<GetMyProfileQuery>({
+          query: GET_MY_PROFILE,
+          fetchPolicy: "no-cache",
+          context: { queryDeduplication: false, fetchOptions: { signal } },
+        });
+        return data?.astroliftMyProfile?.userId ?? null;
+      };
       void openBrainBrowser({
         signal: attempt.signal,
+        isCurrent,
         brainId: brain.id,
         slug,
         endpoint,
-        issue: async (signal) => {
-          const { data } = await issue({
-            variables: { slug },
-            context: { fetchOptions: { signal } },
-          });
-          const result = data?.issueBrainReadToken;
-          if (!result?.ok || !result.data) throw new Error("Connection refused");
-          return result.data;
-        },
+        issue: (signal) =>
+          issueBrainBrowserForPerson(
+            {
+              personId,
+              readPerson,
+              isCurrent,
+              issue: async (signal) => {
+                const { data } = await issue({
+                  variables: { slug },
+                  context: { fetchOptions: { signal } },
+                });
+                const result = data?.issueBrainReadToken;
+                if (!result?.ok || !result.data) throw new Error("Connection refused");
+                return result.data;
+              },
+            },
+            signal
+          ),
       })
         .catch(() => toast.error(t("connectFailed")))
         .finally(() => {
+          stopWatchingSession();
+          window.removeEventListener(ACTIVE_ORG_CHANGED_EVENT, cancel);
           if (browserAttempt.current === attempt) browserAttempt.current = null;
         });
     },
-    [brain, issue, slug, t]
+    [brain, client, issue, personId, slug, t]
   );
 
   const { refetch } = query;
