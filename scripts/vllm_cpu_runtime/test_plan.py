@@ -340,11 +340,13 @@ class SmokeControlTests(unittest.TestCase):
                 ("--max-model-len", "256"),
                 ("--max-num-seqs", "1"),
                 ("--max-num-batched-tokens", "256"),
+                ("--num-gpu-blocks-override", "3"),
             ):
                 self.assertIn(pair, pairs)
         self.assertEqual(
             receipt["memory_evidence"], {"unavailable": "FileNotFoundError"}
         )
+        self.assertEqual(receipt["kv_cache_blocks"], 3)
 
 
 class MemoryEvidenceTests(unittest.TestCase):
