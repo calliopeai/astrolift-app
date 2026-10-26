@@ -321,5 +321,129 @@ class MemoryEvidenceTests(unittest.TestCase):
                 self.assertEqual(smoke.memory_evidence(parent), {"unavailable": reason})
 
 
+CPU_BLOCK = (
+    "processor\t: {n}\n"
+    "vendor_id\t: GenuineIntel\n"
+    "model name\t: Intel(R) Xeon(R) Platinum 8473C\n"
+    "physical id\t: 0\n"
+    "siblings\t: 4\n"
+    "core id\t\t: {core}\n"
+    "cpu cores\t: 2\n"
+    "microcode\t: 0xffffffff\n"
+    "flags\t\t: fpu sse2 avx2 avx512f avx512_vnni avx512_bf16 amx_bf16 {extra}\n"
+)
+MEMINFO = "MemTotal:       16369416 kB\nMemFree:         1000 kB\n"
+
+
+def write_proc(proc, cpuinfo=None, meminfo=MEMINFO):
+    proc.mkdir(parents=True, exist_ok=True)
+    if cpuinfo is None:
+        cpuinfo = "\n".join(
+            CPU_BLOCK.format(n=n, core=n // 2, extra="amx_tile amx_int8 hypervisor")
+            for n in range(4)
+        )
+    for name, content in (("cpuinfo", cpuinfo), ("meminfo", meminfo)):
+        data = content if isinstance(content, bytes) else content.encode()
+        (proc / name).write_bytes(data)
+
+
+class HostEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+
+    def test_only_named_fields_and_allowlisted_flags_leave_the_host(self):
+        write_proc(self.root)
+        evidence = smoke.host_evidence(self.root)
+        self.assertEqual(
+            evidence,
+            {
+                "cpu_vendor": "GenuineIntel",
+                "cpu_model": "Intel(R) Xeon(R) Platinum 8473C",
+                "logical_cpus": 4,
+                "physical_cores": 2,
+                "isa_flags": {
+                    "avx2": True,
+                    "avx512f": True,
+                    "avx512_bf16": True,
+                    "avx512_vnni": True,
+                    "amx_tile": True,
+                    "amx_bf16": True,
+                    "amx_int8": True,
+                },
+                "mem_total_bytes": 16369416 * 1024,
+            },
+        )
+        text = json.dumps(evidence)
+        for leaked in ("hypervisor", "microcode", "0xffffffff", "sse2", "MemFree"):
+            self.assertNotIn(leaked, text)
+
+    def test_a_flag_counts_only_when_every_cpu_lists_it(self):
+        cpuinfo = "\n".join(
+            CPU_BLOCK.format(n=n, core=n // 2, extra="amx_tile" if n else "")
+            for n in range(4)
+        )
+        write_proc(self.root, cpuinfo=cpuinfo)
+        flags = smoke.host_evidence(self.root)["isa_flags"]
+        self.assertFalse(flags["amx_tile"])
+        self.assertFalse(flags["amx_int8"])
+        self.assertTrue(flags["amx_bf16"])
+
+    def test_unreadable_or_unexpected_host_files_record_only_the_reason(self):
+        one = CPU_BLOCK.format(n=0, core=0, extra="")
+        cases = {
+            "missing proc": (None, "FileNotFoundError"),
+            "unbounded cpuinfo": (
+                {"cpuinfo": one + "\n" + "x" * smoke.CPUINFO_READ_BOUND},
+                "ValueError",
+            ),
+            "unbounded meminfo": (
+                {"meminfo": MEMINFO + "y" * smoke.MEMINFO_READ_BOUND},
+                "ValueError",
+            ),
+            "control character in model": (
+                {"cpuinfo": one.replace("8473C", "8473C\x1b[2J")},
+                "ValueError",
+            ),
+            "oversized model": (
+                {"cpuinfo": one.replace("8473C", "A" * 97)},
+                "ValueError",
+            ),
+            "odd vendor": (
+                {"cpuinfo": one.replace("GenuineIntel", "Genuine/Intel")},
+                "ValueError",
+            ),
+            "non-ascii cpuinfo": (
+                {"cpuinfo": b"processor : 0\xff\n"},
+                "UnicodeDecodeError",
+            ),
+            "no processors": ({"cpuinfo": "\n\n"}, "ValueError"),
+            "no flags": ({"cpuinfo": one.split("flags")[0]}, "KeyError"),
+            "no MemTotal": ({"meminfo": "MemFree: 1 kB\n"}, "ValueError"),
+            "MemTotal in pages": ({"meminfo": "MemTotal: 5 pages\n"}, "ValueError"),
+        }
+        for name, (files, reason) in cases.items():
+            with self.subTest(name):
+                proc = self.root / name.replace(" ", "_")
+                if files is not None:
+                    write_proc(proc, **files)
+                self.assertEqual(smoke.host_evidence(proc), {"unavailable": reason})
+
+    def test_refused_smoke_still_records_the_host(self):
+        write_proc(self.root / "proc")
+        proof = self.root / "proof.json"
+        with patch.object(smoke, "PROC_ROOT", self.root / "proc"), patch.object(
+            smoke, "inspect_target", side_effect=ValueError("Wrong candidate platform")
+        ), patch.object(smoke.subprocess, "run"):
+            with self.assertRaises(SystemExit):
+                smoke.smoke("fixture", proof)
+        receipt = json.loads(proof.read_text())
+        self.assertEqual(
+            receipt["host"]["cpu_model"], "Intel(R) Xeon(R) Platinum 8473C"
+        )
+        self.assertEqual(receipt["failure_type"], "ValueError")
+
+
 if __name__ == "__main__":
     unittest.main()

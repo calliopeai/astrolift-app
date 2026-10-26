@@ -6,12 +6,12 @@ key is ``(organization, -timestamp)``: the lifecycle audit filters by org
 and reads newest first, and the leading column serves the FK as well.
 
 If the build fails partway, Postgres keeps an INVALID index under this
-name and a rerun reports that it already exists: drop
-``core_mal_org_time_idx`` and migrate again.
+name. A rerun drops it and builds again, and skips a valid one (#2521).
 """
 
-from django.contrib.postgres.operations import AddIndexConcurrently
 from django.db import migrations, models
+
+from core.db.migration_operations import AddIndexConcurrentlyIfMissing
 
 
 class Migration(migrations.Migration):
@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        AddIndexConcurrently(
+        AddIndexConcurrentlyIfMissing(
             model_name="mutationauditlog",
             index=models.Index(fields=["organization", "-timestamp"], name="core_mal_org_time_idx"),
         ),

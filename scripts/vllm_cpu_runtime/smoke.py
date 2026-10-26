@@ -100,12 +100,16 @@ def memory_parent():
     return f"astrolift_cpu_smoke_{secrets.token_hex(8)}.slice"
 
 
-def read_cgroup(path):
+def read_bounded(path, bound):
     with path.open("rb") as source:
-        data = source.read(CGROUP_READ_BOUND + 1)
-    if len(data) > CGROUP_READ_BOUND:
-        raise ValueError("cgroup file exceeds bound")
+        data = source.read(bound + 1)
+    if len(data) > bound:
+        raise ValueError("file exceeds bound")
     return data.decode("ascii")
+
+
+def read_cgroup(path):
+    return read_bounded(path, CGROUP_READ_BOUND)
 
 
 def cgroup_counter(text):
@@ -141,6 +145,82 @@ def memory_evidence(parent):
         return {"unavailable": type(exc).__name__}
 
 
+PROC_ROOT = Path("/proc")
+CPUINFO_READ_BOUND = 256 * 1024
+MEMINFO_READ_BOUND = 8192
+ISA_FLAGS = (
+    "avx2",
+    "avx512f",
+    "avx512_bf16",
+    "avx512_vnni",
+    "amx_tile",
+    "amx_bf16",
+    "amx_int8",
+)
+
+
+def host_text(value, pattern):
+    value = " ".join(value.split())
+    if not re.fullmatch(pattern, value):
+        raise ValueError("Unexpected host value")
+    return value
+
+
+def host_evidence(proc=None):
+    """CPU model, vendor, counts, an allowlist of ISA flags and memory total.
+
+    Read from /proc/cpuinfo and /proc/meminfo with a bound on each. Only the
+    named fields leave the host, each matched against a narrow pattern; a flag
+    counts as present only when every logical CPU lists it.
+    """
+    proc = proc or PROC_ROOT
+    try:
+        blocks = [
+            dict(
+                (key.strip(), value.strip())
+                for key, _, value in (
+                    line.partition(":") for line in block.splitlines() if ":" in line
+                )
+            )
+            for block in read_bounded(proc / "cpuinfo", CPUINFO_READ_BOUND).split(
+                "\n\n"
+            )
+            if block.strip()
+        ]
+        blocks = [block for block in blocks if "processor" in block]
+        if not blocks:
+            raise ValueError("No processors listed")
+        first = blocks[0]
+        flags = set(first["flags"].split())
+        for block in blocks[1:]:
+            flags &= set(block.get("flags", "").split())
+        cores = {
+            block.get("physical id", "0"): cgroup_counter(block["cpu cores"])
+            for block in blocks
+            if "cpu cores" in block
+        }
+        evidence = {
+            "cpu_vendor": host_text(first["vendor_id"], r"[A-Za-z0-9]{1,32}"),
+            "cpu_model": host_text(first["model name"], r"[ -~]{1,96}"),
+            "logical_cpus": len(blocks),
+            "physical_cores": sum(cores.values()) if cores else None,
+            "isa_flags": {flag: flag in flags for flag in ISA_FLAGS},
+        }
+        for line in read_bounded(proc / "meminfo", MEMINFO_READ_BOUND).splitlines():
+            name, _, value = line.partition(":")
+            if name == "MemTotal":
+                number, _, unit = value.strip().partition(" ")
+                if unit != "kB":
+                    raise ValueError("Unexpected MemTotal unit")
+                evidence["mem_total_bytes"] = cgroup_counter(number) * 1024
+                break
+        else:
+            raise ValueError("No MemTotal")
+        return evidence
+    except (OSError, ValueError, KeyError) as exc:
+        return {"unavailable": type(exc).__name__}
+
+
 def smoke(image, proof):
     spec = json.loads(Path(__file__).with_name("source.json").read_text())
     receipt = {
@@ -152,6 +232,7 @@ def smoke(image, proof):
         "memory_limit": "4GiB",
         "kv_cache_gib": 1,
         "live_cluster_certified": False,
+        "host": host_evidence(),
     }
     container = None
     parent = memory_parent()

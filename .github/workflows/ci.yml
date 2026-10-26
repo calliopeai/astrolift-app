@@ -662,7 +662,7 @@ jobs:
           exit "$status"
       - name: Upload this shard's coverage
         if: ${{ always() && needs.changes.outputs.tier == 'nightly' && matrix.shard != 'test-database' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-${{ matrix.name }}
           path: ${{ runner.temp }}/coverage/
@@ -687,7 +687,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -q "coverage>=7.6"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: coverage-*
           path: ${{ runner.temp }}/coverage
@@ -699,7 +699,7 @@ jobs:
           coverage combine --data-file="$RUNNER_TEMP/combined" "$RUNNER_TEMP"/coverage/.coverage.*
           python scripts/coverage_map.py build --data "$RUNNER_TEMP/combined" \
             --commit "$GITHUB_SHA" --out "$RUNNER_TEMP/test-coverage-map.json.gz"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: test-coverage-map
           path: ${{ runner.temp }}/test-coverage-map.json.gz
