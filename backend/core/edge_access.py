@@ -120,7 +120,10 @@ def record_environment(cluster: Any, app: Any, namespace: str, rendered: list[di
             and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/namespace") == namespace
             and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/custom-domain")
         ]
-        if (hosts and is_restricted(access)) or custom_routes:
+        # Open environments are recorded too, with an empty grant: the renderer
+        # draws nothing for them, and restricting the app later finds the
+        # hosts here instead of waiting for the next deploy (#2533).
+        if hosts or custom_routes:
             rules[key] = {
                 "name": f"{app.slug}-{namespace}",
                 "hosts": hosts,
@@ -138,11 +141,14 @@ def record_environment(cluster: Any, app: Any, namespace: str, rendered: list[di
 def set_app_access(app: Any, *, groups: Any, users: Any, source: str) -> dict[str, list[str]]:
     """Set who may enter ``app``, and re-render every edge it is on.
 
-    Hostnames come from each environment's last deploy, so an environment
-    never deployed on the edge gains its rule on that first deploy.
+    Hostnames come from each environment's last deploy. An environment
+    deployed before open environments were recorded (#2533) has no entry, so
+    its managed hostname is taken from its URL; the next deploy records the
+    full set. One never deployed on the edge gains its rule on that deploy.
     """
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment
+    from providers.k8s_native.edge_gateway import edge_zone
 
     if source not in ACCESS_SOURCES:
         raise ValueError(f"source must be one of {ACCESS_SOURCES}")
@@ -152,23 +158,51 @@ def set_app_access(app: Any, *, groups: Any, users: Any, source: str) -> dict[st
 
     prefix = f"{app.guid}/"
     # Only the clusters this app's own environments run on.
-    cluster_ids = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).values_list(
-        "tenant_cluster_id", flat=True
-    )
+    environments = list(AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True))
     for cluster in TenantCluster.objects.filter(
-        pk__in=list(cluster_ids), ingress_class="envoy", deleted_at__isnull=True
+        pk__in=[env.tenant_cluster_id for env in environments], ingress_class="envoy", deleted_at__isnull=True
     ):
         rules = dict(cluster.edge_access_rules or {})
         ours = {k: v for k, v in rules.items() if k.startswith(prefix)}
         if not ours:
+            ours = _entries_from_urls(
+                app,
+                [e for e in environments if e.tenant_cluster_id == cluster.pk],
+                edge_zone(cluster.oidc_auth_config),
+            )
+        if not ours:
+            logger.warning(
+                "edge access: %s has no hostname on %s yet; its next deploy records it",
+                app.slug,
+                cluster.slug,
+            )
             continue
         for key, entry in ours.items():
-            if is_restricted(access) or entry.get("custom_routes"):
-                rules[key] = {**entry, **access}
-            else:
-                rules.pop(key)
+            # Kept when the grant is cleared: the hosts stay known, so the
+            # next restriction needs no deploy either.
+            rules[key] = {**entry, **access}
         _save_rules(cluster, rules)
     return access
+
+
+def _entries_from_urls(app: Any, environments: list[Any], zone: str) -> dict[str, Any]:
+    """Entries for environments the edge has no record of, from their URLs.
+
+    Only a managed hostname under the edge's zone: a custom domain carries a
+    policy of its own and never enters the shared one.
+    """
+    from urllib.parse import urlparse
+
+    from core.app_deploy import namespace_for_environment
+
+    out: dict[str, Any] = {}
+    for env in environments:
+        host = (urlparse(env.url or "").hostname or "").lower()
+        if not host or not zone or not host.endswith(f".{zone.lower().lstrip('.')}"):
+            continue
+        namespace = namespace_for_environment(env)
+        out[_key(app, namespace)] = {"name": f"{app.slug}-{namespace}", "hosts": [host]}
+    return out
 
 
 def reapply_edge(cluster: Any) -> bool:
