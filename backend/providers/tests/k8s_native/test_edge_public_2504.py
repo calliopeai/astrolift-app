@@ -27,19 +27,14 @@ CFG = {
 }
 
 
-@pytest.mark.parametrize(("allow", "public", "restricted", "brain"), list(itertools.product([True, False], repeat=4)))
-def test_only_every_condition_together_takes_the_gate_off(allow, public, restricted, brain):
-    gated = app_route_gated(
-        cluster_gated=True, allow_public_apps=allow, edge_public=public, restricted=restricted, brain=brain
-    )
-    assert gated is not (allow and public and not restricted and not brain)
+@pytest.mark.parametrize(("allow", "public", "restricted"), list(itertools.product([True, False], repeat=3)))
+def test_only_every_condition_together_takes_the_gate_off(allow, public, restricted):
+    gated = app_route_gated(cluster_gated=True, allow_public_apps=allow, edge_public=public, restricted=restricted)
+    assert gated is not (allow and public and not restricted)
 
 
 def test_a_cluster_without_a_gate_stays_ungated():
-    assert (
-        app_route_gated(cluster_gated=False, allow_public_apps=False, edge_public=False, restricted=True, brain=True)
-        is False
-    )
+    assert app_route_gated(cluster_gated=False, allow_public_apps=False, edge_public=False, restricted=True) is False
 
 
 def _route(gated):
@@ -78,3 +73,55 @@ def test_the_shared_policy_is_the_same_whoever_is_public():
 def test_a_client_cannot_supply_the_gateway_secret_on_a_public_route():
     [ctp] = [m for m in edge_post_install_manifests(CFG) if m["kind"] == "ClientTrafficPolicy"]
     assert DEFAULT_GATEWAY_SECRET_HEADER in ctp["spec"]["headers"]["earlyRequestHeaders"]["remove"]
+
+
+BRAIN = {
+    "brain_audience": "brain-guid-1",
+    "brain_issuer": "https://astro.example.net",
+    "brain_jwks_uri": "https://astro.example.net/jwks.json",
+}
+
+
+@pytest.mark.parametrize("gated", [True, False])
+def test_a_brains_token_route_is_the_same_whether_the_brain_is_public_or_not(gated):
+    out = render_app_routes(
+        app_slug="kb",
+        namespace="kb-ns",
+        workloads={"web": (["kb.edge.test"], 8080)},
+        gated=gated,
+        paused=False,
+        gateway_secret="gw",
+        brain=BRAIN,
+        edge_gated=True,
+    )
+    [mcp] = [m for m in out if m["kind"] == "HTTPRoute" and m["metadata"]["name"].endswith("-mcp")]
+    [policy] = [m for m in out if m["kind"] == "SecurityPolicy"]
+    [app] = [m for m in out if m["kind"] == "HTTPRoute" and m is not mcp]
+    gated_out = render_app_routes(
+        app_slug="kb",
+        namespace="kb-ns",
+        workloads={"web": (["kb.edge.test"], 8080)},
+        gated=True,
+        paused=False,
+        gateway_secret="gw",
+        brain=BRAIN,
+    )
+    assert mcp in gated_out and policy in gated_out
+    assert GATE_LABEL not in mcp["metadata"]["labels"]
+    assert policy["spec"]["authorization"]["defaultAction"] == "Deny"
+    assert (GATE_LABEL in app["metadata"]["labels"]) is gated
+    app_modifier = app["spec"]["rules"][0]["filters"][0]["requestHeaderModifier"]
+    assert ("set" in app_modifier) is gated
+
+
+def test_a_brain_on_an_edge_without_a_login_gets_no_token_route():
+    out = render_app_routes(
+        app_slug="kb",
+        namespace="kb-ns",
+        workloads={"web": (["kb.edge.test"], 8080)},
+        gated=False,
+        paused=False,
+        brain=BRAIN,
+        edge_gated=False,
+    )
+    assert [m["kind"] for m in out] == ["HTTPRoute", "ReferenceGrant"]

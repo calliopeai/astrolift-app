@@ -177,12 +177,31 @@ def test_an_access_list_keeps_a_public_app_gated():
     assert edge_public.public_state(world.app, world.cluster) == edge_public.RESTRICTED
 
 
-def test_a_brain_stays_gated(monkeypatch):
-    world = _world(app_kind="mimwell")
+BRAIN_FIELDS = {
+    "brain_audience": "brain-guid",
+    "brain_issuer": "https://astro.example.net",
+    "brain_jwks_uri": "https://astro.example.net/jwks.json",
+}
+
+
+def test_a_public_brain_keeps_its_token_route(monkeypatch):
+    world = _world(app_kind="mimwell", slug="kb")
+    monkeypatch.setattr("core.edge_access.brain_fields", lambda app: BRAIN_FIELDS)
+    private = _routes(world)
     world.app.edge_public = True
-    monkeypatch.setattr("core.edge_access.brain_fields", lambda app: {})
-    assert _gated(_route(world))
-    assert edge_public.public_state(world.app, world.cluster) == edge_public.BRAIN
+    public = _routes(world)
+
+    assert edge_public.public_state(world.app, world.cluster) == edge_public.PUBLIC
+    [app_route] = [
+        m for m in public if m["kind"] == "HTTPRoute" and not m["metadata"]["name"].endswith("-mcp")
+    ]
+    assert not _gated(app_route) and not _secret_set(app_route)
+    # The /mcp route and its token policy are exactly what a private brain gets.
+    for kind in ("SecurityPolicy",):
+        assert [m for m in public if m["kind"] == kind] == [m for m in private if m["kind"] == kind]
+    mcp = [m for m in public if m["metadata"]["name"].endswith("-mcp") and m["kind"] == "HTTPRoute"]
+    assert mcp == [m for m in private if m["metadata"]["name"].endswith("-mcp") and m["kind"] == "HTTPRoute"]
+    assert len(mcp) == 1
 
 
 def test_states_off_the_envoy_edge_and_without_a_gate():
@@ -380,14 +399,21 @@ def test_agents_are_refused_until_the_organization_allows_them(permission_resolv
     assert allowed.ok is True, allowed.errors
 
 
-def test_an_access_list_or_a_brain_cannot_be_made_public(permission_resolver, api):
+def test_an_access_list_cannot_be_made_public(permission_resolver, api):
     permission_resolver.grant(Permission.APP_ACCESS)
     restricted = _world()
     restricted.app.edge_access = {"groups": ["staff"], "users": [], "source": "ui"}
     restricted.app.save()
     assert _switch(restricted, True).errors[0].code == "PRECONDITION"
+
+
+def test_a_brain_can_be_made_public_like_any_app(permission_resolver, api):
+    permission_resolver.grant(Permission.APP_ACCESS)
     brain = _world(app_kind="mimwell", slug="kb")
-    assert _switch(brain, True).errors[0].code == "PRECONDITION"
+    result = _switch(brain, True)
+    assert result.ok is True, result.errors
+    brain.app.refresh_from_db()
+    assert brain.app.edge_public is True
 
 
 def test_another_orgs_app_is_not_found(permission_resolver, api):

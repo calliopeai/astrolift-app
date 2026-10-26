@@ -3124,8 +3124,7 @@
           "no_gate": "dieser Cluster hat keine Anmeldung, die App ist offen",
           "not_envoy": "bleibt hinter der Anmeldung: nur der Envoy-Edge beachtet diesen Schalter",
           "cluster_disallows": "bleibt hinter der Anmeldung: dieser Cluster erlaubt keine öffentlichen Apps",
-          "restricted": "bleibt hinter der Anmeldung: die App hat eine Zugriffsliste",
-          "brain": "bleibt hinter der Anmeldung: eine semantische Schicht kann nicht öffentlich sein"
+          "restricted": "bleibt hinter der Anmeldung: die App hat eine Zugriffsliste"
         },
         "makePublic": "Öffentlich machen…",
         "makePrivate": "Hinter die Anmeldung stellen",

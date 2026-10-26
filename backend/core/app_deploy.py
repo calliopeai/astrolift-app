@@ -1798,7 +1798,8 @@ def envoy_edge_routes(
 
     The one exception is an app made public (#2504), on this edge only and
     only where :func:`core.edge_public.route_gated` lets it: its route goes
-    without the gate label and without the gateway secret.
+    without the gate label and without the gateway secret. A brain's ``/mcp``
+    route keeps its token policy either way.
     """
     from astrolift_clusters.edge_install import edge_support_refusal
     from core.edge_access import brain_fields
@@ -1827,9 +1828,10 @@ def envoy_edge_routes(
         workloads=workloads,
         gated=gated,
         paused=paused,
-        gateway_secret=oidc_auth.gateway_secret if gated and oidc_auth is not None else "",
+        gateway_secret=oidc_auth.gateway_secret if oidc_auth is not None else "",
         gateway_secret_header=str(edge.get("gateway_secret_header") or ""),
         brain=brain_fields(app) or None,
+        edge_gated=oidc_auth is not None,
     )
     front = _edge_alb_front_for_app(app, namespace=namespace, workloads=workloads, cluster=cluster)
     return [*out, front] if front else out

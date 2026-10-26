@@ -16,7 +16,7 @@ for phase in public private refused mutant; do
   (cd "$BACKEND" && PYTHONPATH="$PWD/providers:$PWD" "$PY" "$HERE/render.py" "$OUT" "$phase")
 done
 kubectl apply --server-side --field-manager=astrolift -f "$OUT/infra.json"
-for ns in pub-ns shop-ns lst-ns; do kubectl -n $ns rollout status deploy/web --timeout=10m; done
+for ns in pub-ns shop-ns lst-ns kb-ns; do kubectl -n $ns rollout status deploy/web --timeout=10m; done
 kubectl -n envoy-gateway-system wait --for=condition=Available deploy \
   -l gateway.envoyproxy.io/owning-gateway-name=edge --timeout=10m
 echo "up. Next: OUT=$OUT $HERE/probe.sh"

@@ -15,6 +15,13 @@ sleep 4
 fails=0
 apply() { # phase
   kubectl apply --server-side --field-manager=astrolift -f "$OUT/routes-$1.json" >/dev/null
+  # Prune what this render no longer has, as prune_edge_leftovers does after a deploy.
+  keep=$(python3 -c "import json;print(' '.join(i['kind'].lower()+'/'+i['metadata']['name'] for i in json.load(open('$OUT/routes-$1.json'))['items']))")
+  for obj in $(kubectl -n astrolift-edge get httproute,securitypolicy -l astrolift.dev/managed-subdomain=true -o name); do
+    short=$(echo "$obj" | sed -E 's#^([a-z]+)\.[^/]*/#\1/#')
+    [[ " $keep " == *" $short "* ]] || kubectl -n astrolift-edge delete "$obj" >/dev/null
+  done
+  V=$(python3 -c "import json;print(json.load(open('$OUT/tokens-$1.json'))['valid'])")
   sleep 8 # Envoy Gateway reconciles the xDS
   echo "--- phase $1: pub route label edge-auth=$(kubectl -n astrolift-edge get httproute pub-ns-web -o jsonpath='{.metadata.labels.astrolift\.dev/edge-auth}')"
 }
@@ -39,11 +46,19 @@ body_is "echo works: a client header reaches the app"     "yes" pub.edge.test "/
 body_is "public app gets no gateway secret"                "" pub.edge.test "/header?key=X-Astrolift-Gateway-Secret"
 body_is "public app: spoofed gateway secret stripped"      "" pub.edge.test "/header?key=X-Astrolift-Gateway-Secret" "X-Astrolift-Gateway-Secret: gw-secret"
 body_is "public app: spoofed identity header stripped"     "" pub.edge.test "/header?key=X-Auth-Request-User" "X-Auth-Request-User: admin"
+check "public brain / no cookie -> app"                    200 kb.edge.test /
+check "public brain /mcp no token -> refused"              401 kb.edge.test /mcp
+check "public brain /mcp valid token -> app"               200 kb.edge.test /mcp "X-Astrolift-Brain-Token: $V"
+check "gated app beside the public brain -> login"         302 shop.edge.test /
 apply private
 check "made private again / no cookie -> login"            302 pub.edge.test /
+check "brain made private / no cookie -> login"            302 kb.edge.test /
+check "private brain /mcp no token -> refused"             401 kb.edge.test /mcp
+check "private brain /mcp valid token -> app"              200 kb.edge.test /mcp "X-Astrolift-Brain-Token: $V"
 check "gated app / no cookie -> login"                     302 shop.edge.test /
 apply "$REFUSED_PHASE"
 check "cluster refuses, app asks / no cookie -> login"     302 pub.edge.test /
+check "brain /mcp no token -> refused"                     401 kb.edge.test /mcp
 check "gated app / no cookie -> login"                     302 shop.edge.test /
 echo "FAILS=$fails"
 [ "$fails" = 0 ]

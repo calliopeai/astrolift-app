@@ -3130,8 +3130,7 @@
           "no_gate": "此集群没有登录，应用处于开放状态",
           "not_envoy": "仍需登录：只有 Envoy 边缘会执行此开关",
           "cluster_disallows": "仍需登录：此集群不允许公开应用",
-          "restricted": "仍需登录：应用设置了访问列表",
-          "brain": "仍需登录：语义层不能公开"
+          "restricted": "仍需登录：应用设置了访问列表"
         },
         "makePublic": "设为公开…",
         "makePrivate": "恢复为需要登录",

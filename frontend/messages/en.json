@@ -2911,8 +2911,7 @@
           "no_gate": "this cluster has no sign-in, so the app is open",
           "not_envoy": "stays behind the sign-in: only the Envoy edge honours this switch",
           "cluster_disallows": "stays behind the sign-in: this cluster does not allow public apps",
-          "restricted": "stays behind the sign-in: the app has an access list",
-          "brain": "stays behind the sign-in: a semantic layer cannot be public"
+          "restricted": "stays behind the sign-in: the app has an access list"
         },
         "makePublic": "Make public…",
         "makePrivate": "Put behind the sign-in",

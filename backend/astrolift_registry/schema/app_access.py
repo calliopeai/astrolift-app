@@ -51,7 +51,7 @@ class AppPublicStateType:
             "public: answers without the edge login. gated: behind it. no_gate: the cluster has "
             "no edge login at all. not_envoy: only the Envoy edge honours the switch, so the app "
             "stays gated. cluster_disallows: the cluster does not allow public apps. restricted: "
-            "the app has an access list. brain: a semantic layer stays gated."
+            "the app has an access list."
         )
     )
 

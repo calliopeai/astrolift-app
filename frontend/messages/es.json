@@ -3124,8 +3124,7 @@
           "no_gate": "este clúster no tiene inicio de sesión, así que la app está abierta",
           "not_envoy": "sigue tras el inicio de sesión: solo el edge de Envoy respeta este interruptor",
           "cluster_disallows": "sigue tras el inicio de sesión: este clúster no permite apps públicas",
-          "restricted": "sigue tras el inicio de sesión: la app tiene una lista de acceso",
-          "brain": "sigue tras el inicio de sesión: una capa semántica no puede ser pública"
+          "restricted": "sigue tras el inicio de sesión: la app tiene una lista de acceso"
         },
         "makePublic": "Hacer pública…",
         "makePrivate": "Poner tras el inicio de sesión",

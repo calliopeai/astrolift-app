@@ -10,9 +10,10 @@ A public app is public because its own HTTPRoute goes without the gate label
 ``edge-oidc`` SecurityPolicy is never loosened for it: on 2026-10-25 a change
 to that one policy opened every gated app on a cluster at once (#2526).
 
-Only the Envoy edge honours the switch. On any other edge, and wherever the
-cluster refuses, the app stays gated. Custom domains keep their own
-``CustomDomain.edge_auth_enabled``.
+A brain can be public too; its ``/mcp`` route keeps its own token policy
+whatever the app's state. Only the Envoy edge honours the switch. On any
+other edge, and wherever the cluster refuses, the app stays gated. Custom
+domains keep their own ``CustomDomain.edge_auth_enabled``.
 """
 
 from __future__ import annotations
@@ -29,19 +30,12 @@ NO_GATE = "no_gate"
 NOT_ENVOY = "not_envoy"
 CLUSTER_DISALLOWS = "cluster_disallows"
 RESTRICTED = "restricted"
-BRAIN = "brain"
 
 
 def _restricted(app: Any) -> bool:
     from core.edge_access import app_access, is_restricted
 
     return is_restricted(app_access(app))
-
-
-def _brain(app: Any) -> bool:
-    from astrolift_manifest.app_kinds import BRAIN_KINDS
-
-    return getattr(app, "app_kind", "") in BRAIN_KINDS
 
 
 def route_gated(app: Any, cluster: Any) -> bool:
@@ -54,7 +48,6 @@ def route_gated(app: Any, cluster: Any) -> bool:
         allow_public_apps=bool(getattr(cluster, "allow_public_apps", True)),
         edge_public=bool(getattr(app, "edge_public", False)),
         restricted=_restricted(app),
-        brain=_brain(app),
     )
 
 
@@ -70,8 +63,6 @@ def public_state(app: Any, cluster: Any) -> str:
         return NOT_ENVOY
     if not getattr(cluster, "allow_public_apps", True):
         return CLUSTER_DISALLOWS
-    if _brain(app):
-        return BRAIN
     if _restricted(app):
         return RESTRICTED
     return PUBLIC if not route_gated(app, cluster) else GATED
@@ -79,8 +70,6 @@ def public_state(app: Any, cluster: Any) -> str:
 
 def make_public_refusal(app: Any) -> str | None:
     """Why ``app`` may not ask to be public at all, or ``None``."""
-    if _brain(app):
-        return "a semantic layer stays behind the edge login; share it or issue read tokens instead"
     if _restricted(app):
         return "this app has an access list, which only applies behind the login; clear it first"
     return None
@@ -160,7 +149,7 @@ def reapply_app_routes(app: Any, clusters: list[Any] | None = None) -> list[str]
                     continue
                 rules = (route.get("spec") or {}).get("rules") or []
                 if len(rules) != 1 or rules[0].get("matches"):
-                    continue  # A brain's token route, which keeps its own policy.
+                    continue  # A brain's /mcp token route keeps its own policy, public or not.
                 refs = rules[0].get("backendRefs") or []
                 if len(refs) != 1:
                     continue

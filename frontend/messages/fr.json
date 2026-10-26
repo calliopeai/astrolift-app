@@ -3124,8 +3124,7 @@
           "no_gate": "ce cluster n’a pas de connexion, l’app est donc ouverte",
           "not_envoy": "reste derrière la connexion : seul l’edge Envoy respecte ce réglage",
           "cluster_disallows": "reste derrière la connexion : ce cluster n’autorise pas les apps publiques",
-          "restricted": "reste derrière la connexion : l’app a une liste d’accès",
-          "brain": "reste derrière la connexion : une couche sémantique ne peut pas être publique"
+          "restricted": "reste derrière la connexion : l’app a une liste d’accès"
         },
         "makePublic": "Rendre publique…",
         "makePrivate": "Remettre derrière la connexion",

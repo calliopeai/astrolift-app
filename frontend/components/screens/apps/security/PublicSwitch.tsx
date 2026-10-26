@@ -17,7 +17,6 @@ const STATES = [
   "not_envoy",
   "cluster_disallows",
   "restricted",
-  "brain",
 ] as const;
 type PublicState = (typeof STATES)[number];
 
