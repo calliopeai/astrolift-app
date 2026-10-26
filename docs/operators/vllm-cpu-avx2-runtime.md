@@ -29,11 +29,25 @@ with a particular node or sufficient memory for a particular model.
 The smoke checks the actual package is `0.15.1+cpu`, PyTorch is `2.10.0+cpu`,
 and checks the registered float32 CPU SwiGLU kernel against PyTorch's numerical
 reference before starting a localhost-only server with
-one CPU, 4 GiB memory, 1 GiB KV cache, a 256-token context and one sequence.
+one CPU, 4 GiB memory, a 256-token context and one sequence.
 It loads an immutable public Qwen/Qwen2.5-0.5B-Instruct revision and requires
 an actual bounded chat completion. Failure, including out of memory, prevents
 publication. The smoke never supplies Hugging Face or cloud credentials.
 A successful runner smoke is still not actual cluster readiness or inference.
+
+The smoke's KV cache holds exactly that context: `--num-gpu-blocks-override 3`
+allocates three 128-token blocks, two for the one 256-token sequence and one
+that vLLM keeps as its null block, about 9 MiB for this model in float32.
+`VLLM_CPU_KVCACHE_SPACE=1` stays set as the 1 GiB ceiling vLLM checks the
+context against; without the override vLLM fills that ceiling with 341 blocks
+(43,648 tokens, 170 times what one sequence can use). The proof records
+`kv_cache_blocks`. Measured with `memory_phases` before the change, anon
+memory, which cannot be reclaimed without swap, reached about 4,000 MiB of the
+4,096 MiB limit at readiness, with page cache already squeezed to tens of MiB,
+so the 1 GiB cache, not reclaimable page cache, was what left no headroom. The
+override changes nothing the smoke certifies beyond its own 256-token,
+one-sequence context; a longer context or more sequences needs more blocks and
+is not covered by this smoke.
 
 The server runs under a cgroup parent of its own, fresh for each run, which
 sets no limit and outlives the container. At the end of the smoke, before the

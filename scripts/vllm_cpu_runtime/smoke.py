@@ -334,6 +334,12 @@ def host_evidence(proc=None):
         return {"unavailable": type(exc).__name__}
 
 
+# Two 128-token blocks hold the 256-token context of the one sequence, and
+# vLLM keeps one more as its null block. VLLM_CPU_KVCACHE_SPACE stays the
+# 1 GiB ceiling vLLM checks the context against; this sets what is allocated.
+KV_CACHE_BLOCKS = 3
+
+
 def smoke(image, proof):
     spec = json.loads(Path(__file__).with_name("source.json").read_text())
     receipt = {
@@ -344,6 +350,7 @@ def smoke(image, proof):
         "cpu_limit": "1",
         "memory_limit": "4GiB",
         "kv_cache_gib": 1,
+        "kv_cache_blocks": KV_CACHE_BLOCKS,
         "live_cluster_certified": False,
         "host": host_evidence(),
     }
@@ -411,6 +418,8 @@ def smoke(image, proof):
                     "1",
                     "--max-num-batched-tokens",
                     "256",
+                    "--num-gpu-blocks-override",
+                    str(KV_CACHE_BLOCKS),
                     "--enforce-eager",
                 ],
                 timeout=30,
