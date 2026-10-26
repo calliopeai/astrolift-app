@@ -87,7 +87,6 @@ RUNTIME_PROVIDERS: dict[str, tuple[str, ...]] = {
     "codex": ("openai",),
     "codex-cli": ("openai",),
     "goose": ("openai",),
-    "aider": ("anthropic", "openai"),
     "opencode": ("anthropic", "openai"),
     "base": ("anthropic", "openai"),
 }
@@ -101,8 +100,6 @@ RUNTIME_WIRING: dict[str, tuple[tuple[str, str], ...]] = {
 
 #: Catalog runtimes that cannot run behind the gateway, and why.
 UNSUPPORTED_RUNTIMES: dict[str, str] = {
-    "openhands": "runtime openhands cannot send the gateway key (its CLI builds its model client from "
-    "LLM_* variables only)",
     "mistral": "no Zentinelle gateway route reaches Mistral yet",
     "deepseek": "no Zentinelle gateway route reaches DeepSeek yet",
 }
@@ -160,7 +157,7 @@ REFUSED_ENV_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         # Provider endpoints. goose reads OPENAI_HOST ahead of OPENAI_BASE_URL.
         _PROVIDERS + r"_(?:BASE_URL|HOST|API_BASE|BASE_PATH|ENDPOINT)",
         r"AZURE_API_BASE",
-        # litellm, aider's model client: its keys, proxy and endpoints.
+        # Reject retired LiteLLM configuration even in a custom pinned image.
         r"LITELLM_\w+",
         # Claude Code: every provider switch (Bedrock, Vertex, Foundry, Mantle
         # and whatever comes next) but its two tool switches, each provider's
@@ -169,7 +166,7 @@ REFUSED_ENV_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"CLAUDE_CODE_USE_(?!(?:POWERSHELL_TOOL|NATIVE_FILE_SEARCH)$)\w+",
         r"ANTHROPIC_(?:FOUNDRY|BEDROCK|VERTEX|AWS|GOOGLE_CLOUD)_\w+",
         r"ANTHROPIC_(?:IDENTITY_TOKEN(?:_FILE)?|UNIX_SOCKET|CONFIG_DIR|PROFILE)|CLAUDE_CONFIG_DIR",
-        # aider: per-provider keys and endpoints, the models it runs, keys and
+        # Retired Aider configuration: per-provider endpoints, models, keys and
         # env it sets itself, and the files it reads them from.
         r"AIDER_\w+_API_(?:KEY|BASE)",
         r"AIDER_(?:(?:WEAK_|EDITOR_)?MODEL|API_KEY|SET_ENV|ENV_FILE|MODEL_SETTINGS_FILE)",
@@ -182,14 +179,12 @@ REFUSED_ENV_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 )
 
 #: Names that are a model key to some runtimes only, and refuse the run for
-#: those. aider's litellm reads GOOGLE_API_KEY as the Gemini key (ahead of
-#: GEMINI_API_KEY) and opencode's Google provider reads it too, so either
-#: could call Gemini with it for a packet that names a Gemini model. To the
+#: those. opencode's Google provider reads GOOGLE_API_KEY as the Gemini key,
+#: so it could call Gemini with it for a packet that names a Gemini model. To the
 #: other runtimes it is an ordinary Google API key (Maps, YouTube, search):
 #: none of them is a Gemini runtime, and goose runs only the provider the
 #: dispatcher sets.
 RUNTIME_REFUSED_ENV: dict[str, frozenset[str]] = {
-    "aider": frozenset({"GOOGLE_API_KEY"}),
     "opencode": frozenset({"GOOGLE_API_KEY"}),
 }
 
