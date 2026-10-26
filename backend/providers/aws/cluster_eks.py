@@ -1809,6 +1809,20 @@ class EKSClusterDriver(ClusterDriver):
             ),
         ]
 
+        # Its admission webhooks intercept Services created by other charts.
+        # Flux must wait for the controller to be ready before installing them.
+        # The activity filters dependencies to selected, rendered releases, so
+        # withholding/deselecting this controller does not deadlock the recipe.
+        components = [
+            replace(
+                component,
+                depends_on=list(dict.fromkeys([*component.depends_on, "aws-load-balancer-controller"])),
+            )
+            if component.chart_repo_url and component.key != "aws-load-balancer-controller"
+            else component
+            for component in components
+        ]
+
         try:
             addon = self._eks.describe_addon(clusterName=eks_cluster_name, addonName="aws-ebs-csi-driver").get("addon")
         except Exception as error:
