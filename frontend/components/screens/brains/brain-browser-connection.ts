@@ -88,8 +88,6 @@ export async function openBrainBrowser(
     let phase: "waiting" | "issuing" | "sent" | "done" = "waiting";
     let nonce: string | null = null;
     const abort = new AbortController();
-    let timeout: number | undefined;
-    let closed: number | undefined;
     const finish = (success: boolean) => {
       if (phase === "done") return;
       phase = "done";
@@ -152,8 +150,8 @@ export async function openBrainBrowser(
     };
     view.addEventListener("message", receive);
     selection.signal?.addEventListener("abort", cancel, { once: true });
-    timeout = view.setTimeout(() => finish(false), 120_000);
-    closed = view.setInterval(() => {
+    const timeout = view.setTimeout(() => finish(false), 120_000);
+    const closed = view.setInterval(() => {
       if (popup?.closed || !isCurrent()) finish(false);
     }, 250);
     // Keep the opener only for this exact-origin/WindowProxy handshake. The
