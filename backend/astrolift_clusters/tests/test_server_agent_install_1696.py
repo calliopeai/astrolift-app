@@ -1227,7 +1227,6 @@ def test_legacy_deploy_refuses_unusable_secret_before_any_writes(world, conditio
 
 
 def test_legacy_deploy_accepts_a_secret_for_the_current_cluster(world):
-
     world.server.objects["/api/v1/namespaces/astrolift-system/secrets/astrolift-agent"] = {
         "apiVersion": "v1",
         "kind": "Secret",
