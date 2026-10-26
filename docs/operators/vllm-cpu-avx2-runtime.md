@@ -49,6 +49,16 @@ exited processes left charged. A host without readable cgroup v2 files records
 `{"unavailable": "<exception type>"}`; the smoke's result never depends on the
 evidence.
 
+Every proof also records `host`, read once at the start of the smoke from
+`/proc/cpuinfo` and `/proc/meminfo` with a bound on each: `cpu_vendor`,
+`cpu_model`, `logical_cpus`, `physical_cores`, `mem_total_bytes` and
+`isa_flags`, which says for each of `avx2`, `avx512f`, `avx512_bf16`,
+`avx512_vnni`, `amx_tile`, `amx_bf16` and `amx_int8` whether every logical
+CPU lists it. No other flag or field leaves the host; the vendor and model must
+match narrow printable patterns, or the proof records
+`{"unavailable": "<exception type>"}`. The runner's region is not visible to
+the smoke; it is in the job log's set-up step.
+
 Before installing a produced digest, inspect actual node CPU flags (AVX2 and
 F16C), allocatable CPU/memory, current requests, image pull access and the
 storage prerequisites. A nominal 8 GiB node does not have 8 GiB allocatable.
