@@ -38,6 +38,7 @@ PLAINTEXT_PREFIX = "alft_at_"
 SCOPE_READ_APPS = "read:apps"
 SCOPE_WRITE_APPS = "write:apps"
 SCOPE_READ_CLUSTERS = "read:clusters"
+SCOPE_READ_ZENTINELLE = "read:zentinelle"
 # The cluster surface, narrow enough for a script to set a cluster's config or
 # run its recipe without minting ``admin`` (#2120). Registering and removing a
 # cluster stay admin-only: those change what the platform runs on.
@@ -65,6 +66,7 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_READ_APPS,
         SCOPE_WRITE_APPS,
         SCOPE_READ_CLUSTERS,
+        SCOPE_READ_ZENTINELLE,
         SCOPE_WRITE_CLUSTERS,
         SCOPE_MANAGE_CLUSTERS,
         SCOPE_MANAGE_AUTH_USERS,
@@ -125,6 +127,18 @@ CLI_OPERATOR_DEVICE_SCOPES: tuple[str, ...] = (
     SCOPE_WRITE_APP_ACCESS,
 )
 
+# Explicit browser consent adds reads only; defaults and cluster sessions do not change.
+CLI_ZENTINELLE_DEVICE_SCOPES: tuple[str, ...] = (*CLI_DEVICE_SCOPES, SCOPE_READ_ZENTINELLE)
+_ZENTINELLE_READ_PERMISSIONS = frozenset(
+    {
+        "zentinelle.status_view",
+        "zentinelle.policy_view",
+        "zentinelle.usage_view",
+        "zentinelle.conformance_view",
+        "zentinelle.audit_view",
+    }
+)
+
 # ``astro auth login --scope admin`` (#2448): the full-power wildcard, for a
 # platform operator only. ``device_flow.approve_session`` refuses anyone else,
 # and the sign-in lasts CLI_ADMIN_SESSION_HOURS instead of the CLI's 30 days.
@@ -183,6 +197,8 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     if token is None or has_scope(token, SCOPE_ADMIN):
         return True
     scopes = set(token.scopes or [])
+    if SCOPE_READ_ZENTINELLE in scopes and permission in _ZENTINELLE_READ_PERMISSIONS:
+        return True
     if SCOPE_READ_APPS in scopes and permission in _READ_APP_PERMISSIONS:
         return True
     if SCOPE_WRITE_APPS in scopes and (
@@ -269,6 +285,12 @@ SCOPE_CATALOG: tuple[ScopeInfo, ...] = (
         "Onboard apps",
         "apps",
         "Register apps and run CI setup (webhook, secrets, workflow), without deploy or delete.",
+    ),
+    ScopeInfo(
+        SCOPE_READ_ZENTINELLE,
+        "Read Zentinelle",
+        "agents",
+        "Read status, policies, token usage, conformance and audit. No export or writes.",
     ),
     ScopeInfo(SCOPE_READ_CLUSTERS, "Read clusters", "clusters", "List clusters and read provider state."),
     ScopeInfo(
