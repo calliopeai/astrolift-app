@@ -318,6 +318,13 @@ def prepare_agent_task(
     if task.environment_spec_id is None:
         task.environment_spec = default_environment_spec(workload)
         fields.append("environment_spec")
+    from astrolift_agents.runtime_catalog import RetiredAgentRuntime
+    from astrolift_dispatch.spawners.k8s_job import _resolve_base_image
+
+    try:
+        _resolve_base_image(workload, task.environment_spec)
+    except RetiredAgentRuntime as exc:
+        raise AgentTaskPreparationError(str(exc)) from exc
     task.vnc_enabled = bool(task.environment_spec and task.environment_spec.vnc_enabled)
     fields.append("vnc_enabled")
 

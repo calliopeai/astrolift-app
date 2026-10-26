@@ -808,6 +808,10 @@ def _resolve_base_image(workload, spec) -> str:
     The ``-vnc`` watchable variant is applied by the caller on top of this
     base, never here.
     """
+    from astrolift_agents.runtime_catalog import assert_runtime_available
+
+    if spec is not None:
+        assert_runtime_available(runtime=getattr(spec, "runtime", ""), image=spec.image_tag or "")
     if spec is not None and spec.image_tag:
         return spec.image_tag
     if spec is not None and getattr(spec, "runtime", ""):
@@ -820,6 +824,7 @@ def _resolve_base_image(workload, spec) -> str:
             return resolve_runtime_image(spec.runtime)
     primary_container = workload.containers.filter(is_primary=True).first() if workload else None
     if primary_container and primary_container.image_ref:
+        assert_runtime_available(image=primary_container.image_ref)
         return primary_container.image_ref
     return ""
 
