@@ -22,9 +22,7 @@ def _published():
 
 def test_exact_released_public_contract_drives_all_192_statuses_and_reasons():
     raw, document = _published()
-    assert bs.MIMWELL_SOURCE == (
-        "ConflictHQ/mimwell v0.3.6 e59de019b3d10564fdc1301caef06842ab84256d"
-    )
+    assert bs.MIMWELL_SOURCE == ("ConflictHQ/mimwell v0.3.6 e59de019b3d10564fdc1301caef06842ab84256d")
     assert document["schemaVersion"] == 1
     assert document["axes"] == {axis: list(values) for axis, values in bs.AXES.items()}
     loaded = bs._load_substrate_cells(bs.SUBSTRATE_TABLE_PATH)
@@ -104,9 +102,7 @@ def test_malformed_or_incomplete_contracts_refuse_without_a_local_fallback(mutat
     assert refused.value.field == "authority"
 
 
-@pytest.mark.parametrize(
-    "raw", [b"{", b'{"schemaVersion":1,"schemaVersion":1}', b'{"cells":NaN}', b"\xff"]
-)
+@pytest.mark.parametrize("raw", [b"{", b'{"schemaVersion":1,"schemaVersion":1}', b'{"cells":NaN}', b"\xff"])
 def test_invalid_json_duplicate_keys_constants_and_encoding_refuse(raw):
     with pytest.raises(bs.SubstrateError):
         bs._parse_substrate_cells(raw)
@@ -116,9 +112,7 @@ def test_loader_accepts_only_exact_published_bytes_and_refuses_missing_or_oversi
     raw, _document = _published()
     copied = tmp_path / "contract.json"
     copied.write_bytes(raw)
-    assert dict(bs._load_substrate_cells(copied)) == dict(
-        bs._load_substrate_cells(bs.SUBSTRATE_TABLE_PATH)
-    )
+    assert dict(bs._load_substrate_cells(copied)) == dict(bs._load_substrate_cells(bs.SUBSTRATE_TABLE_PATH))
     copied.write_bytes(raw + b"\n")
     with pytest.raises(bs.SubstrateError, match="unpinned"):
         bs._load_substrate_cells(copied)

@@ -48,9 +48,7 @@ from typing import Any
 MIMWELL_SOURCE = "ConflictHQ/mimwell v0.3.6 e59de019b3d10564fdc1301caef06842ab84256d"
 MIMWELL_RENDER_SOURCE = "mimwell-pvt 7e103f9"
 SUBSTRATE_TABLE_SHA256 = "0c30ad508da54934cb42787f137c28d5e4aebbbb9c3199ae32ac29e560acfcb5"
-SUBSTRATE_TABLE_PATH = (
-    Path(__file__).resolve().parent / "contracts/mimwell_substrate_v1/substrate-cells.json"
-)
+SUBSTRATE_TABLE_PATH = Path(__file__).resolve().parent / "contracts/mimwell_substrate_v1/substrate-cells.json"
 MAX_SUBSTRATE_TABLE_BYTES = 64 * 1024
 #: ``app_slug`` (``deploy.app_slug``) is held to the commit that added it.
 MIMWELL_APP_SLUG_SOURCE = "mimwell-pvt 416dbf5"
@@ -151,7 +149,9 @@ def _parse_substrate_cells(raw: bytes) -> Mapping[tuple[str, ...], tuple[str, st
         if set(cells) != set(itertools.product(*AXES.values())):
             raise ValueError("incomplete contract")
     except (ValueError, TypeError, KeyError, UnicodeError, RecursionError) as exc:
-        raise SubstrateError("Published substrate contract is invalid or incomplete", field="authority") from exc
+        raise SubstrateError(
+            "Published substrate contract is invalid or incomplete", field="authority"
+        ) from exc
     return MappingProxyType(cells)
 
 
@@ -190,7 +190,9 @@ def _load_substrate_cells(path: Path) -> Mapping[tuple[str, ...], tuple[str, str
         ):
             raise ValueError("changed or unpinned contract")
     except (OSError, ValueError) as exc:
-        raise SubstrateError("Published substrate contract is unavailable or unpinned", field="authority") from exc
+        raise SubstrateError(
+            "Published substrate contract is unavailable or unpinned", field="authority"
+        ) from exc
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -318,9 +320,7 @@ def dropped_data(before: Selection, after: Selection) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def refuse_native_substrate_update(
-    config: dict[str, Any], *, native_contract_declared: bool = False
-) -> None:
+def refuse_native_substrate_update(config: dict[str, Any], *, native_contract_declared: bool = False) -> None:
     """The legacy selector cannot rewrite an explicitly declared native route.
 
     A reserved root contract is a declaration, not proof of adoption. Its
@@ -330,8 +330,10 @@ def refuse_native_substrate_update(
     existing behavior.
     """
     brain = config.get("brain") or {}
-    if native_contract_declared or isinstance(brain, dict) and (
-        "authority" in brain or "collectionAuthority" in brain
+    if (
+        native_contract_declared
+        or isinstance(brain, dict)
+        and ("authority" in brain or "collectionAuthority" in brain)
     ):
         raise SubstrateError(
             "This brain declares a native authority or contract; the legacy substrate selector cannot "
