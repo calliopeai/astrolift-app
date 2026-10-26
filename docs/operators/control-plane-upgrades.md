@@ -41,7 +41,10 @@ the web task's backend and frontend together.
 
 PostgreSQL migrations use a database-scoped advisory lock that covers planning,
 execution and post-migrate hooks. Web startup's normal migration rerun is safe
-alongside the one-off task when both use an image containing this command.
+alongside the one-off task when both use an image containing this command. A
+waiting migrate polls for the lock rather than queueing on it, so it cannot
+deadlock a concurrent index build (#2521), and a non-atomic migration that
+failed partway completes on the next run.
 
 For an image rollback, first verify that the previous backend and worker are
 compatible with the schema already applied. Restore the recorded worker and

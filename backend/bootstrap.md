@@ -81,6 +81,16 @@ it releases when the command finishes or fails. Normal Django options, including
 Both callers must run an application image containing this command (#1739;
 calliopeai/calliope-installer#304).
 
+A waiting `migrate` polls `pg_try_advisory_lock` every half second and holds no
+snapshot between polls; blocking in `pg_advisory_lock` would deadlock the
+holder's `CREATE INDEX CONCURRENTLY`, which waits for every older snapshot
+(#2521). A migration with `atomic = False` commits step by step, so a failure
+leaves it half applied and unrecorded: each of its steps must be safe to run
+again. Use `AddFieldIfMissing` and `AddIndexConcurrentlyIfMissing` from
+`core/db/migration_operations.py`, which also rebuild the INVALID index a
+cancelled concurrent build leaves; `core/tests/test_rerunnable_migrations_2521.py`
+lists every non-atomic migration and fails on a new one until it has a test.
+
 Backend startup stops before bootstrap commands and the server when migration
 fails (#2187). The worker does not migrate; require a successful one-off
 migration with the new backend image before rolling out web and worker.
