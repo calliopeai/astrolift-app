@@ -49,6 +49,28 @@ exited processes left charged. A host without readable cgroup v2 files records
 `{"unavailable": "<exception type>"}`; the smoke's result never depends on the
 evidence.
 
+The proof's `memory_phases` shows what fills the 4 GiB. It samples the
+parent's `memory.current` and the `anon`, `file`, `shmem`, `file_mapped`,
+`active_file`, `inactive_file`, `kernel` and `slab` values of `memory.stat` at
+`before_engine_start`, `weights_loaded`, `kv_cache_allocated` and `warmup`, each
+taken when the candidate's own log line for that point first appears, and at
+`ready`, the first healthy poll. The log is read through `docker logs
+--follow` in lines of at most 4 KiB and 8 MiB in all, and no log text is kept.
+Each sample carries `elapsed_s` since the server started. `file` is page cache
+and includes `shmem`; without swap, `anon` cannot be reclaimed, while the
+kernel reclaims `inactive_file` first and then `active_file`, so a run whose
+peak sits at 4 GiB may still be mostly reclaimable cache. A point whose line
+never appears is left out, and an unreadable file records
+`{"unavailable": "<exception type>"}`.
+
+During readiness, every poll also reads the parent's `oom_kill` count. The
+parent is fresh, so any kill is this candidate's, and vLLM does not restart an
+engine the OOM killer took; the API server can stay up without ever serving
+`/health`. A rise stops the smoke at that poll with `failure_type`
+`OomKillDuringReadiness` and `outcome` `oom_kill during readiness` instead of
+waiting out the 900 s deadline. Where the count cannot be read, readiness
+waits as before.
+
 Every proof also records `host`, read once at the start of the smoke from
 `/proc/cpuinfo` and `/proc/meminfo` with a bound on each: `cpu_vendor`,
 `cpu_model`, `logical_cpus`, `physical_cores`, `mem_total_bytes` and
