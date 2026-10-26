@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The AVX2 CPU runtime smoke's proof records the runner host (#2492): `host` carries the CPU vendor, model name, logical CPU and core counts, memory total and, for a fixed list of ISA flags (`avx2`, `avx512f`, `avx512_bf16`, `avx512_vnni`, `amx_tile`, `amx_bf16`, `amx_int8`), whether every CPU lists it. It is read with a bound from `/proc/cpuinfo` and `/proc/meminfo`, no other field or flag is kept, and an unreadable or unexpected file records `unavailable` with the exception type without changing the result. Passing and failing runs both reach the 4 GiB limit, so this tells whether outcomes follow the host CPU. CPU, memory, KV cache, context, sequence count and deadlines are unchanged.
 - Explicit CLI Zentinelle read consent adds status, policy, token-usage, conformance and audit reads without audit export or write authority (astrolift-cli #179). The default and cluster login scopes remain unchanged, and the public handshake advertises the new login kind for client compatibility.
 
 
