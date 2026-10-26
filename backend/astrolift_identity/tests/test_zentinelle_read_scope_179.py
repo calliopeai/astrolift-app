@@ -66,7 +66,7 @@ def test_browser_consent_and_refresh_retain_explicit_narrow_scope():
         is_active=True,
         lifecycle=Member.Lifecycle.ACTIVE,
     )
-    client = Client()
+    client = Client(REMOTE_ADDR="198.51.100.179")
     response = client.post(
         "/api/cli/v1/auth/start", data={"client_kind": "cli-zentinelle"}, content_type="application/json"
     )
