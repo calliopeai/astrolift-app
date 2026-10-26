@@ -30,6 +30,7 @@ import {
   HomeIcon,
   KeyRoundIcon,
   LayersIcon,
+  LockKeyholeIcon,
   type LucideIcon,
   PackageIcon,
   RocketIcon,
@@ -270,6 +271,14 @@ export const NAV: NavArea[] = [
             module: "admin",
             alternativeModule: "team_access",
             also: ["/administration/permissions", "/administration/policies"],
+          },
+          {
+            // Who may enter every app, and whether the edge holds it (#2534).
+            key: "app-access",
+            label: "App access",
+            href: "/administration/app-access",
+            icon: LockKeyholeIcon,
+            module: "admin",
           },
           {
             key: "projects",

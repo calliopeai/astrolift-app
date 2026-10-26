@@ -389,7 +389,8 @@
       "documentation": "Dokumentation",
       "profile": "Profil",
       "notifications": "Benachrichtigungen",
-      "security": "Sicherheit"
+      "security": "Sicherheit",
+      "appAccess": "App-Zugriff"
     }
   },
   "keyboardShortcuts": {
@@ -16199,7 +16200,8 @@
       "jobs": "Geplante Jobs",
       "environments": "Umgebungen",
       "previews": "Vorschauen",
-      "zentinelle": "Zentinelle"
+      "zentinelle": "Zentinelle",
+      "app-access": "App-Zugriff"
     },
     "areas": {
       "home": "Startseite",
@@ -16360,7 +16362,8 @@
     "substrate": "Substrat",
     "sharing": "Freigabe",
     "connect": "Verbinden",
-    "agentInbox": "Posteingang"
+    "agentInbox": "Posteingang",
+    "appAccess": "App-Zugriff"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17125,6 +17128,36 @@
       "views": {
         "all": "Alle"
       }
+    },
+    "appAccess": {
+      "search": "Apps, Hosts, Gruppen, E-Mails suchen…",
+      "fields": {
+        "status": "Edge-Status",
+        "person": "Person",
+        "team": "Team",
+        "project": "Projekt",
+        "cluster": "Cluster"
+      },
+      "options": {
+        "status": {
+          "enforced": "Durchgesetzt",
+          "applying": "Wird angewendet",
+          "pending_deploy": "Nächstes Deployment",
+          "drift": "Abweichung",
+          "unverified": "Nicht bestätigt",
+          "open": "Offen",
+          "not_on_edge": "Kein Edge",
+          "attention": "Nicht durchgesetzt"
+        }
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "attention": "Nicht durchgesetzt"
+      },
+      "notes": {
+        "mine": "Die Apps, die Sie mit Ihrer eigenen Anmeldung betreten dürfen."
+      }
     }
   },
   "support": {
@@ -17264,6 +17297,62 @@
       "gate": "hat die Anfrage des Agenten beantwortet",
       "woke": "hat den Agenten gestartet",
       "queued": "wartet auf den nächsten Lauf des Agenten"
+    }
+  },
+  "adminAppAccess": {
+    "title": "App-Zugriff",
+    "label": "Umgebungen",
+    "context": "Wer jede App betreten darf, pro Umgebung, und ob der Edge die Regel durchsetzt. Gelesen aus dem, was Astrolift beim letzten Anwenden des Edge aufgezeichnet hat, nicht bei jedem Laden aus dem Cluster.",
+    "columns": {
+      "app": "App",
+      "where": "Cluster und Hosts",
+      "rule": "Wer darf hinein",
+      "entry": "Zugang über",
+      "setBy": "Festgelegt von",
+      "status": "Edge-Status"
+    },
+    "noHosts": "Noch kein Hostname aufgezeichnet",
+    "open": "Jeder angemeldete Benutzer",
+    "via": {
+      "user": "Per E-Mail eingetragen",
+      "group": "Gruppe: {groups}",
+      "open": "Offen für jede Anmeldung",
+      "unknown": "Gruppen nicht lesbar"
+    },
+    "loginUnchecked": "Anmeldung nicht geprüft",
+    "notRecorded": "nicht aufgezeichnet",
+    "emptyTitle": "Noch keine App-Umgebungen",
+    "emptyDescription": "Jede Umgebung jeder App, die Sie lesen dürfen, erscheint hier, mit allen, die sie betreten dürfen.",
+    "status": {
+      "labels": {
+        "enforced": "Durchgesetzt",
+        "applying": "Wird angewendet",
+        "pending_deploy": "Nächstes Deployment",
+        "drift": "Abweichung",
+        "unverified": "Nicht bestätigt",
+        "open": "Offen",
+        "not_on_edge": "Kein Edge"
+      },
+      "hints": {
+        "enforced": "Der Edge wurde mit dieser Regel angewendet",
+        "applying": "Wartet auf erneutes Anwenden des Edge; bleibt es so, neu deployen",
+        "pending_deploy": "Wirkt ab dem nächsten Deployment",
+        "drift": "Die aufgezeichnete Regel weicht ab; App neu deployen",
+        "unverified": "Angewendet, bevor Astrolift Edge-Anwendungen aufzeichnete",
+        "open": "Keine Regel am Edge",
+        "not_on_edge": "Kein Envoy-Edge; nur Anmeldung"
+      },
+      "appliedAt": "Edge angewendet {time}"
+    },
+    "person": {
+      "title": "Was {email} betreten darf",
+      "refused": "{count, plural, one {# weitere Umgebung lehnt die Person ab} other {# weitere Umgebungen lehnen die Person ab}}",
+      "noEdge": "Keine dieser Apps läuft hinter einem Envoy-Edge.",
+      "unresolved": "Identitätsanbieter nicht gelesen: {reason}",
+      "noLogin": "Keine Anmeldung bei diesem Identitätsanbieter",
+      "disabled": "Anmeldung deaktiviert",
+      "groups": "Anmeldung gefunden; Gruppen: {groups}",
+      "noGroups": "Anmeldung gefunden; in keiner Gruppe"
     }
   }
 }

@@ -389,7 +389,8 @@
       "documentation": "ドキュメント",
       "profile": "プロフィール",
       "notifications": "通知",
-      "security": "セキュリティ"
+      "security": "セキュリティ",
+      "appAccess": "アプリへのアクセス"
     }
   },
   "keyboardShortcuts": {
@@ -16196,7 +16197,8 @@
       "jobs": "スケジュール済みジョブ",
       "environments": "環境",
       "previews": "プレビュー",
-      "zentinelle": "Zentinelle"
+      "zentinelle": "Zentinelle",
+      "app-access": "アプリへのアクセス"
     },
     "areas": {
       "home": "ホーム",
@@ -16357,7 +16359,8 @@
     "substrate": "基盤",
     "sharing": "共有",
     "connect": "接続",
-    "agentInbox": "受信トレイ"
+    "agentInbox": "受信トレイ",
+    "appAccess": "アプリへのアクセス"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17122,6 +17125,36 @@
       "views": {
         "all": "すべて"
       }
+    },
+    "appAccess": {
+      "search": "アプリ、ホスト、グループ、メールを検索…",
+      "fields": {
+        "status": "エッジ",
+        "person": "ユーザー",
+        "team": "チーム",
+        "project": "プロジェクト",
+        "cluster": "クラスター"
+      },
+      "options": {
+        "status": {
+          "enforced": "適用済み",
+          "applying": "適用中",
+          "pending_deploy": "次回のデプロイ",
+          "drift": "不一致",
+          "unverified": "未確認",
+          "open": "制限なし",
+          "not_on_edge": "エッジなし",
+          "attention": "未適用"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分",
+        "attention": "未適用"
+      },
+      "notes": {
+        "mine": "自分のログインで入れるアプリです。"
+      }
     }
   },
   "support": {
@@ -17261,6 +17294,62 @@
       "gate": "エージェントのリクエストに回答済み",
       "woke": "エージェントを起動済み",
       "queued": "エージェントの次回実行を待機中"
+    }
+  },
+  "adminAppAccess": {
+    "title": "アプリへのアクセス",
+    "label": "環境",
+    "context": "各アプリに環境ごとに誰が入れるか、そしてエッジがそのルールを適用しているか。読み込みのたびにクラスターを照会するのではなく、Astrolift が最後にエッジを適用したときの記録から読み取ります。",
+    "columns": {
+      "app": "アプリ",
+      "where": "クラスターとホスト",
+      "rule": "入れるユーザー",
+      "entry": "入る経路",
+      "setBy": "設定者",
+      "status": "エッジ"
+    },
+    "noHosts": "ホスト名はまだ記録されていません",
+    "open": "サインイン済みのすべてのユーザー",
+    "via": {
+      "user": "メールで指定",
+      "group": "グループ: {groups}",
+      "open": "すべてのログインに開放",
+      "unknown": "グループを読み取れません"
+    },
+    "loginUnchecked": "ログインは未確認",
+    "notRecorded": "記録なし",
+    "emptyTitle": "アプリの環境はまだありません",
+    "emptyDescription": "閲覧できるすべてのアプリの各環境が、入れるユーザーとともにここに表示されます。",
+    "status": {
+      "labels": {
+        "enforced": "適用済み",
+        "applying": "適用中",
+        "pending_deploy": "次回のデプロイ",
+        "drift": "不一致",
+        "unverified": "未確認",
+        "open": "制限なし",
+        "not_on_edge": "エッジなし"
+      },
+      "hints": {
+        "enforced": "このルールでエッジが適用されました",
+        "applying": "エッジの再適用を待っています。変わらなければ再デプロイしてください",
+        "pending_deploy": "次回のデプロイで有効になります",
+        "drift": "記録されたルールが異なります。アプリを再デプロイしてください",
+        "unverified": "Astrolift がエッジの適用を記録する前に適用されました",
+        "open": "エッジにルールはありません",
+        "not_on_edge": "Envoy エッジなし。サインインのみ"
+      },
+      "appliedAt": "エッジ適用 {time}"
+    },
+    "person": {
+      "title": "{email} が入れるもの",
+      "refused": "{count, plural, other {ほかに # 個の環境が拒否します}}",
+      "noEdge": "これらのアプリはいずれも Envoy エッジの背後にありません。",
+      "unresolved": "ID プロバイダーを読み取れませんでした: {reason}",
+      "noLogin": "この ID プロバイダーにログインがありません",
+      "disabled": "ログインは無効です",
+      "groups": "ログインあり。グループ: {groups}",
+      "noGroups": "ログインあり。グループなし"
     }
   }
 }

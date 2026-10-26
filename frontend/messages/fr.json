@@ -389,7 +389,8 @@
       "documentation": "Documentation",
       "profile": "Profil",
       "notifications": "Notifications",
-      "security": "Sécurité"
+      "security": "Sécurité",
+      "appAccess": "Accès aux applications"
     }
   },
   "keyboardShortcuts": {
@@ -16199,7 +16200,8 @@
       "jobs": "Jobs planifiés",
       "environments": "Environnements",
       "previews": "Aperçus",
-      "zentinelle": "Zentinelle"
+      "zentinelle": "Zentinelle",
+      "app-access": "Accès aux applications"
     },
     "areas": {
       "home": "Accueil",
@@ -16360,7 +16362,8 @@
     "substrate": "Substrat",
     "sharing": "Partage",
     "connect": "Connexion",
-    "agentInbox": "Boîte de réception"
+    "agentInbox": "Boîte de réception",
+    "appAccess": "Accès aux applications"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17125,6 +17128,36 @@
       "views": {
         "all": "Toutes"
       }
+    },
+    "appAccess": {
+      "search": "Rechercher applications, hôtes, groupes, e-mails…",
+      "fields": {
+        "status": "Périphérie",
+        "person": "Personne",
+        "team": "Équipe",
+        "project": "Projet",
+        "cluster": "Cluster"
+      },
+      "options": {
+        "status": {
+          "enforced": "Appliquée",
+          "applying": "En cours d’application",
+          "pending_deploy": "Prochain déploiement",
+          "drift": "Écart",
+          "unverified": "Non vérifiée",
+          "open": "Ouverte",
+          "not_on_edge": "Sans périphérie",
+          "attention": "Non appliquée"
+        }
+      },
+      "views": {
+        "all": "Toutes",
+        "mine": "Les miennes",
+        "attention": "Non appliquées"
+      },
+      "notes": {
+        "mine": "Les applications où vous pouvez entrer avec votre propre connexion."
+      }
     }
   },
   "support": {
@@ -17264,6 +17297,62 @@
       "gate": "a répondu à la demande de l'agent",
       "woke": "a démarré l'agent",
       "queued": "attend la prochaine exécution de l'agent"
+    }
+  },
+  "adminAppAccess": {
+    "title": "Accès aux applications",
+    "label": "Environnements",
+    "context": "Qui peut entrer dans chaque application, par environnement, et si la périphérie applique la règle. Lu depuis ce qu’Astrolift a enregistré lors de la dernière application de la périphérie, pas depuis le cluster à chaque chargement.",
+    "columns": {
+      "app": "Application",
+      "where": "Cluster et hôtes",
+      "rule": "Qui peut entrer",
+      "entry": "Entre par",
+      "setBy": "Définie par",
+      "status": "Périphérie"
+    },
+    "noHosts": "Aucun nom d’hôte enregistré pour l’instant",
+    "open": "Tout utilisateur connecté",
+    "via": {
+      "user": "Listé par e-mail",
+      "group": "Groupe : {groups}",
+      "open": "Ouverte à toute connexion",
+      "unknown": "Groupes illisibles"
+    },
+    "loginUnchecked": "Connexion non vérifiée",
+    "notRecorded": "non enregistré",
+    "emptyTitle": "Aucun environnement d’application pour l’instant",
+    "emptyDescription": "Chaque environnement de chaque application que vous pouvez lire apparaît ici, avec qui peut y entrer.",
+    "status": {
+      "labels": {
+        "enforced": "Appliquée",
+        "applying": "En cours d’application",
+        "pending_deploy": "Prochain déploiement",
+        "drift": "Écart",
+        "unverified": "Non vérifiée",
+        "open": "Ouverte",
+        "not_on_edge": "Sans périphérie"
+      },
+      "hints": {
+        "enforced": "La périphérie a été appliquée avec cette règle",
+        "applying": "En attente d’une nouvelle application de la périphérie ; si cela dure, redéployez",
+        "pending_deploy": "Prend effet au prochain déploiement",
+        "drift": "La règle enregistrée diffère ; redéployez l’application",
+        "unverified": "Appliquée avant qu’Astrolift n’enregistre les applications de la périphérie",
+        "open": "Aucune règle sur la périphérie",
+        "not_on_edge": "Pas de périphérie Envoy ; connexion seule"
+      },
+      "appliedAt": "Périphérie appliquée {time}"
+    },
+    "person": {
+      "title": "Où {email} peut entrer",
+      "refused": "{count, plural, one {# autre environnement le refuse} other {# autres environnements le refusent}}",
+      "noEdge": "Aucune de ces applications n’est derrière une périphérie Envoy.",
+      "unresolved": "Fournisseur d’identité non lu : {reason}",
+      "noLogin": "Aucune connexion dans ce fournisseur d’identité",
+      "disabled": "Connexion désactivée",
+      "groups": "Connexion trouvée ; groupes : {groups}",
+      "noGroups": "Connexion trouvée ; dans aucun groupe"
     }
   }
 }

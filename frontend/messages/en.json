@@ -389,7 +389,8 @@
       "documentation": "Documentation",
       "profile": "Profile",
       "notifications": "Notifications",
-      "security": "Security"
+      "security": "Security",
+      "appAccess": "App access"
     }
   },
   "keyboardShortcuts": {
@@ -16918,6 +16919,36 @@
       "views": {
         "all": "All"
       }
+    },
+    "appAccess": {
+      "search": "Search apps, hosts, groups, emails…",
+      "fields": {
+        "status": "Edge",
+        "person": "Person",
+        "team": "Team",
+        "project": "Project",
+        "cluster": "Cluster"
+      },
+      "options": {
+        "status": {
+          "enforced": "Enforced",
+          "applying": "Applying",
+          "pending_deploy": "Next deploy",
+          "drift": "Drift",
+          "unverified": "Unverified",
+          "open": "Open",
+          "not_on_edge": "No edge",
+          "attention": "Not enforced"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "attention": "Not enforced"
+      },
+      "notes": {
+        "mine": "The apps you may enter, with your own login."
+      }
     }
   },
   "navModel": {
@@ -16974,7 +17005,8 @@
       "events": "Events",
       "logs": "Logs",
       "traces": "Traces",
-      "operations": "Operations"
+      "operations": "Operations",
+      "app-access": "App access"
     }
   },
   "relativeAge": {
@@ -17122,7 +17154,8 @@
     "substrate": "Substrate",
     "sharing": "Sharing",
     "connect": "Connect",
-    "agentInbox": "Inbox"
+    "agentInbox": "Inbox",
+    "appAccess": "App access"
   },
   "support": {
     "title": "Support",
@@ -17261,6 +17294,62 @@
       "gate": "answered the agent's request",
       "woke": "started the agent",
       "queued": "waits for the agent's next run"
+    }
+  },
+  "adminAppAccess": {
+    "title": "App access",
+    "label": "Environments",
+    "context": "Who may enter each app, per environment, and whether the edge holds the rule. Read from what Astrolift recorded when it last applied the edge, not from the cluster on every load.",
+    "columns": {
+      "app": "App",
+      "where": "Cluster and hosts",
+      "rule": "Who may enter",
+      "entry": "Gets in through",
+      "setBy": "Set by",
+      "status": "Edge"
+    },
+    "noHosts": "No hostname recorded yet",
+    "open": "Every signed-in user",
+    "via": {
+      "user": "Listed by email",
+      "group": "Group: {groups}",
+      "open": "Open to every login",
+      "unknown": "Groups not readable"
+    },
+    "loginUnchecked": "Login not checked",
+    "notRecorded": "not recorded",
+    "emptyTitle": "No app environments yet",
+    "emptyDescription": "Each environment of every app you can read appears here, with who may enter it.",
+    "status": {
+      "labels": {
+        "enforced": "Enforced",
+        "applying": "Applying",
+        "pending_deploy": "Next deploy",
+        "drift": "Drift",
+        "unverified": "Unverified",
+        "open": "Open",
+        "not_on_edge": "No edge"
+      },
+      "hints": {
+        "enforced": "The edge was applied with this rule",
+        "applying": "Waiting for the edge to re-apply; if it stays, redeploy",
+        "pending_deploy": "Takes effect on the next deploy",
+        "drift": "The recorded rule differs; redeploy the app",
+        "unverified": "Applied before Astrolift recorded edge applies",
+        "open": "No rule on the edge",
+        "not_on_edge": "No Envoy edge; sign-in only"
+      },
+      "appliedAt": "Edge applied {time}"
+    },
+    "person": {
+      "title": "What {email} may enter",
+      "refused": "{count, plural, one {# other environment refuses them} other {# other environments refuse them}}",
+      "noEdge": "None of these apps runs behind an Envoy edge.",
+      "unresolved": "Identity provider not read: {reason}",
+      "noLogin": "No login in this identity provider",
+      "disabled": "Login disabled",
+      "groups": "Login found; groups: {groups}",
+      "noGroups": "Login found; in no group"
     }
   }
 }

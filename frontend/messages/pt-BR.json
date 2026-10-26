@@ -389,7 +389,8 @@
       "documentation": "Documentação",
       "profile": "Perfil",
       "notifications": "Notificações",
-      "security": "Segurança"
+      "security": "Segurança",
+      "appAccess": "Acesso a aplicativos"
     }
   },
   "keyboardShortcuts": {
@@ -16196,7 +16197,8 @@
       "jobs": "Jobs agendados",
       "environments": "Ambientes",
       "previews": "Prévias",
-      "zentinelle": "Zentinelle"
+      "zentinelle": "Zentinelle",
+      "app-access": "Acesso a aplicativos"
     },
     "areas": {
       "home": "Início",
@@ -16357,7 +16359,8 @@
     "substrate": "Substrato",
     "sharing": "Compartilhamento",
     "connect": "Conectar",
-    "agentInbox": "Caixa de entrada"
+    "agentInbox": "Caixa de entrada",
+    "appAccess": "Acesso a aplicativos"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17122,6 +17125,36 @@
       "views": {
         "all": "Todos"
       }
+    },
+    "appAccess": {
+      "search": "Pesquisar aplicativos, hosts, grupos, e-mails…",
+      "fields": {
+        "status": "Borda",
+        "person": "Pessoa",
+        "team": "Equipe",
+        "project": "Projeto",
+        "cluster": "Cluster"
+      },
+      "options": {
+        "status": {
+          "enforced": "Aplicada",
+          "applying": "Aplicando",
+          "pending_deploy": "Próxima implantação",
+          "drift": "Divergência",
+          "unverified": "Não confirmada",
+          "open": "Aberta",
+          "not_on_edge": "Sem borda",
+          "attention": "Não aplicada"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "attention": "Não aplicadas"
+      },
+      "notes": {
+        "mine": "Os aplicativos em que você pode entrar com seu próprio login."
+      }
     }
   },
   "support": {
@@ -17261,6 +17294,62 @@
       "gate": "respondeu à solicitação do agente",
       "woke": "iniciou o agente",
       "queued": "aguarda a próxima execução do agente"
+    }
+  },
+  "adminAppAccess": {
+    "title": "Acesso a aplicativos",
+    "label": "Ambientes",
+    "context": "Quem pode entrar em cada aplicativo, por ambiente, e se a borda aplica a regra. Lido do que o Astrolift registrou ao aplicar a borda pela última vez, não do cluster a cada carregamento.",
+    "columns": {
+      "app": "Aplicativo",
+      "where": "Cluster e hosts",
+      "rule": "Quem pode entrar",
+      "entry": "Entra por",
+      "setBy": "Definida por",
+      "status": "Borda"
+    },
+    "noHosts": "Nenhum nome de host registrado ainda",
+    "open": "Qualquer usuário conectado",
+    "via": {
+      "user": "Listado por e-mail",
+      "group": "Grupo: {groups}",
+      "open": "Aberto a qualquer login",
+      "unknown": "Grupos ilegíveis"
+    },
+    "loginUnchecked": "Login não verificado",
+    "notRecorded": "não registrado",
+    "emptyTitle": "Nenhum ambiente de aplicativo ainda",
+    "emptyDescription": "Cada ambiente de cada aplicativo que você pode ler aparece aqui, com quem pode entrar.",
+    "status": {
+      "labels": {
+        "enforced": "Aplicada",
+        "applying": "Aplicando",
+        "pending_deploy": "Próxima implantação",
+        "drift": "Divergência",
+        "unverified": "Não confirmada",
+        "open": "Aberta",
+        "not_on_edge": "Sem borda"
+      },
+      "hints": {
+        "enforced": "A borda foi aplicada com esta regra",
+        "applying": "Aguardando a borda ser reaplicada; se continuar assim, reimplante",
+        "pending_deploy": "Entra em vigor na próxima implantação",
+        "drift": "A regra registrada é diferente; reimplante o aplicativo",
+        "unverified": "Aplicada antes de o Astrolift registrar aplicações da borda",
+        "open": "Nenhuma regra na borda",
+        "not_on_edge": "Sem borda Envoy; apenas login"
+      },
+      "appliedAt": "Borda aplicada {time}"
+    },
+    "person": {
+      "title": "Onde {email} pode entrar",
+      "refused": "{count, plural, one {# outro ambiente recusa a pessoa} other {# outros ambientes recusam a pessoa}}",
+      "noEdge": "Nenhum destes aplicativos fica atrás de uma borda Envoy.",
+      "unresolved": "Provedor de identidade não lido: {reason}",
+      "noLogin": "Nenhum login neste provedor de identidade",
+      "disabled": "Login desativado",
+      "groups": "Login encontrado; grupos: {groups}",
+      "noGroups": "Login encontrado; em nenhum grupo"
     }
   }
 }

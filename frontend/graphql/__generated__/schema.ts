@@ -3155,6 +3155,75 @@ export type AstroliftDomainRedirectRule = {
   sourcePattern: Scalars['String']['output'];
 };
 
+export type AstroliftEdgeAccessFilter = {
+  cluster: InputMaybe<Scalars['String']['input']>;
+  project: InputMaybe<Scalars['String']['input']>;
+  status: InputMaybe<Array<AstroliftEdgeAccessStatus>>;
+  team: InputMaybe<Scalars['String']['input']>;
+};
+
+export type AstroliftEdgeAccessPage = {
+  items: Array<AstroliftEdgeAccessRow>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftEdgeAccessPersonLogin = {
+  clusterSlug: Scalars['String']['output'];
+  enabled?: Maybe<Scalars['Boolean']['output']>;
+  groups: Array<Scalars['String']['output']>;
+  hasLogin?: Maybe<Scalars['Boolean']['output']>;
+  reason: Scalars['String']['output'];
+  resolved: Scalars['Boolean']['output'];
+};
+
+export type AstroliftEdgeAccessPersonPage = {
+  email: Scalars['String']['output'];
+  items: Array<AstroliftEdgeAccessPersonRow>;
+  logins: Array<AstroliftEdgeAccessPersonLogin>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  refusedCount: Scalars['Int']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type AstroliftEdgeAccessPersonRow = {
+  enters?: Maybe<Scalars['Boolean']['output']>;
+  rule: AstroliftEdgeAccessRow;
+  via: Scalars['String']['output'];
+  viaGroups: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftEdgeAccessRow = {
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterName: Scalars['String']['output'];
+  clusterSlug: Scalars['String']['output'];
+  edgeAppliedAt?: Maybe<Scalars['DateTime']['output']>;
+  edgeChangedAt?: Maybe<Scalars['DateTime']['output']>;
+  environment: Scalars['String']['output'];
+  environmentId: Scalars['String']['output'];
+  groups: Array<Scalars['String']['output']>;
+  hosts: Array<Scalars['String']['output']>;
+  id: Scalars['String']['output'];
+  projectSlug?: Maybe<Scalars['String']['output']>;
+  restricted: Scalars['Boolean']['output'];
+  setAt?: Maybe<Scalars['DateTime']['output']>;
+  setBy?: Maybe<Scalars['String']['output']>;
+  source: Scalars['String']['output'];
+  status: AstroliftEdgeAccessStatus;
+  teamSlug?: Maybe<Scalars['String']['output']>;
+  users: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftEdgeAccessStatus =
+  | 'APPLYING'
+  | 'DRIFT'
+  | 'ENFORCED'
+  | 'NOT_ON_EDGE'
+  | 'OPEN'
+  | 'PENDING_DEPLOY'
+  | 'UNVERIFIED';
+
 export type AstroliftElevatePayload = {
   elevatedUntil: Scalars['DateTime']['output'];
   method: Scalars['String']['output'];
@@ -13007,6 +13076,8 @@ export type Query = {
   astroliftDeploymentsPage: AstroliftDeploymentPage;
   astroliftDnsCertificates: AstroliftClusterCertificates;
   astroliftDnsZones: AstroliftDnsZones;
+  astroliftEdgeAccess: AstroliftEdgeAccessPage;
+  astroliftEdgeAccessForPerson: AstroliftEdgeAccessPersonPage;
   astroliftElevationStatus: AstroliftElevationStatus;
   astroliftEmailEngagementMetrics?: Maybe<AstroliftEmailEngagementMetrics>;
   astroliftEmailMessages: Array<AstroliftEmailMessage>;
@@ -14256,6 +14327,23 @@ export type QueryAstroliftDnsCertificatesArgs = {
 
 export type QueryAstroliftDnsZonesArgs = {
   dnsDriver: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftEdgeAccessArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  filter?: InputMaybe<AstroliftEdgeAccessFilter>;
+  first?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftEdgeAccessForPersonArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  email: Scalars['String']['input'];
+  filter?: InputMaybe<AstroliftEdgeAccessFilter>;
+  first?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 

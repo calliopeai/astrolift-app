@@ -389,7 +389,8 @@
       "documentation": "문서",
       "profile": "프로필",
       "notifications": "알림",
-      "security": "보안"
+      "security": "보안",
+      "appAccess": "앱 접근"
     }
   },
   "keyboardShortcuts": {
@@ -16196,7 +16197,8 @@
       "jobs": "예약된 작업",
       "environments": "환경",
       "previews": "미리보기",
-      "zentinelle": "Zentinelle"
+      "zentinelle": "Zentinelle",
+      "app-access": "앱 접근"
     },
     "areas": {
       "home": "홈",
@@ -16975,6 +16977,36 @@
       "views": {
         "all": "전체"
       }
+    },
+    "appAccess": {
+      "search": "앱, 호스트, 그룹, 이메일 검색…",
+      "fields": {
+        "status": "에지",
+        "person": "사용자",
+        "team": "팀",
+        "project": "프로젝트",
+        "cluster": "클러스터"
+      },
+      "options": {
+        "status": {
+          "enforced": "적용됨",
+          "applying": "적용 중",
+          "pending_deploy": "다음 배포",
+          "drift": "불일치",
+          "unverified": "미확인",
+          "open": "제한 없음",
+          "not_on_edge": "에지 없음",
+          "attention": "미적용"
+        }
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목",
+        "attention": "미적용"
+      },
+      "notes": {
+        "mine": "내 로그인으로 들어갈 수 있는 앱입니다."
+      }
     }
   },
   "relativeAge": {
@@ -17122,7 +17154,8 @@
     "substrate": "기반",
     "sharing": "공유",
     "connect": "연결",
-    "agentInbox": "받은 편지함"
+    "agentInbox": "받은 편지함",
+    "appAccess": "앱 접근"
   },
   "support": {
     "title": "지원",
@@ -17261,6 +17294,62 @@
       "gate": "에이전트의 요청에 답변함",
       "woke": "에이전트를 시작함",
       "queued": "에이전트의 다음 실행을 기다리는 중"
+    }
+  },
+  "adminAppAccess": {
+    "title": "앱 접근",
+    "label": "환경",
+    "context": "환경별로 각 앱에 누가 들어갈 수 있는지, 그리고 에지가 그 규칙을 적용하는지 보여 줍니다. 로드할 때마다 클러스터를 조회하지 않고, Astrolift가 마지막으로 에지를 적용할 때 기록한 내용을 읽습니다.",
+    "columns": {
+      "app": "앱",
+      "where": "클러스터와 호스트",
+      "rule": "들어갈 수 있는 사용자",
+      "entry": "들어가는 경로",
+      "setBy": "설정한 사람",
+      "status": "에지"
+    },
+    "noHosts": "아직 기록된 호스트 이름이 없습니다",
+    "open": "로그인한 모든 사용자",
+    "via": {
+      "user": "이메일로 지정됨",
+      "group": "그룹: {groups}",
+      "open": "모든 로그인에 열림",
+      "unknown": "그룹을 읽을 수 없음"
+    },
+    "loginUnchecked": "로그인 확인 안 됨",
+    "notRecorded": "기록 없음",
+    "emptyTitle": "아직 앱 환경이 없습니다",
+    "emptyDescription": "읽을 수 있는 모든 앱의 각 환경이 들어갈 수 있는 사용자와 함께 여기에 표시됩니다.",
+    "status": {
+      "labels": {
+        "enforced": "적용됨",
+        "applying": "적용 중",
+        "pending_deploy": "다음 배포",
+        "drift": "불일치",
+        "unverified": "미확인",
+        "open": "제한 없음",
+        "not_on_edge": "에지 없음"
+      },
+      "hints": {
+        "enforced": "이 규칙으로 에지가 적용되었습니다",
+        "applying": "에지 재적용을 기다리는 중입니다. 계속되면 다시 배포하세요",
+        "pending_deploy": "다음 배포부터 적용됩니다",
+        "drift": "기록된 규칙이 다릅니다. 앱을 다시 배포하세요",
+        "unverified": "Astrolift가 에지 적용을 기록하기 전에 적용되었습니다",
+        "open": "에지에 규칙이 없습니다",
+        "not_on_edge": "Envoy 에지 없음. 로그인만 확인"
+      },
+      "appliedAt": "에지 적용 {time}"
+    },
+    "person": {
+      "title": "{email}이(가) 들어갈 수 있는 곳",
+      "refused": "{count, plural, other {다른 환경 #개가 거부합니다}}",
+      "noEdge": "이 앱들은 모두 Envoy 에지 뒤에 있지 않습니다.",
+      "unresolved": "ID 공급자를 읽지 못했습니다: {reason}",
+      "noLogin": "이 ID 공급자에 로그인이 없습니다",
+      "disabled": "로그인이 비활성화되었습니다",
+      "groups": "로그인 있음. 그룹: {groups}",
+      "noGroups": "로그인 있음. 속한 그룹 없음"
     }
   }
 }
