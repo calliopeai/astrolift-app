@@ -182,3 +182,30 @@ async def test_permanent_failure_is_not_retried_as_readiness(temporal_env):
     assert "iam:CreateRole denied for the controller" in result.message
     assert "Activity task failed" not in result.message
     assert recorded == [(7, 3, "failed", 42)]
+
+
+async def test_existing_bootstrap_history_replays_without_the_new_wait_path(temporal_env, monkeypatch):
+    from temporalio import workflow
+    from temporalio.worker import Replayer
+
+    @activity.defn(name="astrolift.cluster.install_prereqs")
+    async def install(
+        cluster_id: int, selected_keys: list[str], option_overrides: dict, additive: bool = False
+    ) -> dict:
+        return {"applied": [], "skipped": []}
+
+    with monkeypatch.context() as previous_worker:
+        previous_worker.setattr(workflow, "patched", lambda _patch_id: False)
+        async with temporal_worker(
+            temporal_env, workflows=[InstallClusterPrereqsWorkflow], activities=[install, _recorder([])]
+        ):
+            handle = await temporal_env.client.start_workflow(
+                InstallClusterPrereqsWorkflow.run,
+                _input(),
+                id="bootstrap-before-readiness-patch",
+                task_queue="astrolift-test",
+            )
+            assert (await handle.result()).ok is True
+            history = await handle.fetch_history()
+
+    await Replayer(workflows=[InstallClusterPrereqsWorkflow]).replay_workflow(history)
