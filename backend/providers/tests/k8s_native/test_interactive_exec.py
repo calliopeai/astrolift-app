@@ -92,3 +92,106 @@ def test_cancelled_reader_does_not_consume_the_next_output():
             response.close()
 
     asyncio.run(exercise())
+
+
+class FinishedResponse:
+    def __init__(self, status):
+        self.status = status
+        self.closed = False
+
+    def is_open(self):
+        return False
+
+    def read_channel(self, channel):
+        assert channel == 3
+        if isinstance(self.status, Exception):
+            raise self.status
+        return self.status
+
+    def close(self):
+        self.closed = True
+
+
+def test_runtime_status_diagnostic_retains_only_a_closed_category():
+    import json
+
+    async def exercise():
+        message = "executable python3 not found --token=synthetic-canary\n\x1b[31m" + "x" * 2048
+        response = FinishedResponse(json.dumps({"status": "Failure", "message": message}))
+        session = InteractiveExecSession(response)
+        try:
+            assert await asyncio.wait_for(session.wait_exit(), 1) == 1
+            diagnostic = await asyncio.wait_for(session.read_stderr(), 1)
+            assert diagnostic == ("exec runtime failure without process ExitCode: executable or path unavailable\n")
+            assert "synthetic-canary" not in diagnostic
+            assert "python3" not in diagnostic
+            assert "\x1b" not in diagnostic
+            for reader in (session.read_stdout, session.read_stderr):
+                try:
+                    await asyncio.wait_for(reader(), 1)
+                except StopAsyncIteration:
+                    pass
+                else:
+                    raise AssertionError("stream did not end after the retained diagnostic")
+        finally:
+            await session.close()
+        assert response.closed
+
+    asyncio.run(exercise())
+
+
+def test_missing_malformed_or_unrecognized_status_never_becomes_success():
+    async def exercise():
+        for payload in (
+            "",
+            None,
+            "not JSON",
+            "[]",
+            '{"status":"Unknown"}',
+            '{"status":"Failure","details":{"causes":"invalid"}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":"bad"}]}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":false}]}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":0.5}]}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":1e999}]}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode"}]}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":"0"}]}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":"-1"}]}}',
+            '{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":"4294967296"}]}}',
+            OSError("synthetic channel failure"),
+        ):
+            response = FinishedResponse(payload)
+            session = InteractiveExecSession(response)
+            try:
+                assert await asyncio.wait_for(session.wait_exit(), 1) == 1
+                assert await asyncio.wait_for(session.read_stderr(), 1) == (
+                    "exec status unavailable; process exit is not established\n"
+                )
+            finally:
+                await session.close()
+            assert response.closed
+
+    asyncio.run(exercise())
+
+
+def test_explicit_success_and_process_exit_code_keep_existing_status_semantics():
+    async def exercise():
+        for payload, expected in (
+            ('{"status":"Success"}', 0),
+            ('{"status":"Failure","details":{"causes":[{"reason":"ExitCode","message":"7"}]}}', 7),
+        ):
+            response = FinishedResponse(payload)
+            session = InteractiveExecSession(response)
+            try:
+                assert await asyncio.wait_for(session.wait_exit(), 1) == expected
+                for reader in (session.read_stdout, session.read_stderr):
+                    try:
+                        await asyncio.wait_for(reader(), 1)
+                    except StopAsyncIteration:
+                        pass
+                    else:
+                        raise AssertionError("explicit process status produced synthetic output")
+            finally:
+                await session.close()
+            assert response.closed
+
+    asyncio.run(exercise())

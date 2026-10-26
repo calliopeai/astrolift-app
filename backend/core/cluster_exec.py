@@ -348,6 +348,8 @@ class _BackendSession(ExecSession):
     async def _exit_watcher(self) -> None:
         try:
             code = await self._sdk.wait_exit()
+            # The client closes on exit; finish forwarding both streams first.
+            await asyncio.gather(*self._tasks[:2])
         except asyncio.CancelledError:
             return
         except Exception:  # noqa: BLE001
