@@ -1275,3 +1275,22 @@ def test_install_sync_keeps_a_withheld_controller_the_recipe_installed(monkeypat
     }
     assert "astrolift-metrics-server" in deleted
     assert not deleted & {"astrolift-external-dns", "astrolift-aws-load-balancer-controller"}
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_cloud_managed_ebs_is_not_reinstalled_or_implicitly_uninstalled(monkeypatch, selected):
+    component = _pi_component("aws-ebs-csi-driver", [])
+    driver = _FakeDriver()
+    result = _run_install_sync(monkeypatch, [component], driver, {component.key} if selected else set())
+    assert component.key in result["skipped"]
+    assert not result["applied"]
+    assert not any(
+        manifest["kind"] == "HelmRelease"
+        for _slug, _namespace, manifests in driver.calls
+        for manifest in manifests
+    )
+    assert not any(
+        manifest["metadata"]["name"] == "astrolift-aws-ebs-csi-driver"
+        for _slug, _namespace, manifests in driver.deletes
+        for manifest in manifests
+    )

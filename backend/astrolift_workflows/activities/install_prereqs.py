@@ -792,7 +792,8 @@ def _install_cluster_prereqs_sync(
     # land, so each controller can assume its role as soon as its pods start
     # (#1032 EBS-CSI, #1044 ALB controller + external-dns). No-op for non-AWS
     # clusters or when the component is deselected.
-    _provision_ebs_csi_irsa_role(cluster, selected_set)
+    chart_components = {component.key for component in components if component.chart_repo_url}
+    _provision_ebs_csi_irsa_role(cluster, selected_set & chart_components)
     _provision_aws_controller_irsa_role(
         cluster,
         selected_set,
@@ -840,10 +841,20 @@ def _install_cluster_prereqs_sync(
     # Track which HelmRelease names this run actively manages — any
     # platform-managed release NOT in this set is either deselected or
     # legacy and should be removed so Flux stops reconciling it.
-    expected_release_names: set[str] = set()
+    # A cloud-managed driver may coexist with a legacy recipe release. Do not
+    # uninstall that release implicitly: its shared CSI objects need an explicit
+    # ownership handoff. Fresh installs never create the duplicate release.
+    expected_release_names: set[str] = {
+        "astrolift-aws-ebs-csi-driver"
+        for component in components
+        if component.key == "aws-ebs-csi-driver" and not component.chart_repo_url
+    }
 
     for component in components:
         if component.key not in selected_set:
+            skipped.append(component.key)
+            continue
+        if component.key == "aws-ebs-csi-driver" and not component.chart_repo_url:
             skipped.append(component.key)
             continue
         if not component.chart_repo_url:

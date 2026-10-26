@@ -65,6 +65,7 @@ def test_envoy_cluster_enables_the_edge_behind_an_alb():
     assert edge.chart_name == "gateway-helm"
     [ingress] = [m for m in edge.post_install_manifests if m["kind"] == "Ingress"]
     assert ingress["metadata"]["namespace"] == "astrolift-system"
+    assert ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/load-balancer-name"] == "astrolift-eks-edge"
     assert ingress["spec"]["rules"][0]["host"] == "*.astro.example.net"
     assert [m for m in edge.post_install_manifests if m["kind"] == "SecurityPolicy"]
 
