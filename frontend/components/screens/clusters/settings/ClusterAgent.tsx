@@ -76,7 +76,10 @@ export function ClusterAgentView({
         "kubectl create secret generic astrolift-agent \\",
         "  --namespace astrolift-system \\",
         `  --from-literal=heartbeat_url='${heartbeatUrl}' \\`,
-        `  --from-literal=agent_key='${issued.agentKey}'`,
+        `  --from-literal=agent_key='${issued.agentKey}' --dry-run=client -o yaml | kubectl apply -f -`,
+        "if kubectl get deployment astrolift-agent --namespace astrolift-system >/dev/null 2>&1; then",
+        "  kubectl rollout restart deployment/astrolift-agent --namespace astrolift-system",
+        "fi",
       ].join("\n")
     : null;
 

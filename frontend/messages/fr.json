@@ -11150,7 +11150,10 @@
       "feedbackDeployed": "Déploiement de l’agent accepté. La réception d’un signal de présence confirme la connexion.",
       "feedbackIssueFailed": "Impossible d’émettre la clé de l’agent.",
       "feedbackDeployFailed": "Impossible de déployer l’agent.",
-      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
+      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
+      "managedDescription": "Le plan de contrôle installe ensemble les identifiants et l’agent. Les identifiants existants restent actifs jusqu’à la connexion de l’agent de remplacement.",
+      "managedPending": "Installation de l’agent et vérification de son premier signal…",
+      "managedConnected": "Agent connecté. Identifiants et déploiement vérifiés."
     },
     "source": {
       "readFailed": "Impossible de lire les détails du cluster",

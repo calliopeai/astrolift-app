@@ -11147,7 +11147,10 @@
       "feedbackDeployed": "Implantação do agente aceita. Uma pulsação recebida confirma a conexão.",
       "feedbackIssueFailed": "Não foi possível emitir a chave do agente.",
       "feedbackDeployFailed": "Não foi possível implantar o agente.",
-      "feedbackRefreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual."
+      "feedbackRefreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual.",
+      "managedDescription": "O plano de controle instala a credencial e o agente juntos. A credencial existente permanece ativa até que o agente substituto se conecte.",
+      "managedPending": "Instalando o agente e verificando seu primeiro sinal…",
+      "managedConnected": "Agente conectado. Credencial e implantação verificadas."
     },
     "source": {
       "readFailed": "Não foi possível ler os detalhes do cluster",

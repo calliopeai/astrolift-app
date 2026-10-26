@@ -11150,7 +11150,10 @@
       "feedbackDeployed": "Bereitstellung des Agenten angenommen. Ein empfangener Heartbeat bestätigt die Verbindung.",
       "feedbackIssueFailed": "Agentenschlüssel konnte nicht ausgegeben werden.",
       "feedbackDeployFailed": "Agent konnte nicht bereitgestellt werden.",
-      "feedbackRefreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
+      "feedbackRefreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen.",
+      "managedDescription": "Die Steuerungsebene installiert Zugangsdaten und Agent gemeinsam. Bestehende Zugangsdaten bleiben aktiv, bis sich der neue Agent verbindet.",
+      "managedPending": "Agent wird installiert und sein erstes Lebenszeichen geprüft…",
+      "managedConnected": "Agent verbunden. Zugangsdaten und Bereitstellung geprüft."
     },
     "source": {
       "readFailed": "Clusterdetails konnten nicht gelesen werden",

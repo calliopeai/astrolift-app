@@ -1006,3 +1006,55 @@ export const GET_PROVIDER_PLUGIN_REFERENCE = gql`
     }
   }
 `;
+
+export const REVIEW_CLUSTER_AGENT_INSTALL = gql`
+  query ReviewClusterAgentInstall($clusterId: GUID!) {
+    astroliftClusterAgentInstallReview(clusterId: $clusterId) {
+      clusterId
+      version
+      source
+    }
+  }
+`;
+
+export const INSTALL_CLUSTER_AGENT = gql`
+  mutation InstallClusterAgent($input: InstallClusterAgentInput!) {
+    installClusterAgent(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        clusterId
+        requestId
+        status
+        secretConfirmed
+        deploymentConfirmed
+        heartbeatConfirmed
+        retryable
+        errorCode
+        errorMessage
+      }
+    }
+  }
+`;
+
+export const GET_CLUSTER_AGENT_INSTALL = gql`
+  query GetClusterAgentInstall($installId: GUID!) {
+    astroliftClusterAgentInstall(installId: $installId) {
+      id
+      clusterId
+      requestId
+      status
+      secretConfirmed
+      deploymentConfirmed
+      heartbeatConfirmed
+      retryable
+      errorCode
+      errorMessage
+    }
+  }
+`;

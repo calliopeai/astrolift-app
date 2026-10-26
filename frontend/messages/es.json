@@ -11150,7 +11150,10 @@
       "feedbackDeployed": "Despliegue del agente aceptado. Un latido recibido confirma la conexión.",
       "feedbackIssueFailed": "No se pudo emitir la clave del agente.",
       "feedbackDeployFailed": "No se pudo desplegar el agente.",
-      "feedbackRefreshWarning": "El cambio se aceptó, pero no se pudieron actualizar los detalles del clúster. Actualiza la vista para consultar el estado actual."
+      "feedbackRefreshWarning": "El cambio se aceptó, pero no se pudieron actualizar los detalles del clúster. Actualiza la vista para consultar el estado actual.",
+      "managedDescription": "El plano de control instala juntos la credencial y el agente. La credencial existente permanece activa hasta que se conecte el agente de reemplazo.",
+      "managedPending": "Instalando el agente y verificando su primer latido…",
+      "managedConnected": "Agente conectado. Credencial y despliegue verificados."
     },
     "source": {
       "readFailed": "No se pudieron consultar los detalles del clúster",
