@@ -15,7 +15,11 @@ function render(view: React.ReactNode) {
 
 // Who may enter an app behind central auth (#2132).
 
-const state = vi.hoisted(() => ({ access: null as unknown, sent: [] as unknown[] }));
+const state = vi.hoisted(() => ({
+  access: null as unknown,
+  sent: [] as unknown[],
+  publicReply: null as unknown,
+}));
 
 vi.mock("@apollo/client/react", () => ({
   useQuery: () => ({ data: { astroliftAppAccess: state.access }, loading: false }),
@@ -23,7 +27,12 @@ vi.mock("@apollo/client/react", () => ({
   useMutation: () => [
     vi.fn(async (opts: { variables: unknown }) => {
       state.sent.push(opts.variables);
-      return { data: { setAppAccess: { ok: true, errors: [] } } };
+      return {
+        data: {
+          setAppAccess: { ok: true, errors: [] },
+          setAppEdgePublic: state.publicReply,
+        },
+      };
     }),
     { loading: false },
   ],
@@ -40,11 +49,18 @@ const open = {
   restricted: false,
   managedByManifest: false,
   enforcedOn: ["astrolift-conflict"],
+  edgePublic: false,
+  publicStates: [{ clusterSlug: "astrolift-conflict", state: "gated" }],
 };
 
 beforeEach(() => {
   state.access = open;
   state.sent = [];
+  state.publicReply = {
+    ok: true,
+    errors: [],
+    data: { appSlug: "veruus-demo", edgePublic: true, publicStates: [] },
+  };
 });
 
 describe("AccessCard (#2132)", () => {
@@ -81,5 +97,58 @@ describe("AccessCard (#2132)", () => {
     expect(screen.getByText("set in astrolift.toml")).toBeInTheDocument();
     expect(screen.getByText("veruus")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save access" })).not.toBeInTheDocument();
+  });
+});
+
+describe("the public switch (#2504)", () => {
+  it("asks before making an app public, then sends the switch", async () => {
+    render(<AccessCard appSlug="veruus-demo" />);
+    fireEvent.click(screen.getByRole("button", { name: "Make public…" }));
+
+    expect(await screen.findByText("Make veruus-demo public?")).toBeInTheDocument();
+    expect(state.sent).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Make public" }));
+
+    await waitFor(() => expect(state.sent).toHaveLength(1));
+    expect(state.sent[0]).toEqual({ input: { appSlug: "veruus-demo", public: true } });
+  });
+
+  it("puts a public app behind the sign-in without asking", async () => {
+    state.access = {
+      ...open,
+      edgePublic: true,
+      publicStates: [{ clusterSlug: "astrolift-conflict", state: "public" }],
+    };
+    render(<AccessCard appSlug="veruus-demo" />);
+
+    expect(screen.getByText("answers without the sign-in")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Put behind the sign-in" }));
+
+    await waitFor(() => expect(state.sent).toHaveLength(1));
+    expect(state.sent[0]).toEqual({ input: { appSlug: "veruus-demo", public: false } });
+  });
+
+  it("cannot make an app with an access list public", () => {
+    state.access = { ...open, groups: ["veruus"], restricted: true };
+    render(<AccessCard appSlug="veruus-demo" />);
+
+    expect(screen.getByRole("button", { name: "Make public…" })).toBeDisabled();
+    expect(screen.getByText(/Clear the access list first/)).toBeInTheDocument();
+  });
+
+  it("shows the server's refusal under the switch", async () => {
+    state.publicReply = {
+      ok: false,
+      errors: [
+        { code: "PERMISSION_DENIED", message: "this action needs a person", field: "public" },
+      ],
+      data: null,
+    };
+    render(<AccessCard appSlug="veruus-demo" />);
+    fireEvent.click(screen.getByRole("button", { name: "Make public…" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Make public" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("this action needs a person");
+    expect(screen.queryByText("Make veruus-demo public?")).not.toBeInTheDocument();
   });
 });

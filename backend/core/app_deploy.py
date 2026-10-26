@@ -1795,9 +1795,14 @@ def envoy_edge_routes(
     so moving a cluster between edges never changes which apps need a login.
     Both render paths call this, for the reason the ALB branch warns about:
     an app's authentication must not depend on which path ran.
+
+    The one exception is an app made public (#2504), on this edge only and
+    only where :func:`core.edge_public.route_gated` lets it: its route goes
+    without the gate label and without the gateway secret.
     """
     from astrolift_clusters.edge_install import edge_support_refusal
     from core.edge_access import brain_fields
+    from core.edge_public import route_gated
     from core.ingress_reconcile import _edge_config
     from providers.k8s_native.edge_gateway import render_app_routes
 
@@ -1815,13 +1820,14 @@ def envoy_edge_routes(
             "Read X-Auth-Request-User and X-Auth-Request-Email instead, or keep this app on a cluster "
             "with the nginx edge.",
         )
+    gated = route_gated(app, cluster)
     out = render_app_routes(
         app_slug=app.slug,
         namespace=namespace,
         workloads=workloads,
-        gated=oidc_auth is not None,
+        gated=gated,
         paused=paused,
-        gateway_secret=oidc_auth.gateway_secret if oidc_auth is not None else "",
+        gateway_secret=oidc_auth.gateway_secret if gated and oidc_auth is not None else "",
         gateway_secret_header=str(edge.get("gateway_secret_header") or ""),
         brain=brain_fields(app) or None,
     )

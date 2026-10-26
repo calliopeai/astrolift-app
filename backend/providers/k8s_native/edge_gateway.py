@@ -1036,6 +1036,29 @@ def brain_mcp_route(
     return [route, policy]
 
 
+def app_route_gated(
+    *,
+    cluster_gated: bool,
+    allow_public_apps: bool,
+    edge_public: bool,
+    restricted: bool,
+    brain: bool,
+) -> bool:
+    """Whether an app's platform route carries the shared gate (#2504).
+
+    Gated unless every one of these holds: the cluster allows public apps,
+    the app asked to be public, it has no access list (a list only means
+    something behind the login) and it is not a brain (its token route
+    assumes the rest of it stays behind the login). A public app is public
+    because its own route goes without :data:`GATE_LABEL`; the shared
+    ``edge-oidc`` policy is never loosened for it, so every other app on the
+    edge keeps the login.
+    """
+    if not cluster_gated:
+        return False
+    return not (allow_public_apps and edge_public and not restricted and not brain)
+
+
 def render_app_routes(
     *,
     app_slug: str,
@@ -1203,6 +1226,7 @@ __all__ = [
     "ROUTE_NAMESPACE_LABEL",
     "alb_front",
     "alb_host_ingress",
+    "app_route_gated",
     "edge_component",
     "edge_configured",
     "edge_oidc_secret_manifest",

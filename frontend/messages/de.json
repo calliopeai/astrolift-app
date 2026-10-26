@@ -3112,6 +3112,30 @@
         "saveFailed": "Speichern fehlgeschlagen.",
         "membersDescription": "Wer diese App sehen und ändern darf: die hier zugewiesenen Rollen und die Teams, mit denen sie geteilt wird.",
         "edgeDescription": "Wer die URL der App erreichen darf. Der Edge entscheidet über den Zugang; Rollen entscheiden, wer die App ändern darf."
+      },
+      "public": {
+        "title": "Öffentlicher Zugriff",
+        "on": "Öffentlich",
+        "off": "Hinter der Anmeldung",
+        "description": "Wenn öffentlich, antwortet die Plattform-URL der App ohne die Anmeldung des Clusters. Die eigene Anmeldung der App gilt weiterhin, und eigene Domains behalten ihre eigene Einstellung.",
+        "states": {
+          "public": "antwortet ohne Anmeldung",
+          "gated": "hinter der Anmeldung",
+          "no_gate": "dieser Cluster hat keine Anmeldung, die App ist offen",
+          "not_envoy": "bleibt hinter der Anmeldung: nur der Envoy-Edge beachtet diesen Schalter",
+          "cluster_disallows": "bleibt hinter der Anmeldung: dieser Cluster erlaubt keine öffentlichen Apps",
+          "restricted": "bleibt hinter der Anmeldung: die App hat eine Zugriffsliste",
+          "brain": "bleibt hinter der Anmeldung: eine semantische Schicht kann nicht öffentlich sein"
+        },
+        "makePublic": "Öffentlich machen…",
+        "makePrivate": "Hinter die Anmeldung stellen",
+        "restrictedHint": "Leeren Sie zuerst die Zugriffsliste; sie gilt nur hinter der Anmeldung.",
+        "confirmTitle": "{app} öffentlich machen?",
+        "confirmDescription": "Wer die Plattform-URL der App erreicht, erhält die App ohne Anmeldung am Cluster. Nur die eigene Authentifizierung der App schützt sie. Sie werden eventuell gebeten, sich erneut zu bestätigen.",
+        "confirm": "Öffentlich machen",
+        "madePublic": "Die App ist öffentlich, wo ihr Cluster es erlaubt.",
+        "madePrivate": "Die App ist wieder hinter der Anmeldung.",
+        "saveFailed": "Änderung fehlgeschlagen."
       }
     },
     "members": {
@@ -11426,6 +11450,23 @@
       "searchReleases": "Releases und Versionen suchen…",
       "noReleases": "Keine installierten Releases",
       "started": "Gestartet"
+    },
+    "publicApps": {
+      "title": "Öffentliche Apps",
+      "description": "Ob eine App auf diesem Cluster ohne die obige Anmeldung antworten darf, wenn ihr Eigentümer das einschaltet. Aus hält jede App hinter der Anmeldung, egal was sie anfordert.",
+      "allowed": "Erlaubt",
+      "refused": "Nicht erlaubt",
+      "notEnvoy": "Nur der Envoy-Edge beachtet die Anfrage einer App; am Edge dieses Clusters bleibt jede App hinter der Anmeldung.",
+      "allow": "Öffentliche Apps erlauben",
+      "refuse": "Öffentliche Apps beenden",
+      "allowTitle": "Öffentliche Apps auf diesem Cluster erlauben?",
+      "allowReview": "Apps, die ihre Eigentümer bereits öffentlich gemacht haben, antworten sofort ohne Anmeldung.",
+      "refuseTitle": "Öffentliche Apps auf diesem Cluster beenden?",
+      "refuseReview": "Jede öffentliche App auf diesem Cluster kommt sofort hinter die Anmeldung.",
+      "allowedToast": "Öffentliche Apps erlaubt.",
+      "refusedToast": "Öffentliche Apps beendet; jede App ist hinter der Anmeldung.",
+      "changeFailed": "Änderung fehlgeschlagen.",
+      "refreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
     }
   },
   "obsPanelReason": {

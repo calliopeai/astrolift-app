@@ -3112,6 +3112,30 @@
         "saveFailed": "No se pudo guardar.",
         "membersDescription": "Quién puede ver y modificar esta app: sus roles aquí y los equipos con los que se comparte.",
         "edgeDescription": "Quién puede acceder a la URL de la app. El borde decide quién puede entrar; los roles deciden quién puede modificarla."
+      },
+      "public": {
+        "title": "Acceso público",
+        "on": "Pública",
+        "off": "Tras el inicio de sesión",
+        "description": "Si es pública, la URL de plataforma de la app responde sin el inicio de sesión del clúster. El inicio de sesión propio de la app sigue aplicándose, y los dominios personalizados conservan su propio ajuste.",
+        "states": {
+          "public": "responde sin iniciar sesión",
+          "gated": "tras el inicio de sesión",
+          "no_gate": "este clúster no tiene inicio de sesión, así que la app está abierta",
+          "not_envoy": "sigue tras el inicio de sesión: solo el edge de Envoy respeta este interruptor",
+          "cluster_disallows": "sigue tras el inicio de sesión: este clúster no permite apps públicas",
+          "restricted": "sigue tras el inicio de sesión: la app tiene una lista de acceso",
+          "brain": "sigue tras el inicio de sesión: una capa semántica no puede ser pública"
+        },
+        "makePublic": "Hacer pública…",
+        "makePrivate": "Poner tras el inicio de sesión",
+        "restrictedHint": "Vacía primero la lista de acceso; solo se aplica tras el inicio de sesión.",
+        "confirmTitle": "¿Hacer pública {app}?",
+        "confirmDescription": "Quien llegue a la URL de plataforma de la app la obtiene sin iniciar sesión en el clúster. Solo la autenticación propia de la app la protege. Puede que se te pida verificar tu identidad.",
+        "confirm": "Hacer pública",
+        "madePublic": "La app es pública donde su clúster lo permite.",
+        "madePrivate": "La app vuelve a estar tras el inicio de sesión.",
+        "saveFailed": "No se pudo aplicar el cambio."
       }
     },
     "members": {
@@ -11426,6 +11450,23 @@
       "searchReleases": "Buscar versiones instaladas…",
       "noReleases": "No hay versiones instaladas",
       "started": "Inicio"
+    },
+    "publicApps": {
+      "title": "Apps públicas",
+      "description": "Si una app de este clúster puede responder sin el inicio de sesión de arriba cuando su propietario lo activa. Desactivado mantiene todas las apps tras el inicio de sesión, pidan lo que pidan.",
+      "allowed": "Permitidas",
+      "refused": "No permitidas",
+      "notEnvoy": "Solo el edge de Envoy respeta la petición de una app; en el edge de este clúster todas las apps siguen tras el inicio de sesión.",
+      "allow": "Permitir apps públicas",
+      "refuse": "Detener apps públicas",
+      "allowTitle": "¿Permitir apps públicas en este clúster?",
+      "allowReview": "Las apps que sus propietarios ya hicieron públicas responden sin iniciar sesión de inmediato.",
+      "refuseTitle": "¿Detener las apps públicas en este clúster?",
+      "refuseReview": "Todas las apps públicas de este clúster pasan tras el inicio de sesión de inmediato.",
+      "allowedToast": "Apps públicas permitidas.",
+      "refusedToast": "Apps públicas detenidas; todas las apps están tras el inicio de sesión.",
+      "changeFailed": "No se pudo aplicar el cambio.",
+      "refreshWarning": "Se aceptó el cambio, pero no se pudieron actualizar los detalles del clúster. Actualiza para ver el estado actual."
     }
   },
   "obsPanelReason": {

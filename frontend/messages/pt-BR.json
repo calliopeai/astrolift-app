@@ -3118,6 +3118,30 @@
         "saveFailed": "Falha ao salvar.",
         "membersDescription": "Quem pode ver e alterar este app: os papéis atribuídos aqui e as equipes com as quais ele é compartilhado.",
         "edgeDescription": "Quem pode acessar a URL do app. A borda decide quem pode entrar; os papéis decidem quem pode alterá-lo."
+      },
+      "public": {
+        "title": "Acesso público",
+        "on": "Pública",
+        "off": "Atrás do login",
+        "description": "Quando pública, a URL de plataforma do app responde sem o login do cluster. O login do próprio app continua valendo, e domínios personalizados mantêm sua própria configuração.",
+        "states": {
+          "public": "responde sem login",
+          "gated": "atrás do login",
+          "no_gate": "este cluster não tem login, então o app está aberto",
+          "not_envoy": "continua atrás do login: só o edge do Envoy respeita esta opção",
+          "cluster_disallows": "continua atrás do login: este cluster não permite apps públicos",
+          "restricted": "continua atrás do login: o app tem uma lista de acesso",
+          "brain": "continua atrás do login: uma camada semântica não pode ser pública"
+        },
+        "makePublic": "Tornar público…",
+        "makePrivate": "Colocar atrás do login",
+        "restrictedHint": "Limpe primeiro a lista de acesso; ela só se aplica atrás do login.",
+        "confirmTitle": "Tornar {app} público?",
+        "confirmDescription": "Quem chegar à URL de plataforma do app o acessa sem entrar no cluster. Só a autenticação do próprio app o protege. Talvez seja preciso confirmar sua identidade.",
+        "confirm": "Tornar público",
+        "madePublic": "O app está público onde o cluster permite.",
+        "madePrivate": "O app voltou a ficar atrás do login.",
+        "saveFailed": "Falha ao alterar."
       }
     },
     "members": {
@@ -11423,6 +11447,23 @@
       "searchReleases": "Buscar versões instaladas…",
       "noReleases": "Nenhuma versão instalada",
       "started": "Início"
+    },
+    "publicApps": {
+      "title": "Apps públicos",
+      "description": "Se um app deste cluster pode responder sem o login acima quando o dono ativa isso. Desativado mantém todo app atrás do login, seja o que for que ele peça.",
+      "allowed": "Permitidos",
+      "refused": "Não permitidos",
+      "notEnvoy": "Só o edge do Envoy respeita o pedido de um app; no edge deste cluster todo app continua atrás do login.",
+      "allow": "Permitir apps públicos",
+      "refuse": "Parar apps públicos",
+      "allowTitle": "Permitir apps públicos neste cluster?",
+      "allowReview": "Apps que os donos já tornaram públicos passam a responder sem login na hora.",
+      "refuseTitle": "Parar os apps públicos neste cluster?",
+      "refuseReview": "Todo app público deste cluster volta para trás do login na hora.",
+      "allowedToast": "Apps públicos permitidos.",
+      "refusedToast": "Apps públicos parados; todo app está atrás do login.",
+      "changeFailed": "Falha ao alterar.",
+      "refreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize para ver o estado atual."
     }
   },
   "obsPanelReason": {

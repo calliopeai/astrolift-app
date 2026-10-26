@@ -1295,9 +1295,13 @@ export type AstroliftApiTokenScopePreset = {
 
 export type AstroliftAppAccess = {
   appSlug: Scalars['String']['output'];
+  /** The app asked for its platform hostname to answer without the edge login (#2504). */
+  edgePublic: Scalars['Boolean']['output'];
   enforcedOn: Array<Scalars['String']['output']>;
   groups: Array<Scalars['String']['output']>;
   managedByManifest: Scalars['Boolean']['output'];
+  /** What that means on each cluster the app runs on. */
+  publicStates: Array<AstroliftAppPublicState>;
   restricted: Scalars['Boolean']['output'];
   users: Array<Scalars['String']['output']>;
 };
@@ -1689,6 +1693,12 @@ export type AstroliftAppPodEvent = {
   message: Scalars['String']['output'];
   reason: Scalars['String']['output'];
   type: Scalars['String']['output'];
+};
+
+export type AstroliftAppPublicState = {
+  clusterSlug: Scalars['String']['output'];
+  /** public: answers without the edge login. gated: behind it. no_gate: the cluster has no edge login at all. not_envoy: only the Envoy edge honours the switch, so the app stays gated. cluster_disallows: the cluster does not allow public apps. restricted: the app has an access list. brain: a semantic layer stays gated. */
+  state: Scalars['String']['output'];
 };
 
 export type AstroliftAppReprovisionState = {
@@ -6226,6 +6236,8 @@ export type AstroliftTemporaryAppPolicyMutationResult = {
 export type AstroliftTenantCluster = {
   agentProvisioned: Scalars['Boolean']['output'];
   albAuthConfig?: Maybe<Scalars['JSON']['output']>;
+  /** Whether an app on this cluster may answer without the edge login when it asks to (#2504). Off: every app is gated whatever its own setting. Only the Envoy edge honours an app's request. */
+  allowPublicApps: Scalars['Boolean']['output'];
   authMethod: Scalars['String']['output'];
   bootstrapRuns: Array<AstroliftClusterBootstrapRun>;
   capabilities: Scalars['JSON']['output'];
@@ -9871,6 +9883,8 @@ export type Mutation = {
   setAgentTaskCallbackSecret: AgentTaskCallbackSecretMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   setAppAccess: AstroliftAppAccessMutationResult;
+  /** Let the app's platform hostname answer without the edge login, or put it back behind it (#2504). Needs app.access. Making it public also needs the organization's rules for app.edge.make_public (a fresh verification by default), is refused for agents unless the organization allows them, and takes effect only on an Envoy edge whose cluster allows public apps. The app's own authentication still applies, and custom domains keep their own setting. The live routes move at once; audited as app.edge.public.set. */
+  setAppEdgePublic: AstroliftAppAccessMutationResult;
   /** Set, extend, shorten or clear a temporary app's expiry (#2433). The timer moves at once and the 24 h and 1 h warnings are sent again for the new time. Audited as app.expiry.set, app.expiry.extend or app.expiry.clear. */
   setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
@@ -11759,6 +11773,11 @@ export type MutationSetAlertSubscriptionArgs = {
 
 export type MutationSetAppAccessArgs = {
   input: SetAppAccessInput;
+};
+
+
+export type MutationSetAppEdgePublicArgs = {
+  input: SetAppEdgePublicInput;
 };
 
 
@@ -16449,6 +16468,11 @@ export type SetAppAccessInput = {
   users: Array<Scalars['String']['input']>;
 };
 
+export type SetAppEdgePublicInput = {
+  appSlug: Scalars['String']['input'];
+  public: Scalars['Boolean']['input'];
+};
+
 export type SetAppExpiryInput = {
   appSlug: Scalars['String']['input'];
   /** Make the app permanent. Needs app.update, the organization's rules for app.expiry.clear (a fresh verification by default), and is refused where the organization requires temporary apps. Agents are refused unless the organization allows them. */
@@ -17192,6 +17216,7 @@ export type UpdateTeamInput = {
 
 export type UpdateTenantClusterInput = {
   albAuthConfig: InputMaybe<Scalars['JSON']['input']>;
+  allowPublicApps: InputMaybe<Scalars['Boolean']['input']>;
   endpoint: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   ingressClass: InputMaybe<Scalars['String']['input']>;

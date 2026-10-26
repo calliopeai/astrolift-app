@@ -689,6 +689,11 @@ export const GET_APP_ACCESS = gql`
       restricted
       managedByManifest
       enforcedOn
+      edgePublic
+      publicStates {
+        clusterSlug
+        state
+      }
     }
   }
 `;
@@ -719,6 +724,33 @@ export const SET_APP_ACCESS = gql`
         restricted
         managedByManifest
         enforcedOn
+        edgePublic
+        publicStates {
+          clusterSlug
+          state
+        }
+      }
+    }
+  }
+`;
+
+/** The public switch (#2504): making an app public is a step-up action. */
+export const SET_APP_EDGE_PUBLIC = gql`
+  mutation SetAppEdgePublic($input: SetAppEdgePublicInput!) {
+    setAppEdgePublic(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        appSlug
+        edgePublic
+        publicStates {
+          clusterSlug
+          state
+        }
       }
     }
   }
