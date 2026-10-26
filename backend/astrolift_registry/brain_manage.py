@@ -25,6 +25,7 @@ from __future__ import annotations
 import contextvars
 import inspect
 import logging
+import re
 from types import SimpleNamespace
 from typing import Any
 
@@ -854,7 +855,7 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
     )
     from astrolift_registry import brain_substrate as bs
     from astrolift_registry.brain_template import CONFIG_SCHEMA, dump_config
-    from astrolift_scm.providers import ProviderError
+    from astrolift_scm.providers import ProviderError, fetch_branch_head
     from astrolift_scm.providers.repo_writes import TreeFile, update_files
     from astrolift_scm.services.workflows import _pick_source_connection
 
@@ -865,7 +866,10 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
         raise SubstrateChangeError("PRECONDITION", "no source connection can write the repository")
     branch = app.deploy_branch or app.default_branch or "main"
     try:
-        config = _read_json(connection, app, "client.config.json", branch)
+        inspected_head = fetch_branch_head(connection, repo_full_name=app.source_repo, branch=branch)
+        if not isinstance(inspected_head, str) or re.fullmatch(r"[0-9a-f]{40}", inspected_head) is None:
+            raise SubstrateChangeError("PRECONDITION", "the source host did not return an immutable commit")
+        config = _read_json(connection, app, "client.config.json", inspected_head)
     except ProviderError as exc:
         raise SubstrateChangeError("PRECONDITION", exc.message) from exc
     if not isinstance(config, dict):
@@ -875,9 +879,11 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
         # Root contract.json is the native topology declaration, including a
         # declaration not adopted yet or one too malformed to interpret safely.
         # Do not infer native status from the requested cell or a /data volume.
-        contract = fetch_file_at(connection, app, "contract.json", branch)
+        contract = fetch_file_at(connection, app, "contract.json", inspected_head)
         bs.refuse_native_substrate_update(config, native_contract_declared=contract is not None)
-        current_manifest = fetch_file_at(connection, app, "astrolift.toml", branch) or app.manifest_raw or ""
+        current_manifest = (
+            fetch_file_at(connection, app, "astrolift.toml", inspected_head) or app.manifest_raw or ""
+        )
     except bs.SubstrateError as exc:
         raise SubstrateChangeError("PRECONDITION", exc.message, field=exc.field) from exc
     except ProviderError as exc:
@@ -918,7 +924,7 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
         # A Mimwell version without deploy.app_slug refuses the key and would
         # rename the app <client.slug>-brain on its next make astrolift-manifest.
         try:
-            schema = _read_json(connection, app, CONFIG_SCHEMA, branch)
+            schema = _read_json(connection, app, CONFIG_SCHEMA, inspected_head)
         except ProviderError as exc:
             raise SubstrateChangeError("PRECONDITION", exc.message) from exc
         if not bs.declares_app_slug(schema):
@@ -943,6 +949,7 @@ def update_substrate(app: RegisteredApp, requested, *, user) -> dict:
             f"Graduate the substrate: {bs.cell_name(after.cell)}; persistence "
             f"{', '.join(after.persistence) or 'none'}; {after.replicas} replica(s)",
             author=_author(user) if user is not None else None,
+            expected_head=inspected_head,
         )
     except ProviderError as exc:
         raise SubstrateChangeError("PRECONDITION", exc.message) from exc

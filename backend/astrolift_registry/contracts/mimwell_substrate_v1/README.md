@@ -24,11 +24,21 @@ App/Metric permission, workload identity or completed graduation. Those are
 independently verified host/brain operations. The existing manifest renderer
 retains its separately documented historical generator provenance.
 
-The legacy substrate-update path refuses an explicit `brain.authority` or a
-reserved root `contract.json` before changing repository or platform state.
+The legacy substrate-update path refuses an explicit `brain.authority`,
+`brain.collectionAuthority` or a reserved root `contract.json` before changing
+repository or platform state.
 It cannot safely rewrite native private storage into its historical `/data`
 projection layout or choose native replicas. A contract declaration is not
 proof of adoption. Ordinary configs without those native declarations keep
 their compiled-projection layout and existing replica behavior. An owner-
 reviewed native manifest remains separate from this selector; this refusal
 does not implement native provisioning or graduation.
+
+All inspection reads use one immutable branch-head commit. Writing requires
+GitHub's atomic `createCommitOnBranch.expectedHeadOid` condition, not a preflight
+GET followed by an unrelated parent lookup or non-force REST ref update.
+Concurrent branch changes refuse the write; source-host failures never fall
+back to unconditional writes. Other hosts currently have no admitted conditional
+writer and this selector refuses them before writing. GitHub records the
+credential owner as commit author; Astrolift separately audits the requesting
+person. This is not a cross-system transaction with later deployment or metadata.

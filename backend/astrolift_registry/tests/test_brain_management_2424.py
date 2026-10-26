@@ -493,8 +493,9 @@ def test_rebuild_with_ingest_dispatches_the_refresh_workflow_only_when_it_exists
     )
     monkeypatch.setattr(
         "astrolift_scm.services.workflows.dispatch_astrolift_ci_workflow",
-        lambda a, branch=None, workflow_path=None: dispatched.append(workflow_path)
-        or WorkflowDispatchResult(ok=True, run_url="https://gh/runs"),
+        lambda a, branch=None, workflow_path=None: (
+            dispatched.append(workflow_path) or WorkflowDispatchResult(ok=True, run_url="https://gh/runs")
+        ),
     )
     present = {"value": None}
     monkeypatch.setattr("astrolift_scm.providers.fetch_file", lambda c, **k: present["value"])
@@ -859,11 +860,17 @@ class FakeRepo:
     def __init__(self, config, manifest):
         self.files = {"client.config.json": json.dumps(config), "astrolift.toml": manifest}
         self.commits = []
+        self.head = "a" * 40
+        self.read_refs = []
 
     def fetch(self, connection, *, repo_full_name, path, ref):
+        self.read_refs.append(ref)
+        assert ref == self.head
         return self.files.get(path)
 
-    def update(self, connection, repo, branch, files, message, *, author=None):
+    def update(self, connection, repo, branch, files, message, *, author=None, expected_head=None):
+        if expected_head != self.head:
+            raise repo_writes._error("CONFLICT", "The inspected branch has changed")
         self.commits.append(
             {"branch": branch, "files": {f.path: f.content.decode() for f in files}, "message": message}
         )
@@ -884,6 +891,7 @@ def repo(world, monkeypatch):
         render_manifest(Selection(), slug="acme-brain", display_name="KB"),
     )
     monkeypatch.setattr("astrolift_scm.providers.fetch_file", fake.fetch)
+    monkeypatch.setattr("astrolift_scm.providers.fetch_branch_head", lambda *a, **kw: fake.head)
     monkeypatch.setattr(repo_writes, "update_files", fake.update)
     monkeypatch.setattr(
         "astrolift_scm.services.workflows._pick_source_connection", lambda a: world.connection
@@ -922,6 +930,43 @@ def test_graduating_commits_config_and_manifest_once_and_provisions_postgres(wor
     assert ManagedService.objects.filter(registered_app=app, kind="postgres", name="brain").exists()
     assert result.data.substrate.cell == "authority=postgres, blobs=fs, vectors=local, graph=age"
     assert audit[-1].action == "brain.substrate.update" and audit[-1].extra["persistence"] == ["postgres"]
+    assert repo.read_refs and set(repo.read_refs) == {"a" * 40}
+
+
+@pytest.mark.parametrize("marker", ["authority", "contract"])
+def test_concurrent_native_declaration_is_not_overwritten_or_persisted(
+    world, repo, started, monkeypatch, marker
+):
+    from astrolift_services.models import ManagedService
+
+    app = _brain(world, build_mode="platform_build")
+    before_manifest = app.manifest_raw
+    inspected_files = dict(repo.files)
+
+    def fetch(connection, *, repo_full_name, path, ref):
+        assert ref == "a" * 40
+        if repo.head == ref:
+            repo.head = "b" * 40
+            if marker == "authority":
+                config = json.loads(repo.files["client.config.json"])
+                config["brain"]["authority"] = {"store": "private"}
+                repo.files["client.config.json"] = json.dumps(config)
+            else:
+                repo.files["contract.json"] = '{"native":true}'
+            repo.files["astrolift.toml"] += "\n# native private mount\n"
+        return inspected_files.get(path)
+
+    monkeypatch.setattr("astrolift_scm.providers.fetch_file", fetch)
+    result = _graduate(world, app.slug, replicas=3)
+
+    assert not result.ok and result.errors[0].code == "PRECONDITION"
+    assert "branch has changed" in result.errors[0].message
+    assert not repo.commits and not started
+    assert repo.head == "b" * 40
+    assert repo.files["astrolift.toml"].endswith("# native private mount\n")
+    app.refresh_from_db()
+    assert app.manifest_raw == before_manifest
+    assert not ManagedService.objects.filter(registered_app=app).exists()
 
 
 def test_graduation_never_drops_persistence_that_holds_data(world, repo):
@@ -1183,8 +1228,9 @@ def test_rebuild_of_a_ci_built_brain_keeps_the_approval_policy(world, monkeypatc
     dispatched = []
     monkeypatch.setattr(
         "astrolift_scm.services.workflows.dispatch_astrolift_ci_workflow",
-        lambda a, branch=None, workflow_path=None: dispatched.append(workflow_path)
-        or WorkflowDispatchResult(ok=True, run_url="https://gh/runs"),
+        lambda a, branch=None, workflow_path=None: (
+            dispatched.append(workflow_path) or WorkflowDispatchResult(ok=True, run_url="https://gh/runs")
+        ),
     )
     with _as(world) as info:
         result = RegistryMutation().rebuild_brain(info, input=RebuildBrainInput(slug=app.slug))

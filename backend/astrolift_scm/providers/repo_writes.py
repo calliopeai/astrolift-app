@@ -28,6 +28,7 @@ import base64
 import dataclasses
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -832,6 +833,65 @@ def _github_update(connection, repo_full_name, branch, files, message, author) -
     return sha
 
 
+def _github_update_if_head(connection, repo_full_name, branch, files, message, expected_head) -> str:
+    """GitHub's expectedHeadOid is checked atomically with the branch update.
+
+    A REST ref PATCH with force=False alone permits building stale files on
+    a newly fetched parent. This mutation also records the credential owner
+    as commit author; the original Astrolift requester remains in our audit.
+    """
+    base, headers = _gh(connection)
+    endpoint = (
+        base.removesuffix("/api/v3") + "/api/graphql" if base.endswith("/api/v3") else base + "/graphql"
+    )
+    query = """mutation UpdateInspectedBranch($input: CreateCommitOnBranchInput!) {
+      createCommitOnBranch(input: $input) { commit { oid } }
+    }"""
+    try:
+        _, reply, _ = _http(
+            "POST",
+            endpoint,
+            headers,
+            body={
+                "query": query,
+                "variables": {
+                    "input": {
+                        "branch": {"repositoryNameWithOwner": repo_full_name, "refName": branch},
+                        "expectedHeadOid": expected_head,
+                        "message": {"headline": message},
+                        "fileChanges": {
+                            "additions": [
+                                {
+                                    "path": item.path,
+                                    "contents": base64.b64encode(item.content).decode("ascii"),
+                                }
+                                for item in files
+                            ]
+                        },
+                    }
+                },
+            },
+            host="GitHub",
+        )
+    except _HttpError as exc:
+        code = "AUTH_FAILED" if exc.status in (401, 403) else "PRECONDITION"
+        raise _error(
+            code, f"The source host did not confirm the inspected branch update ({exc.status})"
+        ) from exc
+    if not isinstance(reply, dict) or reply.get("errors"):
+        # Never expose source-host errors, which may include submitted content.
+        raise _error(
+            "PRECONDITION", "The source host did not confirm the branch update; inspect it before retrying"
+        )
+    data = reply.get("data")
+    result = data.get("createCommitOnBranch") if isinstance(data, dict) else None
+    commit = result.get("commit") if isinstance(result, dict) else None
+    sha = commit.get("oid") if isinstance(commit, dict) else None
+    if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+        raise _error("PRECONDITION", "The source host did not confirm the inspected branch update")
+    return sha
+
+
 def update_files(
     connection,
     repo_full_name: str,
@@ -840,14 +900,27 @@ def update_files(
     message: str,
     *,
     author: dict[str, str] | None = None,
+    expected_head: str | None = None,
 ) -> str:
     """Change text ``files`` on the head of ``branch`` in one commit (GitHub:
     git data API on the head's tree; GitLab: commits API). Other hosts write
     one file per commit through ``put_file``. The ref update is never forced,
-    so a concurrent push makes it fail rather than be lost."""
+    but does not bind a prior inspection. ``expected_head`` instead requires
+    an atomic host-side condition; unsupported hosts refuse before writing.
+    GitHub authors conditional commits as the stored credential's owner."""
     if not files:
         raise _error("VALIDATION", "nothing to commit")
     host = _host(connection)
+    if expected_head is not None:
+        if not isinstance(expected_head, str) or re.fullmatch(r"[0-9a-f]{40}", expected_head) is None:
+            raise _error("VALIDATION", "an inspected full commit SHA is required")
+        if host != "github":
+            raise _error("UNSUPPORTED", "conditional multi-file branch updates are supported on GitHub only")
+        if any(item.executable for item in files):
+            raise _error("UNSUPPORTED", "conditional updates cannot change executable file modes")
+        return _wrap(
+            _github_update_if_head, connection, repo_full_name, branch, files, message, expected_head
+        )
     if host == "github":
         return _wrap(_github_update, connection, repo_full_name, branch, files, message, author)
     if host == "gitlab":
