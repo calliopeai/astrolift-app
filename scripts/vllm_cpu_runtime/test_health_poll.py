@@ -1,6 +1,7 @@
 """Actual localhost startup resets; Docker effects are isolated test doubles."""
 
 import importlib.util
+import io
 import json
 import socket
 import struct
@@ -17,6 +18,42 @@ spec = importlib.util.spec_from_file_location(
 )
 smoke = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(smoke)
+
+STARTUP_LOG = (
+    b"(APIServer pid=1) INFO [model.py:1561] Using max model len 256\n"
+    b"(EngineCore_DP0 pid=14) INFO [default_loader.py:291] Loading weights took 1.44 seconds\n"
+    b"(EngineCore_DP0 pid=14) INFO [core.py:272] init engine (profile, create kv cache, warmup model) took 0.55 seconds\n"
+    b"(APIServer pid=1) INFO [serving.py:177] Warming up chat template processing...\n"
+)
+MEMORY_STAT = (
+    "anon 2952790016\nfile 1207959552\nkernel 41943040\nshmem 33554432\n"
+    "file_mapped 1048576000\nslab 20971520\ninactive_file 905969664\n"
+    "active_file 301989888\n"
+)
+
+
+class FollowedLogs:
+    """A `docker logs --follow` double replaying a vLLM startup."""
+
+    def __init__(self, command, **_kwargs):
+        self.stdout = io.BytesIO(STARTUP_LOG)
+
+    def kill(self):
+        pass
+
+    def wait(self, timeout=None):
+        return 0
+
+
+_follow = patch.object(smoke.subprocess, "Popen", FollowedLogs)
+
+
+def setUpModule():
+    _follow.start()
+
+
+def tearDownModule():
+    _follow.stop()
 
 
 @contextmanager
@@ -62,13 +99,21 @@ def startup_server(*, always_reset=False):
         worker.join(2)
 
 
-def docker_observations(port, *, stops_after_reset=False, cgroup_root=None):
+def docker_observations(
+    port, *, stops_after_reset=False, cgroup_root=None, oom_kill_at=None
+):
     inspections = 0
+    parents = []
 
     def output(command, **_kwargs):
         nonlocal inspections
         if command[:2] == ["docker", "inspect"]:
             inspections += 1
+            if oom_kill_at and inspections == oom_kill_at:
+                # The kernel kills the engine; PID 1 stays up without serving.
+                (parents[0] / "memory.events").write_text(
+                    "low 0\nhigh 0\nmax 1194\noom 1\noom_kill 1\noom_group_kill 0\n"
+                )
             stopped = stops_after_reset and inspections >= 3
             return json.dumps(
                 [
@@ -90,6 +135,8 @@ def docker_observations(port, *, stops_after_reset=False, cgroup_root=None):
             if cgroup_root:
                 parent = cgroup_root / command[command.index("--cgroup-parent") + 1]
                 parent.mkdir()
+                parents.append(parent)
+                (parent / "memory.stat").write_text(MEMORY_STAT)
                 (parent / "memory.peak").write_text("3758096384\n")
                 (parent / "memory.current").write_text("3489660928\n")
                 (parent / "memory.events").write_text(
@@ -155,6 +202,80 @@ class HealthPollingTests(unittest.TestCase):
                     "events": {"max": 0, "oom": 0, "oom_kill": 0, "oom_group_kill": 0},
                 },
             )
+
+    def test_completion_records_memory_at_each_startup_point_and_ready(self):
+        with startup_server() as (
+            port,
+            observed,
+        ), tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof = root / "proof.json"
+            with self.run_smoke(port, cgroup_root=root), patch.object(
+                smoke, "CGROUP_ROOT", root
+            ), patch.object(
+                smoke, "inspect_target", return_value="synthetic-image"
+            ), patch.object(smoke.time, "sleep"), patch.object(smoke.subprocess, "run"):
+                smoke.smoke("synthetic-image", proof)
+            data = json.loads(proof.read_text())
+        self.assertTrue(data["passed"])
+        phases = data["memory_phases"]
+        self.assertEqual(
+            list(phases),
+            [
+                "before_engine_start",
+                "weights_loaded",
+                "kv_cache_allocated",
+                "warmup",
+                "ready",
+            ],
+        )
+        for sample in phases.values():
+            self.assertIsInstance(sample.pop("elapsed_s"), float)
+            self.assertEqual(
+                sample,
+                {
+                    "current_bytes": 3489660928,
+                    "anon": 2952790016,
+                    "file": 1207959552,
+                    "shmem": 33554432,
+                    "file_mapped": 1048576000,
+                    "active_file": 301989888,
+                    "inactive_file": 905969664,
+                    "kernel": 41943040,
+                    "slab": 20971520,
+                },
+            )
+
+    def test_oom_kill_during_readiness_stops_before_the_deadline(self):
+        with startup_server(always_reset=True) as (
+            port,
+            observed,
+        ), tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proof = root / "proof.json"
+            with self.run_smoke(port, cgroup_root=root, oom_kill_at=3), patch.object(
+                smoke, "CGROUP_ROOT", root
+            ), patch.object(
+                smoke, "inspect_target", return_value="synthetic-image"
+            ), patch.object(smoke.time, "sleep") as sleep, patch.object(
+                smoke.time, "monotonic", side_effect=[0, 1, 3, 5]
+            ), patch.object(smoke.subprocess, "run") as run:
+                with self.assertRaises(SystemExit):
+                    smoke.smoke("synthetic-image", proof)
+            data = json.loads(proof.read_text())
+        self.assertFalse(data["passed"])
+        self.assertEqual(data["failure_type"], "OomKillDuringReadiness")
+        self.assertEqual(data["outcome"], "oom_kill during readiness")
+        self.assertNotIn("container_exit", data)
+        self.assertNotIn("completion_received", data)
+        self.assertNotIn("ready", data["memory_phases"])
+        self.assertEqual(sleep.call_count, 1)
+        self.assertEqual(observed, {"health": 1, "completion": 0})
+        self.assertEqual(data["memory_evidence"]["events"]["oom_kill"], 1)
+        self.assertEqual(
+            [call.args[0][:2] for call in run.call_args_list],
+            [["docker", "logs"], ["docker", "rm"]],
+        )
 
     def test_unreadable_memory_evidence_leaves_the_completion_passing(self):
         with startup_server() as (
