@@ -142,6 +142,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # an introspection-derived list, or its presence here on supported
     # installs.
     "server_info.handshake",
+    "identity.zentinelle_read_scope",
 )
 
 
