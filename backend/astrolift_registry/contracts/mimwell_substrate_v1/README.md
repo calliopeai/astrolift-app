@@ -16,7 +16,7 @@ malformed, duplicate or incomplete contract. It does not import/run private
 Mimwell code or reproduce its status algorithm. The process caches only this
 verified immutable deployment artifact; requests cannot select or refresh it.
 A future data update requires an explicit reviewed source/pin change and normal
-qualification. This pin is not unpublished public 0.3.7/S4 or private M76.
+qualification. This v0.3.6 pin does not change when a later engine release is published.
 
 A supported matrix cell describes engine placement, not installed authority,
 protection, a bucket/credential binding, volume attachment, source authorization,
