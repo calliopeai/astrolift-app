@@ -86,3 +86,99 @@ async def test_a_failed_install_records_the_requesting_org(temporal_env):
 
     assert result.ok is False
     assert recorded == [(7, 3, "failed", 42)]
+
+
+async def test_crd_readiness_survives_more_than_three_attempts(temporal_env):
+    from temporalio.exceptions import ApplicationError
+
+    recorded: list = []
+    attempts = 0
+
+    @activity.defn(name="astrolift.cluster.install_prereqs")
+    async def install(
+        cluster_id: int, selected_keys: list[str], option_overrides: dict, additive: bool = False
+    ) -> dict:
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 4:
+            raise ApplicationError(
+                "operator CRDs not registered", type="BootstrapReadinessPending", non_retryable=True
+            )
+        return {"applied": [{"name": "cert-manager", "version": "1.15.0"}], "skipped": []}
+
+    async with temporal_worker(
+        temporal_env, workflows=[InstallClusterPrereqsWorkflow], activities=[install, _recorder(recorded)]
+    ):
+        result = await temporal_env.client.execute_workflow(
+            InstallClusterPrereqsWorkflow.run,
+            _input(),
+            id="bootstrap-delayed-crds",
+            task_queue="astrolift-test",
+        )
+    assert result.ok is True
+    assert attempts == 5
+    assert recorded == [(7, 3, "succeeded", 42)]
+
+
+async def test_readiness_wait_is_bounded_and_keeps_the_underlying_diagnostic(temporal_env):
+    from temporalio.exceptions import ApplicationError
+
+    recorded: list = []
+    attempts = 0
+
+    @activity.defn(name="astrolift.cluster.install_prereqs")
+    async def install(
+        cluster_id: int, selected_keys: list[str], option_overrides: dict, additive: bool = False
+    ) -> dict:
+        nonlocal attempts
+        attempts += 1
+        raise ApplicationError(
+            "KnativeServing CRD is absent", type="BootstrapReadinessPending", non_retryable=True
+        )
+
+    async with temporal_worker(
+        temporal_env, workflows=[InstallClusterPrereqsWorkflow], activities=[install, _recorder(recorded)]
+    ):
+        result = await temporal_env.client.execute_workflow(
+            InstallClusterPrereqsWorkflow.run,
+            _input(),
+            id="bootstrap-readiness-deadline",
+            task_queue="astrolift-test",
+        )
+    assert result.ok is False
+    assert 3 < attempts <= 40
+    assert "readiness deadline exceeded" in result.message
+    assert "KnativeServing CRD is absent" in result.message
+    assert recorded == [(7, 3, "failed", 42)]
+
+
+async def test_permanent_failure_is_not_retried_as_readiness(temporal_env):
+    from temporalio.exceptions import ApplicationError
+
+    recorded: list = []
+    attempts = 0
+
+    @activity.defn(name="astrolift.cluster.install_prereqs")
+    async def install(
+        cluster_id: int, selected_keys: list[str], option_overrides: dict, additive: bool = False
+    ) -> dict:
+        nonlocal attempts
+        attempts += 1
+        raise ApplicationError(
+            "iam:CreateRole denied for the controller", type="AccessDenied", non_retryable=True
+        )
+
+    async with temporal_worker(
+        temporal_env, workflows=[InstallClusterPrereqsWorkflow], activities=[install, _recorder(recorded)]
+    ):
+        result = await temporal_env.client.execute_workflow(
+            InstallClusterPrereqsWorkflow.run,
+            _input(),
+            id="bootstrap-permanent-diagnostic",
+            task_queue="astrolift-test",
+        )
+    assert result.ok is False
+    assert attempts == 1
+    assert "iam:CreateRole denied for the controller" in result.message
+    assert "Activity task failed" not in result.message
+    assert recorded == [(7, 3, "failed", 42)]
