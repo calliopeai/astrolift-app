@@ -1,7 +1,38 @@
 import "@testing-library/jest-dom/vitest";
 
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterAll, afterEach } from "vitest";
+
+// A timer still pending when a file's jsdom is torn down fires against a
+// realm that is gone: Apollo's one-time devtools suggestion (10 s, reads
+// `window`) throws "window is not defined", and Radix FocusScope's unmount
+// (0 ms, `new CustomEvent`) throws "parameter 1 is not of type 'Event'".
+// Vitest reports either as an unhandled error and fails a run whose tests all
+// passed. Track the timers a file starts and clear the leftovers before its
+// environment goes; Vitest's own runner keeps its own timer references.
+const realSetTimeout = globalThis.setTimeout;
+const realClearTimeout = globalThis.clearTimeout;
+const pendingTimers = new Set<ReturnType<typeof realSetTimeout>>();
+globalThis.setTimeout = ((handler: (...args: unknown[]) => void, delay?: number, ...args: unknown[]) => {
+  const id = realSetTimeout(
+    (...callArgs: unknown[]) => {
+      pendingTimers.delete(id);
+      handler(...callArgs);
+    },
+    delay,
+    ...args,
+  );
+  pendingTimers.add(id);
+  return id;
+}) as typeof setTimeout;
+globalThis.clearTimeout = ((id?: ReturnType<typeof realSetTimeout>) => {
+  if (id !== undefined) pendingTimers.delete(id);
+  realClearTimeout(id);
+}) as typeof clearTimeout;
+afterAll(() => {
+  for (const id of pendingTimers) realClearTimeout(id);
+  pendingTimers.clear();
+});
 
 // jsdom does not implement the browser observer used by the shared graph
 // canvas. Keep the polyfill global so every DAG/topology surface exercises
