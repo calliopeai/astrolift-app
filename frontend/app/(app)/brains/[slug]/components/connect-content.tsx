@@ -13,6 +13,7 @@ export function ConnectContent() {
       endpoints={framed.brain.environments}
       connecting={framed.connecting}
       onConnect={framed.onConnect}
+      onOpenPortal={framed.onOpenPortal}
     />
   );
 }

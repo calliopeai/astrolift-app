@@ -16104,6 +16104,7 @@
       "token": "Token de leitura",
       "tokenDescription": "Conectar emite para você um token de leitura válido por 15 minutos e o mostra uma única vez, com uma configuração de cliente MCP para colar. Conecte novamente para obter outro; fechar a caixa de diálogo o descarta.",
       "connect": "Conectar",
+      "openPortal": "Abrir portal",
       "notServed": "Ainda não servida",
       "notServedDescription": "Um cliente se conecta a um ambiente com URL; a primeira implantação lhe dá uma.",
       "endpoints": "Endpoints MCP",

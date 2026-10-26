@@ -44,3 +44,16 @@ export const NotServed: Story = {
     ).not.toBeInTheDocument();
   },
 };
+
+/** Portal delivery remains an explicit action, bound to its selected endpoint. */
+export const BrowserPortal: Story = {
+  args: { onOpenPortal: fn() },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(args.onOpenPortal).not.toHaveBeenCalled();
+    const buttons = canvas.getAllByRole("button", { name: "Open portal" });
+    await userEvent.click(buttons[0]);
+    await expect(args.onOpenPortal).toHaveBeenCalledWith(args.endpoints[0].url);
+    await expect(args.onConnect).not.toHaveBeenCalled();
+  },
+};

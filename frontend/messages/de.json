@@ -16107,6 +16107,7 @@
       "token": "Lesetoken",
       "tokenDescription": "„Verbinden“ stellt Ihnen ein Lesetoken für 15 Minuten aus und zeigt es einmal an, zusammen mit einer MCP-Client-Konfiguration zum Einfügen. Verbinden Sie erneut für ein neues; beim Schließen des Dialogs wird es verworfen.",
       "connect": "Verbinden",
+      "openPortal": "Portal öffnen",
       "notServed": "Noch nicht erreichbar",
       "notServedDescription": "Ein Client verbindet sich mit einer Umgebung, die eine URL hat; die erste Bereitstellung gibt ihr eine.",
       "endpoints": "MCP-Endpunkte",

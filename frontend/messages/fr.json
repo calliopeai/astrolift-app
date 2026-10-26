@@ -16107,6 +16107,7 @@
       "token": "Jeton de lecture",
       "tokenDescription": "« Connecter » émet pour vous un jeton de lecture valable 15 minutes et l’affiche une seule fois, avec une configuration de client MCP à coller. Reconnectez-vous pour en obtenir un nouveau ; fermer la boîte de dialogue l’efface.",
       "connect": "Connecter",
+      "openPortal": "Ouvrir le portail",
       "notServed": "Pas encore servie",
       "notServedDescription": "Un client se connecte à un environnement doté d’une URL ; le premier déploiement lui en donne une.",
       "endpoints": "Points de terminaison MCP",
