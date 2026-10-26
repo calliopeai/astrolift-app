@@ -244,7 +244,7 @@ def test_wrong_account_or_cluster_refuses_without_mutation(fixture):
     assert mutations(calls) == []
 
 
-def test_current_catalogue_does_not_expose_unadmitted_collector(fixture):
+def test_current_catalogue_does_not_expose_unadmitted_collector(fixture, monkeypatch):
     _spec, clients, _, _, _ = fixture
     driver = EKSClusterDriver(
         config=EKSConfig(region=REGION, cluster_name=NAME),
@@ -252,6 +252,14 @@ def test_current_catalogue_does_not_expose_unadmitted_collector(fixture):
         sts_client=clients["sts"],
         ec2_client=clients["ec2"],
     )
+
+    # Moto does not implement DescribeAddon; model AWS's absent-add-on response.
+    def absent_addon(**kwargs):
+        raise clients["eks"].exceptions.ResourceNotFoundException(
+            {"Error": {"Code": "ResourceNotFoundException", "Message": "No add-on"}}, "DescribeAddon"
+        )
+
+    monkeypatch.setattr(clients["eks"], "describe_addon", absent_addon)
     ctx = ClusterContext(slug="fixture", auth_method="exec_plugin", auth_config={"cluster_name": NAME})
     assert "fluent-bit-cloudwatch" not in {c.key for c in driver.bootstrap_components(ctx)}
 

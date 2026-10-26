@@ -936,3 +936,15 @@ def test_bootstrap_reuses_an_eks_managed_ebs_addon(driver):
         assert ebs.requires == []
     finally:
         driver._eks.describe_addon = original
+
+
+@pytest.mark.parametrize("code", ["AccessDeniedException", "ThrottlingException"])
+def test_bootstrap_does_not_treat_addon_lookup_failures_as_absence(driver, monkeypatch, code):
+    from botocore.exceptions import ClientError
+
+    def fail(**kwargs):
+        raise ClientError({"Error": {"Code": code, "Message": "test failure"}}, "DescribeAddon")
+
+    monkeypatch.setattr(driver._eks, "describe_addon", fail)
+    with pytest.raises(ClientError, match=code):
+        driver.bootstrap_components(ClusterContext(slug="test-cluster", auth_method="exec_plugin"))
