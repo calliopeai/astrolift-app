@@ -241,6 +241,8 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
 
         # Containers diff under the workload row.
         c_result = _persist_containers(row, m.containers)
+        if c_result.primary_paths:
+            _follow_mirrored_build_paths(app, *c_result.primary_paths)
         result.containers_created += c_result.created
         result.containers_updated += c_result.updated
         result.containers_soft_deleted += c_result.soft_deleted
@@ -659,6 +661,9 @@ class _ContainerDiff:
     created: int = 0
     updated: int = 0
     soft_deleted: int = 0
+    # The primary container's (dockerfile_path, build_context) before and
+    # after, when this sync changed either (#2531).
+    primary_paths: tuple[tuple[str, str], tuple[str, str]] | None = None
 
 
 def _persist_containers(workload, containers: tuple[ContainerManifest, ...]) -> _ContainerDiff:
@@ -694,6 +699,10 @@ def _persist_containers(workload, containers: tuple[ContainerManifest, ...]) -> 
             )
             diff.created += 1
         elif _container_changed(row, m, env_dict):
+            before = (row.dockerfile_path, row.build_context)
+            after = (m.dockerfile_path, m.build_context)
+            if row.is_primary and m.is_primary and before != after:
+                diff.primary_paths = (before, after)
             row.is_primary = m.is_primary
             row.image_ref = m.image_ref or ""
             row.dockerfile_path = m.dockerfile_path
@@ -709,6 +718,29 @@ def _persist_containers(workload, containers: tuple[ContainerManifest, ...]) -> 
             diff.updated += 1
 
     return diff
+
+
+def _follow_mirrored_build_paths(app, before: tuple[str, str], after: tuple[str, str]) -> None:
+    """Move the app-level build paths with the manifest when they mirror it (#2531).
+
+    A platform build prefers ``RegisteredApp.dockerfile_path`` /
+    ``build_context`` over the manifest, so an operator's explicit choice is
+    never overridden by a manifest. Registration copies the manifest's paths
+    there, though, so a later manifest change was silently ignored: the build
+    kept the old Dockerfile while the container row showed the new one. An
+    app-level value equal to what the manifest said before is a mirror, not a
+    choice, and follows it; one that differs is left alone.
+    """
+    fields = []
+    for attr, old, new in (
+        ("dockerfile_path", before[0], after[0]),
+        ("build_context", before[1], after[1]),
+    ):
+        if old != new and getattr(app, attr) == old:
+            setattr(app, attr, new)
+            fields.append(attr)
+    if fields:
+        app.save(update_fields=[*fields, "updated_at", "version"])
 
 
 def _workload_changed(row, m: WorkloadManifest) -> bool:
