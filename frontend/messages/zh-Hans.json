@@ -11147,7 +11147,10 @@
       "feedbackDeployed": "代理部署已接受。收到心跳后才能确认连接。",
       "feedbackIssueFailed": "无法签发代理密钥。",
       "feedbackDeployFailed": "无法部署代理。",
-      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。"
+      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。",
+      "managedDescription": "控制平面会同时安装凭据和代理。现有凭据会一直有效，直到替换代理连接成功。",
+      "managedPending": "正在安装代理并验证首次心跳…",
+      "managedConnected": "代理已连接，凭据和部署均已验证。"
     },
     "source": {
       "readFailed": "无法读取集群详情",

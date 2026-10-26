@@ -11147,7 +11147,10 @@
       "feedbackDeployed": "에이전트 배포가 승인되었습니다. 하트비트 수신으로 연결을 확인할 수 있습니다.",
       "feedbackIssueFailed": "에이전트 키를 발급하지 못했습니다.",
       "feedbackDeployFailed": "에이전트를 배포하지 못했습니다.",
-      "feedbackRefreshWarning": "변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요."
+      "feedbackRefreshWarning": "변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
+      "managedDescription": "제어 영역에서 자격 증명과 에이전트를 함께 설치합니다. 새 에이전트가 연결될 때까지 기존 자격 증명이 유지됩니다.",
+      "managedPending": "에이전트를 설치하고 첫 하트비트를 확인하는 중…",
+      "managedConnected": "에이전트가 연결되었습니다. 자격 증명과 배포를 확인했습니다."
     },
     "source": {
       "readFailed": "클러스터 세부 정보를 읽지 못했습니다",

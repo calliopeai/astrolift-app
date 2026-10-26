@@ -32,7 +32,9 @@ async def temporal_test_env() -> AsyncIterator[Any]:
         async with WorkflowEnvironment.from_client(client) as env:
             yield env
         return
-    async with await WorkflowEnvironment.start_time_skipping() as env:
+    async with await WorkflowEnvironment.start_time_skipping(
+        test_server_existing_path=os.getenv("ASTROLIFT_TEST_TEMPORAL_SERVER_PATH") or None,
+    ) as env:
         yield env
 
 

@@ -583,7 +583,12 @@ def deploy_agent_dispatch(*, cluster: TenantCluster) -> Any:
 
     with transaction.atomic():
         cluster = TenantCluster.objects.select_for_update().get(pk=cluster.pk)
-        from astrolift_clusters.agent_install import installation_busy, reconcile_installed_agent
+        from astrolift_clusters.agent_install import (
+            AgentInstallError,
+            installation_busy,
+            reconcile_installed_agent,
+            verify_legacy_agent_secret,
+        )
         from core.install_restrictions import cluster_scope_refusal
 
         # The agent's ClusterRole is cluster-scoped RBAC, which the minimal
@@ -595,6 +600,10 @@ def deploy_agent_dispatch(*, cluster: TenantCluster) -> Any:
             raise ClusterManagementError("A server-owned agent installation is pending")
         if cluster.agent_secret_uid:
             return reconcile_installed_agent(cluster)
+        try:
+            verify_legacy_agent_secret(cluster)
+        except AgentInstallError as error:
+            raise ClusterManagementError(str(error)) from None
         driver = _driver_for_cluster(cluster)
         if not hasattr(driver, "apply_manifests"):
             raise ClusterManagementError(

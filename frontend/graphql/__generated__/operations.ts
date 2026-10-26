@@ -18574,6 +18574,27 @@ export type GetProviderPluginReferenceQueryVariables = Exact<{
 
 export type GetProviderPluginReferenceQuery = { astroliftProviderPlugin?: { id: string, slug: string, name: string, version: string, capabilitiesManifest: unknown, isEnabled: boolean } | null };
 
+export type ReviewClusterAgentInstallQueryVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+}>;
+
+
+export type ReviewClusterAgentInstallQuery = { astroliftClusterAgentInstallReview: { clusterId: string, version: number, source: string } };
+
+export type InstallClusterAgentMutationVariables = Exact<{
+  input: InstallClusterAgentInput;
+}>;
+
+
+export type InstallClusterAgentMutation = { installClusterAgent: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, clusterId: string, requestId: string, status: ClusterAgentInstallStatus, secretConfirmed: boolean, deploymentConfirmed: boolean, heartbeatConfirmed: boolean, retryable: boolean, errorCode: string, errorMessage: string } | null } };
+
+export type GetClusterAgentInstallQueryVariables = Exact<{
+  installId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetClusterAgentInstallQuery = { astroliftClusterAgentInstall: { id: string, clusterId: string, requestId: string, status: ClusterAgentInstallStatus, secretConfirmed: boolean, deploymentConfirmed: boolean, heartbeatConfirmed: boolean, retryable: boolean, errorCode: string, errorMessage: string } };
+
 export type DomainAppRouteSupportQueryVariables = Exact<{
   domainId: Scalars['GUID']['input'];
   expectedDomainVersion: Scalars['Int']['input'];

@@ -11147,7 +11147,10 @@
       "feedbackDeployed": "Agent deployment accepted. A received heartbeat confirms the connection.",
       "feedbackIssueFailed": "Could not issue the agent key.",
       "feedbackDeployFailed": "Could not deploy the agent.",
-      "feedbackRefreshWarning": "The change was accepted, but cluster details could not be refreshed. Refresh to see current state."
+      "feedbackRefreshWarning": "The change was accepted, but cluster details could not be refreshed. Refresh to see current state.",
+      "managedDescription": "The control plane installs the credential and agent together. An existing credential stays active until the replacement agent connects.",
+      "managedPending": "Installing the agent and verifying its first heartbeat…",
+      "managedConnected": "Agent connected. Credential and deployment verified."
     },
     "source": {
       "readFailed": "Could not read cluster details",

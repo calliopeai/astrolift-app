@@ -65,6 +65,7 @@ const serverCluster = {
 };
 type Mode =
   | "accepted"
+  | "managed"
   | "refused"
   | "fallback"
   | "transport"
@@ -85,7 +86,37 @@ function context(locale: string, mode: Mode = "accepted", rotated = false, activ
     const request = JSON.parse(String(init?.body)) as Request;
     requests.push(request);
     let data;
-    if (request.operationName === "GetCluster") {
+    if (request.operationName === "WithheldCapabilities") {
+      data = {
+        astroliftWithheldCapabilities:
+          mode === "managed" ? [] : [{ capability: "controllers", reason: "MANUAL_INSTALL_TEST" }],
+      };
+    } else if (request.operationName === "ReviewClusterAgentInstall") {
+      data = {
+        astroliftClusterAgentInstallReview: {
+          clusterId: CLUSTER.id,
+          version: 7,
+          source: "review-proof",
+        },
+      };
+    } else if (["InstallClusterAgent", "GetClusterAgentInstall"].includes(request.operationName)) {
+      const installed = {
+        id: "install-one",
+        clusterId: CLUSTER.id,
+        requestId: "request-one",
+        status: "SUCCEEDED",
+        secretConfirmed: true,
+        deploymentConfirmed: true,
+        heartbeatConfirmed: true,
+        retryable: false,
+        errorCode: "",
+        errorMessage: "",
+      };
+      data =
+        request.operationName === "InstallClusterAgent"
+          ? { installClusterAgent: { ok: true, errors: [], data: installed } }
+          : { astroliftClusterAgentInstall: installed };
+    } else if (request.operationName === "GetCluster") {
       reads++;
       if (mode === "read-deferred" && request.variables.slug === "next")
         await new Promise<void>((resolve) => {
@@ -129,7 +160,10 @@ function context(locale: string, mode: Mode = "accepted", rotated = false, activ
               ? {
                   ...issued,
                   rotated,
-                  clusterId: mode === "wrong-target" ? "FOREIGN_CLUSTER" : CLUSTER.id,
+                  clusterId:
+                    mode === "wrong-target"
+                      ? "FOREIGN_CLUSTER"
+                      : (request.variables.input as { clusterId: string }).clusterId,
                 }
               : {
                   __typename: "AstroliftTenantCluster",
@@ -334,7 +368,10 @@ describe.each(locales)("Cluster heartbeat agent in %s", (locale) => {
         "kubectl create secret generic astrolift-agent \\",
         "  --namespace astrolift-system \\",
         `  --from-literal=heartbeat_url='${issued.heartbeatUrl}' \\`,
-        `  --from-literal=agent_key='${issued.agentKey}'`,
+        `  --from-literal=agent_key='${issued.agentKey}' --dry-run=client -o yaml | kubectl apply -f -`,
+        "if kubectl get deployment astrolift-agent --namespace astrolift-system >/dev/null 2>&1; then",
+        "  kubectl rollout restart deployment/astrolift-agent --namespace astrolift-system",
+        "fi",
       ].join("\n"),
     ]);
   });
@@ -471,11 +508,11 @@ it("target change unmounts prior credential controls while the new source waits,
   expect(await screen.findByRole("button", { name: tFor("de")("deploy") })).toBeTruthy();
   expect(screen.queryByText(issued.agentKey)).toBeNull();
   ctx.setMode("accepted");
-  await userEvent.click(screen.getByRole("button", { name: tFor("de")("deploy") }));
-  await waitFor(() =>
-    expect(feedback.success).toHaveBeenCalledWith(tFor("de")("feedbackDeployed"))
-  );
-  expect(ctx.requests.find((r) => r.operationName === "DeployClusterAgent")?.variables).toEqual({
+  await userEvent.click(screen.getByRole("button", { name: tFor("de")("rotate") }));
+  await waitFor(() => expect(feedback.success).toHaveBeenCalledWith(tFor("de")("feedbackIssued")));
+  expect(
+    ctx.requests.filter((r) => r.operationName === "IssueClusterAgentKey").at(-1)?.variables
+  ).toEqual({
     input: { clusterId: "NEXT_CLUSTER" },
   });
 });
@@ -596,3 +633,18 @@ it.each(locales)(
     }
   }
 );
+
+it("uses the managed installation from unrestricted cluster settings", async () => {
+  const ctx = context("en", "managed", false, false);
+  render(<SettingsJourney />, { wrapper: ctx.Wrapper });
+  const button = await screen.findByRole("button", { name: tFor("en")("deploy") });
+  expect(screen.queryByRole("button", { name: tFor("en")("rotate") })).toBeNull();
+  await userEvent.click(button);
+  expect(await screen.findByText(tFor("en")("managedConnected"))).toBeTruthy();
+  expect(ctx.requests.some((r) => r.operationName === "InstallClusterAgent")).toBe(true);
+  expect(
+    ctx.requests.some((r) =>
+      ["IssueClusterAgentKey", "DeployClusterAgent"].includes(r.operationName)
+    )
+  ).toBe(false);
+});

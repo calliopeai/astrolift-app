@@ -1199,3 +1199,45 @@ def test_transport_initialization_failure_preserves_current_key_and_masks_diagno
     assert not row.heartbeat_confirmed_at
     assert diagnostic not in row.error_message and diagnostic not in caplog.text
     assert pulse(world).status_code == 200
+
+
+@pytest.mark.parametrize("condition", ["missing", "wrong-key", "wrong-url"])
+def test_legacy_deploy_refuses_unusable_secret_before_any_writes(world, condition):
+    from core.cluster_management import ClusterManagementError, deploy_agent_dispatch
+
+    if condition != "missing":
+        key = b"wrong-key" if condition == "wrong-key" else b"previous-disposable-key"
+        url = (
+            "https://foreign.invalid/heartbeat"
+            if condition == "wrong-url"
+            else (f"https://control-plane.invalid/api/clusters/v1/{world.cluster.guid}/heartbeat/")
+        )
+        world.server.objects["/api/v1/namespaces/astrolift-system/secrets/astrolift-agent"] = {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {"name": "astrolift-agent", "namespace": "astrolift-system"},
+            "data": {
+                "agent_key": base64.b64encode(key).decode(),
+                "heartbeat_url": base64.b64encode(url.encode()).decode(),
+            },
+        }
+    with pytest.raises(ClusterManagementError, match="Install or update the astrolift-agent Secret"):
+        deploy_agent_dispatch(cluster=world.cluster)
+    assert not any(method in {"POST", "PATCH"} for method, _, _ in world.server.calls)
+
+
+def test_legacy_deploy_accepts_a_secret_for_the_current_cluster(world):
+
+    world.server.objects["/api/v1/namespaces/astrolift-system/secrets/astrolift-agent"] = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {"name": "astrolift-agent", "namespace": "astrolift-system"},
+        "data": {
+            "agent_key": base64.b64encode(b"previous-disposable-key").decode(),
+            "heartbeat_url": base64.b64encode(
+                f"https://control-plane.invalid/api/clusters/v1/{world.cluster.guid}/heartbeat/".encode()
+            ).decode(),
+        },
+    }
+    install.verify_legacy_agent_secret(world.cluster)
+    assert not any(method in {"POST", "PATCH"} for method, _, _ in world.server.calls)
