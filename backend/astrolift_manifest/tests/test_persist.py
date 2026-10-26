@@ -636,3 +636,50 @@ bind_workloads = ["web"]
     attachment.refresh_from_db()
     assert attachment.workload_names == ["web"]
     assert attachment.deleted_at is None
+
+
+# ---- app-level build paths follow a mirrored manifest (#2531) ------------------
+
+DOCKERFILE_MANIFEST = """
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+
+  [[workloads.containers]]
+  name = "app"
+  is_primary = true
+  dockerfile_path = "{path}"
+  build_context = "."
+  port = 8080
+"""
+
+
+def test_a_mirrored_app_dockerfile_follows_the_manifest():
+    """Registration copies the manifest's Dockerfile onto the app, and a
+    platform build prefers the app's. Before #2531 a later manifest change
+    left the build on the old Dockerfile while the container row moved."""
+    app = _scaffold()
+    old, new = "extensions/portal-container/Dockerfile", "runtime/portal-container/Dockerfile"
+    persist_manifest(app, _normalize(DOCKERFILE_MANIFEST.format(path=old)))
+    app.dockerfile_path = old
+    app.save(update_fields=["dockerfile_path"])
+
+    persist_manifest(app, _normalize(DOCKERFILE_MANIFEST.format(path=new)))
+
+    app.refresh_from_db()
+    assert app.dockerfile_path == new
+    assert Container.objects.get(workload__registered_app=app).dockerfile_path == new
+
+
+def test_an_operator_chosen_app_dockerfile_is_left_alone():
+    app = _scaffold()
+    persist_manifest(app, _normalize(DOCKERFILE_MANIFEST.format(path="Dockerfile.a")))
+    app.dockerfile_path = "docker/Dockerfile.prod"
+    app.save(update_fields=["dockerfile_path"])
+
+    persist_manifest(app, _normalize(DOCKERFILE_MANIFEST.format(path="Dockerfile.b")))
+
+    app.refresh_from_db()
+    assert app.dockerfile_path == "docker/Dockerfile.prod"

@@ -299,6 +299,10 @@ jobs:
                   "LICENSE", ".gitignore"
               }:
                   continue
+              # Live-install probes run by hand against a cluster; no suite
+              # reads them (verification/manifests is read, so not all of it).
+              elif path.startswith(("verification/edge-gate/", "verification/edge-brain-kind/")):
+                  continue
               else:
                   backend = frontend = routes = contracts = providers = True
                   selected = set(shards)

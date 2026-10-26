@@ -41,7 +41,7 @@ def reapplied(monkeypatch):
     return calls
 
 
-def _world(slug="veruus-demo", ingress_class="envoy"):
+def _world(slug="veruus-demo", ingress_class="envoy", url="https://x", oidc_auth_config=None):
     org = Organization.objects.create(name="V", slug=f"v-{uuid.uuid4().hex[:8]}")
     team = Team.objects.create(organization=org, name="t", slug=f"t-{uuid.uuid4().hex[:6]}")
     project = Project.objects.create(organization=org, team=team, name="p", slug=f"p-{uuid.uuid4().hex[:6]}")
@@ -63,8 +63,9 @@ def _world(slug="veruus-demo", ingress_class="envoy"):
         auth_config={"kubeconfig": "fake"},
         is_active=True,
         ingress_class=ingress_class,
+        oidc_auth_config=oidc_auth_config or {},
     )
-    AppEnvironment.objects.create(registered_app=app, tenant_cluster=cluster, name="prod", url="https://x")
+    AppEnvironment.objects.create(registered_app=app, tenant_cluster=cluster, name="prod", url=url)
     return org, app, cluster
 
 
@@ -146,14 +147,84 @@ def test_redeploying_an_unchanged_app_does_not_reapply(reapplied):
     assert reapplied == []
 
 
-def test_an_open_app_leaves_no_rule(reapplied):
+def test_an_open_app_records_its_hosts_with_no_grant(reapplied):
+    """#2533: the hosts are recorded so a later restriction needs no deploy;
+    an empty grant renders no authorization rule."""
+    from providers.k8s_native.edge_gateway import edge_authorization
+
     _org, app, cluster = _world()
 
     edge_access.record_environment(cluster, app, "veruus-prod", [ROUTE])
 
     cluster.refresh_from_db()
+    entry = cluster.edge_access_rules[f"{app.guid}/veruus-prod"]
+    assert entry["hosts"] == ["veruus-demo.apps.example.net"]
+    assert entry["groups"] == [] and entry["users"] == []
+    assert edge_authorization(list(cluster.edge_access_rules.values()), {}) is None
+
+
+def test_restricting_an_open_app_reaches_the_edge_without_a_deploy(reapplied):
+    """#2533: before, set_app_access found no entry for an open app and did
+    nothing, while the API and CLI reported the rule in force."""
+    _org, app, cluster = _world()
+    edge_access.record_environment(cluster, app, "veruus-prod", [ROUTE])
+    reapplied.clear()
+
+    edge_access.set_app_access(app, groups=[], users=["Guest@Example.com"], source="ui")
+
+    cluster.refresh_from_db()
+    entry = cluster.edge_access_rules[f"{app.guid}/veruus-prod"]
+    assert entry["hosts"] == ["veruus-demo.apps.example.net"]
+    assert entry["users"] == ["guest@example.com"]
+    assert reapplied == [cluster.slug]
+
+
+def test_an_app_deployed_before_recording_takes_its_managed_host_from_its_url(reapplied):
+    from core.app_deploy import namespace_for_environment
+
+    _org, app, cluster = _world(
+        url="https://veruus-demo.apps.example.net",
+        oidc_auth_config={"auth_proxy_host": "auth.apps.example.net"},
+    )
+    assert cluster.edge_access_rules == {}
+
+    edge_access.set_app_access(app, groups=["veruus"], users=[], source="ui")
+
+    cluster.refresh_from_db()
+    namespace = namespace_for_environment(app.environments.get())
+    entry = cluster.edge_access_rules[f"{app.guid}/{namespace}"]
+    assert entry["hosts"] == ["veruus-demo.apps.example.net"]
+    assert entry["groups"] == ["veruus"]
+    assert reapplied == [cluster.slug]
+
+
+def test_a_url_outside_the_edge_zone_is_not_taken(reapplied):
+    """A custom domain has a policy of its own; it never enters the shared one."""
+    _org, app, cluster = _world(
+        url="https://portal.customer.example", oidc_auth_config={"auth_proxy_host": "auth.apps.example.net"}
+    )
+
+    edge_access.set_app_access(app, groups=["veruus"], users=[], source="ui")
+
+    cluster.refresh_from_db()
     assert cluster.edge_access_rules == {}
     assert reapplied == []
+
+
+def test_clearing_keeps_the_hosts_so_restricting_again_needs_no_deploy(reapplied):
+    _org, app, cluster = _world()
+    app.edge_access = {"groups": ["veruus"], "users": [], "source": "ui"}
+    app.save()
+    edge_access.record_environment(cluster, app, "veruus-prod", [ROUTE])
+
+    edge_access.set_app_access(app, groups=[], users=[], source="ui")
+    cluster.refresh_from_db()
+    entry = cluster.edge_access_rules[f"{app.guid}/veruus-prod"]
+    assert entry["groups"] == [] and entry["hosts"] == ["veruus-demo.apps.example.net"]
+
+    edge_access.set_app_access(app, groups=["staff"], users=[], source="ui")
+    cluster.refresh_from_db()
+    assert cluster.edge_access_rules[f"{app.guid}/veruus-prod"]["groups"] == ["staff"]
 
 
 def test_a_teardown_removes_the_rule(reapplied):
