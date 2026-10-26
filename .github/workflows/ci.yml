@@ -66,6 +66,7 @@ jobs:
       format_files: ${{ steps.classify.outputs.format_files }}
       backend_test_matrix: ${{ steps.classify.outputs.backend_test_matrix }}
       pytest_markers: ${{ steps.classify.outputs.pytest_markers }}
+      tier: ${{ steps.classify.outputs.tier }}
       testdb_key: ${{ steps.testdb.outputs.key }}
     steps:
       - uses: actions/checkout@v5
@@ -369,6 +370,7 @@ jobs:
                   f"backend_test_matrix={json.dumps({'include': include}, separators=(',', ':'))}\n"
               )
               output.write(f"pytest_markers={markers}\n")
+              output.write(f"tier={tier}\n")
           print(f"tier={tier} ({reason or event}) markers={markers!r}")
           print(f"{flags} shards={[entry['name'] for entry in include]}")
           PY
@@ -620,9 +622,19 @@ jobs:
         # here (backend/conftest.py refuses them under CI).
         env:
           PYTEST_MARKERS: ${{ needs.changes.outputs.pytest_markers }}
+          # The nightly run measures which tests execute which lines, for
+          # pull requests to select by (scripts/coverage_map.py).
+          COVERAGE_MAP: ${{ needs.changes.outputs.tier == 'nightly' }}
+          COVERAGE_FILE: ${{ runner.temp }}/coverage/.coverage.${{ matrix.name }}
         run: |
           set -euo pipefail
           echo "tier markers: $PYTEST_MARKERS"
+          COV=()
+          if [[ "$COVERAGE_MAP" == true ]]; then
+            pipenv run pip install -q "pytest-cov>=6"
+            mkdir -p "$(dirname "$COVERAGE_FILE")"
+            COV=(--cov=. --cov-context=test --cov-report=)
+          fi
           status=0
           if (( ${{ matrix.partitions }} > 1 )); then
             mapfile -t TEST_FILES < <(
@@ -636,10 +648,10 @@ jobs:
             printf 'partition %s/%s: %s test files\n' \
               "${{ matrix.partition }}" "${{ matrix.partitions }}" "${#TEST_FILES[@]}"
             test "${#TEST_FILES[@]}" -gt 0
-            pipenv run pytest -q --tb=short -rf --durations=20 --reuse-db -m "$PYTEST_MARKERS" \
+            pipenv run pytest -q --tb=short -rf --durations=20 --reuse-db -m "$PYTEST_MARKERS" "${COV[@]}" \
               "${TEST_FILES[@]}" || status=$?
           else
-            pipenv run pytest -q --tb=short -rf --durations=20 --reuse-db -m "$PYTEST_MARKERS" \
+            pipenv run pytest -q --tb=short -rf --durations=20 --reuse-db -m "$PYTEST_MARKERS" "${COV[@]}" \
               ${{ matrix.paths }} || status=$?
           fi
           # 5 means every collected test belongs to a tier this run skips.
@@ -648,6 +660,101 @@ jobs:
             exit 0
           fi
           exit "$status"
+      - name: Upload this shard's coverage
+        if: ${{ always() && needs.changes.outputs.tier == 'nightly' && matrix.shard != 'test-database' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.name }}
+          path: ${{ runner.temp }}/coverage/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 3
+
+  coverage-map:
+    # Folds the nightly shards' per-test coverage into the map pull requests
+    # select their tests by (scripts/coverage_map.py). A failing shard still
+    # measured what it ran, so the map is built whatever the shards concluded.
+    name: coverage map
+    needs: [changes, backend-test-shard]
+    if: ${{ always() && needs.changes.outputs.tier == 'nightly' && needs.changes.outputs.shards == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q "coverage>=7.6"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: ${{ runner.temp }}/coverage
+          merge-multiple: true
+      - name: Build the coverage map
+        run: |
+          set -euo pipefail
+          ls -a "$RUNNER_TEMP/coverage"
+          coverage combine --data-file="$RUNNER_TEMP/combined" "$RUNNER_TEMP"/coverage/.coverage.*
+          python scripts/coverage_map.py build --data "$RUNNER_TEMP/combined" \
+            --commit "$GITHUB_SHA" --out "$RUNNER_TEMP/test-coverage-map.json.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage-map
+          path: ${{ runner.temp }}/test-coverage-map.json.gz
+          retention-days: 14
+
+  test-selection:
+    # Report only, while the selection is checked against what pull requests
+    # actually break: the backend tests this change's lines reach, from the
+    # newest nightly coverage map on main. Never fails the run.
+    name: test selection (report)
+    needs: changes
+    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      actions: read
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Select by coverage
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=test-coverage-map&per_page=20" \
+            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "main")][0].id // empty')
+          if [[ -z "$id" ]]; then
+            echo "No coverage map from main yet; the nightly run builds one." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/map.zip"
+          unzip -o -q "$RUNNER_TEMP/map.zip" -d "$RUNNER_TEMP"
+          git fetch -q origin "$(python3 -c "import gzip,json;print(json.load(gzip.open('$RUNNER_TEMP/test-coverage-map.json.gz','rt'))['commit'])")" || true
+          python3 scripts/coverage_map.py select --map "$RUNNER_TEMP/test-coverage-map.json.gz" \
+            --base "$BASE_SHA" --head "$HEAD_SHA" --json > "$RUNNER_TEMP/selection.json"
+          python3 - "$RUNNER_TEMP/selection.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json, sys
+          d = json.load(open(sys.argv[1]))
+          print("### Backend tests this change reaches (report only)\n")
+          if d["all"]:
+              print("**All**: coverage cannot follow " + ", ".join(f"`{r}`" for r in d["reasons"]))
+          else:
+              print(f"**{len(d['tests'])}** of {d['map_tests']} test files, by the map at `{d['map_commit'][:9]}`.\n")
+              print("\n".join(f"- `{t}`" for t in d["tests"]) or "_none_")
+          if d["notes"]:
+              print("\nNotes:\n" + "\n".join(f"- {n}" for n in d["notes"]))
+          PY
+          cat "$GITHUB_STEP_SUMMARY"
 
   test:
     name: test (real postgres)
