@@ -58,4 +58,28 @@ describe("project topology", () => {
       graph.nodes.find((node) => node.id === "repository:javascript:alert(1)")?.data.href
     ).toBeUndefined();
   });
+  it("resolves configured workload bindings when a reusable stage has no agent reference", () => {
+    const workflow = {
+      ...WORKFLOWS[0],
+      stages: WORKFLOWS[0].stages.map((stage) => ({ ...stage, agentSlug: "", agentRef: "" })),
+    };
+    const configuredWorkflows = [
+      {
+        definitionSlug: workflow.slug,
+        stageBindings: { "0": { agent_workload_id: AGENTS[0].id } },
+      },
+    ];
+    const data = { ...input, workflows: [workflow], configuredWorkflows };
+    const graph = buildProjectTopology(data);
+    expect(
+      graph.edges.some(
+        (edge) =>
+          edge.source === `workflow:${workflow.guid}` && edge.target === `agent:${AGENTS[0].id}`
+      )
+    ).toBe(true);
+    const focused = buildProjectTopology(data, workflow.guid);
+    expect(focused.nodes.find((node) => node.data.kind === "stage")?.data.href).toBe(
+      `/agents/${AGENTS[0].slug}/build`
+    );
+  });
 });

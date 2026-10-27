@@ -161,7 +161,7 @@ export function ProjectTopologyScreen({
                 )}
                 <dl className="space-y-3 border-t py-4 text-sm">
                   {selected.data.fields.map((field) => (
-                    <div key={field.label}>
+                    <div key={`${field.label}:${field.value}`}>
                       <dt className="text-muted-foreground text-xs">{t(`field.${field.label}`)}</dt>
                       <dd className="mt-1 break-words">
                         {field.href ? (

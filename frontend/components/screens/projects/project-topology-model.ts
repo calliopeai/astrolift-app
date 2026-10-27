@@ -4,6 +4,8 @@ import type {
   AstroliftAgentLiveStatus,
 } from "@/graphql/agents/agents.types";
 import type {
+  ConfiguredWorkflow,
+  WorkflowTopologyStage,
   WorkflowDefinitionSummary,
   WorkflowDefinitionRun,
 } from "@/graphql/workflows/tiered.types";
@@ -25,6 +27,7 @@ export type ProjectTopologyInput = {
   apps: ProjectDetailApp[];
   liveAgents: AstroliftAgentLiveStatus[];
   workflowRuns: WorkflowDefinitionRun[];
+  configuredWorkflows?: Pick<ConfiguredWorkflow, "definitionSlug" | "stageBindings">[];
 };
 
 const encode = encodeURIComponent;
@@ -70,6 +73,23 @@ export function buildProjectTopology(input: ProjectTopologyInput, focus = "") {
     });
     return id;
   };
+  const assignedAgents = (workflow: WorkflowDefinitionSummary, stage: WorkflowTopologyStage) => {
+    const ids = new Set<string>();
+    for (const configured of input.configuredWorkflows ?? []) {
+      if (configured.definitionSlug !== workflow.slug) continue;
+      const binding = configured.stageBindings[String(stage.order)];
+      if (
+        binding &&
+        typeof binding === "object" &&
+        "agent_workload_id" in binding &&
+        typeof binding.agent_workload_id === "string"
+      )
+        ids.add(binding.agent_workload_id);
+    }
+    return input.agents.filter(
+      (agent) => ids.has(agent.id) || agent.slug === (stage.agentSlug || stage.agentRef)
+    );
+  };
   const workflows = focus ? input.workflows.filter((row) => row.guid === focus) : input.workflows;
   workflows.forEach((workflow, index) => {
     const id = `workflow:${workflow.guid}`;
@@ -105,8 +125,8 @@ export function buildProjectTopology(input: ProjectTopologyInput, focus = "") {
       const repo = repository(workflow.sourceRepo);
       if (repo) edge(repo, id, "source");
       for (const stage of workflow.stages) {
-        const agent = input.agents.find((row) => row.slug === (stage.agentSlug || stage.agentRef));
-        if (agent) edge(id, `agent:${agent.id}`, "dispatches");
+        for (const agent of assignedAgents(workflow, stage))
+          edge(id, `agent:${agent.id}`, "dispatches");
         const nested = input.workflows.find((row) => row.slug === stage.workflowRef);
         if (nested) edge(id, `workflow:${nested.guid}`, "invokes");
       }
@@ -115,7 +135,10 @@ export function buildProjectTopology(input: ProjectTopologyInput, focus = "") {
     const stages = [...workflow.stages].sort((a, b) => a.order - b.order);
     stages.forEach((stage, stageIndex) => {
       const stageId = `stage:${workflow.guid}:${stage.guid}`;
-      const agent = stage.agentSlug || stage.agentRef;
+      const assignments = assignedAgents(workflow, stage);
+      const agent = assignments.length === 1 ? assignments[0].slug : "";
+      const agentLabel =
+        assignments.map((row) => row.name).join(", ") || stage.agentSlug || stage.agentRef;
       const stageHref = stage.workflowRef
         ? `/workflows/${encode(stage.workflowRef)}/observe`
         : agent
@@ -127,17 +150,19 @@ export function buildProjectTopology(input: ProjectTopologyInput, focus = "") {
         label: stage.role || stage.outputKey || stage.kind,
         kind: "stage",
         status,
-        description: agent || stage.workflowRef,
+        description: agentLabel || stage.workflowRef,
         href: stageHref,
         workflowId: workflow.guid,
         fields: [
           { label: "kind", value: stage.kind },
           { label: "order", value: String(stage.order + 1) },
-          {
-            label: "agent",
-            value: agent || "—",
-            href: agent ? `/agents/${encode(agent)}/build` : undefined,
-          },
+          ...(assignments.length
+            ? assignments.map((row) => ({
+                label: "agent",
+                value: row.name,
+                href: `/agents/${encode(row.slug)}/build`,
+              }))
+            : [{ label: "agent", value: agentLabel || "—" }]),
           {
             label: "environment",
             value: stage.environmentSpecSlug || "—",
