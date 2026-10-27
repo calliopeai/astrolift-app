@@ -34,4 +34,20 @@ describe("workflow canvas", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+  it("inspects a station and links to its actual component", () => {
+    renderWithIntl(
+      <WorkflowView
+        snapshot={snapshot}
+        value="transit"
+        motion="reduced"
+        stationLinks={{ "0": "/agents/runs/task-1" }}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Factory: Stage 0/ }));
+    expect(screen.getByRole("link", { name: "See more" })).toHaveAttribute(
+      "href",
+      "/agents/runs/task-1"
+    );
+    expect(screen.getByLabelText("Selected stage")).toHaveTextContent("Stage 0");
+  });
 });

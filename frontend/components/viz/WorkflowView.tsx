@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import * as React from "react";
 import { ExpandIcon, MinusIcon, PlusIcon, ScanIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export interface WorkflowViewFrameProps {
   snapshot: WorkflowSnapshot;
   onSelectRun?: (trainId: string) => void;
   onSelectStation?: (lineId: string, stationId: string) => void;
+  stationLinks?: Record<string, string>;
   title?: React.ReactNode;
   description?: React.ReactNode;
   /** Controlled style; defaults to the person's saved workflow view. */
@@ -52,6 +54,7 @@ export function WorkflowView({
   snapshot,
   onSelectRun,
   onSelectStation,
+  stationLinks = {},
   title,
   description,
   value,
@@ -67,6 +70,11 @@ export function WorkflowView({
   const m = motion ?? resolved;
   const { Component, legend } = WORKFLOW_RENDERERS[style];
   const [expanded, setExpanded] = React.useState(false);
+  const [selection, setSelection] = React.useState<{ line: string; station: string } | null>(null);
+  const selectedLine = snapshot.lines.find((line) => line.id === selection?.line);
+  const selectedStation = selectedLine?.stations.find(
+    (station) => station.id === selection?.station
+  );
   const [zoom, setZoom] = React.useState(1);
   const expandButton = React.useRef<HTMLButtonElement>(null);
   const viewport = React.useRef<HTMLDivElement>(null);
@@ -132,24 +140,47 @@ export function WorkflowView({
         </>
       }
     >
-      <div
-        ref={viewport}
-        tabIndex={0}
-        aria-label={t("canvas.pan")}
-        className={full ? "h-full overflow-auto p-4" : "h-96 overflow-auto p-4"}
-      >
+      <div className={full ? "flex h-full min-h-0 flex-col" : undefined}>
         <div
-          className="flex min-h-full items-center"
-          style={{ width: style === "list" ? "100%" : width * zoom }}
+          ref={viewport}
+          tabIndex={0}
+          aria-label={t("canvas.pan")}
+          className={full ? "min-h-0 flex-1 overflow-auto p-4" : "h-96 overflow-auto p-4"}
         >
-          <Component
-            snapshot={snapshot}
-            motion={m}
-            flowParticles={prefs.flowParticles}
-            onSelectRun={onSelectRun}
-            onSelectStation={onSelectStation}
-          />
+          <div
+            className="flex min-h-full items-center"
+            style={{ width: style === "list" ? "100%" : width * zoom }}
+          >
+            <Component
+              snapshot={snapshot}
+              motion={m}
+              flowParticles={prefs.flowParticles}
+              onSelectRun={onSelectRun}
+              onSelectStation={(line, station) => {
+                setSelection({ line, station });
+                onSelectStation?.(line, station);
+              }}
+            />
+          </div>
         </div>
+        {selectedStation && (
+          <aside
+            className="flex flex-wrap items-center justify-between gap-3 border-t p-4"
+            aria-label={t("canvas.inspector")}
+          >
+            <div>
+              <p className="text-sm font-semibold">{selectedStation.name}</p>
+              <p className="text-muted-foreground text-xs">
+                {selectedLine?.name} · {selectedStation.kind}
+              </p>
+            </div>
+            {stationLinks[selectedStation.id] && (
+              <Button asChild size="sm" variant="outline">
+                <Link href={stationLinks[selectedStation.id]}>{t("canvas.seeMore")}</Link>
+              </Button>
+            )}
+          </aside>
+        )}
       </div>
     </VizFrame>
   );

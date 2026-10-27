@@ -12979,7 +12979,9 @@
       "zoomIn": "Zoom in",
       "fit": "Fit to view",
       "expand": "Expand",
-      "pan": "Workflow canvas. Scroll to pan; use the zoom controls to change scale."
+      "pan": "Workflow canvas. Scroll to pan; use the zoom controls to change scale.",
+      "inspector": "Selected stage",
+      "seeMore": "See more"
     }
   },
   "clusterConnection": {
