@@ -443,7 +443,7 @@ export function WorkflowRunScreen({
                 `${slug}:o${stage.order}`,
                 execution?.agentRunGuid
                   ? `/agents/runs/${encodeURIComponent(execution.agentRunGuid)}`
-                  : workflowTabHref(slug, "build"),
+                  : workflowTabHref(slug, "builder"),
               ];
             })
           )}
