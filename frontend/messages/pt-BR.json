@@ -12972,6 +12972,14 @@
       "task": "Execuções avulsas",
       "workflow": "Um pipeline de várias etapas",
       "mixed": "Vários tipos de carga de trabalho"
+    },
+    "canvas": {
+      "legend": "Legend and symbols",
+      "zoomOut": "Zoom out",
+      "zoomIn": "Zoom in",
+      "fit": "Fit to view",
+      "expand": "Expand",
+      "pan": "Workflow canvas. Scroll to pan; use the zoom controls to change scale."
     }
   },
   "clusterConnection": {
@@ -16360,7 +16368,8 @@
     "substrate": "Substrato",
     "sharing": "Compartilhamento",
     "connect": "Conectar",
-    "agentInbox": "Caixa de entrada"
+    "agentInbox": "Caixa de entrada",
+    "topology": "Project blueprint"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17265,5 +17274,65 @@
       "woke": "iniciou o agente",
       "queued": "aguarda a próxima execução do agente"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Blueprint",
+    "description": "Explore the project, focus a workflow, and inspect each component without losing your place.",
+    "back": "Project overview",
+    "scope": "Focus",
+    "wholeProject": "Whole project",
+    "canvas": "Graph canvas",
+    "componentList": "Component list",
+    "counts": "{nodes} components · {edges} connections",
+    "partialError": "Some project data could not be loaded. This graph is incomplete.",
+    "notFound": "Project not found or not accessible.",
+    "empty": "No visible project components yet.",
+    "inspector": "Component details",
+    "status": "Status",
+    "seeMore": "See more",
+    "exploreWorkflow": "Explore workflow stages",
+    "connections": "Connected components",
+    "selectTitle": "Inspect a component",
+    "selectDescription": "Select any node for its configuration and connections. See more opens its page in Astrolift. Use Focus to expand one workflow into its stages.",
+    "evidenceNote": "Connections come from registered configuration. Stage state is shown only when the latest run identifies the current stage; earlier stages are not inferred across review loops.",
+    "kind": {
+      "workflow": "Workflow",
+      "stage": "Stage",
+      "agent": "Agent",
+      "app": "App",
+      "repository": "Repository"
+    },
+    "edge": {
+      "source": "Source",
+      "dispatches": "Dispatches",
+      "invokes": "Invokes",
+      "next": "Next",
+      "return": "Return",
+      "retry": "Retry"
+    },
+    "field": {
+      "pattern": "Pattern",
+      "stages": "Stages",
+      "enabled": "Enabled",
+      "repository": "Repository",
+      "source": "Source reference",
+      "latestRun": "Latest run",
+      "kind": "Type",
+      "order": "Stage number",
+      "agent": "Agent",
+      "environment": "Environment spec",
+      "model": "Model",
+      "output": "Output key",
+      "skills": "Skills",
+      "failure": "Failure behavior",
+      "attempts": "Maximum attempts",
+      "timeout": "Timeout",
+      "workflow": "Workflow",
+      "mode": "Run mode",
+      "running": "Running tasks",
+      "lastRun": "Last run"
+    },
+    "openBlueprint": "Open blueprint",
+    "expand": "Expand"
   }
 }

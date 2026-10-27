@@ -1,7 +1,10 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type * as React from "react";
+import * as React from "react";
+import { ExpandIcon, MinusIcon, PlusIcon, ScanIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 import {
   WORKFLOW_VIEWS,
@@ -63,7 +66,12 @@ export function WorkflowView({
   const style = value ?? prefs.workflowView;
   const m = motion ?? resolved;
   const { Component, legend } = WORKFLOW_RENDERERS[style];
-  return (
+  const [expanded, setExpanded] = React.useState(false);
+  const [zoom, setZoom] = React.useState(1);
+  const expandButton = React.useRef<HTMLButtonElement>(null);
+  const viewport = React.useRef<HTMLDivElement>(null);
+  const width = Math.max(900, ...snapshot.lines.map((line) => line.stations.length * 180));
+  const canvas = (full: boolean) => (
     <VizFrame
       title={title ?? t("frame.workflowsTitle")}
       description={
@@ -78,17 +86,89 @@ export function WorkflowView({
       onChange={onChange ?? ((workflowView) => update({ workflowView }))}
       motion={m}
       legend={legend}
-      className={className}
+      className={full ? "flex h-full min-h-0 flex-col border-0" : className}
+      bodyClassName={full ? "flex-1" : undefined}
+      collapsibleLegend
+      actions={
+        <>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("canvas.zoomOut")}
+            onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}
+          >
+            <MinusIcon className="size-4" />
+          </Button>
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {Math.round(zoom * 100)}%
+          </span>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("canvas.zoomIn")}
+            onClick={() => setZoom((z) => Math.min(3, z + 0.25))}
+          >
+            <PlusIcon className="size-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={t("canvas.fit")}
+            onClick={() => setZoom(Math.min(1, (viewport.current?.clientWidth ?? width) / width))}
+          >
+            <ScanIcon className="size-4" />
+          </Button>
+          {!full && (
+            <Button
+              ref={expandButton}
+              size="sm"
+              variant="outline"
+              onClick={() => setExpanded(true)}
+            >
+              <ExpandIcon className="size-4" />
+              {t("canvas.expand")}
+            </Button>
+          )}
+        </>
+      }
     >
-      <div className="p-3">
-        <Component
-          snapshot={snapshot}
-          motion={m}
-          flowParticles={prefs.flowParticles}
-          onSelectRun={onSelectRun}
-          onSelectStation={onSelectStation}
-        />
+      <div
+        ref={viewport}
+        tabIndex={0}
+        aria-label={t("canvas.pan")}
+        className={full ? "h-full overflow-auto p-4" : "h-96 overflow-auto p-4"}
+      >
+        <div
+          className="flex min-h-full items-center"
+          style={{ width: style === "list" ? "100%" : width * zoom }}
+        >
+          <Component
+            snapshot={snapshot}
+            motion={m}
+            flowParticles={prefs.flowParticles}
+            onSelectRun={onSelectRun}
+            onSelectStation={onSelectStation}
+          />
+        </div>
       </div>
     </VizFrame>
+  );
+  return (
+    <>
+      {!expanded && canvas(false)}
+      <Dialog open={expanded} onOpenChange={setExpanded}>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            requestAnimationFrame(() => expandButton.current?.focus());
+          }}
+          className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-0 p-2 sm:max-w-none"
+        >
+          <DialogTitle className="sr-only">{title ?? t("frame.workflowsTitle")}</DialogTitle>
+          <DialogDescription className="sr-only">{t("canvas.pan")}</DialogDescription>
+          {expanded && canvas(true)}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

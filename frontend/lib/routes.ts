@@ -29,6 +29,7 @@ export const routeLabels: Record<string, string> = {
   tokens: "Tokens",
   metrics: "Metrics",
   resources: "Resources",
+  topology: "Blueprint",
   docs: "Docs",
   manifest: "Manifest reference",
   drivers: "Driver reference",
