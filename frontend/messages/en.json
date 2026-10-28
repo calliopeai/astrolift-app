@@ -5619,7 +5619,9 @@
         }
       },
       "allowStepUpPin": "Allow step-up with a personal PIN",
-      "allowStepUpPinHint": "Members can set a 6 to 8 digit PIN and confirm sensitive actions with it instead of signing in again. Leave this off if your compliance posture requires the identity provider for every step-up."
+      "allowStepUpPinHint": "Members can set a 6 to 8 digit PIN and confirm sensitive actions with it instead of signing in again. Leave this off if your compliance posture requires the identity provider for every step-up.",
+      "trustedDomainSignup": "Create accounts for trusted domains",
+      "trustedDomainSignupHint": "Anyone who signs in with a verified email under one of this organization's trusted domains gets an account and joins with that domain's default role. Leave this off to admit only people who already have an account."
     },
     "sections": {
       "houseTheme": "House theme",

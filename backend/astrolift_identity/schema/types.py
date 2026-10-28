@@ -39,6 +39,8 @@ class OrganizationType:
     allow_user_profile_edit: bool
     # Members may step up with a personal PIN (#2399). Off by default.
     allow_step_up_pin: bool
+    # A trusted-domain sign-in may create its own account. Off by default.
+    trusted_domain_signup: bool
     # Operator tags stamped on every cloud resource this org provisions
     # (#1505). Portable by construction: refused on write unless all three
     # clouds would accept them.
@@ -125,6 +127,7 @@ def organization_to_type(org) -> OrganizationType:
         trace_retention_days_default=org.trace_retention_days_default,
         allow_user_profile_edit=org.allow_user_profile_edit,
         allow_step_up_pin=org.allow_step_up_pin,
+        trusted_domain_signup=org.trusted_domain_signup,
         default_resource_tags=dict(org.default_resource_tags or {}),
         managed_service_isolation_policy=dict(org.managed_service_isolation_policy or {}),
         appearance_default=dict(org.appearance_default or {}),

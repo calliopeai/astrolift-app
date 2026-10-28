@@ -40,6 +40,7 @@ const ORG = {
   logRetentionDaysDefault: 30,
   allowUserProfileEdit: true,
   allowStepUpPin: false,
+  trustedDomainSignup: false,
   onboardingCompletedAt: null as string | null,
   createdAt: AT,
   updatedAt: AT,

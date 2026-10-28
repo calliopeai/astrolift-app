@@ -18,6 +18,8 @@ export interface OrganizationSettingsDraft {
   allowProfileEdit: boolean;
   /** Members may step up with a personal PIN (#2399). */
   allowStepUpPin: boolean;
+  /** A verified sign-in under a trusted domain may create its own account. */
+  trustedDomainSignup: boolean;
   /** Settings a member can't change, for members who have not chosen themselves. */
   restrictedSettingsDefault: RestrictedSettings;
 }
@@ -47,6 +49,7 @@ export function useOrganizationSettings() {
           auditLogRetentionDays: Number(draft.auditDays) || 365,
           allowUserProfileEdit: draft.allowProfileEdit,
           allowStepUpPin: draft.allowStepUpPin,
+          trustedDomainSignup: draft.trustedDomainSignup,
           restrictedSettingsDefault: draft.restrictedSettingsDefault,
         },
       },

@@ -4692,6 +4692,7 @@ type AstroliftOrganization {
   traceRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
   allowStepUpPin: Boolean!
+  trustedDomainSignup: Boolean!
   defaultResourceTags: JSON!
   managedServiceIsolationPolicy: JSON!
   appearanceDefault: JSON!
@@ -13130,6 +13131,7 @@ input UpdateOrganizationInput {
   traceRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
   allowStepUpPin: Boolean = null
+  trustedDomainSignup: Boolean = null
   defaultResourceTags: JSON = null
   managedServiceIsolationPolicy: JSON = null
   appearanceDefault: JSON = null

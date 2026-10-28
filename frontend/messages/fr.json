@@ -5676,7 +5676,9 @@
         }
       },
       "allowStepUpPin": "Autoriser la vérification par code PIN personnel",
-      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification."
+      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification.",
+      "trustedDomainSignup": "Créer des comptes pour les domaines de confiance",
+      "trustedDomainSignupHint": "Toute personne qui se connecte avec une adresse e-mail vérifiée d'un domaine de confiance de cette organisation obtient un compte et la rejoint avec le rôle par défaut de ce domaine. Laissez désactivé pour n'admettre que les personnes ayant déjà un compte."
     },
     "sections": {
       "houseTheme": "Thème maison",
