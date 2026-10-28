@@ -609,19 +609,20 @@ class Auth1SessionWorkflow:
         email isn't verified.
 
         Configured by env var ASTROLIFT_AUTO_SIGNUP_DOMAINS — comma-
-        separated, case-insensitive (e.g. "acmecorp.com,example.org").
-        Leave it unset to keep the strict-lookup default.
+        separated, case-insensitive (e.g. "acmecorp.com,example.org"),
+        or by an org that turned on trusted_domain_signup for its
+        trusted domains. Leave both off to keep the strict-lookup default.
         """
+        from auth1.auto_join import trusted_domain_allows_signup
+
         raw = os.environ.get("ASTROLIFT_AUTO_SIGNUP_DOMAINS", "")
         allow = {d.strip().lower() for d in raw.split(",") if d.strip()}
-        if not allow:
-            return None
 
         email = (user_info.email or "").strip()
         if not email or "@" not in email:
             return None
         domain = email.rsplit("@", 1)[1].lower()
-        if domain not in allow:
+        if domain not in allow and not trusted_domain_allows_signup(domain):
             logger.info(
                 "[Auth0] auto-signup skipped — domain %r not in allowlist %r",
                 domain,
