@@ -4420,6 +4420,7 @@ export type AstroliftOrganization = {
   scimEnabled: Scalars['Boolean']['output'];
   slug: Scalars['String']['output'];
   traceRetentionDaysDefault: Scalars['Int']['output'];
+  trustedDomainSignup: Scalars['Boolean']['output'];
   updatedAt: Scalars['DateTime']['output'];
   website: Scalars['String']['output'];
 };
@@ -17111,6 +17112,7 @@ export type UpdateOrganizationInput = {
   name: InputMaybe<Scalars['String']['input']>;
   restrictedSettingsDefault: InputMaybe<Scalars['String']['input']>;
   traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
+  trustedDomainSignup: InputMaybe<Scalars['Boolean']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -18808,7 +18810,7 @@ export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string,
 export type ListOrganizationsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
+export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, trustedDomainSignup: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
 
 export type ListTeamsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -18873,7 +18875,7 @@ export type GetOrganizationQueryVariables = Exact<{
 }>;
 
 
-export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
+export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, trustedDomainSignup: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
 
 export type GetOnboardingStateQueryVariables = Exact<{ [key: string]: never; }>;
 

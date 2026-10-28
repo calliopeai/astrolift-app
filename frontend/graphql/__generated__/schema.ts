@@ -4420,6 +4420,7 @@ export type AstroliftOrganization = {
   scimEnabled: Scalars['Boolean']['output'];
   slug: Scalars['String']['output'];
   traceRetentionDaysDefault: Scalars['Int']['output'];
+  trustedDomainSignup: Scalars['Boolean']['output'];
   updatedAt: Scalars['DateTime']['output'];
   website: Scalars['String']['output'];
 };
@@ -17111,6 +17112,7 @@ export type UpdateOrganizationInput = {
   name: InputMaybe<Scalars['String']['input']>;
   restrictedSettingsDefault: InputMaybe<Scalars['String']['input']>;
   traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
+  trustedDomainSignup: InputMaybe<Scalars['Boolean']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
 

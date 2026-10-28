@@ -5682,7 +5682,9 @@
         }
       },
       "allowStepUpPin": "Permitir verificação com PIN pessoal",
-      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação."
+      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação.",
+      "trustedDomainSignup": "Criar contas para domínios confiáveis",
+      "trustedDomainSignupHint": "Quem entrar com um e-mail verificado de um dos domínios confiáveis desta organização recebe uma conta e entra com a função padrão desse domínio. Deixe desativado para admitir apenas quem já tem conta."
     },
     "sections": {
       "houseTheme": "Tema da casa",

@@ -171,6 +171,7 @@ export const UPDATE_ORGANIZATION = gql`
         logRetentionDaysDefault
         allowUserProfileEdit
         allowStepUpPin
+        trustedDomainSignup
       }
     }
   }

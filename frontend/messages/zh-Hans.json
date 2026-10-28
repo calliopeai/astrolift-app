@@ -5682,7 +5682,9 @@
         }
       },
       "allowStepUpPin": "允许使用个人 PIN 进行验证",
-      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。"
+      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。",
+      "trustedDomainSignup": "为受信任域创建账户",
+      "trustedDomainSignupHint": "使用本组织受信任域下已验证邮箱登录的人会获得账户，并以该域的默认角色加入。若只允许已有账户的人，请保持关闭。"
     },
     "sections": {
       "houseTheme": "内部主题",

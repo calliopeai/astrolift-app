@@ -29,6 +29,7 @@ export const ORG: AstroliftOrganization = {
   website: "https://acme.example",
   allowUserProfileEdit: true,
   allowStepUpPin: false,
+  trustedDomainSignup: false,
   appearanceDefault: { ground: "emerald", accent: "green" },
   appearanceLocked: false,
   restrictedSettingsDefault: "show",

@@ -5676,7 +5676,9 @@
         }
       },
       "allowStepUpPin": "Bestätigung mit persönlicher PIN erlauben",
-      "allowStepUpPinHint": "Mitglieder können eine 6- bis 8-stellige PIN festlegen und sensible Aktionen damit statt mit einer erneuten Anmeldung bestätigen. Lass dies aus, wenn deine Compliance für jede Bestätigung den Identitätsanbieter verlangt."
+      "allowStepUpPinHint": "Mitglieder können eine 6- bis 8-stellige PIN festlegen und sensible Aktionen damit statt mit einer erneuten Anmeldung bestätigen. Lass dies aus, wenn deine Compliance für jede Bestätigung den Identitätsanbieter verlangt.",
+      "trustedDomainSignup": "Konten für vertrauenswürdige Domains anlegen",
+      "trustedDomainSignupHint": "Wer sich mit einer bestätigten E-Mail-Adresse unter einer vertrauenswürdigen Domain dieser Organisation anmeldet, erhält ein Konto und tritt mit der Standardrolle dieser Domain bei. Lass dies aus, um nur Personen mit bestehendem Konto zuzulassen."
     },
     "sections": {
       "houseTheme": "Hausdesign",
