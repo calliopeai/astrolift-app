@@ -15,15 +15,19 @@ from constance import config
 from constance.test import override_config
 from django.core.management import CommandError, call_command
 
+import core.cluster_management as cluster_management
 import core.mutations as core_mutations
+from astrolift_clusters.models import ProviderPlugin
 from astrolift_identity.models import Organization
 from astrolift_operations import zentinelle_connect
-from astrolift_operations.models import ZentinelleConnection
+from astrolift_operations.models import ZentinelleClusterGateway, ZentinelleConnection
 from astrolift_operations.tests.test_zentinelle_connect_1887 import (
     API,
     BASE,
     CODE,
+    FakeDriver,
     FakeZentinelle,
+    _make_cluster,
     _stored_in,
 )
 from core.secrets import EncryptedSecret, decrypt
@@ -237,3 +241,84 @@ def test_a_gateway_url_is_stored_at_connect_and_applied_to_a_live_connection(
             gateway_url="http://z.example",
             stdout=out,
         )
+
+
+# ---- the install connection registers the install's own clusters (#1905) ------
+
+
+@pytest.fixture
+def plugin():
+    [row] = ProviderPlugin.objects.bulk_create(
+        [ProviderPlugin(name="k8s", slug="k8s_native", capabilities_manifest={}, config_schema={})]
+    )
+    return row
+
+
+@pytest.fixture
+def driver(monkeypatch) -> FakeDriver:
+    fake = FakeDriver()
+    monkeypatch.setattr(cluster_management, "_driver_for_cluster", lambda cluster: fake)
+    return fake
+
+
+def _run_install(*, register=True, code_env=ENV):
+    out = io.StringIO()
+    call_command(
+        "connect_zentinelle",
+        install=True,
+        url=BASE,
+        code_env=code_env,
+        register_shared_clusters=register,
+        stdout=out,
+    )
+    return out.getvalue()
+
+
+def test_install_connect_registers_each_shared_cluster_once(org, plugin, zentinelle, driver, monkeypatch):
+    shared = [_make_cluster(plugin, None, "shared-a"), _make_cluster(plugin, None, "shared-b")]
+    _make_cluster(plugin, org, "orgs")
+    retired = _make_cluster(plugin, None, "retired")
+    retired.is_active = False
+    retired.save()
+    monkeypatch.setenv(ENV, CODE)
+
+    output = _run_install()
+
+    install = ZentinelleConnection.objects.get(organization__isnull=True)
+    gateways = ZentinelleClusterGateway.objects.filter(connection=install)
+    assert {g.cluster_id for g in gateways} == {c.pk for c in shared}
+    for cluster in shared:
+        assert f"{cluster.slug}: registered" in output
+
+    # Again, connected: no code read, nothing registered twice.
+    monkeypatch.delenv(ENV)
+    zentinelle.calls.clear()
+    added = _make_cluster(plugin, None, "added-later")
+    output = _run_install()
+
+    assert "nothing to do" in output and f"{added.slug}: registered" in output
+    assert [p for p in zentinelle.paths() if p == ("POST", f"{API}/clusters")] == [
+        ("POST", f"{API}/clusters")
+    ]
+    assert ZentinelleClusterGateway.objects.filter(connection=install).count() == 3
+
+
+def test_a_cluster_that_cannot_register_fails_the_run_after_the_others(
+    plugin, zentinelle, driver, monkeypatch
+):
+    _make_cluster(plugin, None, "shared")
+    monkeypatch.setenv(ENV, CODE)
+    driver.fail["Namespace"] = "forbidden"
+
+    with pytest.raises(CommandError, match="shared clusters not registered"):
+        _run_install()
+    assert ZentinelleConnection.objects.filter(organization__isnull=True).exists()
+
+
+def test_register_shared_clusters_needs_install(org, zentinelle, monkeypatch):
+    monkeypatch.setenv(ENV, CODE)
+    with pytest.raises(CommandError, match="goes with --install"):
+        call_command(
+            "connect_zentinelle", org=org.slug, url=BASE, code_env=ENV, register_shared_clusters=True
+        )
+    assert zentinelle.calls == []

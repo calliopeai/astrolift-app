@@ -10,7 +10,9 @@ with the code in that environment variable. ``--gateway-url`` points the
 cluster gateways at a private, in-cluster Zentinelle address (#1905); it is
 applied to an existing connection too. ``--install`` in place of ``--org``
 connects the install connection that shared clusters register through
-(#1905), with an install-scoped code. The code is never an argument,
+(#1905), with an install-scoped code; with ``--register-shared-clusters`` it
+then registers each active shared cluster that has no gateway yet, so the
+install's own clusters need no operator step. The code is never an argument,
 so it is not in the task's command line, its logs or a process listing.
 
 The exchange is the org-admin ``connectZentinelle`` mutation's
@@ -56,6 +58,11 @@ class Command(BaseCommand):
             help="Name of the environment variable holding the one-time enrollment code.",
         )
         parser.add_argument(
+            "--register-shared-clusters",
+            action="store_true",
+            help="With --install: register every shared cluster not yet registered.",
+        )
+        parser.add_argument(
             "--gateway-url",
             default=None,
             help="Where cluster gateways reach Zentinelle, when not at --url (an in-cluster Service).",
@@ -69,6 +76,8 @@ class Command(BaseCommand):
         code_env = options["code_env"]
         if not _ENV_NAME.match(code_env):
             raise CommandError("--code-env must name an environment variable, not hold the code")
+        if options["register_shared_clusters"] and not options["install"]:
+            raise CommandError("--register-shared-clusters goes with --install")
         organization = None
         if not options["install"]:
             organization = Organization.objects.filter(slug=options["org"]).first()
@@ -104,6 +113,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"cluster gateways now reach Zentinelle at {gateway_url or url}")
             self._enable_flags()
             self.stdout.write(f"{who} already connected to {url}; nothing to do")
+            self._register_shared(existing, options)
             return
 
         code = os.environ.get(code_env, "").strip()
@@ -131,6 +141,19 @@ class Command(BaseCommand):
             f"{who} connected to {url} "
             f"(Zentinelle install {connection.zentinelle_install_id or 'unknown'})"
         )
+        self._register_shared(connection, options)
+
+    def _register_shared(self, connection, options):
+        from astrolift_operations import zentinelle_connect
+
+        if not options["register_shared_clusters"]:
+            return
+        results = zentinelle_connect.register_shared_clusters(connection=connection)
+        for result in results:
+            self.stdout.write(f"{result.cluster_slug}: {result.outcome}")
+        failed = [r.cluster_slug for r in results if r.outcome.startswith("failed")]
+        if failed:
+            raise CommandError(f"shared clusters not registered: {', '.join(failed)}")
 
     @staticmethod
     def _enable_flags():
