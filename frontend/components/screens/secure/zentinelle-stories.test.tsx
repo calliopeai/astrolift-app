@@ -18,12 +18,14 @@ import {
   visibleTabs,
   windowStart,
 } from "./zentinelle-model";
+import * as clusterStories from "./ZentinelleClusters.stories";
 import * as overviewStories from "./ZentinelleOverview.stories";
 import * as stories from "./ZentinelleScreen.stories";
 
 setProjectAnnotations(preview);
 const s = composeStories(stories);
 const o = composeStories(overviewStories);
+const c = composeStories(clusterStories);
 
 async function render(Story: Parameters<typeof runStory>[0]) {
   const canvas = document.createElement("div");
@@ -144,6 +146,41 @@ describe("Zentinelle screen states (#1888)", () => {
     });
     await check(s.AuditNoExport, (page) => {
       expect(page.queryByRole("button", { name: "Export CSV" })).toBeNull();
+    });
+  });
+});
+
+describe("Zentinelle shared clusters (#1905)", () => {
+  const section = (page: ReturnType<typeof within>, title: string) =>
+    within(page.getByText(title, { selector: "h2, h3" }).closest("section") as HTMLElement);
+  const registerSection = (page: ReturnType<typeof within>) => section(page, "Register a cluster");
+  const sharedSection = (page: ReturnType<typeof within>) => section(page, "Shared clusters");
+
+  it("never offers an org admin Register on a shared cluster", async () => {
+    await check(c.SharedManagedByPlatform, (page) => {
+      expect(registerSection(page).queryByText("platform-eu-west-1")).toBeNull();
+      const shared = sharedSection(page);
+      expect(shared.getByText("platform-eu-west-1")).toBeInTheDocument();
+      expect(shared.getByText("Managed by the platform")).toBeInTheDocument();
+      expect(shared.queryByRole("button")).toBeNull();
+    });
+  });
+
+  it("gives the platform operator the install connection's clusters and Register", async () => {
+    await check(c.SharedAsOperator, (page) => {
+      const shared = sharedSection(page);
+      expect(shared.getByText("platform-us-west-2")).toBeInTheDocument();
+      expect(shared.getByRole("button", { name: "Unregister" })).toBeEnabled();
+      expect(shared.getByRole("button", { name: "Register" })).toBeEnabled();
+      expect(shared.queryByText("Managed by the platform")).toBeNull();
+    });
+  });
+
+  it("tells the operator to connect the install when it is not", async () => {
+    await check(c.SharedNotConnected, (page) => {
+      const shared = sharedSection(page);
+      expect(shared.getByText(/not connected to Zentinelle/)).toBeInTheDocument();
+      expect(shared.queryByRole("button", { name: "Register" })).toBeNull();
     });
   });
 });

@@ -14759,7 +14759,12 @@
       "noChoices": "Aucun cluster non inscrit ne correspond.",
       "register": "Inscrire",
       "unregisterTitle": "Désinscrire {cluster} de Zentinelle ?",
-      "unregisterBody": "Cela révoque le cluster dans Zentinelle, puis retire sa passerelle et le secret de son identifiant. Le trafic des agents sur ce cluster ne passe plus par Zentinelle."
+      "unregisterBody": "Cela révoque le cluster dans Zentinelle, puis retire sa passerelle et le secret de son identifiant. Le trafic des agents sur ce cluster ne passe plus par Zentinelle.",
+      "sharedTitle": "Clusters partagés",
+      "sharedDescription": "Ils n'appartiennent à aucune organisation. Ils s'enregistrent via la connexion Zentinelle de l'installation, gérée par l'opérateur de la plateforme ; l'installateur enregistre les clusters qu'il crée.",
+      "sharedNotConnected": "L'installation n'est pas connectée à Zentinelle. Connectez Zentinelle avec Astrolift depuis l'installateur pour la connecter et enregistrer ses clusters.",
+      "sharedManaged": "Géré par la plateforme",
+      "sharedEmpty": "Aucun cluster partagé."
     },
     "filters": {
       "window": "Période",

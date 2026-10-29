@@ -14756,7 +14756,12 @@
       "noChoices": "No unregistered clusters match.",
       "register": "Register",
       "unregisterTitle": "Unregister {cluster} from Zentinelle?",
-      "unregisterBody": "This revokes the cluster in Zentinelle, then removes its gateway and credential secret. Agent traffic on it stops going through Zentinelle."
+      "unregisterBody": "This revokes the cluster in Zentinelle, then removes its gateway and credential secret. Agent traffic on it stops going through Zentinelle.",
+      "sharedTitle": "Shared clusters",
+      "sharedDescription": "These belong to no organization. They register through the install's Zentinelle connection, which the platform operator manages; the installer registers the clusters it creates.",
+      "sharedNotConnected": "The install is not connected to Zentinelle. Connect Zentinelle with Astrolift from the installer to connect it and register its clusters.",
+      "sharedManaged": "Managed by the platform",
+      "sharedEmpty": "No shared clusters."
     },
     "filters": {
       "window": "Time window",
