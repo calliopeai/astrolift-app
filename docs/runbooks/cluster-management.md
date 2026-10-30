@@ -96,7 +96,7 @@ instructions if any are missing; the preflight checks behind them are in
    `decommissioning`, `decommissioned`.
    - **Signature:** `astroliftCluster(slug:)` reports `lifecycle: error` and
      `lastManagementError` carries the step and cause, for example `cluster
-     <slug> is inactive — re-activate before bringing into management`,
+     is inactive — re-activate before bringing into management`,
      `cluster <slug> was unregistered before management could run`,
      `platform RBAC apply did not complete`, `preflight Job did not
      complete`, or `mark_managed: <exc>` (truncated to 4000 characters);
