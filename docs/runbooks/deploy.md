@@ -87,7 +87,15 @@ This pins the source revision, not every mutable app setting.
 
 The deploy detail page (reachable from **Deployments → [id]**) shows:
 
-- **Status**: Queued → Building → Deploying → Running | Failed
+- **Status**: `pending_approval` (when the environment requires
+  approvals) → `pending` → `deploying` → `running` | `failed`. A `running`
+  deploy becomes `superseded` when the next deploy goes live, `rolled_back`
+  when it is rolled back, or `redeploying` during a redeploy. `failed`,
+  `superseded` and `rolled_back` are terminal; nothing moves a row out of
+  them (`Deployment._TRANSITIONS` in
+  `backend/astrolift_lifecycle/models/deployment.py`).
+- **Reason**: `statusReason` / `abortedReason` on the deployment carry why a
+  deploy failed or was aborted.
 - **Log stream**: real-time stdout/stderr from the build and deploy
   phases. Errors surface here before they appear as cluster events.
 - **Cluster events**: Kubernetes events for the workload (ImagePullBackOff,
@@ -96,45 +104,109 @@ The deploy detail page (reachable from **Deployments → [id]**) shows:
 From the CLI:
 
 ```bash
-astro deployments list --app <slug> --limit 10
-astro deployments logs <deployment-id>
+astro ci status <deployment-id>
+astro app logs --env production --since 1h --tail 200 -f
 ```
+
+From GraphQL, `astroliftDeploymentsPage(appSlug:, environmentName:, statuses:)`
+lists deployments and `astroliftDeployment(id:)` reads one.
 
 ---
 
 ## Roll back to a previous deploy
 
-Rollback re-applies the manifest and image tag of an earlier successful
-deploy. It does not revert application data or environment variable
-changes made after that deploy.
+Rollback re-applies the image tag, digest and config snapshot of the
+deploy that was live before the current one. It does not revert
+application data or environment variable changes made after that deploy.
+
+The target of `rollbackDeployment` is always the **current `running`**
+deployment of the environment; the mutation refuses any other row
+(`only running deployments are rollback targets`, `only the current running
+deployment is a rollback target`). The deploy it rolls back to is the most
+recent `superseded` deployment created before it; with none, the mutation
+answers `no prior superseded deployment to roll back to`. On a production
+environment the action-safety gate (#2202) is consulted first, as action
+`rollback.production`.
+
+What happens: the running row moves to `rolled_back`, a new row with
+`triggerKind: rollback` is created in `pending` carrying the prior deploy's
+image and snapshot (and its strategy), and `RollbackDeploymentWorkflow`
+(workflow id `RollbackDeploymentWorkflow-<new deployment guid>`) runs the
+ordinary apply path against it: `pre_flight`, `mark_deploying`,
+`render_manifests`, `update_secrets`, `apply_manifests`, `wait_dns`,
+`poll_rollout`, `health_check`, `mark_running`. Apps whose environment
+requires a native identity origin (native GKE) roll back through the native
+pipeline instead (`_start_native_rollback`, #2278).
 
 ### From the UI
 
-1. Open **App detail → Deployments**.
-2. Find the deploy you want to restore. Click the row.
-3. Click **Roll back to this deploy**. Confirm.
+1. Open **App detail → Deployments**, or **Deployments → [id]** for the
+   running deployment.
+2. Click **Roll back**. Confirm. A failed latest deploy also shows
+   **Roll back** on the app overview when a good prior deploy exists.
 
-Astrolift creates a new deploy pointing at the historical manifest
-snapshot and image digest. The rollback deploy appears in the list
-with a **Rollback** badge.
+The rollback deploy appears in the list with the `rollback` trigger kind.
 
 ### From the CLI
 
 ```bash
-astro rollback --app <slug> --deployment <deployment-id>
+# Resolve the running deployment for --app / astrolift.toml and --env
+astro app rollback --env production
+# Or name the running deployment
+astro app rollback <deployment-id> --yes
 ```
+
+### Stuck rollback: `RollbackDeploymentWorkflow` retrying forever
+
+`RollbackDeploymentWorkflow` runs its activities with Temporal's default
+retry policy (unbounded attempts) and handles no `abort` signal; only
+`DeployAppWorkflow` does. When the rollback's deployment row is already
+terminal, in practice `failed` after an operator pressed **Abort**
+(`abortDeployment` signals `abort`, the server accepts the signal, so the
+workflow is not terminated, and the row is moved to `failed`),
+`mark_deploying` or `mark_running` raises
+`Deployment(<id>) cannot transition failed → running` on every attempt,
+and the workflow retries it indefinitely, holding a worker slot.
+
+Symptoms: a `RollbackDeploymentWorkflow-<guid>` execution that stays
+`Running` long after its 15 minute activity timeouts; the Temporal UI shows
+the same activity with a climbing attempt count and that `ValueError`.
+
+Resolution:
+
+```bash
+# From the backend container
+python manage.py temporal_ops list --status running | grep RollbackDeploymentWorkflow
+python manage.py temporal_ops describe RollbackDeploymentWorkflow-<guid>
+python manage.py temporal_ops terminate RollbackDeploymentWorkflow-<guid> \
+  --reason "deployment row already failed; nothing left to mark running"
+```
+
+Terminating leaves the row as it is (`failed`, with its `abortedReason`). To
+restore service, roll back again from the new running deployment if one
+exists, or deploy a known-good image with `astro app deploy --image-tag`.
+The row the rollback moved to `rolled_back` cannot be revived; it is
+history. The workflow-level fix (a bounded retry policy and an `abort`
+handler on the rollback workflow) is not shipped as of 2026-10-30.
 
 ### Estimated time
 
 A rollback that reuses a cached image layer completes in under 60 seconds.
 If the cluster has evicted the image layers, it adds a pull duration
-(typically 30-90 seconds for a multi-hundred-MB image).
+(typically 30-90 seconds for a multi-hundred-MB image). Each rollback
+activity has a 15 minute start-to-close timeout.
 
 ---
 
 ## Failed deploy: immediate remediation
 
-If a deploy ends in **Failed** status:
+If a deploy ends in `failed` status:
+
+0. **Deploy pipeline disabled?** When every deploy, promote and rollback
+   answers `deploy pipeline is disabled in this environment`, the Constance
+   flag `DEPLOY_PIPELINE_ENABLED` is off. Flip it in `/app/admin/constance/`
+   or seed it with the `FEATURE_DEPLOY_PIPELINE` env var on the webservice
+   and worker.
 
 1. **Read the log**: open the deploy detail page, scroll to the error.
    Most failures are one of: build error (Dockerfile), image pull error
@@ -160,8 +232,15 @@ If a deploy ends in **Failed** status:
 
 5. **OOMKilled**: the container exceeded its memory limit.
    - Raise the memory limit in **App detail → Resources** and redeploy.
-   - If memory usage grows over time, the application has a leak — this
+   - If memory usage grows over time, the application has a leak; this
      is a bug in the application, not the platform.
+
+6. **Dismiss a failed row**: `abortDeployment` on a `failed` deployment
+   soft-deletes the record (no workflow is left to stop). On an in-flight
+   row (`pending_approval`, `pending`, `deploying`, `redeploying`) it
+   signals `abort` to `DeployAppWorkflow`, falls back to terminating the
+   workflow when the signal cannot be delivered, and marks the row
+   `failed`. See the stuck-rollback note above before aborting a rollback.
 
 ---
 
