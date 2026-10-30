@@ -12,9 +12,9 @@ Preconditions: `cluster.manage` on the organization (a platform operator for
 shared zones); the backend task role or IRSA role in the cluster's AWS account
 holding the Route 53 and ACM actions listed below; for manage.py steps, a shell
 in the backend container. Placeholders: `<zone>` is the apex you register
-(`astro domains list` shows registered ones); `<cluster guid>` is `id` from
+(`astro operator domains list` shows registered ones); `<cluster guid>` is `id` from
 `astro api graphql -q 'query { astroliftClustersPage { items { id slug } } }'`; `<id>` is the domain GUID
-from `astro domains list` or `astroliftManagedDomains`.
+from `astro operator domains list` or `astroliftManagedDomains`.
 
 ## Two ways a zone gets registered
 
@@ -34,10 +34,10 @@ them. Unset variables make the command a silent no-op.
 workflow. The CLI mirrors the registration half:
 
 ```bash
-astro domains list
-astro domains create <zone> --dns-driver aws [--default-for tenant_apps|preview_envs|both|none] [--wildcard] [--shared] [--dns-config file.json]
-astro domains update <id> [--default-for ...] [--wildcard=false] [--dns-config file.json]
-astro domains verify <zone>
+astro operator domains list
+astro operator domains create <zone> --dns-driver aws [--default-for tenant_apps|preview_envs|both|none] [--wildcard] [--shared] [--dns-config file.json]
+astro operator domains update <id> [--default-for ...] [--wildcard=false] [--dns-config file.json]
+astro operator domains verify <zone>
 ```
 
 `--shared` needs platform-operator permission. Shared rows (no organization)
@@ -46,7 +46,7 @@ operator (`_require_operator_for_shared`). The console lives at `/domains`
 (`/settings/managed-domains` redirects there); a zone's page is `/domains/[id]`.
 
 An organization-owned zone the operator controls must pass the TXT proof
-(`verifyManagedDomain`, `astro domains verify`) before it serves apps; the
+(`verifyManagedDomain`, `astro operator domains verify`) before it serves apps; the
 installer's zone skips it (`verification_state: not_required`).
 
 ## ProvisionManagedDomainWorkflow
@@ -128,7 +128,7 @@ it does not create zones.
 
 ```bash
 # provisionState is mark_active and the zone is active
-astro domains list
+astro operator domains list
 # Public delegation answers with the nameservers the workflow handed out
 dig +short NS <zone>
 # The run is gone from the running list (it closes on activation)
