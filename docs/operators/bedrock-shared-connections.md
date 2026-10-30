@@ -7,6 +7,8 @@ flag is off by default. Only a current active installation superadministrator
 with the required administrator credential ceiling can change this model flag.
 The Django setting is `BEDROCK_MODEL_CONNECTIONS_ENABLED`.
 
+Preconditions: `org.read` in the active organization for `bedrockModelConnectionSupport`; `org.update` there (an organization-bound bearer with `admin`) for `bedrockModelConnectionAction`, `bedrockModelSources`, `bedrockModelSource`, `registerBedrockModelConnection`, `updateBedrockModelConnection` and `unregisterBedrockModelConnection`; a shared cluster or shared model additionally needs the platform operator; the `models.bedrock_connections_enabled` flag on; the cluster's declared AWS credential able to list foundation models and inference profiles. Surface: `/models/connect` (the connection wizard), `/models/connections` and `/models/connections/<connection-id>`, or `astro api graphql`. Placeholders: `<org-id>` is `id` from `astroliftOrganizations`; `<cluster-id>` is `id` from `astroliftClustersPage`; `<connection-id>` is `id` from `clusterModelDeploymentsPage(organizationId)`.
+
 `models.native_connection_metadata` separately advertises the additive
 `ClusterModelDeployment.nativeConnection` projection. It includes typed family,
 source kind and configuration state, unknown invocation access, nullable source
@@ -134,3 +136,13 @@ deletes or modifies the external foundation model, inference profile or paid
 throughput. Snapshot, native prompt testing, per-app token usage and cost are not
 implemented by this connection path. No local test establishes live AWS invocation
 or a deployed application identity.
+
+## Verify
+
+```sh
+astro api graphql --var orgId=<org-id> -q 'query($orgId: GUID!) { bedrockModelConnectionSupport(organizationId: $orgId) { enabled allowed reason } }'
+astro api graphql --var orgId=<org-id> --var id=<connection-id> -q 'query($orgId: GUID!, $id: GUID!) { clusterModelDeployment(organizationId: $orgId, id: $id) { id status sourceKind nativeConnection { family sourceKind } } }'
+cd backend && pytest astrolift_services/tests/test_bedrock_connections_2269.py
+```
+
+Support answers `enabled: true, allowed: true` with a null `reason`; a registered connection reads `status: active` with a native `sourceKind` and `nativeConnection`; the test module passes.

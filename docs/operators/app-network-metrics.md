@@ -7,6 +7,8 @@ Network I/O card in the golden signals panel (Logs & metrics › Metrics). The
 read requires `app.read` on the app, including the bearer token's team and
 permission ceilings, exactly as `astroliftAppGoldenSignals` does.
 
+Preconditions: `app.read` on the app (a bearer token's team and permission ceilings apply); the environment's cluster has a `prometheus_endpoint` configured and that Prometheus scrapes the kubelet's `/metrics/cadvisor`. Surface: Logs & metrics › Metrics at `/apps/<app-slug>/logs` (the Network I/O card), or `astroliftAppNetworkMetrics` through `astro api graphql`. Placeholders: `<app-slug>` is `slug` from `astroliftAppsPage`; `<environment-name>` is `name` from `astroliftEnvironmentsPage(appSlug)`; `<workload-slug>` is `slug` from `astroliftWorkloadsPage(appSlug)`. The example below uses literal values.
+
 ```graphql
 query Network($app: String!, $environment: String, $workload: String) {
   astroliftAppNetworkMetrics(
@@ -139,3 +141,13 @@ No cluster is read either way.
   `astroliftAppGoldenSignals` and `astroliftAppStatusCodeBreakdown`. They
   need an ingress metrics mapping or `metrics.enabled` instrumentation; see
   [workload golden signals](./workload-golden-signals.md).
+
+## Verify
+
+```sh
+astro api graphql --file network.graphql \
+  --var app=<app-slug> --var environment=<environment-name> --var workload=<workload-slug>
+cd backend && pytest astrolift_observability/tests/test_network_metrics_2271.py
+```
+
+`reason` is `OK`, each direction's `measurement.available` is true with `source: CADVISOR`, and `samples` is non-empty with `unit: bytes_per_second`; the test module passes.

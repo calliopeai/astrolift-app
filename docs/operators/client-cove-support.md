@@ -8,6 +8,8 @@ sends no telemetry.
 
 The module is off by default.
 
+Preconditions: `org.read` in the active organization; a bearer must be organization-bound with no team, and `admin` to open or reply. Surface: `/support` (account menu › Support), or the REST routes below. Switching on needs the control-plane environment variables below, the `SUPPORT_ENABLED` platform setting at `/administration/platform-settings`, and the deployment ID and key Calliope AI issued for the install. Placeholders: `<id>` is a case `id` from `GET /api/support/v1/tickets/`.
+
 ## Turn it on
 
 Set these on the control plane, then switch it on:
@@ -45,7 +47,23 @@ Client Cove's own error text is never passed through to the browser.
 
 ## API
 
-`GET` and `POST /api/support/v1/tickets/` list and open cases.
-`GET` and `POST /api/support/v1/tickets/<id>/` read a case and add a reply.
+```text
+GET  /api/support/v1/tickets/          list cases
+POST /api/support/v1/tickets/          open a case
+GET  /api/support/v1/tickets/<id>/     read a case
+POST /api/support/v1/tickets/<id>/     add a reply
+```
+
 Refusals carry a `code`: `PERMISSION_DENIED`, `SUPPORT_COVERAGE_REQUIRED`,
 `SUPPORT_REQUEST_INVALID`, `NOT_FOUND` or `SUPPORT_UNAVAILABLE`.
+
+## Verify
+
+```text
+GET /api/support/v1/tickets/
+Authorization: Bearer <organization-bound token>
+
+cd backend && pytest core/tests/test_client_cove_support_views_1809.py
+```
+
+The list answers `200` with the organization's cases (an empty list on a fresh install); `404` means `FEATURE_SUPPORT` is off, `SUPPORT_UNAVAILABLE` means the deployment ID or key is missing or Client Cove is unreachable; the test module passes.

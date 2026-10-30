@@ -4,6 +4,8 @@
 the agent Observe view. `agentTaskLogs(id, tail): [String!]!` remains available
 for existing run-detail, CLI and other callers.
 
+Preconditions: `agent.read` at the task's effective owner scope (its project, team or app, or the organization for an unowned task); bearer permission, team and share ceilings and operation policies apply. Surface: the Observe view at `/agents/runs/<task-id>`, `astro agent logs <task-id>` (the legacy `agentTaskLogs` read), or `agentTaskLogsPage(id)` through `astro api graphql`. Placeholders: `<task-id>` is `id` from `agentTasksPage` or `astro agent ls`; `<cursor>` is `nextCursor` from the previous page.
+
 ```graphql
 query TaskLogPage($id: ID!, $cursor: String, $limit: Int) {
   agentTaskLogsPage(id: $id, cursor: $cursor, limit: $limit) {
@@ -54,3 +56,13 @@ A malformed or mismatched cursor produces `LOG_CURSOR_INVALID`. An expired or
 evicted snapshot produces `LOG_CURSOR_EXPIRED`. Both are GraphQL query errors;
 refresh the log rather than replaying the cursor. Authorization denial retains
 the normal permission error and does not reveal cached output.
+
+## Verify
+
+```sh
+astro api graphql --var id=<task-id> -q 'query($id: ID!) { agentTaskLogsPage(id: $id, limit: 50) { pageSize hasMore nextCursor liveOnly windowLimited expiresAt items { id timestamp level message podName } } }'
+astro api graphql --var id=<task-id> --var cursor=<cursor> -q 'query($id: ID!, $cursor: String) { agentTaskLogsPage(id: $id, cursor: $cursor) { hasMore items { id timestamp } } }'
+cd backend && pytest astrolift_agents/tests/test_task_log_pages_2175.py
+```
+
+The first call returns `pageSize: 50`, `liveOnly: true` and the newest lines; the second returns the earlier page for that cursor without `LOG_CURSOR_INVALID` or `LOG_CURSOR_EXPIRED`; the test module passes.

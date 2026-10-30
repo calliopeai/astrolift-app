@@ -9,6 +9,8 @@ The legacy elevated account-deletion route performs its existing self-logout.
 The existing tenant, grant-ceiling, fresh-elevation, protected-operator and
 last-owner admission rules apply before cleanup.
 
+Preconditions: `org.manage_members` in the target's organization (the mutation checks it itself, then the tenant, grant-ceiling, fresh-elevation, protected-operator and last-owner rules); self-anonymization needs only the session. Surface: the People list at `/administration/access/people` (**Review privacy cleanup**), or the `astroliftAnonymizeUser(input: { userGid })` mutation through `astro api graphql`. Operations migration `0028_user_privacy_projection` must be applied first, from a shell in the backend container. Placeholders: `<user-guid>` is `user.id` from `astroliftMembersPage`.
+
 `AstroliftUser.isAnonymized` is a nullable read-only indication of the stored
 account state, not permission to erase someone. The shared predicate requires
 an inactive user and an exact, case-sensitive `@anon-astrolift.net` email suffix.
@@ -106,6 +108,10 @@ These copies can contain PII but have no supported blanket-erasure guarantee:
 
 Apply operations migration 0028 before running the new cleanup path. It installs
 functions/guards; it does not scan or anonymize existing users on migration.
+
+```sh
+python manage.py migrate astrolift_operations
+```
 Verify the account-privacy PostgreSQL/API tests, existing tenant/owner/operator
 admission tests and elevated HTTP self-deletion test against the release schema.
 The concurrent callback test proves that a callback waits for erasure's account
@@ -137,3 +143,13 @@ a confirmed missing row does not. Locale changes alone retain acknowledgement.
 Accepted cleanup remains accepted if refresh or required sign-out navigation
 fails, with separate recovery feedback. Navigation failure never claims the
 browser session was successfully ended.
+
+## Verify
+
+```sh
+astro api graphql --var userGid=<user-guid> -q 'mutation($userGid: GUID!) { astroliftAnonymizeUser(input: {userGid: $userGid}) { ok errors { message } data { anonymizedUserId wasSelf requiresLogout } } }'
+astro api graphql -q 'query { astroliftMembersPage { items { user { id email isActive isAnonymized } } } }'
+cd backend && pytest astrolift_identity/tests/test_historical_privacy_2220.py astrolift_identity/tests/test_anonymize_user_mutation.py
+```
+
+The mutation returns `ok: true`; the user's row then reads `isActive: false`, `isAnonymized: true` and an email ending in `@anon-astrolift.net`; both test modules pass.
