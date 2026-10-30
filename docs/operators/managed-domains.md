@@ -8,6 +8,14 @@ stalls. Diagnostics are in [managed-domain-diagnostics.md](managed-domain-diagno
 routing a zone to a public Lambda app is in
 [managed-domain-app-routing.md](managed-domain-app-routing.md).
 
+Preconditions: `cluster.manage` on the organization (a platform operator for
+shared zones); the backend task role or IRSA role in the cluster's AWS account
+holding the Route 53 and ACM actions listed below; for manage.py steps, a shell
+in the backend container. Placeholders: `<zone>` is the apex you register
+(`astro domains list` shows registered ones); `<cluster guid>` is `id` from
+`astro api graphql -q 'query { astroliftClustersPage { items { id slug } } }'`; `<id>` is the domain GUID
+from `astro domains list` or `astroliftManagedDomains`.
+
 ## Two ways a zone gets registered
 
 **From the installer, at container start.** `startup.py` runs
@@ -92,9 +100,14 @@ these actions for the workflow above, from the boto3 calls in
   `acm:ListCertificates`, `acm:DeleteCertificate` (reissue and cleanup).
 
 Without `route53:CreateHostedZone` a platform-managed provision stalls at
-`provision_dns_zone` with an `AccessDenied` reason on the row. The role the
-installer builds for the task is in `calliope-installer`, not in this repo;
-check it there when a new action is needed. The IRSA role Astrolift provisions
+`provision_dns_zone` with an `AccessDenied` reason on the row after the
+activity's retries (seen on an install whose task role was maintained by hand
+and never picked up the installer's policy). The installer grants these in the
+`task_managed_domains` policy of `calliope-installer`
+`terraform/aws/astrolift-deployment-ecs/iam.tf` (`CreateHostedZone`,
+`DeleteHostedZone`, `ListHostedZonesByName`, `ChangeTagsForResource`,
+`ListTagsForResource` on top of the record actions); an install with its own
+IAM must mirror that policy. The role is not in this repo. The IRSA role Astrolift provisions
 for `external-dns` (`EXTERNAL_DNS_POLICY_STATEMENTS`,
 `backend/providers/aws/identity_irsa.py`) holds only
 `route53:ChangeResourceRecordSets` on hosted zones plus the three list actions;
@@ -110,6 +123,22 @@ it does not create zones.
 - `manage.py report_shared_zone_hostname_collisions [--format json]`:
   read-only; lists every hostname two or more organizations both render inside
   a shared zone (#2012).
+
+## Verify
+
+```bash
+# provisionState is mark_active and the zone is active
+astro domains list
+# Public delegation answers with the nameservers the workflow handed out
+dig +short NS <zone>
+# The run is gone from the running list (it closes on activation)
+python manage.py temporal_ops list --status running | grep ProvisionManagedDomainWorkflow
+```
+
+Through GraphQL, `astroliftManagedDomain(domainId: "<id>")` shows
+`provisionState`, `provisionNameservers` and `provisionValidationRecords`;
+`astroliftManagedDomainDiagnostics(domainId:, expectedVersion:)` gives the
+public delegation and certificate observations.
 
 ## Related
 

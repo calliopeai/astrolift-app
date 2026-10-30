@@ -4,6 +4,12 @@ Two runtime fixes from #2554 (2026-10-26) that change what an operator sees on
 a dedicated install: pipelines may now run on the shared platform cluster, and
 `kind = "function"` workloads render annotations Knative accepts.
 
+Preconditions: a pipeline with at least one job on an app in the organization
+(`astro pipeline list`), an active managed cluster that is the organization's
+or shared (`astro api graphql -q 'query { astroliftClustersPage { items { id slug isActive } } }'`), and for functions a cluster with Knative
+Serving installed. Placeholders: `<run-id>` is from `astro pipeline list` or
+`astro pipeline run`; `<slug>` is a cluster slug.
+
 ## Where a pipeline job runs
 
 `backend/astrolift_pipelines/dispatch_router.py` picks a `TenantCluster` for a
@@ -56,6 +62,17 @@ Service's own metadata, and Knative rejected the Service for it; a function
 deploy that failed at `apply_manifests` with a Knative admission error on a
 build before 2026-10-26 was this. Redeploying
 on the current backend is the fix; the manifest needs no change.
+
+## Verify
+
+```bash
+# The job's pod is on the expected cluster; a shared fallback shows the shared cluster's slug
+astro pipeline logs <run-id>
+# The cluster records an architecture, so arch selectors can match it (node_archs is not in GraphQL)
+python manage.py shell -c "from astrolift_clusters.models import TenantCluster; print(list(TenantCluster.objects.values_list('slug','node_os','node_archs')))"
+# A function deploy produced a Ready Knative Service with the annotations on the revision template only
+kubectl -n <app namespace> get ksvc <workload> -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}{"\n"}{.spec.template.metadata.annotations}'
+```
 
 ## Related
 

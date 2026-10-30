@@ -5,6 +5,16 @@ Zentinelle governs the agents Astrolift runs. The link is a
 a base URL, a sealed install credential, and one `ZentinelleClusterGateway`
 per registered cluster. Code: `backend/astrolift_operations/zentinelle_connect.py`.
 
+Preconditions: a reachable Zentinelle URL and a one-time enrollment code
+minted there (the installer mints it from Zentinelle's bootstrap secret); for
+the manage.py path, a shell in the backend container with the code in an
+environment variable; for the console or CLI path, `zentinelle.connect` on the
+organization (`zentinelle.gateway_manage` for gateways, a platform operator
+for the install connection). Placeholders: `<slug>` is the organization slug
+(`astro api graphql -q 'query { astroliftOrganizations { slug } }'`); `<cluster>`
+is a cluster slug as `astro zentinelle status` prints it;
+`ZENTINELLE_CODE` is the name of the variable holding the code, not the code.
+
 Two kinds of connection exist:
 
 - **Organization connection.** One per organization. Its clusters are the
@@ -94,6 +104,21 @@ image is the Constance key `ZENTINELLE_GATEWAY_IMAGE`.
   and new credential for a bounded window.
 - Each gateway row records `gateway_deployed`, `credential_rotated_at` and
   `last_error`; `astro zentinelle status` prints them per cluster.
+
+## Verify
+
+```bash
+# The connection is connected and every expected cluster has gateway_deployed true
+astro zentinelle status
+# In the cluster: two ready gateway pods in astrolift-system
+kubectl -n astrolift-system get deploy zentinelle-gateway
+# Re-running the command is a no-op that still exits 0
+python manage.py connect_zentinelle --install --url <url> --code-env ZENTINELLE_CODE --register-shared-clusters
+```
+
+On the Zentinelle side the install appears with its id (printed as
+`Zentinelle install <id>` by the command) and each registered cluster shows a
+gateway heartbeat.
 
 ## Failure modes
 

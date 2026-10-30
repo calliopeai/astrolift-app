@@ -5,6 +5,12 @@ container start, and how it sees the Calliope AI products the installer runs
 beside it. The installer itself lives in `calliope-installer`; this page covers
 only the Astrolift side.
 
+Preconditions: the environment of the webservice or worker task (ECS task
+definition or Helm values) is where every variable below is set; reading
+results needs a shell in the backend container (`python manage.py shell`) or
+the console once an administrator exists. Placeholders: `<cluster>` is the
+cluster slug in `ASTROLIFT_CLUSTER_SLUG`; `<zone>` is `ASTROLIFT_MANAGED_DOMAIN_ZONE`.
+
 ## Commands that run on every start
 
 `backend/startup.py` runs these in order before starting uvicorn. Every one is
@@ -68,6 +74,20 @@ Django admin; read the table directly or watch the `product_deployment.changed`
 events.
 **Secure › Zentinelle** follows the Zentinelle connection, not hosting, so a
 hosted Zentinelle shows there only once connected.
+
+## Verify
+
+```bash
+# Container log: each command logged by startup.py and no "[STARTUP] Schema migration failed"
+# From the backend container:
+python manage.py showmigrations | grep -c "\[ \]"          # 0 unapplied
+python manage.py register_tenant_cluster --slug <cluster>   # idempotent re-run, exits 0
+python manage.py bootstrap_managed_domain                   # prints "already registered; left as is"
+python manage.py shell -c "from astrolift_clusters.models import ProductDeployment; print(list(ProductDeployment.objects.values_list('kind','namespace','health','gone_at')))"
+```
+
+The seeded cluster is on `/clusters` and the apps zone on `/domains` once an
+administrator has claimed the install.
 
 ## Related
 

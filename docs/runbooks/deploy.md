@@ -2,6 +2,15 @@
 
 Standard deploy and rollback procedures for Astrolift-managed apps.
 
+Preconditions: an `astro` login on the install (`astro auth status`) with
+`app.deploy` (deploy) or `app.rollback` (rollback) on the app; for the
+Temporal steps, a shell in the backend container (ECS `exec` into the
+webservice or worker task, or `kubectl exec` into the api pod) where
+`python manage.py` runs. Placeholders: `<slug>` is the app slug from
+`astro app list`; `<deployment-id>` is the GUID printed by `astro app deploy`
+or `astro ci status`, or `id` from `astroliftDeploymentsPage`; `<guid>` in a
+workflow id is that deployment id.
+
 ---
 
 ## Deploy an app
@@ -260,6 +269,19 @@ For zero-downtime, your app must:
   `terminationGracePeriodSeconds` window (default: 30s).
 
 ---
+
+## Verify
+
+```bash
+# The environment has exactly one running deployment and it is the one you expect
+astro ci status <deployment-id>
+# Or, through GraphQL: statuses: ["running"] returns one row for the environment
+astro api graphql --query 'query { astroliftDeploymentsPage(appSlug: "<slug>", environmentName: "production", statuses: ["running"]) { items { id status imageTag triggerKind } } }'
+```
+
+A rollback is complete when the new `triggerKind: rollback` row is `running`,
+the previous row is `rolled_back`, and `temporal_ops list --status running`
+no longer lists `RollbackDeploymentWorkflow-<guid>`.
 
 ## Related
 
