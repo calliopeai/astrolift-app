@@ -7,6 +7,25 @@ task events, the organization event feed, and the legacy `notificationReceived`
 subscription over `core.Notification`. There is no invented agent sender or task
 association. Reading this inbox never marks an agent thread read.
 
+Preconditions: the authenticated person's own session or a person API token for
+the selected organization; a token must permit `app.read` through the
+`read:apps`, `write:apps` or `admin` scope (`backend/core/permissions.py`); the
+query runs through `astro api graphql`, the subscription over the WebSocket
+endpoint below, and the console shows the same rows at `/settings/notifications`;
+the install must have `astrolift_operations` migration 0037 applied.
+Placeholders: `<install>` is the control plane's hostname; `<person API token>`
+is the caller's token; `<cursor>` is the `endCursor` of the last fully
+processed page, or `null` to start from retained history.
+
+```sh
+astro api graphql -q 'query($after: String) {
+  astroliftMyNotificationsPage(after: $after, limit: 100) {
+    items { id kind title body link readAt createdAt expiryWarning { appId appSlug expiresAt warningWindow } }
+    endCursor hasMore
+  }
+}' --var after=<cursor>
+```
+
 ```graphql
 query CatchUp($after: String) {
   astroliftMyNotificationsPage(after: $after, limit: 100) {
@@ -101,3 +120,13 @@ command or legacy subscription is claimed by this change. WebSocket transport is
 or an existing authorized browser session. Wait for `connection_ack`, then
 subscribe. Authorization failures terminate the operation; reconnecting does not
 restore revoked access.
+
+## Verify
+
+```sh
+astro api graphql -q 'query { astroliftMyNotificationsPage(after: null, limit: 100) { items { id kind createdAt } endCursor hasMore } }'
+```
+
+The page must return a non-null `endCursor` even when `items` is empty, and a
+second call with `--var after=<cursor>` must return only rows after it; an
+unauthorized token exits non-zero with the GraphQL error on stderr.

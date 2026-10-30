@@ -6,6 +6,15 @@ workload explicitly. A missing environment or workload never falls back to a
 sibling. The read requires current app read permission, including the bearer
 token's permission ceiling.
 
+Preconditions: `app.read` on the app (`backend/core/permissions.py`), within the
+bearer token's ceiling; the surface is `astro api graphql` or the workload page
+`/apps/<app-slug>/workloads/<workload-slug>`; for physical measurements the
+cluster's `prometheus_endpoint` must be reachable from the control plane and
+its Kubernetes credential must read pods and controllers in the recorded
+namespace. Placeholders: `<app-slug>` is `slug` from `astro app list`;
+`<environment-name>` is `NAME` from `astro app environments list <app-slug>`;
+`<workload-slug>` is `slug` from `astroliftWorkloadsPage(appSlug: "<app-slug>")`.
+
 ```graphql
 query Signals($app: String!, $environment: String!, $workload: String!) {
   astroliftAppGoldenSignals(
@@ -66,7 +75,7 @@ Save that document as `signals.graphql` and use the existing public CLI:
 
 ```sh
 astro api graphql --file signals.graphql \
-  --var app=example --var environment=production --var workload=api
+  --var app=<app-slug> --var environment=<environment-name> --var workload=<workload-slug>
 ```
 
 The CLI uses the selected server, organization and authenticated session.
@@ -188,3 +197,15 @@ certify cloud credentials, production exporter configuration, GPU metrics,
 mobile authority or native mobile presentation. Existing dedicated legacy
 resource-gauge queries are separate APIs; this contract applies to golden
 signals and does not make those legacy gauges verified measurements.
+
+## Verify
+
+```sh
+astro api graphql --file signals.graphql \
+  --var app=<app-slug> --var environment=<environment-name> --var workload=<workload-slug>
+```
+
+For the CPU and memory signals `measurement.available` must be true with
+`effectiveScope: WORKLOAD` and `identityBasis: VERIFIED_RUNTIME`, and
+`containers` must list the pods' runtime container IDs; an unavailable signal
+names its `unavailableReason` and is not zero utilization.
