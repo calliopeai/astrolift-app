@@ -5,6 +5,13 @@ price estimates and product cost queries. Zentinelle remains the canonical home
 for per-model token tallies. Resource quotas, GPU admission, token/time limits,
 callback status/duration/tokens and lifecycle evidence remain.
 
+Preconditions: the install's deployment tooling (ECS task definitions or
+Kubernetes manifests) to roll the worker, API and client images and to edit
+`ASTROLIFT_ACTIVE_SCHEDULES`; access to the install's Temporal namespace to
+pause the schedule; a shell in the backend container for schema and test
+checks; an authenticated `astro` session for the live contract checks.
+Placeholders: none.
+
 No migration drops or rewrites historical budgets, snapshots, task usage,
 events, encrypted callback bodies or Temporal histories. Historical monetary
 models remain installed; their Django admin is read-only. Private native cloud
@@ -84,3 +91,15 @@ or API can re-enable money collection, transport and old schedule creation, so
 keep the retired schedule paused/configuration removed and require a separate
 review before any rollback that restores old behavior. Preserve old histories
 and ciphertext; do not backfill, scrub or reconstruct monetary records.
+
+## Verify
+
+```sh
+grep -cE 'astroliftBudgets|astroliftCostSnapshots|astroliftCostTrend|astroliftCostForecast|astroliftCostByBinding|astroliftManagedServiceCostPreview|costUsd|billableWindowDays|AstroliftZentinelleBudget|includeRuntimeCost' backend/schema.graphql
+astro api graphql -q '{ astroliftBudgets { id } }'
+./run.sh test astrolift_billing/tests/test_cost_queries.py astrolift_workflows/tests/test_capture_cost_snapshot.py astrolift_workflows/tests/test_retired_monetary_events_2464.py
+```
+
+The grep prints `0`, the live query exits non-zero with a GraphQL error instead of
+data, and the three test modules pass (removed SDL fields, read-only admin,
+side-effect-free snapshot activity, retired event routing).

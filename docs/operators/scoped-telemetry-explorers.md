@@ -6,6 +6,25 @@ choices use its numbered pages. Preview logs retain their separate four-part rev
 identity contract and are opened from the app's Previews page. These explorers do not
 install collectors or imply that telemetry exists.
 
+Preconditions: `app.read_logs` on the app for `/logs` and `astroliftAppLogs`;
+`app.read` on the app for `/traces`, `astroliftAppTracePage` and
+`astroliftTraceSpansResult`; a selected organization. Collector settings live
+on `TenantCluster.provider_config`, written through the Django admin
+TenantCluster form or a shell in the backend container; no GraphQL field sets
+them. For CloudWatch the cluster's registered AWS credential (its assumed role)
+must hold `logs:FilterLogEvents` on the group. Surfaces: the console at `/logs`
+and `/traces`, or GraphQL via `astro api graphql`. Placeholders: `<app-slug>` is
+the registered app slug (`astro app list`); `<environment-id>` is `id` from
+`astroliftEnvironmentsPage(appSlug: "<app-slug>")`; `<since>` and `<until>` are
+the window bounds (DateTime for logs; Unix seconds or timezone-aware ISO for
+traces, at most 24 hours apart); `<trace-id>` is `traceId` of a trace page item.
+
+```graphql
+query { astroliftAppLogs(appSlug: "<app-slug>", environmentId: "<environment-id>", since: "<since>", until: "<until>", limit: 100) { reason historicalAvailable totalCount nextCursor scope { environmentId environmentName clusterId namespace } items { timestamp podName container level message } } }
+query { astroliftAppTracePage(appSlug: "<app-slug>", environmentId: "<environment-id>", since: "<since>", until: "<until>", limit: 10) { reason truncated limit scope { environmentId clusterId namespace } items { traceId rootService rootOperation spanCount durationMs statusCode } } }
+query { astroliftTraceSpansResult(appSlug: "<app-slug>", traceId: "<trace-id>", environmentId: "<environment-id>", since: "<since>", until: "<until>") { reason scope { environmentId namespace } items { spanId parentSpanId service operation durationMs statusCode } } }
+```
+
 The app's persisted `AppEnvironment` foreign key selects the live cluster and namespace.
 A shared platform cluster with `organization_id=null` is supported only through that
 explicit placement. A foreign organization-owned, retired, inactive, or replaced target
@@ -107,9 +126,13 @@ organization, immutable app/environment/cluster identities and the query window.
 Changing that scope hides prior data immediately.
 
 Server discovery advertises `observability.exact_environment_logs` and
-`observability.scoped_trace_envelopes` through `astroliftServerInfo` (and existing
-`astro capabilities` / `astro doctor` discovery). These indicate available API contracts,
-not configured collectors. Existing legacy trace array fields retain their shape and
+`observability.scoped_trace_envelopes` through `astroliftServerInfo` (`astro auth status
+--json` reports the same `capabilities` list). These indicate available API contracts,
+not configured collectors.
+
+```sh
+astro auth status --json
+``` Existing legacy trace array fields retain their shape and
 permissions but now use the same guarded attribution path. No new CLI trace command,
 cluster-wide search, export, service map, automatic tracing setup, or completed live
 collector verification is claimed by this batch.
@@ -119,3 +142,14 @@ Reviewed worker-side installation APIs advertise
 These keys indicate available API contracts; admission still checks current
 operator authority, provider support and required installation configuration.
 An installation receipt does not establish ongoing collector health or tracing.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftAppLogs(appSlug: "<app-slug>", environmentId: "<environment-id>", since: "<since>", until: "<until>", limit: 10) { reason totalCount scope { environmentId namespace } } }'
+astro api graphql -q '{ astroliftAppTracePage(appSlug: "<app-slug>", environmentId: "<environment-id>", since: "<since>", until: "<until>", limit: 10) { reason truncated scope { environmentId namespace } items { traceId } } }'
+./run.sh test astrolift_observability/tests/test_scoped_trace_explorers.py
+```
+
+Both reads return `reason: OK` (or `NO_DATA_YET` for an empty window) with a
+`scope` whose `environmentId` is the selected environment, and the test run passes.

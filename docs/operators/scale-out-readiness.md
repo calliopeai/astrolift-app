@@ -6,6 +6,15 @@ backlog signal for the worker, a drain on scale-in, database connections that
 stay inside the Aurora budget, and no per-process state that breaks with more
 than one replica.
 
+Preconditions: a shell in the worker or backend container (the metrics publisher
+runs `manage.py` from the worker image with the worker's Temporal and database
+environment); the install's deployment tooling for ECS or EKS scaling, stop
+timeouts and environment variables. The CloudWatch sink needs
+`cloudwatch:PutMetricData` on the task role in the install's AWS account; the
+Prometheus sink needs network reach from Prometheus to the publisher's port.
+Placeholders: `<user>` is the database role Django connects as;
+`<publisher-host>` is the host or pod running the Prometheus sink.
+
 ## Backlog signal
 
 `python manage.py publish_task_queue_metrics` reads every task queue the worker
@@ -146,3 +155,15 @@ Audited for anything held in memory across requests:
 | Exec and VNC websockets | the connection itself | A stream lives on the replica that accepted it; the load balancer keeps the connection there. |
 | AWS STS credentials, GitHub App installation tokens, boto3 and email drivers, licence verification, Prometheus query results (30s) | process caches | Safe: each replica fetches or builds its own; nothing is coordinated through them. |
 | Plugin registries, RBAC rule file, RDS CA bundle | process caches | Static per release. |
+
+## Verify
+
+```sh
+curl -s http://<publisher-host>:9464/metrics | grep astrolift_temporal_task_queue_backlog
+aws cloudwatch list-metrics --namespace Astrolift/Temporal --metric-name ApproximateBacklogCount
+./run.sh test astrolift_workflows/tests/test_task_queue_metrics_2435.py astrolift_workflows/tests/test_worker_drain_2435.py astrolift_workflows/tests/test_heartbeat_timeout_guard_2435.py core/tests/test_pubsub_redis_2435.py
+```
+
+The scrape prints one `astrolift_temporal_task_queue_backlog{task_queue=...}` and
+one `..._backlog_age_seconds` line per polled queue (or the CloudWatch listing shows
+a `TaskQueue` dimension per queue), and the four test modules pass.
