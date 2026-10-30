@@ -1,3 +1,5 @@
+> Historical (2026-10-30): validation record for the #2145 app settings namespaces (apps.config, apps.domains, apps.secrets, apps.security, apps.previews, apps.tokens); superseded by frontend/components/screens/apps/config/config-i18n.test.tsx, apps/domains/domains-i18n.test.tsx, apps/secrets/app-secrets-i18n.test.tsx, apps/security/app-previews-i18n.test.tsx and frontend/lib/i18n/deploy-tokens-i18n.test.tsx, with the catalogs in frontend/messages/*.json.
+
 # App settings localization, #2145
 
 This bounded slice owns `apps.config`, `apps.domains`, `apps.secrets`, `apps.security`, `apps.previews` and `apps.tokens`. Other catalog namespaces and shared list chrome belong to separate coordinated slices. The six assigned namespaces and their consumers are complete in all eight locales. The full issue still includes separately coordinated platform/shared consumer slices.

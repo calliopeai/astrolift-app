@@ -1,7 +1,13 @@
 # Calliope AI product deployments on Astrolift clusters (design, #2465)
 
-Status: **design for review, 2026-10-18.** Nothing here is approved or built. No
-product code ships with this document.
+Status: **partly built, 2026-10-30.** Delivery step 3 shipped: the
+`ProductDeployment` model (`astrolift_clusters/models/product_deployment.py`),
+the scan (`astrolift_clusters/product_deployments.py`), the driver
+`list_namespaces`, and `ReconcileProductDeploymentsWorkflow` every 2 minutes
+(`astrolift_workflows/schedule_registry.py`). Steps 2, 4 and 5 have not: no
+GraphQL type, query or mutation in `schema.graphql`, no MCP tool, no screen or
+story, no Zentinelle link step; #2465 stays open. Sections 7 to 9 below are
+still the design, not the code.
 
 Inputs: #2465, the installer contract
 `calliope-installer/docs/contracts/astrolift-product-deployments.md` (version 1,

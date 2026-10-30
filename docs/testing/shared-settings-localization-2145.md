@@ -1,3 +1,5 @@
+> Historical (2026-10-30): validation record for the #2145 shared settings leaf (shared.settings, shared.restricted); superseded by frontend/components/settings/settings-translations.test.tsx.
+
 # Shared settings localization (#2145)
 
 `SettingsPage`, `SettingsSection`, `Restricted`, and `PermissionNote` use

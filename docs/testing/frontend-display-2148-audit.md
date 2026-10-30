@@ -1,3 +1,5 @@
+> Historical (2026-10-30): item-by-item audit of the 90-item #2148 display and logic checklist (closed 2026-10-11); superseded by the regressions it names, frontend/components/screens/display-logic.test.tsx, pending-operations.test.tsx, clusters/status/cluster-connectivity.test.tsx, apps/controls/workload-readiness.test.tsx, pipelines/pipeline-route.test.tsx and frontend/components/home/HomeScreen.test.tsx.
+
 # Frontend display and logic checklist audit (#2148)
 
 Audited against isolated base `a6e2260374d1ef8ec0c663e5a75d2090bf805c0c` plus this branch. The original 90-item issue was read in full. This document records each item without closing the issue or treating parked features as implemented.
