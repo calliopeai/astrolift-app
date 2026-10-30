@@ -18,8 +18,10 @@ workflow id is that deployment id.
 ### Trigger from the UI
 
 1. Open **Apps** and click the target app.
-2. Click **Deploy** (top-right).
-3. Select the target cluster. Confirm.
+2. Click **Deploy** in the app header.
+3. Pick the environment and the image tag or source ref. The dialog reads
+   `Deploy <tag> to <env>?`; click **Deploy**. The target cluster is the
+   environment's, there is no cluster picker.
 4. Watch the deploy log stream on the deploy detail page.
 5. When status shows **Running**, verify via the **Open** link.
 
@@ -33,7 +35,7 @@ git push origin main
 
 Astrolift receives the webhook, creates a build job, and starts a
 deploy automatically. The deploy appears in the **Deployments** list
-within 5-10 seconds of the push.
+once the webhook is accepted.
 
 ### Trigger via the CLI
 
@@ -230,17 +232,20 @@ If a deploy ends in `failed` status:
    - Check that the registry credentials secret is present in the
      target namespace.
    - Verify the image tag exists in the registry.
-   - For private registries, confirm Astrolift has a registry
-     connection under **Settings → Registries**.
+   - For private registries, confirm the app's **Container registry**
+     (App → Settings, `/apps/<slug>/settings`) names the registry the
+     cluster can pull from, and that the pull secret exists in the
+     namespace (`kubectl -n <namespace> get secret`).
 
 4. **CrashLoopBackOff**: the container is starting and crashing.
-   - The application logs (available via **App detail → Logs**) show
-     the error before the crash.
+   - The application logs (**App → Logs**, `/apps/<slug>/logs`, or
+     `astro app logs --env <env>`) show the error before the crash.
    - Common causes: missing required environment variable, database
      not reachable at startup, port mismatch between app and manifest.
 
 5. **OOMKilled**: the container exceeded its memory limit.
-   - Raise the memory limit in **App detail → Resources** and redeploy.
+   - Raise `memory_limit` on the `[[workloads]]` entry in `astrolift.toml`
+     (push it with `astro app manifest push`) and redeploy.
    - If memory usage grows over time, the application has a leak; this
      is a bug in the application, not the platform.
 
@@ -261,9 +266,12 @@ the readiness probe.
 
 For zero-downtime, your app must:
 
-- Define a readiness probe in `astrolift.toml` under `[health]`. A
-  missing readiness probe means Kubernetes sends traffic to new pods
-  the moment they start, before the application is ready.
+- Define a health check on the primary container in `astrolift.toml`
+  (`healthcheck = { kind = "http", value = "/health" }` under
+  `[[workloads.containers]]`; kinds are listed in
+  `backend/astrolift_manifest/parser.py`). A missing readiness probe means
+  Kubernetes sends traffic to new pods the moment they start, before the
+  application is ready.
 - Handle `SIGTERM` gracefully. Kubernetes sends `SIGTERM` before
   killing the pod; your app should finish in-flight requests within the
   `terminationGracePeriodSeconds` window (default: 30s).
