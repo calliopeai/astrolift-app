@@ -4,6 +4,18 @@ The additive `domains.managed_diagnostics` capability advertises read-only
 observations. It does not activate a domain, change delegation, issue a
 certificate, select an organization default, or rewrite existing app URLs.
 
+Preconditions: `provider_plugin.read` in the domain's organization for
+`astroliftManagedDomain`, the diagnostics and the probes; Route53 and Cloudflare
+provider inventory additionally requires a current platform operator, with the
+`admin` scope on a bearer; `provider_plugin.configure` for `updateManagedDomain`
+defaults, plus the platform operator for shared rows. Surface:
+`astro operator domains show|check|lookup|probe <domain-id>`, console
+`/domains/[id]`, or `astro api graphql -q '<document>'`. Placeholders:
+`<domain-id>` is `id` from `astro operator domains list` (`astroliftManagedDomains`);
+`<version>` is `version` from `astro operator domains show <domain-id>`;
+`<hostname>` is the zone apex or a strict subdomain; `<record-type>` is one of
+A, AAAA, CNAME, NS, SOA, TXT, MX, SRV, CAA.
+
 Use `astroliftManagedDomain(domainId)` to load the exact GUID and current
 `version`. Refresh `astroliftManagedDomainDiagnostics(domainId, expectedVersion)`
 with an uncached read. A changed version/source or withdrawn actor, membership,
@@ -11,6 +23,13 @@ credential, session or permission refuses the observation. Missing/foreign rows
 return no target; transport failures have an explicit check state rather than
 an empty successful inventory. Action flags are advisory; existing mutations
 still enforce their own current permissions and proof requirements.
+
+```bash
+astro operator domains show <domain-id>
+astro operator domains check <domain-id> --hostname <hostname> --record-type NS
+astro operator domains lookup <domain-id> --hostname <hostname> --record-type <record-type>
+astro operator domains probe <domain-id> --hostname <hostname> --tool https
+```
 
 | Observation | Perspective and limit |
 | --- | --- |
@@ -121,7 +140,7 @@ installed matching DNS writer. Pending proof, incomplete provisioning,
 read-only discovery, missing/foreign writer association and withdrawn writers
 are explicit refusals; this metadata check performs no provider/network calls
 and does not prove delegation, ingress or HTTPS. An explicit organization
-`defaultManagedDomain` override refuses role selection because it outranks
+`default_managed_domain` override refuses role selection because it outranks
 flags for both use cases. A shared fallback also refuses when the caller's own
 eligible use-case default would still win. `none` can remove unsafe role flags
 but does not clear an explicit override.
@@ -189,3 +208,15 @@ TLS observations still need their separate checks.
 The field shapes follow the [Route53 record-set API](https://docs.aws.amazon.com/Route53/latest/APIReference/API_ResourceRecordSet.html),
 including its [geoproximity configuration](https://docs.aws.amazon.com/Route53/latest/APIReference/API_GeoProximityLocation.html)
 and [CIDR locations](https://docs.aws.amazon.com/Route53/latest/APIReference/API_CidrRoutingConfig.html).
+
+## Verify
+
+```bash
+astro operator domains check <domain-id> --json
+```
+
+Every check carries a fresh `checkedAt`, a `state` and a `reason`; delegation
+and the Route53 or Cloudflare `providerZone` read OK with `observed` values
+matching `expected` ones, and `routes` lists the recorded app URLs under the
+zone. An ERROR, UNSUPPORTED or UNKNOWN state names what was not observed; it is
+never an empty success.

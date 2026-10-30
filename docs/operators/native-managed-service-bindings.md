@@ -6,6 +6,14 @@ binding. Host aliases and URI envelopes use that same locator. A later operator
 namespace default cannot redirect a saved service. Reconcile legacy two-part
 handles before refreshing these bindings; no namespace is guessed from a name.
 
+Preconditions: a backend checkout with its test dependencies and a private
+PostgreSQL for the materialization checks; the registry is
+`PLUGIN.managed_service_drivers` in `backend/providers/k8s_native/plugin.py`. The
+opt-in kind proofs need the private kubeconfig of an explicitly owned
+disposable kind cluster in `ASTROLIFT_BINDING_DNS_KUBECONFIG` or
+`ASTROLIFT_CNPG_SLICE_KUBECONFIG`; never a customer cluster. Placeholders:
+`<kubeconfig>` is the path to that private kubeconfig.
+
 New namespace-qualified hosts use `<service>.<namespace>.svc`. The pod's DNS search
 suffix supplies its actual cluster domain. CNPG's `DATABASE_URL` selects the
 operator's rotating `fqdn-uri` Secret field, which includes the operator's
@@ -202,3 +210,16 @@ server. Production composition and authenticated deployment checks remain separa
 The exact owned kind cluster, private kubeconfig, temporary credential files and
 `test_astrolift_cnpg_acceptance_2092` PostgreSQL database were removed after the
 proof. The unrelated `edge-poc` cluster was retained.
+
+## Verify
+
+```bash
+pytest astrolift_workflows/tests/test_native_binding_namespaces_2092.py astrolift_workflows/tests/test_preview_slice_materialization_2092.py
+ASTROLIFT_BINDING_DNS_KUBECONFIG=<kubeconfig> pytest providers/tests/k8s_native/test_binding_dns_kind_2092.py
+ASTROLIFT_CNPG_SLICE_KUBECONFIG=<kubeconfig> pytest astrolift_workflows/tests/test_preview_slice_cnpg_kind_2092.py
+```
+
+The recording and materialization modules pass from the `backend/` directory;
+the two kind proofs run only with their variable set and skip without it. They
+prove namespace routing and slice authentication, not operator reconciliation or
+supported-version compatibility.

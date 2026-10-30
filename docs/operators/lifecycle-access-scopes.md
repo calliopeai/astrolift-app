@@ -8,6 +8,13 @@ an environment retain their workload's app owner. Missing, malformed, deleted
 or incoherent targets take explicit organization scope; selecting a team does
 not supply fallback authority.
 
+Preconditions: `app.read` at the live app for reads and the lifecycle event
+stream; `app.update` at the coherent live app owner for the rotation-metadata
+read, archive/restore, retention and source resync; the builder HTTP API needs a
+bearer carrying `write:apps`. Surface: console `/apps/[slug]/settings` (agent
+workloads: `/agents/[agentSlug]/settings`), or `astro api graphql -q '<document>'`.
+Placeholders: `<app-slug>` is `slug` from `astro app list` (`astroliftAppsPage`).
+
 Bearer credentials retain their organization, team and action-specific share
 ceiling even when their user has an organization role. Collections apply this
 ceiling and operation policies before limits, pagination and counts. A viewer
@@ -102,3 +109,16 @@ checks, not server identity/version preconditions: the mutation still sends only
 is unchanged. Existing same-target cached observations remain visible after a
 failed read; the outer settings source-error/retry behavior is unchanged. The
 relative timestamp uses the request’s locale/clock and updates each minute.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { astroliftAppDeployTokenRotationMetadata(appSlug: "<app-slug>") { rotationGraceSeconds } }'
+astro api graphql -q 'mutation { resyncAstroliftManifestFromRepo(input: {appSlug: "<app-slug>"}) { ok errors { code message } } }'
+pytest astrolift_lifecycle/tests/test_owner_scopes_2104.py astrolift_lifecycle/tests/test_lifecycle_stream_scopes_2104.py astrolift_lifecycle/tests/test_deploy_token_rotation_metadata.py
+```
+
+For an app you can update, `rotationGraceSeconds` is an integer between 60 and
+604800 and the resync returns `ok: true`; for an app you cannot update the read
+returns null and the mutation is refused. The test modules pass from the
+`backend/` directory.

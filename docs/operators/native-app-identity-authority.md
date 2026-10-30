@@ -5,6 +5,15 @@ for the GCP identity journal. The staged human deployment path captures a privat
 Deployment-bound original reference for the selected cluster’s Endpoint-only
 consumer graph. It does not install or activate the native identity pipeline.
 
+Preconditions: this is an internal Python boundary, not an operator surface. The
+HTTP caller it captures must hold `app.update` or `app.deploy` at the exact live
+app environment; capture runs inside the backend (Django) process and the
+consuming checkpoints inside a registered Temporal activity in the worker. Read
+it in `backend/astrolift_services/native_identity_authority.py` and
+`backend/astrolift_workflows/native_identity_inputs.py`; the behaviour is proven
+by `backend/astrolift_services/tests/test_native_identity_authority_2278.py`.
+Placeholders: none.
+
 Bearer authentication and browser-session tracking remain separate. A request
 authenticated by an API token does not create, refresh, reassign, or revive the
 sidecar for any browser cookie it happens to carry. Ordinary browser requests
@@ -247,3 +256,12 @@ readback and existing ownership reconciliation remain mandatory.
 `DeployAppWorkflow` composes these for Endpoint-only apps; see
 [native Endpoint deployment](gcp-native-configuration-executor.md). Token
 identity and actual prediction acceptance are still separate.
+
+## Verify
+
+```bash
+pytest astrolift_services/tests/test_native_identity_authority_2278.py astrolift_services/tests/test_gcp_identity_source_2278.py
+```
+
+Both modules pass from the `backend/` directory; they cover capture, current
+rechecks, the staged deployment receipts and the source-bootstrap fences.
