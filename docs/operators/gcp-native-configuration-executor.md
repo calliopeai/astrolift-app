@@ -6,6 +6,21 @@ Endpoint-only apps on a GKE cluster, with the GUID-owned Google service account
 the original-source bootstrap creates for the app. Every other app deploys
 exactly as before.
 
+Preconditions: `app.deploy` on the app to start a Deployment (`astro app deploy`
+or the console `/apps/<app-slug>/deployments`), plus `app.rollback` for
+`rollbackDeployment` and `app.delete` for `deregisterAstroliftApp` and
+`tearDownApp`; settling a journal needs a shell in the backend container and an
+active user to name as `--operator`. The account is the GCP project the GKE
+cluster lives in, reached with the cluster's declared credential, holding the
+app's GUID-owned GSA and the Workload Identity binding from that GSA to the
+app's KSA; the cluster's `provider_config.endpoint_prediction_role` names the
+Endpoint prediction role. Placeholders: `<app-slug>` is the registered app slug
+(`astro app list`); `<app-guid>` is `id` from `astroliftApp(slug: "<app-slug>")`;
+`<cluster-guid>` is `id` from `astroliftClustersPage`; `<deployment-id>` is
+`id` from `astroliftDeploymentsPage(appSlug: "<app-slug>")`; `<email>` is the
+settling operator's user email; `<attestation>` is 20 to 500 characters of what
+was checked.
+
 ## Route
 
 The first activity, `validate_deployment_identity_origin`, admits the protected
@@ -64,10 +79,10 @@ it reads or writes anything native.
 
 Resolving it is an operator step, `resolve_native_gcp_journal`:
 
-```
-python manage.py resolve_native_gcp_journal --app <app guid> --cluster <cluster guid>
-python manage.py resolve_native_gcp_journal --app <app guid> --cluster <cluster guid> \
-    --operator <email> --attestation "<what you checked>" --apply
+```sh
+python manage.py resolve_native_gcp_journal --app <app-guid> --cluster <cluster-guid>
+python manage.py resolve_native_gcp_journal --app <app-guid> --cluster <cluster-guid> \
+    --operator <email> --attestation "<attestation>" --apply
 ```
 
 Without `--apply` it lists the unresolved journals. With it, every unresolved
@@ -217,3 +232,13 @@ See [original authority](native-app-identity-authority.md),
 [IAM](gcp-workload-identity-journal.md),
 [prepared rendering](gcp-prepared-identity-render.md), and
 [guarded app configuration](gcp-guarded-app-apply.md).
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftDeployment(id: "<deployment-id>") { status abortedReason phases { name startedAt completedAt failedAt healthyAt } } }'
+python manage.py resolve_native_gcp_journal --app <app-guid> --cluster <cluster-guid>
+./run.sh test astrolift_services/tests/test_gcp_native_journal_resolution_2278.py astrolift_lifecycle/tests/test_native_rollback_2278.py astrolift_workflows/tests/test_deployment_identity_origin_2278.py
+```
+
+A completed native Deployment shows `status: running` with an empty `abortedReason`; a refused one shows `NATIVE_CONFIGURATION_REFUSED:<REASON>`. The journal listing (no `--apply`) prints no unresolved journal once settled, and the suites pass.

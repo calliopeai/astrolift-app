@@ -6,6 +6,16 @@ which tests the inbox channel. The default `django_ses.SESBackend`, other backen
 and plaintext SMTP report unsupported. This API does not configure a relay or
 send ordinary alerts on behalf of an application. Refs: #2289.
 
+Preconditions: the platform operator (an active superuser) who is a current
+member of the selected organization and holds `org.update` there; a bearer also
+needs the `admin` token scope. Surfaces: GraphQL via `astro api graphql`, or
+the console at `/settings/notifications?section=install-email`
+([UI page](install-alert-mail-ui.md)). The SMTP settings are changed on the web
+and worker task definitions; the migration needs a shell in the backend
+container. Placeholders: `<request-id>` is a fresh UUID (`uuidgen`) kept for
+the life of one test; `<source-fingerprint>` is `sourceFingerprint` from
+`installAlertMailSupport`.
+
 ## Admission and source review
 
 Select the current organization. Support, send, and history require its
@@ -53,6 +63,12 @@ mutation InstallAlertMailTest($input: SendInstallAlertMailTestInput!) {
     }
   }
 }
+```
+
+with variables:
+
+```json
+{"input": {"requestId": "<request-id>", "expectedSourceFingerprint": "<source-fingerprint>", "eventKind": "deploy.failed"}}
 ```
 
 The send service refuses an enclosing database transaction or disabled
@@ -128,3 +144,12 @@ operators must keep that migration applied and use a forward fix. Do not delete
 history to enable rollback. This leaf requires the normal source, migration and
 security reviews before release, and does not complete SMTP app transports,
 Azure ACS delivery, alert scheduling or inbox delivery verification.
+
+## Verify
+
+```sh
+astro api graphql -q '{ installAlertMailTestsPage(eventKind: "deploy.failed", limit: 5) { items { requestId status reasonCode acceptedAt deliveryObserved } } }'
+./run.sh test astrolift_operations/tests/test_install_alert_mail_http_2289.py astrolift_operations/tests/test_install_alert_mail_settings_2289.py
+```
+
+The row for `<request-id>` shows `status: accepted` with `acceptedAt` set (or `failed` with a `reasonCode`); `reserved`, `sent` or `unknown` is unresolved, not a failure; the suites pass.

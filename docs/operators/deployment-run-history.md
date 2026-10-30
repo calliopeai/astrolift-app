@@ -9,6 +9,15 @@ If work has already failed, failure-observation storage errors are logged while
 the original provider error still reaches the workflow. Start or completion
 storage errors fail the activity; they do not turn it into a successful result.
 
+Preconditions: `app.read_logs` on the deployment's owning app for both log
+reads. The SQL checks need a database shell with the install's PostgreSQL
+credentials, and the migration a shell in the backend container (see
+[control-plane upgrades](control-plane-upgrades.md)). Surfaces: GraphQL via
+`astro api graphql`, or the console deployment detail at
+`/deployments/<deployment-id>`. Placeholders: `<app-slug>` is the registered
+app slug (`astro app list`); `<deployment-id>` is `id` from
+`astroliftDeploymentsPage(appSlug: "<app-slug>")`.
+
 Only work observed by the runtime gets a timestamp. Historical deployments, external
 CI builds, disabled platform builds, and unavailable build infrastructure have no
 platform build/push timing. An image tag or a running status does not supply missing
@@ -119,12 +128,28 @@ JOIN pg_class c ON c.oid = i.indexrelid
 WHERE c.relname = 'deploylog_cursor_idx';
 ```
 
-An invalid `deploylog_cursor_idx` needs an operator to remove it with
-`DROP INDEX CONCURRENTLY deploylog_cursor_idx` outside a transaction before
-recreating it. If the migration is unrecorded and only part of its operations
+An invalid `deploylog_cursor_idx` needs an operator to remove it outside a
+transaction before recreating it:
+
+```sql
+DROP INDEX CONCURRENTLY deploylog_cursor_idx;
+```
+
+If the migration is unrecorded and only part of its operations
 committed, an ordinary retry can fail on existing columns or an existing index.
 Reconcile the already-applied operations with Django's migration state through
 the normal database recovery procedure; do not automatically fake the migration
 or skip an invalid index. A manual state repair requires verification of every
 column definition and a valid index matching the complete migration. Re-run
 the migration task successfully before rolling out the new API or workers.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftDeploymentsPage(appSlug: "<app-slug>", limit: 10) { items { id status createdAt } } }'
+astro api graphql -q '{ astroliftDeploymentRunLogPage(deploymentId: "<deployment-id>", limit: 5) { pageSize hasMore items { id deploymentId phase event occurredAt } } }'
+astro api graphql -q '{ astroliftDeploymentRunLogDownload(deploymentId: "<deployment-id>") { filename contentType } }'
+./run.sh test astrolift_lifecycle/tests/test_deployment_run_history_2176.py astrolift_lifecycle/tests/test_deployment_timeline_guids_2265.py
+```
+
+Every returned `deploymentId` equals `<deployment-id>`, each item carries a `phase` and `event`, the download returns a filename, and the tests pass.

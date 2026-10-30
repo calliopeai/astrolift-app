@@ -9,6 +9,12 @@ history and send independently require the server's current platform-operator,
 organization, credential and event-preference admission. An ordinary organization
 administrator cannot use the diagnostic merely because its navigation is visible.
 
+Preconditions: the platform operator (an active superuser), a current member of
+the selected organization holding `org.update` there, with `EMAIL_NOTIFICATIONS`
+enabled and the `email` preference for the chosen event kind allowed. Surface:
+the console route `/settings/notifications?section=install-email`. Placeholders:
+`<event-kind>` is the selected email event kind (default `deploy.failed`).
+
 Choose one of the eight existing email event kinds. Review the configured sender,
 your current registered mailbox, configured TLS mode and check time, then explicitly
 select **Send reviewed alert test**. Recipient, message and relay configuration
@@ -30,3 +36,11 @@ SMTP acceptance is not recipient delivery or inbox placement. The backend does
 not observe delivery for this diagnostic. Previous accepted history does not
 establish current transport health. The panel does not configure notification
 preferences or verify alert scheduling, app SMTP transports or Azure ACS.
+
+## Verify
+
+```sh
+astro api graphql -q '{ installAlertMailTestsPage(eventKind: "<event-kind>", limit: 5) { items { requestId status reasonCode acceptedAt } } }'
+```
+
+The newest row carries the request UUID the panel shows, with `status: accepted` (or `failed` and a `reasonCode`), and the panel's history refresh shows the same row.

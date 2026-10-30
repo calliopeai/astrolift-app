@@ -8,6 +8,14 @@ authentication additionally requires the `admin` scope. Configure Prometheus's
 outside the repository, and keep the endpoint behind the install's normal
 network access controls. Anonymous scraping returns 403.
 
+Preconditions: an active Django superuser (the platform operator). For
+`GET /app/metrics/`, a browser session or an API token holding the `admin`
+scope; for `confirmPreSignedUrlImageUpload`, a session or bearer in the active
+organization (bearer writes also need the `admin` scope). Surfaces: the HTTP
+route above and the GraphQL mutation. Placeholders: `<api-url>` is the
+install's `PLATFORM_API_URL`; `<operator-api-token>` is an API token the
+operator created at `/tokens`.
+
 The old `/app/sentry-debug/` and `/app/test/open_telemetry/` routes are removed.
 Use the configured Sentry and OpenTelemetry integrations for diagnostics.
 
@@ -60,3 +68,14 @@ Verification: the frontend `query-states.test.tsx` uses real Apollo clients and
 React hooks to exercise transport refusals, retries and cached refreshes.
 `query-frames.test.tsx` checks that the corresponding rendered screens show the
 failure, preserve their frame and wire the retry action.
+
+## Verify
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' <api-url>/app/metrics/
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Authorization: Bearer <operator-api-token>' <api-url>/app/metrics/
+./run.sh test core/tests/test_access_holes_2174.py
+cd frontend && npx vitest run components/screens/query-states.test.tsx components/screens/query-frames.test.tsx
+```
+
+The anonymous request prints `403`, the operator request prints `200`, and both test runs pass.
