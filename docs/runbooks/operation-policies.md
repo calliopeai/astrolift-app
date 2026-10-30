@@ -4,6 +4,18 @@ ABAC policies restrict an existing role grant. Deployment and run controls,
 environment operations and secret access bind operation facts before their
 permission check (#2164). The facts come from records in the active organization:
 
+Preconditions: `org.update` on the organization to create or update a policy
+(`createPolicy`, `updatePolicy`, or the console at `/administration/policies`
+and `/administration/policies/new`); the affected operation's own permission
+to observe the effect (`app.deploy`, `secret.read`, `agent.dispatch`,
+`workflow.trigger`); `astro perms diagnose --permission <slug> --scope-type
+<ORG|TEAM|PROJECT|APP|AGENT> --scope-id <guid>` or
+`/administration/permissions/diagnostics` to read a decision; a shell in the
+backend container to apply migration `0044_deployment_approval_identities`.
+Placeholders: `<slug>` is a permission slug from `astro perms list`;
+`<guid>` is the target's `id` (an app from `astroliftApps`, a cluster from
+`astroliftClustersPage`).
+
 - App operations use the resolved `AppEnvironment.name` and its cluster's region.
   A promotion uses the target environment. A migration checks the source and
   destination regions. Preview creation uses the environment name and cluster
@@ -94,3 +106,24 @@ Policy create and update validate condition JSON using the evaluator's catalog:
 known kinds and fields, nonempty string lists, valid IP ranges and time windows,
 IANA time zones, and positive integer approval/freshness limits. Invalid updates
 return a validation error before modifying any field or the policy version.
+
+- **Signature:** `createPolicy` / `updatePolicy` answer `VALIDATION` naming the
+  offending condition kind, field or value; a denied operation answers with its
+  permission error while the same operation on an allowed environment succeeds;
+  an operation whose target cannot be resolved stays denied (unknown facts).
+- **Fix:** correct the condition JSON against the catalog above; for an
+  unexpected denial read the decision with `astro perms diagnose` and adjust the
+  `resourcePattern` (`env`, `region`) or `min_approvers` requirement.
+- **Rollback:** `updatePolicy` with the previous conditions, or delete the
+  policy; a refused write changed nothing.
+
+## Verify
+
+```bash
+astro perms diagnose --permission <slug> --scope-type APP --scope-id <guid>
+python manage.py showmigrations astrolift_lifecycle | grep 0044_deployment_approval_identities
+pytest astrolift_identity/tests/test_operation_context_2164.py astrolift_identity/tests/test_policy_validation_2164.py astrolift_identity/tests/test_policy_visibility_2164.py
+```
+
+The diagnostic reports the policy decision you expect for the target, the
+migration shows as applied (`[X]`), and the test modules pass.

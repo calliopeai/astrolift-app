@@ -5,6 +5,23 @@ Astrolift agent workflows are ordered pipelines. `WorkflowDefinition.states`,
 state machine; they do not select an LLM and do not control an agent pipeline.
 An agent's model is selected by its environment/runtime package.
 
+Preconditions: `workflow.create` at the owner (organization or project) to
+import a definition and `workflow.update` to edit or replace one;
+`workflow.trigger` plus `agent.dispatch` on each bound agent to run it;
+`workflow.read` to observe executions and stages; the surfaces are
+`workflows/*.toml` in a registered agent repository, `astro workflow validate
+<file.toml>` and `astro workflow import <file.toml> [--preview] [--replace]`,
+the Builder at `/workflows/[slug]` with runs at `/workflows/[slug]/runs/[runId]`,
+GraphQL (`workflowExecution`, `workflowExecutionStages`,
+`controlWorkflowExecution`, `importWorkflowFlow`) and `astro workflow
+execution-stages <id>`; a shell in the backend container to apply migrations
+`astrolift_operations.0027` and `astrolift_agents.0024`; a reachable dispatch
+cluster for container-backed agents. Placeholders: `<workload-guid>` is the
+agent workload `id` from `astro agent workloads ls`; `<definition-guid>` and
+`<reviewed-native-definition-guid>` are definition `guid` values from `astro
+workflow definitions`; `<head sha>` is the pull request head commit the gate
+read; `<JSON object>` is the exported `back_edge` condition.
+
 The canonical pipeline is a `WorkflowDefinition` with ordered
 `WorkflowStage` rows. The TOML example in
 [`../examples/chained-agent-workflow.toml`](../examples/chained-agent-workflow.toml)
@@ -154,6 +171,16 @@ locally on later ticks until complete without querying the missing execution.
 Apply the additive migration before rolling workers; the previous release can
 run against the expanded schema.
 
+- **Signature:** `workflowExecution` reports `status: expired` with the
+  failure `History expired` and `observationError` set, or a non-terminal
+  mirror whose `observationError` names an unavailable Temporal service; the
+  `astro-workflow_run_reconcile` tick logs `errors > 0`.
+- **Fix:** restore the Temporal service and let the next 60-second tick repair
+  the mirror; an `expired` mirror is final (unknown outcome), so re-run the
+  workflow if its result is needed.
+- **Rollback:** no rollback needed; reconciliation only rewrites mirrors from
+  authoritative observations.
+
 An authoritative observation repairs an incorrectly terminal configured record
 as well as an unfinished one. Abnormal closure settles pending/running stage
 records while preserving completed stage output. After a confirmed terminal
@@ -239,6 +266,23 @@ identity on every page and keep closure/cleanup observation separate.
 `not_required`, plus `remaining`, `errors`, and `retryable`. Execution closure
 and resource deletion are separate facts. A terminal execution with pending or
 failed cleanup must remain visible to operators until cleanup is resolved.
+
+- **Signature:** `taskCleanup.status` `pending` or `failed` with `remaining >
+  0` and up to 20 task errors on a terminal execution (`failure.task_cleanup`
+  in the run record), or a stage whose attempts are exhausted (`stage_failed`
+  after `max_attempts`) and a run ending `failed` with the stage's error; a
+  `github_checks` stage deciding `error`, `timed_out` or `failed` with the
+  message naming the checks.
+- **Fix:** `controlWorkflowExecution(action: cleanup)` on the verified terminal
+  execution (or `astro workflow execution-stages <id> --workflow-id
+  <temporal-workflow-id> --run-id <temporal-run-id>` to inspect first); the
+  reconcile tick also retries one owned task per confirmed terminal
+  observation; for an exhausted stage fix the agent and start a new run; for a
+  gate, fix the connection or the failing check and let the return edge or a
+  new run re-open it.
+- **Rollback:** cleanup deletes only the recorded Job UID or container ID and
+  cannot be undone; a frozen plan is not changed by later definition edits, so
+  a new run is the only way to pick up a fix.
 
 `controlWorkflowExecution(executionId:, workflowId:, runId:, action:, reason:)`
 requires `workflow.trigger` in the same scope. Callers must supply both original
@@ -615,6 +659,20 @@ The pinned
 [Run Flow port resolver](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/base/tools/run_flow.py#L374)
 resolves a specific child component and port; the imported contract preserves
 those identities rather than treating a flow name as an output.
+
+## Verify
+
+```bash
+astro workflow validate <file.toml>
+astro workflow import <file.toml> --preview
+astro workflow execution-stages <execution-id> --workflow-id <temporal-workflow-id> --run-id <temporal-run-id>
+pytest workflows/tests/test_back_edges_2156.py workflows/tests/test_collection_contract_2156.py workflows/tests/test_github_checks_contract_2489.py workflows/tests/test_flowise_bounded_loops_2156.py workflows/tests/test_langflow_collections_2156.py workflows/tests/test_langflow_bound_bodies_2156.py astrolift_workflows/tests/test_workflow_run_reconcile.py astrolift_workflows/tests/test_nested_workflow_temporal.py astrolift_workflows/tests/test_serial_collections_temporal_2156.py
+```
+
+Validation and preview return the parsed stages without a persisted ID, the
+execution's stage page lists every attempt with its `roundNumber`, `causedBy`
+and linked child runs and the execution reports `isTerminal: true` with
+`taskCleanup.status` `completed` or `not_required`, and the test modules pass.
 
 Import reports `explicit_native_body_binding` as a warning. The operator chooses
 and reviews the native implementation of the source body. This preserves source

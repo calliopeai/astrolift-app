@@ -12,6 +12,16 @@ that reads what the resource currently carries, records it, and then stamps
 the identity envelope the resource should have had. Afterwards the resource is
 ordinary: update and teardown work through Astrolift again.
 
+Preconditions: `managed_service.adopt` on the managed service (seeded on
+`org_owner` and `org_admin` only); the `adoptManagedResource` GraphQL mutation,
+run with `astro api graphql -q '<document>'` (there is no console control);
+the `az` CLI signed in to the Azure subscription the service's driver names in
+`subscription_id`, which is the cluster's provider config, for the tag read.
+Placeholders: `<managed-service-guid>` is `id` from
+`astroliftManagedServicesPage(appSlug: "<app-slug>")`; `<resource-id>` is the
+full ARM resource id (`/subscriptions/<sub>/resourceGroups/<rg>/providers/...`);
+`<the-guid-from-the-error>` is the managed-service id quoted in the refusal.
+
 ---
 
 ## When you need this
@@ -23,6 +33,28 @@ ordinary: update and teardown work through Astrolift again.
 | Same error, but "carries no `astrolift-managed-by=platform` marker" | Astrolift did not create this. Adopting it hands somebody's resource to the platform, which will then be willing to delete it. |
 
 The message names which of the three you have. Read it before proceeding.
+
+- **Signature:** the update, snapshot, restore or teardown answers
+  `external_resource_collision` with one of the three marker messages above.
+- **Fix:** adopt the resource (below), with `acknowledgedPriorOwner` when it
+  belongs to another managed service.
+- **Rollback:** none; adoption writes tags and the platform acts on the
+  resource afterwards. Do not adopt a resource Astrolift did not create
+  unless the platform is meant to own it.
+
+Refusals from `adoptManagedResource` itself:
+
+- **Signature:** `PRECONDITION` `an adoption must state a reason`;
+  `PRECONDITION` `refusing to adopt <resource>: it belongs to <owner>, and
+  adopting it away requires naming that owner explicitly in the request`;
+  `VALIDATION` `adoption is implemented for azure; <kind>/<variant> resolves
+  to the <plugin> plugin` for an AWS or GCP service; `VALIDATION` `the
+  <kind> driver on cluster <slug> has no subscription_id configured, so there
+  is no subscription to adopt within`; `NOT_FOUND` `managed service not
+  found`.
+- **Fix:** supply `reason`, set `acknowledgedPriorOwner` to the quoted owner,
+  or stop: AWS and GCP adoption is not implemented (see Not covered).
+- **Rollback:** no rollback needed; a refused adoption writes nothing.
 
 ---
 
@@ -38,7 +70,7 @@ platform will subsequently act on the resource as its own.
 
 2. **Read the resource's current tags** and keep a copy:
 
-   ```
+   ```bash
    az resource show --ids "<resource-id>" --query tags
    ```
 
@@ -134,6 +166,18 @@ what was on it".
 
 `managed_service.resource_adopted` is emitted to the platform event log for the
 activity feed and webhook subscribers.
+
+---
+
+## Verify
+
+```bash
+az resource show --ids "<resource-id>" --query tags
+```
+
+The tags now carry `astrolift-adopted` and the platform identity envelope, the
+response's `classification` is the one you expected, and the operation that was
+refused (update or teardown through Astrolift) now proceeds.
 
 ---
 

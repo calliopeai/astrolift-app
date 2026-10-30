@@ -179,11 +179,15 @@ workflow is not terminated, and the row is moved to `failed`),
 `Deployment(<id>) cannot transition failed → running` on every attempt,
 and the workflow retries it indefinitely, holding a worker slot.
 
-Symptoms: a `RollbackDeploymentWorkflow-<guid>` execution that stays
-`Running` long after its 15 minute activity timeouts; the Temporal UI shows
-the same activity with a climbing attempt count and that `ValueError`.
+**Signature:** `python manage.py temporal_ops list --status running` lists a
+`RollbackDeploymentWorkflow-<guid>` execution that stays `Running` long after
+its 15 minute activity timeouts; `temporal_ops describe` and the Temporal UI
+show `mark_deploying` or `mark_running` with a climbing attempt count and the
+activity error `ValueError: Deployment(<id>) cannot transition failed →
+running`; `astroliftDeployment(id: "<guid>")` already reports `status:
+failed` with the operator's `abortedReason`.
 
-Resolution:
+**Fix:**
 
 ```bash
 # From the backend container
@@ -193,9 +197,16 @@ python manage.py temporal_ops terminate RollbackDeploymentWorkflow-<guid> \
   --reason "deployment row already failed; nothing left to mark running"
 ```
 
-Terminating leaves the row as it is (`failed`, with its `abortedReason`). To
+**Rollback:** a termination cannot be undone and leaves the row as it is
+(`failed`, with its `abortedReason`); nothing on the cluster changed. To
 restore service, roll back again from the new running deployment if one
-exists, or deploy a known-good image with `astro app deploy --image-tag`.
+exists, or deploy a known-good image:
+
+```bash
+astro app rollback --env production
+astro app deploy <slug> --env production --image-tag <known-good-tag> --wait
+```
+
 The row the rollback moved to `rolled_back` cannot be revived; it is
 history. The workflow-level fix (a bounded retry policy and an `abort`
 handler on the rollback workflow) is not shipped as of 2026-10-30.
@@ -213,41 +224,83 @@ activity has a 15 minute start-to-close timeout.
 
 If a deploy ends in `failed` status:
 
-0. **Deploy pipeline disabled?** When every deploy, promote and rollback
-   answers `deploy pipeline is disabled in this environment`, the Constance
-   flag `DEPLOY_PIPELINE_ENABLED` is off. Flip it in `/app/admin/constance/`
-   or seed it with the `FEATURE_DEPLOY_PIPELINE` env var on the webservice
-   and worker.
+0. **Deploy pipeline disabled?**
+   - **Signature:** every deploy, promote and rollback mutation answers
+     `PRECONDITION` with `deploy pipeline is disabled in this environment.
+     Cluster adoption (bringClusterIntoManagement) is unaffected and remains
+     usable. Flip DEPLOY_PIPELINE_ENABLED to True in /app/admin/constance/ to
+     re-enable rollouts at runtime, or seed the default via the
+     FEATURE_DEPLOY_PIPELINE env var on the webservice + worker.`
+   - **Fix:** the Constance flag `DEPLOY_PIPELINE_ENABLED` is off. Flip it in
+     `/app/admin/constance/` or seed it with the `FEATURE_DEPLOY_PIPELINE` env
+     var on the webservice and worker.
+   - **Rollback:** set `DEPLOY_PIPELINE_ENABLED` back to False in
+     `/app/admin/constance/`.
 
 1. **Read the log**: open the deploy detail page, scroll to the error.
    Most failures are one of: build error (Dockerfile), image pull error
    (bad credentials or private registry), or pod crash (application
    startup error).
 
-2. **Build failures**: the log shows the Docker build output. Fix the
-   Dockerfile, push a new commit, and a new deploy triggers
-   automatically (or click Deploy manually).
+2. **Build failures**
+   - **Signature:** `abortedReason` on the row (the first line of the
+     activity's error) reads `image build failed: <first error line>` or
+     `BuildDriver.build failed: <exc>`; the log shows the Docker build output.
+   - **Fix:** fix the Dockerfile, push a new commit, and a new deploy triggers
+     automatically (or click Deploy manually).
+   - **Rollback:** no rollback needed; the build runs before anything is
+     applied to the cluster, and the failed row is terminal.
 
 3. **ImagePullBackOff**: the cluster cannot pull the image.
-   - Check that the registry credentials secret is present in the
-     target namespace.
-   - Verify the image tag exists in the registry.
-   - For private registries, confirm the app's **Container registry**
-     (App → Settings, `/apps/<slug>/settings`) names the registry the
-     cluster can pull from, and that the pull secret exists in the
-     namespace (`kubectl -n <namespace> get secret`).
+   - **Signature:** `abortedReason` reads `rollout <kind>/<name> in
+     <namespace> failed: <message> (timed out)`, where `<message>` is the
+     driver's stall diagnosis, else the workload's last condition message,
+     else `rollout timed out`; **Cluster events** on the deploy page, or
+     `kubectl -n <namespace> describe pod <pod-name>`, show
+     `ImagePullBackOff` / `ErrImagePull`.
+   - **Fix:**
+     - Check that the registry credentials secret is present in the
+       target namespace.
+     - Verify the image tag exists in the registry.
+     - For private registries, confirm the app's **Container registry**
+       (App → Settings, `/apps/<slug>/settings`) names the registry the
+       cluster can pull from, and that the pull secret exists in the
+       namespace:
+       ```bash
+       kubectl -n <namespace> get secret
+       ```
+   - **Rollback:** no rollback needed; redeploy once the image or pull
+     secret exists.
 
 4. **CrashLoopBackOff**: the container is starting and crashing.
-   - The application logs (**App → Logs**, `/apps/<slug>/logs`, or
-     `astro app logs --env <env>`) show the error before the crash.
-   - Common causes: missing required environment variable, database
+   - **Signature:** `abortedReason` reads the `rollout <kind>/<name> in
+     <namespace> failed: <message>` form above, or `workload <kind>/<name>
+     in <namespace> not healthy: ready=<n> desired=<m>` from the health
+     check; cluster events show `CrashLoopBackOff`.
+   - **Fix:** the application logs (**App → Logs**, `/apps/<slug>/logs`, or
+     the CLI) show the error before the crash:
+     ```bash
+     astro app logs --env <env> --since 1h --tail 200
+     ```
+     Common causes: missing required environment variable, database
      not reachable at startup, port mismatch between app and manifest.
+   - **Rollback:** no rollback needed; `mark_failed` touches only the failed
+     row, so the environment's `running` deployment is unchanged.
 
 5. **OOMKilled**: the container exceeded its memory limit.
-   - Raise `memory_limit` on the `[[workloads]]` entry in `astrolift.toml`
-     (push it with `astro app manifest push`) and redeploy.
-   - If memory usage grows over time, the application has a leak; this
+   - **Signature:** cluster events show `OOMKilled` as the container's last
+     termination reason and the deploy ends with one of the `not healthy` /
+     `rollout ... failed` reasons above.
+   - **Fix:** raise `memory_limit` on the `[[workloads]]` entry in
+     `astrolift.toml`, push it and redeploy:
+     ```bash
+     astro app manifest push
+     astro app deploy <slug> --env <env> --wait
+     ```
+     If memory usage grows over time, the application has a leak; this
      is a bug in the application, not the platform.
+   - **Rollback:** restore the previous `memory_limit` in `astrolift.toml`,
+     `astro app manifest push`, redeploy.
 
 6. **Dismiss a failed row**: `abortDeployment` on a `failed` deployment
    soft-deletes the record (no workflow is left to stop). On an in-flight
@@ -255,6 +308,21 @@ If a deploy ends in `failed` status:
    signals `abort` to `DeployAppWorkflow`, falls back to terminating the
    workflow when the signal cannot be delivered, and marks the row
    `failed`. See the stuck-rollback note above before aborting a rollback.
+   - **Signature:** a refused abort answers `PRECONDITION` with `deployment
+     in status <status> is not in-flight` (only the five statuses above are
+     abortable); an empty reason answers `VALIDATION` `reason is required`.
+   - **Fix:**
+     ```graphql
+     mutation {
+       abortDeployment(input: {id: "<deployment-id>", reason: "<why>"}) {
+         ok
+         errors { code field message }
+         data { id status abortedReason }
+       }
+     }
+     ```
+   - **Rollback:** none; an abort moves an in-flight row to `failed`
+     (terminal) and soft-deletes a `failed` one. Redeploy instead.
 
 ---
 
