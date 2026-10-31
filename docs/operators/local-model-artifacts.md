@@ -8,6 +8,17 @@ model endpoints. Byte verification is not model compatibility, memory fit,
 inference success or runtime health. Serving remains pending until the existing
 model readiness checks observe the actual runtime.
 
+Preconditions: a fresh active platform operator (Django superuser) holding
+`org.update` and `cluster.update` in the selected organization; a bearer must
+carry the `admin` scope. The backend's AWS credential chain (the backend task
+role on ECS, or the configured keys) must reach the bucket in
+`AWS_STORAGE_BUCKET_NAME`. Surface: console `/models/deploy` for the browser
+upload, or `astro api graphql -q '<document>'` for the mutations. Placeholders:
+`<organization-id>` is `id` from `astroliftOrganizations`; `<artifact-id>` and
+`<expected-version>` are `id` and `version` from `beginLocalModelArtifact` or
+`astroliftLocalModelArtifactsPage`; `<file-name>`, `<sha256>` and `<size-bytes>`
+describe one local file.
+
 ## Operator prerequisites
 
 The install must provide `AWS_STORAGE_BUCKET_NAME`, an S3 region through
@@ -62,6 +73,35 @@ verification writes; source storage observations remain separate from model heal
    model's public config holds only source kind, artifact GUID/version/digest and
    stable served-model identity. Download URLs never enter persisted control config
    or Temporal activity arguments/results.
+
+```graphql
+mutation Begin($input: BeginLocalModelArtifactInput!) {
+  beginLocalModelArtifact(input: $input) {
+    ok
+    errors { code message }
+    data { id version state fileCount }
+  }
+}
+# $input: {"organizationId": "<organization-id>", "name": "<display-name>",
+#          "files": [{"name": "<file-name>", "sha256": "<sha256>", "sizeBytes": "<size-bytes>"}]}
+
+mutation Authorize($input: LocalModelArtifactIdentityInput!) {
+  authorizeLocalModelUploads(input: $input) {
+    ok
+    errors { code message }
+    data { expiresInSeconds artifact { id version } }
+  }
+}
+
+mutation Finalize($input: LocalModelArtifactIdentityInput!) {
+  finalizeLocalModelArtifact(input: $input) {
+    ok
+    errors { code message }
+    data { id version state manifestSha256 }
+  }
+}
+# $input for Authorize and Finalize: {"id": "<artifact-id>", "expectedVersion": <expected-version>}
+```
 
 Supported files are flat safetensors weights, optional safetensors index JSON,
 `config.json`, tokenizer JSON/model, generation/tokenizer/special-token config,
@@ -123,3 +163,13 @@ hydration or vLLM inference acceptance.
 References: [S3 PutObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html),
 [S3 HeadObject](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html),
 [vLLM 0.15.1 serve](https://docs.vllm.ai/en/v0.15.1/cli/serve/).
+
+## Verify
+
+```bash
+astro api graphql -q 'query { astroliftLocalModelArtifactsPage(limit: 25) { items { id version state manifestSha256 fileCount sizeBytes } } }'
+```
+
+The artifact row shows `state` equal to `verified` with the expected
+`fileCount`; a row still at `uploading` means finalization has not accepted the
+complete manifest.

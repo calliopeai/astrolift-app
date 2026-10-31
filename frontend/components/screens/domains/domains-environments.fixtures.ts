@@ -1,8 +1,10 @@
 import type { AstroliftManagedDomain } from "@/graphql/clusters/clusters.types";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
+import type { ZoneDependent } from "./DefaultZoneDeleteDialog";
 import type { ManagedDomainDetailProps } from "./ManagedDomainDetail";
 import type { ManagedDomainsScreenProps } from "./ManagedDomainsScreen";
+import type { DeleteRefusal } from "./use-managed-domain";
 
 /**
  * Hand-typed fixtures for managed domains and environments (group
@@ -49,6 +51,9 @@ export const DOMAIN_ACTIVE: AstroliftManagedDomain = {
   verificationState: "verified",
   verifiedAt: "2026-09-02T10:15:00Z",
   createdAt: "2026-09-01T09:00:00Z",
+  isEffectiveDefault: false,
+  dependentApps: [],
+  dependentAppCount: 0,
 };
 
 /** Zone created, workflow still running: NS records not back yet. */
@@ -108,6 +113,54 @@ export const DOMAIN_LONG: AstroliftManagedDomain = {
     "ns-cloud-a1.googledomains-with-a-long-regional-suffix.example.com",
     "ns-cloud-a2.googledomains-with-a-long-regional-suffix.example.com",
   ]),
+};
+
+/** What resolves through the default zone (#2572): the first of more. */
+export const ZONE_DEPENDENTS: ZoneDependent[] = [
+  {
+    organizationSlug: "acme",
+    appSlug: "storefront",
+    environmentName: "production",
+    url: "https://storefront.apps.acme.example",
+  },
+  {
+    organizationSlug: "acme",
+    appSlug: "storefront",
+    environmentName: "staging",
+    url: "https://storefront-staging.apps.acme.example",
+  },
+  {
+    organizationSlug: "acme",
+    appSlug: "billing-api",
+    environmentName: "production",
+    url: "https://billing-api.apps.acme.example",
+  },
+];
+
+/** #2572: the zone new apps get their hostnames under, with apps on it. */
+export const DOMAIN_DEFAULT: AstroliftManagedDomain = {
+  ...DOMAIN_ACTIVE,
+  id: "5d0c1a2e-0000-4000-8000-000000000006",
+  defaultFor: "both",
+  isEffectiveDefault: true,
+  dependentApps: ZONE_DEPENDENTS,
+  dependentAppCount: 14,
+};
+
+/** #2572: the effective default zone before any app was placed on it. */
+export const DOMAIN_DEFAULT_UNUSED: AstroliftManagedDomain = {
+  ...DOMAIN_DEFAULT,
+  id: "5d0c1a2e-0000-4000-8000-000000000007",
+  dependentApps: [],
+  dependentAppCount: 0,
+};
+
+/** #2572: the zone read as ordinary, and the server kept it as the default. */
+export const DELETE_REFUSAL: DeleteRefusal = {
+  message:
+    "apps.acme.example is the effective default zone for new app hostnames. 3 environments resolve through it: acme/storefront/production, acme/storefront/staging, acme/billing-api/production. Apps registered after it is deleted get the next default zone, or no hostname at all. Retry with force to delete it anyway.",
+  total: 3,
+  items: ZONE_DEPENDENTS,
 };
 
 /** The screen's props less the list and its page; the story pages `domains`. */
@@ -245,6 +298,7 @@ export const MANAGED_DOMAIN: ManagedDomainDetailProps = {
   dnsConnectionsLoading: false,
   onVerify: noopAsync,
   onDelete: async () => true,
+  deleteRefusal: null,
   removed: false,
   actionMessage: null,
   actionError: null,

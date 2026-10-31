@@ -7,6 +7,18 @@ consistent and inside the active organization. Missing and stale targets take
 an explicit organization scope; selecting a team or project supplies no
 fallback authority.
 
+Preconditions: `project.read` at the live project for
+`astroliftProjectManagedServicesPage`, `astroliftProjectManagedService` and the
+attachments page; `app.read` at the live app for `astroliftManagedService` and
+`astroliftAppManagedServiceMetrics`; writes keep their existing managed-service
+permissions at the recorded owner, and a bearer stays within its organization
+and team ceiling. Surface: `astro project resources list|show|attachments
+--project <project>`, `astro app services list|show`, or
+`astro api graphql -q '<document>'`. Placeholders: `<project-id>` is `id` from
+`astro project list` (`astroliftProjects`); `<managed-service-id>` is `id` from
+`astroliftProjectManagedServicesPage` or `astro app services list <app-slug>`;
+`<context-revision>` is `contextRevision` from the exact read you reviewed.
+
 A private resource targets its app environment's cluster. A shared resource
 targets its own cluster. Deleted or foreign organization clusters are refused
 before provider access, including for an organization operator; correct the
@@ -35,7 +47,7 @@ connections or update email resources. Project resources require the
 credential's own live team. Organization bundles require an organization
 credential.
 
-The ten project-resource MCP tools use the same scoped targets and persisted
+The nine project-resource MCP tools use the same scoped targets and persisted
 operation facts as their GraphQL mutations. A denied scope is returned through
 the normal MCP `permission_denied` envelope and audit decision. The existing
 MCP request schemas remain compatible. The additive GraphQL metadata
@@ -50,6 +62,13 @@ authorized `astroliftProjectManagedServiceAttachmentsPage`, and exact
 replacement. Pages bind their scope/filters into the cursor; removed anchors or
 changed scope require restarting the page rather than guessing continuation.
 Consumer counts reflect visibility, not all subscriptions in the installation.
+
+```bash
+astro project resources list --project <project> --page
+astro project resources show <managed-service-id> --project <project>
+astro project resources attachments <managed-service-id> --project <project> --expected-context-revision <context-revision>
+astro app services show <managed-service-id> --expected-context-revision <context-revision>
+```
 
 Metadata exposes owner/placement GUIDs and versions, status, timestamps,
 `contextRevision` and operation receipts. It excludes provider configuration,
@@ -84,3 +103,14 @@ Web clients clear resource metadata, cursors, samples and captured handlers on
 actor/organization/context changes. Runtime requests are no-cache and disable
 in-flight deduplication, including when switching back to a prior actor. Missing
 or refused context cannot mount runtime charts or enable writes.
+
+## Verify
+
+```bash
+astro app services show <managed-service-id> --expected-context-revision <context-revision>
+pytest astrolift_services/tests/test_resource_reads_2207.py astrolift_services/tests/test_resource_actions_2207.py astrolift_observability/tests/test_resource_metric_context_2207.py
+```
+
+The read returns the service with the same `contextRevision`, owner and
+placement GUIDs you reviewed, and is refused once the context has changed; the
+test modules pass from the `backend/` directory.

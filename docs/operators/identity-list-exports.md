@@ -9,6 +9,13 @@ Every declared sort has a primary-key tiebreak, including equal names and
 missing activity. Descending keys have a `-` prefix; comma-separated keys support
 stable multi-column ordering.
 
+Preconditions: `org.manage_members` in the active organization for the member
+and invitation exports; the binding export applies the caller's own grants on
+each binding's owner. Surfaces: the console People
+(`/administration/access/people`) and Assignments
+(`/administration/permissions/assignments`) export actions, or GraphQL via
+`astro api graphql`. Placeholders: none.
+
 | Page | Filters | Sort keys; default |
 | --- | --- | --- |
 | `astroliftMembersPage` | `scopeKind`, `lifecycle`, `role`, `team`, `mine`, `admin`, `active` | `name`, `email`, `created`, `joined`, `lifecycle`, `lastActive`, `roles`; `name` |
@@ -77,3 +84,13 @@ Blob: available memory, request timeout and deployment response limits still
 apply to very large exports. Those limits fail the request rather than silently
 truncating rows. This synchronous query does not provide a persisted snapshot
 across concurrent identity writes or an asynchronous export job.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftMembersCsv { filename contentType rowCount } }'
+astro api graphql -q '{ astroliftMembersPage(limit: 1) { totalCount } }'
+./run.sh test astrolift_identity/tests/test_identity_csv_2153.py
+```
+
+`rowCount` equals the page query's `totalCount` for the same filters (the complete authorized list, not a page), and the suite passes.

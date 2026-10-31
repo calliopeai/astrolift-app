@@ -9,6 +9,13 @@ Successful startup retains the existing bootstrap commands, production server
 and development reload behavior. Other startup commands keep their existing
 best-effort behavior; their errors are logged.
 
+Preconditions: the ability to run a one-off task or Job with the new backend
+image and to update the web and worker services: on ECS, the install's AWS
+account with rights to register task definitions, run tasks and update the two
+services; on Kubernetes, a kubeconfig for the control-plane cluster. The
+migration runs under the backend task role with the install's existing
+database and secret settings. Placeholders: none.
+
 For a release, record the current web and worker task revisions and image
 digests, then prepare the new backend and frontend images from the same tested
 release. The web backend and worker must use the same backend digest; update
@@ -53,3 +60,12 @@ An image rollback does not reverse schema or data migrations. A schema rollback
 requires its own reviewed migration and database recovery plan; do not run a
 reverse migration merely to match an older image. Prefer a forward repair when
 the schema cannot support that image.
+
+## Verify
+
+```sh
+python manage.py migrate --check
+python manage.py showmigrations --list | grep '\[ \]'
+```
+
+Run both in the migration task or a shell in the backend container: the first exits 0 and the second prints nothing (no unapplied migration). Then confirm the worker and web services are stable on the new revisions and an authenticated GraphQL request succeeds.

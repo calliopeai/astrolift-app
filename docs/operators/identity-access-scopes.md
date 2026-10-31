@@ -5,6 +5,17 @@ selected team or project. The surface guardrail has no `#2103` exemptions;
 its 65 routes comprise 50 organization gates, nine team/project gates and
 six binding operations or collections.
 
+Preconditions: a reference page for the identity permissions
+`org.manage_members`, `team.manage_members`, `team.read` and the role-binding
+grants, read with `astro perms list`; bearer writes need the `admin` token
+scope. Surfaces: the console under `/administration/access` (people, teams,
+`teams/<team-slug>/members`, `teams/<team-slug>/assign-roles`) and the GraphQL
+operations named below. Placeholders: `<team-id>` is `id` from
+`astroliftTeamsPage`; `<org-member-id>` is `id` from `astroliftMembersPage`;
+`<role-id>` is `id` from `astroliftTeamMembershipRolesPage(teamId: "<team-id>")`;
+`<expected-source>` is `expectedSource` from the review; `<request-id>` is a
+fresh UUID (`uuidgen`).
+
 | Surface                                                          | Scope                                                                                                     |
 | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Organization details/settings/deletion, onboarding and modules   | Active organization                                                                                       |
@@ -96,11 +107,30 @@ roles outside the same organization or global TEAM catalogue refuse.
    and organization-member GUIDs. For ADD, select the exact role and obtain a
    fresh review including that `roleId`. The paged role selector is
    `astroliftTeamMembershipRolesPage`.
+
+   ```graphql
+   query {
+     astroliftTeamMembershipReview(teamId: "<team-id>", orgMemberId: "<org-member-id>", kind: ADD, roleId: "<role-id>") {
+       kind expectedSource roles { id name }
+     }
+   }
+   ```
+
 2. Submit `changeAstroliftTeamMembership` with that `expectedSource`, exact
    target/role tuple and a new UUID `requestId`. The server locks existing owner,
    users, memberships and grants, then rechecks persisted authentication,
    session/sidecar revocation and expiry, current authority, elevation, target
    identity, reviewed versions and the grant ceiling before any effects.
+
+   ```graphql
+   mutation {
+     changeAstroliftTeamMembership(input: {
+       requestId: "<request-id>", kind: ADD, teamId: "<team-id>",
+       orgMemberId: "<org-member-id>", roleId: "<role-id>", expectedSource: "<expected-source>"
+     }) { ok errors { code message field } }
+   }
+   ```
+
 3. ADD creates or reuses one active TEAM attachment and direct role grant. It
    never reactivates inactive attachments/accounts/organization memberships or
    silently converts an existing timed grant to a permanent grant.
@@ -146,3 +176,11 @@ legacy role assignment, not reviewed direct-membership removal: its unpaged
 reader still exposes at most 500 direct attachments and the existing role
 catalogue. The UI states that limit and links back to the complete Members
 page; ordinary team managers use the new paged reviewed membership flow.
+
+## Verify
+
+```sh
+./run.sh test astrolift_identity/tests/test_owner_scopes_2103.py astrolift_identity/tests/test_team_memberships_2273.py
+```
+
+Both suites pass; after a membership change the roster at `/administration/access/teams/<team-slug>/members` shows the added or removed attachment.

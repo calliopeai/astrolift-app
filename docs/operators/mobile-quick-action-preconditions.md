@@ -4,6 +4,15 @@ The four quick actions accept an optional top-level `ifMatchVersion: Int`.
 The existing mutation inputs are unchanged. Omitting the argument, or passing
 null, retains the existing web and CLI behavior.
 
+Preconditions: `app.rollback` at the app for `rollbackDeployment`; `app.deploy`
+for `redeployApp`, `restartAstroliftWorkload` and `scaleAstroliftWorkload`.
+Surface: the mobile app, `astro api graphql -q '<document>'`, or
+`astro app rollback <deployment-id>`. Placeholders: `<deployment-id>` and
+`<deployment-version>` are `id` and `version` of the RUNNING row in
+`astroliftDeploymentsPage(appSlug: "<app-slug>", environmentName: "<environment>")`;
+`<workload-id>` and `<workload-version>` are `id` and `version` from
+`astroliftWorkload(appSlug: "<app-slug>", slug: "<workload-slug>")`.
+
 | Mutation | Read this version | Target identified by input |
 | --- | --- | --- |
 | `rollbackDeployment` | `AstroliftDeployment.version` | The current **RUNNING** deployment in the selected environment |
@@ -67,3 +76,15 @@ validate unchanged against this schema, including their top-level
 those exact documents offline. Mobile hooks must consume the target row's
 version and rollback target described here; this backend change does not
 replace the separate mobile hook work.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { astroliftDeploymentsPage(appSlug: "<app-slug>", environmentName: "<environment>") { items { id status version } } }'
+astro api graphql -q 'query { astroliftWorkload(appSlug: "<app-slug>", slug: "<workload-slug>") { id version } }'
+```
+
+After rollback or redeploy the page shows the deployment the mutation returned
+as the RUNNING row for that environment; after restart or scale the workload's
+`version` is one higher than the value you sent. A `VERSION_MISMATCH` error
+means another writer advanced it first: reread before deciding again.

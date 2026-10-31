@@ -6,6 +6,21 @@ that change the build inputs run the build and smoke checks. Registry publicatio
 requires an explicit workflow dispatch with publication enabled, which defaults
 to false, and happens after the runner's kernel and bounded inference checks.
 
+Preconditions: no Astrolift permission for the build; it is the GitHub Actions
+workflow `.github/workflows/vllm-cpu-runtime.yml` of the `astrolift-app`
+repository, dispatched with its `publish` input, and the job holds
+`packages: write` for GHCR. Declaring the result for admission needs a platform
+operator holding `org.update` and `cluster.update` in the cluster's organization
+(`backend/core/permissions.py`), through `updateClusterModelRuntime` or the
+runtime setup form reached from `/models/deploy`. Placeholders: `<ref>` is the
+branch or tag to build; `<image>` is the built image reference; `<proof-path>`
+is where the smoke writes its JSON proof; `<digest>` is the `sha256:` manifest
+digest in the run's `registry-manifest.json` artifact.
+
+```sh
+gh workflow run vllm-cpu-runtime.yml --ref <ref> -f publish=true
+```
+
 The build uses upstream vLLM 0.15.1 commit
 `1892993bc18e243e2c05841314c5e9c06a80c70d`, an archive checksum, and an
 amd64 Ubuntu 22.04 base digest recorded in `scripts/vllm_cpu_runtime/source.json`.
@@ -113,3 +128,14 @@ After a future build, record and declare its exact registry manifest digest.
 Verify the selected nodes, image access and capacity before deployment, then
 require actual deployment readiness and inference observations. Keep launcher
 arguments and certification checks intact.
+
+## Verify
+
+```sh
+python3 scripts/vllm_cpu_runtime/smoke.py --image <image> --proof <proof-path>
+```
+
+The smoke must exit zero and the proof at `<proof-path>` must record
+`"passed": true` with `kv_cache_blocks`, `memory_evidence`, `memory_phases` and
+`host`; a failed smoke exits with "CPU runtime candidate smoke failed" and the
+proof names its `failure_type`.

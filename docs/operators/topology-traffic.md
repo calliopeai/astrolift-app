@@ -7,6 +7,14 @@ timezone, span one minute to 24 hours, and end at or before the current time.
 Missing apps return null; a missing named environment or invalid window fails
 the query instead of selecting another environment.
 
+Preconditions: `app.read_metrics` on the app (`backend/core/permissions.py`),
+held through the current session or bearer token; the query runs through
+`astro api graphql`; the environment cluster must have a `prometheus_endpoint`
+configured and reachable from the control plane. Placeholders: `<app-slug>` is
+`slug` from `astro app list`; `<environment-name>` is `NAME` from
+`astro app environments list <app-slug>`; `<start>` and `<end>` are RFC 3339
+timestamps with a timezone, one minute to 24 hours apart.
+
 The query requires `app.read_metrics` on the actual live app. Home team/project
 ownership, bearer scope and team ceilings apply independently of the UI's
 selected headers. Persisted environment policy facts authorize every selected
@@ -69,3 +77,19 @@ and `truncated` metadata. Backend limit violations return `UNAVAILABLE` rather
 than silently turning partial readings into complete traffic. Successful scoped
 reads use the existing 30-second Prometheus cache; permission or policy revocation
 still fails before cache access. Clients never supply raw PromQL.
+
+## Verify
+
+```sh
+astro api graphql -q 'query($app: String!, $start: DateTime!, $end: DateTime!, $environment: String) {
+  astroliftTopologyTraffic(appSlug: $app, start: $start, end: $end, environmentName: $environment) {
+    status source truncated
+    environments { environmentName namespace status reason truncated
+      edges { sourceWorkloadName destinationWorkloadName requestRate errorRate errorRatio } }
+  }
+}' --var app=<app-slug> --var start=<start> --var end=<end> --var environment=<environment-name>
+```
+
+The top-level `status` must be `AVAILABLE` or `NO_DATA` and every selected
+environment must report its own `status` with an empty `reason`; an
+`UNCONFIGURED` or `UNAVAILABLE` environment carries the reason instead of edges.

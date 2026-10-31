@@ -3113,6 +3113,29 @@
         "saveFailed": "Speichern fehlgeschlagen.",
         "membersDescription": "Wer diese App sehen und ändern darf: die hier zugewiesenen Rollen und die Teams, mit denen sie geteilt wird.",
         "edgeDescription": "Wer die URL der App erreichen darf. Der Edge entscheidet über den Zugang; Rollen entscheiden, wer die App ändern darf."
+      },
+      "public": {
+        "title": "Öffentlicher Zugriff",
+        "on": "Öffentlich",
+        "off": "Hinter der Anmeldung",
+        "description": "Wenn öffentlich, antwortet die Plattform-URL der App ohne die Anmeldung des Clusters. Die eigene Anmeldung der App gilt weiterhin, und eigene Domains behalten ihre eigene Einstellung.",
+        "states": {
+          "public": "antwortet ohne Anmeldung",
+          "gated": "hinter der Anmeldung",
+          "no_gate": "dieser Cluster hat keine Anmeldung, die App ist offen",
+          "not_envoy": "bleibt hinter der Anmeldung: nur der Envoy-Edge beachtet diesen Schalter",
+          "cluster_disallows": "bleibt hinter der Anmeldung: dieser Cluster erlaubt keine öffentlichen Apps",
+          "restricted": "bleibt hinter der Anmeldung: die App hat eine Zugriffsliste"
+        },
+        "makePublic": "Öffentlich machen…",
+        "makePrivate": "Hinter die Anmeldung stellen",
+        "restrictedHint": "Leeren Sie zuerst die Zugriffsliste; sie gilt nur hinter der Anmeldung.",
+        "confirmTitle": "{app} öffentlich machen?",
+        "confirmDescription": "Wer die Plattform-URL der App erreicht, erhält die App ohne Anmeldung am Cluster. Nur die eigene Authentifizierung der App schützt sie. Sie werden eventuell gebeten, sich erneut zu bestätigen.",
+        "confirm": "Öffentlich machen",
+        "madePublic": "Die App ist öffentlich, wo ihr Cluster es erlaubt.",
+        "madePrivate": "Die App ist wieder hinter der Anmeldung.",
+        "saveFailed": "Änderung fehlgeschlagen."
       }
     },
     "members": {
@@ -11442,6 +11465,23 @@
       "searchReleases": "Releases und Versionen suchen…",
       "noReleases": "Keine installierten Releases",
       "started": "Gestartet"
+    },
+    "publicApps": {
+      "title": "Öffentliche Apps",
+      "description": "Ob eine App auf diesem Cluster ohne die obige Anmeldung antworten darf, wenn ihr Eigentümer das einschaltet. Aus hält jede App hinter der Anmeldung, egal was sie anfordert.",
+      "allowed": "Erlaubt",
+      "refused": "Nicht erlaubt",
+      "notEnvoy": "Nur der Envoy-Edge beachtet die Anfrage einer App; am Edge dieses Clusters bleibt jede App hinter der Anmeldung.",
+      "allow": "Öffentliche Apps erlauben",
+      "refuse": "Öffentliche Apps beenden",
+      "allowTitle": "Öffentliche Apps auf diesem Cluster erlauben?",
+      "allowReview": "Apps, die ihre Eigentümer bereits öffentlich gemacht haben, antworten sofort ohne Anmeldung.",
+      "refuseTitle": "Öffentliche Apps auf diesem Cluster beenden?",
+      "refuseReview": "Jede öffentliche App auf diesem Cluster kommt sofort hinter die Anmeldung.",
+      "allowedToast": "Öffentliche Apps erlaubt.",
+      "refusedToast": "Öffentliche Apps beendet; jede App ist hinter der Anmeldung.",
+      "changeFailed": "Änderung fehlgeschlagen.",
+      "refreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
     }
   },
   "obsPanelReason": {
@@ -12988,6 +13028,16 @@
       "task": "Einmalige Läufe",
       "workflow": "Eine mehrstufige Pipeline",
       "mixed": "Mehrere Arten von Workloads"
+    },
+    "canvas": {
+      "legend": "Legende und Symbole",
+      "zoomOut": "Verkleinern",
+      "zoomIn": "Vergrößern",
+      "fit": "An Ansicht anpassen",
+      "expand": "Vergrößern",
+      "pan": "Ablaufdiagramm. Zum Verschieben scrollen; mit den Zoom-Steuerelementen die Größe ändern.",
+      "inspector": "Ausgewählter Schritt",
+      "seeMore": "Mehr anzeigen"
     }
   },
   "clusterConnection": {
@@ -14770,7 +14820,12 @@
       "noChoices": "Keine nicht registrierten Cluster gefunden.",
       "register": "Registrieren",
       "unregisterTitle": "{cluster} bei Zentinelle abmelden?",
-      "unregisterBody": "Damit wird der Cluster in Zentinelle widerrufen und anschließend sein Gateway und das Geheimnis mit den Zugangsdaten entfernt. Agent-Verkehr dort läuft nicht mehr über Zentinelle."
+      "unregisterBody": "Damit wird der Cluster in Zentinelle widerrufen und anschließend sein Gateway und das Geheimnis mit den Zugangsdaten entfernt. Agent-Verkehr dort läuft nicht mehr über Zentinelle.",
+      "sharedTitle": "Gemeinsame Cluster",
+      "sharedDescription": "Sie gehören keiner Organisation. Sie werden über die Zentinelle-Verbindung der Installation registriert, die der Plattformbetreiber verwaltet; der Installer registriert die Cluster, die er anlegt.",
+      "sharedNotConnected": "Die Installation ist nicht mit Zentinelle verbunden. Verbinden Sie Zentinelle mit Astrolift im Installer, um sie zu verbinden und ihre Cluster zu registrieren.",
+      "sharedManaged": "Von der Plattform verwaltet",
+      "sharedEmpty": "Keine gemeinsamen Cluster."
     },
     "filters": {
       "window": "Zeitraum",
@@ -15126,6 +15181,16 @@
     "delete": "Domain entfernen",
     "deleteTitle": "Verwaltete Domain entfernen?",
     "deleteHelp": "Dies startet die bestehende Domainentfernung. Verwaltete Anbietereinträge und Zertifikate können entfernt werden; Anwendungs-Hostnamen können danach nicht mehr aufgelöst werden. Prüfe vor dem Fortfahren die aktuellen Routen.",
+    "effectiveDefault": "Tatsächlicher Standard",
+    "defaultDeleteTitle": "Standardzone entfernen?",
+    "defaultDeleteHelp": "Neue Anwendungen erhalten ihre Hostnamen unter dieser Zone. Anwendungen, die nach dem Entfernen registriert werden, erhalten die nächste Standardzone oder gar keinen Hostnamen.",
+    "defaultDeleteRefused": "Astrolift hat diese Zone behalten: Sie ist der Standard für die Hostnamen neuer Anwendungen.",
+    "defaultDependentsLabel": "Umgebungen unter dieser Zone",
+    "defaultDependentsNone": "Noch wird keine Umgebung über sie aufgelöst.",
+    "defaultDependentsCount": "Umgebungen, die über sie aufgelöst werden: {count}",
+    "defaultDependentsMore": "und {count} weitere",
+    "defaultDeleteTypeToConfirm": "Gib zur Bestätigung die Zone ein:",
+    "defaultDeleteConfirm": "Standardzone entfernen",
     "actionFailed": "Die Aktion wurde abgelehnt. Lies den aktuellen Zustand vor einem erneuten Versuch.",
     "actionUncertain": "Die Antwort auf die Aktion wurde nicht bestätigt. Lies vor einem erneuten Versuch den aktuellen Domain- und Anbieterzustand.",
     "acceptedUnverified": "Der Schreibvorgang wurde akzeptiert, aber die zurückgegebenen Metadaten konnten nicht geprüft werden. Aktualisiere den Zustand vor einer weiteren Aktion.",
@@ -16376,7 +16441,8 @@
     "substrate": "Substrat",
     "sharing": "Freigabe",
     "connect": "Verbinden",
-    "agentInbox": "Posteingang"
+    "agentInbox": "Posteingang",
+    "topology": "Systemübersicht"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17282,5 +17348,65 @@
       "woke": "hat den Agenten gestartet",
       "queued": "wartet auf den nächsten Lauf des Agenten"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Systemübersicht",
+    "description": "Erkunden Sie das Projekt, öffnen Sie einen Ablauf und prüfen Sie jede Komponente im Zusammenhang.",
+    "back": "Projektübersicht",
+    "scope": "Ansicht eingrenzen",
+    "wholeProject": "Gesamtes Projekt",
+    "canvas": "Diagrammfläche",
+    "componentList": "Komponentenliste",
+    "counts": "{nodes} Komponenten · {edges} Verbindungen",
+    "partialError": "Einige Projektdaten konnten nicht geladen werden. Dieses Diagramm ist unvollständig.",
+    "notFound": "Projekt nicht gefunden oder nicht zugänglich.",
+    "empty": "Noch keine sichtbaren Projektkomponenten.",
+    "inspector": "Komponentendetails",
+    "status": "Zustand",
+    "seeMore": "Mehr anzeigen",
+    "exploreWorkflow": "Ablaufschritte erkunden",
+    "connections": "Verbundene Komponenten",
+    "selectTitle": "Komponente prüfen",
+    "selectDescription": "Wählen Sie einen Knoten, um seine Konfiguration und Verbindungen anzuzeigen. Mehr anzeigen öffnet seine Astrolift-Seite. Grenzen Sie die Ansicht ein, um die Schritte eines Ablaufs zu sehen.",
+    "evidenceNote": "Die Verbindungen stammen aus der registrierten Konfiguration. Ein Schrittzustand wird nur angezeigt, wenn der letzte Lauf den aktuellen Schritt identifiziert; frühere Zustände werden bei Prüfschleifen nicht abgeleitet.",
+    "kind": {
+      "workflow": "Arbeitsablauf",
+      "stage": "Schritt",
+      "agent": "Agentenprozess",
+      "app": "Anwendung",
+      "repository": "Quellrepository"
+    },
+    "edge": {
+      "source": "Quelle",
+      "dispatches": "Startet Agenten",
+      "invokes": "Ruft auf",
+      "next": "Weiter",
+      "return": "Rücksprung",
+      "retry": "Wiederholen"
+    },
+    "field": {
+      "pattern": "Ablaufmuster",
+      "stages": "Schritte",
+      "enabled": "Aktiviert",
+      "repository": "Quellrepository",
+      "source": "Quellreferenz",
+      "latestRun": "Letzter Ablauf",
+      "kind": "Art",
+      "order": "Schrittnummer",
+      "agent": "Agentenprozess",
+      "environment": "Umgebungsvorlage",
+      "model": "Modell",
+      "output": "Ausgabeschlüssel",
+      "skills": "Fähigkeiten",
+      "failure": "Fehlerverhalten",
+      "attempts": "Maximale Versuche",
+      "timeout": "Zeitlimit",
+      "workflow": "Arbeitsablauf",
+      "mode": "Ausführungsmodus",
+      "running": "Laufende Aufgaben",
+      "lastRun": "Letzte Ausführung"
+    },
+    "openBlueprint": "Systemübersicht öffnen",
+    "expand": "Vergrößern"
   }
 }

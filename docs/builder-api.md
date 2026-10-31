@@ -4,6 +4,17 @@ For source deployment into a selected project and existing brain, use the
 [two-step source-build/brain-hosting protocol](operators/builder-brain-source.md).
 The legacy team promotion route below does not enroll an app on a brain.
 
+Preconditions: an API token (`alft_at_...`) issued by the CLI device flow
+(`astro auth login`) carrying `write:apps` or `admin`, for an organization whose
+`chat_studio_integration` module is on; the token's user holds `app.create` in
+the organization for create and sync, and `app.create` plus `app.deploy` on the
+destination team for promote (`backend/core/permissions.py`); the surface is the
+REST routes under `/api/builder/v1/` on the control-plane API origin, which the
+edge must pass through without an SSO challenge. Placeholders: `<api>` is the
+control-plane API origin; `<token>` is the API token; `<id>` is `id` from the
+create response; `<team-slug>` is `SLUG` from `astro team list`; `<app_url>` is
+`app_url` from the promote response.
+
 The App Builder REST surface: create a dev environment from a file tree,
 sync new files into it, and promote it to a registered app that Astrolift
 serves. Clients include the Calliope App Builder and Chat Studio's
@@ -231,3 +242,16 @@ Artifact transport removes that dependency. Capacity is now an operator resource
 budget; it is not a framework, browser or Brain format limit. Data still travels
 base64 on this compatible upload endpoint, so very large workloads may benefit
 from a future streaming upload API.
+
+## Verify
+
+```sh
+curl -sS -H "Authorization: Bearer <token>" https://<api>/api/builder/v1/capabilities/
+curl -I <app_url>
+```
+
+The first call must answer `200` with `"artifact_transport": "private-archive-v1"`,
+`max_files`, `max_file_bytes` and `max_data_bytes`; `401` with
+`api_token_required` means no bearer reached the API, and `403` names
+`missing_scope` or `module_not_enabled`. After a promote, the second call must
+return an HTTP 200 status line from the promoted app.

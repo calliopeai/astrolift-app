@@ -47,6 +47,8 @@ export interface VizFrameProps<K extends string> {
   legend: LegendItem[];
   /** Extra controls after the switcher (a zoom, a filter). */
   actions?: React.ReactNode;
+  collapsibleLegend?: boolean;
+  bodyClassName?: string;
   children: React.ReactNode;
   className?: string;
 }
@@ -60,6 +62,8 @@ export function VizFrame<K extends string>({
   motion,
   legend,
   actions,
+  collapsibleLegend = false,
+  bodyClassName,
   children,
   className,
 }: VizFrameProps<K>) {
@@ -96,9 +100,20 @@ export function VizFrame<K extends string>({
           {actions}
         </div>
       </header>
-      <div className="relative min-h-0 overflow-hidden">{children}</div>
+      <div className={cn("relative min-h-0 overflow-hidden", bodyClassName)}>{children}</div>
       <footer className="border-t px-4 py-2">
-        <VizLegend items={legend} motion={motion} />
+        {collapsibleLegend ? (
+          <details>
+            <summary className="text-muted-foreground cursor-pointer text-xs">
+              {t("canvas.legend")}
+            </summary>
+            <div className="pt-3">
+              <VizLegend items={legend} motion={motion} />
+            </div>
+          </details>
+        ) : (
+          <VizLegend items={legend} motion={motion} />
+        )}
       </footer>
     </section>
   );

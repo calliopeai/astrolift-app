@@ -20,6 +20,7 @@ import type { ManagedDomainState } from "./use-managed-domain";
 import { DomainRecordRouting } from "./DomainRecordRouting";
 import { DomainDefaultSettings, type DomainDefaultSettingsProps } from "./DomainDefaultSettings";
 import { DnsDelegationPanel, type DnsDelegationPanelProps } from "./DnsDelegationPanel";
+import { DefaultZoneDeleteDialog } from "./DefaultZoneDeleteDialog";
 
 export type ManagedDomainDetailProps = ManagedDomainState & {
   id: string;
@@ -104,6 +105,10 @@ function DetailTabs({
     props.verifying ||
     props.deleting ||
     props.removed;
+  // New apps resolve through the zone, by this read or by the server's
+  // refusal of a removal without force (#2572): removing it is forced, and
+  // only after the zone is typed.
+  const guarded = d.isEffectiveDefault || props.deleteRefusal !== null;
   // Provisioning writes through the DNS cluster's driver whatever the row's
   // dns_driver says; only a read-only Cloudflare zone never reaches it.
   const dnsWithheld =
@@ -283,16 +288,29 @@ function DetailTabs({
       {dnsWithheld && <p className="text-warning-fg text-sm">{dnsWithheld}</p>}
       {props.actionMessage && <p role="status">{props.actionMessage}</p>}
       {props.actionError && <p role="alert">{props.actionError}</p>}
-      <ConfirmDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title={t("deleteTitle")}
-        description={t("deleteHelp")}
-        confirmLabel={t("delete")}
-        destructive
-        confirmDisabled={busy || !observation?.actions.canDelete}
-        onConfirm={props.onDelete}
-      />
+      {guarded ? (
+        <DefaultZoneDeleteDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          zone={d.zone}
+          dependents={props.deleteRefusal?.items ?? d.dependentApps}
+          total={props.deleteRefusal?.total ?? d.dependentAppCount}
+          refusal={props.deleteRefusal?.message}
+          busy={busy || !observation?.actions.canDelete}
+          onConfirm={() => props.onDelete(true)}
+        />
+      ) : (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title={t("deleteTitle")}
+          description={t("deleteHelp")}
+          confirmLabel={t("delete")}
+          destructive
+          confirmDisabled={busy || !observation?.actions.canDelete}
+          onConfirm={() => props.onDelete()}
+        />
+      )}
       <div role="tablist" aria-label={t("title")} className="flex flex-wrap gap-1 border-b pb-2">
         {tabs.map((value, index) => (
           <Button
@@ -368,6 +386,7 @@ function DetailTabs({
                         : t("unprovisioned")}
                 </Badge>
                 <Badge variant="outline">{d.verificationState || t("unknown")}</Badge>
+                {d.isEffectiveDefault && <Badge>{t("effectiveDefault")}</Badge>}
               </div>
               {d.provisionState === "failed" && (
                 <p role="status" className="text-sm">

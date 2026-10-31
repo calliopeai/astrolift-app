@@ -6,6 +6,11 @@ is resolved to its canonical digest; the Lambda provision and update paths
 receive that protected digest. A missing image or a failed retention request
 blocks the activity before service state or Lambda code changes.
 
+Preconditions: a reference page; nothing runs by hand. The behaviour applies to
+AWS FaaS and static-builder deployments whose install deploy role, in the
+cluster's AWS account, holds the ECR read and tag permissions listed in the
+[backend bootstrap](../../backend/bootstrap.md). Placeholders: none.
+
 Each deployment owns its environment/deployment retention tags, including
 rollback deployments. Retries reuse those tags. The snapshot's
 `ecr_retention_pins` combines pins from FaaS, container workloads and static
@@ -29,3 +34,11 @@ against its SDK fakes, and the static build renderer with a recording cluster.
 It verifies digest propagation, retry and rollback ownership, preservation
 across stages, unchanged retries after source tags move, and failure before
 service, identity or Job writes.
+
+## Verify
+
+```sh
+./run.sh test astrolift_workflows/tests/test_faas_image_retention_2186.py
+```
+
+The suite passes.

@@ -1,7 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { ZentinelleClusters } from "./ZentinelleClusters";
-import { CONNECTED, DEGRADED_CONNECTION, HEALTHY_CONNECTION } from "./zentinelle-fixtures";
+import {
+  CONNECTED,
+  DEGRADED_CONNECTION,
+  HEALTHY_CONNECTION,
+  INSTALL_CONNECTION,
+} from "./zentinelle-fixtures";
 
 const meta: Meta = {
   title: "Screens/Secure/Zentinelle/Clusters",
@@ -64,6 +69,33 @@ export const RefusedWrite: Story = {
     <ZentinelleClusters
       {...actions}
       onRotate={async () => "Zentinelle could not be reached"}
+      connection={HEALTHY_CONNECTION}
+    />
+  ),
+};
+
+/** An org admin: shared clusters are listed as the platform's, with no actions. */
+export const SharedManagedByPlatform: Story = {
+  render: () => <ZentinelleClusters {...actions} connection={HEALTHY_CONNECTION} />,
+};
+
+/** The platform operator: the install connection's clusters, and registering the rest. */
+export const SharedAsOperator: Story = {
+  render: () => (
+    <ZentinelleClusters
+      {...actions}
+      shared={{ ...actions.shared, operator: true, connection: INSTALL_CONNECTION }}
+      connection={HEALTHY_CONNECTION}
+    />
+  ),
+};
+
+/** The platform operator, with no install connection yet. */
+export const SharedNotConnected: Story = {
+  render: () => (
+    <ZentinelleClusters
+      {...actions}
+      shared={{ ...actions.shared, operator: true, connection: null }}
       connection={HEALTHY_CONNECTION}
     />
   ),

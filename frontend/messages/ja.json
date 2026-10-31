@@ -3119,6 +3119,29 @@
         "saveFailed": "保存に失敗しました。",
         "membersDescription": "このアプリを表示・変更できるユーザー：ここでのロールと共有先のチーム。",
         "edgeDescription": "アプリの URL にアクセスできるユーザー。エッジがアクセス可否を決め、ロールが変更権限を決めます。"
+      },
+      "public": {
+        "title": "公開アクセス",
+        "on": "公開",
+        "off": "サインインが必要",
+        "description": "公開にすると、アプリのプラットフォーム URL はクラスターのサインインなしで応答します。アプリ自身のサインインは引き続き適用され、カスタムドメインは独自の設定のままです。",
+        "states": {
+          "public": "サインインなしで応答",
+          "gated": "サインインが必要",
+          "no_gate": "このクラスターにはサインインがないため、アプリは公開状態です",
+          "not_envoy": "サインインが必要なまま: このスイッチは Envoy エッジでのみ有効です",
+          "cluster_disallows": "サインインが必要なまま: このクラスターは公開アプリを許可していません",
+          "restricted": "サインインが必要なまま: アプリにアクセスリストがあります"
+        },
+        "makePublic": "公開する…",
+        "makePrivate": "サインインの後ろに戻す",
+        "restrictedHint": "先にアクセスリストを空にしてください。リストはサインインの後ろでのみ適用されます。",
+        "confirmTitle": "{app} を公開しますか?",
+        "confirmDescription": "アプリのプラットフォーム URL にアクセスした人は、クラスターにサインインせずにアプリを利用できます。保護するのはアプリ自身の認証だけです。本人確認を求められる場合があります。",
+        "confirm": "公開する",
+        "madePublic": "クラスターが許可する場所でアプリは公開されました。",
+        "madePrivate": "アプリは再びサインインが必要になりました。",
+        "saveFailed": "変更に失敗しました。"
       }
     },
     "members": {
@@ -11439,6 +11462,23 @@
       "searchReleases": "リリースやバージョンを検索…",
       "noReleases": "インストール済みリリースはありません",
       "started": "開始日時"
+    },
+    "publicApps": {
+      "title": "公開アプリ",
+      "description": "所有者が有効にしたとき、このクラスターのアプリが上記のサインインなしで応答できるかどうか。オフにすると、どのアプリも要求に関係なくサインインが必要なままです。",
+      "allowed": "許可",
+      "refused": "不許可",
+      "notEnvoy": "アプリの要求を反映するのは Envoy エッジだけです。このクラスターのエッジでは、すべてのアプリがサインインの後ろのままです。",
+      "allow": "公開アプリを許可",
+      "refuse": "公開アプリを停止",
+      "allowTitle": "このクラスターで公開アプリを許可しますか?",
+      "allowReview": "所有者がすでに公開にしたアプリは、ただちにサインインなしで応答します。",
+      "refuseTitle": "このクラスターの公開アプリを停止しますか?",
+      "refuseReview": "このクラスターのすべての公開アプリが、ただちにサインインの後ろに戻ります。",
+      "allowedToast": "公開アプリを許可しました。",
+      "refusedToast": "公開アプリを停止しました。すべてのアプリにサインインが必要です。",
+      "changeFailed": "変更に失敗しました。",
+      "refreshWarning": "変更は受け付けましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。"
     }
   },
   "obsPanelReason": {
@@ -12985,6 +13025,16 @@
       "task": "単発の実行",
       "workflow": "複数ステップのパイプライン",
       "mixed": "複数の種類のワークロード"
+    },
+    "canvas": {
+      "legend": "凡例と記号",
+      "zoomOut": "縮小",
+      "zoomIn": "拡大",
+      "fit": "全体を表示",
+      "expand": "拡大",
+      "pan": "ワークフローの表示領域。スクロールで移動し、ズーム操作で表示倍率を変更できます。",
+      "inspector": "選択中のステップ",
+      "seeMore": "詳細を見る"
     }
   },
   "clusterConnection": {
@@ -14767,7 +14817,12 @@
       "noChoices": "一致する未登録のクラスターはありません。",
       "register": "登録",
       "unregisterTitle": "{cluster} を Zentinelle から登録解除しますか?",
-      "unregisterBody": "Zentinelle でクラスターを失効させ、その後ゲートウェイと認証情報のシークレットを削除します。このクラスター上のエージェントの通信は Zentinelle を経由しなくなります。"
+      "unregisterBody": "Zentinelle でクラスターを失効させ、その後ゲートウェイと認証情報のシークレットを削除します。このクラスター上のエージェントの通信は Zentinelle を経由しなくなります。",
+      "sharedTitle": "共有クラスター",
+      "sharedDescription": "どの組織にも属しません。プラットフォーム運用者が管理するインストールの Zentinelle 接続を通じて登録されます。インストーラーは作成したクラスターを登録します。",
+      "sharedNotConnected": "インストールは Zentinelle に接続されていません。インストーラーで Zentinelle with Astrolift を接続すると、接続してクラスターを登録します。",
+      "sharedManaged": "プラットフォームが管理",
+      "sharedEmpty": "共有クラスターはありません。"
     },
     "filters": {
       "window": "期間",
@@ -15123,6 +15178,16 @@
     "delete": "ドメインを削除",
     "deleteTitle": "管理対象ドメインを削除しますか？",
     "deleteHelp": "既存のドメイン削除処理を開始します。プロバイダーの管理対象レコードや証明書が削除され、アプリのホスト名を解決できなくなる可能性があります。続行する前に現在のルートを確認してください。",
+    "effectiveDefault": "実際の既定",
+    "defaultDeleteTitle": "既定のゾーンを削除しますか？",
+    "defaultDeleteHelp": "新しいアプリのホスト名はこのゾーンの下に作成されます。削除後に登録されたアプリには次の既定のゾーンが使われ、それもなければホスト名は付きません。",
+    "defaultDeleteRefused": "Astrolift はこのゾーンを保持しました。新しいアプリのホスト名の既定のゾーンです。",
+    "defaultDependentsLabel": "このゾーンの環境",
+    "defaultDependentsNone": "このゾーンを経由して解決される環境はまだありません。",
+    "defaultDependentsCount": "このゾーンを経由して解決される環境：{count} 件",
+    "defaultDependentsMore": "ほか {count} 件",
+    "defaultDeleteTypeToConfirm": "確認するにはゾーンを入力してください：",
+    "defaultDeleteConfirm": "既定のゾーンを削除",
     "actionFailed": "操作が拒否されました。再試行する前に現在の状態を確認してください。",
     "actionUncertain": "操作への応答を確認できませんでした。再試行する前に現在のドメインとプロバイダーの状態を確認してください。",
     "acceptedUnverified": "書き込みは受け付けられましたが、返されたメタデータを検証できませんでした。次の操作の前に現在の状態を更新してください。",
@@ -16373,7 +16438,8 @@
     "substrate": "基盤",
     "sharing": "共有",
     "connect": "接続",
-    "agentInbox": "受信トレイ"
+    "agentInbox": "受信トレイ",
+    "topology": "構成図"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17279,5 +17345,65 @@
       "woke": "エージェントを起動済み",
       "queued": "エージェントの次回実行を待機中"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · 構成図",
+    "description": "プロジェクト全体や個別のワークフローを表示し、構成を見失わずに各コンポーネントを確認できます。",
+    "back": "プロジェクト概要",
+    "scope": "表示対象",
+    "wholeProject": "プロジェクト全体",
+    "canvas": "グラフ表示領域",
+    "componentList": "コンポーネント一覧",
+    "counts": "{nodes} 個のコンポーネント · {edges} 個の接続",
+    "partialError": "一部のプロジェクトデータを読み込めませんでした。このグラフは不完全です。",
+    "notFound": "プロジェクトが見つからないか、アクセスできません。",
+    "empty": "表示できるコンポーネントはまだありません。",
+    "inspector": "コンポーネントの詳細",
+    "status": "状態",
+    "seeMore": "詳細を見る",
+    "exploreWorkflow": "ワークフローのステップを表示",
+    "connections": "接続先コンポーネント",
+    "selectTitle": "コンポーネントを確認",
+    "selectDescription": "ノードを選択すると設定と接続を確認できます。「詳細を見る」で Astrolift の該当ページを開きます。表示対象を選ぶとワークフローの各ステップを表示できます。",
+    "evidenceNote": "接続は登録済みの設定に基づきます。最新の実行が現在のステップを特定できる場合のみ状態を表示します。レビューの繰り返しをまたいで以前の状態を推測することはありません。",
+    "kind": {
+      "workflow": "ワークフロー",
+      "stage": "ステップ",
+      "agent": "エージェント",
+      "app": "アプリ",
+      "repository": "リポジトリ"
+    },
+    "edge": {
+      "source": "ソース",
+      "dispatches": "タスクを割り当て",
+      "invokes": "呼び出し",
+      "next": "次へ",
+      "return": "戻り先",
+      "retry": "再試行"
+    },
+    "field": {
+      "pattern": "パターン",
+      "stages": "ステップ数",
+      "enabled": "有効",
+      "repository": "リポジトリ",
+      "source": "ソース参照",
+      "latestRun": "最新の実行",
+      "kind": "種類",
+      "order": "ステップ番号",
+      "agent": "エージェント",
+      "environment": "環境仕様",
+      "model": "モデル",
+      "output": "出力キー",
+      "skills": "スキル",
+      "failure": "失敗時の動作",
+      "attempts": "最大試行回数",
+      "timeout": "タイムアウト",
+      "workflow": "ワークフロー",
+      "mode": "実行モード",
+      "running": "実行中のタスク",
+      "lastRun": "最終実行"
+    },
+    "openBlueprint": "構成図を開く",
+    "expand": "拡大"
   }
 }

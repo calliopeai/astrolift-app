@@ -6,6 +6,17 @@ it belongs to, what it is about and which screen a tap opens. Details are read
 after the client authenticates to that install; the payload carries no
 credential and nothing a tap could act on.
 
+Preconditions: no Astrolift permission; the contract is the fixture
+`backend/contracts/push-notifications.json`, proven by
+`backend/astrolift_operations/tests/test_push_contract_2161.py`, which needs the
+backend test environment (`DJANGO_SETTINGS_MODULE=config.test_settings` from
+`backend/pytest.ini`, with its PostgreSQL, as `make test` runs it inside the
+compose stack); operators set `ASTROLIFT_INSTALL_ID` on every web and worker
+process. Placeholders: `<thread id>`, `<alert event id>`, `<app slug>`,
+`<session id>`, `<cluster id>`, `<deployment id>` and `<environment>` in
+`action_url` are the target's own identifiers, the GUID among them also sent as
+`target_id`.
+
 The machine-readable fixture is
 [`backend/contracts/push-notifications.json`](../backend/contracts/push-notifications.json).
 It is generated from the real dispatcher and drivers (see the end of this page);
@@ -159,3 +170,12 @@ Regenerate it from `backend/` with:
 ```bash
 ASTROLIFT_WRITE_PUSH_CONTRACT=1 pytest astrolift_operations/tests/test_push_contract_2161.py
 ```
+
+## Verify
+
+```sh
+cd backend && pytest astrolift_operations/tests/test_push_contract_2161.py
+```
+
+The test must pass, which means the committed fixture equals what the dispatcher
+and drivers produce; a failure prints the diff between the two.

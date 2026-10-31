@@ -2,6 +2,18 @@
 
 Treat replica count, CPU node capacity and GPU node capacity as separate policies.
 
+Preconditions: the HPA bounds live in the app's `astrolift.toml`, so you need
+write access to the app's source repository (or `astro app manifest push`,
+which opens the pull request) and `app.deploy` on the app
+(`backend/core/permissions.py`) for `astro app deploy`; the Zentinelle gateway
+ceiling `ZENTINELLE_GATEWAY_MAX_REPLICAS` is an admin setting; Cluster
+Autoscaler and GPU node groups are configured in the cluster's AWS account with
+Terraform and Flux, outside Astrolift. Reading the rendered HPA needs a
+kubeconfig for the app's cluster. Placeholders: `<app-slug>` is `slug` from
+`astro app list`; `<namespace>` is the `Namespace:` line of
+`astro app show <app-slug>`; `<workload-name>` is the workload `name` in the
+manifest; `<environment>` is `NAME` from `astro app environments list <app-slug>`.
+
 | Layer                 | Owner and signal                                   | Astrolift configuration                                                                                            |
 | --------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | CPU workload replicas | HPA, measured CPU as a percentage of requested CPU | Set both `hpa_min` and `hpa_max`, with an explicit `hpa_target_cpu_pct`.                                           |
@@ -40,6 +52,11 @@ HPA. Both bounds should be valid positive integers, with min no greater than max
 the existing manifest parser does not comprehensively validate those inputs.
 Kubernetes rejects an invalid HPA. The default CPU target remains 80%; the
 example explicitly chooses 75%.
+
+```sh
+astro app manifest push <app-slug>
+astro app deploy --app <app-slug> --env <environment> --wait
+```
 
 Rendered autoscaled Deployments declare `astrolift.dev/replica-owner: hpa`.
 The shared EKS/GKE/AKS/native apply client reads existing managed fields before
@@ -170,3 +187,15 @@ Sources: [Kubernetes HPA](https://kubernetes.io/docs/tasks/run-application/horiz
 [SSA ownership transfer](https://kubernetes.io/docs/reference/using-api/server-side-apply/#transferring-ownership),
 [Cluster Autoscaler FAQ](https://github.com/kubernetes/autoscaler/blob/master/cluster-autoscaler/FAQ.md),
 [EKS autoscaling guidance](https://docs.aws.amazon.com/eks/latest/best-practices/cas.html).
+
+## Verify
+
+```sh
+kubectl -n <namespace> get hpa <workload-name>
+kubectl -n <namespace> get deployment <workload-name> \
+  -o jsonpath='{.metadata.annotations.astrolift\.dev/replica-owner}{"\n"}'
+```
+
+The HPA's `MINPODS` and `MAXPODS` must equal `hpa_min` and `hpa_max` and its
+`TARGETS` must read against the CPU percentage you set; the Deployment must
+print `hpa`, so Astrolift no longer owns `spec.replicas`.

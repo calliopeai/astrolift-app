@@ -4,6 +4,8 @@ On-demand foundation models and inference profiles are capability bindings. They
 create no paid throughput resource. Provisioned throughput is a separate paid AWS
 resource; selecting a model is not evidence that a commitment is ready.
 
+Preconditions: `app.update` on the app for `provisionManagedService` (`project.update` on the project for `provisionProjectManagedService`); a managed service of kind `model_endpoint` on the Bedrock variant whose `config` carries `model_id`, `model_units` (an integer, at least 1) and `provisioned_throughput` (`OneMonth` or `SixMonths`); the cluster's AWS provider credential holds the Bedrock actions listed under "Updates, removal and rollback". Placeholders: `<app-slug>` is `slug` from `astroliftAppsPage`; `<managed-service-id>` is `id` from `astroliftManagedServicesPage(appSlug)`.
+
 The Bedrock driver saves the exact native throughput ARN in a versioned
 `ManagedService.backend_ref` handle, with the service and organization UUIDs,
 model fingerprint, units, commitment and original provision-intent fingerprint.
@@ -122,3 +124,12 @@ and ownership tag shape in
 This implementation's native tests use actual botocore schemas and owned protocol
 fakes; they do not certify account permissions, model availability, purchase,
 latency or successful live inference.
+
+## Verify
+
+```sh
+astro api graphql --var id=<managed-service-id> -q 'query($id: GUID!) { astroliftManagedService(id: $id) { id version contextRevision kind variant status } }'
+cd backend && pytest providers/tests/aws/test_bedrock_throughput_2276.py astrolift_workflows/tests/test_bedrock_durable_activity_2276.py
+```
+
+`status` is `active` only once the readiness probe confirmed `InService` on the recorded ARN with matching source, units, commitment and live ownership; `provisioning`, `updating` or `failed` means it has not; both test modules pass.

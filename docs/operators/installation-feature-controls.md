@@ -4,6 +4,12 @@ The administration Features screen changes only the existing server-allowlisted
 runtime flags. Server authorization remains authoritative; this recovery flow
 does not add permissions or editable flags. Build-time features remain read-only.
 
+Preconditions: the platform operator (an active superuser) holding
+`admin.elevate` in the active organization; `setFeatureFlag` refuses anyone
+else. Surfaces: the console at `/administration/features`, or GraphQL via
+`astro api graphql`. Placeholders: `<flag-key>` is `key` from
+`astroliftServerInfo { featureFlags { key } }`.
+
 A successful `SetFeatureFlag` reply confirms acceptance only when its returned
 key and enabled value match the requested change and the reply has no errors.
 The screen closes confirmation and retains that accepted value even if the
@@ -26,3 +32,12 @@ navigation caches. A changed or unavailable viewer requires a new current read
 before writes resume. These are browser recovery protections, not server-side
 idempotency or immutable-target guarantees. Local tests do not establish release
 or live installation acceptance for #2281.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftServerInfo { featureFlags { key enabled } } }'
+./run.sh test core/schema/tests/test_feature_flags_mutation.py
+```
+
+The entry for `<flag-key>` reports the `enabled` value the screen confirmed, and the suite passes.

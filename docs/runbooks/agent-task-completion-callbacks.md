@@ -7,6 +7,27 @@ distinct from the pod's `AGENT_CALLBACK_URL`, which reports results **into** the
 control plane. The public [setup and verification guide](https://astrolift.dev/guides/agent-completion-callbacks/)
 contains CLI commands, GraphQL examples and a Python signature verifier.
 
+Preconditions: `org.update` on the organization to set the allowed hosts,
+`secret.write` to store a signing key, `secret.read` plus `agent.dispatch` on
+the agent's app to dispatch with a callback (`FULL` also needs `app.read`),
+and task-scoped `app.read` plus `agent.dispatch` to redeliver; an organization
+token or user session, not a team-scoped API token; the surfaces are the
+`astro agent callbacks` and `astro agent dispatch` commands or the GraphQL
+mutations named below; the production worker must reach the receiver. The
+receiver host must be on the allow-list and present a certificate the worker
+trusts. Placeholders: `<task-id>` is the task `id` from `astro agent ls`;
+`<name>` is the signing key name; `<host>` is the receiver's exact host or
+`*.example.org` pattern; `<url>` is the HTTPS callback URL.
+
+```bash
+astro agent callbacks show
+astro agent callbacks configure --allow-host <host>
+astro agent callbacks secret-set <name> --file <path>
+astro agent dispatch <agent-slug> --callback-url <url> --callback-secret-ref <name> \
+  --correlation-id <id> --callback-mode FULL
+astro agent callbacks redeliver <task-id>
+```
+
 Organization administrators configure `configureAgentTaskCallbacks(allowedHosts)`
 with `org.update` and write a signing key using
 `setAgentTaskCallbackSecret(name, value)` with organization `secret.write`.
@@ -61,6 +82,17 @@ a worker interrupted after the receiver accepts a request can send it again.
 
 `agentTask` exposes `callbackStatus` (`pending`, `delivered`, `failed`, or null
 when unconfigured), `callbackAttempts` and sanitized `callbackLastError`.
+
+- **Signature:** `callbackStatus: failed` with `callbackLastError` naming the
+  final HTTP status or connection error, or `callbackStatus: pending` with a
+  climbing `callbackAttempts` while the receiver answers 5xx, 408, 429 or
+  times out.
+- **Fix:** fix the receiver, its allow-list entry or its signing key, then
+  replay the final event without rerunning the agent:
+  `redeliverAgentTaskCallback(taskId:)` / `astro agent callbacks redeliver
+  <task-id>`. A pending callback cannot be replayed; wait for it to settle.
+- **Rollback:** no rollback needed; redelivery requeues the same final event
+  under a new generation.
 `redeliverAgentTaskCallback(taskId)` requires task-scoped `app.read` and
 `agent.dispatch`. It requeues the same final event under a new delivery generation
 and 24-hour window without running the agent again. Pending callbacks cannot be
@@ -94,3 +126,14 @@ fix the receiver or its allow-list/key configuration before manual replay. Tests
 cover real PostgreSQL migrations, actual HTTPS receivers, outages through the
 24-hour boundary, rotation, payload markers absent from logs/history, and actual
 Temporal worker replacement and history replay.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { agentTask(id: "<task-id>") { status callbackStatus callbackAttempts callbackLastError } }'
+pytest astrolift_agents/tests/test_completion_callback_api_2234.py astrolift_agents/tests/test_completion_callback_outbox_2234.py astrolift_agents/tests/test_completion_callback_dispatch_api_2234.py
+```
+
+The terminal task reports `callbackStatus: delivered` with a null
+`callbackLastError`, the receiver logged one `agent_task.finished` delivery
+whose signature verified, and the test modules pass.

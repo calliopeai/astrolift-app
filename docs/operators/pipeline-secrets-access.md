@@ -7,6 +7,23 @@ bare name or another pipeline's same-name secret cannot supply a missing value.
 Values are passed to the existing job secret materialization boundary, never
 returned by GraphQL or persisted in a pipeline definition.
 
+Preconditions: `secret.list` at the pipeline's owner (the live app of an
+app-associated pipeline, the organization of an unassociated one) to list;
+`pipeline.secret_manage` and `secret.write` at that same owner to set or
+delete. A bearer credential needs `secret:write` for writes and a read scope
+such as `read:apps` for listing, and a team-bound credential reaches only an
+app its team owns or holds a share on. Surfaces: the console at
+`/pipelines/<pipeline-id>/secrets`, or GraphQL via `astro api graphql`.
+Placeholders: `<pipeline-id>` is `id` from `astro pipeline list --json` or
+`astroliftPipelinesPage`; `<secret-name>` and `<secret-value>` are the name and
+value you supply.
+
+```graphql
+query { astroliftPipelineSecrets(pipelineId: "<pipeline-id>") { id name createdAt updatedAt } }
+mutation { setPipelineSecret(input: {pipelineId: "<pipeline-id>", name: "<secret-name>", value: "<secret-value>"}) { ok errors { code message field } data { pipelineId name } } }
+mutation { deletePipelineSecret(input: {pipelineId: "<pipeline-id>", name: "<secret-name>"}) { ok errors { code message field } data { pipelineId name } } }
+```
+
 `astroliftPipelineSecrets(pipelineId: GUID!)` returns only public IDs, names and
 creation/update timestamps. It requires `secret.list` at the pipeline's actual
 owner. `setPipelineSecret` and `deletePipelineSecret` return typed mutation
@@ -42,3 +59,13 @@ encrypted storage boundaries and dispatch retrieval. Browser route navigation
 uses controlled HTTP fixtures and is a separate frontend proof; it does not
 claim to replace backend authorization tests. No production secret migration,
 cloud secret write or existing-source deletion is required by this change.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftPipelineSecrets(pipelineId: "<pipeline-id>") { id name createdAt updatedAt } }'
+./run.sh test astrolift_pipelines/tests/test_secret_api_2171.py
+```
+
+The listing names `<secret-name>` after a set and omits it after a delete, never
+showing a value, and the test run passes.

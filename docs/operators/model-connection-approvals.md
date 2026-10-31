@@ -6,6 +6,22 @@ connect an already admitted, ready model through their current `app.update` gran
 Organization policy administration uses current `org.update` in the selected
 organization; an app owner cannot change that policy or a model restriction.
 
+Preconditions: `app.update` at the app for `modelConnectionTargetsPage`,
+`modelConnectionAction`, `requestModelConnection`, `finalizeModelConnectionRequest`
+and `cancelModelConnectionRequest`; `org.update` in the selected organization for
+`updateOrganizationModelConnectionPolicy` and `modelConnectionApprovalRequestsPage`,
+plus scoped `app.approve_deploy` to approve or reject; a platform superadmin with
+hosting admission for `modelConnectionRestriction` and
+`setModelConnectionRestriction`. The install must advertise capability
+`models.connection_approvals`. Surface: console `/models/connections`,
+`/models/connections/[id]` and `/administration/organization`, or
+`astro api graphql -q '<document>'`. Placeholders: `<organization-id>` is `id`
+from `astroliftOrganizations`; `<model-deployment-id>`, `<cluster-id>` and
+`<provider-id>` are `id`, `clusterId` and `providerId` from
+`clusterModelDeploymentsPage(organizationId: "<organization-id>")`;
+`<request-id>` and `<request-version>` are `id` and `version` from
+`modelConnectionApprovalRequestsPage` or the intake reply.
+
 The Models navigation manifest advertises `canCreate`/`canManage` only after
 current installation-superadmin hosting admission, including organization/cluster
 checks and current bearer or persisted browser credentials. A `cluster.update`
@@ -129,8 +145,8 @@ provider account discovery or a new approval framework.
 
 ## Web request and policy workflow
 
-Open **Models → Connection requests** to see your server-paged requests, or switch
-explicitly to the reviewer inbox. The active tab calls only its own endpoint; the
+Open **Models → Model connections** and its **Your requests** tab to see your
+server-paged requests, or switch explicitly to the **Review inbox** tab. The active tab calls only its own endpoint; the
 API has no free-text request search or model-only request filter. Safe labels and
 literal GUIDs identify the returned targets; these pages do not infer permission
 from an account role or aggregate grant list.
@@ -192,3 +208,14 @@ active organization membership, including when its actor is a platform operator;
 the existing browser operator membership rule is separate. Requests whose recorded
 app/environment/model/cluster/provider tuple has become incoherent are excluded
 before page counts and refused by exact detail and effects.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { modelConnectionReviewRequest(input: {id: "<request-id>", ifMatchVersion: <request-version>}) { id version status approvalCount requiredApprovals canFinalize subscriptionId } }'
+```
+
+Before Connect the request shows `status: APPROVED` with `approvalCount` at
+least `requiredApprovals` and `canFinalize: true`; after finalization it carries
+a non-null `subscriptionId`. `STALE` means the policy or tuple changed: start a
+new reviewed request.

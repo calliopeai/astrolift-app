@@ -1,3 +1,5 @@
+> Historical (2026-10-30): validation record for the #2145 grant-access translation leaf (shared.access.grant); superseded by frontend/components/access/grant-access-translations.test.tsx, use-grant-access.test.tsx and frontend/components/screens/administration/access/use-grant-page.test.tsx.
+
 # Grant-access translations (#2145)
 
 This leaf finishes the parked grant-access draft from `4551e4cf`. Its isolated

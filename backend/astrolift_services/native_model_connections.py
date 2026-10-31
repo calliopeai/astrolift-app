@@ -120,7 +120,7 @@ def native_identity(service, *, cleanup=False):
         raise NativeConnectionUnavailable("Bedrock placement or credential declaration changed.")
     if value.get("organization_id") != str(service.organization.guid):
         raise NativeConnectionUnavailable("Bedrock connection owner changed.")
-    from aws.bedrock_catalogue import BedrockCatalogue, BedrockSourceKind
+    from aws.bedrock_catalogue import BedrockCatalogue, BedrockSourceKind, valid_foundation_model_destination
 
     try:
         kind = BedrockSourceKind(value["source_kind"])
@@ -135,11 +135,7 @@ def native_identity(service, *, cleanup=False):
             or len(value["destination_model_arns"]) > 16
             or len(set(value["destination_model_arns"])) != len(value["destination_model_arns"])
             or any(
-                not isinstance(arn, str)
-                or not re.fullmatch(
-                    rf"arn:{re.escape(value['partition'])}:bedrock:[a-z0-9-]+::foundation-model/[a-zA-Z0-9.:-]+",
-                    arn,
-                )
+                not valid_foundation_model_destination(arn, value["partition"])
                 for arn in value["destination_model_arns"]
             )
         ):

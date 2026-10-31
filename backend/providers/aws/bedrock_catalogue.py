@@ -17,7 +17,22 @@ MAX_ITEMS = 500
 MAX_PAGES = 5
 _ID = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9.:-]{0,139}\Z")
 _REGION = re.compile(r"[a-z]{2}(?:-[a-z]+)+-\d+\Z")
-_ARN = re.compile(r"arn:(aws(?:-[a-z-]+)?):bedrock:([a-z0-9-]+):(\d{12}|):([^/]+)/(.+)\Z")
+_ARN = re.compile(r"arn:(aws(?:-[a-z-]+)?):bedrock:([a-z0-9-]*):(\d{12}|):([^/]+)/(.+)\Z")
+
+
+def valid_foundation_model_destination(arn: Any, partition: str) -> bool:
+    """Global profiles use a regionless foundation-model ARN in commercial AWS."""
+    match = _ARN.fullmatch(arn) if isinstance(arn, str) and len(arn) <= 2048 else None
+    if not match:
+        return False
+    actual_partition, region, account, resource, identifier = match.groups()
+    return bool(
+        actual_partition == partition
+        and not account
+        and resource == "foundation-model"
+        and _ID.fullmatch(identifier)
+        and (_REGION.fullmatch(region) or (partition == "aws" and region == ""))
+    )
 
 
 class CatalogueState(StrEnum):
@@ -311,7 +326,10 @@ class BedrockCatalogue:
         if (
             partition != self._identity.partition
             or (not destination and region != self.config.region)
-            or not _REGION.fullmatch(region)
+            or not (
+                _REGION.fullmatch(region)
+                or (destination and kind == "foundation-model" and partition == "aws" and region == "")
+            )
             or resource != kind
             or account != ("" if kind == "foundation-model" else self._identity.account_id)
             or not _ID.fullmatch(identifier)

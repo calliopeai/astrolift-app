@@ -11,6 +11,28 @@ contracts. They grant no permissions, reveal no request or input values, and
 do not promise an enabled Temporal engine. Check runtime feature flags and
 handle the normal scoped permission and precondition errors after login.
 
+Preconditions: `workflow.read` to review a definition and `workflow.trigger` at
+its owner to start or recover it; `pipeline.read` to read a pipeline or run,
+`pipeline.trigger` to start one and `pipeline.cancel` to cancel; browser
+elevation (step-up) when the install requires it for a browser session, while
+API bearers follow the native exemption; the surfaces are GraphQL (the
+operations below, via `astro api graphql -f <file>`) and the CLI:
+`astro workflow definition-review <definition-guid>`, `astro workflow
+definition-start <definition-guid> --request-file <path> [--inputs-file <path>]
+--expected-revision <revision> --expected-input-schema-digest <digest> --yes`,
+`astro workflow definition-reconcile --request-file <path>`, `astro pipeline
+run <pipeline-name-or-guid> --request-file <path> --yes`, `astro pipeline
+reconcile --request-file <path>`, `astro pipeline show <run-guid>` and `astro
+pipeline cancel <run-id> --yes`; a shell in the backend container for the
+fixtures command. Placeholders: `definitionId` is the definition `guid` from
+`astro workflow definitions` or `workflowDefinitionById`; `expectedRevision`
+and `expectedInputSchemaDigest` come from `workflowDefinitionById` /
+`inputContract`; `requestId` is a UUID the caller persists before dispatch;
+`pipelineId` and `expectedVersion` come from `astroliftPipelinesPage` /
+`astroliftPipeline(id:)`; `runId`, `temporalWorkflowId` and `temporalRunId`
+come from `astroliftPipelineRun(id:)`; `<org-guid>` is `id` from
+`astroliftOrganizations`.
+
 Read `workflowDefinitionById(id: GUID!)` before starting a workflow definition.
 The response identifies the exact global or organization definition; an organization
 copy with the same slug never replaces this GUID. Its revision covers its execution
@@ -108,8 +130,8 @@ fields expose recorded state and excerpts, not a live or full log stream.
 Use an explicitly selected disposable staging organization:
 
 ```sh
-python manage.py create_reviewed_start_fixtures --organization ORG_GUID
-python manage.py create_reviewed_start_fixtures --organization ORG_GUID --execute
+python manage.py create_reviewed_start_fixtures --organization <org-guid>
+python manage.py create_reviewed_start_fixtures --organization <org-guid> --execute
 ```
 
 The default reports the concrete plan without changing data. The executed command
@@ -121,3 +143,16 @@ execution and Temporal run IDs plus final outcome. A caller needs workflow read
 and trigger permission, and browser elevation if required. Delete these definitions
 through the normal scoped soft-delete API after collecting receipts. Creating the
 fixtures is not evidence that a remote staging client acceptance test has passed.
+
+## Verify
+
+```sh
+astro api graphql -q 'query { astroliftServerInfo { capabilities } }'
+astro workflow definition-reconcile --request-file <path>
+pytest workflows/tests/test_reviewed_starts_2236.py workflows/tests/test_reviewed_start_api_2236.py workflows/tests/test_reviewed_start_authority_2236.py core/schema/tests/test_reviewed_start_discovery_2236.py astrolift_pipelines/tests/test_reviewed_start_migrations_2204.py astrolift_pipelines/tests/test_cancellation_cascade.py
+```
+
+`capabilities` lists the `workflows.*` and `pipelines.*` keys named above, the
+reconcile reads back the original request with its recorded execution,
+`temporalWorkflowId` and `temporalRunId` and a `dispatchStatus` of `submitted`,
+and the test modules pass.

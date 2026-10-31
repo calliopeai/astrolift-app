@@ -66,6 +66,16 @@ export const SOFT_DELETE_MANAGED_DOMAIN = gql`
       errors {
         code
         message
+        field
+        dependents {
+          total
+          items {
+            organizationSlug
+            appSlug
+            environmentName
+            url
+          }
+        }
       }
       data {
         id
@@ -257,6 +267,7 @@ export const GET_CLUSTER = gql`
     astroliftCluster(slug: $slug) {
       ...ClusterFields
       oidcAuthConfig
+      allowPublicApps
       viewerPermissions
       workloadIdentityRebind {
         state
@@ -293,6 +304,7 @@ export const UPDATE_TENANT_CLUSTER = gql`
         ingressClass
         albAuthConfig
         oidcAuthConfig
+        allowPublicApps
       }
     }
   }
@@ -455,6 +467,7 @@ export const LIST_MANAGED_DOMAINS = gql`
       provisionValidationRecords
       delegationCheck
       provisionClusterId
+      isEffectiveDefault
     }
   }
 `;

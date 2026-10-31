@@ -6,6 +6,17 @@ reference, configuration snapshot, strategy and immutable source commit in the
 new deployment. The existing workflow input carries that saved commit to the
 builder, including when approval delays dispatch.
 
+Preconditions: `app.deploy` on the deployment's app, within the bearer token's
+team ceiling, plus the app's approval policy when it requires approval.
+Surfaces: the `redeployApp` mutation via `astro api graphql`. Placeholders:
+`<deployment-id>` is `id` from `astroliftDeploymentsPage(appSlug: "<app-slug>")`;
+`<app-slug>` is the registered app slug (`astro app list`);
+`<new-deployment-id>` is `data.id` returned by the mutation.
+
+```graphql
+mutation { redeployApp(input: {id: "<deployment-id>"}) { ok errors { code message field } data { id status commitSha environmentName } } }
+```
+
 When the app's effective build strategy requires a platform rebuild, the
 selected deployment must have a full resolved hexadecimal SHA-1 (40 characters)
 or SHA-256 (64 characters) commit. Missing or malformed historical source data
@@ -38,3 +49,13 @@ kinds and keep their existing contracts. Physical deletion of the source can
 clear that historical lineage; this change does not reconstruct lost lineage
 or retroactively identify ambiguous legacy rows. Normal soft deletion retains
 the foreign-key identity.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftDeployment(id: "<deployment-id>") { id status commitSha } }'
+astro api graphql -q '{ astroliftDeployment(id: "<new-deployment-id>") { id status commitSha } }'
+./run.sh test astrolift_lifecycle/tests/test_redeploy_source_pin_2282.py
+```
+
+Both reads show the same 40- or 64-character `commitSha`, and the test run passes.

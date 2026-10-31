@@ -9,6 +9,22 @@ current source review. New Deployment/EKS targets and Cloudflare read-only
 connections are refused by this path; existing unbound domain behavior remains
 separate. No automatic default-domain migration occurs.
 
+Preconditions: `provider_plugin.read` in the organization for the support,
+targets, review and operation reads; `provider_plugin.configure` at the mutation
+gate, with current `app.update` and `cluster.manage` rechecked inside prepare,
+connect and reconcile; a shared zone additionally requires an active platform
+superadmin. The selected cluster's signing role, in the cluster's AWS account,
+needs the Route53, ACM, API Gateway v2, Lambda and STS actions listed below.
+Surface: `astro api graphql -q '<document>'`. Placeholders: `<domain-id>` and
+`<domain-version>` are `id` and `version` from
+`astro operator domains show <domain-id>` (`astro operator domains list` prints
+the ids); `<environment-id>`, `<environment-version>` and `<workload-id>` are
+`environmentId`, `environmentVersion` and `workloadId` from
+`managedDomainAppTargetsPage`; `<hostname>` is the apex or a strict subdomain;
+`<review-sha256>` is `reviewSha256` from `managedDomainAppRouteReview`;
+`<request-id>` is a UUID you generate once and retain; `<operation-id>` and
+`<operation-version>` are `id` and `version` from `managedDomainAppRouteOperation`.
+
 Use `managedDomainAppRouteSupport` and `managedDomainAppTargetsPage` to select an
 admitted app, environment and public workload. Review the apex or a strict
 subdomain with `managedDomainAppRouteReview`. The review binds current domain,
@@ -17,6 +33,21 @@ credential declaration, native account, API integration, Lambda revision and
 invoke policy. Read access does not authorize a write. Writes require current
 `app.update`, `provider_plugin.configure` and `cluster.manage`; a shared zone
 additionally requires an active platform superadmin. Bearer ceilings still apply.
+
+```graphql
+query RouteReads($domainId: GUID!, $domainVersion: Int!, $target: ManagedDomainAppRouteTargetInput!) {
+  managedDomainAppRouteSupport(domainId: $domainId, expectedDomainVersion: $domainVersion) { allowed reason writer }
+  managedDomainAppTargetsPage(domainId: $domainId, expectedDomainVersion: $domainVersion) {
+    items { appId appName environmentId environmentVersion workloadId workloadName clusterId }
+  }
+  managedDomainAppRouteReview(input: $target) {
+    reviewSha256 certificateStatus allocationState canPrepare canAttach reason
+  }
+}
+# $target: {"domainId": "<domain-id>", "expectedDomainVersion": <domain-version>,
+#           "environmentId": "<environment-id>", "expectedEnvironmentVersion": <environment-version>,
+#           "workloadId": "<workload-id>", "hostname": "<hostname>"}
+```
 
 The selected cluster signing role needs Route53 zone/record reads and exact
 record creation, ACM certificate request/read, API Gateway v2 domain/mapping
@@ -43,6 +74,19 @@ an apex ALIAS destination. The route creates an empty-key mapping to the owned
 API's `$default` stage and an exact Route53 A ALIAS, never an apex CNAME or broad
 UPSERT. Existing native domains, mappings or conflicting address records refuse
 rather than become platform-owned resources.
+
+```graphql
+mutation Connect($input: ManagedDomainAppRouteWriteInput!) {
+  connectManagedDomainAppRoute(input: $input) {
+    ok
+    errors { code message }
+    data { id version requestId status reason dnsState ingressState tlsState }
+  }
+}
+# $input: the reviewed target fields above plus
+#         "reviewSha256": "<review-sha256>", "requestId": "<request-id>"
+# prepareManagedDomainAppRoute takes the same input type with its own requestId.
+```
 
 Recover with `managedDomainAppRouteOperation` using the original domain GUID and
 request UUID. Prepare and Connect have independent original UUIDs. Repeating an
@@ -78,3 +122,14 @@ required instead of issuing legacy unowned writes. Guarded route removal and
 uncertain deletion recovery remain follow-up work. Protected history cannot be
 physically deleted or repointed; migration rollback refuses any retained row,
 including soft-deleted history. Empty-history rollback restores the prior graph.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { managedDomainAppRouteOperation(input: {domainId: "<domain-id>", requestId: "<request-id>"}) { id version status reason dnsState ingressState tlsState canReconcile records { name type target } } }'
+```
+
+The operation shows `status` equal to `ready` with the exact A ALIAS record for
+`<hostname>`; `pending` or `unknown` with a `reason` means the stage has not been
+reread yet, and public delegation, TLS and application response still need the
+separate diagnostics.

@@ -8,6 +8,13 @@ deletion and moderation require `form.create`, `form.update`, `form.delete`
 and `form.moderate` respectively at that same explicit organization scope.
 Selecting a team or project does not grant authority over organization forms.
 
+Preconditions: a reference page for the `form.read`, `form.create`,
+`form.update`, `form.delete`, `form.submit` and `form.moderate` permissions,
+held at the active organization; bearer calls also need the `admin` token
+scope. Read the catalog with `astro perms list`. The console `/forms` routes
+are feature-flagged off (`frontend/lib/route-flags.ts`), so the surface is
+GraphQL via `astro api graphql`. Placeholders: none.
+
 The definition collection retains the organization's live forms, and the
 submission collection retains the named form's live responses. Foreign,
 deleted and unknown targets keep their existing null/empty or `NOT_FOUND`
@@ -44,3 +51,11 @@ regeneration is required. Real PostgreSQL tests in
 `test_subscription_scopes_2112.py` cover two-team RoleBindings, cross-org
 rows, session/bearer HTTP requests, silent stream refusal, event filtering
 and cancellation. The surface guardrail has no `#2112` exemptions.
+
+## Verify
+
+```sh
+./run.sh test astrolift_forms/tests/test_org_scopes_2112.py astrolift_forms/tests/test_subscription_scopes_2112.py
+```
+
+Both suites pass.

@@ -11,7 +11,9 @@ Decisions (Leo, 2026-10-11):
 * First cut: destructive deletes, exec/console attach, and secret reveal and
   change. Second cut (Leo, 2026-10-12): deploying to and rolling back a
   production environment (named ``production`` or ``prod``). Approval for
-  deploys stays with the environment's own required approvals.
+  deploys stays with the environment's own required approvals. Making an
+  app reachable without the edge login (``app.edge.make_public``, #2504);
+  making it private again is never gated.
 * Approval is off by default; any scope can add it to a destructive delete
   (``APPROVABLE``), and the largest quorum asked for wins. The mutation then
   records an ``ActionApprovalRequest`` and refuses with ``APPROVAL_REQUIRED``;
@@ -55,12 +57,15 @@ ACTIONS: dict[str, str] = {
     "brain.share": "Share a semantic layer",
     "brain.delete": "Delete a semantic layer",
     "app.expiry.clear": "Make a temporary app permanent",
+    "app.edge.make_public": "Make an app reachable without the edge login",
 }
 
 #: The actions an agent on the MCP surface is refused unless the organization
 #: allows agents (#2424). Agents cannot step up, so the person who would have
 #: been asked is the organization's rule.
-AGENT_GATED: frozenset[str] = frozenset({"brain.share", "brain.delete", "app.expiry.clear"})
+AGENT_GATED: frozenset[str] = frozenset(
+    {"brain.share", "brain.delete", "app.expiry.clear", "app.edge.make_public"}
+)
 
 #: The actions a rule can add approval to, and the kind of target each binds to.
 APPROVABLE: dict[str, str] = {
@@ -174,6 +179,7 @@ def agent_refusal(action: str, *, app: Any = None) -> str | None:
         "brain.share": ("astro brain share", "the Brains screen"),
         "brain.delete": ("astro brain delete", "the Brains screen"),
         "app.expiry.clear": ("astro app expiry --clear", "the app's page"),
+        "app.edge.make_public": ("astro app public on", "the app's Access tab"),
     }[action]
     return f"this action needs a person: run `{command}` or use {screen}"
 

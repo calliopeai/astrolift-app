@@ -1,10 +1,11 @@
 "use client";
 
-import { Download, Loader2, Pause, Play } from "lucide-react";
+import { Download, Loader2, Pause, Play, ExpandIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -169,6 +170,7 @@ function laneKey(run: PlacedRun, t: number): string {
 
 export function RunReplay({ timeline, motion, now, onSelectStage, className }: RunReplayProps) {
   const vt = useTranslations("vizRender");
+  const [expanded, setExpanded] = React.useState(false);
   const run = React.useMemo(() => placeRun(timeline, now), [timeline, now]);
   const slow = React.useMemo(() => slowestStage(run), [run]);
   const reduced = motion === "reduced";
@@ -359,7 +361,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
   const note = active ? gateNote(active, true, done, vt) : null;
   const activeColor = active ? HEALTH_COLOR[STAGE_HEALTH[active.stage.status]] : undefined;
 
-  return (
+  const body = (
     <div
       ref={rootRef}
       data-motion={motion}
@@ -792,5 +794,21 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
         </DropdownMenu>
       </div>
     </div>
+  );
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setExpanded(true)}>
+        <ExpandIcon className="size-4" />
+        {vt("canvas.expand")}
+      </Button>
+      {!expanded && body}
+      <Dialog open={expanded} onOpenChange={setExpanded}>
+        <DialogContent className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col overflow-auto p-5 sm:max-w-none">
+          <DialogTitle>{timeline.label}</DialogTitle>
+          <DialogDescription>{vt("canvas.pan")}</DialogDescription>
+          {expanded && body}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

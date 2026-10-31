@@ -7,6 +7,8 @@ image, built once, instead of installing them in every task. This page covers
 building such an image, pinning it on a spec, pulling it, and what its size costs
 on the cluster.
 
+Preconditions: `agent_env_spec.update` (or `agent_env_spec.create` for a new recipe) in the spec's organization for `updateAgentEnvironmentSpec`, `createAgentEnvironmentSpec` and `astro agent env-spec upsert`; a Docker host that can push to your registry for the build; a kubeconfig for the cluster that holds the agent namespace for the `kubectl` checks; a shell in the backend container for `manage.py upsert_agent_environment_spec`. Placeholders: `<runtime>` is a catalog runtime name; `<image>` and `<ref>` are the image reference you pushed; `<d>` is an image digest; `<slug>` is the spec's slug from `agentEnvironmentSpecsPage`; `<org>` is the organization slug or GUID and `<org slug>` its `slug`, from `astroliftOrganizations`; `<agent-type>` is `claude` or `codex`; `<task guid without dashes>` is `id` from `agentTasksPage` with its dashes removed; `<user>` and `<token>` are your registry's pull credentials.
+
 ## Why not install at boot
 
 With `allow_install = true` in its manifest's `[environment]`, an agent installs
@@ -164,6 +166,11 @@ Any other spec takes the image from `imageTag` on `createAgentEnvironmentSpec` o
 `updateAgentEnvironmentSpec`, `astro agent env-spec upsert <slug> --image-tag <ref>`,
 or `manage.py upsert_agent_environment_spec --image-tag <ref>`. The reference is used
 as written, up to 512 characters; nothing checks it before a task pulls it.
+
+```sh
+astro agent env-spec upsert <slug> --image-tag <ref> --runtime <runtime>
+python manage.py upsert_agent_environment_spec --org <org> --slug <slug> --agent-type <agent-type> --image-tag <ref>
+```
 
 - **Precedence.** `imageTag` wins over `runtime`, which wins over the agent's primary
   container image. Box pods resolve their image the same way.
@@ -327,3 +334,14 @@ its bindings, ran wrangler and fossil, found cargo from a login shell, and could
 install the toolchain a mismatched `rust-toolchain.toml` asked for. The cluster side
 was not exercised here: pull policy, node caching, garbage collection and eviction
 are Kubernetes' documented behaviour, not measured on a cluster.
+
+## Verify
+
+```sh
+astro api graphql -q 'query { agentEnvironmentSpec(slug: "<slug>") { slug runtime imageTag } }'
+NS=astrolift-agents-<org slug>
+kubectl -n "$NS" get job agent-task-<task guid without dashes> \
+    -o jsonpath='{.spec.template.spec.containers[0].image} {.spec.template.spec.containers[0].imagePullPolicy}{"\n"}'
+```
+
+`imageTag` is the reference you pinned, and a task dispatched after the change runs that image (its `-vnc` repository for a VNC spec) with `IfNotPresent` for a tag or digest.

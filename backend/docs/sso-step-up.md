@@ -8,6 +8,18 @@ URL returned by Django's `auth1-elevate-sso-callback` route with that provider.
 Use the deployed HTTPS API origin and route prefix, rather than a frontend-only
 origin or a localhost redirect. This flow uses persisted Django database sessions.
 
+Preconditions: an operator who can set the webservice environment
+(`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_CLIENT_SCOPES`,
+`AUTH0_SERVER_METADATA_URL`, `STEP_UP_SSO_FRESHNESS_SECONDS`,
+`STEP_UP_AUTH_TTL_SECONDS`, `STEP_UP_AUTH_MAX_TTL_SECONDS`; values never in git)
+and an administrator of the OpenID Connect provider to register the callback;
+an authenticated browser session whose signed-in user already has an
+`auth1.UserInfo` link to that provider; the routes are `auth1/elevate-sso/`
+(`auth1-elevate-sso-start`) and `auth1/elevate-sso/callback/`
+(`auth1-elevate-sso-callback`), mounted under `BASE_URL` (the `/app/`
+prefix). Placeholders: `<api-origin>` is the deployed HTTPS API origin;
+`<return-path>` is a relative console path.
+
 An authenticated browser opens `auth1-elevate-sso-start` with a safe relative
 `return` path. Astrolift requests `prompt=login`, `max_age=0` and a one-shot state
 and nonce. The provider must return a signed ID token with a fresh `auth_time`
@@ -40,4 +52,17 @@ control-plane diagnostics.
 This is a browser-session proof, not general action approval, an API bearer proof,
 a new login/linking flow or an implementation of WebAuthn, OTP or mobile consent.
 The broader action-safety requirements and durable audit contract remain separate.
+## Verify
+
+```bash
+# Register this URL with the provider, then open the start URL in a signed-in browser
+echo "https://<api-origin>/app/auth1/elevate-sso/callback/"
+open "https://<api-origin>/app/auth1/elevate-sso/?return=<return-path>"
+pytest astrolift_identity/tests/test_step_up_sso.py astrolift_identity/tests/test_step_up_sso_binding_2202.py astrolift_identity/tests/test_step_up_sso_peer_races_2202.py
+```
+
+The provider prompts for a fresh login, the callback returns the browser to
+`<return-path>` with no `stepUp` refusal code, the elevated action proceeds
+within `STEP_UP_AUTH_TTL_SECONDS`, and the test modules pass.
+
 The identity rule follows [OpenID Connect Core, Claim Stability and Uniqueness](https://openid.net/specs/openid-connect-core-1_0.html#ClaimStabilityAndUniqueness).

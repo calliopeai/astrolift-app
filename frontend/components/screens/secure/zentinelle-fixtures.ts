@@ -79,6 +79,20 @@ export const HEALTHY_CONNECTION: ZentinelleConnection = {
   ],
 };
 
+/** The install connection shared clusters register through (#1905). */
+export const INSTALL_CONNECTION: ZentinelleConnection = {
+  ...HEALTHY_CONNECTION,
+  id: "0199a1b2-0000-7000-8000-0000000000bb",
+  tenantIds: [],
+  clusters: [
+    cluster({
+      clusterId: "0199a1b2-0000-7000-8000-000000000020",
+      clusterSlug: "platform-us-west-2",
+      zentinelleClusterId: "0199a1b2-0000-7000-8000-000000000020",
+    }),
+  ],
+};
+
 export const DEGRADED_CONNECTION: ZentinelleConnection = {
   ...HEALTHY_CONNECTION,
   gatewayUrl: "http://zentinelle.zentinelle.svc:8000",
@@ -279,8 +293,24 @@ export const CONNECTED: ZentinelleScreenProps = {
     busyClusterId: null,
     choices: {
       items: [
-        { id: "0199a1b2-0000-7000-8000-000000000001", slug: "prod-us-east-1", name: "Prod US" },
-        { id: "0199a1b2-0000-7000-8000-000000000009", slug: "gpu-pool", name: "GPU pool" },
+        {
+          id: "0199a1b2-0000-7000-8000-000000000001",
+          slug: "prod-us-east-1",
+          name: "Prod US",
+          shared: false,
+        },
+        {
+          id: "0199a1b2-0000-7000-8000-000000000009",
+          slug: "gpu-pool",
+          name: "GPU pool",
+          shared: false,
+        },
+        {
+          id: "0199a1b2-0000-7000-8000-000000000021",
+          slug: "platform-eu-west-1",
+          name: "Platform EU",
+          shared: true,
+        },
       ],
       loading: false,
       search: "",
@@ -290,6 +320,7 @@ export const CONNECTED: ZentinelleScreenProps = {
     onSetEnabled: ok,
     onRotate: ok,
     onUnregister: ok,
+    shared: { operator: false, connection: null, onRegister: ok, onUnregister: ok },
   },
   usage: { filter, usage: { data: USAGE_ROWS, loading: false, error: null } },
   policies: { filter, policies: { data: POLICIES, loading: false, error: null } },

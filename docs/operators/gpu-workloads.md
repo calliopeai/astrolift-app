@@ -2,6 +2,16 @@
 
 Astrolift schedules GPU work (model hosting, inference APIs, GPU agents) on GPU nodes and keeps everything else off them. This page covers what the platform does and what an operator sets up per cluster.
 
+Preconditions: `app.deploy` on the app to deploy a GPU workload; `billing.read`
+to read the organization's `gpu` quota (`astroliftQuotas`); `gpu_autoprovision`
+is set in the cluster's `provider_config` at registration (`providerConfig` on
+`registerTenantCluster`). Node taints, the GPU Operator and node pools are set
+with the cluster's own cloud credentials and a kubeconfig for that cluster,
+outside Astrolift. Placeholders: `<app-slug>` is the registered app slug
+(`astro app list`); `<environment-name>` is a name from
+`astro app environments list <app-slug>`; `<cluster-slug>` is `slug` from
+`astroliftClustersPage`; `<node>` is a Kubernetes node name.
+
 ## What an app declares
 
 A workload asks for GPUs in `astrolift.toml`:
@@ -59,3 +69,13 @@ For always-on GPU availability and the separate CPU workload/node policies, see
 [workload and node autoscaling](workload-and-node-autoscaling.md). CPU HPA settings
 remain an explicit workload choice; GPU pools do not opt into node autoscaling
 merely because their maximum size exceeds their desired size.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftClustersPage(search: "<cluster-slug>", limit: 1) { items { slug capabilities capabilitiesProbedAt } } }'
+astro app deploy --app <app-slug> --env <environment-name> --wait
+./run.sh test astrolift_manifest/tests/test_gpu_requests_2038.py
+```
+
+`capabilities.gpu` lists `nodes`, `total`, `mig_total` and `products`, with `device_plugin`, `gpu_operator` and `dcgm_exporter` true once those pods run; the deploy reaches a terminal state instead of the refusal that names `gpu_autoprovision`; the suite passes.

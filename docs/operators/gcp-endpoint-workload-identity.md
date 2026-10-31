@@ -7,6 +7,16 @@ a service account or assigning a project role. Other legacy GCP services retain
 their existing project-role behavior; this change does not make those grants
 resource-scoped.
 
+Preconditions: a reference page for internal provider ports; there is no
+operator command or console surface. The account is the GCP project (ID and
+number) the GKE cluster lives in, reached with the cluster's declared ADC
+credential. That project must hold the app's GUID-owned GSA, the custom role
+whose only permission is `aiplatform.endpoints.predict`, and the Workload
+Identity pool whose GKE UID principals the port binds to that GSA; the
+cluster's `provider_config.endpoint_prediction_role` names the role.
+Placeholders: `<project-id>` and `<role-id>` form
+`projects/<project-id>/roles/<role-id>`.
+
 `gcp.identity_owned.NativeGCPIdentity` is a separate internal port. It uses the
 installed `google-cloud-aiplatform` **v1beta1** Endpoint IAM client, IAM Admin and
 Resource Manager clients. It never creates a model, Endpoint, service account,
@@ -136,7 +146,7 @@ Neither proves immediate revocation of externally granted access.
 The internal `astrolift_services.gcp_app_identity_plan` seam consumes an original
 HTTP-captured, signed `AcceptedAppIdentityAuthority` and the server's retained
 `NativeIdentityContext`. Configure the private cluster provider field
-`endpoint_prediction_role` as the exact `projects/{project_id}/roles/{role_id}`
+`endpoint_prediction_role` as the exact `projects/<project-id>/roles/<role-id>`
 custom role described above. The field is a declaration; current native role
 verification remains mandatory whenever desired Endpoint grants exist.
 
@@ -198,11 +208,20 @@ Production deployment must bind these observations to its exact accepted and
 applied workload records before treating them as rollout evidence.
 
 These foundations do not complete #2278 or expose native Vertex connections in
-the UI/API. Public original-caller capture,
-consumption of the accepted Endpoint-only app plan, subscription orchestration,
-receipt-bound rendering, rollout, actual token exchange and inference still
-require integration. Complete mixed-service unions and GSA/custom-role creation
+the UI/API. `DeployAppWorkflow` now consumes the accepted Endpoint-only app plan,
+renders and applies against receipts and observes rollout (see
+[native Endpoint deployment](gcp-native-configuration-executor.md)); shared-model
+subscription orchestration, actual token exchange and inference still require
+integration. Complete mixed-service unions and GSA/custom-role creation
 are not implemented by these ports. The IAM port returns `workload_ready=false`;
 its annotation is configuration metadata, not proof of applied Kubernetes state.
 Existing project-wide grants must be separately reviewed and removed by their
 owner; this port neither searches for nor silently migrates them.
+
+## Verify
+
+```sh
+./run.sh test astrolift_workflows/tests/test_gcp_endpoint_grant_translation_2278.py astrolift_services/tests/test_gcp_app_identity_plan_2278.py astrolift_services/tests/test_gcp_gke_runtime_placement_2278.py
+```
+
+The suites pass against controlled SDK fixtures; they are not live GKE or Vertex evidence.

@@ -1,11 +1,24 @@
 # Managed GitHub CI for multiple registered apps
 
-Template generation 9 gives each ordinary GitHub app its own
+Since template generation 9 (the current generation is 11), each ordinary
+GitHub app has its own
 `.github/workflows/astrolift-app-<app-guid-without-hyphens>.yml`, concurrency
 group and review branch. Default dispatch, repo pulls and drift checks use
 that same app path. Agent-only registrations retain their separate
 `astrolift-agent-<slug>.yml` package validator; mixed app/agent registrations
 use the ordinary app workflow. Source delivery for agent tasks remains separate.
+
+Preconditions: `app.update` at the app for `astro ci setup`,
+`astro app set-build-context`, the webhook, secret and workflow pushes and
+`setAppSource`; `app.read` for `validateAstroliftCiSecrets`. The organization's
+GitHub App installation must include the source repository with Contents and
+Workflows write permissions; the OIDC push role lives in the cluster's AWS
+account and must authorize the app's ECR repository. Surface:
+`astro ci setup <app-slug>`, console `/apps/[slug]/settings`, or
+`astro api graphql -q '<document>'`. Placeholders: `<app-slug>` is `slug` from
+`astro app list`; `<app-id>` and `<app-version>` are `id` and `version` from
+`astroliftApp(slug: "<app-slug>")`; `<path>` is a repository-relative build
+context; `<owner/name>` is the repository as GitHub lists it.
 
 ## Configure each registration
 
@@ -31,6 +44,11 @@ build → Build**. The workflow in the repository keeps the old paths until it i
 pushed again: sync it under **CI setup**, or run
 `astro ci setup <app> --skip-webhook --skip-secrets`. A full `astro ci setup` also
 re-pushes the CI secrets, which rotates the deploy token.
+
+```bash
+astro app set-build-context <app-slug> <path> --dockerfile <dockerfile-path>
+astro ci setup <app-slug> --skip-webhook --skip-secrets
+```
 
 Missing registry, Dockerfile or context refuses workflow sync with an actionable
 `PRECONDITION`, before repository writes. Unsafe paths, malformed arguments and
@@ -104,6 +122,17 @@ repository, and the push role trusts `repo:<owner>/<name>:*`. The
 at the new name, or at a different repository (#2478). It needs `app.update` on
 the app and is audited as `app.set_source` with both names.
 
+```graphql
+mutation MoveSource($input: SetAppSourceInput!) {
+  setAppSource(input: $input) {
+    ok
+    errors { code message }
+    data { previousSourceRepo app { id slug sourceRepo version } }
+  }
+}
+# $input: {"id": "<app-id>", "sourceRepo": "<owner/name>", "ifMatchVersion": <app-version>}
+```
+
 The repository must be in the organization's GitHub App installation on its
 owner; the app stores the name as GitHub lists it. The organization's
 repository policy applies, and another app in the organization registered from
@@ -151,3 +180,13 @@ the repository does not reopen the finished teardown; the step names the files
 to delete by hand. GitLab, Gitea and Bitbucket keep the managed CI in a
 repository-wide file that can hold other jobs, so deregister names it and
 leaves it. A sync pull request the app opened earlier is not closed.
+
+## Verify
+
+```bash
+astro api graphql -q 'mutation { validateAstroliftCiSecrets(input: {appSlug: "<app-slug>"}) { ok errors { code message } data { repo results { secretName isSet isCurrent } } } }'
+```
+
+`ok` is true and all five `ASTROLIFT_*_<APP-GUID>` names report `isSet: true`
+(and `isCurrent: true` where reported) against the app's current `sourceRepo`;
+a missing or stale name means the secrets were not pushed to that repository.

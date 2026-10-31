@@ -9,6 +9,14 @@ Successful sends record `status: notified`; a configuration requesting no
 channels records `status: skipped`. Email success means the configured transport
 accepted one message, not proof that a recipient received it.
 
+Preconditions: reading the event needs `audit_log.read` in the active
+organization (`astroliftEventsPage`, or the console `/events`). The SES
+checklist runs in the install's AWS account with rights to read SES identities
+and Route53 zones; the sender is the backend task and worker role (the actual
+task/workload role below), and the settings are changed on the web and worker
+task definitions. Placeholders: `<workflow-run-guid>` is `workflow_run_guid` in
+the event payload.
+
 The event uses the standard organization-confined append-only event writer and
 is visible through authorized activity/event reads. No recipient address or
 provider exception is included in its payload. Persistence relies on the event
@@ -55,3 +63,11 @@ SES settings in environment or secret references, so the backend's default
 operator-applied DNS records, paired task sender configuration and an authorized
 external-mail test remain required. #1823 remains open; these local delivery
 tests do not establish a working production sender.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftEventsPage(eventType: "workflow.human_gate.notified", limit: 5) { items { occurredAt severity payload } } }'
+```
+
+The newest event's `payload.status` is `notified` with `payload.delivery.email: true`; `failed` with `delivery.email: false` and severity `error` means the transport refused, returned zero deliveries or found no recipient.
