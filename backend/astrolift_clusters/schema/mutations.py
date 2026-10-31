@@ -31,6 +31,7 @@ from astrolift_clusters.models import (
     ProviderPlugin,
     ProviderPluginConfig,
     TenantCluster,
+    effective_default_ids,
     managed_domain_for_zone,
 )
 from astrolift_clusters.schema.types import (
@@ -43,6 +44,7 @@ from astrolift_clusters.scopes import cluster_catalog_org_scope, cluster_org_sco
 from astrolift_graphql import GUID, MutationErrorType, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_graphql.errors import MutationErrorDependentsType, MutationErrorDependentType
 from astrolift_identity.models import Organization
 from astrolift_operations import observability_profile
 from astrolift_workflows.client import signal_workflow, start_workflow
@@ -416,6 +418,9 @@ class UpdateManagedDomainInput:
 @strawberry.input
 class SoftDeleteManagedDomainInput:
     id: GUID
+    # A zone new apps resolve through is refused without it (#2572): deleting
+    # it leaves every later registration without that hostname.
+    force: bool = False
 
 
 @strawberry.input
@@ -1798,7 +1803,38 @@ class ClustersMutation:
                 "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
                 "Manage the original domain route before changing its native resources.",
             )
-        domain.soft_delete()
+        from astrolift_clusters.managed_domain_bindings import default_zone_refusal, dependent_environments
+        from astrolift_clusters.managed_domain_defaults import lock_default_scope
+
+        with transaction.atomic():
+            domain = next(
+                (row for row in lock_default_scope(domain.organization_id) if row.pk == domain.pk), None
+            )
+            if domain is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+            # Losing the zone new apps resolve through broke every later
+            # registration with no error anywhere (#2572); existing apps
+            # kept serving, so nothing pointed back at the delete.
+            if not input.force and domain.pk in effective_default_ids([domain]):
+                total, environments = dependent_environments(domain, _caller(info))
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    default_zone_refusal(domain, total, environments),
+                    field="force",
+                    dependents=MutationErrorDependentsType(
+                        total=total,
+                        items=[
+                            MutationErrorDependentType(
+                                organization_slug=environment.registered_app.organization.slug,
+                                app_slug=environment.registered_app.slug,
+                                environment_name=environment.name,
+                                url=environment.url,
+                            )
+                            for environment in environments
+                        ],
+                    ),
+                )
+            domain.soft_delete()
 
         # The cloud resources must die with the row: a delete that only
         # soft-deletes leaves the hosted zone billing monthly and the

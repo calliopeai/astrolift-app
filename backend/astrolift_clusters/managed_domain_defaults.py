@@ -103,6 +103,22 @@ def default_refusal(domain, organization, roles=frozenset({"tenant_apps", "previ
     return ""
 
 
+def lock_default_scope(organization_id):
+    """Take the locks ``update_domain`` holds while it changes a scope's default
+    roles, in its order, and return the scope's live rows (#2572). Removing a
+    zone checks whether it is an effective default under them, so a default
+    change cannot land between that check and the delete. Call inside a
+    transaction."""
+    if organization_id is None:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(%s)", [_SHARED_DEFAULT_LOCK])
+    return list(
+        ManagedDomain.objects.select_for_update()
+        .filter(organization_id=organization_id, deleted_at__isnull=True)
+        .order_by("pk")
+    )
+
+
 def _credential_pin(token):
     if token is None:
         return None
