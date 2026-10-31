@@ -258,7 +258,8 @@ def _fail(plan: _Plan, reason: str) -> None:
     deployment.transition_to(deployment.Status.FAILED)
 
 
-def _start(app, plan: _Plan, actor, organization_id: int | None) -> None:
+def _start(app, plan: _Plan, actor, organization_id: int | None) -> bool:
+    """Start the run for ``plan``'s row; False when the engine did not answer."""
     from astrolift_identity.api_tokens import get_current_api_token
     from astrolift_lifecycle.schema.mutations.helpers import _deploy_workflow_id, _record_workflow_run
     from astrolift_workflows.inputs import ReprovisionInput
@@ -283,14 +284,14 @@ def _start(app, plan: _Plan, actor, organization_id: int | None) -> None:
         )
     except WorkflowAlreadyRunning:
         _fail(plan, "a deployment started first")
-        return
+        return True
     except Exception as exc:  # noqa: BLE001 - recorded on the row and returned, never raised
         log.warning("reprovision: could not start for %s/%s", app.slug, plan.env.name, exc_info=True)
         _fail(plan, f"could not start the reprovision: {exc}")
-        return
+        return False
     if not handle.enqueued:
         _fail(plan, "the workflow engine is off on this install")
-        return
+        return False
     plan.handle = handle
     run = _record_workflow_run(
         kind="ReprovisionAppWorkflow",
@@ -319,6 +320,7 @@ def _start(app, plan: _Plan, actor, organization_id: int | None) -> None:
         organization_id=organization_id,
         registered_app_id=app.pk,
     )
+    return True
 
 
 def _collect(plans: list[_Plan]) -> set[int]:
@@ -361,9 +363,16 @@ def reprovision(
         for plan in plans:
             _bind(plan)
         _claims(app, plans)
+    engine_error = ""
     for plan in plans:
-        if plan.running is not None and _record(plan, actor):
-            _start(app, plan, actor, organization_id)
+        if plan.running is None:
+            continue
+        if engine_error:
+            # Each start that the engine leaves unanswered costs its timeout,
+            # and the caller's deadline (30 s for the CLI) covers all of them.
+            plan.error = engine_error
+        elif _record(plan, actor) and not _start(app, plan, actor, organization_id):
+            engine_error = plan.error
     still_running = _collect(plans)
 
     verdicts = environment_verdicts([p.env for p in plans], reader=ClusterReader())

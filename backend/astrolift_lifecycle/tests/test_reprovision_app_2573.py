@@ -717,6 +717,49 @@ def test_a_run_that_cannot_start_fails_its_row_and_says_why(permission_resolver,
 
 
 @pytest.mark.django_db
+def test_an_engine_that_does_not_answer_is_asked_once_not_once_per_environment(
+    permission_resolver, no_server, monkeypatch
+):
+    world = _world("silent", zone=True)
+    staging = AppEnvironment.objects.create(
+        registered_app=world.app,
+        tenant_cluster=world.cluster,
+        name="staging",
+        managed_domain=world.env.managed_domain,
+    )
+    Deployment.objects.create(
+        registered_app=world.app,
+        app_environment=staging,
+        trigger_kind=Deployment.TriggerKind.MANUAL.value,
+        status=Deployment.Status.RUNNING.value,
+        image_tag="v1",
+        image_digest=DIGEST,
+        config_snapshot={"manifest_hash": world.app.manifest_hash, "image_tag": "v1"},
+    )
+    permission_resolver.grant(Permission.APP_DEPLOY)
+    asked: list[str] = []
+
+    def unanswered(name, args, *, workflow_id, task_queue=None):
+        asked.append(workflow_id)
+        raise TimeoutError("the engine did not answer")
+
+    monkeypatch.setattr("astrolift_lifecycle.reprovision.start_workflow_exclusive", unanswered)
+
+    result = _reprovision(world)
+
+    assert not result.ok
+    assert asked == [f"DeployAppWorkflow-{world.app.guid}-{world.env.guid}"]
+    assert [e.message for e in result.errors] == [
+        "environment 'production': could not start the reprovision: the engine did not answer",
+        "environment 'staging': could not start the reprovision: the engine did not answer",
+    ]
+    rows = Deployment.objects.filter(trigger_kind="reprovision").values_list(
+        "app_environment__name", "status"
+    )
+    assert list(rows) == [("production", "failed")]
+
+
+@pytest.mark.django_db
 def test_reprovision_and_force_redeploy_are_distinct_audit_actions(
     permission_resolver, no_server, audit_log, monkeypatch
 ):
