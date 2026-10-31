@@ -14796,7 +14796,12 @@
       "noChoices": "일치하는 미등록 클러스터가 없습니다.",
       "register": "등록",
       "unregisterTitle": "{cluster}의 Zentinelle 등록을 해제할까요?",
-      "unregisterBody": "Zentinelle에서 클러스터를 철회한 뒤 게이트웨이와 자격 증명 시크릿을 제거합니다. 이 클러스터의 에이전트 트래픽은 더 이상 Zentinelle을 거치지 않습니다."
+      "unregisterBody": "Zentinelle에서 클러스터를 철회한 뒤 게이트웨이와 자격 증명 시크릿을 제거합니다. 이 클러스터의 에이전트 트래픽은 더 이상 Zentinelle을 거치지 않습니다.",
+      "sharedTitle": "공유 클러스터",
+      "sharedDescription": "어떤 조직에도 속하지 않습니다. 플랫폼 운영자가 관리하는 설치의 Zentinelle 연결을 통해 등록되며, 설치 프로그램이 자신이 만든 클러스터를 등록합니다.",
+      "sharedNotConnected": "설치가 Zentinelle에 연결되어 있지 않습니다. 설치 프로그램에서 Zentinelle with Astrolift를 연결하면 연결하고 클러스터를 등록합니다.",
+      "sharedManaged": "플랫폼에서 관리",
+      "sharedEmpty": "공유 클러스터가 없습니다."
     },
     "filters": {
       "window": "기간",

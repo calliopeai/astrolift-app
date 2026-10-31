@@ -14799,7 +14799,12 @@
       "noChoices": "Ningún clúster sin registrar coincide.",
       "register": "Registrar",
       "unregisterTitle": "¿Dar de baja {cluster} en Zentinelle?",
-      "unregisterBody": "Esto revoca el clúster en Zentinelle y después retira su pasarela y el secreto de su credencial. El tráfico de agentes en él deja de pasar por Zentinelle."
+      "unregisterBody": "Esto revoca el clúster en Zentinelle y después retira su pasarela y el secreto de su credencial. El tráfico de agentes en él deja de pasar por Zentinelle.",
+      "sharedTitle": "Clústeres compartidos",
+      "sharedDescription": "No pertenecen a ninguna organización. Se registran a través de la conexión de Zentinelle de la instalación, que gestiona el operador de la plataforma; el instalador registra los clústeres que crea.",
+      "sharedNotConnected": "La instalación no está conectada a Zentinelle. Conecta Zentinelle con Astrolift desde el instalador para conectarla y registrar sus clústeres.",
+      "sharedManaged": "Gestionado por la plataforma",
+      "sharedEmpty": "No hay clústeres compartidos."
     },
     "filters": {
       "window": "Periodo",

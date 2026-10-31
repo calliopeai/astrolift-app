@@ -60,6 +60,17 @@ export const ZENTINELLE_CONNECTION = gql`
   ${ZENTINELLE_CONNECTION_FIELDS}
 `;
 
+/** The install connection shared clusters register through (#1905). Platform
+ * operator only: anyone else gets an error, which is how the screen tells. */
+export const ZENTINELLE_INSTALL_CONNECTION = gql`
+  query ZentinelleInstallConnection {
+    astroliftZentinelleInstallConnection {
+      ...ZentinelleConnectionFields
+    }
+  }
+  ${ZENTINELLE_CONNECTION_FIELDS}
+`;
+
 /** The health card's counts from Zentinelle (zentinelle.status_view, #2436). */
 export const ZENTINELLE_HEALTH = gql`
   query ZentinelleHealth {
@@ -166,6 +177,7 @@ export const ZENTINELLE_CLUSTER_CHOICES = gql`
         id
         slug
         name
+        organizationSlug
       }
     }
   }

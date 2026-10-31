@@ -21694,6 +21694,20 @@ export type ExportZentinelleAuditMutationVariables = Exact<{
 
 export type ExportZentinelleAuditMutation = { exportZentinelleAudit: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { filename: string, content: string, contentType: string, rowCount: number } | null } };
 
+export type RegisterZentinelleSharedClusterMutationVariables = Exact<{
+  input: ZentinelleClusterInput;
+}>;
+
+
+export type RegisterZentinelleSharedClusterMutation = { registerZentinelleSharedCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
+
+export type UnregisterZentinelleSharedClusterMutationVariables = Exact<{
+  input: ZentinelleClusterInput;
+}>;
+
+
+export type UnregisterZentinelleSharedClusterMutation = { unregisterZentinelleSharedCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
+
 export type ZentinelleClusterFieldsFragment = { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null };
 
 export type ZentinelleConnectionFieldsFragment = { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> };
@@ -21707,6 +21721,11 @@ export type ZentinelleConnectionQueryVariables = Exact<{ [key: string]: never; }
 
 
 export type ZentinelleConnectionQuery = { astroliftZentinelleConnection?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } | null };
+
+export type ZentinelleInstallConnectionQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ZentinelleInstallConnectionQuery = { astroliftZentinelleInstallConnection?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } | null };
 
 export type ZentinelleHealthQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -21753,4 +21772,4 @@ export type ZentinelleClusterChoicesQueryVariables = Exact<{
 }>;
 
 
-export type ZentinelleClusterChoicesQuery = { astroliftClustersPage: { items: Array<{ id: string, slug: string, name: string }> } };
+export type ZentinelleClusterChoicesQuery = { astroliftClustersPage: { items: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null }> } };

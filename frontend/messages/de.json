@@ -14799,7 +14799,12 @@
       "noChoices": "Keine nicht registrierten Cluster gefunden.",
       "register": "Registrieren",
       "unregisterTitle": "{cluster} bei Zentinelle abmelden?",
-      "unregisterBody": "Damit wird der Cluster in Zentinelle widerrufen und anschließend sein Gateway und das Geheimnis mit den Zugangsdaten entfernt. Agent-Verkehr dort läuft nicht mehr über Zentinelle."
+      "unregisterBody": "Damit wird der Cluster in Zentinelle widerrufen und anschließend sein Gateway und das Geheimnis mit den Zugangsdaten entfernt. Agent-Verkehr dort läuft nicht mehr über Zentinelle.",
+      "sharedTitle": "Gemeinsame Cluster",
+      "sharedDescription": "Sie gehören keiner Organisation. Sie werden über die Zentinelle-Verbindung der Installation registriert, die der Plattformbetreiber verwaltet; der Installer registriert die Cluster, die er anlegt.",
+      "sharedNotConnected": "Die Installation ist nicht mit Zentinelle verbunden. Verbinden Sie Zentinelle mit Astrolift im Installer, um sie zu verbinden und ihre Cluster zu registrieren.",
+      "sharedManaged": "Von der Plattform verwaltet",
+      "sharedEmpty": "Keine gemeinsamen Cluster."
     },
     "filters": {
       "window": "Zeitraum",

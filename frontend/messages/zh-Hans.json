@@ -14796,7 +14796,12 @@
       "noChoices": "没有匹配的未注册集群。",
       "register": "注册",
       "unregisterTitle": "从 Zentinelle 取消注册 {cluster}?",
-      "unregisterBody": "这会在 Zentinelle 中吊销该集群,然后移除其网关和凭据密钥。该集群上的智能体流量将不再经过 Zentinelle。"
+      "unregisterBody": "这会在 Zentinelle 中吊销该集群,然后移除其网关和凭据密钥。该集群上的智能体流量将不再经过 Zentinelle。",
+      "sharedTitle": "共享集群",
+      "sharedDescription": "它们不属于任何组织，通过安装的 Zentinelle 连接注册，该连接由平台运维者管理；安装程序会注册它创建的集群。",
+      "sharedNotConnected": "此安装尚未连接到 Zentinelle。在安装程序中连接 Zentinelle with Astrolift，即可连接并注册其集群。",
+      "sharedManaged": "由平台管理",
+      "sharedEmpty": "没有共享集群。"
     },
     "filters": {
       "window": "时间范围",

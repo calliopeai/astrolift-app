@@ -14796,7 +14796,12 @@
       "noChoices": "一致する未登録のクラスターはありません。",
       "register": "登録",
       "unregisterTitle": "{cluster} を Zentinelle から登録解除しますか?",
-      "unregisterBody": "Zentinelle でクラスターを失効させ、その後ゲートウェイと認証情報のシークレットを削除します。このクラスター上のエージェントの通信は Zentinelle を経由しなくなります。"
+      "unregisterBody": "Zentinelle でクラスターを失効させ、その後ゲートウェイと認証情報のシークレットを削除します。このクラスター上のエージェントの通信は Zentinelle を経由しなくなります。",
+      "sharedTitle": "共有クラスター",
+      "sharedDescription": "どの組織にも属しません。プラットフォーム運用者が管理するインストールの Zentinelle 接続を通じて登録されます。インストーラーは作成したクラスターを登録します。",
+      "sharedNotConnected": "インストールは Zentinelle に接続されていません。インストーラーで Zentinelle with Astrolift を接続すると、接続してクラスターを登録します。",
+      "sharedManaged": "プラットフォームが管理",
+      "sharedEmpty": "共有クラスターはありません。"
     },
     "filters": {
       "window": "期間",
