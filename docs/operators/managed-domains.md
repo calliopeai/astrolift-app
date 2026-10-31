@@ -113,6 +113,63 @@ for `external-dns` (`EXTERNAL_DNS_POLICY_STATEMENTS`,
 `route53:ChangeResourceRecordSets` on hosted zones plus the three list actions;
 it does not create zones.
 
+## Platform default zone deleted: new apps come up with no hostname
+
+The platform-level row (`organization` NULL, `default_for` `both` or
+`tenant_apps`) is what every app in every organization resolves through unless
+the org registered its own zone. Deleting it is accepted without a guard
+(#2572). Nothing visible breaks at that moment: apps that already deployed keep
+their Ingress objects and their `AppEnvironment.url`. Every app registered
+afterwards resolves no zone.
+
+**Signature:** the app reads `Ready` and its deployment reads `Running`, the
+overview URL card shows the bare subdomain with no zone, the host answers the
+ingress controller's generic `404 Not Found` (an invented hostname under the
+same zone answers the identical page), and the namespace holds a Deployment,
+Service and pod but no Ingress, Certificate or `HostnameClaim`. Confirm the
+cause from the backend container:
+
+```bash
+python manage.py shell -c "
+from astrolift_clusters.models import ManagedDomain
+for m in ManagedDomain._base_manager.filter(organization__isnull=True):
+    print(m.pk, m.zone, m.default_for, m.deleted_at)
+"
+```
+
+A platform row with `deleted_at` set is the cause. `astro operator domains list`
+does not show it because the list excludes deleted rows.
+
+**Fix:**
+
+1. Restore the row. `<pk>` is the id the query above printed:
+   ```bash
+   python manage.py shell -c "
+   from astrolift_clusters.models import ManagedDomain
+   ManagedDomain._base_manager.filter(pk=<pk>).update(deleted_at=None, deleted_by=None)
+   "
+   ```
+2. Bind the environments created while it was gone and rewrite their URLs:
+   ```bash
+   python manage.py backfill_managed_domain --dry-run
+   python manage.py backfill_managed_domain
+   ```
+   Each affected row prints as `SET <app>/<env> -> <zone> (url (empty) -> https://...)`.
+3. Deploy each affected app once (Deploy button, `astro app deploy --app <slug>`,
+   or `astro app reprovision --app <slug>` once #2573 ships). The render reads
+   the binding; only a deploy creates the Ingress, Certificate and claim.
+
+**Rollback:** none needed; restoring the row returns the install to the state
+before the deletion. If the deletion was intended, register the replacement
+zone first and move the apps, then delete.
+
+**Verify:**
+
+```bash
+kubectl get ingress,certificate -n <app namespace>
+curl -sI https://<app>.<zone>/ | head -1      # 302 to central auth or the app's own 200
+```
+
 ## Backfills
 
 - `manage.py backfill_managed_zone_ids [--apply]`: writes the verified hosted
