@@ -29,6 +29,7 @@ from astrolift_lifecycle.reachability import (
     ClusterReader,
     environment_url,
     environment_verdicts,
+    record_environment_verdicts,
     usable_domain,
 )
 from astrolift_workflows.client import (
@@ -375,11 +376,17 @@ def reprovision(
             engine_error = plan.error
     still_running = _collect(plans)
 
-    verdicts = environment_verdicts([p.env for p in plans], reader=ClusterReader())
+    busy = {p.env.pk for p in plans if p.joined is not None} | still_running
+    # A run still going records its verdict when it ends. The rest record it
+    # now, so a run that never started does not leave "Reprovision started."
+    # standing.
+    verdicts = {
+        **environment_verdicts([p.env for p in plans if p.env.pk in busy], reader=ClusterReader()),
+        **record_environment_verdicts([p.env for p in plans if p.env.pk not in busy], read_cluster=True),
+    }
     results = []
     for plan in plans:
         deployment = plan.joined or plan.deployment
-        busy = plan.joined is not None or plan.env.pk in still_running
         results.append(
             EnvironmentResult(
                 environment_name=plan.env.name,
@@ -387,7 +394,7 @@ def reprovision(
                 status=verdicts[plan.env.pk].status,
                 created=plan.created,
                 updated=plan.updated,
-                unchanged=not busy and not plan.created and not plan.updated,
+                unchanged=plan.env.pk not in busy and not plan.created and not plan.updated,
                 error=plan.error,
             )
         )

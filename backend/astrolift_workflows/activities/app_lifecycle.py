@@ -2080,6 +2080,8 @@ def _mark_failed_sync(deployment_id: int, reason: str) -> None:
     except Exception:  # noqa: BLE001
         log.warning("github reflect_deploy_failed errored for deploy %s", deployment_id, exc_info=True)
 
+    _record_reachability([d.app_environment], read_cluster=True)
+
 
 @activity.defn(name="astrolift.deploy.mark_failed")
 async def mark_failed(deployment_id: int, reason: str = "") -> None:

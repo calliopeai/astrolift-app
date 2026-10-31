@@ -24,7 +24,11 @@ from astrolift_lifecycle.reachability import (
     environment_verdicts,
 )
 from astrolift_registry.models import HostnameClaim, RegisteredApp, Workload
-from astrolift_workflows.activities.app_lifecycle import _mark_app_ready_sync, _mark_running_sync
+from astrolift_workflows.activities.app_lifecycle import (
+    _mark_app_ready_sync,
+    _mark_failed_sync,
+    _mark_running_sync,
+)
 from core.app_deploy import namespace_for_environment
 
 pytestmark = pytest.mark.django_db
@@ -367,6 +371,23 @@ def test_deploy_completion_records_a_missing_host_rule(app, env, web, api):
     finishing = deployment(env, status=Deployment.Status.DEPLOYING.value)
 
     _mark_running_sync(finishing.pk)
+
+    env.refresh_from_db()
+    assert env.reachability_status == NEEDS_REPROVISION
+    assert f"No Ingress serves {HOST}" in env.reachability_detail
+
+
+def test_a_failed_run_records_what_it_left_not_what_it_started_with(app, env, web, api):
+    serve(env, zone(), web)
+    deployment(env)
+    AppEnvironment.objects.filter(pk=env.pk).update(
+        reachability_status=PROVISIONING, reachability_detail="Reprovision started."
+    )
+    failing = deployment(
+        env, status=Deployment.Status.DEPLOYING.value, trigger_kind=Deployment.TriggerKind.REPROVISION.value
+    )
+
+    _mark_failed_sync(failing.pk, "rollout timed out")
 
     env.refresh_from_db()
     assert env.reachability_status == NEEDS_REPROVISION

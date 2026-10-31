@@ -696,7 +696,9 @@ def test_a_never_deployed_environment_is_bound_and_claimed_without_a_run(permiss
 
 
 @pytest.mark.django_db
-def test_a_run_that_cannot_start_fails_its_row_and_says_why(permission_resolver, no_server, monkeypatch):
+def test_a_run_that_cannot_start_fails_its_row_and_says_why(
+    permission_resolver, no_server, cluster_api, monkeypatch
+):
     from astrolift_workflows.client import WorkflowAlreadyRunning
 
     world = _world("taken", zone=True)
@@ -714,6 +716,12 @@ def test_a_run_that_cannot_start_fails_its_row_and_says_why(permission_resolver,
     [outcome] = result.data.environments
     row = Deployment.objects.get(guid=outcome.deployment_id)
     assert (row.status, row.aborted_reason) == ("failed", "a deployment started first")
+    # Not the "Reprovision started." it wrote first: what the cluster shows.
+    env = AppEnvironment.objects.get(pk=world.env.pk)
+    assert (env.reachability_status, env.reachability_detail) == (
+        "needs_reprovision",
+        f"No Ingress serves {HOST}.",
+    )
 
 
 @pytest.mark.django_db
