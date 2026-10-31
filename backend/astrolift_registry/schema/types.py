@@ -6,6 +6,7 @@ import dataclasses
 import datetime as dt
 import enum
 from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from _sdk.k8s_naming import app_namespace
@@ -13,7 +14,9 @@ from django.db import models
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
-from astrolift_lifecycle.schema.types import ReachabilityStatus
+
+if TYPE_CHECKING:
+    from astrolift_lifecycle.schema.types import ReachabilityStatus
 
 JSON = strawberry.scalars.JSON
 
@@ -759,7 +762,12 @@ class RegisteredAppType:
             "provisioningStatus says whether registration finished; this says whether the app can be reached."
         )
     )
-    def reachability_status(self) -> ReachabilityStatus:
+    def reachability_status(
+        self,
+    ) -> Annotated[ReachabilityStatus, strawberry.lazy("astrolift_lifecycle.schema.types")]:
+        # Imported here: the lifecycle schema package imports this module.
+        from astrolift_lifecycle.schema.types import ReachabilityStatus
+
         return ReachabilityStatus(self.reachability.app(self.row_pk).status)
 
     @strawberry.field
