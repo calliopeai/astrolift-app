@@ -392,3 +392,44 @@ def test_a_failed_run_records_what_it_left_not_what_it_started_with(app, env, we
     env.refresh_from_db()
     assert env.reachability_status == NEEDS_REPROVISION
     assert f"No Ingress serves {HOST}" in env.reachability_detail
+
+
+def test_an_app_registered_after_its_zone_was_deleted_reads_no_managed_domain_until_bound(
+    app, cluster, web, settings
+):
+    """#2572, criterion 3: the platform zone is deleted, the next app registers
+    with no hostname, and it reads no managed domain rather than Ready, in its
+    own status and in the Apps list. Once the zone is back and the backfill
+    binds it, it reads needs reprovision, which reprovisionApp clears."""
+    from django.utils import timezone
+
+    from astrolift_clusters.managed_domain_bindings import backfill_managed_domain_bindings
+    from astrolift_registry.schema.mutations.helpers import _bootstrap_app_environments
+    from astrolift_registry.schema.queries import _annotate_apps_list
+
+    settings.ASTROLIFT_TEMPORAL_ENABLED = False
+    platform = zone()
+    ManagedDomain.objects.filter(pk=platform.pk).update(deleted_at=timezone.now())
+    RegisteredApp.objects.filter(pk=app.pk).update(
+        provisioning_status="provisioning", default_tenant_cluster=cluster
+    )
+    _bootstrap_app_environments(RegisteredApp.objects.get(pk=app.pk), ["production"])
+    _mark_app_ready_sync(app.pk)
+
+    def app_state():
+        row = RegisteredApp.objects.get(pk=app.pk)
+        listed = _annotate_apps_list(RegisteredApp.objects.filter(pk=app.pk)).values_list(
+            "_list_state", flat=True
+        )
+        return app_verdicts([row])[0][app.pk].status, listed.get()
+
+    [env] = AppEnvironment.objects.filter(registered_app=app)
+    assert (env.managed_domain_id, env.url, env.reachability_status) == (None, "", NO_MANAGED_DOMAIN)
+    assert app_state() == (NO_MANAGED_DOMAIN, "no_managed_domain")
+
+    ManagedDomain.all_objects.get(pk=platform.pk).restore()
+    backfill_managed_domain_bindings()
+
+    env.refresh_from_db()
+    assert (env.managed_domain_id, env.reachability_status) == (platform.pk, NEEDS_REPROVISION)
+    assert app_state() == (NEEDS_REPROVISION, "needs_reprovision")

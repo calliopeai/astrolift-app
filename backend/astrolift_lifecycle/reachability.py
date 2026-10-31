@@ -179,28 +179,6 @@ def usable_domain(domain: Any) -> Any:
     return domain
 
 
-def environment_url(env: Any, domain: Any) -> str:
-    """The URL ``env`` advertises under ``domain``, as registration writes it.
-
-    ``<label>.<zone>``, the label being the app's subdomain (or slug), with
-    the environment's name appended for an environment in a namespace of its
-    own (#1922). A preview keeps the URL its preview row named.
-    """
-    from core.app_deploy import environment_hostname_label
-
-    app = env.registered_app
-    label = (app.subdomain or app.slug or "").strip()
-    if not label or domain is None:
-        return env.url or ""
-    if (env.k8s_namespace or "").strip():
-        from astrolift_lifecycle.models import PreviewEnvironment
-
-        if PreviewEnvironment.all_objects.filter(app_environment=env).exists():
-            return env.url or ""
-        label = environment_hostname_label(label, env.name)
-    return f"https://{label}.{domain.zone}"
-
-
 def expected_hosts(env: Any, workloads: list[Any], domain: Any) -> list[tuple[str, str, bool]]:
     """``(workload_slug, hostname, through_ingress)`` for each public workload of ``env``."""
     from astrolift_manifest.hostname import HostnameInputs, compute_hostnames

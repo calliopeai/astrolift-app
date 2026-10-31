@@ -27,7 +27,6 @@ from django.utils import timezone
 from astrolift_lifecycle.reachability import (
     PROVISIONING,
     ClusterReader,
-    environment_url,
     environment_verdicts,
     record_environment_verdicts,
     usable_domain,
@@ -147,6 +146,7 @@ def _plan(app, env) -> _Plan:
 
 def _bind(plan: _Plan) -> None:
     """Bind a zone registration could not, and write the URL that follows."""
+    from astrolift_clusters.managed_domain_bindings import environment_url
     from astrolift_clusters.models import resolve_managed_domain
     from astrolift_lifecycle.models import PreviewEnvironment
     from astrolift_registry.hostname_claims import hostname_label_refusal

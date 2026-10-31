@@ -335,6 +335,7 @@ async def test_a_registration_without_a_zone_reaches_reachable_after_reprovision
     )
     await sync_to_async(call_command)("backfill_managed_domain")
     assert await sync_to_async(_app_status)(world) is ReachabilityStatus.NEEDS_REPROVISION
+    await sync_to_async(AppEnvironment.objects.get)(pk=world.env.pk, reachability_status="needs_reprovision")
 
     permission_resolver.grant(Permission.APP_DEPLOY)
     _use_temporal(monkeypatch, temporal_env)
