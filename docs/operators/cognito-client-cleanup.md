@@ -3,6 +3,8 @@
 Two one-command operator tools for steps that need a live install and a person's
 own credentials. Nothing here runs in CI.
 
+Preconditions: an AWS SSO profile in the pool's account allowed `cognito-idp:ListUserPoolClients`, `DescribeUserPoolClient`, `DescribeManagedLoginBrandingByClient`, `UpdateUserPoolClient` and `DeleteUserPoolClient` on the pool, with boto3 installed; for the edge sign-out, `cluster.update` and `cluster.manage` in the cluster's organization through `astro auth login --scope clusters`; for the live smoke, Node and Playwright in `frontend/` and your own signed-in session. Placeholders: `<command>` is `show`, `clients`, `trim` or `retire`; `P` and `C` in the table are a pool ID and a client ID (`clients --pool <pool>` lists the clients); `<the console logout URL from step 1>` is the entry in `LogoutURLs` that `show` prints; `<id from cluster.json>` is `astroliftCluster.id`; `<steadymd profile>` is your SteadyMD AWS profile; `<tenant ALB client id>` is the client `clients` lists under that name.
+
 - `backend/scripts/ops/cognito_client.py` inspects and trims Cognito app clients
   (#2055, #1727).
 - `npm run smoke:live` is a read-only browser smoke of a signed-in console
@@ -197,3 +199,13 @@ LIVE_BASE_URL=http://127.0.0.1:6171 LIVE_STORAGE_STATE=/tmp/live-mock-state.json
 
 `LIVE_EXPECT_FIXTURES=1` flips the fixture check for the mocks: it must find
 fixture names there, which proves the detector works.
+
+## Verify
+
+```sh
+tool show --pool <pool> --client <client>
+astro api graphql --org conflict -q 'query { astroliftCluster(slug: "conflict-astrolift") { oidcAuthConfig } }'
+npm run smoke:live
+```
+
+`show` lists only the kept callback and logout URLs; `oidcAuthConfig` carries `logout_url` with every `*_set` flag `true`; the browser sign-out lands on the signed-out page; the smoke's `report.json` has every test passing with an empty `blockedWrites`.

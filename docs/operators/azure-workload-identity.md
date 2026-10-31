@@ -4,6 +4,8 @@ On an AKS cluster, an app that binds a managed service runs as a user-assigned
 managed identity (UAMI) the platform creates for it, one per app per cluster,
 through AKS workload identity (#2279). No cloud key reaches the app.
 
+Preconditions: `app.deploy` on the app for the deploy that creates and federates the identity; `app.delete` on the app for `deleteAppIdentityRole`; `provider_plugin.configure` in the cluster's organization to set the provider config below; the control plane's Azure identity with the roles under "Configuration and permissions"; a kubeconfig for the AKS cluster for the checks below. Placeholders: `<app-id>` and `<app-slug>` are `id` and `slug` from `astroliftAppsPage`.
+
 ## What a deploy does
 
 Before it renders, the deploy's workload identity step:
@@ -70,7 +72,14 @@ Each refusal stops before anything is written:
   The grants show `failed` naming the scope. Correct the service, then deploy.
 
 To remove the app's workload identity, use `deleteAppIdentityRole` or deregister
-the app. Removal reaches the app's identity on every live Azure cluster, including
+the app.
+
+```sh
+astro api graphql --var appId=<app-id> -q 'mutation($appId: GUID!) { deleteAppIdentityRole(input: {appId: $appId}) { ok errors { message } } }'
+astro app deregister <app-slug>
+```
+
+Removal reaches the app's identity on every live Azure cluster, including
 one its environments have since migrated off. It strips the platform's federations
 and role assignments, deletes the UAMI and soft-deletes the record; the next deploy
 creates a new one. A UAMI replaced under the recorded name is left untouched and
@@ -83,3 +92,13 @@ Move or delete them, then remove again. Removal does not revoke a token issued
 before it; that ends when the token expires.
 
 Provider contract: `backend/providers/docs/azure_owned_workload_identity.md`.
+
+## Verify
+
+```sh
+kubectl get pods -A -l azure.workload.identity/use=true -o wide
+kubectl get serviceaccounts -A -o json | jq -r '.items[] | select(.metadata.annotations["azure.workload.identity/client-id"]) | "\(.metadata.namespace) \(.metadata.name) \(.metadata.annotations["azure.workload.identity/client-id"]) \(.metadata.annotations["azure.workload.identity/tenant-id"])"'
+cd backend && pytest astrolift_workflows/tests/test_azure_workload_identity_2279.py providers/tests/azure/test_identity_provisioning_2279.py
+```
+
+After a deploy, the app's pods are listed with the label and their ServiceAccount carries the recorded client and tenant IDs; after removal and before the next deploy, neither appears; both test modules pass.

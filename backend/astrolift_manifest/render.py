@@ -995,10 +995,6 @@ def _render_function(
             "name": w.name,
             "namespace": namespace,
             "labels": labels,
-            "annotations": {
-                "autoscaling.knative.dev/minScale": str(w.min_scale),
-                "autoscaling.knative.dev/maxScale": str(w.max_scale),
-            },
         },
         "spec": {
             "template": {

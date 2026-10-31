@@ -1295,9 +1295,13 @@ export type AstroliftApiTokenScopePreset = {
 
 export type AstroliftAppAccess = {
   appSlug: Scalars['String']['output'];
+  /** The app asked for its platform hostname to answer without the edge login (#2504). */
+  edgePublic: Scalars['Boolean']['output'];
   enforcedOn: Array<Scalars['String']['output']>;
   groups: Array<Scalars['String']['output']>;
   managedByManifest: Scalars['Boolean']['output'];
+  /** What that means on each cluster the app runs on. */
+  publicStates: Array<AstroliftAppPublicState>;
   restricted: Scalars['Boolean']['output'];
   users: Array<Scalars['String']['output']>;
 };
@@ -1689,6 +1693,12 @@ export type AstroliftAppPodEvent = {
   message: Scalars['String']['output'];
   reason: Scalars['String']['output'];
   type: Scalars['String']['output'];
+};
+
+export type AstroliftAppPublicState = {
+  clusterSlug: Scalars['String']['output'];
+  /** public: answers without the edge login. gated: behind it. no_gate: the cluster has no edge login at all. not_envoy: only the Envoy edge honours the switch, so the app stays gated. cluster_disallows: the cluster does not allow public apps. restricted: the app has an access list. */
+  state: Scalars['String']['output'];
 };
 
 export type AstroliftAppReprovisionState = {
@@ -3850,8 +3860,14 @@ export type AstroliftManagedDomain = {
   delegationConnectionId?: Maybe<Scalars['GUID']['output']>;
   delegationWrite: Scalars['JSON']['output'];
   delegationZoneName: Scalars['String']['output'];
+  /** How many environments dependentApps draws from (#2572). */
+  dependentAppCount: Scalars['Int']['output'];
+  /** The first ten app environments bound to this zone (#2572), whose hostnames go with it when it is deleted: your organization's apps you may read, and on a shared zone every organization's for the platform operator. */
+  dependentApps: Array<AstroliftManagedDomainDependent>;
   dnsDriver: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  /** Whether new apps get their hostnames under this zone now (#2572): the zone resolution picks for the organization that owns it, the shared zone every organization without its own falls through to, or an organization's explicit default. Deleting one asks for force. */
+  isEffectiveDefault: Scalars['Boolean']['output'];
   isWildcardManaged: Scalars['Boolean']['output'];
   organizationSlug?: Maybe<Scalars['String']['output']>;
   provisionClusterId?: Maybe<Scalars['String']['output']>;
@@ -3864,6 +3880,36 @@ export type AstroliftManagedDomain = {
   verifiedAt?: Maybe<Scalars['DateTime']['output']>;
   version: Scalars['Int']['output'];
   zone: Scalars['String']['output'];
+};
+
+export type AstroliftManagedDomainBinding = {
+  appSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  organizationSlug: Scalars['String']['output'];
+  previousUrl: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type AstroliftManagedDomainBindingBackfill = {
+  bindings: Array<AstroliftManagedDomainBinding>;
+  dryRun: Scalars['Boolean']['output'];
+  found: Scalars['Int']['output'];
+  skipped: Scalars['Int']['output'];
+  updated: Scalars['Int']['output'];
+};
+
+export type AstroliftManagedDomainBindingBackfillMutationResult = {
+  data?: Maybe<AstroliftManagedDomainBindingBackfill>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftManagedDomainDependent = {
+  appSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  organizationSlug: Scalars['String']['output'];
+  url: Scalars['String']['output'];
 };
 
 export type AstroliftManagedDomainMutationResult = {
@@ -4489,6 +4535,7 @@ export type AstroliftOrganization = {
   scimEnabled: Scalars['Boolean']['output'];
   slug: Scalars['String']['output'];
   traceRetentionDaysDefault: Scalars['Int']['output'];
+  trustedDomainSignup: Scalars['Boolean']['output'];
   updatedAt: Scalars['DateTime']['output'];
   website: Scalars['String']['output'];
 };
@@ -6295,6 +6342,8 @@ export type AstroliftTemporaryAppPolicyMutationResult = {
 export type AstroliftTenantCluster = {
   agentProvisioned: Scalars['Boolean']['output'];
   albAuthConfig?: Maybe<Scalars['JSON']['output']>;
+  /** Whether an app on this cluster may answer without the edge login when it asks to (#2504). Off: every app is gated whatever its own setting. Only the Envoy edge honours an app's request. */
+  allowPublicApps: Scalars['Boolean']['output'];
   authMethod: Scalars['String']['output'];
   bootstrapRuns: Array<AstroliftClusterBootstrapRun>;
   capabilities: Scalars['JSON']['output'];
@@ -7032,6 +7081,10 @@ export type AvailableTransition = {
   fromState: Scalars['String']['output'];
   label: Scalars['String']['output'];
   toState: Scalars['String']['output'];
+};
+
+export type BackfillManagedDomainBindingsInput = {
+  dryRun: Scalars['Boolean']['input'];
 };
 
 export type BedrockModelConnectionAction = {
@@ -9604,6 +9657,7 @@ export type Mutation = {
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
+  backfillManagedDomainBindings: AstroliftManagedDomainBindingBackfillMutationResult;
   beginCloudflareDnsOAuth: CloudflareDnsOAuthStartMutationResult;
   beginLocalModelArtifact: LocalModelArtifactMutationResult;
   bindManagedDomainDelegation: DnsProviderConnectionTypeMutationResult;
@@ -9940,6 +9994,8 @@ export type Mutation = {
   setAgentTaskCallbackSecret: AgentTaskCallbackSecretMutationResult;
   setAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   setAppAccess: AstroliftAppAccessMutationResult;
+  /** Let the app's platform hostname answer without the edge login, or put it back behind it (#2504). Needs app.access. Making it public also needs the organization's rules for app.edge.make_public (a fresh verification by default), is refused for agents unless the organization allows them, and takes effect only on an Envoy edge whose cluster allows public apps. The app's own authentication still applies, and custom domains keep their own setting. The live routes move at once; audited as app.edge.public.set. */
+  setAppEdgePublic: AstroliftAppAccessMutationResult;
   /** Set, extend, shorten or clear a temporary app's expiry (#2433). The timer moves at once and the 24 h and 1 h warnings are sent again for the new time. Audited as app.expiry.set, app.expiry.extend or app.expiry.clear. */
   setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
@@ -10268,6 +10324,11 @@ export type MutationAttestSessionArgs = {
 
 export type MutationAuthorizeLocalModelUploadsArgs = {
   input: LocalModelArtifactIdentityInput;
+};
+
+
+export type MutationBackfillManagedDomainBindingsArgs = {
+  input: BackfillManagedDomainBindingsInput;
 };
 
 
@@ -11831,6 +11892,11 @@ export type MutationSetAppAccessArgs = {
 };
 
 
+export type MutationSetAppEdgePublicArgs = {
+  input: SetAppEdgePublicInput;
+};
+
+
 export type MutationSetAppExpiryArgs = {
   input: SetAppExpiryInput;
 };
@@ -12493,11 +12559,24 @@ export type MutationError = {
   approvalRequestId?: Maybe<Scalars['String']['output']>;
   code: Scalars['String']['output'];
   currentVersion?: Maybe<Scalars['Int']['output']>;
+  dependents?: Maybe<MutationErrorDependents>;
   field?: Maybe<Scalars['String']['output']>;
   message: Scalars['String']['output'];
   requestedVersion?: Maybe<Scalars['Int']['output']>;
   requiresAttestation?: Maybe<Scalars['Boolean']['output']>;
   supportedMethods?: Maybe<Array<Scalars['String']['output']>>;
+};
+
+export type MutationErrorDependent = {
+  appSlug: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  organizationSlug: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+};
+
+export type MutationErrorDependents = {
+  items: Array<MutationErrorDependent>;
+  total: Scalars['Int']['output'];
 };
 
 /** Standard mutation result with ok flag and validation errors. */
@@ -16537,6 +16616,11 @@ export type SetAppAccessInput = {
   users: Array<Scalars['String']['input']>;
 };
 
+export type SetAppEdgePublicInput = {
+  appSlug: Scalars['String']['input'];
+  public: Scalars['Boolean']['input'];
+};
+
 export type SetAppExpiryInput = {
   appSlug: Scalars['String']['input'];
   /** Make the app permanent. Needs app.update, the organization's rules for app.expiry.clear (a fresh verification by default), and is refused where the organization requires temporary apps. Agents are refused unless the organization allows them. */
@@ -16733,6 +16817,7 @@ export type SoftDeleteByGuidInput = {
 };
 
 export type SoftDeleteManagedDomainInput = {
+  force: Scalars['Boolean']['input'];
   id: Scalars['GUID']['input'];
 };
 
@@ -17199,6 +17284,7 @@ export type UpdateOrganizationInput = {
   name: InputMaybe<Scalars['String']['input']>;
   restrictedSettingsDefault: InputMaybe<Scalars['String']['input']>;
   traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
+  trustedDomainSignup: InputMaybe<Scalars['Boolean']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -17280,6 +17366,7 @@ export type UpdateTeamInput = {
 
 export type UpdateTenantClusterInput = {
   albAuthConfig: InputMaybe<Scalars['JSON']['input']>;
+  allowPublicApps: InputMaybe<Scalars['Boolean']['input']>;
   endpoint: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
   ingressClass: InputMaybe<Scalars['String']['input']>;
@@ -18353,7 +18440,7 @@ export type SoftDeleteManagedDomainMutationVariables = Exact<{
 }>;
 
 
-export type SoftDeleteManagedDomainMutation = { softDeleteManagedDomain: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, deleted: boolean } | null } };
+export type SoftDeleteManagedDomainMutation = { softDeleteManagedDomain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, dependents?: { total: number, items: Array<{ organizationSlug: string, appSlug: string, environmentName: string, url: string }> } | null }>, data?: { id: string, deleted: boolean } | null } };
 
 export type RevalidateManagedDomainMutationVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
@@ -18393,14 +18480,14 @@ export type GetClusterQueryVariables = Exact<{
 }>;
 
 
-export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, viewerPermissions: Array<string>, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, workloadIdentityRebind?: { state: string, issuer: string, previousIssuers: Array<string>, appsTotal: number, appsReconciled: number, error: string, requestedAt: string, startedAt?: string | null, finishedAt?: string | null, failures: Array<{ app: string, role: string, error: string }> } | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
+export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, allowPublicApps: boolean, viewerPermissions: Array<string>, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, workloadIdentityRebind?: { state: string, issuer: string, previousIssuers: Array<string>, appsTotal: number, appsReconciled: number, error: string, requestedAt: string, startedAt?: string | null, finishedAt?: string | null, failures: Array<{ app: string, role: string, error: string }> } | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
 
 export type UpdateTenantClusterMutationVariables = Exact<{
   input: UpdateTenantClusterInput;
 }>;
 
 
-export type UpdateTenantClusterMutation = { updateTenantCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, ingressClass: string, albAuthConfig?: unknown | null, oidcAuthConfig?: unknown | null } | null } };
+export type UpdateTenantClusterMutation = { updateTenantCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, ingressClass: string, albAuthConfig?: unknown | null, oidcAuthConfig?: unknown | null, allowPublicApps: boolean } | null } };
 
 export type ReconcileClusterIngressesMutationVariables = Exact<{
   input: ReconcileClusterIngressesInput;
@@ -18448,7 +18535,7 @@ export type RefreshClusterManagementMutation = { refreshClusterManagement: { ok:
 export type ListManagedDomainsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionFailedStep: string, provisionFailureReason: string, provisionNameservers: unknown, provisionValidationRecords: unknown, delegationCheck: unknown, provisionClusterId?: string | null }> };
+export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionFailedStep: string, provisionFailureReason: string, provisionNameservers: unknown, provisionValidationRecords: unknown, delegationCheck: unknown, provisionClusterId?: string | null, isEffectiveDefault: boolean }> };
 
 export type ClusterHealthQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
@@ -18662,6 +18749,27 @@ export type GetProviderPluginReferenceQueryVariables = Exact<{
 
 export type GetProviderPluginReferenceQuery = { astroliftProviderPlugin?: { id: string, slug: string, name: string, version: string, capabilitiesManifest: unknown, isEnabled: boolean } | null };
 
+export type ReviewClusterAgentInstallQueryVariables = Exact<{
+  clusterId: Scalars['GUID']['input'];
+}>;
+
+
+export type ReviewClusterAgentInstallQuery = { astroliftClusterAgentInstallReview: { clusterId: string, version: number, source: string } };
+
+export type InstallClusterAgentMutationVariables = Exact<{
+  input: InstallClusterAgentInput;
+}>;
+
+
+export type InstallClusterAgentMutation = { installClusterAgent: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, clusterId: string, requestId: string, status: ClusterAgentInstallStatus, secretConfirmed: boolean, deploymentConfirmed: boolean, heartbeatConfirmed: boolean, retryable: boolean, errorCode: string, errorMessage: string } | null } };
+
+export type GetClusterAgentInstallQueryVariables = Exact<{
+  installId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetClusterAgentInstallQuery = { astroliftClusterAgentInstall: { id: string, clusterId: string, requestId: string, status: ClusterAgentInstallStatus, secretConfirmed: boolean, deploymentConfirmed: boolean, heartbeatConfirmed: boolean, retryable: boolean, errorCode: string, errorMessage: string } };
+
 export type DomainAppRouteSupportQueryVariables = Exact<{
   domainId: Scalars['GUID']['input'];
   expectedDomainVersion: Scalars['Int']['input'];
@@ -18721,7 +18829,7 @@ export type ManagedDomainQueryVariables = Exact<{
 }>;
 
 
-export type ManagedDomainQuery = { astroliftManagedDomain?: { id: string, version: number, zone: string, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, organizationSlug?: string | null, createdAt: string, provisionState: string, provisionFailedStep: string, provisionFailureReason: string, provisionNameservers: unknown, provisionValidationRecords: unknown, provisionClusterId?: string | null, verificationState: string, verifiedAt?: string | null, challengeRecordName: string, challengeRecordValue: string, delegationCheck: unknown, delegationConnectionId?: string | null, delegationZoneName: string, delegationWrite: unknown } | null };
+export type ManagedDomainQuery = { astroliftManagedDomain?: { id: string, version: number, zone: string, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, organizationSlug?: string | null, createdAt: string, provisionState: string, provisionFailedStep: string, provisionFailureReason: string, provisionNameservers: unknown, provisionValidationRecords: unknown, provisionClusterId?: string | null, verificationState: string, verifiedAt?: string | null, challengeRecordName: string, challengeRecordValue: string, delegationCheck: unknown, delegationConnectionId?: string | null, delegationZoneName: string, delegationWrite: unknown, isEffectiveDefault: boolean, dependentAppCount: number, dependentApps: Array<{ organizationSlug: string, appSlug: string, environmentName: string, url: string }> } | null };
 
 export type ManagedDomainActionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -18875,7 +18983,7 @@ export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string,
 export type ListOrganizationsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
+export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, trustedDomainSignup: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
 
 export type ListTeamsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -18940,7 +19048,7 @@ export type GetOrganizationQueryVariables = Exact<{
 }>;
 
 
-export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
+export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, trustedDomainSignup: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
 
 export type GetOnboardingStateQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -20945,7 +21053,7 @@ export type GetAppAccessQueryVariables = Exact<{
 }>;
 
 
-export type GetAppAccessQuery = { astroliftAppAccess?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string> } | null };
+export type GetAppAccessQuery = { astroliftAppAccess?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string>, edgePublic: boolean, publicStates: Array<{ clusterSlug: string, state: string }> } | null };
 
 export type PreviewAppAccessQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -20961,7 +21069,14 @@ export type SetAppAccessMutationVariables = Exact<{
 }>;
 
 
-export type SetAppAccessMutation = { setAppAccess: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string> } | null } };
+export type SetAppAccessMutation = { setAppAccess: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string>, edgePublic: boolean, publicStates: Array<{ clusterSlug: string, state: string }> } | null } };
+
+export type SetAppEdgePublicMutationVariables = Exact<{
+  input: SetAppEdgePublicInput;
+}>;
+
+
+export type SetAppEdgePublicMutation = { setAppEdgePublic: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { appSlug: string, edgePublic: boolean, publicStates: Array<{ clusterSlug: string, state: string }> } | null } };
 
 export type EdgeAccessRowFieldsFragment = { id: string, appSlug: string, appName: string, teamSlug?: string | null, projectSlug?: string | null, environment: string, environmentId: string, clusterSlug: string, clusterName: string, hosts: Array<string>, restricted: boolean, groups: Array<string>, users: Array<string>, source: string, setBy?: string | null, setAt?: string | null, status: AstroliftEdgeAccessStatus, edgeChangedAt?: string | null, edgeAppliedAt?: string | null };
 
@@ -21690,6 +21805,20 @@ export type ExportZentinelleAuditMutationVariables = Exact<{
 
 export type ExportZentinelleAuditMutation = { exportZentinelleAudit: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { filename: string, content: string, contentType: string, rowCount: number } | null } };
 
+export type RegisterZentinelleSharedClusterMutationVariables = Exact<{
+  input: ZentinelleClusterInput;
+}>;
+
+
+export type RegisterZentinelleSharedClusterMutation = { registerZentinelleSharedCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
+
+export type UnregisterZentinelleSharedClusterMutationVariables = Exact<{
+  input: ZentinelleClusterInput;
+}>;
+
+
+export type UnregisterZentinelleSharedClusterMutation = { unregisterZentinelleSharedCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null } | null } };
+
 export type ZentinelleClusterFieldsFragment = { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null };
 
 export type ZentinelleConnectionFieldsFragment = { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> };
@@ -21703,6 +21832,11 @@ export type ZentinelleConnectionQueryVariables = Exact<{ [key: string]: never; }
 
 
 export type ZentinelleConnectionQuery = { astroliftZentinelleConnection?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } | null };
+
+export type ZentinelleInstallConnectionQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ZentinelleInstallConnectionQuery = { astroliftZentinelleInstallConnection?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, serverVersion?: string | null, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean, gatewayVersion?: string | null, lastSeenAt?: string | null }> } | null };
 
 export type ZentinelleHealthQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -21749,4 +21883,4 @@ export type ZentinelleClusterChoicesQueryVariables = Exact<{
 }>;
 
 
-export type ZentinelleClusterChoicesQuery = { astroliftClustersPage: { items: Array<{ id: string, slug: string, name: string }> } };
+export type ZentinelleClusterChoicesQuery = { astroliftClustersPage: { items: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null }> } };

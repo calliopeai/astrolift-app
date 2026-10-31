@@ -1,3 +1,5 @@
+> Historical (2026-10-30): design and verification journal for the #2215 shared model UI (closed 2026-10-01) and its #2270 follow-ups; the routes it names (/models, /models/deploy, /models/deploy/legacy, /models/endpoints, /models/shared/[id]) are live in frontend/ROUTES.md; superseded by frontend/e2e-routes/shared-models.spec.ts and frontend/components/screens/models/shared-model-management.test.tsx, shared-models-read.test.tsx.
+
 # Shared model UI — #2215
 
 ## Product flow and routes

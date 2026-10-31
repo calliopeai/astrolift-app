@@ -5,6 +5,21 @@ definition GUID reviewed through the workflow catalog. `createWorkflow` accepts
 that `definitionId` directly. To prepare a configuration without activating it,
 explicitly set `isEnabled: false`; legacy callers retain the default of true.
 
+Preconditions: `workflow.create` at the definition's owner to configure,
+`workflow.update` to edit, `workflow.delete` to soft-delete, `workflow.read` to
+inspect a schedule, and `workflow.trigger` whenever the saved configuration is
+an active schedule (create, update or reconcile with `desiredActive: true`);
+the surfaces are GraphQL (the operations below, via `astro api graphql -f
+<file>`), the `astro workflow` commands, MCP at `/api/mcp/v1/` with an
+`alft_at_` token holding `mcp:read` (+ `mcp:write`, `workflow:write`,
+`mcp:dispatch`, `workflow:trigger` as stated below), and a shell in the backend
+container for `resync_workflow_schedules`. Placeholders: `$definition` is the
+definition GUID from `importWorkflowManifest` or `astro workflow definitions`;
+`$bindings` is the stage-order binding object and `<agent UUID>` the workload
+`id` from `astro agent workloads ls`; `$id` and `<configured-workflow-guid>`
+are the `guid` `createWorkflow` returned; `$version` is `configurationVersion`
+and `$active` is `desiredActive`, both from `workflowSchedule`.
+
 ```graphql
 mutation Prepare($definition: GUID!, $bindings: JSON!, $inputs: JSON!) {
   createWorkflow(
@@ -94,6 +109,21 @@ service, invalid cron and timeout after acceptance return explicit error codes.
 Operations have a 20-second engine deadline with bounded RPCs. Errors omit raw
 engine messages and credentials.
 
+- **Signature:** a write answers `ok: false, configurationSaved: true` with a
+  `schedule` observation whose `confirmed` is false and whose `errorCode` /
+  `message` name the engine problem; `workflowSchedule` reports
+  `observedState` `paused`, `drifted` or `unknown`; a stale
+  `expectedVersion` or `expectedActive` is refused with no engine change;
+  `resync_workflow_schedules` exits non-zero while any activation or cleanup
+  remains unconfirmed.
+- **Fix:** re-read `workflowSchedule(workflowId:)`, then
+  `reconcileWorkflowSchedule` (or `astro workflow schedule reconcile`) with the
+  observed `configurationVersion` and `desiredActive`; for `unknown`, restore
+  the Temporal service first; for a stale assertion, re-read and reassess.
+- **Rollback:** reconciliation applies the saved configuration, so undo by
+  saving the previous configuration (`updateWorkflow` with `isEnabled: false`
+  or the previous cron) and reconciling again; a refused write saves nothing.
+
 Updates preserve the existing Temporal schedule and its history. Configuration
 writes and reconciliation serialize on the configured workflow row; observations
 carry their configuration version. Each schedule fire still creates its own run,
@@ -126,7 +156,27 @@ python manage.py resync_workflow_schedules --workflow-id <configured-workflow-gu
 The migration conservatively tracks every existing configuration for possible
 cleanup, including soft-deleted rows. The command fails if any activation or
 cleanup remains unconfirmed. The exact-ID filter permits targeted retries.
-Native Astrolift CLI commands and rollout qualification remain tracked in
+The CLI covers the same surface:
+
+```bash
+astro workflow create --definition-id <definition-guid> --name "<name>" --enabled=false --bind 0=<agent-workload-guid>
+astro workflow schedule inspect <workflow-guid>
+astro workflow schedule reconcile <workflow-guid> --expected-version <configurationVersion> --expected-active=<true|false>
+astro workflow update <workflow-guid> --enabled=<true|false> --trigger schedule --cron "<cron>"
+```
+
+Rollout qualification remains tracked in
 [issue #2308](https://github.com/calliopeai/astrolift-app/issues/2308). MCP
 configuration adapters and reviewed configured starts remain under
 [issue #2283](https://github.com/calliopeai/astrolift-app/issues/2283).
+
+## Verify
+
+```bash
+astro workflow schedule inspect <workflow-guid>
+pytest astrolift_workflows/tests/test_configured_workflow_schedule_2053.py astrolift_workflows/tests/test_schedule_surface.py astrolift_agents/tests/test_workflow_configuration_mcp.py astrolift_agents/tests/test_workflow_schedule_mcp.py
+```
+
+The observation reports `confirmed: true` with `observedState` matching
+`desiredActive` (`active` with a `scheduleId`, or missing for an inactive
+configuration) at the current `configurationVersion`, and the test modules pass.

@@ -313,3 +313,40 @@ def test_empty_runs_on_returns_none():
     result = route("", org)
     assert result.cluster is None
     assert "empty" in result.reason.lower()
+
+
+def test_shared_platform_cluster_is_a_pipeline_target():
+    org = _org("shared-target")
+    shared = _managed_cluster(None, _plugin("shared-provider"), slug="shared")
+    assert select_cluster("astrolift/default", org) == shared
+    assert select_cluster("cluster:shared", org) == shared
+    assert select_cluster("linux", org) == shared
+
+
+def test_owned_cluster_is_preferred_over_older_shared_cluster():
+    org = _org("owned-target")
+    plugin = _plugin("owned-provider")
+    _managed_cluster(None, plugin, slug="older-shared")
+    own = _managed_cluster(org, plugin, slug="owned")
+    assert select_cluster("astrolift/default", org) == own
+    assert select_cluster("linux", org) == own
+
+
+def test_shared_fallback_does_not_allow_other_tenant_cluster():
+    org = _org("isolated-target")
+    other = _org("other-target")
+    plugin = _plugin("isolated-provider")
+    _managed_cluster(other, plugin, slug="other-only")
+    assert select_cluster("astrolift/default", org) is None
+    assert select_cluster("cluster:other-only", org) is None
+    assert select_cluster("linux", org) is None
+
+
+def test_deleted_shared_cluster_is_not_a_pipeline_target():
+    from django.utils import timezone
+
+    org = _org("deleted-target")
+    shared = _managed_cluster(None, _plugin("deleted-provider"), slug="deleted-shared")
+    shared.deleted_at = timezone.now()
+    shared.save(update_fields=["deleted_at"])
+    assert select_cluster("astrolift/default", org) is None

@@ -6,6 +6,21 @@ organization and granted app/project scopes. Cancel and terminate require
 `workflow.trigger` at the target's own scope, or the existing elevated platform
 operator authority. Visible controls do not replace the server permission check.
 
+Preconditions: `audit_log.read` in the active organization to list executions
+and read history; `workflow.trigger` at the execution's own app or project
+scope, or platform operator authority, to cancel or terminate. Surfaces: the
+console at `/platform-activity`, or GraphQL via `astro api graphql`.
+Placeholders: `<workflow-id>` and `<run-id>` are `workflowId` and `runId` of one
+item from `astroliftWorkflowInstances`; `<reason>` is the terminate reason you
+supply.
+
+```graphql
+query { astroliftWorkflowInstances(limit: 50) { items { workflowId runId workflowType status startedAt } nextCursor } }
+query { astroliftWorkflowInstanceDetail(workflowId: "<workflow-id>", runId: "<run-id>") { instance { runId status } history { eventType } } }
+mutation { cancelWorkflowInstance(workflowId: "<workflow-id>", runId: "<run-id>") { ok errors { field messages } } }
+mutation { terminateWorkflowInstance(workflowId: "<workflow-id>", runId: "<run-id>", reason: "<reason>") { ok errors { field messages } } }
+```
+
 Type and Status filter on the server. Older and Newer navigate Temporal's opaque
 cursor pages. An authorization-filtered page can contain no visible rows while
 Older remains available; continue paging rather than interpreting that page as
@@ -32,3 +47,13 @@ the same execution, check current access/status, and then decide whether to retr
 The viewer displays a failure without reproducing the transport error payload.
 History remains bounded to the API's first 200 shaped events; this viewer is not
 a complete-history export.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftWorkflowInstanceDetail(workflowId: "<workflow-id>", runId: "<run-id>") { instance { runId status } } }'
+./run.sh test astrolift_workflows/tests/test_viewer_schema.py astrolift_workflows/tests/test_activity_exact_execution_2252.py
+```
+
+The detail read returns the same `runId`, its `status` reflects the confirmed
+cancel or terminate rather than the state before the action, and the test run passes.

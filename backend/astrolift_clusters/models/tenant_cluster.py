@@ -167,6 +167,9 @@ class TenantCluster(NamedBaseCoreModel):
     # current rules once the second is at or after the first.
     edge_access_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
     edge_access_applied_at = models.DateTimeField(null=True, blank=True, editable=False)
+    # Whether an app on this cluster may opt out of the edge login (#2504).
+    # Off: every app is gated whatever its own ``edge_public`` says.
+    allow_public_apps = models.BooleanField(default=True, db_default=True)
     # An operator-managed ingress-nginx install moving to the Envoy edge
     # (#2117). Until the operator records the cutover complete, recipe runs
     # never delete these HelmReleases, nor any labelled

@@ -1,9 +1,16 @@
 # Private prepared GCP deployment rendering
 
-This renderer is a staged private bridge, not an activated deployment workflow.
-It does not apply resources, establish a controller incarnation, start a rollout,
-or prove workload identity, inference or readiness. Existing deployments with no
+This renderer is the private bridge `DeployAppWorkflow` uses for Endpoint-only
+native apps (see [native Endpoint deployment](gcp-native-configuration-executor.md)).
+On its own it does not apply resources, establish a controller incarnation, start a
+rollout, or prove workload identity, inference or readiness. Existing deployments with no
 prepared input keep their current render behavior on every provider.
+
+Preconditions: a reference page for a private renderer; no operator command,
+permission or console surface. It renders for the GKE cluster in the app's GCP
+project and selects the recorded KSA that the Workload Identity binding on the
+app's GSA was completed for, read from the committed journals; it opens no
+cloud client itself. Placeholders: none.
 
 `prepared_identity_for_deployment` reads actual committed preparation and IAM
 journals under their current joint locks. Preparation must be terminal
@@ -75,7 +82,16 @@ counts remain pending. This renderer does not fabricate a `WorkloadTarget` or
 prove that later count admission.
 
 Controller apply journaling, exact execution/current-source admission, native
-response UID persistence, ancillary effects and runtime acceptance remain
-separate #2278 prerequisites. In particular, a lost create without acknowledged
+response UID persistence and runtime acceptance belong to the
+[guarded app configuration](gcp-guarded-app-apply.md) port; its staged limits
+remain #2278 prerequisites. In particular, a lost create without acknowledged
 and committed original UID evidence stays unknown; matching names or operation
 markers do not establish its incarnation or permit a resend.
+
+## Verify
+
+```sh
+./run.sh test core/tests/test_gcp_prepared_identity_render_2278.py
+```
+
+The suite passes; it renders against recorded fixtures and applies nothing.

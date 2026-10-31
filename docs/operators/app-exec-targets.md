@@ -5,6 +5,8 @@ namespace before opening a connection. Pod and container selection belongs to
 that environment. A change to the selected environment, pod, container or review
 closes the displayed shell; opening again creates a new connection.
 
+Preconditions: `app.exec_pod` on the app, checked at the selected environment and its cluster region; filling in missing selectors also uses the environment's normal read permissions. Surface: Logs & metrics › Console at `/apps/<app-slug>/logs` (`/apps/<app-slug>/shell` redirects there), `astro exec --app <app-slug> --environment <environment-GUID>` or `astro app exec --environment <environment-GUID>`, or `astroliftAppExecTarget` followed by the WebSocket route with the browser cookie or an `alft_` bearer. Placeholders: `<app-slug>` is `slug` from `astroliftAppsPage`; `<environment-GUID>` is `id` from `astroliftEnvironmentsPage(appSlug)`; `<pod-name>` is a pod of that environment from `astroliftAppPods(appSlug, environmentName)`; `<host>` is the console's API host; `<workload GUID>`, `<app GUID>`, `<environment GUID>`, `<cluster GUID>`, `<reviewed namespace>`, `<reviewed pod>` and `<reviewed pod UID>` are the `ReviewExec` result fields, sent back unchanged.
+
 Integrations first query the exact target with current `app.exec_pod` permission:
 
 ```graphql
@@ -103,6 +105,12 @@ web shell omits the generic CLI shortcut palette so primary-only examples cannot
 be mistaken for its selected target. See `astro docs show environment-actions`
 for the consumer contract.
 
+```sh
+astro exec --app <app-slug> --environment <environment-GUID> --workload <workload-slug> --pod <pod-name> -c <container> -- sh
+astro app exec --environment <environment-GUID> <workload-slug> -- sh
+astro docs show environment-actions
+```
+
 The broader native-client execution contract remains incomplete: action-admission
 proofs, mobile-specific audience/token support, durable pre-open audit admission
 and atomic pod binding are not implemented here. Native clients must not infer
@@ -149,3 +157,12 @@ it sends its own `open`. `replay` returns up to the last 1000 `stdout`,
 `stderr` and `exit` frames of the current connection only. It never contains
 input, and a new connection starts with an empty buffer. There is no durable
 session resume or input replay.
+
+## Verify
+
+```sh
+astro exec --app <app-slug> --environment <environment-GUID> --pod <pod-name> --no-tty -- hostname
+cd backend && pytest core/tests/test_exec_environment_contracts_2209.py core/tests/test_exec_legacy_environment_2209.py
+```
+
+The command prints `<pod-name>` from inside the reviewed pod and exits; both test modules pass.

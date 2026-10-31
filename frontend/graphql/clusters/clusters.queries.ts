@@ -66,6 +66,16 @@ export const SOFT_DELETE_MANAGED_DOMAIN = gql`
       errors {
         code
         message
+        field
+        dependents {
+          total
+          items {
+            organizationSlug
+            appSlug
+            environmentName
+            url
+          }
+        }
       }
       data {
         id
@@ -257,6 +267,7 @@ export const GET_CLUSTER = gql`
     astroliftCluster(slug: $slug) {
       ...ClusterFields
       oidcAuthConfig
+      allowPublicApps
       viewerPermissions
       workloadIdentityRebind {
         state
@@ -293,6 +304,7 @@ export const UPDATE_TENANT_CLUSTER = gql`
         ingressClass
         albAuthConfig
         oidcAuthConfig
+        allowPublicApps
       }
     }
   }
@@ -455,6 +467,7 @@ export const LIST_MANAGED_DOMAINS = gql`
       provisionValidationRecords
       delegationCheck
       provisionClusterId
+      isEffectiveDefault
     }
   }
 `;
@@ -1003,6 +1016,58 @@ export const GET_PROVIDER_PLUGIN_REFERENCE = gql`
       version
       capabilitiesManifest
       isEnabled
+    }
+  }
+`;
+
+export const REVIEW_CLUSTER_AGENT_INSTALL = gql`
+  query ReviewClusterAgentInstall($clusterId: GUID!) {
+    astroliftClusterAgentInstallReview(clusterId: $clusterId) {
+      clusterId
+      version
+      source
+    }
+  }
+`;
+
+export const INSTALL_CLUSTER_AGENT = gql`
+  mutation InstallClusterAgent($input: InstallClusterAgentInput!) {
+    installClusterAgent(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        clusterId
+        requestId
+        status
+        secretConfirmed
+        deploymentConfirmed
+        heartbeatConfirmed
+        retryable
+        errorCode
+        errorMessage
+      }
+    }
+  }
+`;
+
+export const GET_CLUSTER_AGENT_INSTALL = gql`
+  query GetClusterAgentInstall($installId: GUID!) {
+    astroliftClusterAgentInstall(installId: $installId) {
+      id
+      clusterId
+      requestId
+      status
+      secretConfirmed
+      deploymentConfirmed
+      heartbeatConfirmed
+      retryable
+      errorCode
+      errorMessage
     }
   }
 `;

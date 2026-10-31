@@ -1,3 +1,5 @@
+> Historical (2026-10-30): root-cause analysis for the CloudFront OAC to Lambda Function URL 403 (#1039, closed 2026-07-26, parked); the shipped public FaaS invoke path is API Gateway HTTP API (#987), and the OAC plumbing is retained unused as allow_cloudfront_invoke in backend/providers/aws/managed/faas_lambda.py.
+
 # #1039 — CloudFront OAC to Lambda Function URL returns 403: root-cause analysis
 
 Status: research / parked. The shipped public-faas invoke path is API Gateway

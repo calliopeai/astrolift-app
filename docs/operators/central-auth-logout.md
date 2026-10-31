@@ -8,6 +8,8 @@ When enabled, that exact path is reserved at the edge. Applications with their
 own logout handler at the same path must move their session-clearing action to
 a different route before redirecting to the platform logout route.
 
+Preconditions: in the cluster's organization, `cluster.update` for `updateTenantCluster` and `cluster.manage` for `reconcileClusterIngresses` (the platform operator and a bearer with `admin` on a shared cluster). Surface: Cluster settings › Central auth at `/clusters/<cluster-slug>/settings`, or `astro api graphql`; the Cognito console or CLI in the pool's AWS account to register the sign-out URL; a cluster on the `nginx` or `ingress-nginx` class running the `oauth2-proxy` recipe. Placeholders: `<cluster-slug>` and `<cluster-id>` are `slug` and `id` from `astroliftClustersPage`; `<auth host>` is `oidcAuthConfig.auth_proxy_host`.
+
 The browser visits:
 
 1. The app's `/auth/logout`, then the central auth host's `/auth/logout`.
@@ -57,6 +59,16 @@ include the logout URL, which must contain only public routing parameters, never
 tokens or secrets. Fixed HTTPS URLs are supported; per-session token templates
 are not.
 
+```sh
+astro api graphql -q 'query { astroliftCluster(slug: "<cluster-slug>") { id oidcAuthConfig } }' > cluster.json
+astro api graphql --vars-file update.json -q \
+  'mutation($input: UpdateTenantClusterInput!) { updateTenantCluster(input: $input) { ok errors { message } data { oidcAuthConfig } } }'
+astro api graphql --var clusterId=<cluster-id> -q \
+  'mutation($clusterId: GUID!) { reconcileClusterIngresses(input: {clusterId: $clusterId}) { ok errors { message } data { reconciledCount skippedCount errors } } }'
+```
+
+`update.json` is `{"input": {"id": "<cluster-id>", "oidcAuthConfig": {...}}}`, built from `cluster.json` without its `*_set` flags and with `logout_url` added.
+
 For startup registration, supply `ASTROLIFT_CLUSTER_OIDC_LOGOUT_URL` alongside
 the existing `ASTROLIFT_CLUSTER_OIDC_*` registration settings. Re-registration
 preserves an operator-set logout URL when that environment variable is absent.
@@ -86,3 +98,11 @@ This flow covers managed subdomains using the central proxy. Custom domains
 with their own proxy, ALB authentication, application-owned sessions, and
 one-time removal of legacy `AWSELBAuthSessionCookie-*` cookies have separate
 logout/migration requirements tracked in #1727.
+
+## Verify
+
+```sh
+astro api graphql -q 'query { astroliftCluster(slug: "<cluster-slug>") { oidcAuthConfig } }'
+```
+
+`oidcAuthConfig` shows `logout_url` with every `*_set` flag still `true`; in a browser, `https://<auth host>/auth/logout` clears the proxy cookies, passes the provider's logout endpoint and lands on `/auth/logged-out`.

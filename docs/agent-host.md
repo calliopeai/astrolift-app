@@ -5,6 +5,23 @@ pinned to VS Code commit `08d4889f9ec4a1685d257b9b95de036c8e1ce1e5`.
 This endpoint attaches to existing tasks and boxes. Registered-agent dispatch
 continues through the ordinary control-plane API.
 
+Preconditions: the organization module `agent_live_attach` on and the admin
+setting `AGENT_LIVE_ATTACH_ALLOWED` not forcing it off; `agent.read` to follow
+a task, `agent_task.send_input` to steer or answer, `agent.dispatch` to cancel
+and `agent_box.attach` for a box terminal (`backend/core/permissions.py`); a
+session cookie or bearer API token, the latter with `X-Astrolift-Organization`;
+the CLI surface is `astro agent session attach`, the console's task page is
+`/agents/runs/<task-id>`; box attach also needs gVisor and a NetworkPolicy CNI
+on the agents' cluster. Placeholders: `<task-id>` is `TASK ID` from
+`astro agent ls`; `<task-uuid>` in `ahp-session:/<task-uuid>` is the same id;
+`<box-id>` is the box's UUID; `<message>` is the steering text.
+
+```sh
+astro agent session attach <task-id>
+astro agent session attach <task-id> --steer "<message>"
+astro agent session attach <box-id> --box --interactive
+```
+
 ## Authentication and permissions
 
 Use the same session cookie or bearer API token as exec. A bearer client sends
@@ -82,5 +99,15 @@ terminal leases, delivery receipts, missing live controls, and structured event
 validation. Run the upstream conformance check with a scratch pinned checkout:
 
 ```sh
-AHP_SOURCE=/path/to/pinned/upstream node scripts/ahp/check-chat-projection.mjs
+AHP_SOURCE=<path-to-pinned-upstream> node scripts/ahp/check-chat-projection.mjs
 ```
+
+## Verify
+
+```sh
+astro agent session attach <task-id> --snapshot
+```
+
+The command must print the task's history and detach; a task whose organization
+has the module off falls back to the durable event watch and reports why, and a
+viewer credential's steer or approval is rejected and audited.

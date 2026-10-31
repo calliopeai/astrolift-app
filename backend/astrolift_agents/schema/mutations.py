@@ -1248,7 +1248,16 @@ class AgentsMutation:
                 f"unknown agent type {input.agent_type!r}",
                 field="agentType",
             )
+        from astrolift_agents.runtime_catalog import RetiredAgentRuntime, assert_runtime_available
         from astrolift_dispatch.agent_secrets import SecretRefNamespaceError, assert_org_scoped_secret_ref
+
+        try:
+            assert_runtime_available(runtime=input.runtime or "", image=input.image_tag or "")
+        except RetiredAgentRuntime as exc:
+            return cast(
+                MutationResultType[AgentEnvironmentSpecType],
+                gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field),
+            )
 
         try:
             secret_refs = normalize_secret_references(input.secret_refs, field="secretRefs")
@@ -1326,6 +1335,19 @@ class AgentsMutation:
         )
         if spec is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "environment spec not found")
+
+        from astrolift_agents.runtime_catalog import RetiredAgentRuntime, assert_runtime_available
+
+        try:
+            assert_runtime_available(
+                runtime=spec.runtime if input.runtime is None else input.runtime,
+                image=spec.image_tag if input.image_tag is None else input.image_tag,
+            )
+        except RetiredAgentRuntime as exc:
+            return cast(
+                MutationResultType[AgentEnvironmentSpecType],
+                gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field),
+            )
 
         if input.agent_type is not None:
             if input.agent_type not in AgentEnvironmentSpec.AgentType.values:

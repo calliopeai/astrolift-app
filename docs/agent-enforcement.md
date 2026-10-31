@@ -7,6 +7,15 @@ team/project and declared agent/spec/tool-preset intent. Prompt and tool-result
 content is not copied to the governance stream. A stable event ID makes retry
 delivery idempotent. This stream is independent of attached AHP clients.
 
+Preconditions: the organization module `agent_policy_enforcement` on and the
+admin setting `AGENT_POLICY_ENFORCEMENT_ALLOWED` not forcing it off; a
+Zentinelle connection enrolled for the install, whose encrypted enrollment
+credential signs deliveries; clearing a quarantine needs `agent.dispatch` at
+the agent's app or team scope, or at the organization scope for an environment
+spec (`backend/core/permissions.py`), through `astro agent quarantine clear` or
+`clearAgentQuarantine`. Placeholders: `<quarantine-id>` is `ID` from
+`astro agent quarantine ls`.
+
 Task reconciliation, accepted runner callbacks and the box reaper poll the
 install-scoped enforcement feed. Each action binds tenant, cluster, minted agent
 identity and saved task/box target. Both the authenticated polling channel and
@@ -45,7 +54,22 @@ audit-mode policy records observation without interruption; audit-mode alerts
 may notify. The normal per-run gateway enrollment and cluster guards still apply.
 
 `agentQuarantines` lists only quarantines the caller can manage.
-`clearAgentQuarantine(id: UUID)` requires `agent.dispatch` at the agent's app/team
+`clearAgentQuarantine(id: ID!)` requires `agent.dispatch` at the agent's app/team
 scope, or org scope for an environment spec. A controller in another team or org
 cannot clear it. Clearing permits future dispatch and does not restart a stopped
 run. The clearing mutation has its own authorization audit.
+
+```sh
+astro agent quarantine ls
+astro agent quarantine clear <quarantine-id> --yes
+```
+
+## Verify
+
+```sh
+astro agent quarantine ls
+```
+
+The cleared `<quarantine-id>` must be absent from the table; the clear command
+itself prints `Quarantine <quarantine-id> cleared.` and a refusal prints
+`quarantine clear refused:` with the server's reason.

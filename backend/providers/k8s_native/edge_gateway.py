@@ -541,7 +541,9 @@ def edge_access_manifests(
     return [edge_security_policy(config, access_rules), *_custom_route_policies(config, access_rules)]
 
 
-def alb_front(oidc_auth_config: dict[str, Any] | None, *, namespace: str) -> list[dict[str, Any]]:
+def alb_front(
+    oidc_auth_config: dict[str, Any] | None, *, namespace: str, cluster_name: str = ""
+) -> list[dict[str, Any]]:
     """An ALB in front of the Gateway's Service, for EKS.
 
     One wildcard host covers every app and the auth host, so the AWS Load
@@ -590,6 +592,13 @@ def alb_front(oidc_auth_config: dict[str, Any] | None, *, namespace: str) -> lis
         "alb.ingress.kubernetes.io/healthcheck-path": "/",
         "alb.ingress.kubernetes.io/success-codes": "200-499",
     }
+    if cluster_name:
+        # Keep the deployment prefix required by the installer's IAM boundary.
+        # ALB names are limited to 32 characters; retain a stable collision suffix.
+        name = f"{cluster_name}-edge"
+        if len(name) > 32:
+            name = f"{name[:23]}-{hashlib.sha256(name.encode()).hexdigest()[:8]}"
+        ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/load-balancer-name"] = name
     if group := (oidc_auth_config or {}).get("custom_domain_alb_group"):
         ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/group.name"] = str(group)
     return [ingress]
@@ -1036,6 +1045,28 @@ def brain_mcp_route(
     return [route, policy]
 
 
+def app_route_gated(
+    *,
+    cluster_gated: bool,
+    allow_public_apps: bool,
+    edge_public: bool,
+    restricted: bool,
+) -> bool:
+    """Whether an app's platform route carries the shared gate (#2504).
+
+    Gated unless every one of these holds: the cluster allows public apps,
+    the app asked to be public and it has no access list (a list only means
+    something behind the login). A public app is public because its own
+    route goes without :data:`GATE_LABEL`; the shared ``edge-oidc`` policy
+    is never loosened for it, so every other app on the edge keeps the
+    login. A brain's ``/mcp`` route keeps its own token policy either way
+    (:func:`brain_mcp_route`).
+    """
+    if not cluster_gated:
+        return False
+    return not (allow_public_apps and edge_public and not restricted)
+
+
 def render_app_routes(
     *,
     app_slug: str,
@@ -1046,14 +1077,17 @@ def render_app_routes(
     gateway_secret: str = "",
     gateway_secret_header: str = "",
     brain: dict[str, str] | None = None,
+    edge_gated: bool | None = None,
 ) -> list[dict[str, Any]]:
     """The HTTPRoutes and ReferenceGrant that put one environment on the edge.
 
     ``workloads`` maps a workload's Service name to its hostnames and port.
     ``brain`` (``brain_audience``, ``brain_issuer``, ``brain_jwks_uri``) marks
-    the app as a brain: a gated environment gets a route of its own for
-    ``/mcp`` that admits a brain read token and nothing else
-    (:func:`brain_mcp_route`).
+    the app as a brain: on an edge with a login (``edge_gated``, by default
+    ``gated``) it gets a route of its own for ``/mcp`` that admits a brain
+    read token and nothing else (:func:`brain_mcp_route`), whether or not
+    the app's own route is public (#2504). The gateway secret goes on that
+    route and on a gated app route, never on a public one.
     Routes live in the edge namespace, where only the platform writes; the
     ReferenceGrant in the app's namespace is what lets them reach its
     Services, and it names each Service rather than the whole namespace.
@@ -1063,11 +1097,15 @@ def render_app_routes(
         ROUTE_NAMESPACE_LABEL: namespace,
         "astrolift.dev/managed-subdomain": "true",
     }
-    header_set: list[dict[str, str]] = []
-    if gated and gateway_secret:
+    secret_set: list[dict[str, str]] = []
+    if gateway_secret:
         # Set, not add: whatever a client sent under this name is replaced,
         # and the listener already dropped the default name before the gate.
-        header_set.append({"name": gateway_secret_header or DEFAULT_GATEWAY_SECRET_HEADER, "value": gateway_secret})
+        secret_set.append({"name": gateway_secret_header or DEFAULT_GATEWAY_SECRET_HEADER, "value": gateway_secret})
+    # A public route reaches the app without crossing any gate, so it carries
+    # no proof that one was crossed.
+    header_set = secret_set if gated else []
+    token_route = bool(brain) and (gated if edge_gated is None else edge_gated)
     out: list[dict[str, Any]] = []
     for workload, (hostnames, port) in sorted(workloads.items()):
         if paused:
@@ -1107,13 +1145,13 @@ def render_app_routes(
                 "backendRefs": [{"name": workload, "namespace": namespace, "port": port}],
                 "filters": [{"type": "RequestHeaderModifier", "requestHeaderModifier": modifier}],
             }
-            if brain and gated:
+            if token_route and brain:
                 out.extend(
                     brain_mcp_route(
                         route_name(namespace, f"{workload}-mcp"),
                         hostnames,
                         backend={"name": workload, "namespace": namespace, "port": port},
-                        header_set=header_set,
+                        header_set=secret_set,
                         brain=brain,
                         labels=labels,
                     )
@@ -1203,6 +1241,7 @@ __all__ = [
     "ROUTE_NAMESPACE_LABEL",
     "alb_front",
     "alb_host_ingress",
+    "app_route_gated",
     "edge_component",
     "edge_configured",
     "edge_oidc_secret_manifest",

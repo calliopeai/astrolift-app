@@ -3113,6 +3113,29 @@
         "saveFailed": "Échec de l’enregistrement.",
         "membersDescription": "Qui peut voir et modifier cette application : les rôles attribués ici et les équipes avec lesquelles elle est partagée.",
         "edgeDescription": "Qui peut accéder à l’URL de l’application. La périphérie décide qui peut entrer ; les rôles décident qui peut la modifier."
+      },
+      "public": {
+        "title": "Accès public",
+        "on": "Publique",
+        "off": "Derrière la connexion",
+        "description": "Publique, l’URL de plateforme de l’app répond sans la connexion du cluster. La connexion propre de l’app s’applique toujours, et les domaines personnalisés gardent leur propre réglage.",
+        "states": {
+          "public": "répond sans connexion",
+          "gated": "derrière la connexion",
+          "no_gate": "ce cluster n’a pas de connexion, l’app est donc ouverte",
+          "not_envoy": "reste derrière la connexion : seul l’edge Envoy respecte ce réglage",
+          "cluster_disallows": "reste derrière la connexion : ce cluster n’autorise pas les apps publiques",
+          "restricted": "reste derrière la connexion : l’app a une liste d’accès"
+        },
+        "makePublic": "Rendre publique…",
+        "makePrivate": "Remettre derrière la connexion",
+        "restrictedHint": "Videz d’abord la liste d’accès ; elle ne s’applique que derrière la connexion.",
+        "confirmTitle": "Rendre {app} publique ?",
+        "confirmDescription": "Quiconque atteint l’URL de plateforme de l’app l’obtient sans se connecter au cluster. Seule l’authentification propre de l’app la protège. Il peut vous être demandé de confirmer votre identité.",
+        "confirm": "Rendre publique",
+        "madePublic": "L’app est publique là où son cluster l’autorise.",
+        "madePrivate": "L’app est de nouveau derrière la connexion.",
+        "saveFailed": "Échec de la modification."
       }
     },
     "members": {
@@ -5677,7 +5700,9 @@
         }
       },
       "allowStepUpPin": "Autoriser la vérification par code PIN personnel",
-      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification."
+      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification.",
+      "trustedDomainSignup": "Créer des comptes pour les domaines de confiance",
+      "trustedDomainSignupHint": "Toute personne qui se connecte avec une adresse e-mail vérifiée d'un domaine de confiance de cette organisation obtient un compte et la rejoint avec le rôle par défaut de ce domaine. Laissez désactivé pour n'admettre que les personnes ayant déjà un compte."
     },
     "sections": {
       "houseTheme": "Thème maison",
@@ -11151,7 +11176,10 @@
       "feedbackDeployed": "Déploiement de l’agent accepté. La réception d’un signal de présence confirme la connexion.",
       "feedbackIssueFailed": "Impossible d’émettre la clé de l’agent.",
       "feedbackDeployFailed": "Impossible de déployer l’agent.",
-      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
+      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
+      "managedDescription": "Le plan de contrôle installe ensemble les identifiants et l’agent. Les identifiants existants restent actifs jusqu’à la connexion de l’agent de remplacement.",
+      "managedPending": "Installation de l’agent et vérification de son premier signal…",
+      "managedConnected": "Agent connecté. Identifiants et déploiement vérifiés."
     },
     "source": {
       "readFailed": "Impossible de lire les détails du cluster",
@@ -11427,6 +11455,23 @@
       "searchReleases": "Rechercher des versions installées…",
       "noReleases": "Aucune version installée",
       "started": "Début"
+    },
+    "publicApps": {
+      "title": "Apps publiques",
+      "description": "Si une app de ce cluster peut répondre sans la connexion ci-dessus quand son propriétaire l’active. Désactivé garde chaque app derrière la connexion, quoi qu’elle demande.",
+      "allowed": "Autorisées",
+      "refused": "Non autorisées",
+      "notEnvoy": "Seul l’edge Envoy respecte la demande d’une app ; sur l’edge de ce cluster, chaque app reste derrière la connexion.",
+      "allow": "Autoriser les apps publiques",
+      "refuse": "Arrêter les apps publiques",
+      "allowTitle": "Autoriser les apps publiques sur ce cluster ?",
+      "allowReview": "Les apps que leurs propriétaires ont déjà rendues publiques répondent aussitôt sans connexion.",
+      "refuseTitle": "Arrêter les apps publiques sur ce cluster ?",
+      "refuseReview": "Chaque app publique de ce cluster repasse aussitôt derrière la connexion.",
+      "allowedToast": "Apps publiques autorisées.",
+      "refusedToast": "Apps publiques arrêtées ; chaque app est derrière la connexion.",
+      "changeFailed": "Échec de la modification.",
+      "refreshWarning": "La modification a été acceptée, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
     }
   },
   "obsPanelReason": {
@@ -12973,6 +13018,16 @@
       "task": "Des exécutions ponctuelles",
       "workflow": "Un pipeline en plusieurs étapes",
       "mixed": "Plusieurs types de charges de travail"
+    },
+    "canvas": {
+      "legend": "Légende et symboles",
+      "zoomOut": "Réduire le zoom",
+      "zoomIn": "Augmenter le zoom",
+      "fit": "Ajuster à la vue",
+      "expand": "Agrandir",
+      "pan": "Canevas du processus. Faites défiler pour vous déplacer et utilisez le zoom pour changer l’échelle.",
+      "inspector": "Étape sélectionnée",
+      "seeMore": "En savoir plus"
     }
   },
   "clusterConnection": {
@@ -14755,7 +14810,12 @@
       "noChoices": "Aucun cluster non inscrit ne correspond.",
       "register": "Inscrire",
       "unregisterTitle": "Désinscrire {cluster} de Zentinelle ?",
-      "unregisterBody": "Cela révoque le cluster dans Zentinelle, puis retire sa passerelle et le secret de son identifiant. Le trafic des agents sur ce cluster ne passe plus par Zentinelle."
+      "unregisterBody": "Cela révoque le cluster dans Zentinelle, puis retire sa passerelle et le secret de son identifiant. Le trafic des agents sur ce cluster ne passe plus par Zentinelle.",
+      "sharedTitle": "Clusters partagés",
+      "sharedDescription": "Ils n'appartiennent à aucune organisation. Ils s'enregistrent via la connexion Zentinelle de l'installation, gérée par l'opérateur de la plateforme ; l'installateur enregistre les clusters qu'il crée.",
+      "sharedNotConnected": "L'installation n'est pas connectée à Zentinelle. Connectez Zentinelle avec Astrolift depuis l'installateur pour la connecter et enregistrer ses clusters.",
+      "sharedManaged": "Géré par la plateforme",
+      "sharedEmpty": "Aucun cluster partagé."
     },
     "filters": {
       "window": "Période",
@@ -15111,6 +15171,16 @@
     "delete": "Supprimer le domaine",
     "deleteTitle": "Supprimer le domaine géré ?",
     "deleteHelp": "Cette action lance la procédure existante de suppression du domaine. Les enregistrements gérés du fournisseur et les certificats peuvent être supprimés, et les noms d’hôte des applications peuvent cesser de se résoudre. Vérifiez les routes actuelles avant de continuer.",
+    "effectiveDefault": "Défaut effectif",
+    "defaultDeleteTitle": "Supprimer la zone par défaut ?",
+    "defaultDeleteHelp": "Les nouvelles applications reçoivent leur nom d’hôte sous cette zone. Les applications enregistrées après sa suppression reçoivent la zone par défaut suivante, ou aucun nom d’hôte.",
+    "defaultDeleteRefused": "Astrolift a conservé cette zone : c’est la zone par défaut des noms d’hôte des nouvelles applications.",
+    "defaultDependentsLabel": "Environnements sous cette zone",
+    "defaultDependentsNone": "Aucun environnement ne se résout encore par elle.",
+    "defaultDependentsCount": "Environnements qui se résolvent par elle : {count}",
+    "defaultDependentsMore": "et {count} de plus",
+    "defaultDeleteTypeToConfirm": "Pour confirmer, saisissez la zone :",
+    "defaultDeleteConfirm": "Supprimer la zone par défaut",
     "actionFailed": "L’action a été refusée. Consultez l’état actuel avant de réessayer.",
     "actionUncertain": "La réponse à l’action n’a pas été confirmée. Consultez l’état actuel du domaine et du fournisseur avant de réessayer.",
     "acceptedUnverified": "L’écriture a été acceptée, mais les métadonnées retournées n’ont pas pu être vérifiées. Actualisez l’état avant toute autre action.",
@@ -16363,7 +16433,8 @@
     "sharing": "Partage",
     "connect": "Connexion",
     "agentInbox": "Boîte de réception",
-    "appAccess": "Accès aux applications"
+    "appAccess": "Accès aux applications",
+    "topology": "Plan du système"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17354,5 +17425,65 @@
       "groups": "Connexion trouvée ; groupes : {groups}",
       "noGroups": "Connexion trouvée ; dans aucun groupe"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Plan du système",
+    "description": "Explorez le projet, ciblez un processus et examinez chaque composant sans perdre le contexte.",
+    "back": "Vue du projet",
+    "scope": "Cibler",
+    "wholeProject": "Projet entier",
+    "canvas": "Canevas du graphe",
+    "componentList": "Liste des composants",
+    "counts": "{nodes} composants · {edges} connexions",
+    "partialError": "Certaines données du projet n’ont pas pu être chargées. Ce graphe est incomplet.",
+    "notFound": "Projet introuvable ou inaccessible.",
+    "empty": "Aucun composant visible pour le moment.",
+    "inspector": "Détails du composant",
+    "status": "État",
+    "seeMore": "En savoir plus",
+    "exploreWorkflow": "Explorer les étapes du processus",
+    "connections": "Composants connectés",
+    "selectTitle": "Examiner un composant",
+    "selectDescription": "Sélectionnez un nœud pour afficher sa configuration et ses connexions. En savoir plus ouvre sa page Astrolift. Ciblez un processus pour afficher ses étapes.",
+    "evidenceNote": "Les connexions proviennent de la configuration enregistrée. L’état d’une étape apparaît uniquement si la dernière exécution identifie l’étape actuelle ; les états précédents ne sont pas déduits entre les cycles de révision.",
+    "kind": {
+      "workflow": "Processus",
+      "stage": "Étape",
+      "agent": "Agent logiciel",
+      "app": "Application",
+      "repository": "Dépôt"
+    },
+    "edge": {
+      "source": "Origine",
+      "dispatches": "Distribue les tâches",
+      "invokes": "Appelle",
+      "next": "Suivant",
+      "return": "Retour",
+      "retry": "Réessayer"
+    },
+    "field": {
+      "pattern": "Structure",
+      "stages": "Étapes",
+      "enabled": "Activé",
+      "repository": "Dépôt",
+      "source": "Référence source",
+      "latestRun": "Dernière exécution",
+      "kind": "Catégorie",
+      "order": "Numéro d’étape",
+      "agent": "Agent logiciel",
+      "environment": "Spécification d’environnement",
+      "model": "Modèle",
+      "output": "Clé de sortie",
+      "skills": "Compétences",
+      "failure": "Comportement en cas d’échec",
+      "attempts": "Nombre maximal de tentatives",
+      "timeout": "Délai maximal",
+      "workflow": "Processus",
+      "mode": "Mode d’exécution",
+      "running": "Tâches en cours",
+      "lastRun": "Dernière exécution"
+    },
+    "openBlueprint": "Ouvrir le plan",
+    "expand": "Agrandir"
   }
 }

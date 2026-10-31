@@ -7,6 +7,12 @@ configuration. `DeployAppWorkflow` uses them for Endpoint-only native apps (see
 they do not report a deployed, ready, or inference-capable app. Existing AWS,
 Azure, local, and legacy GCP render/apply paths are unchanged.
 
+Preconditions: a reference page for a private port and adapter; no operator
+command, permission or console surface. Writes go to the GKE cluster in the
+app's GCP project through the cluster's declared credential, under the
+Workload Identity binding the preparation and IAM journals completed; nothing
+on this page is applied by hand. Placeholders: none.
+
 ## Required caller boundaries
 
 The caller must first establish the protected Deployment origin and actual
@@ -150,3 +156,11 @@ API references. DaemonSet scheduling counts are observed status, not supplied
 replica configuration.
 
 Runtime placement validates the complete bounded pool inventory but retains only the original admitted pool ceiling. An unrelated provisioning pool or pool without GKE_METADATA neither expands that ceiling nor invalidates eligible original pools. Initial capture includes only eligible RUNNING/GKE_METADATA pools and does not establish capacity or model compatibility. Standalone identity observation retains its stricter all-pools check.
+
+## Verify
+
+```sh
+./run.sh test astrolift_services/tests/test_gcp_gke_app_apply_journal_2278.py astrolift_services/tests/test_gcp_gke_runtime_placement_2278.py
+```
+
+Both suites pass against real PostgreSQL and controlled Kubernetes fixtures.

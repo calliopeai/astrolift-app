@@ -6,6 +6,7 @@ import type { CentralAuthViewProps, IngressClassViewProps } from "./CentralAuth"
 import type { ClusterAgentViewProps } from "./ClusterAgent";
 import type { BootstrapHistoryViewProps, ClusterSettingsScreenProps } from "./ClusterSettings";
 import type { IngressAuthViewProps } from "./IngressAuth";
+import type { PublicAppsViewProps } from "./PublicApps";
 import type { BootstrapRun, ClusterWithHeartbeat } from "./types";
 
 /** Hand-typed fixtures for the cluster settings tab and its cards. */
@@ -257,6 +258,15 @@ export const INGRESS_CLASS: IngressClassViewProps = {
   ingressClass: "alb",
   albGate: true,
   centralAuthConfigured: true,
+  onApply: noop,
+};
+
+/** Whether apps may skip the edge login (#2504): allowed, on the Envoy edge. */
+export const PUBLIC_APPS: PublicAppsViewProps = {
+  clusterId: CLUSTER.id,
+  allowed: true,
+  envoy: true,
+  saving: false,
   onApply: noop,
 };
 

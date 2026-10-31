@@ -181,6 +181,10 @@ class RegisteredApp(NamedBaseCoreModel):
     # ``source`` is ``manifest`` when astrolift.toml's [ingress.access] set
     # it, which the UI then leaves to the repo.
     edge_access = models.JSONField(default=dict, blank=True)
+    # The app's platform hostname answers without the edge login (#2504),
+    # where its cluster allows public apps (``core.edge_public``). Its own
+    # authentication still applies; custom domains keep their own setting.
+    edge_public = models.BooleanField(default=False, db_default=False)
 
     # App-global webhook-deploy pause (#399). Independent of the
     # per-env ``deploys_paused`` (#378) and the per-env ``ingress_paused``

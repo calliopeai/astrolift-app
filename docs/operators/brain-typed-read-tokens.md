@@ -6,6 +6,8 @@ only after the platform operator stages it and then enables issuance for it.
 Every other brain keeps the four legacy token shapes, byte for byte. Nothing
 here advertises a shared contract version.
 
+Preconditions: a shell in the control plane's backend container for `manage.py brain_typed_tokens`; `--operator` is the email of an active superuser; the brain and every app hosted on it need a deploy (`app.deploy` on each) to pick up the settings; the replica checks need a kubeconfig for the cluster serving the brain; `astro brain connect` needs read access to the brain. Placeholders: `<brain app guid>` is `id` from `astroliftBrains` (a brain is a RegisteredApp); `<brain-slug>` is its `slug`; `<email>` is the operator's email; `<what you checked on every serving replica>` is free text, 20 to 500 characters.
+
 ## What a typed token adds
 
 A typed token keeps every legacy claim and adds these:
@@ -73,6 +75,11 @@ python manage.py brain_typed_tokens unstage <brain app guid> --operator <email> 
 4. On every serving replica, check the image and that both settings are in its
    environment, and that a legacy token still reads (`astro brain connect`, then
    an MCP `initialize` through the edge).
+
+   ```sh
+   astro brain connect <brain-slug>
+   ```
+
 5. `enable --apply` with an attestation of what you checked, 20 to 500
    characters. It is refused unless the brain is staged and every environment
    that serves it runs only deployments made after staging.
@@ -93,3 +100,12 @@ python manage.py brain_typed_tokens unstage <brain app guid> --operator <email> 
 
 Unstaging and redeploying the brain before typed tokens expire would make the
 brain refuse them, so the command holds the order.
+
+## Verify
+
+```sh
+python manage.py brain_typed_tokens status
+astro brain connect <brain-slug>
+```
+
+`status` prints `<org slug>/<brain slug> <guid>: staged ...; issuing typed tokens since ...` for the brain (`No brain is staged for typed read tokens.` after unstaging), and the token `connect` prints reads the brain through its MCP endpoint.

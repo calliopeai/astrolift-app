@@ -5,6 +5,13 @@ ownership metadata for the owned GCP IAM port. They do not wire app deployment,
 create a GSA or KSA, configure GKE, authorize a request, or prove token exchange,
 Vertex invocation or workload readiness. There is no public journal API.
 
+Preconditions: a reference page for a private backend journal; no operator
+command, permission or console surface. Its rows live in the install's
+PostgreSQL and pin the GCP project (ID and number) the GKE cluster lives in,
+the app's GSA numeric identity and the Workload Identity binding between that
+GSA and the observed KSA UIDs; the journal itself makes no cloud call.
+Placeholders: none.
+
 One live row is anchored by the original app and physical cluster, independently
 of current organization/provider assignment. The organization and provider are
 immutable protected owner fields; replacing either cannot open an empty ledger.
@@ -25,7 +32,8 @@ physical namespace/KSA name; each alias requires current source and authority
 checks. Adding or removing an alias cannot replace the original KSA UID or GSA.
 The private [preparation journal](gcp-gke-preparation-journal.md) now retains that
 template and the original signed authority separately for each accepted operation.
-Its real deployment consumer remains separate integration work.
+`DeployAppWorkflow` is their deployment consumer for Endpoint-only native apps
+(see [native Endpoint deployment](gcp-native-configuration-executor.md)).
 
 ## Committed write protocol
 
@@ -84,15 +92,18 @@ including every current environment/binding, and use the accepted-authority
 reference consumer to re-admit the original actor and credential after waits.
 The checkpoint must also compare actual current provider/configuration,
 GSA/GKE/KSA identity, union and accepted context; a callback that merely returns
-`None` is not authority evidence. These consumers and production orchestration
-remain separate work. Background origin IP is not invented.
+`None` is not authority evidence. `DeployAppWorkflow` is the Endpoint-only slice
+of that orchestration; mixed unions remain separate work. Background origin IP is
+not invented.
 
 The target snapshot conservatively pins the original observed KSA set. Adding
 or replacing that set requires a separately reviewed recovery/migration design;
 this foundation does not silently substitute a new UID or retire an owned
 journal. Soft retirement/restore is refused, and a previously retired row blocks
 silent replacement. Existing owned grants survive later desired revisions.
-Operator repair for unresolved native sends is not implemented by this table.
+Operator repair for unresolved native sends is the `resolve_native_gcp_journal`
+command (see [settling a stuck journal](gcp-native-configuration-executor.md#settling-a-stuck-journal)),
+not this table.
 A cleared database pending entry does not establish that another remote sender
 has stopped; orchestration must continue to hold the mutex and current fences.
 
@@ -101,8 +112,16 @@ They perform no cloud IAM write, KSA rollout or invocation.
 
 ## Migration rollback
 
-Unpublished migration `0038_gcp_workload_identity_journal` refuses reversal when
+Migration `0038_gcp_workload_identity_journal` refuses reversal when
 any journal row remains, including retired or observed rows. Dropping the table
 would erase ownership and uncertain-send evidence. Empty disposable databases
 can migrate down and reapply. This reviewer-visible constraint does not provide
 an operator repair path or permission to delete retained history for rollback.
+
+## Verify
+
+```sh
+./run.sh test astrolift_services/tests/test_gcp_workload_identity_journal_2278.py astrolift_services/tests/test_gcp_identity_journal_nowait_2278.py
+```
+
+Both suites pass against real PostgreSQL transactions and independent connections.

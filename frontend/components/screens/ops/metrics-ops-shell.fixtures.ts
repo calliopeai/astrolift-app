@@ -181,6 +181,7 @@ function cluster(overrides: Partial<AstroliftTenantCluster>): AstroliftTenantClu
     lifecycle: "managed",
     managedAt: "2026-06-01T12:30:00Z",
     oidcAuthConfig: null,
+    allowPublicApps: true,
     organizationSlug: "acme",
     secretsBackendProvisionedAt: null,
     ...overrides,

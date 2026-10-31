@@ -1,6 +1,7 @@
 "use client";
 
 import { BootstrapPlanView } from "@/components/screens/clusters/settings/BootstrapPlan";
+import { ManagedClusterAgent } from "@/components/screens/clusters/settings/ManagedClusterAgent";
 import { ClusterAgentView } from "@/components/screens/clusters/settings/ClusterAgent";
 import {
   BootstrapHistoryView,
@@ -19,7 +20,7 @@ import { useSettingsSection } from "@/components/settings/use-settings-section";
 import { useWithheldCapabilities } from "@/hooks/use-install-policy";
 
 import { AuthUsersCard } from "./auth-users-card";
-import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
+import { CentralAuthCard, IngressClassCard, PublicAppsCard } from "./central-auth-card";
 
 /**
  * Cluster settings tab, one section at a time (`?section=`). The screen owns
@@ -48,6 +49,7 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
               agent: <ClusterAgentCard cluster={cluster} />,
               ingressClass: <IngressClassCard cluster={cluster} />,
               centralAuth: <CentralAuthCard cluster={cluster} />,
+              publicApps: <PublicAppsCard cluster={cluster} />,
               ingressAuth: <IngressAuthCard cluster={cluster} />,
               authUsers: <AuthUsersCard clusterId={cluster.id} />,
               bootstrapPlan: <BootstrapPlanCard clusterId={cluster.id} />,
@@ -64,12 +66,21 @@ function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
   // installer holds the control plane to on AWS (calliope-installer#447).
   const onAws = cluster.providerPluginSlug === "aws";
   const withheld = useWithheldCapabilities({ skip: !onAws });
-  return (
-    <ClusterAgentView
-      {...useClusterAgent(cluster)}
-      deployWithheldReason={onAws ? withheld.controllers : null}
-    />
+  return onAws && withheld.controllers ? (
+    <ManualClusterAgentCard cluster={cluster} reason={withheld.controllers} />
+  ) : (
+    <ManagedClusterAgent key={cluster.id} clusterId={cluster.id} />
   );
+}
+
+function ManualClusterAgentCard({
+  cluster,
+  reason,
+}: {
+  cluster: ClusterWithHeartbeat;
+  reason: string;
+}) {
+  return <ClusterAgentView {...useClusterAgent(cluster)} deployWithheldReason={reason} />;
 }
 
 function IngressAuthCard({ cluster }: { cluster: ClusterWithHeartbeat }) {

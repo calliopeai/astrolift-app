@@ -7,6 +7,19 @@ an absent, foreign or stale owner. Such targets require an explicit organization
 grant. Every populated app team/project ancestor must be live, in the same
 organization and consistent with the ownership chain.
 
+Preconditions: `app.read` at the live app for metrics, traces, URL health and
+PromQL; `app.read_logs` for historical logs; `cluster.manage` at the cluster for
+the collector review, install and status, plus the platform operator for shared
+organization-null clusters. The collector install runs through the worker in
+the cluster's AWS account against the registered EKS endpoint, with
+`ASTROLIFT_COLLECTOR_PROBE_IMAGE` set on the worker and HTTPS egress to the
+upstream GitHub release. Surface: console `/logs` and `/traces`,
+`astro operator cluster log-collector-review|install-log-collector|log-collector-status`,
+or `astro api graphql -q '<document>'`. Placeholders: `<cluster-id>` is `id` from
+`astroliftClustersPage`; `<request-file>` is a private path where the CLI keeps
+the original request; `<operation-id>` is the operation UUID the install command
+prints.
+
 App metrics and traces retain `app.read`. Historical logs retain the separate
 `app.read_logs` permission. App, project and inherited team grants reach their
 own apps; organization grants still reach all live apps in that organization.
@@ -85,6 +98,11 @@ probe policy, deadline and immutable query window. A replacement token cannot
 silently reattribute an old request. Status reads require current authority and
 the original credential to remain valid.
 
+```bash
+astro operator cluster log-collector-review --cluster-id <cluster-id> --retention-days 30
+astro operator cluster install-log-collector --cluster-id <cluster-id> --retention-days 30 --request-file <request-file>
+```
+
 Before writes the worker verifies the declared AWS account, registered EKS
 endpoint/CA/OIDC, live platform-owned namespace, EC2 eligibility and renderer.
 It prepares only immutable cluster-GUID-owned log-group/IRSA identities; foreign
@@ -117,3 +135,15 @@ resources through operator review of exact recorded identities before a fresh
 operation; never delete by name alone. Local HTTP/Helm proof does not establish
 live Fluent Bit ingestion or deployed app/CLI acceptance. Verify those before
 claiming #1706 complete. Trace collectors and agent-task log retention are separate.
+
+## Verify
+
+```bash
+astro operator cluster log-collector-status --operation-id <operation-id> --cluster-id <cluster-id>
+pytest astrolift_observability/tests/test_access_scopes_2111.py
+```
+
+The operation reports `ACTIVATED` with `activatedAt` set and `cleanupPending`
+false; `READER_GRANT_PENDING` means the returned reader policy still has to be
+applied to the runtime-reader role. The scope test module passes from the
+`backend/` directory.

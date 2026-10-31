@@ -9,6 +9,19 @@ timeout and 1 MiB response limit apply to search and detail. No caller URL,
 browser API key, saved Hub token, model file download or remote code execution is
 part of this read.
 
+Preconditions: a live authenticated account for `astroliftHuggingFaceModels`
+and `astroliftHuggingFaceModel`; `cluster.register` in the organization for
+cluster-owned `astroliftModelDeploymentMetrics` and for
+`astroliftClusterModelDensity`, with the `admin` scope on a bearer;
+`app.read_metrics` for legacy app/project models. The backend reaches the Hub
+over HTTPS and the cluster's recorded Prometheus endpoint; the cluster must be
+active with an enabled provider. Surface: console `/models`, or
+`astro api graphql -q '<document>'`. Placeholders: `<organization-id>` is `id`
+from `astroliftOrganizations`; `<service-id>`, `<cluster-id>` and `<provider-id>`
+are `id`, `clusterId` and `providerId` from
+`clusterModelDeploymentsPage(organizationId: "<organization-id>")`; `<start>` and
+`<end>` are timezone-aware ISO 8601 timestamps at most 24 hours apart.
+
 `astroliftHuggingFaceModel(repoId, revision)` resolves a repository revision to
 its actual immutable SHA. A missing SHA or mismatching requested commit fails
 closed. Search metadata may omit SHA; resolve detail before deployment. The
@@ -134,3 +147,15 @@ superusers retain their existing active-account bypass; bearer membership and
 scope/team ceilings still apply. Other module rows retain their contracts.
 An entitlement does not replace the selected target's actual policy, immutable
 identity, readiness or mutation checks.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { astroliftHuggingFaceModels(search: "<query>", first: 5) { state observedAt items { repoId revisionSha pipelineTag } } }'
+astro api graphql -q 'query { astroliftClusterModelDensity(clusterId: "<cluster-id>", expectedProviderId: "<provider-id>", start: "<start>", end: "<end>") { modelCount returnedCount truncated scope items { serviceId name status } } }'
+```
+
+The catalogue read reports `state: AVAILABLE` with rows (RATE_LIMITED or
+UNAVAILABLE names a transport outcome, never an empty success); the density
+read reports `scope: organization_cluster_owned_models` with `modelCount` equal
+to your authorized shared-model inventory.

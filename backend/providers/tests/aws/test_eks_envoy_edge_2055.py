@@ -65,6 +65,7 @@ def test_envoy_cluster_enables_the_edge_behind_an_alb():
     assert edge.chart_name == "gateway-helm"
     [ingress] = [m for m in edge.post_install_manifests if m["kind"] == "Ingress"]
     assert ingress["metadata"]["namespace"] == "astrolift-system"
+    assert ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/load-balancer-name"] == "astrolift-eks-edge"
     assert ingress["spec"]["rules"][0]["host"] == "*.astro.example.net"
     assert [m for m in edge.post_install_manifests if m["kind"] == "SecurityPolicy"]
 
@@ -98,3 +99,14 @@ def test_the_recipe_renders_the_rows_access_rules_into_the_shared_policy():
         if m["kind"] == "SecurityPolicy" and m["metadata"]["name"] == "edge-oidc"
     ]
     assert [r["name"] for r in policy["spec"]["authorization"]["rules"]] == ["shop-ns-groups", "shop-ns-deny"]
+
+
+def test_service_charts_wait_for_the_load_balancer_admission_webhooks():
+    components = _driver().bootstrap_components(
+        ClusterContext(slug="c", auth_method="exec_plugin", ingress_class="envoy", oidc_auth_config=COGNITO)
+    )
+    for component in components:
+        if component.chart_repo_url and component.key != "aws-load-balancer-controller":
+            assert "aws-load-balancer-controller" in component.depends_on, component.key
+        elif component.key == "aws-load-balancer-controller":
+            assert component.key not in component.depends_on

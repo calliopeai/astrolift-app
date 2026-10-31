@@ -1180,3 +1180,27 @@ def test_statefulset_no_port_omits_headless_ports():
     # No regular Service for a port-less workload
     non_headless = [r for r in out if r["kind"] == "Service" and r["metadata"]["name"] != "etcd-headless"]
     assert non_headless == []
+
+
+def test_function_autoscaling_annotations_are_only_on_revision_template():
+    workload = WorkloadManifest(
+        name="utility",
+        kind="function",
+        min_scale=0,
+        max_scale=2,
+        containers=(ContainerManifest(name="app", is_primary=True, port=8080),),
+    )
+    resources = render_manifests(
+        _normalized(workload),
+        app_slug="utility",
+        namespace="t1-utility",
+        environment_name="production",
+        image_tag="test",
+        image_repository="example.com/utility",
+    )
+    service = next(r for r in resources if r["kind"] == "Service")
+    assert "autoscaling.knative.dev/minScale" not in service["metadata"].get("annotations", {})
+    assert service["spec"]["template"]["metadata"]["annotations"] == {
+        "autoscaling.knative.dev/minScale": "0",
+        "autoscaling.knative.dev/maxScale": "2",
+    }

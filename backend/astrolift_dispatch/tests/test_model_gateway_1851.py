@@ -649,7 +649,6 @@ def test_a_cluster_whose_gateway_is_not_running_is_refused(
 @pytest.mark.parametrize(
     ("runtime", "phrase"),
     [
-        ("openhands", "openhands cannot send the gateway key"),
         ("mistral", "reaches Mistral"),
         ("deepseek", "reaches DeepSeek"),
     ],
@@ -1309,7 +1308,6 @@ def test_an_apps_cloud_credentials_still_reach_a_gateway_pod(
 @pytest.mark.parametrize(
     ("runtime", "refused"),
     [
-        ("aider", True),
         ("opencode", True),
         ("claude", False),
         ("codex", False),

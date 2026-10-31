@@ -179,6 +179,12 @@ class OrganizationMutations:
         )
         if step_up_pin_changed:
             org.allow_step_up_pin = bool(input.allow_step_up_pin)
+        signup_changed = (
+            input.trusted_domain_signup is not None
+            and bool(input.trusted_domain_signup) != org.trusted_domain_signup
+        )
+        if signup_changed:
+            org.trusted_domain_signup = bool(input.trusted_domain_signup)
         if input.default_resource_tags is not None:
             # Refused here rather than at provision time. A tag that only
             # AWS accepts would otherwise provision fine for weeks and then
@@ -260,6 +266,22 @@ class OrganizationMutations:
                     duration_ms=0,
                     permissions=(Permission.ORG_UPDATE.value,),
                     extra={"allow_step_up_pin": org.allow_step_up_pin},
+                )
+            )
+        if signup_changed:
+            # Its own row for the same reason: who opened account creation to
+            # a whole domain, and when, is what a reviewer goes looking for.
+            emit_audit(
+                AuditEntry(
+                    actor_user_id=tenant.actor_user_id if tenant else None,
+                    organization_id=org.pk,
+                    action="org.trusted_domain_signup.changed",
+                    decision="ALLOW",
+                    target_kind="organization",
+                    target_id=org.pk,
+                    duration_ms=0,
+                    permissions=(Permission.ORG_UPDATE.value,),
+                    extra={"trusted_domain_signup": org.trusted_domain_signup},
                 )
             )
         return gql_success(organization_to_type(org))

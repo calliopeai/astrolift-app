@@ -153,3 +153,41 @@ export const EXPORT_ZENTINELLE_AUDIT = gql`
     }
   }
 `;
+
+/** A shared cluster, through the install connection (#1905). Platform operator only. */
+export const REGISTER_ZENTINELLE_SHARED_CLUSTER = gql`
+  mutation RegisterZentinelleSharedCluster($input: ZentinelleClusterInput!) {
+    registerZentinelleSharedCluster(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+        supportedMethods
+      }
+      data {
+        ...ZentinelleClusterFields
+      }
+    }
+  }
+  ${ZENTINELLE_CLUSTER_FIELDS}
+`;
+
+/** A shared cluster, through the install connection (#1905). Platform operator only. */
+export const UNREGISTER_ZENTINELLE_SHARED_CLUSTER = gql`
+  mutation UnregisterZentinelleSharedCluster($input: ZentinelleClusterInput!) {
+    unregisterZentinelleSharedCluster(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+        supportedMethods
+      }
+      data {
+        ...ZentinelleClusterFields
+      }
+    }
+  }
+  ${ZENTINELLE_CLUSTER_FIELDS}
+`;

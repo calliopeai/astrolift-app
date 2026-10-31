@@ -4,6 +4,17 @@ Preview catalog browsing and preview detail have separate APIs. Use the immutabl
 preview GUID for detail; a branch, pull request number, retained hostname, or
 conventional environment name does not identify a workload target.
 
+Preconditions: `app.read` on the preview's app for detail and deployment
+history, `app.read_logs` for logs and live streams, `app.log_export` for
+exports, all within the token's team ceiling. Surfaces: GraphQL via
+`astro api graphql`, `astro app previews`, or the console at
+`/previews/<preview-guid>`. Placeholders: `<app-slug>` is the registered app
+slug (`astro app list`); `<preview-guid>` is `id` from
+`astro app previews list <app-slug> --json` or `astroliftPreviewEnvironmentsPage`;
+`<environment-id>`, `<preview-version>` and `<environment-version>` are
+`environment.environmentId`, `version` and `environment.environmentVersion`
+from the exact read below.
+
 ```graphql
 query Preview($id: GUID!, $includeRuntimeResources: Boolean! = false) {
   astroliftPreviewEnvironment(id: $id, includeRuntimeResources: $includeRuntimeResources) {
@@ -176,10 +187,10 @@ responses cannot populate the new detail.
 The matching CLI supports:
 
 ```sh
-astro app previews show example-app --id PREVIEW_GUID --json
-astro app previews show example-app --id PREVIEW_GUID --resources --json
-astro app previews logs example-app --id PREVIEW_GUID --since 30m --tail 200
-astro app previews open example-app --id PREVIEW_GUID --url
+astro app previews show <app-slug> --id <preview-guid> --json
+astro app previews show <app-slug> --id <preview-guid> --resources --json
+astro app previews logs <app-slug> --id <preview-guid> --since 30m --tail 200
+astro app previews open <app-slug> --id <preview-guid> --url
 ```
 
 `--id` reads directly, including previews older than the recent 200-entry catalog.
@@ -194,3 +205,12 @@ Public capability metadata exposes `previews.exact_identity`,
 informational and never grants permission. Mobile clients can consume this
 additive canonical contract; native mobile integration and consent UI require
 separate acceptance evidence.
+
+## Verify
+
+```sh
+astro app previews show <app-slug> --id <preview-guid> --json
+./run.sh test astrolift_lifecycle/tests/test_exact_preview_queries_2206.py astrolift_observability/tests/test_preview_live_logs_2257.py astrolift_operations/tests/test_preview_log_export_access_2257.py
+```
+
+The show output returns the same `id`, `environmentStatus: available` and a populated `environment` binding for a live preview (`retired` or `unavailable` for one that is not an action target); the tests pass.

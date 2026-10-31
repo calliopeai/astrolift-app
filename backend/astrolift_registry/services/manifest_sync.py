@@ -1131,6 +1131,11 @@ def _register_one_agent(
     org = project.organization
     raw_manifest = parse_raw(discovered.raw_text)
     manifest = _normalize_text(discovered.raw_text)
+    from astrolift_agents.runtime_catalog import assert_runtime_available
+
+    for workload in manifest.workloads:
+        for container in workload.containers:
+            assert_runtime_available(image=container.image_ref or "")
 
     app = RegisteredApp.objects.filter(
         organization=org,

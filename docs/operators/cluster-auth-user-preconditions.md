@@ -8,6 +8,8 @@ username inferred from a display label. Microsoft Entra ID (Azure clusters)
 uses the tenant ID as the pool and the user's immutable object ID. Passwords and cloud credential values
 are absent from these reads and from the source-token payload.
 
+Preconditions: `cluster.users` in the cluster's organization, and the platform operator for an install-shared pool; a bearer's scope and team ceilings apply. Surface: the sign-in users card at `/clusters/<cluster-slug>/settings`, `astro auth-users list <cluster-slug>`, or `astroliftClusterAuthUsers(clusterId)` and the seven mutations through `astro api graphql`; the control plane's cloud identity holds the provider permissions named below (Cognito `cognito-idp:AdminGetUser` on the configured pool plus the admin write actions, the Entra Graph application permissions, or GCP `roles/identitytoolkit.admin`). Placeholders: `<cluster-slug>` and `<cluster-id>` are `slug` and `id` from `astroliftClustersPage`; `<provider-plugin-id>`, `<provider-pool-id>` and `<source-version>` are the `source` fields of the inventory; `<provider-user-id>` is `providerUserId` of the user row.
+
 Pass the observed `source` as `expectedSource` to all seven existing mutations:
 create user, create group, set password, reset password, enable/disable, delete,
 and update memberships. Existing-user writes additionally require the observed
@@ -109,3 +111,12 @@ the user's immutable `localId` is the provider user ID.
   the same.
 - **Reset password** sends the provider's password-reset email.
 
+## Verify
+
+```sh
+astro auth-users list <cluster-slug>
+astro api graphql --var clusterId=<cluster-id> -q 'query($clusterId: GUID!) { astroliftClusterAuthUsers(clusterId: $clusterId) { supported provider reason source { providerPluginId providerPoolId sourceVersion } users { username providerUserId } } }'
+cd backend && pytest astrolift_clusters/tests/test_auth_user_preconditions_2225.py
+```
+
+`supported` is true, `source` is non-null and every user carries a `providerUserId`; a mutation sending that `source` as `expectedSource` (and the user's `providerUserId` as `expectedUserId`) is admitted, while a stale tuple returns the `MutationResult` error envelope before any provider write; the test module passes.

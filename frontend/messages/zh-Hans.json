@@ -3119,6 +3119,29 @@
         "saveFailed": "保存失败。",
         "membersDescription": "谁可以查看和修改此应用：在此分配的角色及共享应用的团队。",
         "edgeDescription": "谁可以访问应用 URL。边缘决定谁能进入，角色决定谁能修改应用。"
+      },
+      "public": {
+        "title": "公开访问",
+        "on": "公开",
+        "off": "需要登录",
+        "description": "公开后，应用的平台 URL 无需集群登录即可访问。应用自身的登录仍然有效，自定义域名保留各自的设置。",
+        "states": {
+          "public": "无需登录即可访问",
+          "gated": "需要登录",
+          "no_gate": "此集群没有登录，应用处于开放状态",
+          "not_envoy": "仍需登录：只有 Envoy 边缘会执行此开关",
+          "cluster_disallows": "仍需登录：此集群不允许公开应用",
+          "restricted": "仍需登录：应用设置了访问列表"
+        },
+        "makePublic": "设为公开…",
+        "makePrivate": "恢复为需要登录",
+        "restrictedHint": "请先清空访问列表；它只在登录之后生效。",
+        "confirmTitle": "将 {app} 设为公开？",
+        "confirmDescription": "任何访问该应用平台 URL 的人都无需登录集群即可使用应用，只有应用自身的认证保护它。你可能需要再次验证身份。",
+        "confirm": "设为公开",
+        "madePublic": "在集群允许的位置，应用已公开。",
+        "madePrivate": "应用已恢复为需要登录。",
+        "saveFailed": "更改失败。"
       }
     },
     "members": {
@@ -5683,7 +5706,9 @@
         }
       },
       "allowStepUpPin": "允许使用个人 PIN 进行验证",
-      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。"
+      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。",
+      "trustedDomainSignup": "为受信任域创建账户",
+      "trustedDomainSignupHint": "使用本组织受信任域下已验证邮箱登录的人会获得账户，并以该域的默认角色加入。若只允许已有账户的人，请保持关闭。"
     },
     "sections": {
       "houseTheme": "内部主题",
@@ -11148,7 +11173,10 @@
       "feedbackDeployed": "代理部署已接受。收到心跳后才能确认连接。",
       "feedbackIssueFailed": "无法签发代理密钥。",
       "feedbackDeployFailed": "无法部署代理。",
-      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。"
+      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。",
+      "managedDescription": "控制平面会同时安装凭据和代理。现有凭据会一直有效，直到替换代理连接成功。",
+      "managedPending": "正在安装代理并验证首次心跳…",
+      "managedConnected": "代理已连接，凭据和部署均已验证。"
     },
     "source": {
       "readFailed": "无法读取集群详情",
@@ -11424,6 +11452,23 @@
       "searchReleases": "搜索发布版本、版本号…",
       "noReleases": "没有已安装的发布版本",
       "started": "开始时间"
+    },
+    "publicApps": {
+      "title": "公开应用",
+      "description": "所有者开启后，此集群上的应用是否可以无需上方的登录即可访问。关闭后，无论应用如何请求，所有应用都需要登录。",
+      "allowed": "已允许",
+      "refused": "不允许",
+      "notEnvoy": "只有 Envoy 边缘会执行应用的请求；在此集群的边缘上，所有应用仍需登录。",
+      "allow": "允许公开应用",
+      "refuse": "停止公开应用",
+      "allowTitle": "允许此集群上的公开应用？",
+      "allowReview": "所有者已设为公开的应用会立即无需登录即可访问。",
+      "refuseTitle": "停止此集群上的公开应用？",
+      "refuseReview": "此集群上的所有公开应用会立即恢复为需要登录。",
+      "allowedToast": "已允许公开应用。",
+      "refusedToast": "已停止公开应用；所有应用都需要登录。",
+      "changeFailed": "更改失败。",
+      "refreshWarning": "更改已接受，但无法刷新集群详情。请刷新以查看当前状态。"
     }
   },
   "obsPanelReason": {
@@ -12970,6 +13015,16 @@
       "task": "一次性运行",
       "workflow": "多步骤流水线",
       "mixed": "多种类型的工作负载"
+    },
+    "canvas": {
+      "legend": "图例与符号",
+      "zoomOut": "缩小",
+      "zoomIn": "放大",
+      "fit": "适应视图",
+      "expand": "展开",
+      "pan": "工作流画布。滚动以平移，使用缩放控件更改比例。",
+      "inspector": "已选步骤",
+      "seeMore": "查看更多"
     }
   },
   "clusterConnection": {
@@ -14752,7 +14807,12 @@
       "noChoices": "没有匹配的未注册集群。",
       "register": "注册",
       "unregisterTitle": "从 Zentinelle 取消注册 {cluster}?",
-      "unregisterBody": "这会在 Zentinelle 中吊销该集群,然后移除其网关和凭据密钥。该集群上的智能体流量将不再经过 Zentinelle。"
+      "unregisterBody": "这会在 Zentinelle 中吊销该集群,然后移除其网关和凭据密钥。该集群上的智能体流量将不再经过 Zentinelle。",
+      "sharedTitle": "共享集群",
+      "sharedDescription": "它们不属于任何组织，通过安装的 Zentinelle 连接注册，该连接由平台运维者管理；安装程序会注册它创建的集群。",
+      "sharedNotConnected": "此安装尚未连接到 Zentinelle。在安装程序中连接 Zentinelle with Astrolift，即可连接并注册其集群。",
+      "sharedManaged": "由平台管理",
+      "sharedEmpty": "没有共享集群。"
     },
     "filters": {
       "window": "时间范围",
@@ -15108,6 +15168,16 @@
     "delete": "移除域名",
     "deleteTitle": "移除托管域名？",
     "deleteHelp": "这将启动现有的域名移除操作。提供商的托管记录和证书可能会被移除，应用主机名可能不再解析。继续前请检查当前路由。",
+    "effectiveDefault": "实际默认",
+    "defaultDeleteTitle": "移除默认区域？",
+    "defaultDeleteHelp": "新应用的主机名位于此区域之下。移除后注册的应用将使用下一个默认区域，若没有则不会获得主机名。",
+    "defaultDeleteRefused": "Astrolift 保留了此区域：它是新应用主机名的默认区域。",
+    "defaultDependentsLabel": "此区域下的环境",
+    "defaultDependentsNone": "尚无环境通过它解析。",
+    "defaultDependentsCount": "通过它解析的环境：{count} 个",
+    "defaultDependentsMore": "以及另外 {count} 个",
+    "defaultDeleteTypeToConfirm": "请输入区域名称以确认：",
+    "defaultDeleteConfirm": "移除默认区域",
     "actionFailed": "操作被拒绝。请读取当前状态后再重试。",
     "actionUncertain": "无法确认操作响应。请读取当前域名和提供商状态后再重试。",
     "acceptedUnverified": "写入已被接受，但无法验证返回的元数据。执行其他操作前请刷新当前状态。",
@@ -17155,7 +17225,8 @@
     "sharing": "共享",
     "connect": "连接",
     "agentInbox": "收件箱",
-    "appAccess": "应用访问权限"
+    "appAccess": "应用访问权限",
+    "topology": "系统蓝图"
   },
   "support": {
     "title": "支持",
@@ -17351,5 +17422,65 @@
       "groups": "找到登录；组：{groups}",
       "noGroups": "找到登录；不属于任何组"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · 系统蓝图",
+    "description": "浏览整个项目或聚焦某个工作流，在保留上下文的同时检查各个组件。",
+    "back": "项目概览",
+    "scope": "聚焦范围",
+    "wholeProject": "整个项目",
+    "canvas": "图形画布",
+    "componentList": "组件列表",
+    "counts": "{nodes} 个组件 · {edges} 条连接",
+    "partialError": "部分项目数据未能加载，此图并不完整。",
+    "notFound": "找不到项目或无权访问。",
+    "empty": "尚无可见的项目组件。",
+    "inspector": "组件详情",
+    "status": "状态",
+    "seeMore": "查看更多",
+    "exploreWorkflow": "浏览工作流步骤",
+    "connections": "相连组件",
+    "selectTitle": "检查组件",
+    "selectDescription": "选择节点即可查看配置和连接。“查看更多”会打开对应的 Astrolift 页面。选择聚焦范围可展开某个工作流的步骤。",
+    "evidenceNote": "连接来自已登记的配置。仅在最新运行能确定当前步骤时显示步骤状态，不会跨审核循环推断先前步骤的状态。",
+    "kind": {
+      "workflow": "工作流",
+      "stage": "步骤",
+      "agent": "智能体",
+      "app": "应用",
+      "repository": "代码仓库"
+    },
+    "edge": {
+      "source": "来源",
+      "dispatches": "分派任务",
+      "invokes": "调用",
+      "next": "下一步",
+      "return": "返回",
+      "retry": "重试"
+    },
+    "field": {
+      "pattern": "模式",
+      "stages": "步骤数",
+      "enabled": "已启用",
+      "repository": "代码仓库",
+      "source": "来源引用",
+      "latestRun": "最新运行",
+      "kind": "类型",
+      "order": "步骤编号",
+      "agent": "智能体",
+      "environment": "环境规格",
+      "model": "模型",
+      "output": "输出键",
+      "skills": "技能",
+      "failure": "失败时的行为",
+      "attempts": "最大尝试次数",
+      "timeout": "超时",
+      "workflow": "工作流",
+      "mode": "运行模式",
+      "running": "运行中的任务",
+      "lastRun": "上次运行"
+    },
+    "openBlueprint": "打开蓝图",
+    "expand": "展开"
   }
 }

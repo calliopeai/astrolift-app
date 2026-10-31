@@ -42,6 +42,7 @@ class UpdateOrganizationInput:
     trace_retention_days_default: int | None = None
     allow_user_profile_edit: bool | None = None
     allow_step_up_pin: bool | None = None
+    trusted_domain_signup: bool | None = None
     # Operator tags stamped on every resource this org provisions (#1505).
     # A whole-map replace rather than a merge: there has to be a way to
     # remove a tag, and `{}` is the obvious one.

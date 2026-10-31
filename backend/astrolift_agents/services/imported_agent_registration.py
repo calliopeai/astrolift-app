@@ -84,6 +84,12 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
     image = str((package.get("runtime") or {}).get("image") or "").strip()
     if not image:
         raise ImportedAgentRegistrationError("runtime.image is required before an imported agent can run")
+    from astrolift_agents.runtime_catalog import RetiredAgentRuntime, assert_runtime_available
+
+    try:
+        assert_runtime_available(image=image)
+    except RetiredAgentRuntime as exc:
+        raise ImportedAgentRegistrationError(str(exc)) from exc
     organization = project.organization
     effective_slug = _agent_slug(organization, package, slug)
     name = str((package.get("agent") or {}).get("name") or effective_slug).strip()

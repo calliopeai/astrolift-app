@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("astrolift_clusters", "0029_clear_stale_domain_failures"),
+        ("astrolift_clusters", "0030_tenantcluster_allow_public_apps"),
     ]
 
     operations = [

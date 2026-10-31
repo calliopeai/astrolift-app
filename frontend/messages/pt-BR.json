@@ -3119,6 +3119,29 @@
         "saveFailed": "Falha ao salvar.",
         "membersDescription": "Quem pode ver e alterar este app: os papéis atribuídos aqui e as equipes com as quais ele é compartilhado.",
         "edgeDescription": "Quem pode acessar a URL do app. A borda decide quem pode entrar; os papéis decidem quem pode alterá-lo."
+      },
+      "public": {
+        "title": "Acesso público",
+        "on": "Pública",
+        "off": "Atrás do login",
+        "description": "Quando pública, a URL de plataforma do app responde sem o login do cluster. O login do próprio app continua valendo, e domínios personalizados mantêm sua própria configuração.",
+        "states": {
+          "public": "responde sem login",
+          "gated": "atrás do login",
+          "no_gate": "este cluster não tem login, então o app está aberto",
+          "not_envoy": "continua atrás do login: só o edge do Envoy respeita esta opção",
+          "cluster_disallows": "continua atrás do login: este cluster não permite apps públicos",
+          "restricted": "continua atrás do login: o app tem uma lista de acesso"
+        },
+        "makePublic": "Tornar público…",
+        "makePrivate": "Colocar atrás do login",
+        "restrictedHint": "Limpe primeiro a lista de acesso; ela só se aplica atrás do login.",
+        "confirmTitle": "Tornar {app} público?",
+        "confirmDescription": "Quem chegar à URL de plataforma do app o acessa sem entrar no cluster. Só a autenticação do próprio app o protege. Talvez seja preciso confirmar sua identidade.",
+        "confirm": "Tornar público",
+        "madePublic": "O app está público onde o cluster permite.",
+        "madePrivate": "O app voltou a ficar atrás do login.",
+        "saveFailed": "Falha ao alterar."
       }
     },
     "members": {
@@ -5683,7 +5706,9 @@
         }
       },
       "allowStepUpPin": "Permitir verificação com PIN pessoal",
-      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação."
+      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação.",
+      "trustedDomainSignup": "Criar contas para domínios confiáveis",
+      "trustedDomainSignupHint": "Quem entrar com um e-mail verificado de um dos domínios confiáveis desta organização recebe uma conta e entra com a função padrão desse domínio. Deixe desativado para admitir apenas quem já tem conta."
     },
     "sections": {
       "houseTheme": "Tema da casa",
@@ -11148,7 +11173,10 @@
       "feedbackDeployed": "Implantação do agente aceita. Uma pulsação recebida confirma a conexão.",
       "feedbackIssueFailed": "Não foi possível emitir a chave do agente.",
       "feedbackDeployFailed": "Não foi possível implantar o agente.",
-      "feedbackRefreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual."
+      "feedbackRefreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize a tela para ver o estado atual.",
+      "managedDescription": "O plano de controle instala a credencial e o agente juntos. A credencial existente permanece ativa até que o agente substituto se conecte.",
+      "managedPending": "Instalando o agente e verificando seu primeiro sinal…",
+      "managedConnected": "Agente conectado. Credencial e implantação verificadas."
     },
     "source": {
       "readFailed": "Não foi possível ler os detalhes do cluster",
@@ -11424,6 +11452,23 @@
       "searchReleases": "Buscar versões instaladas…",
       "noReleases": "Nenhuma versão instalada",
       "started": "Início"
+    },
+    "publicApps": {
+      "title": "Apps públicos",
+      "description": "Se um app deste cluster pode responder sem o login acima quando o dono ativa isso. Desativado mantém todo app atrás do login, seja o que for que ele peça.",
+      "allowed": "Permitidos",
+      "refused": "Não permitidos",
+      "notEnvoy": "Só o edge do Envoy respeita o pedido de um app; no edge deste cluster todo app continua atrás do login.",
+      "allow": "Permitir apps públicos",
+      "refuse": "Parar apps públicos",
+      "allowTitle": "Permitir apps públicos neste cluster?",
+      "allowReview": "Apps que os donos já tornaram públicos passam a responder sem login na hora.",
+      "refuseTitle": "Parar os apps públicos neste cluster?",
+      "refuseReview": "Todo app público deste cluster volta para trás do login na hora.",
+      "allowedToast": "Apps públicos permitidos.",
+      "refusedToast": "Apps públicos parados; todo app está atrás do login.",
+      "changeFailed": "Falha ao alterar.",
+      "refreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize para ver o estado atual."
     }
   },
   "obsPanelReason": {
@@ -12970,6 +13015,16 @@
       "task": "Execuções avulsas",
       "workflow": "Um pipeline de várias etapas",
       "mixed": "Vários tipos de carga de trabalho"
+    },
+    "canvas": {
+      "legend": "Legenda e símbolos",
+      "zoomOut": "Diminuir zoom",
+      "zoomIn": "Aumentar zoom",
+      "fit": "Ajustar à visualização",
+      "expand": "Ampliar",
+      "pan": "Área do fluxo. Role para mover a visualização e use o zoom para alterar a escala.",
+      "inspector": "Etapa selecionada",
+      "seeMore": "Ver mais"
     }
   },
   "clusterConnection": {
@@ -14752,7 +14807,12 @@
       "noChoices": "Nenhum cluster não registrado corresponde.",
       "register": "Registrar",
       "unregisterTitle": "Cancelar o registro de {cluster} no Zentinelle?",
-      "unregisterBody": "Isso revoga o cluster no Zentinelle e depois remove o gateway e o segredo da credencial. O tráfego de agentes nele deixa de passar pelo Zentinelle."
+      "unregisterBody": "Isso revoga o cluster no Zentinelle e depois remove o gateway e o segredo da credencial. O tráfego de agentes nele deixa de passar pelo Zentinelle.",
+      "sharedTitle": "Clusters compartilhados",
+      "sharedDescription": "Não pertencem a nenhuma organização. São registrados pela conexão do Zentinelle da instalação, gerenciada pelo operador da plataforma; o instalador registra os clusters que cria.",
+      "sharedNotConnected": "A instalação não está conectada ao Zentinelle. Conecte o Zentinelle com o Astrolift no instalador para conectá-la e registrar seus clusters.",
+      "sharedManaged": "Gerenciado pela plataforma",
+      "sharedEmpty": "Nenhum cluster compartilhado."
     },
     "filters": {
       "window": "Período",
@@ -15108,6 +15168,16 @@
     "delete": "Remover domínio",
     "deleteTitle": "Remover domínio gerenciado?",
     "deleteHelp": "Isso inicia a ação existente de remoção do domínio. Registros gerenciados do provedor e certificados podem ser removidos, e os nomes de host dos aplicativos podem deixar de resolver. Revise as rotas atuais antes de continuar.",
+    "effectiveDefault": "Padrão efetivo",
+    "defaultDeleteTitle": "Remover a zona padrão?",
+    "defaultDeleteHelp": "Os novos aplicativos recebem seus nomes de host nesta zona. Os aplicativos registrados depois da remoção recebem a próxima zona padrão, ou nenhum nome de host.",
+    "defaultDeleteRefused": "O Astrolift manteve esta zona: ela é a padrão para os nomes de host dos novos aplicativos.",
+    "defaultDependentsLabel": "Ambientes nesta zona",
+    "defaultDependentsNone": "Nenhum ambiente é resolvido por ela ainda.",
+    "defaultDependentsCount": "Ambientes resolvidos por ela: {count}",
+    "defaultDependentsMore": "e mais {count}",
+    "defaultDeleteTypeToConfirm": "Para confirmar, digite a zona:",
+    "defaultDeleteConfirm": "Remover zona padrão",
     "actionFailed": "A ação foi recusada. Consulte o estado atual antes de tentar novamente.",
     "actionUncertain": "A resposta da ação não foi confirmada. Consulte o estado atual do domínio e do provedor antes de tentar novamente.",
     "acceptedUnverified": "A gravação foi aceita, mas os metadados retornados não puderam ser verificados. Atualize o estado antes de outra ação.",
@@ -16360,7 +16430,8 @@
     "sharing": "Compartilhamento",
     "connect": "Conectar",
     "agentInbox": "Caixa de entrada",
-    "appAccess": "Acesso a aplicativos"
+    "appAccess": "Acesso a aplicativos",
+    "topology": "Mapa do sistema"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17351,5 +17422,65 @@
       "groups": "Login encontrado; grupos: {groups}",
       "noGroups": "Login encontrado; em nenhum grupo"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Mapa do sistema",
+    "description": "Explore o projeto, selecione um fluxo e examine cada componente sem perder o contexto.",
+    "back": "Visão geral do projeto",
+    "scope": "Foco",
+    "wholeProject": "Projeto inteiro",
+    "canvas": "Área do grafo",
+    "componentList": "Lista de componentes",
+    "counts": "{nodes} componentes · {edges} conexões",
+    "partialError": "Não foi possível carregar alguns dados do projeto. Este grafo está incompleto.",
+    "notFound": "Projeto não encontrado ou sem acesso.",
+    "empty": "Ainda não há componentes visíveis.",
+    "inspector": "Detalhes do componente",
+    "status": "Estado",
+    "seeMore": "Ver mais",
+    "exploreWorkflow": "Explorar etapas do fluxo",
+    "connections": "Componentes conectados",
+    "selectTitle": "Examinar um componente",
+    "selectDescription": "Selecione um nó para ver sua configuração e conexões. Ver mais abre sua página no Astrolift. Use Foco para exibir as etapas de um fluxo.",
+    "evidenceNote": "As conexões vêm da configuração registrada. O estado de uma etapa só é exibido quando a última execução identifica a etapa atual; estados anteriores não são inferidos entre ciclos de revisão.",
+    "kind": {
+      "workflow": "Fluxo de trabalho",
+      "stage": "Etapa",
+      "agent": "Agente",
+      "app": "Aplicativo",
+      "repository": "Repositório"
+    },
+    "edge": {
+      "source": "Origem",
+      "dispatches": "Distribui tarefas",
+      "invokes": "Invoca",
+      "next": "Próximo",
+      "return": "Retorno",
+      "retry": "Tentar novamente"
+    },
+    "field": {
+      "pattern": "Padrão",
+      "stages": "Etapas",
+      "enabled": "Habilitado",
+      "repository": "Repositório",
+      "source": "Referência de origem",
+      "latestRun": "Última execução",
+      "kind": "Tipo",
+      "order": "Número da etapa",
+      "agent": "Agente",
+      "environment": "Especificação do ambiente",
+      "model": "Modelo",
+      "output": "Chave de saída",
+      "skills": "Habilidades",
+      "failure": "Comportamento em caso de falha",
+      "attempts": "Máximo de tentativas",
+      "timeout": "Tempo limite",
+      "workflow": "Fluxo de trabalho",
+      "mode": "Modo de execução",
+      "running": "Tarefas em execução",
+      "lastRun": "Última execução"
+    },
+    "openBlueprint": "Abrir mapa",
+    "expand": "Ampliar"
   }
 }

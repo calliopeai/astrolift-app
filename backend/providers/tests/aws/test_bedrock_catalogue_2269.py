@@ -721,3 +721,37 @@ def test_actual_botocore_json_decoder_does_not_certify_projected_string_type(wir
     assert isinstance(parsed["modelDetails"]["modelName"], dict)
     with pytest.raises(BedrockCatalogueError, match="INVALID_METADATA"):
         catalog._foundation(parsed["modelDetails"])
+
+
+def test_global_profile_accepts_regionless_foundation_destination(wire):
+    catalog, sts, bedrock = wire
+    row = profile(
+        "global.amazon.titan-text-express-v1", models=[{"modelArn": f"arn:aws:bedrock:::foundation-model/{MODEL}"}]
+    )
+    read(sts, bedrock, "list_inference_profiles", {"inferenceProfileSummaries": [row]}, {"maxResults": 100})
+    page = catalog.inference_profiles()
+    assert page.state == CatalogueState.METADATA
+    assert page.items[0].destination_model_arns == (f"arn:aws:bedrock:::foundation-model/{MODEL}",)
+
+
+def test_regionless_arn_is_not_a_regional_source_selector(wire):
+    catalog, _, _ = wire
+    with pytest.raises(BedrockCatalogueError, match="INVALID_REQUEST"):
+        catalog._selector(BedrockSourceKind.FOUNDATION_MODEL, f"arn:aws:bedrock:::foundation-model/{MODEL}")
+
+
+@pytest.mark.parametrize(
+    "arn,partition,expected",
+    [
+        (f"arn:aws:bedrock:::foundation-model/{MODEL}", "aws", True),
+        (MODEL_ARN, "aws", True),
+        (f"arn:aws:bedrock::{ACCOUNT}:foundation-model/{MODEL}", "aws", False),
+        (f"arn:aws-cn:bedrock:::foundation-model/{MODEL}", "aws-cn", False),
+        (f"arn:aws-cn:bedrock:cn-north-1::foundation-model/{MODEL}", "aws", False),
+        (f"arn:aws:bedrock:::inference-profile/{PROFILE}", "aws", False),
+    ],
+)
+def test_persisted_destination_identity_validation(arn, partition, expected):
+    from aws.bedrock_catalogue import valid_foundation_model_destination
+
+    assert valid_foundation_model_destination(arn, partition) is expected

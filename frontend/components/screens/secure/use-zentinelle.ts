@@ -13,6 +13,7 @@ import type {
   ZentinelleClusterChoicesQuery,
   ZentinelleConnectionQuery,
   ZentinelleHealthQuery,
+  ZentinelleInstallConnectionQuery,
   ZentinellePoliciesQuery,
   ZentinelleScopeOptionsQuery,
   ZentinelleUsageQuery,
@@ -22,10 +23,12 @@ import {
   DISCONNECT_ZENTINELLE,
   EXPORT_ZENTINELLE_AUDIT,
   REGISTER_ZENTINELLE_CLUSTER,
+  REGISTER_ZENTINELLE_SHARED_CLUSTER,
   ROTATE_ZENTINELLE_GATEWAY_CREDENTIAL,
   SET_ZENTINELLE_GATEWAY_ENABLED,
   SET_ZENTINELLE_GATEWAY_URL,
   UNREGISTER_ZENTINELLE_CLUSTER,
+  UNREGISTER_ZENTINELLE_SHARED_CLUSTER,
 } from "@/graphql/zentinelle/zentinelle.mutations";
 import {
   ZENTINELLE_AUDIT_PAGE,
@@ -33,6 +36,7 @@ import {
   ZENTINELLE_CLUSTER_CHOICES,
   ZENTINELLE_CONNECTION,
   ZENTINELLE_HEALTH,
+  ZENTINELLE_INSTALL_CONNECTION,
   ZENTINELLE_POLICIES,
   ZENTINELLE_SCOPE_OPTIONS,
   ZENTINELLE_USAGE,
@@ -62,7 +66,7 @@ interface Payload {
 /** Codes another surface already answers: the step-up prompt and the approval toast. */
 const HANDLED = new Set(["STEP_UP_REQUIRED", "APPROVAL_REQUIRED"]);
 
-const REFETCH = ["ZentinelleConnection", "ZentinelleCapability"];
+const REFETCH = ["ZentinelleConnection", "ZentinelleCapability", "ZentinelleInstallConnection"];
 
 /** A write's reason to show, or null when it worked or another prompt took it. */
 async function outcome(
@@ -199,6 +203,13 @@ export function useZentinelle(): ZentinelleScreenProps {
     fetchPolicy: "cache-and-network",
     skip: !live || tab !== "clusters" || !access.gatewayManage,
   });
+  // Platform operator only; anyone else's read errors, which is the answer.
+  const install = useQuery<ZentinelleInstallConnectionQuery>(ZENTINELLE_INSTALL_CONNECTION, {
+    fetchPolicy: "cache-and-network",
+    errorPolicy: "all",
+    skip: !live || tab !== "clusters" || !access.gatewayManage,
+  });
+  const operator = Boolean(install.data) && !install.error;
 
   // ---- writes --------------------------------------------------------------
   const opts = { refetchQueries: REFETCH, awaitRefetchQueries: true };
@@ -209,6 +220,8 @@ export function useZentinelle(): ZentinelleScreenProps {
   const [enabledMutation] = useMutation(SET_ZENTINELLE_GATEWAY_ENABLED, opts);
   const [rotateMutation] = useMutation(ROTATE_ZENTINELLE_GATEWAY_CREDENTIAL, opts);
   const [unregisterMutation] = useMutation(UNREGISTER_ZENTINELLE_CLUSTER, opts);
+  const [registerSharedMutation] = useMutation(REGISTER_ZENTINELLE_SHARED_CLUSTER, opts);
+  const [unregisterSharedMutation] = useMutation(UNREGISTER_ZENTINELLE_SHARED_CLUSTER, opts);
   const [exportMutation] = useMutation(EXPORT_ZENTINELLE_AUDIT);
   const failed = t("writeFailed");
 
@@ -329,7 +342,12 @@ export function useZentinelle(): ZentinelleScreenProps {
     clusters: {
       busyClusterId,
       choices: {
-        items: choices.data?.astroliftClustersPage.items ?? [],
+        items: (choices.data?.astroliftClustersPage.items ?? []).map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          name: c.name,
+          shared: c.organizationSlug == null,
+        })),
         loading: choices.loading && !choices.data,
         search: clusterSearch,
       },
@@ -346,6 +364,18 @@ export function useZentinelle(): ZentinelleScreenProps {
         onCluster(id, () => rotateMutation(input(id)), "rotateZentinelleGatewayCredential"),
       onUnregister: (id) =>
         onCluster(id, () => unregisterMutation(input(id)), "unregisterZentinelleCluster"),
+      shared: {
+        operator,
+        connection: operator ? (install.data?.astroliftZentinelleInstallConnection ?? null) : null,
+        onRegister: (id) =>
+          onCluster(id, () => registerSharedMutation(input(id)), "registerZentinelleSharedCluster"),
+        onUnregister: (id) =>
+          onCluster(
+            id,
+            () => unregisterSharedMutation(input(id)),
+            "unregisterZentinelleSharedCluster"
+          ),
+      },
     },
     usage: {
       filter: {

@@ -9,6 +9,8 @@ every test picks it up automatically.
 
 Set ASTROLIFT_TEST_TEMPORAL_ADDRESS to use an existing disposable server
 instead, such as the compose service on architectures without a test binary.
+Set ASTROLIFT_TEST_TEMPORAL_SERVER_PATH to a preinstalled time-skipping test
+server when the SDK cannot download one from the test container.
 
 This file is imported lazily by ``conftest.py`` — importing temporalio
 at module load time would slow the unit-test path that doesn't need it.
@@ -32,7 +34,9 @@ async def temporal_test_env() -> AsyncIterator[Any]:
         async with WorkflowEnvironment.from_client(client) as env:
             yield env
         return
-    async with await WorkflowEnvironment.start_time_skipping() as env:
+    async with await WorkflowEnvironment.start_time_skipping(
+        test_server_existing_path=os.getenv("ASTROLIFT_TEST_TEMPORAL_SERVER_PATH") or None,
+    ) as env:
         yield env
 
 

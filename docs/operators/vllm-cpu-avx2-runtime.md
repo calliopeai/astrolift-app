@@ -6,6 +6,21 @@ that change the build inputs run the build and smoke checks. Registry publicatio
 requires an explicit workflow dispatch with publication enabled, which defaults
 to false, and happens after the runner's kernel and bounded inference checks.
 
+Preconditions: no Astrolift permission for the build; it is the GitHub Actions
+workflow `.github/workflows/vllm-cpu-runtime.yml` of the `astrolift-app`
+repository, dispatched with its `publish` input, and the job holds
+`packages: write` for GHCR. Declaring the result for admission needs a platform
+operator holding `org.update` and `cluster.update` in the cluster's organization
+(`backend/core/permissions.py`), through `updateClusterModelRuntime` or the
+runtime setup form reached from `/models/deploy`. Placeholders: `<ref>` is the
+branch or tag to build; `<image>` is the built image reference; `<proof-path>`
+is where the smoke writes its JSON proof; `<digest>` is the `sha256:` manifest
+digest in the run's `registry-manifest.json` artifact.
+
+```sh
+gh workflow run vllm-cpu-runtime.yml --ref <ref> -f publish=true
+```
+
 The build uses upstream vLLM 0.15.1 commit
 `1892993bc18e243e2c05841314c5e9c06a80c70d`, an archive checksum, and an
 amd64 Ubuntu 22.04 base digest recorded in `scripts/vllm_cpu_runtime/source.json`.
@@ -29,11 +44,25 @@ with a particular node or sufficient memory for a particular model.
 The smoke checks the actual package is `0.15.1+cpu`, PyTorch is `2.10.0+cpu`,
 and checks the registered float32 CPU SwiGLU kernel against PyTorch's numerical
 reference before starting a localhost-only server with
-one CPU, 4 GiB memory, 1 GiB KV cache, a 256-token context and one sequence.
+one CPU, 4 GiB memory, a 256-token context and one sequence.
 It loads an immutable public Qwen/Qwen2.5-0.5B-Instruct revision and requires
 an actual bounded chat completion. Failure, including out of memory, prevents
 publication. The smoke never supplies Hugging Face or cloud credentials.
 A successful runner smoke is still not actual cluster readiness or inference.
+
+The smoke's KV cache holds exactly that context: `--num-gpu-blocks-override 3`
+allocates three 128-token blocks, two for the one 256-token sequence and one
+that vLLM keeps as its null block, about 9 MiB for this model in float32.
+`VLLM_CPU_KVCACHE_SPACE=1` stays set as the 1 GiB ceiling vLLM checks the
+context against; without the override vLLM fills that ceiling with 341 blocks
+(43,648 tokens, 170 times what one sequence can use). The proof records
+`kv_cache_blocks`. Measured with `memory_phases` before the change, anon
+memory, which cannot be reclaimed without swap, reached about 4,000 MiB of the
+4,096 MiB limit at readiness, with page cache already squeezed to tens of MiB,
+so the 1 GiB cache, not reclaimable page cache, was what left no headroom. The
+override changes nothing the smoke certifies beyond its own 256-token,
+one-sequence context; a longer context or more sequences needs more blocks and
+is not covered by this smoke.
 
 The server runs under a cgroup parent of its own, fresh for each run, which
 sets no limit and outlives the container. At the end of the smoke, before the
@@ -48,6 +77,38 @@ values include page cache, and after a stop `current_bytes` is only what the
 exited processes left charged. A host without readable cgroup v2 files records
 `{"unavailable": "<exception type>"}`; the smoke's result never depends on the
 evidence.
+
+The proof's `memory_phases` shows what fills the 4 GiB. It samples the
+parent's `memory.current` and the `anon`, `file`, `shmem`, `file_mapped`,
+`active_file`, `inactive_file`, `kernel` and `slab` values of `memory.stat` at
+`before_engine_start`, `weights_loaded`, `kv_cache_allocated` and `warmup`, each
+taken when the candidate's own log line for that point first appears, and at
+`ready`, the first healthy poll. The log is read through `docker logs
+--follow` in lines of at most 4 KiB and 8 MiB in all, and no log text is kept.
+Each sample carries `elapsed_s` since the server started. `file` is page cache
+and includes `shmem`; without swap, `anon` cannot be reclaimed, while the
+kernel reclaims `inactive_file` first and then `active_file`, so a run whose
+peak sits at 4 GiB may still be mostly reclaimable cache. A point whose line
+never appears is left out, and an unreadable file records
+`{"unavailable": "<exception type>"}`.
+
+During readiness, every poll also reads the parent's `oom_kill` count. The
+parent is fresh, so any kill is this candidate's, and vLLM does not restart an
+engine the OOM killer took; the API server can stay up without ever serving
+`/health`. A rise stops the smoke at that poll with `failure_type`
+`OomKillDuringReadiness` and `outcome` `oom_kill during readiness` instead of
+waiting out the 900 s deadline. Where the count cannot be read, readiness
+waits as before.
+
+Every proof also records `host`, read once at the start of the smoke from
+`/proc/cpuinfo` and `/proc/meminfo` with a bound on each: `cpu_vendor`,
+`cpu_model`, `logical_cpus`, `physical_cores`, `mem_total_bytes` and
+`isa_flags`, which says for each of `avx2`, `avx512f`, `avx512_bf16`,
+`avx512_vnni`, `amx_tile`, `amx_bf16` and `amx_int8` whether every logical
+CPU lists it. No other flag or field leaves the host; the vendor and model must
+match narrow printable patterns, or the proof records
+`{"unavailable": "<exception type>"}`. The runner's region is not visible to
+the smoke; it is in the job log's set-up step.
 
 Before installing a produced digest, inspect actual node CPU flags (AVX2 and
 F16C), allocatable CPU/memory, current requests, image pull access and the
@@ -67,3 +128,14 @@ After a future build, record and declare its exact registry manifest digest.
 Verify the selected nodes, image access and capacity before deployment, then
 require actual deployment readiness and inference observations. Keep launcher
 arguments and certification checks intact.
+
+## Verify
+
+```sh
+python3 scripts/vllm_cpu_runtime/smoke.py --image <image> --proof <proof-path>
+```
+
+The smoke must exit zero and the proof at `<proof-path>` must record
+`"passed": true` with `kv_cache_blocks`, `memory_evidence`, `memory_phases` and
+`host`; a failed smoke exits with "CPU runtime candidate smoke failed" and the
+proof names its `failure_type`.

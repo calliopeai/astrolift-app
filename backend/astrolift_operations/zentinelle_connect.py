@@ -1280,6 +1280,36 @@ def reconcile_gateways() -> list[GatewayReconcile]:
     return results
 
 
+def register_shared_clusters(*, connection: ZentinelleConnection) -> list[GatewayReconcile]:
+    """Register every active shared cluster that has no gateway yet through the
+    install connection (#1905), so an install's own clusters are governed without
+    an operator registering each by hand. Idempotent: a registered cluster is
+    skipped, so running it again only picks up clusters added since. One
+    cluster's failure is reported and does not stop the others."""
+    from astrolift_clusters.models import TenantCluster
+
+    if not connection.is_install:
+        raise ZentinelleConnectError(ErrorCode.PRECONDITION, "not the install connection")
+    retired = (TenantCluster.Lifecycle.DECOMMISSIONING, TenantCluster.Lifecycle.DECOMMISSIONED)
+    registered = ZentinelleClusterGateway.objects.values_list("cluster_id", flat=True)
+    clusters = (
+        TenantCluster.objects.filter(organization__isnull=True, deleted_at__isnull=True, is_active=True)
+        .exclude(lifecycle__in=retired)
+        .exclude(pk__in=registered)
+        .select_related("provider_plugin")
+    )
+    results: list[GatewayReconcile] = []
+    for cluster in clusters:
+        try:
+            register_cluster(connection=connection, cluster=cluster)
+            outcome = "registered"
+        except ZentinelleConnectError as exc:
+            outcome = f"failed: {exc.message}"
+            log.warning("zentinelle: registering shared cluster %s failed: %s", cluster.slug, exc.message)
+        results.append(GatewayReconcile(cluster.slug, outcome))
+    return results
+
+
 def set_gateway_url(*, connection: ZentinelleConnection, url: str | None) -> list[GatewayReconcile]:
     """Point this connection's cluster gateways at ``url`` (empty: the
     connection's own URL) and redeploy each running one so it takes effect

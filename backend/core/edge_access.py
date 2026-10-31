@@ -172,7 +172,12 @@ def set_app_access(app: Any, *, groups: Any, users: Any, source: str) -> dict[st
         raise ValueError(f"source must be one of {ACCESS_SOURCES}")
     access = normalize_access(groups, users)
     app.edge_access = {**access, "source": source} if is_restricted(access) else {}
-    app.save(update_fields=["edge_access", "updated_at", "version"])
+    # A list only means something behind the login, so restricting a public
+    # app makes it private (#2504); making it public again is a step-up.
+    was_public = bool(getattr(app, "edge_public", False)) and is_restricted(access)
+    if was_public:
+        app.edge_public = False
+    app.save(update_fields=["edge_access", "updated_at", "version", *(["edge_public"] if was_public else [])])
 
     prefix = f"{app.guid}/"
     # Only the clusters this app's own environments run on.
@@ -200,6 +205,11 @@ def set_app_access(app: Any, *, groups: Any, users: Any, source: str) -> dict[st
             # next restriction needs no deploy either.
             rules[key] = {**entry, **access}
         _save_rules(cluster, rules)
+    if was_public:
+        from core.edge_public import reapply_app_routes
+
+        for error in reapply_app_routes(app):
+            logger.error("edge access: gating %s again failed: %s; its next deploy does it", app.slug, error)
     return access
 
 

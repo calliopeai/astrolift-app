@@ -8,6 +8,8 @@ for tenant apps, preview environments, both, or none.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from django.db import models
 from django.db.models import Q
 
@@ -222,6 +224,49 @@ def resolve_managed_domain(
         .order_by("pk")
         .first()
     )
+
+
+def effective_default_ids(domains: Iterable[ManagedDomain]) -> set[int]:
+    """The pks among ``domains`` that new environments resolve to (#2572).
+
+    A zone is an effective default when ``resolve_managed_domain`` picks it,
+    for apps or for previews, for the organization that owns it; when it is
+    the platform-tier pick, which every org without a zone of its own falls
+    through to, one created later included; or when a live org names it as
+    its ``default_managed_domain``. Asking ``resolve_managed_domain`` itself
+    keeps the delete guard from drifting away from what registration does.
+    """
+    from astrolift_identity.models import Organization
+
+    domains = list(domains)
+    if not domains:
+        return set()
+    picks: set[int] = set()
+    for org_id in {d.organization_id for d in domains}:
+        organization = None
+        if org_id is not None:
+            organization = (
+                Organization.objects.filter(pk=org_id).select_related("default_managed_domain").first()
+            )
+            if organization is None:
+                continue
+        for for_preview in (False, True):
+            pick = resolve_managed_domain(organization, for_preview=for_preview)
+            if pick is not None:
+                picks.add(pick.pk)
+    named = set(
+        Organization.objects.filter(default_managed_domain_id__in=[d.pk for d in domains]).values_list(
+            "default_managed_domain_id", flat=True
+        )
+    )
+    return {d.pk for d in domains if d.pk in picks} | {
+        d.pk
+        for d in domains
+        if d.pk in named
+        and d.deleted_at is None
+        and d.verification_state != ManagedDomain.VerificationState.PENDING
+        and d.dns_driver != "cloudflare_read_only"
+    }
 
 
 def managed_domain_for_zone(zone: str, organization_id: int | None) -> ManagedDomain | None:

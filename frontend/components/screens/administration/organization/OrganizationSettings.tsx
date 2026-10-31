@@ -65,6 +65,7 @@ export function OrganizationSettings({
       auditDays: String(org?.auditLogRetentionDays ?? 365),
       allowProfileEdit: org?.allowUserProfileEdit ?? true,
       allowStepUpPin: org?.allowStepUpPin ?? false,
+      trustedDomainSignup: org?.trustedDomainSignup ?? false,
       restrictedSettingsDefault: isRestrictedSettings(org?.restrictedSettingsDefault)
         ? org.restrictedSettingsDefault
         : PRODUCT_RESTRICTED_SETTINGS,
@@ -76,6 +77,7 @@ export function OrganizationSettings({
   const [auditDays, setAuditDays] = React.useState(saved.auditDays);
   const [allowProfileEdit, setAllowProfileEdit] = React.useState(saved.allowProfileEdit);
   const [allowStepUpPin, setAllowStepUpPin] = React.useState(saved.allowStepUpPin);
+  const [trustedDomainSignup, setTrustedDomainSignup] = React.useState(saved.trustedDomainSignup);
   const [restrictedDefault, setRestrictedDefault] = React.useState<RestrictedSettings>(
     saved.restrictedSettingsDefault
   );
@@ -86,6 +88,7 @@ export function OrganizationSettings({
     setAuditDays(saved.auditDays);
     setAllowProfileEdit(saved.allowProfileEdit);
     setAllowStepUpPin(saved.allowStepUpPin);
+    setTrustedDomainSignup(saved.trustedDomainSignup);
     setRestrictedDefault(saved.restrictedSettingsDefault);
   }, [saved]);
 
@@ -99,6 +102,7 @@ export function OrganizationSettings({
     Boolean(org) &&
     (allowProfileEdit !== saved.allowProfileEdit ||
       allowStepUpPin !== saved.allowStepUpPin ||
+      trustedDomainSignup !== saved.trustedDomainSignup ||
       restrictedDefault !== saved.restrictedSettingsDefault);
 
   const sections = [
@@ -221,10 +225,16 @@ export function OrganizationSettings({
           onCancel={() => {
             setAllowProfileEdit(saved.allowProfileEdit);
             setAllowStepUpPin(saved.allowStepUpPin);
+            setTrustedDomainSignup(saved.trustedDomainSignup);
             setRestrictedDefault(saved.restrictedSettingsDefault);
           }}
           onSave={() =>
-            save({ allowProfileEdit, allowStepUpPin, restrictedSettingsDefault: restrictedDefault })
+            save({
+              allowProfileEdit,
+              allowStepUpPin,
+              trustedDomainSignup,
+              restrictedSettingsDefault: restrictedDefault,
+            })
           }
         >
           {orgsLoading ? (
@@ -259,6 +269,20 @@ export function OrganizationSettings({
                   <span className="font-medium">{t("policies.allowStepUpPin")}</span>
                   <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
                     {t("policies.allowStepUpPinHint")}
+                  </span>
+                </span>
+              </label>
+              <label className="flex min-w-0 items-start gap-3 text-sm sm:max-w-xl">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={trustedDomainSignup}
+                  onChange={(e) => setTrustedDomainSignup(e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="font-medium">{t("policies.trustedDomainSignup")}</span>
+                  <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                    {t("policies.trustedDomainSignupHint")}
                   </span>
                 </span>
               </label>

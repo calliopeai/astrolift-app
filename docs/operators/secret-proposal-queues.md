@@ -4,6 +4,14 @@ The additive proposal page API returns queue metadata without secret material.
 The legacy list remains available for compatible clients and retains its 200-row
 cap. Clients needing a complete queue use `astroliftSecretChangeProposalsPage`.
 
+Preconditions: `app.read` on the apps whose proposals you list, within the
+bearer token's team ceiling; opening a proposal's detail additionally needs
+`secret.read` and step-up. Surfaces: the console at `/approvals/secret`, or
+GraphQL via `astro api graphql` (pass the documents below with `-q` or `-f` and
+`--var name=value`). Placeholders: `<app-slug>` is the registered app slug
+(`astro app list`); `<cursor>` is `nextCursor` from the previous page;
+`<proposal-id>` is `id` of a page item.
+
 ```graphql
 query ProposalPage($appSlug: String, $status: String, $limit: Int!, $after: String) {
   astroliftSecretChangeProposalsPage(
@@ -66,3 +74,16 @@ use the existing mutation envelopes and permissions.
 Source contract: [issue #2233](https://github.com/calliopeai/astrolift-app/issues/2233).
 This guide describes the additive API; availability depends on the installed
 server. It does not claim a deployment or mobile client update.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftSecretChangeProposalsPage(status: "pending", limit: 25) { items { id status approvalsCount } nextCursor totalCount complete } }'
+astro api graphql -q '{ astroliftSecretChangeProposalsPage(status: "pending", limit: 25, after: "<cursor>") { items { id } nextCursor totalCount complete } }'
+astro api graphql -q '{ astroliftSecretChangeProposalMetadata(id: "<proposal-id>") { id status approvalsCount requiredApproverCount } }'
+./run.sh test astrolift_services/tests/test_secret_proposal_paging_2233.py
+```
+
+Following `nextCursor` to the end yields exactly `totalCount` items with
+`complete: true` on the last page and no `STALE_CURSOR`, the metadata read returns
+the same row, and the test run passes.

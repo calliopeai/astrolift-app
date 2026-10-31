@@ -3113,6 +3113,29 @@
         "saveFailed": "No se pudo guardar.",
         "membersDescription": "Quién puede ver y modificar esta app: sus roles aquí y los equipos con los que se comparte.",
         "edgeDescription": "Quién puede acceder a la URL de la app. El borde decide quién puede entrar; los roles deciden quién puede modificarla."
+      },
+      "public": {
+        "title": "Acceso público",
+        "on": "Pública",
+        "off": "Tras el inicio de sesión",
+        "description": "Si es pública, la URL de plataforma de la app responde sin el inicio de sesión del clúster. El inicio de sesión propio de la app sigue aplicándose, y los dominios personalizados conservan su propio ajuste.",
+        "states": {
+          "public": "responde sin iniciar sesión",
+          "gated": "tras el inicio de sesión",
+          "no_gate": "este clúster no tiene inicio de sesión, así que la app está abierta",
+          "not_envoy": "sigue tras el inicio de sesión: solo el edge de Envoy respeta este interruptor",
+          "cluster_disallows": "sigue tras el inicio de sesión: este clúster no permite apps públicas",
+          "restricted": "sigue tras el inicio de sesión: la app tiene una lista de acceso"
+        },
+        "makePublic": "Hacer pública…",
+        "makePrivate": "Poner tras el inicio de sesión",
+        "restrictedHint": "Vacía primero la lista de acceso; solo se aplica tras el inicio de sesión.",
+        "confirmTitle": "¿Hacer pública {app}?",
+        "confirmDescription": "Quien llegue a la URL de plataforma de la app la obtiene sin iniciar sesión en el clúster. Solo la autenticación propia de la app la protege. Puede que se te pida verificar tu identidad.",
+        "confirm": "Hacer pública",
+        "madePublic": "La app es pública donde su clúster lo permite.",
+        "madePrivate": "La app vuelve a estar tras el inicio de sesión.",
+        "saveFailed": "No se pudo aplicar el cambio."
       }
     },
     "members": {
@@ -5677,7 +5700,9 @@
         }
       },
       "allowStepUpPin": "Permitir verificación con un PIN personal",
-      "allowStepUpPinHint": "Los miembros pueden definir un PIN de 6 a 8 dígitos y confirmar acciones sensibles con él en lugar de volver a iniciar sesión. Déjalo desactivado si tu cumplimiento normativo exige el proveedor de identidad en cada verificación."
+      "allowStepUpPinHint": "Los miembros pueden definir un PIN de 6 a 8 dígitos y confirmar acciones sensibles con él en lugar de volver a iniciar sesión. Déjalo desactivado si tu cumplimiento normativo exige el proveedor de identidad en cada verificación.",
+      "trustedDomainSignup": "Crear cuentas para dominios de confianza",
+      "trustedDomainSignupHint": "Quien inicie sesión con un correo verificado de uno de los dominios de confianza de esta organización obtiene una cuenta y se une con el rol predeterminado de ese dominio. Déjalo desactivado para admitir solo a quienes ya tienen una cuenta."
     },
     "sections": {
       "houseTheme": "Tema de la casa",
@@ -11151,7 +11176,10 @@
       "feedbackDeployed": "Despliegue del agente aceptado. Un latido recibido confirma la conexión.",
       "feedbackIssueFailed": "No se pudo emitir la clave del agente.",
       "feedbackDeployFailed": "No se pudo desplegar el agente.",
-      "feedbackRefreshWarning": "El cambio se aceptó, pero no se pudieron actualizar los detalles del clúster. Actualiza la vista para consultar el estado actual."
+      "feedbackRefreshWarning": "El cambio se aceptó, pero no se pudieron actualizar los detalles del clúster. Actualiza la vista para consultar el estado actual.",
+      "managedDescription": "El plano de control instala juntos la credencial y el agente. La credencial existente permanece activa hasta que se conecte el agente de reemplazo.",
+      "managedPending": "Instalando el agente y verificando su primer latido…",
+      "managedConnected": "Agente conectado. Credencial y despliegue verificados."
     },
     "source": {
       "readFailed": "No se pudieron consultar los detalles del clúster",
@@ -11427,6 +11455,23 @@
       "searchReleases": "Buscar versiones instaladas…",
       "noReleases": "No hay versiones instaladas",
       "started": "Inicio"
+    },
+    "publicApps": {
+      "title": "Apps públicas",
+      "description": "Si una app de este clúster puede responder sin el inicio de sesión de arriba cuando su propietario lo activa. Desactivado mantiene todas las apps tras el inicio de sesión, pidan lo que pidan.",
+      "allowed": "Permitidas",
+      "refused": "No permitidas",
+      "notEnvoy": "Solo el edge de Envoy respeta la petición de una app; en el edge de este clúster todas las apps siguen tras el inicio de sesión.",
+      "allow": "Permitir apps públicas",
+      "refuse": "Detener apps públicas",
+      "allowTitle": "¿Permitir apps públicas en este clúster?",
+      "allowReview": "Las apps que sus propietarios ya hicieron públicas responden sin iniciar sesión de inmediato.",
+      "refuseTitle": "¿Detener las apps públicas en este clúster?",
+      "refuseReview": "Todas las apps públicas de este clúster pasan tras el inicio de sesión de inmediato.",
+      "allowedToast": "Apps públicas permitidas.",
+      "refusedToast": "Apps públicas detenidas; todas las apps están tras el inicio de sesión.",
+      "changeFailed": "No se pudo aplicar el cambio.",
+      "refreshWarning": "Se aceptó el cambio, pero no se pudieron actualizar los detalles del clúster. Actualiza para ver el estado actual."
     }
   },
   "obsPanelReason": {
@@ -12973,6 +13018,16 @@
       "task": "Ejecuciones puntuales",
       "workflow": "Una canalización de varios pasos",
       "mixed": "Varios tipos de carga de trabajo"
+    },
+    "canvas": {
+      "legend": "Leyenda y símbolos",
+      "zoomOut": "Alejar",
+      "zoomIn": "Acercar",
+      "fit": "Ajustar a la vista",
+      "expand": "Ampliar",
+      "pan": "Lienzo del flujo. Desplázate para moverlo y usa el zoom para cambiar la escala.",
+      "inspector": "Etapa seleccionada",
+      "seeMore": "Ver más"
     }
   },
   "clusterConnection": {
@@ -14755,7 +14810,12 @@
       "noChoices": "Ningún clúster sin registrar coincide.",
       "register": "Registrar",
       "unregisterTitle": "¿Dar de baja {cluster} en Zentinelle?",
-      "unregisterBody": "Esto revoca el clúster en Zentinelle y después retira su pasarela y el secreto de su credencial. El tráfico de agentes en él deja de pasar por Zentinelle."
+      "unregisterBody": "Esto revoca el clúster en Zentinelle y después retira su pasarela y el secreto de su credencial. El tráfico de agentes en él deja de pasar por Zentinelle.",
+      "sharedTitle": "Clústeres compartidos",
+      "sharedDescription": "No pertenecen a ninguna organización. Se registran a través de la conexión de Zentinelle de la instalación, que gestiona el operador de la plataforma; el instalador registra los clústeres que crea.",
+      "sharedNotConnected": "La instalación no está conectada a Zentinelle. Conecta Zentinelle con Astrolift desde el instalador para conectarla y registrar sus clústeres.",
+      "sharedManaged": "Gestionado por la plataforma",
+      "sharedEmpty": "No hay clústeres compartidos."
     },
     "filters": {
       "window": "Periodo",
@@ -15111,6 +15171,16 @@
     "delete": "Eliminar dominio",
     "deleteTitle": "¿Eliminar dominio administrado?",
     "deleteHelp": "Esto inicia la acción existente de eliminación del dominio. Se pueden eliminar los registros administrados del proveedor y los certificados, y los nombres de host de las aplicaciones podrían dejar de resolverse. Revisa las rutas actuales antes de continuar.",
+    "effectiveDefault": "Predeterminada efectiva",
+    "defaultDeleteTitle": "¿Eliminar la zona predeterminada?",
+    "defaultDeleteHelp": "Las aplicaciones nuevas reciben sus nombres de host bajo esta zona. Las aplicaciones registradas después de eliminarla reciben la siguiente zona predeterminada, o ningún nombre de host.",
+    "defaultDeleteRefused": "Astrolift conservó esta zona: es la predeterminada para los nombres de host de las aplicaciones nuevas.",
+    "defaultDependentsLabel": "Entornos bajo esta zona",
+    "defaultDependentsNone": "Aún no se resuelve ningún entorno a través de ella.",
+    "defaultDependentsCount": "Entornos que se resuelven a través de ella: {count}",
+    "defaultDependentsMore": "y {count} más",
+    "defaultDeleteTypeToConfirm": "Para confirmar, escribe la zona:",
+    "defaultDeleteConfirm": "Eliminar zona predeterminada",
     "actionFailed": "La acción fue rechazada. Consulta el estado actual antes de reintentar.",
     "actionUncertain": "No se confirmó la respuesta de la acción. Consulta el estado actual del dominio y del proveedor antes de reintentar.",
     "acceptedUnverified": "La escritura fue aceptada, pero no se pudieron verificar los metadatos devueltos. Actualiza el estado actual antes de otra acción.",
@@ -17158,7 +17228,8 @@
     "sharing": "Acceso compartido",
     "connect": "Conectar",
     "agentInbox": "Bandeja de entrada",
-    "appAccess": "Acceso a aplicaciones"
+    "appAccess": "Acceso a aplicaciones",
+    "topology": "Plano del sistema"
   },
   "support": {
     "title": "Soporte",
@@ -17354,5 +17425,65 @@
       "groups": "Inicio de sesión encontrado; grupos: {groups}",
       "noGroups": "Inicio de sesión encontrado; sin grupo"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Plano del sistema",
+    "description": "Explora el proyecto, enfoca un flujo y examina cada componente sin perder el contexto.",
+    "back": "Resumen del proyecto",
+    "scope": "Enfoque",
+    "wholeProject": "Proyecto completo",
+    "canvas": "Lienzo del grafo",
+    "componentList": "Lista de componentes",
+    "counts": "{nodes} componentes · {edges} conexiones",
+    "partialError": "No se pudieron cargar algunos datos del proyecto. Este grafo está incompleto.",
+    "notFound": "Proyecto no encontrado o sin acceso.",
+    "empty": "Todavía no hay componentes visibles.",
+    "inspector": "Detalles del componente",
+    "status": "Estado",
+    "seeMore": "Ver más",
+    "exploreWorkflow": "Explorar etapas del flujo",
+    "connections": "Componentes conectados",
+    "selectTitle": "Examinar un componente",
+    "selectDescription": "Selecciona un nodo para ver su configuración y conexiones. Ver más abre su página en Astrolift. Usa Enfoque para mostrar las etapas de un flujo.",
+    "evidenceNote": "Las conexiones proceden de la configuración registrada. Solo se muestra el estado de una etapa cuando la última ejecución identifica la etapa actual; no se deducen estados anteriores entre ciclos de revisión.",
+    "kind": {
+      "workflow": "Flujo de trabajo",
+      "stage": "Etapa",
+      "agent": "Agente",
+      "app": "Aplicación",
+      "repository": "Repositorio"
+    },
+    "edge": {
+      "source": "Origen",
+      "dispatches": "Envía tareas",
+      "invokes": "Invoca",
+      "next": "Siguiente",
+      "return": "Retorno",
+      "retry": "Reintentar"
+    },
+    "field": {
+      "pattern": "Patrón",
+      "stages": "Etapas",
+      "enabled": "Habilitado",
+      "repository": "Repositorio",
+      "source": "Referencia de origen",
+      "latestRun": "Última ejecución",
+      "kind": "Tipo",
+      "order": "Número de etapa",
+      "agent": "Agente",
+      "environment": "Especificación del entorno",
+      "model": "Modelo",
+      "output": "Clave de salida",
+      "skills": "Habilidades",
+      "failure": "Comportamiento ante errores",
+      "attempts": "Intentos máximos",
+      "timeout": "Tiempo límite",
+      "workflow": "Flujo de trabajo",
+      "mode": "Modo de ejecución",
+      "running": "Tareas en ejecución",
+      "lastRun": "Última ejecución"
+    },
+    "openBlueprint": "Abrir plano",
+    "expand": "Ampliar"
   }
 }

@@ -441,7 +441,7 @@ def _apply_post_install_manifests(
                 errors.append(str(err))
                 if not _operator_not_serving([err]):
                     log.warning(
-                        "install_cluster_prereqs: post-install %s manifest error " "(non-fatal): %s",
+                        "install_cluster_prereqs: post-install %s manifest error (non-fatal): %s",
                         component.key,
                         err,
                     )
@@ -796,7 +796,8 @@ def _install_cluster_prereqs_sync(
     # land, so each controller can assume its role as soon as its pods start
     # (#1032 EBS-CSI, #1044 ALB controller + external-dns). No-op for non-AWS
     # clusters or when the component is deselected.
-    _provision_ebs_csi_irsa_role(cluster, selected_set)
+    chart_components = {component.key for component in components if component.chart_repo_url}
+    _provision_ebs_csi_irsa_role(cluster, selected_set & chart_components)
     _provision_aws_controller_irsa_role(
         cluster,
         selected_set,
@@ -844,10 +845,20 @@ def _install_cluster_prereqs_sync(
     # Track which HelmRelease names this run actively manages — any
     # platform-managed release NOT in this set is either deselected or
     # legacy and should be removed so Flux stops reconciling it.
-    expected_release_names: set[str] = set()
+    # A cloud-managed driver may coexist with a legacy recipe release. Do not
+    # uninstall that release implicitly: its shared CSI objects need an explicit
+    # ownership handoff. Fresh installs never create the duplicate release.
+    expected_release_names: set[str] = {
+        "astrolift-aws-ebs-csi-driver"
+        for component in components
+        if component.key == "aws-ebs-csi-driver" and not component.chart_repo_url
+    }
 
     for component in components:
         if component.key not in selected_set:
+            skipped.append(component.key)
+            continue
+        if component.key == "aws-ebs-csi-driver" and not component.chart_repo_url:
             skipped.append(component.key)
             continue
         if not component.chart_repo_url:
@@ -986,7 +997,8 @@ def _install_cluster_prereqs_sync(
             raise ApplicationError(
                 f"Flux bootstrapped on cluster {ctx.slug!r}; "
                 "waiting for CRD group registration — Temporal will retry",
-                non_retryable=False,
+                type="BootstrapReadinessPending",
+                non_retryable=True,
             )
 
     if not result.ok:
@@ -1084,7 +1096,8 @@ def _install_cluster_prereqs_sync(
         raise ApplicationError(
             f"post-install custom resources on cluster {ctx.slug!r} are waiting "
             "for their operator's CRDs to register — Temporal will retry",
-            non_retryable=False,
+            type="BootstrapReadinessPending",
+            non_retryable=True,
         )
 
     # The edge now carries the access rules as they stood when this run read

@@ -3119,6 +3119,29 @@
         "saveFailed": "저장에 실패했습니다.",
         "membersDescription": "이 앱을 보고 변경할 수 있는 사용자: 여기서 부여된 역할과 앱이 공유된 팀입니다.",
         "edgeDescription": "앱 URL에 접근할 수 있는 사용자입니다. 엣지는 접근을 허용할 사용자를 결정하고 역할은 앱을 변경할 사용자를 결정합니다."
+      },
+      "public": {
+        "title": "공개 접근",
+        "on": "공개",
+        "off": "로그인 필요",
+        "description": "공개하면 앱의 플랫폼 URL이 클러스터 로그인 없이 응답합니다. 앱 자체 로그인은 그대로 적용되며, 사용자 지정 도메인은 각자의 설정을 유지합니다.",
+        "states": {
+          "public": "로그인 없이 응답",
+          "gated": "로그인 필요",
+          "no_gate": "이 클러스터에는 로그인이 없어 앱이 열려 있습니다",
+          "not_envoy": "로그인 필요 유지: 이 스위치는 Envoy 엣지에서만 적용됩니다",
+          "cluster_disallows": "로그인 필요 유지: 이 클러스터는 공개 앱을 허용하지 않습니다",
+          "restricted": "로그인 필요 유지: 앱에 접근 목록이 있습니다"
+        },
+        "makePublic": "공개하기…",
+        "makePrivate": "로그인 뒤로 되돌리기",
+        "restrictedHint": "먼저 접근 목록을 비우세요. 목록은 로그인 뒤에서만 적용됩니다.",
+        "confirmTitle": "{app}을(를) 공개할까요?",
+        "confirmDescription": "앱의 플랫폼 URL에 접근하는 누구나 클러스터에 로그인하지 않고 앱을 사용할 수 있습니다. 앱 자체 인증만이 앱을 보호합니다. 본인 확인을 요청받을 수 있습니다.",
+        "confirm": "공개하기",
+        "madePublic": "클러스터가 허용하는 곳에서 앱이 공개되었습니다.",
+        "madePrivate": "앱이 다시 로그인 뒤에 있습니다.",
+        "saveFailed": "변경하지 못했습니다."
       }
     },
     "members": {
@@ -5683,7 +5706,9 @@
         }
       },
       "allowStepUpPin": "개인 PIN으로 확인 허용",
-      "allowStepUpPinHint": "구성원은 6~8자리 PIN을 설정하고 다시 로그인하는 대신 이 PIN으로 민감한 작업을 확인할 수 있습니다. 규정상 모든 확인에 ID 공급자가 필요하면 끈 상태로 두세요."
+      "allowStepUpPinHint": "구성원은 6~8자리 PIN을 설정하고 다시 로그인하는 대신 이 PIN으로 민감한 작업을 확인할 수 있습니다. 규정상 모든 확인에 ID 공급자가 필요하면 끈 상태로 두세요.",
+      "trustedDomainSignup": "신뢰할 수 있는 도메인의 계정 만들기",
+      "trustedDomainSignupHint": "이 조직의 신뢰할 수 있는 도메인에 속한 확인된 이메일로 로그인하면 계정이 만들어지고 해당 도메인의 기본 역할로 참여합니다. 이미 계정이 있는 사람만 허용하려면 끈 상태로 두세요."
     },
     "sections": {
       "houseTheme": "하우스 테마",
@@ -11148,7 +11173,10 @@
       "feedbackDeployed": "에이전트 배포가 승인되었습니다. 하트비트 수신으로 연결을 확인할 수 있습니다.",
       "feedbackIssueFailed": "에이전트 키를 발급하지 못했습니다.",
       "feedbackDeployFailed": "에이전트를 배포하지 못했습니다.",
-      "feedbackRefreshWarning": "변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요."
+      "feedbackRefreshWarning": "변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
+      "managedDescription": "제어 영역에서 자격 증명과 에이전트를 함께 설치합니다. 새 에이전트가 연결될 때까지 기존 자격 증명이 유지됩니다.",
+      "managedPending": "에이전트를 설치하고 첫 하트비트를 확인하는 중…",
+      "managedConnected": "에이전트가 연결되었습니다. 자격 증명과 배포를 확인했습니다."
     },
     "source": {
       "readFailed": "클러스터 세부 정보를 읽지 못했습니다",
@@ -11424,6 +11452,23 @@
       "searchReleases": "릴리스 및 버전 검색…",
       "noReleases": "설치된 릴리스 없음",
       "started": "시작 시각"
+    },
+    "publicApps": {
+      "title": "공개 앱",
+      "description": "소유자가 켰을 때 이 클러스터의 앱이 위의 로그인 없이 응답할 수 있는지 여부입니다. 끄면 앱이 무엇을 요청하든 모든 앱이 로그인 뒤에 있습니다.",
+      "allowed": "허용됨",
+      "refused": "허용 안 됨",
+      "notEnvoy": "앱의 요청은 Envoy 엣지에서만 적용됩니다. 이 클러스터의 엣지에서는 모든 앱이 로그인 뒤에 있습니다.",
+      "allow": "공개 앱 허용",
+      "refuse": "공개 앱 중지",
+      "allowTitle": "이 클러스터에서 공개 앱을 허용할까요?",
+      "allowReview": "소유자가 이미 공개한 앱은 즉시 로그인 없이 응답합니다.",
+      "refuseTitle": "이 클러스터의 공개 앱을 중지할까요?",
+      "refuseReview": "이 클러스터의 모든 공개 앱이 즉시 로그인 뒤로 이동합니다.",
+      "allowedToast": "공개 앱을 허용했습니다.",
+      "refusedToast": "공개 앱을 중지했습니다. 모든 앱이 로그인 뒤에 있습니다.",
+      "changeFailed": "변경하지 못했습니다.",
+      "refreshWarning": "변경은 적용되었지만 클러스터 정보를 새로 고치지 못했습니다. 현재 상태를 보려면 새로 고치세요."
     }
   },
   "obsPanelReason": {
@@ -12970,6 +13015,16 @@
       "task": "일회성 실행",
       "workflow": "다단계 파이프라인",
       "mixed": "여러 종류의 워크로드"
+    },
+    "canvas": {
+      "legend": "범례 및 기호",
+      "zoomOut": "축소",
+      "zoomIn": "확대",
+      "fit": "화면에 맞추기",
+      "expand": "확대",
+      "pan": "워크플로 영역입니다. 스크롤로 이동하고 확대 및 축소 버튼으로 배율을 변경하세요.",
+      "inspector": "선택한 단계",
+      "seeMore": "더 보기"
     }
   },
   "clusterConnection": {
@@ -14752,7 +14807,12 @@
       "noChoices": "일치하는 미등록 클러스터가 없습니다.",
       "register": "등록",
       "unregisterTitle": "{cluster}의 Zentinelle 등록을 해제할까요?",
-      "unregisterBody": "Zentinelle에서 클러스터를 철회한 뒤 게이트웨이와 자격 증명 시크릿을 제거합니다. 이 클러스터의 에이전트 트래픽은 더 이상 Zentinelle을 거치지 않습니다."
+      "unregisterBody": "Zentinelle에서 클러스터를 철회한 뒤 게이트웨이와 자격 증명 시크릿을 제거합니다. 이 클러스터의 에이전트 트래픽은 더 이상 Zentinelle을 거치지 않습니다.",
+      "sharedTitle": "공유 클러스터",
+      "sharedDescription": "어떤 조직에도 속하지 않습니다. 플랫폼 운영자가 관리하는 설치의 Zentinelle 연결을 통해 등록되며, 설치 프로그램이 자신이 만든 클러스터를 등록합니다.",
+      "sharedNotConnected": "설치가 Zentinelle에 연결되어 있지 않습니다. 설치 프로그램에서 Zentinelle with Astrolift를 연결하면 연결하고 클러스터를 등록합니다.",
+      "sharedManaged": "플랫폼에서 관리",
+      "sharedEmpty": "공유 클러스터가 없습니다."
     },
     "filters": {
       "window": "기간",
@@ -15108,6 +15168,16 @@
     "delete": "도메인 제거",
     "deleteTitle": "관리 도메인을 제거할까요?",
     "deleteHelp": "기존 도메인 제거 작업을 시작합니다. 공급자의 관리 레코드와 인증서가 제거되고 앱 호스트 이름이 더 이상 해석되지 않을 수 있습니다. 계속하기 전에 현재 경로를 검토하세요.",
+    "effectiveDefault": "실제 기본값",
+    "defaultDeleteTitle": "기본 영역을 제거할까요?",
+    "defaultDeleteHelp": "새 앱의 호스트 이름은 이 영역 아래에 만들어집니다. 제거한 뒤에 등록되는 앱은 다음 기본 영역을 쓰거나, 그마저 없으면 호스트 이름을 받지 못합니다.",
+    "defaultDeleteRefused": "Astrolift가 이 영역을 유지했습니다. 새 앱 호스트 이름의 기본 영역입니다.",
+    "defaultDependentsLabel": "이 영역의 환경",
+    "defaultDependentsNone": "아직 이 영역을 통해 확인되는 환경이 없습니다.",
+    "defaultDependentsCount": "이 영역을 통해 확인되는 환경: {count}개",
+    "defaultDependentsMore": "외 {count}개",
+    "defaultDeleteTypeToConfirm": "확인하려면 영역 이름을 입력하세요:",
+    "defaultDeleteConfirm": "기본 영역 제거",
     "actionFailed": "작업이 거부되었습니다. 다시 시도하기 전에 현재 상태를 조회하세요.",
     "actionUncertain": "작업 응답을 확인하지 못했습니다. 다시 시도하기 전에 현재 도메인과 공급자 상태를 조회하세요.",
     "acceptedUnverified": "쓰기 요청은 수락되었지만 반환된 메타데이터를 검증하지 못했습니다. 다음 작업 전에 현재 상태를 새로 고치세요.",
@@ -17155,7 +17225,8 @@
     "sharing": "공유",
     "connect": "연결",
     "agentInbox": "받은 편지함",
-    "appAccess": "앱 접근"
+    "appAccess": "앱 접근",
+    "topology": "구성도"
   },
   "support": {
     "title": "지원",
@@ -17351,5 +17422,65 @@
       "groups": "로그인 있음. 그룹: {groups}",
       "noGroups": "로그인 있음. 속한 그룹 없음"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · 구성도",
+    "description": "프로젝트 전체나 개별 워크플로를 살펴보고 맥락을 유지하면서 각 구성 요소를 확인하세요.",
+    "back": "프로젝트 개요",
+    "scope": "표시 범위",
+    "wholeProject": "전체 프로젝트",
+    "canvas": "그래프 영역",
+    "componentList": "구성 요소 목록",
+    "counts": "구성 요소 {nodes}개 · 연결 {edges}개",
+    "partialError": "일부 프로젝트 데이터를 불러오지 못했습니다. 그래프가 불완전합니다.",
+    "notFound": "프로젝트를 찾을 수 없거나 접근할 수 없습니다.",
+    "empty": "아직 표시할 구성 요소가 없습니다.",
+    "inspector": "구성 요소 상세",
+    "status": "상태",
+    "seeMore": "더 보기",
+    "exploreWorkflow": "워크플로 단계 살펴보기",
+    "connections": "연결된 구성 요소",
+    "selectTitle": "구성 요소 확인",
+    "selectDescription": "노드를 선택하면 설정과 연결을 볼 수 있습니다. 더 보기는 해당 Astrolift 페이지를 엽니다. 표시 범위에서 워크플로를 선택하면 각 단계를 볼 수 있습니다.",
+    "evidenceNote": "연결은 등록된 설정을 기반으로 합니다. 최신 실행에서 현재 단계를 식별하는 경우에만 단계 상태를 표시하며, 검토 반복 사이의 이전 상태는 추론하지 않습니다.",
+    "kind": {
+      "workflow": "워크플로",
+      "stage": "단계",
+      "agent": "에이전트",
+      "app": "앱",
+      "repository": "저장소"
+    },
+    "edge": {
+      "source": "소스",
+      "dispatches": "작업 배정",
+      "invokes": "호출",
+      "next": "다음",
+      "return": "돌아가기",
+      "retry": "재시도"
+    },
+    "field": {
+      "pattern": "패턴",
+      "stages": "단계 수",
+      "enabled": "활성화됨",
+      "repository": "저장소",
+      "source": "소스 참조",
+      "latestRun": "최신 실행",
+      "kind": "유형",
+      "order": "단계 번호",
+      "agent": "에이전트",
+      "environment": "환경 사양",
+      "model": "모델",
+      "output": "출력 키",
+      "skills": "스킬",
+      "failure": "실패 시 동작",
+      "attempts": "최대 시도 횟수",
+      "timeout": "시간 제한",
+      "workflow": "워크플로",
+      "mode": "실행 모드",
+      "running": "실행 중인 작업",
+      "lastRun": "마지막 실행"
+    },
+    "openBlueprint": "구성도 열기",
+    "expand": "확대"
   }
 }

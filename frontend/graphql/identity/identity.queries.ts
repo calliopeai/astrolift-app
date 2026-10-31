@@ -24,6 +24,7 @@ export const LIST_ORGANIZATIONS = gql`
       logRetentionDaysDefault
       allowUserProfileEdit
       allowStepUpPin
+      trustedDomainSignup
       onboardingCompletedAt
       createdAt
       updatedAt
@@ -287,6 +288,7 @@ export const GET_ORGANIZATION = gql`
       logRetentionDaysDefault
       allowUserProfileEdit
       allowStepUpPin
+      trustedDomainSignup
       onboardingCompletedAt
       createdAt
       updatedAt

@@ -7,6 +7,8 @@ store. Both preserve runtime organization namespace checks, which accept legacy
 and owner locations. They do not enable owner enforcement or run automatically
 on startup or dispatch.
 
+Preconditions: a shell in the backend container running the exact maintenance image, with the install's database and the organization's secret store reachable (the readiness and namespace audits read control-plane metadata only). `--operator` must be an active platform operator; `--apply` also needs `--confirm-plan` and `--writers-paused`. `AGENT_SECRET_OWNER_ENFORCEMENT` is a Constance setting. Placeholders: `<org>` is the organization slug or GUID (`slug` or `id` from `astroliftOrganizations`); `<sha256>` is the digest the preview prints; `<user-id>` is the operator's Django user primary key (an integer, not the GUID).
+
 | Release phase | Behavior |
 |---|---|
 | Compatible maintenance | Explicit reviewed migration command; existing runtime continues to accept org-scoped refs. |
@@ -164,7 +166,7 @@ backend/provider suites and production migration/cutover were not run.
 ## Conflict preflight, 2026-09-30 UTC
 
 An authenticated read returned 28 visible environment specs, below the legacy
-100-row cap: 22 project-owned and 6 organization-shared. Of these, 24 specs contain
+200-row cap: 22 project-owned and 6 organization-shared. Of these, 24 specs contain
 54 typed refs. No payload was resolved or printed. This is not a complete operator
 plan: hidden/deleted rows, binding overrides, other organizations and source
 repository manifests need the maintenance tool's full review. No migration ran.
@@ -173,3 +175,13 @@ Migration command output/errors and `agents.secret.owner_migrate` audit records
 do not echo payloads. Existing provider telemetry may retain raw store exceptions
 in logs and provider audit records; handle access to those records accordingly.
 Keep the private review file outside source control.
+
+## Verify
+
+```sh
+python manage.py migrate_agent_secret_owners --org <org> --plan-file /private/agent-secret-plan-check.json
+python manage.py audit_agent_secret_owner_cutover --org <org> --require-ready
+python manage.py audit_agent_secret_namespace --org <org>
+```
+
+The fresh preview reports zero specs needing copies, strict readiness prints the inventory and exits `0`, and the namespace audit reports no invalid refs.

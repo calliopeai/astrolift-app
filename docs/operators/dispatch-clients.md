@@ -4,6 +4,17 @@ The CLI, console and agent clients use Astrolift's existing Dispatch lifecycle.
 The controller schedules work, receives runtime status and records outcomes.
 A chat-based overseer can use the same API as another authenticated client.
 
+Preconditions: `agent.read` for discovery and reads, `agent.dispatch` to launch
+or cancel, and `agent_box.attach` to reach a box, in the active organization;
+a bearer also needs the `mcp:read` (and, to dispatch, `mcp:dispatch`) token
+scopes. Surfaces: the `astro agent` commands, the GraphQL operations named
+below, and the MCP endpoint `/api/mcp/v1/`. The managed IDE runtime needs the
+control-plane settings in the table below on the organization's default
+cluster; the migrations need a shell in the backend container. Placeholders:
+`<agent-slug>` is a slug from `astro agent workloads ls`; `<task-id>` is the
+task `id` printed by `astro agent dispatch` or `astro agent ls`; `<box-guid>`
+is the GUID of the box the runtime was provisioned for.
+
 ## Managed IDE runtime authority
 
 `POST /api/dispatch/v1/boxes/<box-guid>/runtime/validate/` is an internal runtime
@@ -157,7 +168,7 @@ The CLI supports the operator path:
 ```sh
 astro agent workloads ls --json
 astro agent ls --status running --json
-astro agent dispatch triage --input '{"repository":"example/service"}'
+astro agent dispatch <agent-slug> --input '{"repository":"example/service"}'
 astro agent logs <task-id>
 astro agent cancel <task-id>
 ```
@@ -281,3 +292,12 @@ an additive migration would discard its saved diagnostics or progress.
 Older clients can ignore the additive fields. Older servers do not expose them;
 clients may retry an older query only for an unknown-field schema error, never an
 authorization or network failure. Capacity changes remain an operator decision.
+
+## Verify
+
+```sh
+astro agent inspect <task-id> --json
+astro agent ls --status running --json
+```
+
+The inspected record shows the task's `status` and lifecycle timestamps; the running list includes `<task-id>` until it reaches a terminal state and omits it afterwards.

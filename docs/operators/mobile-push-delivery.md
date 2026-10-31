@@ -8,6 +8,13 @@ access tokens minted from a service-account key, so it runs on any cloud or
 none. Apple and Google still carry each notification to the device: hosting
 the sender does not replace APNs or FCM.
 
+Preconditions: `org.update` in the active organization for
+`setNotificationProfile`; a kubeconfig that can edit the api and worker
+Deployments in the install's namespace to mount the Secret; a shell in an api
+or worker pod for `manage.py notification_driver_check`. Placeholders:
+`<organization GUID>` is `id` from `astroliftOrganizations` (the health check
+prints it too); `<organization-slug>` is its `slug`.
+
 What a push carries is the versioned contract in
 [mobile push contract](../mobile-push-contract.md): routing identity and a
 link, never a credential or an action.
@@ -50,6 +57,10 @@ The drivers read their keys from files, never from the profile:
 `python manage.py notification_driver_check --organization <slug>` prints the
 directory (see [Health check](#health-check)). The GUID is also the
 `organization_id` in every push.
+
+```bash
+python manage.py notification_driver_check --organization <organization-slug>
+```
 
 Mount a Kubernetes Secret per organization into the api (web) and worker
 Deployments; both send pushes, for the events they emit:
@@ -278,3 +289,15 @@ collapse id, so a copy Apple accepted twice shows once.
 - UnifiedPush for Android devices without Google services.
 - Acceptance on signed builds and physical devices, which is separate from
   these tests and from simulator payload injection.
+
+## Verify
+
+```bash
+python manage.py notification_driver_check --organization <organization-slug>
+astro api graphql -q 'query { astroliftAuditEventsPage(action: "notification.push", limit: 20) { items { occurredAt decision data } } }'
+```
+
+The health check prints `health: ok` for every driver in the profile and exits
+zero; after an event that pushes, the audit rows carry `status: delivered` in
+`data` for the recipient's devices, and any other `status` names the cause from
+the table above.

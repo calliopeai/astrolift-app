@@ -2,8 +2,19 @@
 
 This is a backend durability adapter for the private GCP preparation port. It
 does not register a public workflow, create a GSA, grant IAM access, deploy an
-app, or prove impersonation, inference or rollout readiness. Full #2278 caller
-orchestration and workload acceptance remain open.
+app, or prove impersonation, inference or rollout readiness. `DeployAppWorkflow`
+consumes it for Endpoint-only native apps (see
+[native Endpoint deployment](gcp-native-configuration-executor.md)); the rest of
+#2278 remains open.
+
+Preconditions: a reference page for a private backend adapter; no operator
+command, permission or console surface. Its rows live in the install's
+PostgreSQL and pin the GCP project the GKE cluster lives in, the app's GSA and
+the Workload Identity binding between that GSA and the prepared KSA; the
+adapter itself opens no cloud client. Operator repair of a stuck journal is
+`resolve_native_gcp_journal` (see
+[settling a stuck journal](gcp-native-configuration-executor.md#settling-a-stuck-journal)).
+Placeholders: none.
 
 ## Original identity and accepted operations
 
@@ -139,3 +150,11 @@ Reversal refuses **any** retained journal or operation row, including retired
 ones. Disable future callers and retain the forward schema; deleting history
 to make a rollback pass is not an operator recovery procedure. Privileged SQL
 or a database administrator remains outside these application protections.
+
+## Verify
+
+```sh
+./run.sh test astrolift_services/tests/test_gcp_gke_preparation_journal_2278.py
+```
+
+The suite passes against real PostgreSQL; it performs no cloud call.

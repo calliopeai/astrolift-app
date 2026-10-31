@@ -2,6 +2,21 @@
 
 Astrolift hosts open-weight models with **vLLM**, the same OpenAI-compatible server on EKS, AKS, GKE and on-prem. A model is a managed service of kind `model_endpoint`, variant `vllm`. Apps and agents bind to it the same way they bind to Bedrock, Azure OpenAI or Vertex, through `MODEL_ENDPOINT_URL`, `MODEL_API_KEY` and `MODEL_DEPLOYMENT_NAME`.
 
+Preconditions: a project-owned model is a managed service, provisioned with
+`project.update` in the owning project; an organization-owned shared deployment
+needs `cluster.update` in the organization; catalogue reads need `org.read`; a
+named subscription needs `app.update` on the destination app and `org.read` on
+the source; runtime setup (`clusterModelRuntimeSettings`,
+`updateClusterModelRuntime`) needs `org.update` and `cluster.update` in the
+cluster's organization (`backend/core/permissions.py`). Surfaces are the Models
+pages `/models` and `/models/deploy`, and `astro api graphql`; the install default `VLLM_FRONTEND_DEFAULT` is an admin
+setting. The GPU or CPU nodes must belong to the registered cluster, with its
+provider config holding `vllm_image`. Placeholders: `<organizationId>` is `id`
+from `astroliftOrganizations`; `<clusterId>` is `id` from
+`astroliftClustersPage`; `<expectedProviderId>` is `id` from
+`astroliftProviderPlugins` for the plugin whose `slug` equals the cluster's
+`providerPluginSlug`.
+
 ## The two frontends
 
 vLLM runs one engine behind one of two HTTP frontends:
@@ -344,3 +359,19 @@ concurrent logout; it is not an atomic logout/dispatch guarantee. The
 browser binds review/drafts to the actor/organization, selected cluster/provider,
 mode and observed versions; server identity/version and authority checks remain
 canonical. Retry current reads before another write after an unknown response.
+
+## Verify
+
+```sh
+astro api graphql -q 'query($org: GUID!, $cluster: GUID!, $provider: GUID!) {
+  clusterModelRuntimeSettings(organizationId: $org, clusterId: $cluster, expectedProviderId: $provider) {
+    modes { computeMode configured reason hardwareAdmission }
+  }
+}' --var org=<organizationId> --var cluster=<clusterId> --var provider=<expectedProviderId>
+astro api graphql -q 'query { astroliftModelEndpointsPage { items { id name kind variant status } } }'
+```
+
+The declared compute mode must show `configured: true` with an empty `reason`,
+and the hosted model's row must read `model_endpoint` / `vllm` with `status`
+`active`; `provisioning` means the rollout has not reported ready and `failed`
+means admission or the worker refused it.

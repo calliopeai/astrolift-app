@@ -569,6 +569,27 @@ class KubernetesInstallPort:
             ) from None
 
 
+def verify_legacy_agent_secret(cluster):
+    """A manually deployed agent may only start with its installed, active key."""
+    port = KubernetesInstallPort(cluster)
+    secret = port.call("get", kind="Secret", name="astrolift-agent", namespace="astrolift-system")
+    try:
+        data = secret["data"]
+        key = base64.b64decode(data["agent_key"], validate=True)
+        url = base64.b64decode(data["heartbeat_url"], validate=True).decode()
+        expected_url = heartbeat_origin() + f"/api/clusters/v1/{cluster.guid}/heartbeat/"
+        valid = bool(key) and hmac.compare_digest(hashlib.sha256(key).hexdigest(), cluster.agent_key_hash)
+        valid = valid and url == expected_url
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        valid = False
+    if not valid:
+        raise AgentInstallError(
+            "PRECONDITION",
+            "Install or update the astrolift-agent Secret with this cluster's active credential before deploying, "
+            "or use the managed agent installation.",
+        )
+
+
 def _uid(obj):
     metadata = (obj or {}).get("metadata") or {}
     if any(not isinstance(metadata.get(key), str) or not metadata[key] for key in ("uid", "resourceVersion")):

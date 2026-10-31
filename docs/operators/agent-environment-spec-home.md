@@ -6,6 +6,8 @@ runtime/image override, capability flags, owner kind, manifest source, and secre
 reference bindings. This home is read-only; it does not resolve secret values or
 launch a task.
 
+Preconditions: `agent_env_spec.read` in the active organization; an owned recipe also needs its project or team in scope, and a bearer token's organization/team ceiling applies. Surface: `/agents/environment-specs` and `/agents/environment-specs/<slug>`, `astro agent env-spec ls`, or `agentEnvironmentSpecsPage(orgId)` through `astro api graphql`. Placeholders: `<slug>` is `slug` from `agentEnvironmentSpecsPage` or `astro agent env-spec ls`; `<org-id>` is `id` from `astroliftOrganizations`.
+
 `agentEnvironmentSpecsPage(orgId, search, filter, sort, page, pageSize)` applies
 `agent_env_spec.read`, live-owner visibility, and bearer organization/team ceilings
 before filtering, counting, and slicing. Organization-shared recipes remain visible
@@ -30,3 +32,30 @@ Verified with real PostgreSQL role/token/HTTP tests, a 205-recipe paging/search 
 revoked bindings and deleted owners, real Apollo refresh/organization-switch tests,
 Storybook states and Chromium layout checks. This does not establish live-browser
 authorization for a deployed install.
+
+## Retired runtimes
+
+Aider and OpenHands are retired because their integrations depend on LiteLLM.
+They no longer appear in the selectable runtime catalog. New or updated recipes,
+repository/import registrations, task preparation and box/job image resolution
+refuse these runtime names and the known `astrolift-agent-aider` and
+`astrolift-agent-openhands` image repositories, including mirrored, tagged,
+digest-pinned and VNC variants. An explicit image does not bypass a retired
+runtime name.
+
+Existing recipes and task history remain readable, and existing tasks can still
+be cancelled. Select an active runtime explicitly to reuse a retired recipe;
+there is no automatic runtime or credential migration. Custom image contents
+remain the image owner's responsibility: the control plane does not inspect
+arbitrarily renamed images for embedded dependencies.
+
+## Verify
+
+```sh
+astro agent env-spec ls
+astro api graphql --var orgId=<org-id> -q 'query($orgId: ID!) { agentEnvironmentSpecsPage(orgId: $orgId, pageSize: 5) { totalCount page pageSize items { slug runtime imageTag } } }'
+astro api graphql --var orgId=<org-id> -q 'query($orgId: ID!) { agentEnvironmentSpec(slug: "<slug>", orgId: $orgId) { slug runtime imageTag } }'
+cd backend && pytest astrolift_agents/tests/test_environment_specs_page_2178.py
+```
+
+`totalCount` counts every authorized recipe, including those past the legacy 200-row cap; the detail read returns the recipe, or null when it is missing or inaccessible; the test module passes.
