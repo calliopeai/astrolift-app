@@ -4039,6 +4039,29 @@ type AstroliftManagedDomain {
   dependentAppCount: Int!
 }
 
+type AstroliftManagedDomainBinding {
+  organizationSlug: String!
+  appSlug: String!
+  environmentName: String!
+  zone: String!
+  previousUrl: String!
+  url: String!
+}
+
+type AstroliftManagedDomainBindingBackfill {
+  dryRun: Boolean!
+  found: Int!
+  updated: Int!
+  skipped: Int!
+  bindings: [AstroliftManagedDomainBinding!]!
+}
+
+type AstroliftManagedDomainBindingBackfillMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftManagedDomainBindingBackfill
+}
+
 type AstroliftManagedDomainDependent {
   organizationSlug: String!
   appSlug: String!
@@ -7527,6 +7550,10 @@ type AvailableTransition {
   conditionsMet: Boolean!
 }
 
+input BackfillManagedDomainBindingsInput {
+  dryRun: Boolean! = false
+}
+
 type BedrockModelConnectionAction {
   enabled: Boolean!
   allowed: Boolean!
@@ -10502,6 +10529,7 @@ type Mutation {
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   softDeleteManagedDomain(input: SoftDeleteManagedDomainInput!): SoftdeletepayloadMutationResult!
+  backfillManagedDomainBindings(input: BackfillManagedDomainBindingsInput!): AstroliftManagedDomainBindingBackfillMutationResult!
   verifyManagedDomain(input: VerifyManagedDomainInput!): VerifyManagedDomainPayloadMutationResult!
   provisionManagedDomain(clusterId: GUID!, zone: String!, isPlatformManagedZone: Boolean! = false): ProvisionManagedDomainPayloadMutationResult!
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!

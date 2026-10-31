@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from django.core.management.base import BaseCommand
 
-from astrolift_clusters.models import resolve_managed_domain
+from astrolift_clusters.managed_domain_bindings import backfill_managed_domain_bindings
 
 
 class Command(BaseCommand):
@@ -34,54 +34,23 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from astrolift_lifecycle.models import AppEnvironment
-
-        dry_run = options["dry_run"]
-        prefix = "[DRY RUN] " if dry_run else ""
-
-        qs = AppEnvironment.objects.filter(
-            managed_domain__isnull=True,
-            deleted_at__isnull=True,
-        ).select_related("registered_app__organization")
-
-        total = qs.count()
-        self.stdout.write(f"{prefix}Found {total} AppEnvironment(s) with managed_domain=NULL")
-
-        updated = 0
-        skipped = 0
-        for env in qs:
-            org = getattr(env.registered_app, "organization", None)
-            domain = resolve_managed_domain(org, for_preview=False)
-            if domain is None:
-                self.stdout.write(f"  SKIP  {env.registered_app.slug}/{env.name} — no matching ManagedDomain")
-                skipped += 1
-                continue
-
-            app = env.registered_app
-            host = (app.subdomain or app.slug or "").strip()
-            if host and (env.k8s_namespace or "").strip():
-                # An environment in a namespace of its own serves its own
-                # hostname (#1922): a preview the one its row records, which
-                # its URL already names, any other ``<label>-<env>``.
-                from astrolift_lifecycle.models import PreviewEnvironment
-                from core.app_deploy import environment_hostname_label
-
-                is_preview = PreviewEnvironment.all_objects.filter(app_environment=env).exists()
-                host = "" if is_preview else environment_hostname_label(host, env.name)
-            new_url = f"https://{host}.{domain.zone}" if host else env.url
-            changes: dict = {"managed_domain": domain}
-            if new_url != env.url:
-                changes["url"] = new_url
+        result = backfill_managed_domain_bindings(dry_run=options["dry_run"])
+        prefix = "[DRY RUN] " if result.dry_run else ""
+        self.stdout.write(
+            f"{prefix}Found {len(result.bound) + len(result.skipped)} AppEnvironment(s) with managed_domain=NULL"
+        )
+        for row in result.skipped:
+            self.stdout.write(f"  SKIP  {row.app_slug}/{row.environment_name}: no matching ManagedDomain")
+        for row in result.bound:
+            if row.url != row.previous_url:
                 self.stdout.write(
-                    f"  {prefix}SET   {app.slug}/{env.name} → {domain.zone} "
-                    f"(url {env.url or '(empty)'} → {new_url})"
+                    f"  {prefix}SET   {row.app_slug}/{row.environment_name} → {row.zone} "
+                    f"(url {row.previous_url or '(empty)'} → {row.url})"
                 )
             else:
-                self.stdout.write(f"  {prefix}SET   {app.slug}/{env.name} → {domain.zone}")
-            if not dry_run:
-                AppEnvironment.objects.filter(pk=env.pk).update(**changes)
-            updated += 1
-
+                self.stdout.write(f"  {prefix}SET   {row.app_slug}/{row.environment_name} → {row.zone}")
         self.stdout.write(
-            self.style.SUCCESS(f"{prefix}Done — {updated} updated, {skipped} skipped (no domain found)")
+            self.style.SUCCESS(
+                f"{prefix}Done: {len(result.bound)} updated, {len(result.skipped)} skipped (no domain found)"
+            )
         )

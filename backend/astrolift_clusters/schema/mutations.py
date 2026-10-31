@@ -424,6 +424,14 @@ class SoftDeleteManagedDomainInput:
 
 
 @strawberry.input
+class BackfillManagedDomainBindingsInput:
+    """``backfillManagedDomainBindings`` input (#2572). ``dry_run`` reports
+    what would change and writes nothing."""
+
+    dry_run: bool = False
+
+
+@strawberry.input
 class VerifyManagedDomainInput:
     """``verifyManagedDomain`` mutation input (#1931).
 
@@ -628,6 +636,32 @@ class ReissueManagedDomainCertPayload:
     zone: str
     signaled: bool
     message: str
+
+
+@strawberry.type(name="AstroliftManagedDomainBinding")
+class ManagedDomainBindingType:
+    """One environment the backfill bound to the zone its organization
+    resolves to, and the URL it now advertises (#2572)."""
+
+    organization_slug: str
+    app_slug: str
+    environment_name: str
+    zone: str
+    previous_url: str
+    url: str
+
+
+@strawberry.type(name="AstroliftManagedDomainBindingBackfill")
+class ManagedDomainBindingBackfillType:
+    """Outcome of ``backfillManagedDomainBindings`` (#2572): ``found``
+    environments had no managed domain, ``updated`` were bound (or would be,
+    on a dry run), ``skipped`` still have no zone to resolve to."""
+
+    dry_run: bool
+    found: int
+    updated: int
+    skipped: int
+    bindings: list[ManagedDomainBindingType]
 
 
 @strawberry.type
@@ -1856,6 +1890,45 @@ class ClustersMutation:
                 ),
             )
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.field
+    @mutation_audit(action="domain.backfill_bindings")
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE),
+    )
+    @tenant_scoped()
+    def backfill_managed_domain_bindings(
+        self, info: Info, input: BackfillManagedDomainBindingsInput
+    ) -> MutationResultType[ManagedDomainBindingBackfillType]:
+        """Bind every environment with no managed domain to the zone its
+        organization resolves to now, and rewrite the URL it advertises
+        (#2572): ``manage.py backfill_managed_domain`` without a shell on the
+        webservice task, for the recovery after a default zone was removed.
+        Install-wide, so the platform operator's alone."""
+        check_platform_operator(_caller(info), gate=Permission.PROVIDER_PLUGIN_CONFIGURE)
+        from astrolift_clusters.managed_domain_bindings import backfill_managed_domain_bindings
+
+        result = backfill_managed_domain_bindings(dry_run=input.dry_run)
+        return gql_success(
+            ManagedDomainBindingBackfillType(
+                dry_run=result.dry_run,
+                found=len(result.bound) + len(result.skipped),
+                updated=len(result.bound),
+                skipped=len(result.skipped),
+                bindings=[
+                    ManagedDomainBindingType(
+                        organization_slug=row.organization_slug,
+                        app_slug=row.app_slug,
+                        environment_name=row.environment_name,
+                        zone=row.zone,
+                        previous_url=row.previous_url,
+                        url=row.url,
+                    )
+                    for row in result.bound
+                ],
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="domain.verify")

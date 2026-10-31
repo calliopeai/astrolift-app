@@ -8,7 +8,8 @@ manual ``deleted_at = NULL`` and ``manage.py backfill_managed_domain`` from a
 shell on the webservice task.
 
 ``softDeleteManagedDomain`` now keeps an effective default zone unless the
-caller passes ``force``, and names what resolves through it.
+caller passes ``force``, and names what resolves through it;
+``backfillManagedDomainBindings`` runs the backfill for the platform operator.
 """
 
 from __future__ import annotations
@@ -136,6 +137,13 @@ def _delete(organization, user, domain, *, force=False):
     with tenant_context(TenantContext(organization_id=organization.id, actor_user_id=user.id)):
         return mut.ClustersMutation().soft_delete_managed_domain(
             _info(user), mut.SoftDeleteManagedDomainInput(id=GUID(str(domain.guid)), force=force)
+        )
+
+
+def _backfill(organization, user, *, dry_run=False):
+    with tenant_context(TenantContext(organization_id=organization.id, actor_user_id=user.id)):
+        return mut.ClustersMutation().backfill_managed_domain_bindings(
+            _info(user), mut.BackfillManagedDomainBindingsInput(dry_run=dry_run)
         )
 
 
@@ -291,6 +299,86 @@ def test_the_list_marks_only_the_effective_default(org, cluster, grants):
 
     assert _listed(org, _org_admin(), platform)[0] is True
     assert _listed(org, _org_admin(), spare) == (False, 0, [])
+
+
+# ---- the backfill ---------------------------------------------------
+
+
+def test_the_backfill_binds_an_environment_and_rewrites_its_url(org, cluster, grants):
+    env = _register(org, cluster, "storefront")
+    assert (env.managed_domain_id, env.url) == (None, "")
+    platform = _zone(None, "apps-2572.example", "both")
+
+    result = _backfill(org, _operator())
+
+    assert result.ok, result.errors
+    env.refresh_from_db()
+    assert env.managed_domain_id == platform.pk
+    assert env.url == f"https://{env.registered_app.slug}.apps-2572.example"
+    data = result.data
+    assert (data.dry_run, data.found, data.updated, data.skipped) == (False, 1, 1, 0)
+    assert [
+        (b.organization_slug, b.app_slug, b.environment_name, b.zone, b.previous_url, b.url)
+        for b in data.bindings
+    ] == [(org.slug, env.registered_app.slug, "production", "apps-2572.example", "", env.url)]
+
+
+def test_a_dry_run_backfill_reports_and_writes_nothing(org, cluster, grants):
+    env = _register(org, cluster, "storefront")
+    _zone(None, "apps-2572.example", "both")
+
+    result = _backfill(org, _operator(), dry_run=True)
+
+    assert (result.data.dry_run, result.data.updated) == (True, 1)
+    assert result.data.bindings[0].url == f"https://{env.registered_app.slug}.apps-2572.example"
+    env.refresh_from_db()
+    assert (env.managed_domain_id, env.url) == (None, "")
+
+
+def test_an_environment_with_no_zone_to_resolve_is_skipped(org, cluster, grants):
+    env = _register(org, cluster, "storefront")
+
+    result = _backfill(org, _operator())
+
+    assert (result.data.found, result.data.updated, result.data.skipped) == (1, 0, 1)
+    assert result.data.bindings == []
+    env.refresh_from_db()
+    assert env.managed_domain_id is None
+
+
+def test_an_org_admin_cannot_backfill_the_install(org, cluster, grants):
+    env = _register(org, cluster, "storefront")
+    _zone(None, "apps-2572.example", "both")
+
+    result = _backfill(org, _org_admin())
+
+    assert result.ok is False
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    env.refresh_from_db()
+    assert env.managed_domain_id is None
+
+
+def test_registering_after_a_forced_delete_and_the_recovery(org, cluster, grants, started):
+    """The incident end to end: the guard holds, force removes the zone, the
+    next registration gets no hostname, and restoring the zone plus the
+    backfill binds it without a shell."""
+    operator = _operator()
+    platform = _zone(None, "apps-2572.example", "both")
+    first = _register(org, cluster, "storefront")
+
+    assert _delete(org, operator, platform).errors[0].dependents.total == 1
+    assert _delete(org, operator, platform, force=True).ok
+
+    later = _register(org, cluster, "billing")
+    assert (later.managed_domain_id, later.url) == (None, "")
+    first.refresh_from_db()
+    assert first.managed_domain_id == platform.pk
+
+    ManagedDomain.all_objects.get(pk=platform.pk).restore()
+    assert _backfill(org, operator).data.updated == 1
+    later.refresh_from_db()
+    assert later.managed_domain_id == platform.pk
+    assert later.url == f"https://{later.registered_app.slug}.apps-2572.example"
 
 
 # ---- the wire --------------------------------------------------------
