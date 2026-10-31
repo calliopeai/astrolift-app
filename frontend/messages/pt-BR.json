@@ -2179,23 +2179,23 @@
           "failed": "Tente novamente para recriar o repositório do registro e o namespace.",
           "pending": "Inicie para colocar o aplicativo online.",
           "provisioning": "Aguarde; execute novamente somente se o processo travar.",
-          "ready_missing_registry": "Provisione novamente para recriar o repositório do registro de contêineres e a credencial de envio. Até lá, as implantações não terão efeito nem exibirão avisos.",
-          "unknown": "Provisione novamente para recuperar o aplicativo."
+          "ready_missing_registry": "Force a reimplantação para recriar o repositório do registro de contêineres e a credencial de envio. Até lá, as implantações não terão efeito nem exibirão avisos.",
+          "unknown": "Force a reimplantação para recuperar o aplicativo."
         },
         "elapsed": "iniciado há {minutes} min",
-        "cta": "Provisionar novamente",
+        "cta": "Forçar reimplantação",
         "confirm": {
-          "title": "Provisionar {slug} novamente?",
+          "title": "Forçar a reimplantação de {slug}?",
           "description": "Cancela as implantações em andamento, exclui os objetos Kubernetes de cada carga de trabalho e executa novamente o workflow CI de implantação. As aprovações existentes são executadas novamente.",
-          "confirm": "Sim, provisionar novamente"
+          "confirm": "Sim, forçar reimplantação"
         },
         "toast": {
-          "dispatched": "Novo provisionamento iniciado: o workflow de implantação está sendo executado novamente.",
+          "dispatched": "Reimplantação forçada iniciada: o workflow de implantação está sendo executado novamente.",
           "partial": "Recuperação parcial: a limpeza foi realizada, mas o início da implantação falhou ({message})."
         },
         "error": {
-          "noResponse": "Falha no novo provisionamento: o servidor não respondeu.",
-          "generic": "Falha no novo provisionamento."
+          "noResponse": "Falha na reimplantação forçada: o servidor não respondeu.",
+          "generic": "Falha na reimplantação forçada."
         }
       },
       "configDrift": {

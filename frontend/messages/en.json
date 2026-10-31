@@ -1663,23 +1663,23 @@
           "failed": "Retry to rebuild the registry repo and namespace.",
           "pending": "Kick it off to bring the app online.",
           "provisioning": "Sit tight — re-run only if it stalls.",
-          "ready_missing_registry": "Reprovision to rebuild the container registry repo and push credential; deploys will silently no-op until then.",
-          "unknown": "Reprovision to recover."
+          "ready_missing_registry": "Force redeploy to rebuild the container registry repo and push credential; deploys will silently no-op until then.",
+          "unknown": "Force redeploy to recover."
         },
         "elapsed": "started {minutes}m ago",
-        "cta": "Reprovision",
+        "cta": "Force redeploy",
         "confirm": {
-          "title": "Reprovision {slug}?",
+          "title": "Force redeploy {slug}?",
           "description": "Cancels in-flight deploys, deletes the per-workload k8s objects, and re-fires the deploy CI workflow. Existing approvals re-run.",
-          "confirm": "Yes, reprovision"
+          "confirm": "Yes, force redeploy"
         },
         "toast": {
-          "dispatched": "Reprovision dispatched — deploy workflow is rerunning.",
+          "dispatched": "Force redeploy dispatched; the deploy workflow is rerunning.",
           "partial": "Partial recovery: cleanup ran but the deploy dispatch failed ({message})."
         },
         "error": {
-          "noResponse": "Reprovision failed: no response from backend.",
-          "generic": "Reprovision failed."
+          "noResponse": "Force redeploy failed: no response from backend.",
+          "generic": "Force redeploy failed."
         }
       },
       "configDrift": {

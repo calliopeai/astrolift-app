@@ -16,7 +16,7 @@ export default meta;
 
 type Story = StoryObj;
 
-/** Registry missing (amber) with the reprovision CTA. */
+/** Registry missing (amber) with the force redeploy CTA. */
 export const Full: Story = {
   render: () => (
     <ReprovisionCalloutView
@@ -50,14 +50,14 @@ export const Empty: Story = {
 export const ErrorState: Story = {
   render: () => <ReprovisionCalloutView {...REPROVISION} />,
   play: async ({ canvasElement }) => {
-    await userEvent.click(within(canvasElement).getByRole("button", { name: /reprovision/i }));
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /force redeploy/i }));
     await expect(
-      await within(document.body).findByRole("alertdialog", { name: /reprovision checkout/i })
+      await within(document.body).findByRole("alertdialog", { name: /force redeploy checkout/i })
     ).toBeInTheDocument();
   },
 };
 
-/** Reprovision dispatched: the CTA is busy. */
+/** Force redeploy dispatched: the CTA is busy. */
 export const Redeploying: Story = {
   render: () => <ReprovisionCalloutView {...REPROVISION} redeploying />,
 };

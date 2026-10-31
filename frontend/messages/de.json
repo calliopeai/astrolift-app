@@ -2173,23 +2173,23 @@
           "failed": "Versuche es erneut, um das Registrierungsrepository und den Namensraum neu zu erstellen.",
           "pending": "Starte die Bereitstellung, um die Anwendung online zu bringen.",
           "provisioning": "Warte ab; führe den Vorgang nur erneut aus, wenn er hängen bleibt.",
-          "ready_missing_registry": "Stelle die Ressourcen erneut bereit, um das Repository der Containerregistrierung und die Zugangsdaten zum Hochladen neu zu erstellen. Bis dahin bleiben Bereitstellungen ohne Wirkung und ohne Warnung.",
-          "unknown": "Stelle die Ressourcen zur Wiederherstellung erneut bereit."
+          "ready_missing_registry": "Erzwinge eine erneute Bereitstellung, um das Repository der Containerregistrierung und die Zugangsdaten zum Hochladen neu zu erstellen. Bis dahin bleiben Bereitstellungen ohne Wirkung und ohne Warnung.",
+          "unknown": "Erzwinge zur Wiederherstellung eine erneute Bereitstellung."
         },
         "elapsed": "vor {minutes} Min. gestartet",
-        "cta": "Ressourcen erneut bereitstellen",
+        "cta": "Erneute Bereitstellung erzwingen",
         "confirm": {
-          "title": "Ressourcen für {slug} erneut bereitstellen?",
+          "title": "Erneute Bereitstellung von {slug} erzwingen?",
           "description": "Bricht laufende Bereitstellungen ab, löscht die Kubernetes-Objekte jeder Arbeitslast und startet den CI-Bereitstellungsworkflow erneut. Bestehende Genehmigungen werden erneut ausgeführt.",
-          "confirm": "Ja, erneut bereitstellen"
+          "confirm": "Ja, erneute Bereitstellung erzwingen"
         },
         "toast": {
-          "dispatched": "Erneute Ressourcenbereitstellung gestartet; der Bereitstellungsworkflow läuft erneut.",
+          "dispatched": "Erzwungene erneute Bereitstellung gestartet; der Bereitstellungsworkflow läuft erneut.",
           "partial": "Teilweise Wiederherstellung: Die Bereinigung wurde durchgeführt, aber der Bereitstellungsstart ist fehlgeschlagen ({message})."
         },
         "error": {
-          "noResponse": "Erneute Ressourcenbereitstellung fehlgeschlagen: keine Antwort vom Server.",
-          "generic": "Erneute Ressourcenbereitstellung fehlgeschlagen."
+          "noResponse": "Erzwungene erneute Bereitstellung fehlgeschlagen: keine Antwort vom Server.",
+          "generic": "Erzwungene erneute Bereitstellung fehlgeschlagen."
         }
       },
       "configDrift": {
