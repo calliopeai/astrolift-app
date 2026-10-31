@@ -598,6 +598,38 @@ def test_a_deploy_in_flight_refuses_and_a_reprovision_in_flight_is_joined(permis
 
 
 @pytest.mark.django_db
+def test_a_concurrent_call_that_records_its_row_first_is_joined(permission_resolver, no_server, monkeypatch):
+    """Two calls can both pass the in-flight check; the row lock lets one record."""
+    import astrolift_lifecycle.reprovision as service
+
+    world = _world("race", zone=True)
+    permission_resolver.grant(Permission.APP_DEPLOY)
+    claims = service._claims
+    rival: list[Deployment] = []
+
+    def claims_then_a_rival_records(app, plans):
+        claims(app, plans)
+        rival.append(
+            Deployment.objects.create(
+                registered_app=world.app,
+                app_environment=world.env,
+                trigger_kind=Deployment.TriggerKind.REPROVISION.value,
+                status=Deployment.Status.PENDING.value,
+                image_tag="v1",
+            )
+        )
+
+    monkeypatch.setattr(service, "_claims", claims_then_a_rival_records)
+
+    result = _reprovision(world)
+
+    assert result.ok, result.errors
+    assert result.data.environments[0].deployment_id == str(rival[0].guid)
+    assert no_server == []
+    assert Deployment.objects.filter(trigger_kind="reprovision").count() == 1
+
+
+@pytest.mark.django_db
 def test_an_approval_gated_environment_refuses_a_manifest_its_approvers_never_saw(
     permission_resolver, no_server
 ):

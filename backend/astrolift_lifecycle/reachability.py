@@ -389,7 +389,7 @@ def _sentence(parts: list[str]) -> str:
 def _evaluate(env: Any, facts: _Facts, view: ClusterView | None, now: dt.datetime) -> Verdict:
     public = facts.workloads.get(env.registered_app_id, [])
     if not public:
-        return Verdict(REACHABLE, "No public workload")
+        return Verdict(REACHABLE, "No public workload.")
     in_flight = env.pk in facts.in_flight
     deployed = env.pk in facts.running
     domain = usable_domain(env.managed_domain if env.managed_domain_id else None)
@@ -556,7 +556,7 @@ def app_verdicts(
     out: dict[int, Verdict] = {}
     for app in app_list:
         if app.pk not in with_public:
-            out[app.pk] = Verdict(REACHABLE, "No public workload")
+            out[app.pk] = Verdict(REACHABLE, "No public workload.")
             continue
         verdicts = by_app.get(app.pk)
         if not verdicts:

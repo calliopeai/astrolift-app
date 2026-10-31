@@ -206,10 +206,20 @@ def _record(plan: _Plan, actor) -> bool:
     running = plan.running
     with transaction.atomic():
         AppEnvironment.objects.select_for_update().filter(pk=plan.env.pk).first()
-        if Deployment.objects.filter(
-            app_environment=plan.env, status__in=_IN_FLIGHT, deleted_at__isnull=True
-        ).exists():
-            plan.error = "a deployment started while this was being prepared; it renders the environment"
+        started = (
+            Deployment.objects.filter(
+                app_environment=plan.env, status__in=_IN_FLIGHT, deleted_at__isnull=True
+            )
+            .order_by("-created_at", "-pk")
+            .first()
+        )
+        if started is not None:
+            # A concurrent call got here first: join its run. A deploy that
+            # started meanwhile renders the environment itself.
+            if started.trigger_kind == Deployment.TriggerKind.REPROVISION.value:
+                plan.joined = started
+            else:
+                plan.error = "a deployment started while this was being prepared; it renders the environment"
             return False
         plan.deployment = Deployment.objects.create(
             registered_app_id=running.registered_app_id,
