@@ -6,6 +6,18 @@ Creation therefore requires the existing `app.update` permission at explicit
 organization scope. A selected team or project cannot replace that owner;
 app, project and team grants do not grant upward to the organization.
 
+Preconditions: `app.update` granted at the active organization itself; an
+app, project or team grant does not reach it. A bearer credential must be
+organization-bound and its owner must hold that grant. Surfaces: the console
+at `/pipelines/new`, or the `createPipeline` mutation via `astro api graphql`.
+Placeholders: `<pipeline-name>`, `<repo-url>` and `<default-branch>` are the
+values you choose; `<pipeline-id>` is `id` from `astro pipeline list --json`
+or `astroliftPipelinesPage`.
+
+```graphql
+mutation { createPipeline(input: {name: "<pipeline-name>", repoUrl: "<repo-url>", defaultBranch: "<default-branch>", tomlPath: ""}) { ok errors { code message field } data { id name } } }
+```
+
 An organization bearer credential also requires its owner's organization
 permission and the token permission ceiling. Team-bound credentials cannot
 create organization pipelines, including credentials owned by organization
@@ -27,3 +39,14 @@ Pipelines list. It sends only the four existing input fields, preserves a
 failed draft for retry, and retains the created GUID if navigation fails after
 commit. The create action requires `app.update` in the frontend permission set;
 the API remains authoritative for its explicit organization scope.
+
+## Verify
+
+```sh
+astro pipeline list --json
+astro api graphql -q '{ astroliftPipeline(id: "<pipeline-id>") { id name repoUrl defaultBranch tomlPath organizationId } }'
+./run.sh test astrolift_pipelines/tests/test_creation_scope_2115.py
+```
+
+The list carries the new pipeline's `id` and `name`, the exact read returns it with
+`organizationId` set, and the test run passes.

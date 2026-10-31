@@ -10,6 +10,26 @@ model names, artifact upload and cross-region/version-alias adoption are not
 implemented. Model registration, access, inference compatibility and billing
 remain operator responsibilities.
 
+Preconditions: `project.update` in the owning project
+(`backend/core/permissions.py`), which gates `provisionProjectManagedService`,
+`updateProjectManagedService` and deprovisioning; the surface is
+`astro project resources` or the project resources page at
+`/projects/<project-slug>/resources`; the cluster is a `gcp` provider cluster
+whose provider credential reaches Vertex AI in the configured GCP project and
+region, with the provider package's `gcp` extra installed on the control-plane
+workers. Placeholders: `<project-slug>` is `SLUG` from `astro project list`;
+`<cluster>` is `slug` from `astroliftClustersPage`; `<resource>` is `ID` from
+`astro project resources list --project <project-slug>`; `<name>` is the
+resource name you choose and `<config.json>` the driver config file; `<project>`,
+`<region>` and `<model-id>` are the GCP project, Vertex region and registered
+Model ID.
+
+```sh
+astro project resources catalog --project <project-slug> --cluster <cluster>
+astro project resources add --project <project-slug> --cluster <cluster> \
+  --kind model_endpoint --variant vertex_ai --name <name> --config @<config.json>
+```
+
 ## Resource and operation identities
 
 `display_name` is a human label, not an endpoint resource ID. The service's
@@ -114,3 +134,14 @@ purchase, model upload or inference is performed.
 Primary contracts: [Endpoint and DeployedModel](https://github.com/googleapis/googleapis/blob/master/google/cloud/aiplatform/v1/endpoint.proto),
 [EndpointService requests and operations](https://github.com/googleapis/googleapis/blob/master/google/cloud/aiplatform/v1/endpoint_service.proto),
 and [Python API-core operations](https://googleapis.dev/python/google-api-core/latest/operation.html).
+
+## Verify
+
+```sh
+astro project resources show <resource> --project <project-slug>
+```
+
+`Kind:` must read `model_endpoint / vertex_ai` and `Status:` must be `active`;
+`provisioning`, `updating` or `deprovisioning` means the recorded operation is
+still pending, and `failed` means the journal needs the review above before any
+new allocation.

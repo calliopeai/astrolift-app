@@ -6,6 +6,25 @@ the owner's live `workflow.read` grants. `tools/list` filters capabilities by
 these grants. `FEATURE_WORKFLOWS=false` removes the workflow tools and refuses
 their calls. The generated contract is `backend/contracts/mcp-tools.json`.
 
+Preconditions: an `alft_at_` API token (issued at `/tokens`) whose scopes cover
+the tool (`mcp:read` to discover and inspect; `mcp:write` plus `workflow:write`
+to import, enable, create, update or delete; `mcp:dispatch` plus
+`workflow:trigger` to start, control or decide) and whose owner holds the
+matching live grants (`workflow.read`, `workflow.create`, `workflow.update`,
+`workflow.delete`, `workflow.trigger`, `agent.dispatch`) at the actual owner;
+`FEATURE_WORKFLOWS` on; the surface is JSON-RPC `tools/list` and `tools/call`
+posted to `https://<astrolift-host>/api/mcp/v1/` with `Authorization: Bearer
+<alft_at_ token>`. Placeholders: `definition_id` is `guid` from
+`astrolift_list_workflow_definitions`; `workflow_id` is the configured workflow
+`guid` from `astrolift_list_workflows`; `project_id` is the project UUID;
+`expected_revision` and `expected_input_schema_digest` come from
+`astrolift_get_workflow_definition`; `request_id` is a UUID you persist before
+the start; `execution_id`, `temporal_workflow_id` and `temporal_run_id` come
+from the start's `data` or `astrolift_list_workflow_runs`; `run_guid`,
+`execution_guid` and `temporal_execution.run_id` come from
+`astrolift_list_human_gates`; `expected_version` is `version` from
+`astrolift_get_workflow`.
+
 | Tool | Result |
 | --- | --- |
 | `astrolift_list_workflow_definitions` | Native definition summaries and stage topology; optional `project_id` filter |
@@ -246,6 +265,25 @@ set MCP `isError: true` and preserve the complete native result in both
 `structuredContent` and the JSON text content. A failed start can still have
 `data` containing the reserved request/execution identity.
 
+- **Signature:** a tool result with `isError: true` whose `structuredContent`
+  carries the native envelope: `PRECONDITION` `Explicit confirmation of this
+  reviewed workflow start is required` (no `confirmed: true`); `VALIDATION`
+  with the input-contract error (undeclared or malformed inputs);
+  `PERMISSION_DENIED` `Current authority does not permit this workflow start`;
+  `CONFLICT` `Concurrent requestId reservation; reconcile the same request
+  before retrying`; or a failed start whose `data` still carries the reserved
+  `execution_id` with `dispatch_status: uncertain`. For gates,
+  `astrolift_get_human_gate_decision` answers `request_state` `refused`,
+  `unbound` or `unknown`.
+- **Fix:** after a timeout or uncertain dispatch, call
+  `astrolift_get_workflow_start` with the original request ID; retry the same
+  start body only with the same `request_id`; for a gate, read
+  `astrolift_get_human_gate_decision` with the same run and stage GUIDs before
+  deciding again; for `unbound`, use the legacy signal API.
+- **Rollback:** a refused start reserves nothing; an accepted execution is
+  stopped with `astrolift_control_workflow_execution` (`cancel`, or
+  `terminate` with a reason); an admitted gate decision cannot be withdrawn.
+
 After a timeout or uncertain dispatch, call `astrolift_get_workflow_start` with
 the original request ID. It can reconcile the original recorded identity with
 the engine, but never starts a new execution. Retrying the original start with
@@ -270,6 +308,19 @@ execution. A successful `requested` response acknowledges delivery, so inspect
 again for engine-confirmed closure and cleanup progress. A delayed control for
 one incarnation cannot select a newer execution that reuses the workflow ID.
 
-Native configured-workflow authoring/bindings and independent human-gate
-decision adapters remain tracked in #2283. Execution authority does not grant
-human approval authority.
+Execution authority does not grant human approval authority.
+
+## Verify
+
+```bash
+curl -sf -X POST "https://<astrolift-host>/api/mcp/v1/" \
+  -H "Authorization: Bearer <alft_at_ token>" -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+pytest astrolift_agents/tests/test_workflow_mcp.py astrolift_agents/tests/test_workflow_import_mcp.py astrolift_agents/tests/test_workflow_activation_mcp.py astrolift_agents/tests/test_workflow_execution_mcp.py astrolift_agents/tests/test_human_gate_mcp.py
+```
+
+`tools/list` names the workflow tools the token's scopes and grants admit
+(`astrolift_list_workflow_definitions` at minimum for `mcp:read` with
+`workflow.read`), a started execution read back through
+`astrolift_get_workflow_execution` shows its terminal status, and the test
+modules pass.

@@ -6,6 +6,18 @@ Behind a load balancer every request reaches the backend from the balancer,
 so the backend must be told which peers it may believe when they name the
 client in `X-Forwarded-For` (#2431).
 
+Preconditions: no Astrolift permission; `ASTROLIFT_TRUSTED_PROXIES` is an
+environment variable of the backend process (`backend/config/proxies.py`), set
+where the control plane is deployed (the ECS task definition or the EKS chart
+values of the install) with the balancer's subnet ranges read from the
+cluster's AWS account; confirming the parsed value needs a shell in the backend
+container. Placeholders: `<cidr>` is the CIDR of a subnet the load balancer is
+attached to; the value is a comma-separated list of them.
+
+```sh
+ASTROLIFT_TRUSTED_PROXIES=<cidr>,<cidr>
+```
+
 `ASTROLIFT_TRUSTED_PROXIES` lists those peers: IP addresses or CIDR ranges,
 comma-separated. Loopback (`127.0.0.1`, the nginx sidecar) is always
 trusted. `config.asgi` reads `X-Forwarded-For` and `X-Forwarded-Proto` only
@@ -57,3 +69,14 @@ INFO:     203.0.113.7:0 - "POST /app/auth1/invitation-preview HTTP/1.1" 200 OK
 A private balancer address there (`10.x.x.x:0`) means its subnet is not in
 the setting. Never list a range that holds hosts other than the proxies:
 whatever runs there can name any client address it likes.
+
+## Verify
+
+```sh
+# a shell in the backend container, where manage.py lives
+python manage.py shell -c "from django.conf import settings; print(settings.TRUSTED_PROXIES)"
+```
+
+The tuple must start with `127.0.0.1` and list every `<cidr>` you set; then a
+request through the balancer must show the client's own address, not a
+`10.x.x.x` balancer address, in the uvicorn access-log line above.

@@ -6,6 +6,17 @@ instrumentation endpoint when the ingress supplies metrics. Workload resource
 measurements and workload instrumentation remain separate from these environment
 totals.
 
+Preconditions: `app.read` on the app to read the signals (console
+`/apps/<app-slug>/observability`, or GraphQL via `astro api graphql`). The
+cluster's `prometheus_endpoint` and `ingress_class` live in its
+`provider_config` (`register_tenant_cluster --prometheus-endpoint` from a shell
+in the backend container, or `providerConfig` on `registerTenantCluster`); the
+Helm and Prometheus changes need a kubeconfig for that cluster, and the
+CloudWatch fallback the cluster's AWS account with load-balancer discovery and
+CloudWatch metric reads. Placeholders: `<app-slug>` is the registered app slug
+(`astro app list`); `<environment-name>` is a name from
+`astro app environments list <app-slug>`.
+
 Idle histogram windows have no latency percentile. Astrolift excludes windows
 with zero observations, preserving real latency samples in the same range rather
 than turning undefined values into zero latency or rejecting the whole chart.
@@ -112,8 +123,29 @@ provider/query failures remain distinct from measured zero traffic.
 
 ## Check the read
 
-Query `astroliftAppGoldenSignals(appSlug: ..., environmentName: ...,
-rangeSeconds: 3600)` without `workloadSlug` for environment ingress totals.
+Query the golden signals without `workloadSlug` for environment ingress totals:
+
+```graphql
+query {
+  astroliftAppGoldenSignals(appSlug: "<app-slug>", environmentName: "<environment-name>", rangeSeconds: 3600) {
+    reason
+    signals {
+      name reason
+      measurement { source available unavailableReason target { namespace clusterId } }
+    }
+  }
+}
+```
+
 Inspect each signal's `measurement.source`, `measurement.target.namespace`,
 `available` and `unavailableReason`, not just the panel's overall reason.
 `astroliftAppStatusCodeBreakdown` uses the same exact route selection.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftAppGoldenSignals(appSlug: "<app-slug>", environmentName: "<environment-name>", rangeSeconds: 3600) { reason signals { name reason measurement { source available unavailableReason target { namespace } } } } }'
+./run.sh test astrolift_observability/tests/test_golden_signal_cli_2219.py
+```
+
+Each request signal reports `measurement.available: true`, a `source` other than `NONE` (`EDGE_PROMETHEUS`, or `CLOUDWATCH_ALB` for the dedicated ALB fallback) and the environment's namespace in `target.namespace`; `unavailableReason` is null; the suite passes.

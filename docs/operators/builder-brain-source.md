@@ -11,6 +11,8 @@ IAM policy, registry, built image or running application. Production acceptance
 requires an operator-configured target and authorized artifact/runtime canary.
 This change does not perform that canary.
 
+Preconditions: on the control plane, `BUILDER_BRAIN_BUILD_TARGETS` holding the destination project's target and an HTTPS `APP_BASE_URL`; the operator-provisioned namespace, ServiceAccount, IAM role and ECR repository in the cluster's AWS account; the caller's current `alft_at_` bearer with `write:apps`, the organization's `chat_studio_integration` module on, `app.create` and `app.deploy` on the destination project, source access, and read access to the brain in that project. Surface: the Builder REST routes under `/api/builder/v1/`. Placeholders: `<project-guid>` is `id` from `astroliftProjectsPage`; `<organization-guid>` is `id` from `astroliftOrganizations`; `<managed-aws-cluster-guid>` is `id` from `astroliftClustersPage`; `<actual-namespace-uid>` and `<actual-serviceaccount-uid>` are `.metadata.uid` from `kubectl get namespace` and `kubectl get serviceaccount`; `<dev-guid>` is the Builder dev environment's id from the Builder API; `<build-guid>` is `id` in the POST response; `<64-lowercase-hex>` is `archive_sha256` from the source read, or `image_digest` from the build read for `host/`.
+
 ## Operator target and trust
 
 `BUILDER_BRAIN_BUILD_TARGETS` is JSON keyed by the exact destination project GUID:
@@ -203,3 +205,17 @@ No new `astro` command is claimed. API/CLI consumers may make these bearer REST
 calls. Studio keeps the intent GUID, polls, then calls `host/` with the observed
 digest. It must not substitute team `promote/`, fabricate an image, edit TTL after
 creation or inject brain secrets into the raw Builder runtime.
+
+## Verify
+
+```text
+GET /api/builder/v1/capabilities/
+Authorization: Bearer <alft_at token>
+
+GET /api/builder/v1/brain-source-builds/<build-guid>/
+Authorization: Bearer <alft_at token>
+
+cd backend && pytest astrolift_lifecycle/tests/test_builder_brain_source_2456.py
+```
+
+Capabilities carry `brain_source` with `protocol: builder-brain-source-v1`; after `host/`, the build read shows `status: hosted`, `hosting_status: created` and non-null `app_guid`, `deployment_guid` and `runtime_url`, and that deployment reaches a running state in the ordinary deployment views; the test module passes.

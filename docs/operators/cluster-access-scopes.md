@@ -6,6 +6,8 @@ with `app.read`, without obtaining cluster mutation authority. See
 redaction and persisted-observation contract. Organization-level inventory and
 control routes below retain their existing gates.
 
+Preconditions: the declared permission at the active organization scope: `cluster.read` for inventory and detail, `cluster.register`, `cluster.update`, `cluster.unregister`, `cluster.manage`, `cluster.users`, and `provider_plugin.read` or `provider_plugin.configure` for provider configuration; a bearer must be organization-bound with the matching scope, and shared-resource writes need the platform operator with `admin`. The catalog is `backend/core/permissions.py` (`astro perms list` offline, `astro perms diagnose` for one slug on a target); the behaviour is proved by `backend/astrolift_clusters/tests/test_org_scopes_2108.py`. Placeholders: `<org-id>` is `id` from `astroliftOrganizations`.
+
 Tenant clusters, managed domains and per-organization provider configuration
 belong to an organization. Their inventory, detail, live state, bootstrap,
 metrics, lifecycle, identity-user and configuration routes require the declared
@@ -76,3 +78,13 @@ transitions invalidate old callbacks. Cached same-target observations retain
 their current read behavior; changing locale alone preserves the review.
 These checks add no server immutable-incarnation/version precondition and do
 not establish identity or infrastructure state beyond the actual response.
+
+## Verify
+
+```sh
+astro perms diagnose --permission cluster.read --scope-type ORG --scope-id <org-id>
+astro api graphql -q 'query { astroliftClustersPage { items { id slug } } }'
+cd backend && pytest astrolift_clusters/tests/test_org_scopes_2108.py
+```
+
+The diagnostic reports the grant at the organization, the inventory lists the active organization's and shared clusters only, and the test module passes.

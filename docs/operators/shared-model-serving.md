@@ -4,6 +4,27 @@ Implementation target for [#2212](https://github.com/calliopeai/astrolift-app/is
 This document records the agreed behavior; it is not proof that the feature is
 released. Deployment and browser verification must accompany the implementation.
 
+Preconditions: deploying, editing, reprovisioning, adopting or deprovisioning a
+model requires an active Django superuser holding `org.update` and
+`cluster.update` in the selected organization; a bearer token additionally needs
+the `admin` scope and a live selected-org membership. Subscribing or revoking an
+app environment requires `app.update` on that app. Reading one subscription's
+traffic requires `app.read_metrics`. The kind checks need an expendable local
+kubeconfig. Surfaces: the console at `/models/deploy` and
+`/models/shared/<model-deployment-id>`, or GraphQL via `astro api graphql`.
+Placeholders: `<organization-id>` is `id` from `astroliftOrganizations`;
+`<model-deployment-id>`, `<cluster-id>` and `<provider-id>` are `id`, `clusterId`
+and `providerId` of an item from `clusterModelDeploymentsPage`; `<service-id>` is
+that same `id` when reading subscription metrics; `<subscription-id>` is `id`
+from `clusterModelSubscriptionsPage`; `<start>` and `<end>` are DateTime bounds
+one minute to 24 hours apart.
+
+```graphql
+query { clusterModelDeploymentsPage(organizationId: "<organization-id>") { items { id version name clusterId providerId status ready sharingMode subscriptionsEnabled } totalCount } }
+query { clusterModelSubscriptionsPage(organizationId: "<organization-id>", modelDeploymentId: "<model-deployment-id>") { items { id version appSlug environmentName alias status } totalCount } }
+query { astroliftModelSubscriptionMetrics(organizationId: "<organization-id>", serviceId: "<service-id>", subscriptionId: "<subscription-id>", expectedClusterId: "<cluster-id>", expectedProviderId: "<provider-id>", start: "<start>", end: "<end>") { scope stepSeconds retrievedAt metrics { key unit state value observedAt } } }
+```
+
 ## Deploy a model, then subscribe applications
 
 A shared model belongs to an organization and an eligible cluster. Creating it
@@ -304,3 +325,14 @@ settings. Changing the target/version or admission invalidates an old review;
 new desired metadata replaces the draft only for the newly observed version.
 Accepted updates remain pending reconciliation and a model restart, not live
 readiness or hardware-fit proof. Existing superadmin and bearer admission apply.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftModelSubscriptionMetrics(organizationId: "<organization-id>", serviceId: "<service-id>", subscriptionId: "<subscription-id>", expectedClusterId: "<cluster-id>", expectedProviderId: "<provider-id>", start: "<start>", end: "<end>") { scope metrics { key state value } } }'
+./run.sh test astrolift_services/tests/test_cluster_model_foundation_2213.py astrolift_services/tests/test_cluster_model_mutations_2213.py astrolift_services/tests/test_cluster_model_queries_2213.py astrolift_services/tests/test_shared_model_binding_runtime_2213.py astrolift_clusters/tests/test_shared_model_retirement_2213.py astrolift_workflows/tests/test_shared_model_reconcile_runtime_2213.py providers/tests/k8s_native/test_shared_model_auth.py providers/tests/k8s_native/test_shared_model_runtime.py
+```
+
+The metrics read returns `scope: "authenticated_subscription"` with each measure's
+`state` explicit (`NO_DATA`, `UNCONFIGURED`, `UNAVAILABLE`, `STALE` or a value), and
+every test module passes; the kind checks above remain the opt-in provider proof.

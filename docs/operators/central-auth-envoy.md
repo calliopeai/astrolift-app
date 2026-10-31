@@ -10,6 +10,8 @@ its own. The one registered callback is
 `https://<auth host>/oauth2/callback`, and the session covers every host
 under the auth host's parent zone.
 
+Preconditions: in the cluster's organization, `cluster.update` for `updateTenantCluster` and `cluster.manage` for `installClusterPrereqs` and `reconcileClusterIngresses`; a shared cluster needs the platform operator and a bearer with `admin`. Surface: Cluster settings at `/clusters/<cluster-slug>/settings`, or `astro api graphql`; a kubeconfig for the cluster for the edge checks; the cluster's AWS account (Route53, ALB, ACM) for the DNS and certificate reads. EKS only; see "Explicitly unsupported fronts". Placeholders: `<cluster-slug>` and `<cluster-id>` are `slug` and `id` from `astroliftClustersPage`; `<auth host>` is `oidcAuthConfig.auth_proxy_host`; `<zone>` is the cluster's managed zone (`zone` from `astroliftManagedDomains`); `<issuer>` is the IdP issuer behind `discovery_url`.
+
 ## What an app receives
 
 - `X-Auth-Request-User` (the `sub` claim) and `X-Auth-Request-Email`, set by
@@ -83,6 +85,25 @@ not serve `<issuer>/.well-known/jwks.json`.
 6. **Clean up the IdP.** When no app on the cluster still renders an ALB
    Ingress, remove the per-app callback and sign-out URLs from the old
    app client.
+
+Steps 1, 2 and 4 through `astro api graphql`; `update.json` is `{"input": {"id": "<cluster-id>", "oidcAuthConfig": {...}}}` with the complete intended config:
+
+```sh
+astro api graphql --vars-file update.json -q \
+  'mutation($input: UpdateTenantClusterInput!) { updateTenantCluster(input: $input) { ok errors { message } data { ingressClass oidcAuthConfig } } }'
+astro api graphql --var clusterId=<cluster-id> -q \
+  'mutation($clusterId: GUID!) { installClusterPrereqs(input: {clusterId: $clusterId, selectedComponents: ["envoy-gateway", "<every component the cluster already runs>"]}) { ok errors { message } } }'
+astro api graphql --var clusterId=<cluster-id> -q \
+  'mutation($clusterId: GUID!) { updateTenantCluster(input: {id: $clusterId, ingressClass: "envoy"}) { ok errors { message } data { ingressClass } } }'
+```
+
+The checks of step 3:
+
+```sh
+curl -sI https://<auth host>/ | grep -i '^location:'
+kubectl -n astrolift-edge get securitypolicy edge-oidc -o jsonpath='{.status.ancestors[*].conditions[?(@.type=="Accepted")].status}{"\n"}'
+kubectl -n astrolift-edge get gateway edge -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}{"\n"}'
+```
 
 ## Rolling back
 
@@ -295,3 +316,14 @@ the present API accepts clusterId plus username and the server resolves the
 current configured pool at write time. An unseen pool retarget or username
 replacement race remains a backend boundary tracked in APP #2225. No cloud
 calls, pagination extension, new authority gate or backend contract are added.
+
+## Verify
+
+```sh
+kubectl -n astrolift-edge get securitypolicy edge-oidc -o jsonpath='{.status.ancestors[*].conditions[?(@.type=="Accepted")].status}{"\n"}'
+kubectl -n astrolift-edge get gateway edge -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}{"\n"}'
+curl -sI https://<auth host>/ | grep -i '^location:'
+astro api graphql -q 'query { astroliftCluster(slug: "<cluster-slug>") { ingressClass oidcAuthConfig } }'
+```
+
+`Accepted` and `Programmed` both read `True`, the auth host redirects to the IdP with `redirect_uri=https://<auth host>/oauth2/callback`, the cluster reads `ingressClass: "envoy"`, and a redeployed app's hostname resolves to the edge ALB with its own ALB Ingress gone.

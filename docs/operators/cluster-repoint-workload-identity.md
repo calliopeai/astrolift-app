@@ -7,6 +7,8 @@ region's first cluster under the old region's slug after the cut-over
 (calliope-installer#540). The row keeps its GUID, its apps and their
 environments; only the cluster behind it changes.
 
+Preconditions: a shell in the control plane's backend container with the cluster's registration environment (the installer runs the command at every control-plane start); the control plane's AWS role can describe the EKS cluster and update IAM role trust policies in the cluster's AWS account; reading the card needs `cluster.register` in the cluster's organization (the platform operator on a shared cluster), at `/clusters/<cluster-slug>` or through `astroliftCluster(slug)`. Placeholders: `<cluster-slug>` is `slug` from `astroliftClustersPage`; `<request guid>` is the rebind request's GUID in the Temporal workflow ID.
+
 Every per-app IAM role Astrolift minted for the row (`astrolift-<org>-<app>`,
 the role an app's pods assume through IRSA) trusts the old cluster's OIDC
 provider. Until that trust moves, pods on the new cluster cannot assume the
@@ -55,6 +57,10 @@ appsReconciled failures { app role error } error } }`. It follows the
 management error's visibility: callers with `cluster.register` see it; on a
 shared cluster, only the platform operator does.
 
+```sh
+astro api graphql -q 'query { astroliftCluster(slug: "<cluster-slug>") { workloadIdentityRebind { state issuer previousIssuers appsTotal appsReconciled failures { app role error } error requestedAt startedAt finishedAt } } }'
+```
+
 ## Retrying
 
 A move that stops before it finishes (its retries ran out on a lost database
@@ -64,9 +70,23 @@ when the control plane started) or that failed is started again the next
 time the cluster is registered: every control-plane start runs the command,
 and an operator can run `python manage.py register_tenant_cluster` with the
 same environment.
+
+```sh
+python manage.py register_tenant_cluster --auto-discover-aws
+```
+
 Deploying an app also moves its role. A newer re-point supersedes an
 unfinished move and carries its issuers forward.
 
 A move refused with "the cluster's OIDC issuer is X, not Y" found the row
 pointing at a different cluster from the one it was started for; registering
 the cluster again starts a move to the current issuer.
+
+## Verify
+
+```sh
+astro api graphql -q 'query { astroliftCluster(slug: "<cluster-slug>") { workloadIdentityRebind { state issuer appsTotal appsReconciled failures { app role error } error } } }'
+cd backend && pytest astrolift_clusters/tests/test_workload_identity_rebind_2472.py astrolift_workflows/tests/test_rebind_cluster_workload_identity_2472.py providers/tests/aws/test_identity_irsa_rebind_2472.py
+```
+
+`state` is `succeeded`, `appsReconciled` equals `appsTotal`, `failures` is empty and `error` is empty; the three test modules pass.

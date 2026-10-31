@@ -5,6 +5,18 @@ when this additive contract is installed. That capability describes available
 API fields; present app permissions and action preconditions still decide each
 request. It does not establish a client's confirmation UI or native consent.
 
+Preconditions: `app.read` on the workload's app for the review query and
+`app.deploy` at the app scope for the mutation (`backend/core/permissions.py`);
+run both through `astro api graphql` with a session or bearer token, or use the
+Primary environment controls at `/apps/<app-slug>/workloads/<workload-slug>`;
+the environment's cluster must be live. Placeholders: `<app-slug>` is `slug`
+from `astro app list`; `<workload GUID>` is `id` from
+`astroliftWorkloadsPage(appSlug: "<app-slug>")`; `<environment GUID>` is `id`
+from `astroliftEnvironments(appSlug: "<app-slug>")`; `<cluster GUID>` and
+`<reviewed namespace>` are `clusterId` and `namespace` as the review query
+returns them, and the version numbers are its `workloadVersion`,
+`environmentVersion`, `clusterVersion` and `appVersion`.
+
 Restart and scale can target an explicit environment GUID. First read
 `astroliftWorkloadActionTarget(workloadId: ..., environmentId: ...)`. It returns
 immutable workload, app, environment and cluster GUIDs, their current versions,
@@ -52,6 +64,13 @@ Send the read-back values without guessing:
 }
 ```
 
+With each operation saved in its own file:
+
+```sh
+astro api graphql --file review.graphql --var workload=<workload GUID> --var environment=<environment GUID>
+astro api graphql --file scale.graphql --vars-file scale.json
+```
+
 `restartAstroliftWorkload` uses the same target fields in `RestartWorkloadInput`,
 without `replicas`. Explicit targets require every listed precondition, including
 `ifMatchVersion`. Incomplete input returns `VALIDATION`; changed versions return
@@ -92,3 +111,15 @@ the same cluster use their separate recorded namespaces; two different clusters
 retain separate kubeconfig identities even during concurrent connections. No
 production resources are needed to verify this contract: the opt-in tests use
 two task-owned local Kind clusters and PostgreSQL, with real provider calls.
+
+## Verify
+
+```sh
+astro api graphql --file review.graphql --var workload=<workload GUID> --var environment=<environment GUID>
+astro app pods <app-slug>
+```
+
+The re-read `workloadVersion` must equal the `workloadVersion` the mutation
+returned, and the pod list must show the workload's pods reaching the requested
+replica count with `STATUS` Running; until then `accepted: true` only means the
+cluster took the patch.

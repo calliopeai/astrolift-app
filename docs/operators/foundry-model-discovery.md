@@ -6,6 +6,13 @@ account. It uses the installed `azure-mgmt-cognitiveservices` SDK and an admitte
 Azure `TokenCredential`. It is not yet a public model-registration API or a UI
 connection flow.
 
+Preconditions: an internal adapter with no operator surface, permission or
+`astro` command; it runs inside the control plane after the current
+organization, credential, enabled provider and reviewed placement are admitted.
+The account is the Azure subscription, resource group and `AIServices` account
+of that admitted placement, read with the admitted Azure `TokenCredential`.
+Placeholders: none.
+
 Before construction, the control plane must check the current organization,
 credential, enabled provider and exact reviewed placement. Provider reads cannot
 replace those checks. The adapter takes the subscription UUID, resource group,
@@ -60,3 +67,11 @@ Microsoft's [deployment resource reference](https://learn.microsoft.com/azure/te
 documents the native resource hierarchy. Its [Foundry endpoint documentation](https://learn.microsoft.com/en-us/azure/ai-studio/ai-services/concepts/endpoints)
 explains why a deployment's model metadata does not identify one universal client
 protocol. The catalogue deliberately does not invent an inference URL.
+
+## Verify
+
+```sh
+cd backend/providers && pytest tests/azure/test_foundry_catalogue_wire_2269.py
+```
+
+The suite passes against its controlled ARM transport; it is not live Azure inference.

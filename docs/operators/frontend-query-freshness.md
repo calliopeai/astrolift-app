@@ -8,6 +8,13 @@ including an expanded window, instead of issuing a query with default arguments.
 A rejected write reports an error; a committed write whose refresh fails retains
 its success and reports the refresh failure separately.
 
+Preconditions: a reference page for console behaviour. The direct reads need
+`app.read` on the app (`astroliftAlertRule`, `astroliftAlertEvent`,
+`astroliftAlertEventSummary`) or `audit_log.read` (`astroliftEvent`) in the
+active organization. Surfaces: the console screens named below, or GraphQL via
+`astro api graphql`. Placeholders: `<app-slug>` is the registered app slug
+(`astro app list`); `<event-id>` is `id` from `astroliftEventsPage`.
+
 The app frame owns the shared 15-second recent-deployment poll on every app tab.
 The Overview, approval queue and deploy strip consume that cache. Deploying from
 an environment control refreshes its latest deployment as well, so the next
@@ -61,3 +68,13 @@ shares its three reads across summaries; workflow run history polls while the
 run is live; and Preview server rendering preloads the cursor-page document the
 list reads. Agent discovery's effective-ref scan key and stale-response guards
 are covered by #2147.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftAlertEventSummary(appSlug: "<app-slug>") { unresolvedCount criticalCount } }'
+astro api graphql -q '{ astroliftEvent(id: "<event-id>") { id eventType occurredAt } }'
+./run.sh test astrolift_operations/tests/test_detail_reads_2143.py
+```
+
+The summary returns both counts for the app, the event read returns the row (or null when it is not visible), and the suite passes.

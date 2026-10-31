@@ -4,54 +4,43 @@
 #   - Single HTTP workload
 #   - Build from source (Dockerfile at repo root)
 #   - Auto-managed TLS via cert-manager
-#   - Environment variable injection from Astrolift secrets
+#   - App-wide environment variables plus app secrets
 #   - Basic health probe
 
-[app]
-name        = "demo-nodejs-web"
-description = "Demo Node.js web application"
+name = "demo-nodejs-web"
 
-[build]
-# Astrolift clones the repo at the specified ref and builds using
-# the Dockerfile at the repo root.
-dockerfile  = "Dockerfile"
-context     = "."
-
-[workload]
-replicas    = 2
-port        = 3000
-
-[resources]
+[[workloads]]
+name       = "web"
+kind       = "deployment"
+# is_public = true tells Astrolift to create the Ingress. The hostname
+# is <slug>.<cluster-base-domain>; cert-manager issues the certificate.
+is_public  = true
+replicas   = 2
 cpu_request    = "100m"
 cpu_limit      = "500m"
 memory_request = "128Mi"
 memory_limit   = "256Mi"
 
-[health]
-# Astrolift creates a Kubernetes readinessProbe and livenessProbe
-# from these values. The path must return HTTP 2xx when the app is ready.
-readiness_path = "/health"
-liveness_path  = "/health"
-initial_delay  = 5
-period         = 10
-timeout        = 3
-failure_threshold = 3
+  [[workloads.containers]]
+  name       = "web"
+  is_primary = true
+  port       = 3000
+  # Astrolift builds from the Dockerfile at the repo root (platform_build)
+  # or deploys the image CI pushed (ci_pushed); pick with --build-mode at
+  # registration.
+  dockerfile_path = "Dockerfile"
+  build_context   = "."
+  # Astrolift creates a Kubernetes readinessProbe and livenessProbe from
+  # this. The path must return HTTP 2xx when the app is ready.
+  healthcheck = { kind = "http", value = "/health" }
 
-[ingress]
-# enabled = true tells Astrolift to create an Ingress resource.
-# The hostname defaults to <slug>.<cluster-base-domain> if not set.
-enabled        = true
-tls            = true           # cert-manager issues the certificate
+[env]
+# Non-secret environment variables, injected as-is into every workload.
+NODE_ENV  = "production"
+LOG_LEVEL = "info"
+PORT      = "3000"
 
-[environment]
-# Non-secret environment variables. Values are injected as-is.
-NODE_ENV       = "production"
-LOG_LEVEL      = "info"
-PORT           = "3000"
-
-[secrets]
-# Secret names reference the Astrolift secrets store.
-# Each name maps to an environment variable in the running container.
-# Secrets are encrypted at rest and never appear in logs or API responses.
-DATABASE_URL    = { secret = "demo-nodejs-web-db-url" }
-SESSION_SECRET  = { secret = "demo-nodejs-web-session-secret" }
+# Secrets never live in the manifest. Create them on the registered app;
+# each key becomes an environment variable in the running container:
+#   astro app secrets create DATABASE_URL --stdin
+#   astro app secrets create SESSION_SECRET --stdin

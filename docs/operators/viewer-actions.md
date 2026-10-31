@@ -6,6 +6,14 @@ owner, credential scope ceiling, RoleBinding/share grants and ABAC decision as
 their mutations. The page resolver loads these inputs in a batch, including
 project slugs used by policies; it does not issue one permission query per row.
 
+Preconditions: `app.read` on the app to read the page and its `viewerCan`
+fields; an allowed decision needs `app.deploy` on the app's live owner scope
+(`backend/core/permissions.py`); run the query through `astro api graphql`, or
+read the decisions as the enabled or disabled restart and scale controls at
+`/apps/<app-slug>/workloads` and `/apps/<app-slug>/workloads/<workload-slug>`.
+Placeholders: `<app-slug>` is `slug` from `astro app list`; `<workload-slug>` is
+`slug` from `astroliftWorkloadsPage(appSlug: "<app-slug>")`.
+
 ```graphql
 query WorkloadActions {
   astroliftWorkloadsPage {
@@ -62,3 +70,17 @@ remaining action consumption, operation-specific early refusal, common denial
 envelopes across transports and complete stock-role web/CLI acceptance remain
 outstanding. Existing union-based capability lists are not object authority and
 should not substitute for `viewerCan`.
+
+## Verify
+
+```sh
+astro api graphql -q 'query($app: String!) {
+  astroliftWorkloadsPage(appSlug: $app) {
+    items { id slug version viewerCan { restart { allowed code reason } scale { allowed code reason } } }
+  }
+}' --var app=<app-slug>
+```
+
+Every item must carry both decisions: an allowed action shows `allowed: true`
+with empty `code` and `reason`; a denial shows `PERMISSION_DENIED` or
+`PRECONDITION` with the checker's reason.

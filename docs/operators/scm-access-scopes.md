@@ -3,6 +3,19 @@
 SCM routes authorize the resource's owner (#2109). Choosing a team or project
 does not grant access to an organization's connections or a sibling app.
 
+Preconditions: this page describes the SCM permission catalog (`scm.read`,
+`scm.connect`, `scm.disconnect`, `scm.key_create`, `scm.key_delete`) plus
+`app.update` for CI workflow operations. Read the bundled catalog with
+`astro perms list`; trace one account's grant with `astro perms diagnose`.
+The tests under Verify prove the behaviour. Placeholders: `<app-slug>` is the
+registered app slug (`astro app list`); `<permission>` is a slug from
+`astro perms list`.
+
+```sh
+astro perms list
+astro perms diagnose <app-slug> --permission <permission>
+```
+
 Named repository and source-file reads require a live, active connection in
 the current organization. Missing, inactive, deleted and foreign connections
 return `NOT_FOUND` before any provider request; personal credentials remain
@@ -57,3 +70,11 @@ No database migration or GraphQL field change is required. Existing per-app
 roles can manage their app's keys and CI workflow. Organizations that previously
 let viewers or team-only roles connect SCM hosts must assign `scm.connect` at
 the organization to the people who should perform that operation.
+
+## Verify
+
+```sh
+./run.sh test astrolift_scm/tests/test_access_scopes_2109.py astrolift_scm/tests/test_owner_coherence_2109.py
+```
+
+Both modules pass.

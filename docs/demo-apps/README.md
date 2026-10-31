@@ -15,7 +15,7 @@ Each subdirectory contains:
 |-----------|---------|----------------|
 | `nodejs-web/` | Node.js HTTP server | Single workload, auto TLS, environment inject |
 | `python-fastapi/` | Python async API | Build from source, health probes, managed Postgres |
-| `go-microservice/` | Go gRPC/HTTP service | Minimal image, resource limits, custom domain |
+| `go-microservice/` | Go HTTP service | Pre-built image (no build), tight resource limits, custom domain added after registration |
 | `multi-workload/` | Web server + background worker | Multi-workload app, shared secrets, worker scaling |
 
 ## Expanded set (#980) — monorepo, FaaS, managed-service combos
@@ -36,7 +36,16 @@ Validated live on the SteadyMD test bed (spec 41 Phase 4):
 Register any of these apps by pointing Astrolift at a repo that
 contains the corresponding `astrolift.toml` at its root, or paste the
 manifest contents directly in the manifest editor during app
-registration.
+registration (`/apps/new`). From the CLI, in the manifest's directory:
+
+```sh
+astro app register --project-id <project-guid> --source-repo <owner/repo>
+```
+
+`--manifest-raw` sends the local file instead of having the platform read
+the repo; `--build-mode none` is for the pre-built-image demo. Secrets are
+not part of a manifest; create them with `astro app secrets create <KEY>`
+once the app is registered.
 
 For GA validation testing (spec #16), use the `multi-workload` config
 on at least two different cloud providers to exercise the cross-cloud

@@ -5,6 +5,16 @@ Repository client usage includes `fileUpload`; the checked web operations do
 not call the unavailable legacy organization, activation or sign-request
 fields. No field or input was removed and the GraphQL contract is unchanged.
 
+Preconditions: an active account on the install. Own-account reads
+(`effectivePermissions`, `permissionDiagnose`) need no grant; inspecting another
+person requires `org.manage_members` in the explicit active organization, or an
+active platform operator (Django superuser) whose bearer carries `admin`. The
+operator-only paths below require that platform operator, and API bearers
+additionally require the `admin` scope. Surface: `astro perms diagnose`, or
+`astro api graphql -q '<document>'`. Placeholders: `<user-id>` is the integer
+`userId` from `astroliftMyProfile` (printed by `astro whoami`); `<permission>` is
+a slug from `astro perms list`.
+
 `effectivePermissions` and `permissionDiagnose` remain own-account reads.
 Inspecting another person requires `org.manage_members` at the explicit active
 organization and live target membership, or an active platform operator with
@@ -63,3 +73,15 @@ the removed Rocket.Chat history exporter stays unavailable. The feature-gated
 organization, with bearer organization/team ceilings, before calling ClientCove.
 Creating one's own ticket through a bearer additionally requires `admin`.
 The support client receives that organization row for its signed assertion.
+
+## Verify
+
+```bash
+astro perms diagnose --permission <permission>
+astro api graphql -q 'query { permissionDiagnose(userId: "<user-id>", permission: "<permission>") { granted isSuperuser steps { check result detail } } }'
+pytest core/tests/test_legacy_access_2110.py
+```
+
+The diagnosis reports `granted` for your own account with each step's result;
+reading another user's ID without `org.manage_members` is refused; the test
+module passes from the `backend/` directory.

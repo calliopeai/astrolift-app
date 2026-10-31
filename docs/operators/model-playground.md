@@ -8,6 +8,18 @@ app, environment, project, team, or cluster ownership is refused before reading
 heartbeat/configuration facts or accessing rate/job caches. An inactive cluster
 cannot relay a prompt. The mutation repeats these checks on each invocation.
 
+Preconditions: `app.update` at the app owning the endpoint for
+`astroliftModelPromptReadiness` and `testModelEndpoint`; `cluster.update` in the
+exact organization for `astroliftSharedModelPromptReadiness` and
+`testSharedModelEndpoint`. The install's Django cache must be the core
+`RedisCache`, and the cluster agent must be running with a live heartbeat.
+Surface: console `/playground`, `/playground/history` and `/playground/starred`,
+or `astro api graphql -q '<document>'`. Placeholders: `<managed-service-id>` is
+`id` from `astroliftModelEndpointsPage`; `<model-deployment-id>`, `<cluster-id>`,
+`<provider-id>` and `<deployment-version>` are `id`, `clusterId`, `providerId`
+and `version` from `clusterModelDeploymentsPage(organizationId: "<organization-id>")`;
+`<organization-id>` is `id` from `astroliftOrganizations`.
+
 Only active, app-owned vLLM endpoints with a live cluster heartbeat, configured
 model and opt-in `vllm_agent_test.namespace` can attempt a prompt. Other managed
 model variants have provisioning/binding drivers, but no supported playground
@@ -23,7 +35,7 @@ timeout, null data, or a refused mutation is never an assistant success.
 The current heartbeat payload advertises `agent_version`, but no prompt-relay
 capability. A READY snapshot permits an attempt; it does not prove the running
 image contains a relay. Reported version 0.3.0 is not feature proof: the relay
-addition and a later safety fix both used that version. A model/agent can still
+addition and a later safety fix both used that version (unverified). A model/agent can still
 fail or time out, and readiness/configuration/authorization can change before
 submission. Upgrade/roll out the agent through the ordinary operator workflow;
 this feature does not change an agent repository or deploy an image.
@@ -137,3 +149,15 @@ Subscription creation/revocation can restart the entire shared model; pending
 reconciliation does not promise uninterrupted playground availability. See
 [vLLM hosting](vllm-model-hosting.md#organization-owned-shared-deployments) for
 certified CPU/GPU declarations, named bindings, monitoring and agent prerequisites.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { astroliftModelPromptReadiness(id: "<managed-service-id>") { state eligible maxPromptChars maxOutputTokens promptsPerMinute maxWaitSeconds } }'
+astro api graphql -q 'query { astroliftSharedModelPromptReadiness(id: "<model-deployment-id>", expectedClusterId: "<cluster-id>", expectedProviderId: "<provider-id>", expectedVersion: <deployment-version>) { state eligible } }'
+```
+
+A relay can be attempted only when `state` is `READY` and `eligible` is true;
+any other state (`UNCONFIGURED_RELAY`, `STALE_HEARTBEAT`, `INACTIVE`, ...) names
+what blocks the prompt. READY is advisory: the prompt mutation can still fail
+or time out.

@@ -1,3 +1,5 @@
+> Historical (2026-10-30): validation record for the #2145 shared access leaf (RoleSummary, PermissionMatrix, PermissionPicker, ScopePicker); superseded by frontend/components/access/access-controls-translations.test.tsx.
+
 # Shared access localization (#2145)
 
 The first leaf translates `RoleSummary`, `PermissionMatrix`, `PermissionPicker`,

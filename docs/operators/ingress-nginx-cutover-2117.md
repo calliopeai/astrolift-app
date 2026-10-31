@@ -9,6 +9,15 @@ so these hosts move to the Envoy Gateway edge with central auth
 procedure (#2117): one host at a time, each with a rollback, and the old
 release removed only after every host has moved.
 
+Preconditions: the platform operator (an active superuser) holding
+`cluster.manage` on the cluster for `setIngressCutover`; a kubeconfig for the
+cluster and its cloud account for the HelmRelease, Service, NLB and DNS reads
+and changes; write access to the DNS zone that holds the hosts. Surface:
+GraphQL via `astro api graphql`. Placeholders: `<cluster-guid>` is `id` from
+`astroliftClustersPage`; `<release-name>` is the ingress-nginx HelmRelease name
+from the inventory; `<host>` is a hostname on the inventory; `<edge-ip>` is the
+Envoy edge load balancer address.
+
 ## What keeps the old release alive
 
 A recipe run (`installClusterPrereqs` that is not additive) deletes the
@@ -26,7 +35,7 @@ call and which is audited as `cluster.ingress_cutover`:
 
 ```graphql
 mutation {
-  setIngressCutover(input: { clusterId: "<cluster guid>", preservedReleases: ["<release name>"] }) {
+  setIngressCutover(input: { clusterId: "<cluster-guid>", preservedReleases: ["<release-name>"] }) {
     ok
     errors { code message field }
     data { preservedReleases completedAt }
@@ -78,8 +87,13 @@ Stop here if any of these fails; nothing has moved yet.
 1. Lower the host's DNS TTL a day ahead, so a rollback takes effect quickly.
 2. Put the host's route on the edge (redeploy the app on the `envoy` class,
    or apply its HTTPRoute) and confirm the edge serves it by resolving the
-   host to the edge directly (`curl --resolve`), with login, logout and the
-   identity headers as in step 2.
+   host to the edge directly, with login, logout and the identity headers
+   as in step 2:
+
+   ```sh
+   curl -sSI --resolve <host>:443:<edge-ip> https://<host>/
+   ```
+
 3. Point the host's DNS record at the edge. Leave its Ingress on ingress-nginx
    in place.
 4. Watch for at least one full traffic cycle: request rate, 4xx and 5xx rate
@@ -101,10 +115,31 @@ Only after every host on the inventory has moved and been verified:
 
 1. Confirm no DNS record still targets the NLB and ingress-nginx serves no
    traffic.
-2. Record the cutover complete with `setIngressCutover(complete: true)`.
+2. Record the cutover complete:
+
+   ```graphql
+   mutation {
+     setIngressCutover(input: { clusterId: "<cluster-guid>", complete: true }) {
+       ok
+       errors { code message field }
+       data { preservedReleases completedAt }
+     }
+   }
+   ```
+
 3. Delete the old Ingresses, the oauth2-proxy gate and the ingress-nginx
    release (or let the next recipe run that does not select it prune it).
    The NLB goes with its Service.
 
 Until step 2, a recipe run never removes the release, so a host moved back in
 a rollback always has somewhere to go.
+
+## Verify
+
+```sh
+dig +short <host>
+curl -sSI --resolve <host>:443:<edge-ip> https://<host>/
+./run.sh test astrolift_workflows/tests/test_ingress_cutover_2117.py
+```
+
+For every moved host `dig` returns the edge address, the `curl` answers with the edge certificate and a redirect to the IdP (or the app for an ungated host), the step 4 mutation returned a non-null `completedAt`, and the suite passes.

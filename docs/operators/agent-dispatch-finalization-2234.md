@@ -8,6 +8,8 @@ same task/job and creates no completion event. Agent/container `max_retries` and
 `AgentRun.retry_count` retain their existing meanings; the Temporal activity
 attempt is recorded separately.
 
+Preconditions: the Temporal worker's identity holds DescribeWorkflowExecution and GetWorkflowExecutionHistory in its own namespace. Reading a task's final state needs `agent.read` at the task's owner scope, at `/agents/runs/<task-id>`, through `astro agent inspect <task-id>`, or through `agentTask(id)`. Placeholders: `<task-id>` is `id` from `agentTasksPage` or `astro agent ls`.
+
 Before registered dispatch effects, the worker reads its actual Temporal execution
 and original start input. It records the namespace, canonical task workflow ID,
 original run ID, actor kind/user ID/token ID and dispatch activity/attempt in the
@@ -72,3 +74,12 @@ placement, completion races, unfinished-history upgrade, completed-history repla
 and uncertain cleanup across worker replacement. A final event sent to a
 controlled 503 receiver recovers with the same body/event and a new delivery ID.
 These tests do not attest customer VPC reachability or a production callback POST.
+
+## Verify
+
+```sh
+astro agent inspect <task-id>
+cd backend && pytest astrolift_workflows/tests/test_dispatch_finalization_2234.py astrolift_workflows/tests/test_agent_task_callback_temporal_2234.py
+```
+
+The task is in a terminal status and its failure packet carries only `AGENT_DISPATCH_EXHAUSTED` or `AGENT_DISPATCH_TIMEOUT` with the static message; both test modules pass.

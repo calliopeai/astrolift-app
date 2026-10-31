@@ -2,6 +2,8 @@
 
 Servers advertising `workflows.atomic_full_review` provide exact-GUID full review and explicit reviewed schedule consent. Review reads native definitions; it does not edit, enable or execute them.
 
+Preconditions: `workflow.read` at the actual scope of the root and every reachable child definition and `agent.read` on every source and configured agent to review; activation adds root `workflow.update`, root and child `workflow.trigger` and `agent.dispatch` on each selected agent, plus the install's step-up elevation for a browser session; the surface is GraphQL (the operations below) via `astro api graphql -f <file>`, on a server whose `astroliftServerInfo.capabilities` lists `workflows.atomic_full_review`. Placeholders: `$workflowId` is the configured workflow `guid` (from `createWorkflow` or `astro workflow list`); `id` for the definition review is the definition `guid` from `astro workflow definitions`; `expectedScheduleReviewDigest` is `scheduleReviewDigest` from the review you just read; `requestId` is a new UUID you persist before calling.
+
 `workflowDefinitionFullReview(id: GUID!)` reads the root, reachable child definitions, stages and source agent identities from one dedicated PostgreSQL `REPEATABLE READ, READ ONLY` transaction. Its `canonicalReview` is the authoritative complete graph. `reviewDigest` is SHA-256 of those exact UTF-8 bytes. `revision` is the existing native definition revision, computed from the same captured rows. `capturedAt` is the capture transaction's statement time. `rootManifest` is a native TOML projection of the root only; it is not a replacement for reviewing the full graph.
 
 Every root and child needs current `workflow.read` at its actual scope. Source and configured agents independently need `agent.read`, including a source agent FK that a configured binding replaces. Organization membership, bearer scope/team ceilings, live owners, IdP group membership and ABAC are checked freshly. A missing, foreign or unreadable child/agent refuses the whole review before raw content is returned.
@@ -33,7 +35,11 @@ mutation ApproveSchedule($input: ActivateReviewedWorkflowScheduleInput!) {
 }
 ```
 
-Pass the exact configured workflow GUID, captured `expectedScheduleReviewDigest`, a new `requestId` and `confirmed: true` after the person reviews the returned content and consent intent. Activation requires current root `workflow.update`, root/child `workflow.trigger`, and selected agent `agent.dispatch`, as well as all read authority. It rechecks after content locks. The existing install-wide step-up/elevation policy applies to person consent, including a fresh persisted browser-session check after waits. API bearers follow the existing native exemption from session step-up; their current credential and ceilings are still required. The receipt records the actual approver and optional API-token row/ceiling; it stores no plaintext bearer credential. Repeating the same actor's request ID and arguments recovers the saved receipt. Reusing that ID for changed arguments refuses. Recovery does not reactivate a superseded receipt.
+Pass the exact configured workflow GUID, captured `expectedScheduleReviewDigest`, a new `requestId` and `confirmed: true` after the person reviews the returned content and consent intent.
+
+- **Signature:** `activateReviewedWorkflowSchedule` answers `CONFLICT` with the review error (the content changed since the digest was captured, or the request ID was reused with different arguments), or `PERMISSION_DENIED` `Current schedule authority is required`; a saved receipt always reports `engineState: UNCONFIRMED`; a later timer skips with a review-required reason when the content differs from the approved pin.
+- **Fix:** capture a fresh `workflowScheduleFullReview`, review it, and activate again with the new digest and a new `requestId`; for `UNCONFIRMED`, inspect and reconcile the schedule with `workflowSchedule(workflowId:)` / `reconcileWorkflowSchedule` (see [configuration and schedule recovery](workflow-configuration.md)).
+- **Rollback:** a refused activation saves nothing; a saved receipt is superseded by the next activation and does not by itself change the engine, so disable the configured workflow (`updateWorkflow(isEnabled: false)`) to stop fires. Activation requires current root `workflow.update`, root/child `workflow.trigger`, and selected agent `agent.dispatch`, as well as all read authority. It rechecks after content locks. The existing install-wide step-up/elevation policy applies to person consent, including a fresh persisted browser-session check after waits. API bearers follow the existing native exemption from session step-up; their current credential and ceilings are still required. The receipt records the actual approver and optional API-token row/ceiling; it stores no plaintext bearer credential. Repeating the same actor's request ID and arguments recovers the saved receipt. Reusing that ID for changed arguments refuses. Recovery does not reactivate a superseded receipt.
 
 The intended enable change is pinned deliberately: the person's digest identifies the pre-activation configuration; the sealed receipt preserves it and the resulting configuration with `isEnabled: true`. `isCurrent` means this receipt is the configured workflow's current approval pointer. It does not prove current content, authority or engine state.
 
@@ -46,6 +52,15 @@ A timer whose definition, stages, inputs, bindings, trigger, owner or selected d
 Reviewed stage executions save all execution-significant stage fields, including kind, role, prompt and approvers. Human gate authority, pending lists, notifications and projections use that saved descriptor. Later edits cannot turn an approved gate into a checkpoint or substitute a different named approver for an already reserved run. Existing run-specific human decisions remain required.
 
 Limits are 128 reachable definitions, 2,048 stages/agent candidates, nesting depth 8, 50 selected delivery channels, and 2 MiB per canonical review or sealed approval payload. Unsupported graphs, invalid inputs, invalid bindings and unavailable/corrupt sealed plans refuse. Migration `workflows.0021_reviewed_schedule_approval` adds the durable receipt/run association, saved stage descriptors and PostgreSQL immutability guards. Existing schedules without a reviewed receipt keep their previous behavior.
+
+## Verify
+
+```bash
+astro workflow schedule inspect <workflow-guid>
+pytest workflows/tests/test_atomic_review_2459.py astrolift_workflows/tests/test_reviewed_schedule_temporal_2459.py
+```
+
+The schedule observation reports `confirmed: true` with `desiredActive` and `observedState` agreeing, `activateReviewedWorkflowSchedule` returned `databaseStatus: SAVED` with `isCurrent: true` for the receipt, and the test modules pass.
 
 ## Rollout
 

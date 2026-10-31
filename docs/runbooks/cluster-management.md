@@ -3,6 +3,28 @@
 Procedures for bringing a Kubernetes cluster into Astrolift management,
 ongoing maintenance, and controlled decommission.
 
+Preconditions: `cluster.register` to register a cluster, `cluster.manage` to
+bring it into management, refresh setup, re-run preflight or install
+prerequisites, `cluster.update` for `updateTenantCluster`,
+`cluster.unregister` to decommission, `cluster.read` to list and read
+clusters; a shared (organization-less) registration additionally needs the
+platform-operator check behind `cluster.register`. Surfaces: the console
+(`/clusters`, `/clusters/new`, `/clusters/[slug]`, `/clusters/[slug]/settings`),
+the `astro` CLI (`astro cluster bootstrap`, `astro operator cluster
+install-agent`), GraphQL (`astroliftClustersPage`, `astroliftCluster(slug:)`,
+`bringClusterIntoManagement`, `decommissionCluster`, `updateTenantCluster`),
+and a shell in the backend container for `python manage.py
+register_tenant_cluster` and `temporal_ops`; `kubectl` steps need the
+cluster's kubeconfig, and `--auto-discover-*` needs the cluster's cloud
+account reachable from the backend task role. Placeholders: `<slug>` and
+`<name>` are the cluster slug and display name (`astroliftClustersPage`);
+`<cluster-guid>` is `id` from `astroliftCluster(slug: "<slug>")`;
+`<eks-name>` is the cloud provider's cluster name; `<path>` is the
+`--request-file` `install-agent` creates on its first run and re-reads on a
+retry, and `<uuid>` is the installation id it prints (`Agent installation
+<id>: <status>`); `<project-namespace>` is the Kubernetes namespace of the trusted
+workload; `<id>` in `updateTenantCluster` is the cluster GUID.
+
 ---
 
 ## Bring a cluster into management
@@ -18,47 +40,110 @@ Before registering the cluster, confirm the following are in place:
 | Default StorageClass | `kubectl get storageclass` |
 | metrics-server healthy | `kubectl get apiservice v1beta1.metrics.k8s.io` |
 
-See [cluster-prerequisites.md](../operators/cluster-prerequisites.md) for
-install instructions if any are missing.
+The console page `/documentation/cluster-prerequisites` has install
+instructions if any are missing; the preflight checks behind them are in
+`backend/providers/k8s_native/preflight.py` and their failures under
+[Troubleshooting](#troubleshooting).
 
 ### Registration steps
 
-1. **Prepare the kubeconfig.** Export a kubeconfig scoped to the
-   permissions Astrolift needs. The control plane needs permission to:
+1. **Prepare the credentials.** Registration accepts one of three auth
+   methods: `kubeconfig`, `exec_plugin` or `service_account_token`. The
+   control plane needs permission to:
    - Create and manage `Namespace`, `Deployment`, `Service`,
      `Ingress`, `Certificate` resources in app namespaces.
    - Read `Node`, `Pod`, `Event` resources cluster-wide (for the
      cluster health dashboard).
+   - Create the `astrolift-system` namespace and its ServiceAccount,
+     ClusterRole and ClusterRoleBinding (applied by bring-into-management).
 
-   For a minimum-permission kubeconfig, use the `astro cluster kubeconfig`
-   helper or create a `ClusterRole` and `ServiceAccount` manually.
+   For a minimum-permission kubeconfig, create a `ClusterRole` and
+   `ServiceAccount` manually. On EKS, AKS or GKE the backend can discover
+   endpoint, CA and auth shape itself from the backend container
+   (`--auto-discover-azure` and `--auto-discover-gcp` likewise). The
+   command upserts by slug.
+
+   ```bash
+   python manage.py register_tenant_cluster --slug <slug> --name <name> \
+     --plugin-slug aws --auto-discover-aws --aws-cluster-name <eks-name>
+   ```
 
 2. **Register in Astrolift.**
    - Go to **Clusters → Register cluster**.
-   - Fill in the name, provider, region, and paste the kubeconfig.
-   - Click **Register**. Astrolift runs a preflight check automatically.
+   - Fill in the name, slug, provider plugin, region, API endpoint, auth
+     method and auth config (a pasted kubeconfig is wrapped as
+     `{"kubeconfig": "..."}`).
+   - Click **Register**. The row is created with lifecycle `registered`:
+     metadata only, not yet a deploy target. A slug that already exists
+     is refused.
+   - **Signature:** `registerTenantCluster` answers `CONFLICT` on field
+     `slug` with `cluster slug '<slug>' already registered`; an unknown auth
+     method answers `VALIDATION` `authMethod must be kubeconfig | exec_plugin
+     | service_account_token`.
+   - **Fix:** pick another slug, or update the existing row (rotate its
+     credentials as described below).
+   - **Rollback:** no rollback needed; a refused registration writes nothing.
 
-3. **Review preflight results.** The cluster detail page shows a
-   bootstrap card listing required and optional components. Green
-   means detected; amber means recommended but missing; red means
-   required and missing. Missing required components block app deploys
-   to that cluster until they are installed.
+3. **Bring the cluster into management.** Click **Bring into management**
+   on the cluster header. `BringClusterIntoManagementWorkflow` flips the
+   lifecycle to `managing`, verifies reachability, applies the platform
+   RBAC bundle, probes capabilities, runs a one-shot preflight Job in
+   `astrolift-system`, then marks the cluster `managed`. A failure lands
+   in `error` with the message under **Last management diagnostic**;
+   **Retry bring into management** restarts the workflow. **Refresh
+   setup** and **Re-run preflight** re-run it on a managed cluster.
+   Lifecycle values: `registered`, `managing`, `managed`, `error`,
+   `decommissioning`, `decommissioned`.
+   - **Signature:** `astroliftCluster(slug:)` reports `lifecycle: error` and
+     `lastManagementError` carries the step and cause, for example `cluster
+     is inactive — re-activate before bringing into management`,
+     `cluster <slug> was unregistered before management could run`,
+     `platform RBAC apply did not complete`, `preflight Job did not
+     complete`, or `mark_managed: <exc>` (truncated to 4000 characters);
+     `temporal_ops describe BringClusterIntoManagement-<cluster-guid>`
+     shows the failed activity.
+   - **Fix:** correct what the message names (credentials, reachability,
+     RBAC, the preflight Job in `astrolift-system`), then **Retry bring into
+     management**.
+   - **Rollback:** no rollback needed; `error` is re-entrant and the retry
+     re-applies the idempotent RBAC bundle.
 
-4. **Label the cluster.** Add labels to classify the cluster for
-   placement policies. Standard label keys:
-   - `env`: `production`, `staging`, `development`
-   - `region`: matches the cloud provider's region slug (e.g. `us-west-2`)
-   - `provider`: `aws`, `gcp`, `azure`, `k8s_native`
+4. **Review capabilities and bootstrap missing components.**
+   **Settings → Bootstrap recipe** lists what the probe detected
+   (cert-manager, ingress controller, external-dns, storage classes,
+   metrics-server, Prometheus). Select the missing components and apply;
+   `InstallClusterPrereqsWorkflow` installs them as Flux HelmReleases and
+   waits for readiness. The CLI alternative installs the bundled
+   `astrolift-prereqs` Helm chart:
 
-   Set labels from **Cluster detail → Settings → Labels**.
+   ```bash
+   astro cluster bootstrap --cluster-slug <slug> --dry-run
+   astro cluster bootstrap --cluster-slug <slug>
+   astro cluster bootstrap --cluster-slug <slug> --upgrade --values-file <path>
+   ```
+
+5. **Install the keep-alive agent.** `install-agent` asks the server to
+   install the heartbeat agent; `agent-install-status` reads the server-side
+   confirmation. The server installs and verifies the agent before its staged
+   credentials activate.
+
+   ```bash
+   astro operator cluster install-agent --slug <slug> --request-file <path>
+   astro operator cluster agent-install-status --install-id <uuid>
+   ```
 
 ### Verification
 
-After registration:
+After bring-into-management:
 
-- The cluster status shows **Healthy** (green).
+- The lifecycle badge shows **managed** (green) and, once the agent is
+  installed, the heartbeat shows **Connected**.
 - The cluster appears as a deployment target in the app deploy wizard.
-- The cluster activity feed shows the first reconciliation events.
+- The management workflow completed:
+
+  ```bash
+  python manage.py temporal_ops describe BringClusterIntoManagement-<cluster-guid>
+  ```
 
 ---
 
@@ -73,9 +158,13 @@ The cluster detail page provides:
 - **Alerts**: any active Prometheus alert rules targeting this cluster
   (if in-cluster Prometheus is configured).
 
-Astrolift polls the cluster every 60 seconds and marks it **Degraded**
-if the API server stops responding for more than 2 consecutive polls.
-**Unreachable** if the cluster does not respond for 10 minutes.
+Liveness is derived from the keep-alive agent, which POSTs
+`/api/clusters/v1/<guid>/heartbeat/` every `heartbeat_interval_seconds`
+(default 30). The status is **Never seen** (no heartbeat yet),
+**Connected** (last pulse within 1.5 intervals), **Degraded** (one missed
+interval, fewer than three) or **Offline** (three missed intervals).
+Offline and Never seen render the dependent tabs as an offline empty
+state instead of calling the apiserver.
 
 ---
 
@@ -124,15 +213,34 @@ ingress or service boundary.
 When the kubeconfig or service account token used by Astrolift expires
 or is rotated:
 
-1. Generate a new kubeconfig / token using the same steps as initial
-   registration.
-2. Go to **Cluster detail → Settings → Credentials**.
-3. Click **Rotate credentials** and paste the new kubeconfig.
-4. Click **Save**. Astrolift validates reachability immediately; if
-   validation fails, the old credentials remain active.
+There is no console or API surface that replaces a registered cluster's
+stored `auth_config`: `updateTenantCluster` changes region, endpoint,
+ingress class, ingress mode and ingress auth only, and
+`registerTenantCluster` refuses an existing slug.
 
-Do not revoke the old credentials until Astrolift confirms the new
-ones work.
+1. For an EKS, AKS or GKE cluster, re-run the registration from the
+   backend container (or `--auto-discover-azure` / `--auto-discover-gcp`).
+   The command upserts the row by slug and rewrites endpoint, CA and auth
+   shape from the cloud API.
+
+   ```bash
+   python manage.py register_tenant_cluster --slug <slug> --auto-discover-aws --aws-cluster-name <eks-name>
+   ```
+2. For a pasted kubeconfig or service-account token there is currently
+   no supported rotation path.
+3. Click **Refresh setup** on the cluster header; the workflow
+   re-verifies reachability and lands in `error` if the credentials do
+   not work.
+
+Do not revoke the old credentials until the refresh succeeds.
+
+- **Signature:** after **Refresh setup** the cluster lands in `lifecycle:
+  error` with `lastManagementError` naming the reachability or RBAC step
+  (see step 3 above).
+- **Fix:** re-run `register_tenant_cluster` against the correct cloud
+  cluster name, then **Refresh setup** again.
+- **Rollback:** the command upserts by slug; re-run it with the previous
+  values to restore the prior endpoint and auth shape.
 
 ---
 
@@ -193,75 +301,148 @@ catalogue.
 
 ## Decommission a cluster
 
-Decommissioning removes the cluster from Astrolift's management. It
-does not delete the Kubernetes cluster itself.
+Decommissioning removes the cluster from Astrolift's management. By
+default it does not delete the Kubernetes cluster itself.
 
 ### Pre-decommission checklist
 
-1. Identify all apps deployed to the cluster:
+1. Identify all apps deployed to the cluster; `astro app list` prints a
+   cluster column:
    ```
-   astro apps list --cluster <cluster-slug>
+   astro app list
    ```
-2. Migrate each app to another cluster or remove it. Astrolift blocks
-   decommission if any apps are actively deployed to the cluster.
-3. Verify no active deploys are in progress (status **Running** or
-   **Deploying**).
+2. Migrate each app to another cluster or remove it. The workflow's first
+   activity, `ensure_cluster_drained`, refuses while any active
+   `AppEnvironment` is bound to the cluster. Remove cluster-owned models
+   as well.
+3. Verify no active deploys are in progress (status `deploying` or
+   `redeploying`).
 
 ### Decommission steps
 
 1. Go to **Cluster detail → Settings → Danger zone**.
-2. Click **Decommission cluster**.
-3. Type the cluster slug to confirm.
-4. Click **Confirm decommission**.
+2. Click **Decommission** (platform retirement only) or **Decommission
+   and delete the cluster** (also runs the provider's `teardown_cluster`,
+   which can permanently delete EKS / GKE / AKS infrastructure).
+3. Confirm in the dialog. Acceptance means the request was queued, not
+   that retirement completed; follow the lifecycle badge.
 
-Astrolift removes the cluster record and all associated Astrolift
-resources from the database. The kubeconfig is purged from the secrets
-store. Kubernetes-side resources created by Astrolift (Deployments,
-Services, Ingresses in app namespaces) are left in place — you are
-responsible for cleaning them up if needed.
+- **Signature:** a refused decommission lands the row in `lifecycle: error`
+  with `lastManagementError` reading `decommission refused: cluster '<slug>'
+  has <n> active app environment(s) bound — migrate them to a different
+  cluster or delete them first` or `decommission refused: Remove all shared
+  model deployments before retiring this cluster.`; a failure after the
+  drain check reads `remove_platform_rbac failed: <exc>` or
+  `teardown_cluster_infra failed: <exc>`.
+- **Fix:** migrate or delete the bound environments and cluster-owned
+  models, then click **Decommission** again; for a teardown failure fix the
+  cloud-side cause and retry.
+- **Rollback:** a refused decommission changes nothing on the cluster
+  (`error` is re-entrant, **Retry bring into management** returns it to
+  `managed`); once the workflow has marked the row `decommissioning` there
+  is no path back (`Retiring clusters cannot return to management.`), so
+  re-register the cluster under a new slug if it must be managed again.
+
+`DecommissionClusterWorkflow-<cluster-guid>` marks the row
+`decommissioning`, deletes the `astrolift-system` namespace (which
+cascades the platform RBAC bundle), revokes the Zentinelle gateway, reaps
+per-app cloud satellites (DNS records, ACM certs, ECR repos, IRSA roles;
+best-effort, failures reported in the workflow result), optionally tears
+down the cloud cluster, then marks the row `decommissioned`. The row is
+kept for audit and leaves the active-cluster picker; it is not deleted.
+Kubernetes-side resources created by Astrolift in app namespaces
+(Deployments, Services, Ingresses) are left in place; you are responsible
+for cleaning them up if needed. A failure lands the row in `error`;
+inspect it with:
+
+```bash
+python manage.py temporal_ops describe DecommissionClusterWorkflow-<cluster-guid>
+```
 
 ---
 
 ## Troubleshooting
 
-**Cluster shows Degraded after network maintenance.**
-Wait 2-3 minutes for the health check backoff to clear. If it stays
-Degraded, verify the kubeconfig is still valid:
+**Cluster shows Degraded or Offline after network maintenance.**
 
-```bash
-kubectl --kubeconfig <path> get nodes
-```
+- **Signature:** `astroliftCluster(slug:)` reports `heartbeatStatus`
+  `degraded` (one missed interval) or `offline` (three missed intervals,
+  default 30 s each) and `lastHeartbeatAt` stops advancing.
+- **Fix:** the badge follows the keep-alive agent's heartbeat. Wait two
+  intervals; if it stays Degraded or Offline, check the agent pods in
+  `astrolift-system` and that the kubeconfig is still valid:
 
-If the API endpoint changed (e.g. load balancer IP rotated), rotate
-credentials with the updated kubeconfig.
+  ```bash
+  kubectl --kubeconfig <path> get nodes
+  kubectl --kubeconfig <path> -n astrolift-system get deploy,pods
+  ```
+
+  If the API endpoint changed (e.g. load balancer IP rotated), update it
+  or re-run `register_tenant_cluster` as described under Rotate cluster
+  credentials:
+
+  ```graphql
+  mutation {
+    updateTenantCluster(input: {id: "<cluster-guid>", endpoint: "<new-endpoint>"}) {
+      ok
+      errors { code field message }
+      data { id endpoint lifecycle }
+    }
+  }
+  ```
+- **Rollback:** run `updateTenantCluster` again with the previous
+  `endpoint`.
 
 **Preflight shows cert-manager missing but it is installed.**
-Astrolift checks for `cert-manager.io/v1` CRD availability and for at
-least one Ready pod in any namespace named `cert-manager`. If your
-install is in a non-standard namespace, the pod check may not find it —
-confirm CRDs exist:
 
-```bash
-kubectl get crds | grep cert-manager.io
-```
+- **Signature:** **Last management diagnostic** / `lastManagementError`
+  names cert-manager as missing while `kubectl get pods -n cert-manager`
+  shows it running.
+- **Fix:** Astrolift reports cert-manager installed when the
+  `certificates.cert-manager.io` CRD exists; pods in the `cert-manager` or
+  `astrolift-system` namespace only supply the version. Confirm the CRD
+  exists:
 
-If CRDs are present but pods are in a custom namespace, file a support
-request to configure the namespace override.
+  ```bash
+  kubectl get crds | grep cert-manager.io
+  ```
+
+  If the CRD is absent, install cert-manager (or select it in the
+  Bootstrap recipe) and click **Re-run preflight**.
+- **Rollback:** no rollback needed.
 
 **Preflight shows metrics-server missing but `kubectl top nodes` works.**
-Astrolift checks the `v1beta1.metrics.k8s.io` APIService:
 
-```bash
-kubectl get apiservice v1beta1.metrics.k8s.io
-```
+- **Signature:** the diagnostic names metrics-server as missing while
+  `kubectl top nodes` answers.
+- **Fix:** Astrolift detects metrics-server from pods in `kube-system` (or
+  `astrolift-system`) whose name contains `metrics-server` or that carry
+  the `k8s-app=metrics-server` label:
 
-If it shows `False`, the metrics-server pods are not healthy. If it
-shows `True`, this is a platform bug — please file an issue.
+  ```bash
+  kubectl get pods -n kube-system -l k8s-app=metrics-server
+  ```
+
+  If metrics-server runs in another namespace or under another label, the
+  probe does not see it; please file an issue.
+- **Rollback:** no rollback needed.
 
 ---
 
+## Verify
+
+```bash
+astro api graphql -q 'query { astroliftCluster(slug: "<slug>") { id lifecycle heartbeatStatus lastHeartbeatAt lastManagementError } }'
+python manage.py temporal_ops describe BringClusterIntoManagement-<cluster-guid>
+```
+
+After bring-into-management the cluster reports `lifecycle: managed`,
+`heartbeatStatus: connected` once the agent is installed and an empty
+`lastManagementError`, and the workflow is completed; after decommission it
+reports `lifecycle: decommissioned`.
+
 ## Related
 
-- [Cluster prerequisites](../operators/cluster-prerequisites.md)
+- Cluster prerequisites: console page `/documentation/cluster-prerequisites`
 - [Multi-cloud topology spec](../specs/multi-cloud-topology.md)
 - [Deploy runbook](deploy.md)

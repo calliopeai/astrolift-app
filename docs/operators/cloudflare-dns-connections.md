@@ -6,6 +6,8 @@ prove current authorization, configured OAuth, DNS write access, delegation,
 certificate readiness, or live provider acceptance. This is the read-only foundation
 for #1787/#2287; managed DNS writes remain unfinished.
 
+Preconditions: an active platform superadmin holding `provider_plugin.read` for the reads and `provider_plugin.configure` to connect, attach or register, in the selected organization; a bearer must be organization-bound with `admin`. Surface: `/domains/connect` and `/domains/<domain-id>`, or the GraphQL operations below through `astro api graphql`; the installation encryption key configured before a token is accepted; the `ASTROLIFT_CLOUDFLARE_OAUTH_*` settings for the OAuth path. Placeholders: `<org-id>` is `id` from `astroliftOrganizations`; `<connection-id>` and `<connection-version>` are `id` and `version` from `dnsProviderConnectionsPage`; `<zone-id>` and `<zone-name>` come from `cloudflareDnsZones`; `<domain-id>` and `<domain-version>` are `id` and `version` from `astroliftManagedDomains`.
+
 An active platform superadmin also needs the current selected-org
 `provider_plugin.read` / `provider_plugin.configure` grants and credential scope
 ceiling. Staff status or organization administration alone does not satisfy this
@@ -127,3 +129,13 @@ acceptance. Read-only metadata or TXT verification does not complete #1787.
 - [API token permissions](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)
 - [List zones](https://developers.cloudflare.com/api/resources/zones/methods/list/)
 - [List DNS records](https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/list/)
+
+## Verify
+
+```sh
+astro api graphql -q 'query { dnsProviderConnectionSupport { allowed reason apiTokenSupported oauthConfigured } dnsProviderConnectionsPage { items { id version name state revocationState } } }'
+astro api graphql --var domainId=<domain-id> -q 'query($domainId: GUID!) { dnsProviderDomainBinding(domainId: $domainId) { state connectionId connectionVersion currentConnectionVersion zoneId zoneName canVerify dnsWritesSupported } }'
+cd backend && pytest astrolift_clusters/tests/test_cloudflare_dns_connections_1787.py
+```
+
+The connection is listed with its current `version`; the binding names that connection with `connectionVersion` equal to `currentConnectionVersion`, the chosen `zoneId` and `zoneName`, and `canVerify: true` until `verifyManagedDomain` confirms the TXT challenge; the test module passes.

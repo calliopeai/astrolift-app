@@ -3,12 +3,24 @@
 > **Canonical URL**: <https://astrolift.dev/scm-github-oauth/>
 > **Wiki mirror**: <https://github.com/calliopeai/astrolift-app/wiki/SCM-GitHub-OAuth-Setup>
 >
-> This file in `docs/operators/` is the source of truth — both
-> destinations sync from here. Edit this, then publish.
+> This file in `docs/operators/` is the source of truth; both
+> destinations sync from here (unverified). Edit this, then publish.
 
 Operator setup. Run through this once after deploying Astrolift; users
 can then connect their personal GitHub accounts from the UI without
 operator involvement.
+
+Preconditions: `scm.connect` at the active organization (the stock `org_owner`
+and `org_admin` roles hold it), checked again at the OAuth callback; a GitHub
+user or organization account allowed to register OAuth Apps; an Astrolift host
+GitHub can reach. Surfaces: the console at `/providers#source`
+(`/settings/source-providers` redirects there), and `updateSourceConnection`
+via `astro api graphql` for secret rotation. Placeholders:
+`<your-astrolift-host>` is the installation's public host; `<your-login>` is
+the GitHub login that authorized; `<code>` is the `scm_error` value;
+`<connection-id>` is `id` of the row with `isOauthAppConfig: true` from
+`astroliftSourceConnectionsPage`; `<new-client-secret>` is the secret GitHub
+generated.
 
 ## What this gives you
 
@@ -27,6 +39,8 @@ After this is wired up:
 There are three other ways to authenticate to GitHub (PAT, GitHub App
 installation, SSH deploy keys) that don't need this OAuth dance. This
 guide is specifically for the per-user "Connect my GitHub" experience.
+A GitHub App connection offers the same **Connect my GitHub** action once
+its OAuth Client ID is added with **Add Client ID** on the Hosts table.
 
 ## Prerequisites
 
@@ -71,7 +85,8 @@ Keep both tabs open; you'll paste them into Astrolift in the next step.
 1. Sign in to Astrolift as an admin.
 2. Navigate to **Settings → Source providers**
    (`/settings/source-providers`).
-3. Click **Connect host**.
+3. Expand **Advanced: paste a Personal Access Token or pre-registered
+   OAuth app** and click **Paste credentials…**.
 4. In the sheet:
    - **Kind**: `GitHub OAuth App config`.
    - **Display name**: optional (e.g. "Acme GitHub OAuth App").
@@ -83,8 +98,8 @@ Keep both tabs open; you'll paste them into Astrolift in the next step.
      ```
    - **OAuth Client Secret**: paste the secret you copied from
      GitHub. Astrolift encrypts it at rest via the platform secrets
-     backend (see `core.secrets` — local Fernet by default; swap to
-     a cloud KMS via `ASTROLIFT_SECRETS_BACKEND`).
+     backend (see `core.secrets`; `local_fernet` is the only backend
+     registered today).
    - **Repo visibility scopes**: pick the constraints you want every
      user-token derived from this app to honor. Combinations are OR'd:
      - `private repos in connected org` — match the user-token owner
@@ -112,9 +127,9 @@ with a **Connect my GitHub** action.
    toast.
 4. The Hosts table now has a second row tagged
    `personal · <your-login>` with kind `GitHub (OAuth user token)`.
-5. Navigate to `/apps/new`. Pick the new connection from the
-   "Pick from a connected host" panel — your repos should populate
-   the dropdown.
+5. Navigate to `/apps/new`. Pick the new connection in the
+   **Source connection** picker; your repos should populate the
+   **Repository** dropdown.
 
 Repeat Step 3 for each user; each click of **Connect my GitHub**
 creates that user's own personal connection row.
@@ -128,8 +143,12 @@ If the dance fails the URL comes back with `?scm_error=<code>`:
 | `missing_config_id` | `Connect my GitHub` was clicked without a config row reference. | Don't hand-craft the URL; click the button on the OAuth-app row. |
 | `config_not_found`  | The OAuth-app row was deleted or belongs to a different org. | Reconfigure Step 2 in the org you're signed into. |
 | `config_incomplete` | The row's `oauth_client_id` is blank (GitLab path only — see `config_missing_client_id` for GitHub). | Edit the row, paste the Client ID from GitLab. |
-| `config_missing_client_id` | The GitHub row's `app_client_id` is blank — the OAuth dance would 404 at github.com because we'd send the numeric App ID where the Client ID belongs. | Edit the row from `/settings/source-providers` and paste the GitHub App **Client ID** (e.g. `Iv23lic8662KXwe4XKEI`). Distinct from the numeric App ID. |
-| `state_mismatch`    | CSRF check failed — the session lost the state token (e.g. the user spent >2h on GitHub's authorize page, or session was rotated). | Click the button again. |
+| `config_missing_client_id` | The GitHub row's `app_client_id` is blank; the OAuth dance would 404 at github.com because we'd send the numeric App ID where the Client ID belongs. | Use **Add Client ID** on the row at `/settings/source-providers` and paste the GitHub App **Client ID** (e.g. `Iv23lic8662KXwe4XKEI`). Distinct from the numeric App ID. |
+| `config_missing_oauth_secret` | The row has no OAuth client secret. GitHub App rows registered before the manifest flow stored one are the usual case. | Re-register the GitHub App through **Connect to GitHub**, or paste the secret on an OAuth-app config row. |
+| `config_gone`       | The OAuth-app or GitHub App row was deactivated or deleted between the start and the callback. | Reconnect the host, then click the button again. |
+| `no_org`            | The signed-in user has no active organization membership. | Join or select an organization, then retry. |
+| `no_pending_state`  | The callback arrived with no pending dance in the session (cookies lost, or the callback was opened in another browser). | Click the button again in the same browser. |
+| `state_mismatch`    | CSRF check failed: the returned `state` does not match the one stored in the session (session rotated, or a second dance was started in between). | Click the button again. |
 | `no_code`           | GitHub didn't return a `code` (user denied authorization). | Click again, accept on GitHub. |
 | `exchange_failed`   | Astrolift couldn't reach `github.com/login/oauth/access_token` or the request was rejected. | Check that the **callback URL** registered on GitHub *exactly* matches the **OAuth redirect URI** in Astrolift; both must include the protocol and the trailing path. |
 | `exchange_no_token` | GitHub returned 200 but no `access_token`. Usually means the client secret is wrong (typo on paste). | Edit the row, rotate the secret on GitHub, re-paste. |
@@ -140,9 +159,14 @@ If the dance fails the URL comes back with `?scm_error=<code>`:
 1. In GitHub: `Settings → Developer settings → OAuth Apps → <your app>`,
    click **Generate a new client secret**, copy it, **revoke the old
    one**.
-2. In Astrolift: edit the OAuth-app config row on
-   `/settings/source-providers` and paste the new secret in
-   **Rotate secret**. Existing user tokens keep working — they're
+2. In Astrolift: call `updateSourceConnection` with the OAuth-app row's
+   `id` and the new value in `rotateSecretPlaintext`:
+   ```graphql
+   mutation { updateSourceConnection(input: {id: "<connection-id>", rotateSecretPlaintext: "<new-client-secret>"}) { ok errors { code message field } data { id isOauthAppConfig updatedAt } } }
+   ```
+   The **Rotate secret**
+   action on the Hosts table rotates the connection's webhook secret, not
+   the OAuth client secret. Existing user tokens keep working; they're
    tied to the access token, not the client secret. New OAuth dances
    start using the new secret immediately.
 
@@ -155,14 +179,27 @@ If the dance fails the URL comes back with `?scm_error=<code>`:
   `request.build_absolute_uri(...)` which can pick up the wrong host
   behind a reverse proxy.
 - **Public client secrets are a security incident**. Astrolift
-  encrypts at rest and never logs the value. If your secrets backend
-  is `local_fernet` (default), the encryption key is derived from
-  `SECRET_KEY` via HKDF. Migrate to AWS Secrets Manager / GCP Secret
-  Manager / Azure Key Vault by setting `ASTROLIFT_SECRETS_BACKEND`
-  and running the (forthcoming) `migrate_secrets` command — see
-  `core.secrets`.
-- **Scopes**: Astrolift requests `read:user repo` from GitHub. If you
+  encrypts at rest and never logs the value. The only registered secrets
+  backend is `local_fernet`; its encryption key is derived from
+  `SECRET_KEY` via HKDF, so protect `SECRET_KEY` accordingly. Cloud
+  secret-manager backends and the `migrate_secrets` command mentioned in
+  `core.secrets` do not exist yet.
+- **Scopes**: Astrolift requests `read:user repo workflow` from GitHub;
+  `workflow` is needed to write `.github/workflows/*` during CI setup
+  (#1542), and scopes freeze at authorization, so connections minted
+  without it must reconnect. If you
   don't want OAuth users to grant write access, register a separate
   OAuth App for read-only consumers and configure both — the
   visibility-scope policy on each app row constrains what gets
   surfaced regardless.
+
+## Verify
+
+```sh
+astro api graphql -q '{ astroliftSourceConnectionsPage(limit: 50) { items { id kind displayName isOauthAppConfig isPersonal userUsername isActive } } }'
+./run.sh test auth1/tests/test_scm_oauth.py
+```
+
+After Step 2 the page holds one active row with `isOauthAppConfig: true`; after
+Step 3 it also holds a row with `isPersonal: true` whose `userUsername` is
+`<your-login>`; the test run passes.

@@ -5,6 +5,18 @@ transport for public response text, terminal output and input attention;
 legacy `partial` heartbeats remain unchanged. It does not automatically
 interpret a CLI's stdout as assistant text.
 
+Preconditions: the runner posts to the task's callback URL with its
+task-scoped callback credential (or its assigned dispatcher credential);
+readers hold `agent.read` on the task and query `agentTaskEvents` as the
+task's organization; replying needs `agent_task.send_input` on the task,
+through `replyAgentTaskInput` or the task page `/tasks/runs/[id]`; migration
+`0028_agenttask_input_wait_budget` is applied for the execution-time rules.
+Placeholders: `$task` is the task `id` from `astro agent ls` or
+`agentTasksPage`; `$org` is the active organization `id` from
+`astroliftOrganizations`; `$after` is the last stored `sequence` (0 to start);
+`$sequence` is the `sequence` of the `input_required` or `approval_required`
+event; `$response` is the decision or answers object described below.
+
 Send events to the callback URL issued for the task, using its task-scoped
 callback credential (or its assigned dispatcher credential):
 
@@ -27,6 +39,15 @@ Sequences start at one and remain contiguous across turns. A batch can overlap
 already-recorded history: identical entries are acknowledged without rewriting,
 then its unseen suffix is appended. Reusing a sequence with different content
 or skipping a sequence returns 409 without committing any part of the callback.
+
+- **Signature:** HTTP `409` on the callback (a reused sequence with different
+  content, or a gap); HTTP `413` (the task's 16 MiB event-text capacity is
+  exhausted); HTTP `503` (the Kubernetes deadline reservation for the first
+  typed request failed); the acknowledgement's `event_sequence` stays below
+  the batch's last sequence.
+- **Fix:** re-send the retained batch verbatim from `event_sequence + 1` for
+  a 409 or 503; stop emitting events on a 413 and finish the task.
+- **Rollback:** no rollback needed; a refused callback commits nothing.
 The producer retains an unacknowledged batch and retries it verbatim after a
 connection loss. A terminal result may carry the final batch; events and result
 commit together. Task-scoped credentials are revoked at termination, so producers
@@ -177,3 +198,15 @@ The opt-in Kubernetes regression requires `ASTROLIFT_TEST_KUBECONFIG` pointing
 at a disposable cluster. It creates a unique namespace and a Job, preserves the
 Job UID/spec, and verifies the Job remains active beyond its original deadline.
 It never uses the caller's default Kubernetes context.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { agentTask(id: "<task-id>") { status eventSequence } }'
+astro api graphql -q 'query { agentTaskEvents(orgId: "<org-id>", taskId: "<task-id>", after: 0, limit: 100) { sequence kind text request } }'
+pytest astrolift_agents/tests/test_agent_task_events.py astrolift_agents/tests/test_agent_task_requests.py
+```
+
+`eventSequence` equals the last `event_sequence` the runner was acknowledged,
+the feed returns the events in contiguous sequence order with the typed
+`request` on attention events, and the test modules pass.

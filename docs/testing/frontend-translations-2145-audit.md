@@ -1,3 +1,5 @@
+> Historical (2026-10-30): running audit of the #2145 translation sweep (closed 2026-10-12), slice by slice; superseded by the *-translations.test.tsx files beside each screen under frontend/components and the eight catalogs in frontend/messages/*.json.
+
 # Frontend translations audit (#2145)
 
 Keep all eight locales. English is the canonical key shape; each locale has its

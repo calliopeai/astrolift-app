@@ -9,6 +9,8 @@ authenticated main GraphQL transport. No tenant field or provider catalog data
 is added to the public schema, and clients must show refused/unavailable states
 instead of substituting a simulated read when support or permission is absent.
 
+Preconditions: `app.read` on the app through its live owner chain (a role or share grant; a bearer token's permission scopes and team ceiling apply). Both reads go through the authenticated main GraphQL transport (`astro api graphql`); `astroliftProviderPlugin` needs only authentication. Placeholders: `<app-id>` is `id` from `astroliftAppsPage`; `<environment-id>` is `id` from `astroliftEnvironmentsPage(appSlug)`; `<cluster-id>` and `<provider-id>` are `cluster.id` and `cluster.providerId` from the first read; `<provider-slug>` is `cluster.providerSlug`.
+
 `astroliftAppDependencyContext(appId: GUID!, environmentId: GUID!,
 expectedClusterId: GUID, expectedProviderId: GUID)` is a read-only projection
 for one exact live app/environment pair (#2208). It requires `app.read` on
@@ -28,6 +30,12 @@ missing or invisible context returns null or a permission error under the
 normal scoped gate. A missing context must never retain a prior successful
 response as current authority. Slugs describe the current objects, not their
 identity.
+
+```sh
+astro api graphql --var appId=<app-id> --var environmentId=<environment-id> -q 'query($appId: GUID!, $environmentId: GUID!, $expectedClusterId: GUID, $expectedProviderId: GUID) { astroliftAppDependencyContext(appId: $appId, environmentId: $environmentId, expectedClusterId: $expectedClusterId, expectedProviderId: $expectedProviderId) { appId environmentId environmentName readAt permissions { requiredPermission appReadAllowed appDeployGateAllowed clusterRegisterGateAllowed } cluster { id slug providerId providerSlug region lifecycle isActive heartbeatSource } managedDomainState domainsState domainsTruncated domainLimit liveProviderObservationState liveProviderObservationReason } }'
+```
+
+Pass `--var expectedClusterId=<cluster-id> --var expectedProviderId=<provider-id>` on every later read.
 
 The permission explanation identifies the required `app.read` gate and reports
 effective `app.deploy` and organization `cluster.register` gate decisions at
@@ -71,3 +79,13 @@ Real PostgreSQL and GraphQL HTTP regressions are in
 `backend/astrolift_registry/tests/test_dependency_context_2208.py`; they exercise
 owner grants, shared/foreign resources, policy and credential refusal,
 revocation, immutable identity, field redaction and bounded observations.
+
+## Verify
+
+```sh
+astro api graphql --var appId=<app-id> --var environmentId=<environment-id> --var expectedClusterId=<cluster-id> --var expectedProviderId=<provider-id> -q 'query($appId: GUID!, $environmentId: GUID!, $expectedClusterId: GUID, $expectedProviderId: GUID) { astroliftAppDependencyContext(appId: $appId, environmentId: $environmentId, expectedClusterId: $expectedClusterId, expectedProviderId: $expectedProviderId) { appId cluster { id providerId } permissions { requiredPermission appReadAllowed } liveProviderObservationState } }'
+astro api graphql -q 'query { astroliftProviderPlugin(slug: "<provider-slug>", expectedId: "<provider-id>") { id slug isEnabled } }'
+cd backend && pytest astrolift_registry/tests/test_dependency_context_2208.py
+```
+
+The context comes back with the same `cluster.id` and `providerId`, `permissions.requiredPermission` is `app.read` with `appReadAllowed: true`, `liveProviderObservationState` is `UNAVAILABLE`, the plugin read returns the entry (null once its GUID changed), and the test module passes.

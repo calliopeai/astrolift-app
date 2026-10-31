@@ -8,6 +8,8 @@ organization role may supply the permission as well. Team and project grants
 do not grant upward, and selecting a team or project does not change the
 quota console's owner.
 
+Preconditions: `billing.read` at the active organization, from `org_billing`, `org_owner`, `org_admin` or a custom organization role; a bearer token must be organization-bound with `admin`. Operations: `astroliftQuotas`, `astroliftQuotaUsageHistory(quotaId)` and `requestQuotaIncrease`, through `astro api graphql`. The catalog is `backend/core/permissions.py`, read offline with `astro perms list`; the behaviour is proved by `backend/astrolift_billing/tests/test_org_scopes_2113.py`. Placeholders: `<quota-id>` is `id` from `astroliftQuotas`.
+
 Quota `scope_kind`/`scope_id` identifies the resource allocation. It does not
 turn the organization console into a team-owned collection. An organization
 grant reads the organization's allocations across teams; organization filters
@@ -42,3 +44,13 @@ not drop or rewrite historical monetary data.
 quota entry points with PostgreSQL RoleBindings, sibling teams,
 cross-organization rows and session/bearer HTTP requests. Historical budget
 and snapshot fixtures in those tests do not establish active monetary APIs.
+
+## Verify
+
+```sh
+astro api graphql -q 'query { astroliftQuotas { id scopeKind scopeId resource } }'
+astro api graphql --var quotaId=<quota-id> -q 'query($quotaId: GUID!) { astroliftQuotaUsageHistory(quotaId: $quotaId, windowDays: 30) { date used limit } }'
+cd backend && pytest astrolift_billing/tests/test_org_scopes_2113.py
+```
+
+With `billing.read` at the organization the quotas list the organization's allocations across teams and the history returns points; without it both refuse before any row is read; the test module passes.

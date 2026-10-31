@@ -6,6 +6,16 @@ files inline with its terminal callback. The controller validates the whole
 list, stores it in the same transaction as the result, and serves it to API
 readers and the CLI.
 
+Preconditions: the runner posts to the task's callback URL (the pod's
+`AGENT_CALLBACK_URL`) with its task-scoped callback credential or its assigned
+dispatcher credential; readers hold `agent.read` on the task and query the
+API (`agentTask`, `agentTaskArtifact`) as the task's organization, for
+example with `astro api graphql -q '<document>'`; the install has applied
+migration `astrolift_agents.0052_agent_task_artifacts_2488`. Placeholders:
+`$task` is the task `id` from `astro agent ls` or `agentTasksPage`; `$org` is
+the active organization `id` from `astroliftOrganizations`; `$name` is an
+artifact `name` from the task's `artifacts` list.
+
 ## Sending artifacts
 
 Add `artifacts` to the terminal callback (`status: "completed"` or `"failed"`)
@@ -60,6 +70,19 @@ probe before the terminal callback rather than retrying after it.
 Artifact names, kinds and digests appear on every task read, and content to
 anyone with `agent.read` on the task. Runners must not attach secrets.
 
+Refused callbacks:
+
+- **Signature:** HTTP `413` (an artifact over 512 KiB, or the list over
+  1 MiB); HTTP `400` (any other invalid entry, a non-empty list on a
+  heartbeat, or a `sha256` that does not match); HTTP `409` (a terminal
+  callback after the task is already terminal). The acknowledgement of an
+  accepted list carries `artifact_count`.
+- **Fix:** correct the entry and send the terminal callback again while the
+  task is still running; the refused callback stored nothing, result
+  included.
+- **Rollback:** no rollback needed; nothing is written on a refusal, and a
+  task records its artifacts once.
+
 ## Reading artifacts
 
 `AstroliftAgentTask.artifacts` lists the metadata on every task read
@@ -98,6 +121,16 @@ The completion webhook (`agent_task.finished`) does not carry artifacts; its
 receiver reads them through the API. MCP `astrolift_get_task` does not list
 them. Collecting files in the runner (astrolift-agents) and showing them in
 `astro agent inspect` (astrolift-cli) are separate changes.
+
+## Verify
+
+```bash
+astro api graphql -q 'query { agentTask(id: "<task-id>") { status artifacts { name kind mediaType sizeBytes sha256 } } }'
+pytest astrolift_agents/tests/test_agent_task_artifacts_2488.py
+```
+
+The terminal task lists every artifact the runner sent, with `sizeBytes` and
+`sha256` matching the content, and the test module passes.
 
 ## Rollout
 

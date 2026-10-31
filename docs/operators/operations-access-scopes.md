@@ -4,6 +4,15 @@ Operations authorize the recorded resource owner (#2107). A selected team or
 project supplies context; it does not authorize another team's apps or an
 organization resource. Existing permission verbs and public API shapes remain.
 
+Preconditions: the permission the table names for each surface (`audit_log.read`,
+`webhook.create`, `app.read`, and the existing app, audit, webhook, deploy,
+update, organization, connect and gateway permissions) at the recorded owner
+inside the active organization; a bearer stays within its organization and team
+ceiling. Read the catalog with `astro perms list` and your grants with
+`astro perms diagnose`. Surface: console `/events`, `/administration/audit`,
+`/webhooks` and `/alerts`, or `astro api graphql -q '<document>'`.
+Placeholders: `<permission>` is a slug from `astro perms list`.
+
 | Surface | Permission and actual owner |
 | --- | --- |
 | App uptime, app metrics, log exports | Existing app read, metrics, or log-export permission at the live app |
@@ -44,3 +53,13 @@ primary environment that workload restart and scale actually operate on.
 Environment alert targets check their own persisted environment; app alert
 targets check every affected app environment. An environment-dependent read
 policy narrows alert collections even when the actor has an organization role.
+
+## Verify
+
+```bash
+astro perms diagnose --permission <permission>
+pytest astrolift_operations/tests/test_access_scopes_2107.py
+```
+
+The diagnosis reports `granted` for your account in the selected organization
+with each step's result; the test module passes from the `backend/` directory.
