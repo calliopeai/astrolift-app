@@ -2771,7 +2771,8 @@
         "ci": "CI",
         "scheduled": "geplant",
         "rollback": "Zurücksetzen",
-        "promotion": "Hochstufung"
+        "promotion": "Hochstufung",
+        "reprovision": "Neuprovisionierung"
       },
       "label": "Bereitstellungen",
       "emptyCurrentTitle": "Noch keine Bereitstellungen",
@@ -3848,6 +3849,8 @@
       "status": {
         "ready": "Bereit",
         "live": "Online",
+        "needs_reprovision": "Neuprovisionierung nötig",
+        "no_managed_domain": "Keine verwaltete Domain",
         "pending": "Ausstehend",
         "provisioning": "Wird eingerichtet",
         "failed": "Fehlgeschlagen",
@@ -7331,8 +7334,16 @@
         "failed": "Ändern der Subdomain fehlgeschlagen.",
         "changed": "Subdomain in {subdomain} geändert.",
         "copied": "URL in die Zwischenablage kopiert.",
-        "copyFailed": "Kopieren nicht möglich: Zwischenablage nicht verfügbar."
-      }
+        "copyFailed": "Kopieren nicht möglich: Zwischenablage nicht verfügbar.",
+        "reprovisionRunning": "Wird neu provisioniert; der Status aktualisiert sich, sobald es fertig ist.",
+        "reprovisionUnchanged": "Nichts neu zu provisionieren: Alles ist bereits vorhanden.",
+        "reprovisionDone": "Neu provisioniert: {created} erstellt, {updated} aktualisiert.",
+        "reprovisionFailed": "Neuprovisionierung fehlgeschlagen.",
+        "reprovisionNoResponse": "Neuprovisionierung fehlgeschlagen: keine Antwort vom Server."
+      },
+      "noManagedDomain": "Keine verwaltete Domain",
+      "needsReprovision": "Neuprovisionierung nötig",
+      "reprovision": "Neu provisionieren"
     }
   },
   "projectResources": {
@@ -16680,7 +16691,8 @@
           "ci": "CI",
           "scheduled": "geplant",
           "rollback": "Zurücksetzen",
-          "promotion": "Hochstufung"
+          "promotion": "Hochstufung",
+          "reprovision": "Neuprovisionierung"
         },
         "since": {
           "today": "Heute",

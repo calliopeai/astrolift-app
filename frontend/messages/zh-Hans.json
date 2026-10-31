@@ -2777,7 +2777,8 @@
         "ci": "CI",
         "scheduled": "定时",
         "rollback": "回滚",
-        "promotion": "提升"
+        "promotion": "提升",
+        "reprovision": "重新预配"
       },
       "label": "部署",
       "emptyCurrentTitle": "暂无部署",
@@ -3854,6 +3855,8 @@
       "status": {
         "ready": "就绪",
         "live": "在线",
+        "needs_reprovision": "需要重新预配",
+        "no_managed_domain": "无托管域名",
         "pending": "待处理",
         "provisioning": "预配中",
         "failed": "失败",
@@ -7328,8 +7331,16 @@
         "failed": "子域名更改失败。",
         "changed": "子域名已更改为 {subdomain}。",
         "copied": "URL 已复制到剪贴板。",
-        "copyFailed": "无法复制：剪贴板不可用。"
-      }
+        "copyFailed": "无法复制：剪贴板不可用。",
+        "reprovisionRunning": "正在重新预配，完成后状态会更新。",
+        "reprovisionUnchanged": "无需重新预配：所有对象都已就位。",
+        "reprovisionDone": "已重新预配：创建 {created} 个，更新 {updated} 个。",
+        "reprovisionFailed": "重新预配失败。",
+        "reprovisionNoResponse": "重新预配失败：服务器没有响应。"
+      },
+      "noManagedDomain": "无托管域名",
+      "needsReprovision": "需要重新预配",
+      "reprovision": "重新预配"
     }
   },
   "projectResources": {
@@ -16530,7 +16541,8 @@
           "ci": "CI",
           "scheduled": "定时",
           "rollback": "回滚",
-          "promotion": "提升"
+          "promotion": "提升",
+          "reprovision": "重新预配"
         },
         "since": {
           "today": "今天",

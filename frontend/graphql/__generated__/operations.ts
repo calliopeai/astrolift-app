@@ -1449,6 +1449,10 @@ export type AstroliftAppEnvironment = {
   ownedByMe: Scalars['Boolean']['output'];
   /** The owner's user pk: the environment's creator, else the app's. */
   ownerUserId?: Maybe<Scalars['String']['output']>;
+  /** What is missing or still in progress, or why the cluster could not be checked; empty when there is nothing to say. */
+  reachabilityDetail: Scalars['String']['output'];
+  /** Whether this environment's public hosts answer, checked against the cluster when it can be read (#2573). */
+  reachabilityStatus: ReachabilityStatus;
   /** The bound cluster's region; empty when unset. */
   region: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
@@ -1564,6 +1568,8 @@ export type AstroliftAppListState =
   | 'DEREGISTERED'
   | 'FAILED'
   | 'LIVE'
+  | 'NEEDS_REPROVISION'
+  | 'NO_MANAGED_DOMAIN'
   | 'PENDING'
   | 'PROVISIONING'
   | 'READY'
@@ -5145,7 +5151,10 @@ export type AstroliftRegisteredApp = {
   rawManifest: Scalars['String']['output'];
   rawManifestStaged: Scalars['String']['output'];
   rawManifestStagedHash: Scalars['String']['output'];
+  /** Whether the app's public hosts answer (#2573): the worst of its non-preview environments' reachabilityStatus, or PROVISIONING while any of them is being deployed or reprovisioned. provisioningStatus says whether registration finished; this says whether the app can be reached. */
+  reachabilityStatus: ReachabilityStatus;
   registryRepoUri: Scalars['String']['output'];
+  /** Onboarding recovery for the overview notice (#407): needsReprovision is set while registration has not finished, or finished without a container registry, and the notice's action is forceAstroliftRedeploy. It says nothing about reachability: reachabilityStatus says whether reprovisionApp is needed. */
   reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
   retentionPolicies: Array<AstroliftRetentionPolicy>;
@@ -9809,6 +9818,8 @@ export type Mutation = {
   reorderWorkflowStages: MutationResult;
   replyAgentTaskInput: AstroliftAgentTaskInputReplyMutationResult;
   replyToAgentMessage: AstroliftAgentMessageReplyMutationResult;
+  /** Re-render and re-apply an app's environments (or the one named) against the release each is running (#2573): zone binding, URL, hostname claims, Ingress and certificate request, DNS and the rest of the platform half. No build and no new image; pods restart only when the rendered workload differs. Records a reprovision deployment per environment with a running release. Returns within seconds: an environment still being applied reads PROVISIONING and settles on its own. Calling it again while one runs joins that run. */
+  reprovisionApp: ReprovisionAppPayloadMutationResult;
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
@@ -11440,6 +11451,11 @@ export type MutationReplyAgentTaskInputArgs = {
 
 export type MutationReplyToAgentMessageArgs = {
   input: AstroliftReplyToAgentMessageInput;
+};
+
+
+export type MutationReprovisionAppArgs = {
+  input: ReprovisionAppInput;
 };
 
 
@@ -15852,6 +15868,13 @@ export type QueryWorkflowsPageArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Whether public hosts answer (#2573). REACHABLE: every public host has its Ingress, a Ready certificate, a hostname claim and the environment URL. PROVISIONING: a deploy is in flight, a certificate is being issued, or the first deploy has not run. NO_MANAGED_DOMAIN: no zone resolves for the organization. NEEDS_REPROVISION: something else is missing; reprovisionApp puts it back. */
+export type ReachabilityStatus =
+  | 'NEEDS_REPROVISION'
+  | 'NO_MANAGED_DOMAIN'
+  | 'PROVISIONING'
+  | 'REACHABLE';
+
 export type ReapCloudOrphanInput = {
   clusterSlug: InputMaybe<Scalars['String']['input']>;
   forceDestroy: Scalars['Boolean']['input'];
@@ -16068,6 +16091,36 @@ export type RepoVisibility =
   | 'INTERNAL'
   | 'PRIVATE'
   | 'PUBLIC';
+
+export type ReprovisionAppInput = {
+  appSlug: Scalars['String']['input'];
+  environmentName: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ReprovisionAppPayload = {
+  appSlug: Scalars['String']['output'];
+  environments: Array<ReprovisionEnvironmentResult>;
+};
+
+export type ReprovisionAppPayloadMutationResult = {
+  data?: Maybe<ReprovisionAppPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ReprovisionEnvironmentResult = {
+  /** The reprovision deployment: the one this call started, or the one already running that it joined. Null when the environment has no running release, so only its domain binding, URL and hostname claims were reconciled. */
+  deploymentId?: Maybe<Scalars['ID']['output']>;
+  environmentName: Scalars['String']['output'];
+  /** Kind/name of what this call created: hostname claims, and the objects the apply created when the run finished within the call. Empty while it runs. */
+  objectsCreated: Array<Scalars['String']['output']>;
+  /** Kind/name of what this call changed: the environment row, and objects the apply patched. */
+  objectsUpdated: Array<Scalars['String']['output']>;
+  /** The environment's reachabilityStatus when the call returned; PROVISIONING while its run goes on. */
+  reachabilityStatus: ReachabilityStatus;
+  /** True when the run finished and nothing was created or updated. */
+  unchanged: Scalars['Boolean']['output'];
+};
 
 export type ReprovisionManagedServiceInput = {
   expectedContextRevision: InputMaybe<Scalars['String']['input']>;
@@ -19228,6 +19281,13 @@ export type ListEnvironmentsQueryVariables = Exact<{
 
 export type ListEnvironmentsQuery = { astroliftEnvironments: Array<{ id: string, name: string, url: string, deploysPaused: boolean, ingressPaused: boolean, requiredApprovals: number, registeredAppSlug: string, clusterSlug?: string | null, clusterId?: string | null, clusterProviderPluginSlug?: string | null, domainZone?: string | null, createdAt: string, viewerPermissions: Array<string>, settings: Array<{ id: string, key: string, value: string }> }> };
 
+export type AppReachabilityQueryVariables = Exact<{
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type AppReachabilityQuery = { astroliftEnvironments: Array<{ id: string, name: string, kind: string, reachabilityStatus: ReachabilityStatus, reachabilityDetail: string }> };
+
 export type ListEnvironmentsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
@@ -20718,7 +20778,7 @@ export type GetBrainArchiveStateQueryVariables = Exact<{
 
 export type GetBrainArchiveStateQuery = { astroliftApp?: { id: string, slug: string, name: string, appKind: string, isArchived: boolean, archivedAt?: string | null } | null };
 
-export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
+export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, reachabilityStatus: ReachabilityStatus, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
 
 export type AppFreshnessFieldsFragment = { lastDeployedAt?: string | null, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null };
 
@@ -20727,7 +20787,7 @@ export type ListAppsQueryVariables = Exact<{
 }>;
 
 
-export type ListAppsQuery = { astroliftApps: Array<{ id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> };
+export type ListAppsQuery = { astroliftApps: Array<{ id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, reachabilityStatus: ReachabilityStatus, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> };
 
 export type ListAppsPageQueryVariables = Exact<{
   includeFreshness?: InputMaybe<Scalars['Boolean']['input']>;
@@ -20747,7 +20807,7 @@ export type ListAppsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListAppsPageQuery = { astroliftAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
+export type ListAppsPageQuery = { astroliftAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, reachabilityStatus: ReachabilityStatus, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
 
 export type ListMyAppsPageQueryVariables = Exact<{
   includeFreshness?: InputMaybe<Scalars['Boolean']['input']>;
@@ -20762,7 +20822,7 @@ export type ListMyAppsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListMyAppsPageQuery = { astroliftMyAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
+export type ListMyAppsPageQuery = { astroliftMyAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, reachabilityStatus: ReachabilityStatus, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
 
 export type GetAppQueryVariables = Exact<{
   slug: Scalars['String']['input'];
@@ -20770,7 +20830,7 @@ export type GetAppQueryVariables = Exact<{
 }>;
 
 
-export type GetAppQuery = { astroliftApp?: { buildMode: string, buildContext: string, dockerfilePath: string, stagedEnvChanges: Array<string>, viewerPermissions: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
+export type GetAppQuery = { astroliftApp?: { buildMode: string, buildContext: string, dockerfilePath: string, stagedEnvChanges: Array<string>, viewerPermissions: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, reachabilityStatus: ReachabilityStatus, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, expiresAt?: string | null, deleteDataOnExpiry: boolean, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
 
 export type ListWorkloadsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;

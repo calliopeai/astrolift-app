@@ -36,7 +36,15 @@ const STATUSES: DeploymentStatus[] = [
   "superseded",
 ];
 
-const TRIGGERS: TriggerKind[] = ["push", "manual", "ci", "scheduled", "rollback", "promotion"];
+const TRIGGERS: TriggerKind[] = [
+  "push",
+  "manual",
+  "ci",
+  "scheduled",
+  "rollback",
+  "promotion",
+  "reprovision",
+];
 
 export const DEPLOYMENTS_LIST: CopiedListDefinition = {
   id: "apps.deployments",

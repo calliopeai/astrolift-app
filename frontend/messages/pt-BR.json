@@ -2777,7 +2777,8 @@
         "ci": "ci",
         "scheduled": "agendado",
         "rollback": "reversão",
-        "promotion": "promoção"
+        "promotion": "promoção",
+        "reprovision": "novo provisionamento"
       },
       "label": "Implantações",
       "emptyCurrentTitle": "Ainda não há implantações",
@@ -3854,6 +3855,8 @@
       "status": {
         "ready": "Pronto",
         "live": "Online",
+        "needs_reprovision": "Requer novo provisionamento",
+        "no_managed_domain": "Sem domínio gerenciado",
         "pending": "Pendente",
         "provisioning": "Provisionando",
         "failed": "Falhou",
@@ -7328,8 +7331,16 @@
         "failed": "Falha ao alterar o subdomínio.",
         "changed": "Subdomínio alterado para {subdomain}.",
         "copied": "URL copiada para a área de transferência.",
-        "copyFailed": "Não foi possível copiar: área de transferência indisponível."
-      }
+        "copyFailed": "Não foi possível copiar: área de transferência indisponível.",
+        "reprovisionRunning": "Provisionando novamente; o status será atualizado quando terminar.",
+        "reprovisionUnchanged": "Nada para provisionar novamente: tudo já está no lugar.",
+        "reprovisionDone": "Provisionado novamente: {created} criados, {updated} atualizados.",
+        "reprovisionFailed": "Falha no novo provisionamento.",
+        "reprovisionNoResponse": "Falha no novo provisionamento: o servidor não respondeu."
+      },
+      "noManagedDomain": "Sem domínio gerenciado",
+      "needsReprovision": "Requer novo provisionamento",
+      "reprovision": "Provisionar novamente"
     }
   },
   "projectResources": {
@@ -16677,7 +16688,8 @@
           "ci": "ci",
           "scheduled": "agendado",
           "rollback": "reversão",
-          "promotion": "promoção"
+          "promotion": "promoção",
+          "reprovision": "novo provisionamento"
         },
         "since": {
           "today": "Hoje",

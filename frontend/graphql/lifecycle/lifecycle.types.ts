@@ -56,7 +56,14 @@ export type DeploymentStatus =
   | "superseded"
   | "rolled_back";
 
-export type TriggerKind = "push" | "manual" | "ci" | "scheduled" | "rollback" | "promotion";
+export type TriggerKind =
+  | "push"
+  | "manual"
+  | "ci"
+  | "scheduled"
+  | "rollback"
+  | "promotion"
+  | "reprovision";
 
 export type PreviewStatus = "building" | "running" | "failed" | "torn_down";
 

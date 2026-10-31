@@ -8,7 +8,15 @@ import { type ListState, useLocalListState } from "@/components/list/use-list-st
 
 import { APPS_LIST, type AppRow, localizedAppsList, pinFirst } from "./apps-list";
 import { AppsListScreen, type AppsListScreenProps, PushSecretsDialog } from "./AppsListScreen";
-import { APPS, LONG_APP, MANY, PUSH_SECRETS, listProps } from "./fixtures";
+import {
+  APPS,
+  LONG_APP,
+  MANY,
+  NO_ZONE_APP,
+  PUSH_SECRETS,
+  UNREACHABLE_APP,
+  listProps,
+} from "./fixtures";
 
 // What each view's page holds, as the server answers it.
 const ACTIVE = APPS.filter((a) => !a.isArchived);
@@ -183,6 +191,22 @@ export const HeaderNavigation: Story = {
     await expect(
       await within(document.body).findByRole("menuitem", { name: /Deployments/ })
     ).toBeInTheDocument();
+  },
+};
+
+/**
+ * Rolled out but not reachable (#2573), or registered with no zone (#2572):
+ * each row says why instead of Ready, beside a healthy one that reads Live.
+ */
+export const Unreachable: Story = {
+  render: () => <Apps apps={[UNREACHABLE_APP, NO_ZONE_APP, APPS[0]]} />,
+  play: async ({ canvasElement }) => {
+    const rows = within(canvasElement).getAllByRole("row");
+    const row = (name: string) => rows.find((r) => within(r).queryByText(name) !== null)!;
+    await expect(within(row("Storefront")).getByText("Needs reprovision")).toBeInTheDocument();
+    await expect(within(row("Kiosk")).getByText("No managed domain")).toBeInTheDocument();
+    await expect(within(row("API Gateway")).getByText("Live")).toBeInTheDocument();
+    await expect(within(canvasElement).queryByText("Ready")).toBeNull();
   },
 };
 

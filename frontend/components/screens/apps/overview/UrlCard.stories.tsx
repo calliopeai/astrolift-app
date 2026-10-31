@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, fn, userEvent, within } from "storybook/test";
 
 import { LONG, URL_CARD, URL_HEALTH } from "./app-overview-cards-a.fixtures";
 import { UrlCardView } from "./UrlCard";
@@ -36,6 +37,63 @@ export const Provisioning: Story = { args: { isRoutable: false, isProvisioning: 
 
 /** Ready with a workload the platform cannot route to yet. */
 export const NotRoutable: Story = { args: { isRoutable: false, hasWorkload: true } };
+
+/** Deployed, with the Ingress missing behind the host: Reprovision puts it back (#2573). */
+export const NeedsReprovision: Story = {
+  args: {
+    isRoutable: false,
+    reachabilityStatus: "NEEDS_REPROVISION",
+    reachabilityDetail:
+      "production: No Ingress serves storefront.acme.astrolift.app. storefront.acme.astrolift.app has no hostname claim.",
+    onReprovision: fn(),
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Needs reprovision")).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Reprovision" }));
+    await expect(args.onReprovision).toHaveBeenCalledTimes(1);
+  },
+};
+
+/** Reprovision submitted and still applying. */
+export const Reprovisioning: Story = {
+  args: { ...NeedsReprovision.args, reprovisioning: true },
+};
+
+/** A reprovision in flight: the app reads provisioning until it settles. */
+export const ReprovisionRunning: Story = {
+  args: {
+    isRoutable: false,
+    reachabilityStatus: "PROVISIONING",
+    reachabilityDetail: "production: A deployment is in flight.",
+  },
+};
+
+/** No zone resolves for the organization: nothing to reprovision until one does. */
+export const NoManagedDomain: Story = {
+  args: {
+    isRoutable: false,
+    fullHost: "storefront",
+    reachabilityStatus: "NO_MANAGED_DOMAIN",
+    reachabilityDetail: "production: No managed domain resolves for this organization.",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("No managed domain")).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: "Reprovision" })).not.toBeInTheDocument();
+  },
+};
+
+/** Needs reprovision, seen by a viewer without app.deploy: no Reprovision button. */
+export const NeedsReprovisionReadOnly: Story = {
+  args: { ...NeedsReprovision.args },
+  globals: { permissions: "none" },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Needs reprovision")).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: "Reprovision" })).not.toBeInTheDocument();
+  },
+};
 
 /**
  * The card has no error state (a failed rename toasts). Closest real

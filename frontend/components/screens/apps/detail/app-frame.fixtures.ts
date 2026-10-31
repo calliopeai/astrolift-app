@@ -10,7 +10,7 @@ export const FRAME_APP: AppFrameApp = {
   slug: "checkout",
   name: "checkout",
   status: "ready",
-  live: true,
+  statusKey: "live",
   archived: false,
   failureReason: null,
   environment: { name: "production", clusterSlug: "conflict-astrolift" },
@@ -44,7 +44,7 @@ export const FRAME: Omit<AppFrameProps, "children"> = {
 export const FAILING_APP: AppFrameApp = {
   ...FRAME_APP,
   status: "failed",
-  live: false,
+  statusKey: "failed",
   appUrl: null,
   failureReason:
     "Image pull denied: 123456789012.dkr.ecr.us-west-2.amazonaws.com/checkout:sha-1112015d9f3c2a1b7e4d5c6b7a8f9e0d1c2b3a4f5e6d7c8b9a0f1e2d3c4b5a6f7e8d9c0b is not authorized for arn:aws:iam::123456789012:role/astrolift-node-role-conflict-astrolift-production-us-west-2-with-a-deliberately-long-suffix-for-overflow-testing",

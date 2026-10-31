@@ -34,6 +34,7 @@ import type { ProvisioningStatus } from "@/graphql/registry/registry.types";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
 import { ExpiryBadge } from "../ExpiryBadge";
+import { APP_STATUS_DOT, type AppStatusKey } from "../list/apps-list";
 
 import { appTabHref, appTabs, sectionHref, APP_TAB_SECTIONS } from "./app-tabs-model";
 
@@ -43,8 +44,8 @@ export interface AppFrameApp {
   slug: string;
   name: string;
   status: ProvisioningStatus;
-  /** Ready with a managed hostname: traffic is routing. */
-  live: boolean;
+  /** What the header reads (`appStatusKey`): Live only while its hosts answer (#2573). */
+  statusKey: AppStatusKey;
   archived: boolean;
   /** Why provisioning failed; shown first, above the tab body. */
   failureReason?: string | null;
@@ -103,15 +104,6 @@ export interface AppFrameProps {
   /** The tab body; rendered once the app is found. */
   children: React.ReactNode;
 }
-
-type Dot = "ok" | "warn" | "error" | "muted" | "pending";
-
-const DOT: Record<ProvisioningStatus, Dot> = {
-  ready: "ok",
-  pending: "warn",
-  provisioning: "pending",
-  failed: "error",
-};
 
 /** `Apps ▾`: the Apps area's functions, read from the rail's own model (§4.4 rule 7). */
 function appsCrumb(): Crumb {
@@ -221,12 +213,8 @@ export function AppFrame({
     ? [appsCrumb(), { label: app.name, href: appHref }, { label: nested }]
     : [appsCrumb(), { label: app.name }];
 
-  const statusKey = app.archived
-    ? "archived"
-    : app.status === "ready" && app.live
-      ? "live"
-      : app.status;
-  const dot: Dot = app.archived ? "muted" : (DOT[app.status] ?? "muted");
+  const statusKey = app.statusKey;
+  const dot = APP_STATUS_DOT[statusKey];
 
   const env = app.environment;
   const context = env ? (

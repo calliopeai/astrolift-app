@@ -2771,7 +2771,8 @@
         "ci": "ci",
         "scheduled": "planifié",
         "rollback": "restauration",
-        "promotion": "promotion"
+        "promotion": "promotion",
+        "reprovision": "reprovisionnement"
       },
       "label": "Déploiements",
       "emptyCurrentTitle": "Aucun déploiement pour le moment",
@@ -3848,6 +3849,8 @@
       "status": {
         "ready": "Prête",
         "live": "En ligne",
+        "needs_reprovision": "Reprovisionnement requis",
+        "no_managed_domain": "Aucun domaine géré",
         "pending": "En attente",
         "provisioning": "Provisionnement",
         "failed": "Échec",
@@ -7331,8 +7334,16 @@
         "failed": "Échec du changement de sous-domaine.",
         "changed": "Sous-domaine changé en {subdomain}.",
         "copied": "URL copiée dans le presse-papiers.",
-        "copyFailed": "Copie impossible : presse-papiers indisponible."
-      }
+        "copyFailed": "Copie impossible : presse-papiers indisponible.",
+        "reprovisionRunning": "Reprovisionnement en cours ; le statut sera mis à jour une fois terminé.",
+        "reprovisionUnchanged": "Rien à reprovisionner : tout est déjà en place.",
+        "reprovisionDone": "Reprovisionné : {created} créés, {updated} mis à jour.",
+        "reprovisionFailed": "Échec du reprovisionnement.",
+        "reprovisionNoResponse": "Échec du reprovisionnement : aucune réponse du serveur."
+      },
+      "noManagedDomain": "Aucun domaine géré",
+      "needsReprovision": "Reprovisionnement requis",
+      "reprovision": "Reprovisionner"
     }
   },
   "projectResources": {
@@ -16680,7 +16691,8 @@
           "ci": "ci",
           "scheduled": "planifié",
           "rollback": "restauration",
-          "promotion": "promotion"
+          "promotion": "promotion",
+          "reprovision": "reprovisionnement"
         },
         "since": {
           "today": "Aujourd’hui",

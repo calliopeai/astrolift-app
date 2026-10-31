@@ -1463,6 +1463,8 @@
       "status": {
         "ready": "Ready",
         "live": "Live",
+        "needs_reprovision": "Needs reprovision",
+        "no_managed_domain": "No managed domain",
         "pending": "Pending",
         "provisioning": "Provisioning",
         "failed": "Failed",
@@ -2089,7 +2091,8 @@
         "ci": "ci",
         "scheduled": "scheduled",
         "rollback": "rollback",
-        "promotion": "promotion"
+        "promotion": "promotion",
+        "reprovision": "reprovision"
       },
       "label": "Deployments",
       "emptyCurrentTitle": "No deployments yet",
@@ -7328,8 +7331,16 @@
         "failed": "Subdomain change failed.",
         "changed": "Subdomain changed to {subdomain}.",
         "copied": "URL copied to clipboard.",
-        "copyFailed": "Couldn't copy: clipboard unavailable."
-      }
+        "copyFailed": "Couldn't copy: clipboard unavailable.",
+        "reprovisionRunning": "Reprovisioning; the status updates when it finishes.",
+        "reprovisionUnchanged": "Nothing to reprovision: everything is already in place.",
+        "reprovisionDone": "Reprovisioned: {created} created, {updated} updated.",
+        "reprovisionFailed": "Reprovision failed.",
+        "reprovisionNoResponse": "Reprovision failed: no response from backend."
+      },
+      "noManagedDomain": "No managed domain",
+      "needsReprovision": "Needs reprovision",
+      "reprovision": "Reprovision"
     }
   },
   "projectResources": {
@@ -16473,7 +16484,8 @@
           "ci": "ci",
           "scheduled": "scheduled",
           "rollback": "rollback",
-          "promotion": "promotion"
+          "promotion": "promotion",
+          "reprovision": "reprovision"
         },
         "since": {
           "today": "Today",

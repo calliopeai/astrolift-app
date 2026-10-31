@@ -2771,7 +2771,8 @@
         "ci": "ci",
         "scheduled": "programado",
         "rollback": "reversión",
-        "promotion": "promoción"
+        "promotion": "promoción",
+        "reprovision": "reaprovisionamiento"
       },
       "label": "Despliegues",
       "emptyCurrentTitle": "Aún no hay despliegues",
@@ -3848,6 +3849,8 @@
       "status": {
         "ready": "Lista",
         "live": "En línea",
+        "needs_reprovision": "Requiere reaprovisionar",
+        "no_managed_domain": "Sin dominio administrado",
         "pending": "Pendiente",
         "provisioning": "Aprovisionando",
         "failed": "Falló",
@@ -7331,8 +7334,16 @@
         "failed": "Error al cambiar el subdominio.",
         "changed": "Subdominio cambiado a {subdomain}.",
         "copied": "URL copiada al portapapeles.",
-        "copyFailed": "No se pudo copiar: portapapeles no disponible."
-      }
+        "copyFailed": "No se pudo copiar: portapapeles no disponible.",
+        "reprovisionRunning": "Reaprovisionando; el estado se actualizará cuando termine.",
+        "reprovisionUnchanged": "Nada que reaprovisionar: todo ya está en su lugar.",
+        "reprovisionDone": "Reaprovisionado: {created} creados, {updated} actualizados.",
+        "reprovisionFailed": "El reaprovisionamiento falló.",
+        "reprovisionNoResponse": "El reaprovisionamiento falló: el servidor no respondió."
+      },
+      "noManagedDomain": "Sin dominio administrado",
+      "needsReprovision": "Requiere reaprovisionar",
+      "reprovision": "Volver a aprovisionar"
     }
   },
   "projectResources": {
@@ -16533,7 +16544,8 @@
           "ci": "ci",
           "scheduled": "programado",
           "rollback": "reversión",
-          "promotion": "promoción"
+          "promotion": "promoción",
+          "reprovision": "reaprovisionamiento"
         },
         "since": {
           "today": "Hoy",

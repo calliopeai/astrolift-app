@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangleIcon,
   CheckIcon,
   ClockIcon,
   CopyIcon,
@@ -8,6 +9,8 @@ import {
   GlobeIcon,
   Loader2Icon,
   PencilIcon,
+  UnlinkIcon,
+  WrenchIcon,
   XIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -67,6 +70,22 @@ function PendingUrlBadge({
   );
 }
 
+/**
+ * The host does not answer and the platform knows why (#2573): its zone is
+ * missing, or something in front of the workload (Ingress, certificate,
+ * claim, URL) is, which Reprovision puts back.
+ */
+function GapBadge({ noManagedDomain }: { noManagedDomain: boolean }) {
+  const t = useTranslations("appOverviewCards.url");
+  const Icon = noManagedDomain ? UnlinkIcon : AlertTriangleIcon;
+  return (
+    <span className="border-warning-border bg-warning-bg text-warning-fg inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium">
+      <Icon className="size-3" />
+      <span>{noManagedDomain ? t("noManagedDomain") : t("needsReprovision")}</span>
+    </span>
+  );
+}
+
 // Full hostname pattern: 1..n DNS labels separated by dots. Each
 // label: lowercase alphanumeric + hyphen, no leading/trailing hyphen,
 // max 63 chars. Total length 1..253.
@@ -90,9 +109,13 @@ export function UrlCardView({
   isRoutable,
   isProvisioning,
   hasWorkload,
+  reachabilityStatus,
+  reachabilityDetail,
   saving,
+  reprovisioning,
   onSave,
   onCopy,
+  onReprovision,
   healthBadge,
   span = 6,
 }: UrlCardViewProps) {
@@ -132,6 +155,10 @@ export function UrlCardView({
     setEditing(false);
   }
 
+  const gap =
+    hasWorkload &&
+    (reachabilityStatus === "NEEDS_REPROVISION" || reachabilityStatus === "NO_MANAGED_DOMAIN");
+
   return (
     <Panel
       title={t("title")}
@@ -150,7 +177,9 @@ export function UrlCardView({
             <span className="min-w-0">{fullHost}</span>
             <ExternalLinkIcon className="size-3.5 shrink-0" />
           </a>
-          {isRoutable ? (
+          {gap ? (
+            <GapBadge noManagedDomain={reachabilityStatus === "NO_MANAGED_DOMAIN"} />
+          ) : isRoutable ? (
             healthBadge
           ) : (
             <PendingUrlBadge isProvisioning={isProvisioning} hasWorkload={hasWorkload} />
@@ -165,7 +194,31 @@ export function UrlCardView({
             <CopyIcon className="size-3.5" />
             <span className="text-xs">{t("copy")}</span>
           </Button>
+          {gap && reachabilityStatus === "NEEDS_REPROVISION" ? (
+            <Can permission="app.deploy">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 px-2"
+                onClick={onReprovision}
+                disabled={reprovisioning}
+              >
+                {reprovisioning ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <WrenchIcon className="size-3.5" />
+                )}
+                <span className="text-xs">{t("reprovision")}</span>
+              </Button>
+            </Can>
+          ) : null}
         </div>
+        {reachabilityDetail ? (
+          <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
+            {reachabilityDetail}
+          </p>
+        ) : null}
 
         <Can
           permission="app.update"

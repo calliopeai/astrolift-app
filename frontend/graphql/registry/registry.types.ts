@@ -15,7 +15,11 @@ import type {
   AstroliftRegisteredApp as GeneratedRegisteredApp,
   AstroliftRetentionPolicy as GeneratedRetentionPolicy,
   AstroliftWorkload as GeneratedWorkload,
+  ReachabilityStatus as GeneratedReachabilityStatus,
 } from "@/graphql/__generated__/schema";
+
+/** Whether an app's or environment's public hosts answer (#2573), by name on the wire. */
+export type ReachabilityStatus = GeneratedReachabilityStatus;
 
 export type AstroliftRetentionPolicy = Pick<
   GeneratedRetentionPolicy,

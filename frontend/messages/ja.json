@@ -2777,7 +2777,8 @@
         "ci": "CI",
         "scheduled": "スケジュール",
         "rollback": "ロールバック",
-        "promotion": "昇格"
+        "promotion": "昇格",
+        "reprovision": "再プロビジョニング"
       },
       "label": "デプロイ",
       "emptyCurrentTitle": "デプロイはまだありません",
@@ -3854,6 +3855,8 @@
       "status": {
         "ready": "準備完了",
         "live": "稼働中",
+        "needs_reprovision": "再プロビジョニングが必要",
+        "no_managed_domain": "管理対象ドメインがありません",
         "pending": "待機中",
         "provisioning": "プロビジョニング中",
         "failed": "失敗",
@@ -7328,8 +7331,16 @@
         "failed": "サブドメインの変更に失敗しました。",
         "changed": "サブドメインを {subdomain} に変更しました。",
         "copied": "URL をクリップボードにコピーしました。",
-        "copyFailed": "コピーできません: クリップボードを利用できません。"
-      }
+        "copyFailed": "コピーできません: クリップボードを利用できません。",
+        "reprovisionRunning": "再プロビジョニング中です。完了するとステータスが更新されます。",
+        "reprovisionUnchanged": "再プロビジョニングするものはありません。すべてそろっています。",
+        "reprovisionDone": "再プロビジョニングしました。作成 {created} 件、更新 {updated} 件。",
+        "reprovisionFailed": "再プロビジョニングに失敗しました。",
+        "reprovisionNoResponse": "再プロビジョニングに失敗しました。サーバーから応答がありません。"
+      },
+      "noManagedDomain": "管理対象ドメインがありません",
+      "needsReprovision": "再プロビジョニングが必要",
+      "reprovision": "再プロビジョニング"
     }
   },
   "projectResources": {
@@ -16677,7 +16688,8 @@
           "ci": "CI",
           "scheduled": "スケジュール",
           "rollback": "ロールバック",
-          "promotion": "昇格"
+          "promotion": "昇格",
+          "reprovision": "再プロビジョニング"
         },
         "since": {
           "today": "今日",
