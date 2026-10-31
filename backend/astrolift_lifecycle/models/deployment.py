@@ -46,6 +46,9 @@ class Deployment(BaseCoreModel):
         SCHEDULED = "scheduled"
         ROLLBACK = "rollback"
         PROMOTION = "promotion"
+        # Re-applies the running release's platform half (#2573); written
+        # only by reprovisionApp, never accepted from startDeployment.
+        REPROVISION = "reprovision"
 
     class Strategy(models.TextChoices):
         """Rollout strategy captured at deploy-creation time (#736).

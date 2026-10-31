@@ -12,6 +12,8 @@ deployed (team A), Echo ok (team B), all on one cluster.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -19,6 +21,8 @@ from django.test.utils import CaptureQueriesContext
 from astrolift_clusters.models import ManagedDomain
 from astrolift_graphql import UnsupportedSort
 from astrolift_lifecycle.models import AppEnvironment
+from astrolift_lifecycle.reachability import CERTIFICATE_KIND, INGRESS_KIND
+from astrolift_lifecycle.schema.types import ReachabilityStatus
 from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.schema.queries import RegistryQuery
 from astrolift_registry.schema.types import (
@@ -210,6 +214,63 @@ def test_ready_with_a_managed_zone_is_live(world):
     ready = _page(world, world.user, filter=AppsListFilterInput(status=[AppListState.READY]), sort="name")
     assert _names(live) == ["Alpha", "Echo"]
     assert _names(ready) == []
+
+
+def test_an_environment_last_recorded_unreachable_keeps_its_app_from_live(world):
+    """#2573: a deploy that recorded its host missing outranks a resolvable zone."""
+    domain = ManagedDomain.objects.create(
+        organization=world.org, zone="apps-2573.example", dns_driver="route53", default_for="tenant_apps"
+    )
+    world.org.default_managed_domain = domain
+    world.org.save(update_fields=["default_managed_domain"])
+    AppEnvironment.objects.filter(pk=world.envs["ok-a"].pk).update(
+        reachability_status=AppEnvironment.Reachability.NEEDS_REPROVISION
+    )
+    # Transient: a certificate still issuing, a deploy still running.
+    AppEnvironment.objects.filter(pk=world.envs["ok-b"].pk).update(
+        reachability_status=AppEnvironment.Reachability.PROVISIONING
+    )
+
+    live = _page(world, world.user, filter=AppsListFilterInput(status=[AppListState.LIVE]), sort="name")
+    ready = _page(world, world.user, filter=AppsListFilterInput(status=[AppListState.READY]), sort="name")
+    assert _names(live) == ["Echo"]
+    assert _names(ready) == ["Alpha"]
+
+
+def test_reachability_on_a_page_reads_each_cluster_once_not_once_per_row(world, monkeypatch):
+    """#2573: the Apps list asks every row for reachabilityStatus, which needs the cluster's
+    Ingresses and Certificates. One read of each per cluster serves the whole page."""
+    calls: list[str] = []
+
+    class ClusterApi:
+        def list_manifests(self, cluster, namespace, kind):
+            calls.append(kind)
+            return []
+
+    monkeypatch.setattr("astrolift_lifecycle.reachability._driver_for_cluster", lambda cluster: ClusterApi())
+    monkeypatch.setattr(
+        "astrolift_lifecycle.reachability._context_for_cluster",
+        lambda cluster: SimpleNamespace(slug=cluster.slug),
+    )
+    domain = ManagedDomain.objects.create(
+        organization=world.org, zone="apps-2573.example", dns_driver="route53", default_for="tenant_apps"
+    )
+    for key, app in world.apps.items():
+        Workload.objects.create(
+            registered_app=app, name="site", slug="site", kind="deployment", is_public=True
+        )
+        AppEnvironment.objects.filter(pk=world.envs[key].pk).update(
+            managed_domain=domain, url=f"https://{app.slug}.apps-2573.example"
+        )
+
+    page = _page(world, world.user, sort="name", page=1)
+    statuses = {row.name: row.reachability_status() for row in page.items}
+
+    deployed = {"Alpha", "Charlie", "Echo"}
+    assert {
+        name for name, status in statuses.items() if status is ReachabilityStatus.NEEDS_REPROVISION
+    } >= deployed
+    assert calls == [INGRESS_KIND, CERTIFICATE_KIND]
 
 
 def test_deploy_filter_matches_the_row_health_pulse(world):

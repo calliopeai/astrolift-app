@@ -557,7 +557,9 @@ def _annotate_apps_list(qs):
     * ``_failing``: provisioning failed or the latest deploy did.
     * ``_list_state`` / ``_state_rank``: the header status and its sort rank.
       ``live`` is ``ready`` with a managed zone, resolved the way
-      ``_managed_hostnames_for_apps`` resolves it.
+      ``_managed_hostnames_for_apps`` resolves it, and no non-preview
+      environment whose last registration, deploy or reprovision recorded it
+      unreachable (#2573).
     """
     deploys = Deployment.objects.filter(registered_app=OuterRef("pk"), deleted_at__isnull=True).order_by(
         "-created_at"
@@ -565,6 +567,17 @@ def _annotate_apps_list(qs):
     stale_before = timezone.now() - dt.timedelta(days=STALE_DEPLOY_WINDOW_DAYS)
     org_zone = "organization__default_managed_domain"
     from astrolift_clusters.models import ManagedDomain
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    unreachable = AppEnvironment.objects.filter(
+        registered_app=OuterRef("pk"),
+        deleted_at__isnull=True,
+        previewed_environment__isnull=True,
+        reachability_status__in=[
+            AppEnvironment.Reachability.NEEDS_REPROVISION,
+            AppEnvironment.Reachability.NO_MANAGED_DOMAIN,
+        ],
+    ).exclude(Exists(PreviewEnvironment.all_objects.filter(app_environment=OuterRef("pk"))))
 
     qs = qs.annotate(
         _latest_deploy_status=Subquery(deploys.values("status")[:1]),
@@ -605,8 +618,8 @@ def _annotate_apps_list(qs):
         _list_state=Case(
             When(archived_at__isnull=False, then=Value(AppListState.ARCHIVED.value)),
             When(
-                provisioning_status=RegisteredApp.ProvisioningStatus.READY.value,
-                _has_zone=True,
+                Q(provisioning_status=RegisteredApp.ProvisioningStatus.READY.value, _has_zone=True)
+                & ~Exists(unreachable),
                 then=Value(AppListState.LIVE.value),
             ),
             default=F("provisioning_status"),

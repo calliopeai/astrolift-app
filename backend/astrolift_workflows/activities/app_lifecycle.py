@@ -134,6 +134,19 @@ def _mark_app_ready_sync(registered_app_id: int) -> None:
 
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
     app.transition_provisioning(RegisteredApp.ProvisioningStatus.READY)
+    _record_reachability(app.environments.filter(deleted_at__isnull=True), read_cluster=False)
+
+
+def _record_reachability(envs, *, read_cluster: bool) -> None:
+    """Store whether the environments' hosts answer, the moment the platform
+    is done with them, so a registration or deploy that left no host rule
+    reads that way (#2573). Never fails the step that called it."""
+    try:
+        from astrolift_lifecycle.reachability import record_environment_verdicts
+
+        record_environment_verdicts(list(envs), read_cluster=read_cluster)
+    except Exception:  # noqa: BLE001 - the verdict is derived; the step it follows is not
+        log.warning("could not record reachability", exc_info=True)
 
 
 @activity.defn(name="astrolift.app.mark_ready")
@@ -2009,6 +2022,8 @@ def _mark_running_sync(deployment_id: int) -> None:
         reflect_deploy_succeeded(d)
     except Exception:  # noqa: BLE001
         log.warning("github reflect_deploy_succeeded errored for deploy %s", deployment_id, exc_info=True)
+
+    _record_reachability([d.app_environment], read_cluster=True)
 
 
 def _write_config_snapshot(deployment) -> None:

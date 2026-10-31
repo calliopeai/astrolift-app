@@ -13,6 +13,7 @@ from django.db import models
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
+from astrolift_lifecycle.schema.types import ReachabilityStatus
 
 JSON = strawberry.scalars.JSON
 
@@ -61,9 +62,10 @@ class AstroliftAppSourceKindFilter(enum.Enum):
 class AppListState(enum.Enum):
     """The status an app's own header shows, as a list filter (#2149).
 
-    ``live`` is ``ready`` with a platform-managed hostname; ``archived``
-    wins over everything. The rest are the raw ``provisioning_status``.
-    Same rule as ``appStatusKey`` in the frontend Apps list.
+    ``live`` is ``ready`` with a platform-managed hostname and no
+    environment recorded unreachable (#2573); ``archived`` wins over
+    everything. The rest are the raw ``provisioning_status``. The frontend
+    Apps list's ``appStatusKey`` reads the same answer computed on read.
     """
 
     LIVE = "live"
@@ -740,6 +742,18 @@ class RegisteredAppType:
             "is visibly recorded on the source repository's owner. Empty everywhere else (#2297)."
         ),
     )
+    row_pk: strawberry.Private[int | None] = None
+    reachability: strawberry.Private[object] = None
+
+    @strawberry.field(
+        description=(
+            "Whether the app's public hosts answer (#2573): the worst of its non-preview environments' "
+            "reachabilityStatus, or PROVISIONING while any of them is being deployed or reprovisioned. "
+            "provisioningStatus says whether registration finished; this says whether the app can be reached."
+        )
+    )
+    def reachability_status(self) -> ReachabilityStatus:
+        return ReachabilityStatus(self.reachability.app(self.row_pk).status)
 
     @strawberry.field
     def provisioning_progress(self) -> ProvisioningProgressType | None:
@@ -1196,6 +1210,7 @@ def app_to_type(
     topology_kind: str | None = None,
     cluster_slugs: list[str] | None = None,
 ) -> RegisteredAppType:
+    from astrolift_lifecycle.reachability import request_reachability
     from astrolift_manifest.env_diff import changed_env_key_names
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
@@ -1330,6 +1345,8 @@ def app_to_type(
         ),
         topology_kind=topology_kind,
         cluster_slugs=list(cluster_slugs or []),
+        row_pk=app.pk,
+        reachability=request_reachability(info).track_app(app),
     )
 
 
