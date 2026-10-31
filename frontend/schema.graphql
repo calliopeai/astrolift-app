@@ -1635,6 +1635,8 @@ type AstroliftAppKind {
 enum AstroliftAppListState {
   LIVE
   READY
+  NEEDS_REPROVISION
+  NO_MANAGED_DOMAIN
   PENDING
   PROVISIONING
   FAILED

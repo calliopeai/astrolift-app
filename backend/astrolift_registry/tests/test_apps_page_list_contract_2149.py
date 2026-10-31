@@ -216,25 +216,42 @@ def test_ready_with_a_managed_zone_is_live(world):
     assert _names(ready) == []
 
 
-def test_an_environment_last_recorded_unreachable_keeps_its_app_from_live(world):
-    """#2573: a deploy that recorded its host missing outranks a resolvable zone."""
+def test_a_ready_app_reads_the_worst_gap_its_environments_recorded(world):
+    """#2573: a deploy that recorded its host missing outranks a resolvable zone, and no
+    managed domain outranks a missing host rule; neither reads Ready."""
     domain = ManagedDomain.objects.create(
         organization=world.org, zone="apps-2573.example", dns_driver="route53", default_for="tenant_apps"
     )
     world.org.default_managed_domain = domain
     world.org.save(update_fields=["default_managed_domain"])
-    AppEnvironment.objects.filter(pk=world.envs["ok-a"].pk).update(
+    staging = AppEnvironment.objects.get(registered_app=world.apps["ok-b"], name="staging")
+    AppEnvironment.objects.filter(pk__in=[world.envs["ok-a"].pk, world.envs["ok-b"].pk]).update(
         reachability_status=AppEnvironment.Reachability.NEEDS_REPROVISION
     )
-    # Transient: a certificate still issuing, a deploy still running.
-    AppEnvironment.objects.filter(pk=world.envs["ok-b"].pk).update(
+    staging.reachability_status = AppEnvironment.Reachability.NO_MANAGED_DOMAIN
+    staging.save(update_fields=["reachability_status"])
+
+    def state(*states):
+        return _names(_page(world, world.user, filter=AppsListFilterInput(status=list(states)), sort="name"))
+
+    assert state(AppListState.NEEDS_REPROVISION) == ["Alpha"]
+    assert state(AppListState.NO_MANAGED_DOMAIN) == ["Echo"]
+    assert state(AppListState.LIVE, AppListState.READY) == []
+
+    # A preview's gap is its own, and a recorded "provisioning" is transient:
+    # a certificate still issuing, a deploy still running.
+    AppEnvironment.objects.filter(pk__in=[world.envs["ok-a"].pk, world.envs["ok-b"].pk, staging.pk]).update(
         reachability_status=AppEnvironment.Reachability.PROVISIONING
     )
-
-    live = _page(world, world.user, filter=AppsListFilterInput(status=[AppListState.LIVE]), sort="name")
-    ready = _page(world, world.user, filter=AppsListFilterInput(status=[AppListState.READY]), sort="name")
-    assert _names(live) == ["Echo"]
-    assert _names(ready) == ["Alpha"]
+    AppEnvironment.objects.create(
+        registered_app=world.apps["ok-b"],
+        tenant_cluster=world.other_cluster,
+        name="preview-pr-7",
+        url="",
+        previewed_environment=staging,
+        reachability_status=AppEnvironment.Reachability.NEEDS_REPROVISION,
+    )
+    assert state(AppListState.LIVE) == ["Alpha", "Echo"]
 
 
 def test_reachability_on_a_page_reads_each_cluster_once_not_once_per_row(world, monkeypatch):

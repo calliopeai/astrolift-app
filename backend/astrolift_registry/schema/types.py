@@ -65,14 +65,18 @@ class AstroliftAppSourceKindFilter(enum.Enum):
 class AppListState(enum.Enum):
     """The status an app's own header shows, as a list filter (#2149).
 
-    ``live`` is ``ready`` with a platform-managed hostname and no
-    environment recorded unreachable (#2573); ``archived`` wins over
-    everything. The rest are the raw ``provisioning_status``. The frontend
-    Apps list's ``appStatusKey`` reads the same answer computed on read.
+    A ``ready`` app reads ``no_managed_domain`` or ``needs_reprovision`` when
+    a non-preview environment's last registration, deploy or reprovision
+    recorded that gap (#2573), else ``live`` with a platform-managed
+    hostname; ``archived`` wins over everything. The rest are the raw
+    ``provisioning_status``. The frontend's ``appStatusKey`` gives the same
+    answer from ``reachabilityStatus``, which is checked on read.
     """
 
     LIVE = "live"
     READY = "ready"
+    NEEDS_REPROVISION = "needs_reprovision"
+    NO_MANAGED_DOMAIN = "no_managed_domain"
     PENDING = "pending"
     PROVISIONING = "provisioning"
     FAILED = "failed"
