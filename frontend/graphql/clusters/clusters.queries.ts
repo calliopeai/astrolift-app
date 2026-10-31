@@ -66,6 +66,16 @@ export const SOFT_DELETE_MANAGED_DOMAIN = gql`
       errors {
         code
         message
+        field
+        dependents {
+          total
+          items {
+            organizationSlug
+            appSlug
+            environmentName
+            url
+          }
+        }
       }
       data {
         id
@@ -455,6 +465,7 @@ export const LIST_MANAGED_DOMAINS = gql`
       provisionValidationRecords
       delegationCheck
       provisionClusterId
+      isEffectiveDefault
     }
   }
 `;

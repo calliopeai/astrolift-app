@@ -202,6 +202,16 @@ const keys = [
   "defaultHelp",
   "typeFilter",
   "aliasHealth",
+  "effectiveDefault",
+  "defaultDeleteTitle",
+  "defaultDeleteHelp",
+  "defaultDeleteRefused",
+  "defaultDependentsLabel",
+  "defaultDependentsNone",
+  "defaultDependentsCount",
+  "defaultDependentsMore",
+  "defaultDeleteTypeToConfirm",
+  "defaultDeleteConfirm",
 ] as const;
 // These international protocol/tool words are also valid localized labels.
 const internationalWords: Partial<Record<(typeof locales)[number], readonly string[]>> = {
@@ -214,6 +224,8 @@ const internationalWords: Partial<Record<(typeof locales)[number], readonly stri
 const argsByKey: Partial<Record<(typeof keys)[number], readonly string[]>> = {
   recordCount: ["count"],
   provisionStalled: ["step", "reason"],
+  defaultDependentsCount: ["count"],
+  defaultDependentsMore: ["count"],
 };
 describe("managed domain multilingual contract", () => {
   it.each(locales)("%s has exact keys and ICU arguments without English fallback", (locale) => {
