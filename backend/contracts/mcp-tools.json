@@ -1275,6 +1275,34 @@
       ]
     },
     {
+      "description": "Re-render and re-apply an app's environments, or the one named, against the release each runs (#2573): zone binding, URL, hostname claims, Ingress and certificate request, DNS. No build and no new image. Returns each environment's reachability_status; one still being applied reads PROVISIONING and settles on its own, and calling again joins that run.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "environment_name": {
+            "description": "One environment; omit for every one.",
+            "type": "string"
+          },
+          "slug": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_reprovision_app",
+      "required_permissions": [
+        "app.deploy"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps"
+      ]
+    },
+    {
       "description": "Stop sharing a semantic layer with a team (team_slug) or an agent (agent_slug); name one. Never removes the home team or an owner. Unsharing with an agent revokes its runs' tokens.",
       "inputSchema": {
         "additionalProperties": false,

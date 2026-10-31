@@ -79,6 +79,7 @@ from astrolift_workflows.workflows.rebind_cluster_workload_identity import (
     RebindClusterWorkloadIdentityWorkflow,
 )
 from astrolift_workflows.workflows.reconcile_workload_identity import ReconcileWorkloadIdentityWorkflow
+from astrolift_workflows.workflows.reprovision_app import ReprovisionAppWorkflow
 from astrolift_workflows.workflows.rollback_deployment import RollbackDeploymentWorkflow
 from astrolift_workflows.workflows.run_status_reconcile_tick import (
     RunStatusReconcileTickWorkflow,
@@ -177,6 +178,7 @@ __all__ = [
     "ReconcileWorkloadIdentityWorkflow",
     "RegistryProvisionWorkflow",
     "RehealWebhookSubscriptionsWorkflow",
+    "ReprovisionAppWorkflow",
     "RollbackDeploymentWorkflow",
     "RotateSecretBundleWorkflow",
     "RunStatusReconcileTickWorkflow",

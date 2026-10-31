@@ -661,7 +661,14 @@ class RegisteredAppType:
     # cost is O(1) on the row, so we don't gate it behind an opt-in.
     # ``needs_reprovision`` collapses to False on a healthy ready app
     # so the FE can short-circuit the banner with a single null check.
-    reprovision: AppReprovisionStateType
+    reprovision: AppReprovisionStateType = strawberry.field(
+        description=(
+            "Onboarding recovery for the overview notice (#407): needsReprovision is set while "
+            "registration has not finished, or finished without a container registry, and the notice's "
+            "action is forceAstroliftRedeploy. It says nothing about reachability: reachabilityStatus "
+            "says whether reprovisionApp is needed."
+        )
+    )
 
     # Config-drift signals (#407 C). Compares the latest applied
     # ``Deployment.config_snapshot`` against the live manifest hash;

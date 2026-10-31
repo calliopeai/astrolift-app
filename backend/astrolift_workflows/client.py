@@ -287,6 +287,99 @@ def start_workflow_once(
     return WorkflowHandle(workflow_id=workflow_id, run_id=run_id, enqueued=True)
 
 
+class WorkflowAlreadyRunning(RuntimeError):
+    """A run is open under the workflow id that was asked to start."""
+
+
+@async_to_sync
+async def _start_exclusive(workflow_name: str, args: list[Any], workflow_id: str, task_queue: str) -> str:
+    from temporalio.common import WorkflowIDReusePolicy
+    from temporalio.exceptions import WorkflowAlreadyStartedError
+
+    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+    try:
+        # A run that is still open fails the start (the default conflict
+        # policy); a closed one, completed included, does not.
+        handle = await client.start_workflow(
+            workflow_name,
+            args=args,
+            id=workflow_id,
+            task_queue=task_queue,
+            id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+            rpc_timeout=timedelta(seconds=5),
+        )
+    except WorkflowAlreadyStartedError as exc:
+        raise WorkflowAlreadyRunning(workflow_id) from exc
+    return handle.result_run_id or handle.first_execution_run_id or ""
+
+
+def start_workflow_exclusive(
+    workflow_name: str, args: list[Any], *, workflow_id: str, task_queue: str | None = None
+) -> WorkflowHandle:
+    """Start a run under ``workflow_id`` unless one is open there, which it never replaces.
+
+    Unlike ``replace_running=False``, a completed run of the id does not stop
+    a new one. Raises ``WorkflowAlreadyRunning`` while a run is open; returns
+    a handle with ``enqueued=False`` when Temporal is disabled.
+    """
+    if not _temporal_enabled():
+        return WorkflowHandle(workflow_id=workflow_id, run_id="", enqueued=False)
+    run_id = _start_exclusive(workflow_name, args, workflow_id, task_queue or _task_queue())
+    return WorkflowHandle(workflow_id=workflow_id, run_id=run_id, enqueued=True)
+
+
+@dataclass(frozen=True)
+class WorkflowOutcome:
+    """How a run stood when the wait ended: ``completed`` (with its result),
+    ``failed`` (with why) or ``running``."""
+
+    state: str
+    result: Any = None
+    error: str = ""
+
+
+@async_to_sync
+async def _wait_for(handles: list[WorkflowHandle], timeout_seconds: float) -> list[WorkflowOutcome]:
+    from temporalio.client import WorkflowFailureError
+
+    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+
+    async def outcome(handle: WorkflowHandle) -> WorkflowOutcome:
+        try:
+            result = await client.get_workflow_handle(
+                handle.workflow_id, run_id=handle.run_id or None
+            ).result()
+        except WorkflowFailureError as exc:
+            return WorkflowOutcome("failed", error=str(exc.cause or exc))
+        return WorkflowOutcome("completed", result=result)
+
+    tasks = [asyncio.ensure_future(outcome(h)) for h in handles]
+    done, pending = await asyncio.wait(tasks, timeout=timeout_seconds)
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+    out: list[WorkflowOutcome] = []
+    for task in tasks:
+        if task not in done:
+            out.append(WorkflowOutcome("running"))
+        elif task.exception() is not None:
+            out.append(WorkflowOutcome("failed", error=str(task.exception())))
+        else:
+            out.append(task.result())
+    return out
+
+
+def wait_for_workflows(handles: list[WorkflowHandle], *, timeout_seconds: float) -> list[WorkflowOutcome]:
+    """Each run's outcome, waiting at most ``timeout_seconds`` for all of them together.
+
+    For a caller with a deadline of its own: a run still going reads
+    ``running`` and keeps going.
+    """
+    if not handles:
+        return []
+    return _wait_for(list(handles), timeout_seconds)
+
+
 @dataclass(frozen=True)
 class WorkflowRunState:
     """The latest run of a workflow id: whether it is still running, and its run id

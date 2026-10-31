@@ -2494,9 +2494,15 @@ def _create_rollback_deployment_sync(deployment_id: int) -> int:
     from astrolift_lifecycle.deployment_identity_origin import refuse_unsupported_origin
 
     refuse_unsupported_origin(current.registered_app, current.app_environment)
+    prior = None
+    if current.trigger_kind == Deployment.TriggerKind.ROLLBACK.value and current.promoted_from_id:
+        # rollbackDeployment chose the target and named it on this row. The
+        # latest one before it can be the release a reprovision repeated, the
+        # one being rolled back from (#2573).
+        prior = Deployment.objects.filter(pk=current.promoted_from_id, deleted_at__isnull=True).first()
     # Find the prior running deployment in the same env (older
     # than the current row). Pick the most recent terminal-OK one.
-    prior = (
+    prior = prior or (
         Deployment.objects.filter(
             registered_app=current.registered_app,
             app_environment=current.app_environment,

@@ -556,6 +556,24 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
             required=("slug",),
         ),
     },
+    "astrolift_reprovision_app": {
+        "description": (
+            "Re-render and re-apply an app's environments, or the one named, against the release each "
+            "runs (#2573): zone binding, URL, hostname claims, Ingress and certificate request, DNS. No "
+            "build and no new image. Returns each environment's reachability_status; one still being "
+            "applied reads PROVISIONING and settles on its own, and calling again joins that run."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS,),
+        "permission": Permission.APP_DEPLOY,
+        "inputSchema": _schema(
+            {
+                "slug": {"type": "string", "minLength": 1},
+                "environment_name": {"type": "string", "description": "One environment; omit for every one."},
+            },
+            required=("slug",),
+        ),
+    },
     "astrolift_unshare_brain": {
         "description": (
             "Stop sharing a semantic layer with a team (team_slug) or an agent (agent_slug); name one. "

@@ -44,6 +44,7 @@ _SOURCE_TRIGGERS: dict[str, dict[str, str]] = {
         "manual": RunTrigger.MANUAL,
         "rollback": RunTrigger.MANUAL,
         "promotion": RunTrigger.MANUAL,
+        "reprovision": RunTrigger.MANUAL,
         "ci": RunTrigger.API,
         "push": RunTrigger.WEBHOOK,
         "scheduled": RunTrigger.SCHEDULE,
@@ -88,8 +89,8 @@ def source_triggers(kind: str, triggers: list[str]) -> list[str] | None:
 def deployment_run_trigger(deploy_trigger_kind: str, *, via_token: bool) -> str:
     """The trigger for the ``WorkflowRun`` mirror of a deployment's workflow.
 
-    A manual-shaped deploy (manual, rollback, promotion) started through an
-    API token is ``api``; everything else follows :func:`normalize`.
+    A manual-shaped deploy (manual, rollback, promotion, reprovision) started
+    through an API token is ``api``; everything else follows :func:`normalize`.
     """
     shared = normalize("deployment", deploy_trigger_kind)
     if shared == RunTrigger.MANUAL and via_token:

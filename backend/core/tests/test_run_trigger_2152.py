@@ -33,6 +33,7 @@ def test_normalize_maps_each_source_word():
     assert normalize("deployment", "ci") == RunTrigger.API
     assert normalize("deployment", "scheduled") == RunTrigger.SCHEDULE
     assert normalize("deployment", "rollback") == RunTrigger.MANUAL
+    assert normalize("deployment", "reprovision") == RunTrigger.MANUAL
     assert normalize("job", "scheduled") == RunTrigger.SCHEDULE
     assert normalize("task", "workflow") == RunTrigger.PARENT
     assert normalize("task", "api") == RunTrigger.API
@@ -43,7 +44,12 @@ def test_normalize_maps_each_source_word():
 
 
 def test_source_triggers_reverses_normalize():
-    assert sorted(source_triggers("deployment", ["manual"])) == ["manual", "promotion", "rollback"]
+    assert sorted(source_triggers("deployment", ["manual"])) == [
+        "manual",
+        "promotion",
+        "reprovision",
+        "rollback",
+    ]
     assert source_triggers("job", ["webhook"]) == []
     assert source_triggers("agent", ["manual"]) is None
 

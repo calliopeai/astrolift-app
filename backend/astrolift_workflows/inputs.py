@@ -54,6 +54,18 @@ class RollbackInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class ReprovisionInput:
+    """One environment's reprovision (#2573). ``deployment_id`` is the
+    ``trigger_kind=reprovision`` row the mutation created, which carries the
+    running release's image and snapshots."""
+
+    deployment_id: int
+    registered_app_id: int
+    app_environment_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class RedeployInput:
     """Re-run apply for the latest deployment of (app, env) with the
     same image_tag. The mutation already created the new Deployment
