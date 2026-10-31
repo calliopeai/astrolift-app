@@ -409,6 +409,10 @@ async def test_the_call_returns_before_the_run_and_the_app_reads_provisioning_un
     await sync_to_async(_deployed)(world, cluster_api)
     namespace = await sync_to_async(namespace_for_environment)(world.env)
     del cluster_api.objects[("Ingress", namespace, "hello-app-web")]
+    # Recorded reachable by an earlier deploy; the Ingress went missing since.
+    await sync_to_async(AppEnvironment.objects.filter(pk=world.env.pk).update)(
+        reachability_status="reachable"
+    )
     assert await sync_to_async(_app_status)(world) is ReachabilityStatus.NEEDS_REPROVISION
     released = asyncio.Event()
 
