@@ -271,6 +271,9 @@ def resolve_box_image(box) -> str:
     from astrolift_dispatch.spawners.k8s_job import _resolve_base_image
 
     if box.environment_spec_id is None and box.image:
+        from astrolift_agents.runtime_catalog import assert_runtime_available
+
+        assert_runtime_available(image=box.image)
         return box.image
     return _resolve_base_image(box.agent_definition, box.environment_spec)
 
@@ -1223,6 +1226,17 @@ def ensure_agent_box(
 
     spec = environment_spec
     image_ref = (image or "").strip()
+    from astrolift_agents.runtime_catalog import RetiredAgentRuntime, assert_runtime_available
+
+    try:
+        assert_runtime_available(
+            runtime=getattr(spec, "runtime", ""),
+            image=image_ref or getattr(spec, "image_tag", ""),
+        )
+    except RetiredAgentRuntime as exc:
+        raise AgentBoxEnsureError(
+            "validation", str(exc), "image" if image_ref else "environmentSpecSlug"
+        ) from exc
     if spec is None and agent is None and not image_ref:
         raise AgentBoxEnsureError(
             "validation",

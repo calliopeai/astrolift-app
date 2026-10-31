@@ -541,7 +541,9 @@ def edge_access_manifests(
     return [edge_security_policy(config, access_rules), *_custom_route_policies(config, access_rules)]
 
 
-def alb_front(oidc_auth_config: dict[str, Any] | None, *, namespace: str) -> list[dict[str, Any]]:
+def alb_front(
+    oidc_auth_config: dict[str, Any] | None, *, namespace: str, cluster_name: str = ""
+) -> list[dict[str, Any]]:
     """An ALB in front of the Gateway's Service, for EKS.
 
     One wildcard host covers every app and the auth host, so the AWS Load
@@ -590,6 +592,13 @@ def alb_front(oidc_auth_config: dict[str, Any] | None, *, namespace: str) -> lis
         "alb.ingress.kubernetes.io/healthcheck-path": "/",
         "alb.ingress.kubernetes.io/success-codes": "200-499",
     }
+    if cluster_name:
+        # Keep the deployment prefix required by the installer's IAM boundary.
+        # ALB names are limited to 32 characters; retain a stable collision suffix.
+        name = f"{cluster_name}-edge"
+        if len(name) > 32:
+            name = f"{name[:23]}-{hashlib.sha256(name.encode()).hexdigest()[:8]}"
+        ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/load-balancer-name"] = name
     if group := (oidc_auth_config or {}).get("custom_domain_alb_group"):
         ingress["metadata"]["annotations"]["alb.ingress.kubernetes.io/group.name"] = str(group)
     return [ingress]

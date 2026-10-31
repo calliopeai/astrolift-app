@@ -1,6 +1,7 @@
 import hashlib
 import importlib.util
 import io
+import time
 import json
 import tarfile
 import tempfile
@@ -22,19 +23,90 @@ def load(name):
 prepare = load("prepare")
 smoke = load("smoke")
 
+
+class FakeLogs:
+    """A `docker logs --follow` double that replays fixed lines."""
+
+    lines = []
+    commands = []
+
+    def __init__(self, command, **_kwargs):
+        FakeLogs.commands.append(command)
+        self.stdout = io.BytesIO(b"".join(self.lines))
+
+    def kill(self):
+        pass
+
+    def wait(self, timeout=None):
+        return 0
+
+
+_follow = patch.object(smoke.subprocess, "Popen", FakeLogs)
+
+
+def setUpModule():
+    _follow.start()
+
+
+def tearDownModule():
+    _follow.stop()
+
+
+MEMORY_STAT = (
+    "anon 2952790016\n"
+    "file 1207959552\n"
+    "kernel 41943040\n"
+    "kernel_stack 1048576\n"
+    "pagetables 12582912\n"
+    "sock 0\n"
+    "shmem 33554432\n"
+    "file_mapped 1048576000\n"
+    "file_dirty 0\n"
+    "file_writeback 0\n"
+    "slab 20971520\n"
+    "inactive_anon 2952790016\n"
+    "active_anon 0\n"
+    "inactive_file 905969664\n"
+    "active_file 301989888\n"
+    "workingset_refault_file 12345\n"
+)
+MEMORY_SAMPLE = {
+    "current_bytes": 4202692608,
+    "anon": 2952790016,
+    "file": 1207959552,
+    "shmem": 33554432,
+    "file_mapped": 1048576000,
+    "active_file": 301989888,
+    "inactive_file": 905969664,
+    "kernel": 41943040,
+    "slab": 20971520,
+}
+VLLM_LOG = [
+    b"(APIServer pid=1) INFO 10-26 06:14:35 [model.py:1561] Using max model len 256\n",
+    b"(EngineCore_DP0 pid=14) INFO 10-26 06:14:53 [default_loader.py:291] Loading weights took 1.44 seconds\n",
+    b"(EngineCore_DP0 pid=14) INFO 10-26 06:14:53 [kv_cache_utils.py:1307] GPU KV cache size: 43,648 tokens\n",
+    b"(EngineCore_DP0 pid=14) INFO 10-26 06:14:53 [core.py:272] init engine (profile, create kv cache, warmup model) took 0.55 seconds\n",
+    b"(APIServer pid=1) INFO 10-26 06:14:54 [serving.py:177] Warming up chat template processing...\n",
+]
+
 OOM_EVENTS = (
     "low 0\nhigh 0\nmax 41\noom 1\noom_kill 1\noom_group_kill 0\nsock_throttled 0\n"
 )
 
 
-def write_parent(parent, events=OOM_EVENTS, peak="4294967296\n", current="1052672\n"):
+def write_parent(
+    parent, events=OOM_EVENTS, peak="4294967296\n", current="1052672\n", stat=None
+):
     """Lay out the cgroup v2 files the Docker daemon's parent would hold."""
     parent.mkdir(parents=True, exist_ok=True)
-    for name, content in (
+    files = [
         ("memory.events", events),
         ("memory.peak", peak),
         ("memory.current", current),
-    ):
+    ]
+    if stat is not None:
+        files.append(("memory.stat", stat))
+    for name, content in files:
         data = content if isinstance(content, bytes) else content.encode()
         (parent / name).write_bytes(data)
 
@@ -217,7 +289,8 @@ class SmokeControlTests(unittest.TestCase):
                     smoke.smoke("fixture", proof)
             receipt = json.loads(proof.read_text())
         self.assertFalse(receipt["passed"])
-        self.assertEqual(receipt["failure_type"], "ValueError")
+        self.assertEqual(receipt["failure_type"], "OomKillDuringReadiness")
+        self.assertEqual(receipt["outcome"], "oom_kill during readiness")
         self.assertTrue(receipt["oom_killed"])
         self.assertEqual(receipt["container_exit"], 1)
         self.assertEqual(
@@ -267,11 +340,13 @@ class SmokeControlTests(unittest.TestCase):
                 ("--max-model-len", "256"),
                 ("--max-num-seqs", "1"),
                 ("--max-num-batched-tokens", "256"),
+                ("--num-gpu-blocks-override", "3"),
             ):
                 self.assertIn(pair, pairs)
         self.assertEqual(
             receipt["memory_evidence"], {"unavailable": "FileNotFoundError"}
         )
+        self.assertEqual(receipt["kv_cache_blocks"], 3)
 
 
 class MemoryEvidenceTests(unittest.TestCase):
@@ -319,6 +394,120 @@ class MemoryEvidenceTests(unittest.TestCase):
                 if files is not None:
                     write_parent(parent, **files)
                 self.assertEqual(smoke.memory_evidence(parent), {"unavailable": reason})
+
+
+class MemorySampleTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = directory.name
+        self.parent = (
+            Path(directory.name) / "astrolift_cpu_smoke_0123456789abcdef.slice"
+        )
+
+    def sample(self):
+        sample = smoke.memory_sample(self.parent, time.perf_counter())
+        sample.pop("elapsed_s", None)
+        return sample
+
+    def test_only_allowlisted_composition_fields_leave_the_parent(self):
+        write_parent(self.parent, current="4202692608\n", stat=MEMORY_STAT)
+        sample = smoke.memory_sample(self.parent, time.perf_counter() - 3)
+        self.assertGreaterEqual(sample.pop("elapsed_s"), 3)
+        self.assertEqual(sample, MEMORY_SAMPLE)
+        text = json.dumps(sample)
+        for leaked in ("pagetables", "workingset", "kernel_stack", self.root):
+            self.assertNotIn(leaked, text)
+
+    def test_kernel_without_the_kernel_field_still_samples(self):
+        stat = "".join(
+            line + "\n"
+            for line in MEMORY_STAT.splitlines()
+            if not line.startswith("kernel ")
+        )
+        write_parent(self.parent, current="4202692608\n", stat=stat)
+        expected = dict(MEMORY_SAMPLE)
+        del expected["kernel"]
+        self.assertEqual(self.sample(), expected)
+
+    def test_unreadable_or_unexpected_stat_records_only_the_reason(self):
+        cases = {
+            "missing stat": (None, "FileNotFoundError"),
+            "missing anon": (
+                MEMORY_STAT.replace("anon 2952790016\n", "", 1),
+                "ValueError",
+            ),
+            "signed file": (
+                MEMORY_STAT.replace("file 1207959552", "file -1"),
+                "ValueError",
+            ),
+            "unbounded stat": (MEMORY_STAT + "x 0\n" * 8192, "ValueError"),
+            "non-ascii stat": (MEMORY_STAT.encode() + b"\xff\n", "UnicodeDecodeError"),
+        }
+        for name, (stat, reason) in cases.items():
+            with self.subTest(name):
+                self.parent = Path(self.root) / name.replace(" ", "_")
+                write_parent(self.parent, stat=stat)
+                self.assertEqual(self.sample(), {"unavailable": reason})
+
+    def test_oom_kills_reads_only_the_kill_counter(self):
+        write_parent(self.parent)
+        self.assertEqual(smoke.oom_kills(self.parent), 1)
+        write_parent(self.parent, events="max 3\noom 0\noom_kill 0\n")
+        self.assertEqual(smoke.oom_kills(self.parent), 0)
+        self.assertIsNone(smoke.oom_kills(Path(self.root) / "missing"))
+        write_parent(self.parent, events="oom_kill many\n")
+        self.assertIsNone(smoke.oom_kills(self.parent))
+
+
+class FollowPhasesTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.parent = Path(directory.name) / "parent.slice"
+        write_parent(self.parent, current="4202692608\n", stat=MEMORY_STAT)
+        FakeLogs.commands = []
+        self.addCleanup(setattr, FakeLogs, "lines", [])
+
+    def follow(self, lines):
+        FakeLogs.lines = lines
+        samples = {}
+        smoke.follow_phases(
+            "owned-fixture-id", self.parent, time.perf_counter(), samples
+        )()
+        for sample in samples.values():
+            sample.pop("elapsed_s")
+        return samples
+
+    def test_each_startup_point_is_sampled_once_in_log_order(self):
+        noise = [b"Loading safetensors checkpoint shards: 100% Completed\r\n"]
+        with patch.object(smoke, "memory_sample", wraps=smoke.memory_sample) as taken:
+            samples = self.follow(noise + VLLM_LOG + VLLM_LOG)
+        self.assertEqual(taken.call_count, 4)
+        self.assertEqual(
+            list(samples),
+            ["before_engine_start", "weights_loaded", "kv_cache_allocated", "warmup"],
+        )
+        for sample in samples.values():
+            self.assertEqual(sample, MEMORY_SAMPLE)
+        self.assertEqual(
+            FakeLogs.commands, [["docker", "logs", "--follow", "owned-fixture-id"]]
+        )
+
+    def test_a_point_missing_from_the_log_is_left_out(self):
+        samples = self.follow([VLLM_LOG[1], VLLM_LOG[4]])
+        self.assertEqual(list(samples), ["weights_loaded", "warmup"])
+
+    def test_the_follower_stops_reading_at_its_bound(self):
+        with patch.object(smoke, "LOG_FOLLOW_BOUND", 1024):
+            samples = self.follow([b"x" * 100 + b"\n"] * 11 + VLLM_LOG)
+        self.assertEqual(samples, {})
+
+    def test_docker_unavailable_samples_nothing(self):
+        samples = {}
+        with patch.object(smoke.subprocess, "Popen", side_effect=FileNotFoundError):
+            smoke.follow_phases("owned-fixture-id", self.parent, 0, samples)()
+        self.assertEqual(samples, {})
 
 
 CPU_BLOCK = (

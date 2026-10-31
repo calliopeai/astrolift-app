@@ -1,6 +1,6 @@
 """Agent runtime catalog — maps a short runtime name to its public image.
 
-The 12 agent runtimes are published to Docker Hub as
+Supported agent runtimes are published to Docker Hub as
 ``docker.io/calliopeai/astrolift-agent-<name>`` (plus a ``-vnc`` watchable
 variant of each). Rather than have every :class:`AgentEnvironmentSpec`
 carry a free-form image string, an operator can select a runtime by name
@@ -44,12 +44,32 @@ RUNTIME_NAMES: tuple[str, ...] = (
     "deepseek",
     "claude-code",
     "codex-cli",
-    "aider",
     "goose",
-    "openhands",
     "calliope-cli",
     "base",
 )
+
+
+RETIRED_RUNTIME_NAMES = frozenset({"aider", "openhands"})
+
+
+class RetiredAgentRuntime(ValueError):
+    def __init__(self, name: str, field: str):
+        self.field = field
+        super().__init__(
+            f"Agent runtime {name!r} is retired because it depends on LiteLLM; select an active runtime."
+        )
+
+
+def assert_runtime_available(*, runtime: str = "", image: str = "") -> None:
+    name = runtime.strip().lower()
+    if name in RETIRED_RUNTIME_NAMES:
+        raise RetiredAgentRuntime(name, "runtime")
+    repository = image.strip().split("@", 1)[0].rsplit("/", 1)[-1].split(":", 1)[0].lower()
+    for retired in RETIRED_RUNTIME_NAMES:
+        if repository in {f"astrolift-agent-{retired}", f"astrolift-agent-{retired}-vnc"}:
+            raise RetiredAgentRuntime(retired, "imageTag")
+
 
 # Default public Docker Hub namespace the runtimes are published under.
 _DEFAULT_REGISTRY = "docker.io/calliopeai"
@@ -86,6 +106,7 @@ def runtime_repo(name: str) -> str:
     Raises ``KeyError`` for an unknown runtime so a misconfigured spec
     fails loudly rather than spawning a nonexistent image.
     """
+    assert_runtime_available(runtime=name)
     if name not in RUNTIME_NAMES:
         raise KeyError(f"unknown agent runtime: {name!r}")
     return f"{registry_namespace()}/{_IMAGE_STEM}-{name}"

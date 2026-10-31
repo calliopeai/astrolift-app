@@ -215,6 +215,8 @@ def route(
 
     Callers that only need the cluster can use ``select_cluster`` instead.
     """
+    from django.db.models import F, Q
+
     from astrolift_clusters.models import TenantCluster
 
     labels = _normalise_labels(runs_on)
@@ -238,14 +240,15 @@ def route(
 
     # --- Base queryset: active, managed, belonging to org ---
     qs = TenantCluster.objects.filter(
-        organization=org,
+        Q(organization=org) | Q(organization__isnull=True),
         is_active=True,
         lifecycle=TenantCluster.Lifecycle.MANAGED,
-    )
+        deleted_at__isnull=True,
+    ).order_by(F("organization_id").asc(nulls_last=True), "created_at")
 
     # --- "astrolift/default" → any active managed cluster ---
     if LABEL_DEFAULT in labels or labels == {LABEL_ASTROLIFT}:
-        cluster = qs.order_by("created_at").first()
+        cluster = qs.first()
         if cluster is None:
             return RoutingResult(
                 cluster=None,
@@ -272,11 +275,11 @@ def route(
         )
 
     # --- Label matching against node_os / node_archs / node_labels ---
-    for cluster in qs.order_by("created_at"):
+    for cluster in qs:
         if _cluster_matches(cluster, labels):
             return RoutingResult(
                 cluster=cluster,
-                reason=(f"Cluster '{cluster.slug}' satisfies label selector " f"{sorted(labels)!r}."),
+                reason=(f"Cluster '{cluster.slug}' satisfies label selector {sorted(labels)!r}."),
             )
 
     return RoutingResult(

@@ -103,6 +103,15 @@ class Organization(NamedBaseCoreModel):
         default=False,
         help_text="Let members step up for sensitive actions with a personal 6 to 8 digit PIN.",
     )
+    # Whether a verified sign-in from a trusted domain may create its own
+    # account. Off by default: trusted domains then only add people who
+    # already have an account, and turning on open sign-up for a whole
+    # domain is a decision an operator has to make.
+    trusted_domain_signup = models.BooleanField(
+        default=False,
+        db_default=False,
+        help_text="Create an account on first sign-in for a verified email under a trusted domain.",
+    )
     preview_max_active_default = models.PositiveIntegerField(default=5)
     log_retention_days_default = models.PositiveIntegerField(default=30)
     # Observability streams. Metrics carry two horizons because raw

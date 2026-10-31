@@ -33,11 +33,18 @@ import {
   REVALIDATE_MANAGED_DOMAIN,
   SOFT_DELETE_MANAGED_DOMAIN,
 } from "@/graphql/clusters/clusters.queries";
+import type { ZoneDependent } from "./DefaultZoneDeleteDialog";
 
 export type DomainProbeInput = Pick<
   ManagedDomainProbeQueryVariables,
   "hostname" | "tool" | "recordType"
 >;
+/** Why the server kept a zone removed without force (#2572), and what resolves through it. */
+export interface DeleteRefusal {
+  message: string;
+  total: number;
+  items: ZoneDependent[];
+}
 export function useManagedDomain(id: string) {
   const t = useTranslations("managedDomains");
   const connectionText = useTranslations("domainConnections");
@@ -113,6 +120,7 @@ export function useManagedDomain(id: string) {
   const [actionMessage, setActionMessage] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [removed, setRemoved] = React.useState(false);
+  const [deleteRefusal, setDeleteRefusal] = React.useState<DeleteRefusal | null>(null);
   const canVerify = Boolean(
     domain &&
     !query.loading &&
@@ -245,7 +253,7 @@ export function useManagedDomain(id: string) {
     SoftDeleteManagedDomainMutation,
     SoftDeleteManagedDomainMutationVariables
   >(SOFT_DELETE_MANAGED_DOMAIN);
-  async function onDelete() {
+  async function onDelete(force = false) {
     if (
       !domain ||
       removed ||
@@ -257,8 +265,18 @@ export function useManagedDomain(id: string) {
     setActionError(null);
     setActionMessage(null);
     try {
-      const result = await softDelete({ variables: { input: { id: domain.id } } });
+      const result = await softDelete({ variables: { input: { id: domain.id, force } } });
       const payload = result.data?.softDeleteManagedDomain;
+      const kept = payload?.ok === false ? payload.errors?.[0] : undefined;
+      if (kept?.dependents) {
+        // An effective default zone: ask again, with what resolves through it.
+        setDeleteRefusal({
+          message: kept.message,
+          total: kept.dependents.total,
+          items: kept.dependents.items,
+        });
+        return false;
+      }
       if (payload?.ok === false) throw new Error(payload.errors?.[0]?.message ?? t("actionFailed"));
       if (payload?.ok !== true) throw new Error(t("actionUncertain"));
       onResetProbe();
@@ -349,6 +367,7 @@ export function useManagedDomain(id: string) {
     dnsConnectionsLoading: ownDomainReadable && supportQuery.loading,
     onDelete,
     deleting,
+    deleteRefusal,
     removed,
     actionMessage,
     actionError,

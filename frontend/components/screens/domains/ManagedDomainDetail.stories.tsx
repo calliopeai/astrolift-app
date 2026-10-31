@@ -3,10 +3,13 @@ import { DEFAULT_SETTINGS } from "./DomainDefaultSettings.stories";
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, userEvent, within } from "storybook/test";
 import {
+  DELETE_REFUSAL,
   DNS_WITHHELD,
   DOMAIN_ACTIVE,
+  DOMAIN_DEFAULT,
+  DOMAIN_DEFAULT_UNUSED,
   DOMAIN_DIAGNOSTICS,
   DOMAIN_LONG,
   DOMAIN_STALLED,
@@ -374,5 +377,56 @@ export const CertificateHostMismatch: Story = {
         validationRecords: 0,
       },
     },
+  },
+};
+
+/**
+ * #2572: the zone new apps get their hostnames under. It reads as the
+ * effective default, and Remove asks for the zone, naming what resolves
+ * through it, before it forces the removal.
+ */
+const openRemoval = async (canvasElement: HTMLElement) => {
+  await userEvent.click(within(canvasElement).getByRole("button", { name: "Remove domain" }));
+  return within(await within(canvasElement.ownerDocument.body).findByRole("alertdialog"));
+};
+export const EffectiveDefaultWithDependents: Story = {
+  args: { ...MANAGED_DOMAIN, domain: DOMAIN_DEFAULT },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText("Effective default")).toBeVisible();
+    const dialog = await openRemoval(canvasElement);
+    await expect(dialog.getByText("Remove the default zone?")).toBeVisible();
+    await expect(dialog.getByText("Environments that resolve through it: 14")).toBeVisible();
+    await expect(dialog.getByText("billing-api · production")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Remove default zone" })).toBeDisabled();
+  },
+};
+export const EffectiveDefaultWithoutDependents: Story = {
+  args: { ...MANAGED_DOMAIN, domain: DOMAIN_DEFAULT_UNUSED },
+  play: async ({ canvasElement }) => {
+    const dialog = await openRemoval(canvasElement);
+    await expect(dialog.getByText("No environment resolves through it yet.")).toBeVisible();
+    await expect(
+      dialog.getByLabelText(`To confirm, type the zone: ${DOMAIN_DEFAULT_UNUSED.zone}`)
+    ).toBeVisible();
+  },
+};
+/** Any other zone keeps the plain confirmation. */
+export const OrdinaryZoneRemoval: Story = {
+  args: MANAGED_DOMAIN,
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).queryByText("Effective default")).toBeNull();
+    const dialog = await openRemoval(canvasElement);
+    await expect(dialog.getByText("Remove managed domain?")).toBeVisible();
+    await expect(dialog.queryByRole("textbox")).toBeNull();
+  },
+};
+/** The page read the zone as ordinary; the server kept it as the default and said why. */
+export const RemovalRefused: Story = {
+  args: { ...MANAGED_DOMAIN, deleteRefusal: DELETE_REFUSAL },
+  play: async ({ canvasElement }) => {
+    const dialog = await openRemoval(canvasElement);
+    await expect(within(dialog.getByRole("alert")).getByText(DELETE_REFUSAL.message)).toBeVisible();
+    await expect(dialog.getByText("Environments that resolve through it: 3")).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Remove default zone" })).toBeDisabled();
   },
 };

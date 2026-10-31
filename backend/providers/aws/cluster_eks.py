@@ -1363,7 +1363,7 @@ class EKSClusterDriver(ClusterDriver):
             },
         }
 
-        return [
+        components = [
             BootstrapComponent(
                 key="aws-load-balancer-controller",
                 title="AWS Load Balancer Controller",
@@ -1799,11 +1799,57 @@ class EKSClusterDriver(ClusterDriver):
             edge_component(
                 getattr(cluster, "oidc_auth_config", None),
                 ingress_class=getattr(cluster, "ingress_class", "") or "",
-                front=alb_front(getattr(cluster, "oidc_auth_config", None), namespace=PLATFORM_NAMESPACE),
+                front=alb_front(
+                    getattr(cluster, "oidc_auth_config", None),
+                    namespace=PLATFORM_NAMESPACE,
+                    cluster_name=eks_cluster_name,
+                ),
                 # Per-app access (#2132), kept current by the control plane.
                 access_rules=list((getattr(cluster, "edge_access_rules", None) or {}).values()),
             ),
         ]
+
+        # Its admission webhooks intercept Services created by other charts.
+        # Flux must wait for the controller to be ready before installing them.
+        # The activity filters dependencies to selected, rendered releases, so
+        # withholding/deselecting this controller does not deadlock the recipe.
+        components = [
+            replace(
+                component,
+                depends_on=list(dict.fromkeys([*component.depends_on, "aws-load-balancer-controller"])),
+            )
+            if component.chart_repo_url and component.key != "aws-load-balancer-controller"
+            else component
+            for component in components
+        ]
+
+        try:
+            addon = self._eks.describe_addon(clusterName=eks_cluster_name, addonName="aws-ebs-csi-driver").get("addon")
+        except Exception as error:
+            code = getattr(error, "response", {}).get("Error", {}).get("Code")
+            if code != "ResourceNotFoundException":
+                raise
+            addon = None
+        if isinstance(addon, dict) and addon.get("addonName") == "aws-ebs-csi-driver":
+            components = [
+                replace(
+                    component,
+                    default_enabled=False,
+                    chart_name="",
+                    chart_repo_url="",
+                    chart_version="",
+                    requires=[],
+                    post_install_manifests=[],
+                    rationale=(
+                        "EBS CSI is provided by the EKS managed add-on; "
+                        "reuse it without installing a second controller."
+                    ),
+                )
+                if component.key == "aws-ebs-csi-driver"
+                else component
+                for component in components
+            ]
+        return components
 
     # ---- exec_plugin token materialization (#309) -----------------
     #

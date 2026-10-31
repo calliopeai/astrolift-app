@@ -133,6 +133,25 @@ def _resolve_pending_invitations(user, org, *, member_is_active: bool) -> bool:
     return applied_role
 
 
+def trusted_domain_allows_signup(domain: str) -> bool:
+    """Whether a verified sign-in under ``domain`` may create its own account.
+
+    Only when the active org turned on ``trusted_domain_signup`` and lists the
+    domain as trusted. The account alone grants nothing: membership and the
+    default role still come from ``maybe_auto_join_user``.
+    """
+    from astrolift_identity.models import OrganizationAllowlistedDomain
+
+    org = _active_organization()
+    if org is None or not org.trusted_domain_signup:
+        return False
+    return OrganizationAllowlistedDomain.objects.filter(
+        organization_id=org.pk,
+        domain=domain.strip().lower(),
+        deleted_at__isnull=True,
+    ).exists()
+
+
 def maybe_auto_join_user(user) -> bool:
     """Auto-create a ``Member`` for ``user`` when their email's domain
     is on the active org's allowlist. Returns True when a Member was

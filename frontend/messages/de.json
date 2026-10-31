@@ -5699,7 +5699,9 @@
         }
       },
       "allowStepUpPin": "Bestätigung mit persönlicher PIN erlauben",
-      "allowStepUpPinHint": "Mitglieder können eine 6- bis 8-stellige PIN festlegen und sensible Aktionen damit statt mit einer erneuten Anmeldung bestätigen. Lass dies aus, wenn deine Compliance für jede Bestätigung den Identitätsanbieter verlangt."
+      "allowStepUpPinHint": "Mitglieder können eine 6- bis 8-stellige PIN festlegen und sensible Aktionen damit statt mit einer erneuten Anmeldung bestätigen. Lass dies aus, wenn deine Compliance für jede Bestätigung den Identitätsanbieter verlangt.",
+      "trustedDomainSignup": "Konten für vertrauenswürdige Domains anlegen",
+      "trustedDomainSignupHint": "Wer sich mit einer bestätigten E-Mail-Adresse unter einer vertrauenswürdigen Domain dieser Organisation anmeldet, erhält ein Konto und tritt mit der Standardrolle dieser Domain bei. Lass dies aus, um nur Personen mit bestehendem Konto zuzulassen."
     },
     "sections": {
       "houseTheme": "Hausdesign",
@@ -11173,7 +11175,10 @@
       "feedbackDeployed": "Bereitstellung des Agenten angenommen. Ein empfangener Heartbeat bestätigt die Verbindung.",
       "feedbackIssueFailed": "Agentenschlüssel konnte nicht ausgegeben werden.",
       "feedbackDeployFailed": "Agent konnte nicht bereitgestellt werden.",
-      "feedbackRefreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
+      "feedbackRefreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen.",
+      "managedDescription": "Die Steuerungsebene installiert Zugangsdaten und Agent gemeinsam. Bestehende Zugangsdaten bleiben aktiv, bis sich der neue Agent verbindet.",
+      "managedPending": "Agent wird installiert und sein erstes Lebenszeichen geprüft…",
+      "managedConnected": "Agent verbunden. Zugangsdaten und Bereitstellung geprüft."
     },
     "source": {
       "readFailed": "Clusterdetails konnten nicht gelesen werden",
@@ -15150,6 +15155,16 @@
     "delete": "Domain entfernen",
     "deleteTitle": "Verwaltete Domain entfernen?",
     "deleteHelp": "Dies startet die bestehende Domainentfernung. Verwaltete Anbietereinträge und Zertifikate können entfernt werden; Anwendungs-Hostnamen können danach nicht mehr aufgelöst werden. Prüfe vor dem Fortfahren die aktuellen Routen.",
+    "effectiveDefault": "Tatsächlicher Standard",
+    "defaultDeleteTitle": "Standardzone entfernen?",
+    "defaultDeleteHelp": "Neue Anwendungen erhalten ihre Hostnamen unter dieser Zone. Anwendungen, die nach dem Entfernen registriert werden, erhalten die nächste Standardzone oder gar keinen Hostnamen.",
+    "defaultDeleteRefused": "Astrolift hat diese Zone behalten: Sie ist der Standard für die Hostnamen neuer Anwendungen.",
+    "defaultDependentsLabel": "Umgebungen unter dieser Zone",
+    "defaultDependentsNone": "Noch wird keine Umgebung über sie aufgelöst.",
+    "defaultDependentsCount": "Umgebungen, die über sie aufgelöst werden: {count}",
+    "defaultDependentsMore": "und {count} weitere",
+    "defaultDeleteTypeToConfirm": "Gib zur Bestätigung die Zone ein:",
+    "defaultDeleteConfirm": "Standardzone entfernen",
     "actionFailed": "Die Aktion wurde abgelehnt. Lies den aktuellen Zustand vor einem erneuten Versuch.",
     "actionUncertain": "Die Antwort auf die Aktion wurde nicht bestätigt. Lies vor einem erneuten Versuch den aktuellen Domain- und Anbieterzustand.",
     "acceptedUnverified": "Der Schreibvorgang wurde akzeptiert, aber die zurückgegebenen Metadaten konnten nicht geprüft werden. Aktualisiere den Zustand vor einer weiteren Aktion.",

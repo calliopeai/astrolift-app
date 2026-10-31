@@ -5705,7 +5705,9 @@
         }
       },
       "allowStepUpPin": "개인 PIN으로 확인 허용",
-      "allowStepUpPinHint": "구성원은 6~8자리 PIN을 설정하고 다시 로그인하는 대신 이 PIN으로 민감한 작업을 확인할 수 있습니다. 규정상 모든 확인에 ID 공급자가 필요하면 끈 상태로 두세요."
+      "allowStepUpPinHint": "구성원은 6~8자리 PIN을 설정하고 다시 로그인하는 대신 이 PIN으로 민감한 작업을 확인할 수 있습니다. 규정상 모든 확인에 ID 공급자가 필요하면 끈 상태로 두세요.",
+      "trustedDomainSignup": "신뢰할 수 있는 도메인의 계정 만들기",
+      "trustedDomainSignupHint": "이 조직의 신뢰할 수 있는 도메인에 속한 확인된 이메일로 로그인하면 계정이 만들어지고 해당 도메인의 기본 역할로 참여합니다. 이미 계정이 있는 사람만 허용하려면 끈 상태로 두세요."
     },
     "sections": {
       "houseTheme": "하우스 테마",
@@ -11170,7 +11172,10 @@
       "feedbackDeployed": "에이전트 배포가 승인되었습니다. 하트비트 수신으로 연결을 확인할 수 있습니다.",
       "feedbackIssueFailed": "에이전트 키를 발급하지 못했습니다.",
       "feedbackDeployFailed": "에이전트를 배포하지 못했습니다.",
-      "feedbackRefreshWarning": "변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요."
+      "feedbackRefreshWarning": "변경은 승인되었지만 클러스터 세부 정보를 새로 불러오지 못했습니다. 화면을 새로고침하여 현재 상태를 확인하세요.",
+      "managedDescription": "제어 영역에서 자격 증명과 에이전트를 함께 설치합니다. 새 에이전트가 연결될 때까지 기존 자격 증명이 유지됩니다.",
+      "managedPending": "에이전트를 설치하고 첫 하트비트를 확인하는 중…",
+      "managedConnected": "에이전트가 연결되었습니다. 자격 증명과 배포를 확인했습니다."
     },
     "source": {
       "readFailed": "클러스터 세부 정보를 읽지 못했습니다",
@@ -15147,6 +15152,16 @@
     "delete": "도메인 제거",
     "deleteTitle": "관리 도메인을 제거할까요?",
     "deleteHelp": "기존 도메인 제거 작업을 시작합니다. 공급자의 관리 레코드와 인증서가 제거되고 앱 호스트 이름이 더 이상 해석되지 않을 수 있습니다. 계속하기 전에 현재 경로를 검토하세요.",
+    "effectiveDefault": "실제 기본값",
+    "defaultDeleteTitle": "기본 영역을 제거할까요?",
+    "defaultDeleteHelp": "새 앱의 호스트 이름은 이 영역 아래에 만들어집니다. 제거한 뒤에 등록되는 앱은 다음 기본 영역을 쓰거나, 그마저 없으면 호스트 이름을 받지 못합니다.",
+    "defaultDeleteRefused": "Astrolift가 이 영역을 유지했습니다. 새 앱 호스트 이름의 기본 영역입니다.",
+    "defaultDependentsLabel": "이 영역의 환경",
+    "defaultDependentsNone": "아직 이 영역을 통해 확인되는 환경이 없습니다.",
+    "defaultDependentsCount": "이 영역을 통해 확인되는 환경: {count}개",
+    "defaultDependentsMore": "외 {count}개",
+    "defaultDeleteTypeToConfirm": "확인하려면 영역 이름을 입력하세요:",
+    "defaultDeleteConfirm": "기본 영역 제거",
     "actionFailed": "작업이 거부되었습니다. 다시 시도하기 전에 현재 상태를 조회하세요.",
     "actionUncertain": "작업 응답을 확인하지 못했습니다. 다시 시도하기 전에 현재 도메인과 공급자 상태를 조회하세요.",
     "acceptedUnverified": "쓰기 요청은 수락되었지만 반환된 메타데이터를 검증하지 못했습니다. 다음 작업 전에 현재 상태를 새로 고치세요.",

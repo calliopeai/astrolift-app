@@ -53,7 +53,7 @@ class AgentEnvironmentSpec(BaseCoreModel):
     # for this spec. When set it WINS over ``runtime``; leave blank to resolve
     # the image from the runtime catalog instead.
     image_tag = models.CharField(max_length=512, blank=True, default="")
-    # Catalog runtime short-name (e.g. "claude", "aider"). Resolves to the
+    # Catalog runtime short-name (e.g. "claude", "goose"). Resolves to the
     # public image ``docker.io/calliopeai/astrolift-agent-<name>`` via
     # astrolift_agents.runtime_catalog when ``image_tag`` is blank. Empty =
     # no catalog runtime (the dispatcher falls back to the workload image).

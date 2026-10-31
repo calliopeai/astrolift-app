@@ -30,3 +30,19 @@ Verified with real PostgreSQL role/token/HTTP tests, a 205-recipe paging/search 
 revoked bindings and deleted owners, real Apollo refresh/organization-switch tests,
 Storybook states and Chromium layout checks. This does not establish live-browser
 authorization for a deployed install.
+
+## Retired runtimes
+
+Aider and OpenHands are retired because their integrations depend on LiteLLM.
+They no longer appear in the selectable runtime catalog. New or updated recipes,
+repository/import registrations, task preparation and box/job image resolution
+refuse these runtime names and the known `astrolift-agent-aider` and
+`astrolift-agent-openhands` image repositories, including mirrored, tagged,
+digest-pinned and VNC variants. An explicit image does not bypass a retired
+runtime name.
+
+Existing recipes and task history remain readable, and existing tasks can still
+be cancelled. Select an active runtime explicitly to reuse a retired recipe;
+there is no automatic runtime or credential migration. Custom image contents
+remain the image owner's responsibility: the control plane does not inspect
+arbitrarily renamed images for embedded dependencies.

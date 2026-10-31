@@ -29,11 +29,25 @@ with a particular node or sufficient memory for a particular model.
 The smoke checks the actual package is `0.15.1+cpu`, PyTorch is `2.10.0+cpu`,
 and checks the registered float32 CPU SwiGLU kernel against PyTorch's numerical
 reference before starting a localhost-only server with
-one CPU, 4 GiB memory, 1 GiB KV cache, a 256-token context and one sequence.
+one CPU, 4 GiB memory, a 256-token context and one sequence.
 It loads an immutable public Qwen/Qwen2.5-0.5B-Instruct revision and requires
 an actual bounded chat completion. Failure, including out of memory, prevents
 publication. The smoke never supplies Hugging Face or cloud credentials.
 A successful runner smoke is still not actual cluster readiness or inference.
+
+The smoke's KV cache holds exactly that context: `--num-gpu-blocks-override 3`
+allocates three 128-token blocks, two for the one 256-token sequence and one
+that vLLM keeps as its null block, about 9 MiB for this model in float32.
+`VLLM_CPU_KVCACHE_SPACE=1` stays set as the 1 GiB ceiling vLLM checks the
+context against; without the override vLLM fills that ceiling with 341 blocks
+(43,648 tokens, 170 times what one sequence can use). The proof records
+`kv_cache_blocks`. Measured with `memory_phases` before the change, anon
+memory, which cannot be reclaimed without swap, reached about 4,000 MiB of the
+4,096 MiB limit at readiness, with page cache already squeezed to tens of MiB,
+so the 1 GiB cache, not reclaimable page cache, was what left no headroom. The
+override changes nothing the smoke certifies beyond its own 256-token,
+one-sequence context; a longer context or more sequences needs more blocks and
+is not covered by this smoke.
 
 The server runs under a cgroup parent of its own, fresh for each run, which
 sets no limit and outlives the container. At the end of the smoke, before the
@@ -48,6 +62,28 @@ values include page cache, and after a stop `current_bytes` is only what the
 exited processes left charged. A host without readable cgroup v2 files records
 `{"unavailable": "<exception type>"}`; the smoke's result never depends on the
 evidence.
+
+The proof's `memory_phases` shows what fills the 4 GiB. It samples the
+parent's `memory.current` and the `anon`, `file`, `shmem`, `file_mapped`,
+`active_file`, `inactive_file`, `kernel` and `slab` values of `memory.stat` at
+`before_engine_start`, `weights_loaded`, `kv_cache_allocated` and `warmup`, each
+taken when the candidate's own log line for that point first appears, and at
+`ready`, the first healthy poll. The log is read through `docker logs
+--follow` in lines of at most 4 KiB and 8 MiB in all, and no log text is kept.
+Each sample carries `elapsed_s` since the server started. `file` is page cache
+and includes `shmem`; without swap, `anon` cannot be reclaimed, while the
+kernel reclaims `inactive_file` first and then `active_file`, so a run whose
+peak sits at 4 GiB may still be mostly reclaimable cache. A point whose line
+never appears is left out, and an unreadable file records
+`{"unavailable": "<exception type>"}`.
+
+During readiness, every poll also reads the parent's `oom_kill` count. The
+parent is fresh, so any kill is this candidate's, and vLLM does not restart an
+engine the OOM killer took; the API server can stay up without ever serving
+`/health`. A rise stops the smoke at that poll with `failure_type`
+`OomKillDuringReadiness` and `outcome` `oom_kill during readiness` instead of
+waiting out the 900 s deadline. Where the count cannot be read, readiness
+waits as before.
 
 Every proof also records `host`, read once at the start of the smoke from
 `/proc/cpuinfo` and `/proc/meminfo` with a bound on each: `cpu_vendor`,

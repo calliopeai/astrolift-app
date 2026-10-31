@@ -404,3 +404,17 @@ def test_the_signed_out_landing_is_ungated_so_it_does_not_sign_in_again():
         if f["metadata"]["name"] == "auth-signed-out"
     ]
     assert "You have signed out" in page["spec"]["directResponse"]["body"]["inline"]
+
+
+def test_alb_front_keeps_the_cluster_prefix_and_bounds_long_names():
+    annotation = "alb.ingress.kubernetes.io/load-balancer-name"
+    [front] = alb_front(COGNITO, namespace="astrolift-system", cluster_name="t1-astrolift")
+    assert front["metadata"]["annotations"][annotation] == "t1-astrolift-edge"
+    names = []
+    for cluster in ("t1-" + "a" * 40, "t1-" + "a" * 39 + "b"):
+        [front] = alb_front(COGNITO, namespace="astrolift-system", cluster_name=cluster)
+        name = front["metadata"]["annotations"][annotation]
+        assert len(name) == 32
+        assert name.startswith("t1-")
+        names.append(name)
+    assert names[0] != names[1]

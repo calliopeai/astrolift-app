@@ -6,6 +6,7 @@ from astrolift_clusters.models.cluster_workload_identity_rebind import ClusterWo
 from astrolift_clusters.models.dns_provider_connection import DnsProviderConnection, DnsProviderOAuthAttempt
 from astrolift_clusters.models.managed_domain import (
     ManagedDomain,
+    effective_default_ids,
     managed_domain_for_zone,
     resolve_managed_domain,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "ProviderPlugin",
     "ProviderPluginConfig",
     "TenantCluster",
+    "effective_default_ids",
     "managed_domain_for_zone",
     "resolve_managed_domain",
 ]

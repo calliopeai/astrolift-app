@@ -5699,7 +5699,9 @@
         }
       },
       "allowStepUpPin": "Autoriser la vérification par code PIN personnel",
-      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification."
+      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification.",
+      "trustedDomainSignup": "Créer des comptes pour les domaines de confiance",
+      "trustedDomainSignupHint": "Toute personne qui se connecte avec une adresse e-mail vérifiée d'un domaine de confiance de cette organisation obtient un compte et la rejoint avec le rôle par défaut de ce domaine. Laissez désactivé pour n'admettre que les personnes ayant déjà un compte."
     },
     "sections": {
       "houseTheme": "Thème maison",
@@ -11173,7 +11175,10 @@
       "feedbackDeployed": "Déploiement de l’agent accepté. La réception d’un signal de présence confirme la connexion.",
       "feedbackIssueFailed": "Impossible d’émettre la clé de l’agent.",
       "feedbackDeployFailed": "Impossible de déployer l’agent.",
-      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
+      "feedbackRefreshWarning": "Le changement a été accepté, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel.",
+      "managedDescription": "Le plan de contrôle installe ensemble les identifiants et l’agent. Les identifiants existants restent actifs jusqu’à la connexion de l’agent de remplacement.",
+      "managedPending": "Installation de l’agent et vérification de son premier signal…",
+      "managedConnected": "Agent connecté. Identifiants et déploiement vérifiés."
     },
     "source": {
       "readFailed": "Impossible de lire les détails du cluster",
@@ -15150,6 +15155,16 @@
     "delete": "Supprimer le domaine",
     "deleteTitle": "Supprimer le domaine géré ?",
     "deleteHelp": "Cette action lance la procédure existante de suppression du domaine. Les enregistrements gérés du fournisseur et les certificats peuvent être supprimés, et les noms d’hôte des applications peuvent cesser de se résoudre. Vérifiez les routes actuelles avant de continuer.",
+    "effectiveDefault": "Défaut effectif",
+    "defaultDeleteTitle": "Supprimer la zone par défaut ?",
+    "defaultDeleteHelp": "Les nouvelles applications reçoivent leur nom d’hôte sous cette zone. Les applications enregistrées après sa suppression reçoivent la zone par défaut suivante, ou aucun nom d’hôte.",
+    "defaultDeleteRefused": "Astrolift a conservé cette zone : c’est la zone par défaut des noms d’hôte des nouvelles applications.",
+    "defaultDependentsLabel": "Environnements sous cette zone",
+    "defaultDependentsNone": "Aucun environnement ne se résout encore par elle.",
+    "defaultDependentsCount": "Environnements qui se résolvent par elle : {count}",
+    "defaultDependentsMore": "et {count} de plus",
+    "defaultDeleteTypeToConfirm": "Pour confirmer, saisissez la zone :",
+    "defaultDeleteConfirm": "Supprimer la zone par défaut",
     "actionFailed": "L’action a été refusée. Consultez l’état actuel avant de réessayer.",
     "actionUncertain": "La réponse à l’action n’a pas été confirmée. Consultez l’état actuel du domaine et du fournisseur avant de réessayer.",
     "acceptedUnverified": "L’écriture a été acceptée, mais les métadonnées retournées n’ont pas pu être vérifiées. Actualisez l’état avant toute autre action.",

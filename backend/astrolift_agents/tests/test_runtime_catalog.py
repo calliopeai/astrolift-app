@@ -23,7 +23,7 @@ from astrolift_dispatch.spawners.k8s_job import _render_agent_job, _resolve_base
 
 
 def test_all_published_runtimes_are_catalogued():
-    # The 12 runtimes published to Docker Hub (plus the shared base).
+    # Active runtime catalog, including the shared base.
     expected = {
         "claude",
         "codex",
@@ -32,9 +32,7 @@ def test_all_published_runtimes_are_catalogued():
         "deepseek",
         "claude-code",
         "codex-cli",
-        "aider",
         "goose",
-        "openhands",
         "calliope-cli",
         "base",
     }
@@ -45,7 +43,7 @@ def test_all_published_runtimes_are_catalogued():
     "name,expected_repo",
     [
         ("claude", "docker.io/calliopeai/astrolift-agent-claude"),
-        ("aider", "docker.io/calliopeai/astrolift-agent-aider"),
+        ("goose", "docker.io/calliopeai/astrolift-agent-goose"),
         ("calliope-cli", "docker.io/calliopeai/astrolift-agent-calliope-cli"),
         ("base", "docker.io/calliopeai/astrolift-agent-base"),
     ],
@@ -189,7 +187,7 @@ def test_render_job_runtime_composes_with_vnc_variant():
 
 def test_render_job_runtime_no_vnc_uses_plain_catalog_image():
     workload = _FakeWorkload("ghcr.io/old/ignored:0", 0)
-    spec = _FakeSpec(runtime="aider")
+    spec = _FakeSpec(runtime="goose")
     task = _FakeTask(guid="t-cat-2", vnc_enabled=False, environment_spec=spec)
 
     manifest = _render_agent_job(
@@ -199,6 +197,31 @@ def test_render_job_runtime_no_vnc_uses_plain_catalog_image():
         task=task,
     )
     container = _container_of(manifest)
-    assert container["image"] == "docker.io/calliopeai/astrolift-agent-aider:latest"
+    assert container["image"] == "docker.io/calliopeai/astrolift-agent-goose:latest"
     # No app port, no vnc -> no ports block.
     assert "ports" not in container
+
+
+@pytest.mark.parametrize("runtime", ["aider", "openhands", " AIDER "])
+def test_retired_runtime_refuses_even_an_explicit_active_image(runtime):
+    spec = _FakeSpec(runtime=runtime, image_tag="private.example/active:pin")
+    with pytest.raises(rc.RetiredAgentRuntime, match="retired"):
+        _resolve_base_image(_FakeWorkload("active:latest"), spec)
+
+
+@pytest.mark.parametrize("runtime", ["aider", "openhands"])
+@pytest.mark.parametrize("suffix", [":latest", "-vnc:old", "@sha256:" + "a" * 64, "-vnc@sha256:" + "b" * 64])
+def test_retired_images_refuse_overrides_and_workload_fallback(runtime, suffix):
+    image = f"mirror.example:5000/team/astrolift-agent-{runtime}{suffix}"
+    with pytest.raises(rc.RetiredAgentRuntime, match="retired"):
+        _resolve_base_image(_FakeWorkload("active:latest"), _FakeSpec(image_tag=image))
+    with pytest.raises(rc.RetiredAgentRuntime, match="retired"):
+        _resolve_base_image(_FakeWorkload(image), _FakeSpec())
+    with pytest.raises(rc.RetiredAgentRuntime, match="retired"):
+        _resolve_base_image(_FakeWorkload(image), None)
+
+
+def test_retired_catalog_entries_are_absent_but_unrelated_custom_images_remain_valid():
+    assert not set(rc.RETIRED_RUNTIME_NAMES).intersection(rc.RUNTIME_NAMES)
+    assert not set(rc.RETIRED_RUNTIME_NAMES).intersection(row["name"] for row in rc.catalog_entries())
+    rc.assert_runtime_available(image="private.example/custom-agent:pin")

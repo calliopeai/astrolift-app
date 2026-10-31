@@ -5,6 +5,7 @@ import json
 import re
 import secrets
 import subprocess
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -145,6 +146,118 @@ def memory_evidence(parent):
         return {"unavailable": type(exc).__name__}
 
 
+MEMORY_STAT_READ_BOUND = 16384
+MEMORY_STAT_FIELDS = (
+    "anon",
+    "file",
+    "shmem",
+    "file_mapped",
+    "active_file",
+    "inactive_file",
+    "kernel",
+    "slab",
+)
+# Startup points, matched in the candidate's own log in this order. The first
+# line matching each one triggers a sample; "ready" is the first healthy poll.
+MEMORY_PHASES = (
+    ("before_engine_start", re.compile(rb"Using max model len")),
+    ("weights_loaded", re.compile(rb"Loading weights took")),
+    ("kv_cache_allocated", re.compile(rb"init engine \(profile, create kv cache")),
+    ("warmup", re.compile(rb"Warming up chat template processing")),
+)
+LOG_LINE_BOUND = 4096
+LOG_FOLLOW_BOUND = 8 * 1024 * 1024
+
+
+def memory_sample(parent, started):
+    """Composition of the parent's charge at one point, integers only.
+
+    `file` is page cache and includes `shmem`; the kernel reclaims
+    `inactive_file` first and `active_file` after it, never `anon` (there is
+    no swap). `kernel` is absent on kernels older than 5.18.
+    """
+    try:
+        stat = {}
+        for line in read_bounded(
+            parent / "memory.stat", MEMORY_STAT_READ_BOUND
+        ).splitlines():
+            name, _, value = line.partition(" ")
+            if name in MEMORY_STAT_FIELDS:
+                stat[name] = cgroup_counter(value)
+        if any(name not in stat for name in MEMORY_STAT_FIELDS if name != "kernel"):
+            raise ValueError("Incomplete cgroup memory stat")
+        return {
+            "elapsed_s": round(time.perf_counter() - started, 1),
+            "current_bytes": cgroup_counter(read_cgroup(parent / "memory.current")),
+            **stat,
+        }
+    except (OSError, ValueError) as exc:
+        return {"unavailable": type(exc).__name__}
+
+
+def oom_kills(parent):
+    """The parent's oom_kill count, or None where it cannot be read."""
+    try:
+        for line in read_cgroup(parent / "memory.events").splitlines():
+            name, _, value = line.partition(" ")
+            if name == "oom_kill":
+                return cgroup_counter(value)
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def follow_phases(container, parent, started, samples):
+    """Sample memory at each startup point as its log line appears.
+
+    Follows the candidate's log in a thread; reads lines of at most 4 KiB and
+    8 MiB in all, keeps no log text, and stops once every point is sampled.
+    Returns a function that stops the follower.
+    """
+    try:
+        follower = subprocess.Popen(
+            ["docker", "logs", "--follow", container],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+    except OSError:
+        return lambda: None
+
+    def read():
+        pending = list(MEMORY_PHASES)
+        consumed = 0
+        try:
+            while pending and consumed < LOG_FOLLOW_BOUND:
+                line = follower.stdout.readline(LOG_LINE_BOUND)
+                if not line:
+                    break
+                consumed += len(line)
+                for index, (name, marker) in enumerate(pending):
+                    if marker.search(line):
+                        samples[name] = memory_sample(parent, started)
+                        del pending[: index + 1]
+                        break
+        except (OSError, ValueError):
+            pass
+        finally:
+            follower.kill()
+
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+
+    def stop():
+        follower.kill()
+        reader.join(10)
+        follower.stdout.close()
+        follower.wait(10)
+
+    return stop
+
+
+class OomKillDuringReadiness(Exception):
+    pass
+
+
 PROC_ROOT = Path("/proc")
 CPUINFO_READ_BOUND = 256 * 1024
 MEMINFO_READ_BOUND = 8192
@@ -221,6 +334,12 @@ def host_evidence(proc=None):
         return {"unavailable": type(exc).__name__}
 
 
+# Two 128-token blocks hold the 256-token context of the one sequence, and
+# vLLM keeps one more as its null block. VLLM_CPU_KVCACHE_SPACE stays the
+# 1 GiB ceiling vLLM checks the context against; this sets what is allocated.
+KV_CACHE_BLOCKS = 3
+
+
 def smoke(image, proof):
     spec = json.loads(Path(__file__).with_name("source.json").read_text())
     receipt = {
@@ -231,11 +350,14 @@ def smoke(image, proof):
         "cpu_limit": "1",
         "memory_limit": "4GiB",
         "kv_cache_gib": 1,
+        "kv_cache_blocks": KV_CACHE_BLOCKS,
         "live_cluster_certified": False,
         "host": host_evidence(),
     }
     container = None
     parent = memory_parent()
+    phases = {}
+    stop_following = None
     try:
         receipt["image_id"] = inspect_target(image)
         output = subprocess.check_output(
@@ -296,6 +418,8 @@ def smoke(image, proof):
                     "1",
                     "--max-num-batched-tokens",
                     "256",
+                    "--num-gpu-blocks-override",
+                    str(KV_CACHE_BLOCKS),
                     "--enforce-eager",
                 ],
                 timeout=30,
@@ -303,6 +427,8 @@ def smoke(image, proof):
             .decode()
             .strip()
         )
+        started = time.perf_counter()
+        stop_following = follow_phases(container, CGROUP_ROOT / parent, started, phases)
         data = json.loads(subprocess.check_output(["docker", "inspect", container]))[0]
         port = int(data["NetworkSettings"]["Ports"]["8000/tcp"][0]["HostPort"])
         deadline = time.monotonic() + 900
@@ -313,12 +439,19 @@ def smoke(image, proof):
             if not data["State"]["Running"]:
                 receipt["container_exit"] = data["State"]["ExitCode"]
                 receipt["oom_killed"] = data["State"]["OOMKilled"]
+            # The parent is fresh, so any OOM kill is this candidate's, and an
+            # OOM-killed engine never becomes ready behind a live API server.
+            if oom_kills(CGROUP_ROOT / parent):
+                receipt["outcome"] = "oom_kill during readiness"
+                raise OomKillDuringReadiness("Candidate OOM-killed before readiness")
+            if not data["State"]["Running"]:
                 raise ValueError("Candidate stopped before readiness")
             try:
                 with urllib.request.urlopen(
                     f"http://127.0.0.1:{port}/health", timeout=5
                 ) as response:
                     if response.status == 200:
+                        phases["ready"] = memory_sample(CGROUP_ROOT / parent, started)
                         break
             except (urllib.error.URLError, TimeoutError, ConnectionError):
                 pass
@@ -333,8 +466,11 @@ def smoke(image, proof):
             "CPU runtime candidate smoke failed; see sanitized proof"
         ) from None
     finally:
+        if stop_following:
+            stop_following()
         if container:
             receipt["memory_evidence"] = memory_evidence(CGROUP_ROOT / parent)
+            receipt["memory_phases"] = dict(phases)
         if container and not receipt["passed"]:
             keep_container_log(container, proof.with_name("runtime-container.log"))
         if container:

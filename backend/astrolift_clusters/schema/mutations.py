@@ -31,6 +31,7 @@ from astrolift_clusters.models import (
     ProviderPlugin,
     ProviderPluginConfig,
     TenantCluster,
+    effective_default_ids,
     managed_domain_for_zone,
 )
 from astrolift_clusters.schema.types import (
@@ -43,6 +44,7 @@ from astrolift_clusters.scopes import cluster_catalog_org_scope, cluster_org_sco
 from astrolift_graphql import GUID, MutationErrorType, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_graphql.errors import MutationErrorDependentsType, MutationErrorDependentType
 from astrolift_identity.models import Organization
 from astrolift_operations import observability_profile
 from astrolift_workflows.client import signal_workflow, start_workflow
@@ -419,6 +421,17 @@ class UpdateManagedDomainInput:
 @strawberry.input
 class SoftDeleteManagedDomainInput:
     id: GUID
+    # A zone new apps resolve through is refused without it (#2572): deleting
+    # it leaves every later registration without that hostname.
+    force: bool = False
+
+
+@strawberry.input
+class BackfillManagedDomainBindingsInput:
+    """``backfillManagedDomainBindings`` input (#2572). ``dry_run`` reports
+    what would change and writes nothing."""
+
+    dry_run: bool = False
 
 
 @strawberry.input
@@ -626,6 +639,32 @@ class ReissueManagedDomainCertPayload:
     zone: str
     signaled: bool
     message: str
+
+
+@strawberry.type(name="AstroliftManagedDomainBinding")
+class ManagedDomainBindingType:
+    """One environment the backfill bound to the zone its organization
+    resolves to, and the URL it now advertises (#2572)."""
+
+    organization_slug: str
+    app_slug: str
+    environment_name: str
+    zone: str
+    previous_url: str
+    url: str
+
+
+@strawberry.type(name="AstroliftManagedDomainBindingBackfill")
+class ManagedDomainBindingBackfillType:
+    """Outcome of ``backfillManagedDomainBindings`` (#2572): ``found``
+    environments had no managed domain, ``updated`` were bound (or would be,
+    on a dry run), ``skipped`` still have no zone to resolve to."""
+
+    dry_run: bool
+    found: int
+    updated: int
+    skipped: int
+    bindings: list[ManagedDomainBindingType]
 
 
 @strawberry.type
@@ -1820,7 +1859,38 @@ class ClustersMutation:
                 "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
                 "Manage the original domain route before changing its native resources.",
             )
-        domain.soft_delete()
+        from astrolift_clusters.managed_domain_bindings import default_zone_refusal, dependent_environments
+        from astrolift_clusters.managed_domain_defaults import lock_default_scope
+
+        with transaction.atomic():
+            domain = next(
+                (row for row in lock_default_scope(domain.organization_id) if row.pk == domain.pk), None
+            )
+            if domain is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+            # Losing the zone new apps resolve through broke every later
+            # registration with no error anywhere (#2572); existing apps
+            # kept serving, so nothing pointed back at the delete.
+            if not input.force and domain.pk in effective_default_ids([domain]):
+                total, environments = dependent_environments(domain, _caller(info))
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    default_zone_refusal(domain, total, environments),
+                    field="force",
+                    dependents=MutationErrorDependentsType(
+                        total=total,
+                        items=[
+                            MutationErrorDependentType(
+                                organization_slug=environment.registered_app.organization.slug,
+                                app_slug=environment.registered_app.slug,
+                                environment_name=environment.name,
+                                url=environment.url,
+                            )
+                            for environment in environments
+                        ],
+                    ),
+                )
+            domain.soft_delete()
 
         # The cloud resources must die with the row: a delete that only
         # soft-deletes leaves the hosted zone billing monthly and the
@@ -1842,6 +1912,45 @@ class ClustersMutation:
                 ),
             )
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
+
+    @strawberry.field
+    @mutation_audit(action="domain.backfill_bindings")
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE),
+    )
+    @tenant_scoped()
+    def backfill_managed_domain_bindings(
+        self, info: Info, input: BackfillManagedDomainBindingsInput
+    ) -> MutationResultType[ManagedDomainBindingBackfillType]:
+        """Bind every environment with no managed domain to the zone its
+        organization resolves to now, and rewrite the URL it advertises
+        (#2572): ``manage.py backfill_managed_domain`` without a shell on the
+        webservice task, for the recovery after a default zone was removed.
+        Install-wide, so the platform operator's alone."""
+        check_platform_operator(_caller(info), gate=Permission.PROVIDER_PLUGIN_CONFIGURE)
+        from astrolift_clusters.managed_domain_bindings import backfill_managed_domain_bindings
+
+        result = backfill_managed_domain_bindings(dry_run=input.dry_run)
+        return gql_success(
+            ManagedDomainBindingBackfillType(
+                dry_run=result.dry_run,
+                found=len(result.bound) + len(result.skipped),
+                updated=len(result.bound),
+                skipped=len(result.skipped),
+                bindings=[
+                    ManagedDomainBindingType(
+                        organization_slug=row.organization_slug,
+                        app_slug=row.app_slug,
+                        environment_name=row.environment_name,
+                        zone=row.zone,
+                        previous_url=row.previous_url,
+                        url=row.url,
+                    )
+                    for row in result.bound
+                ],
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="domain.verify")

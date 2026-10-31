@@ -259,6 +259,16 @@ class ClustersListFilterInput:
     )
 
 
+@strawberry.type(name="AstroliftManagedDomainDependent")
+class ManagedDomainDependentType:
+    """An app environment whose platform hostname is under a managed domain (#2572)."""
+
+    organization_slug: str
+    app_slug: str
+    environment_name: str
+    url: str
+
+
 @strawberry.type(name="AstroliftManagedDomain")
 class ManagedDomainType:
     id: GUID
@@ -297,6 +307,66 @@ class ManagedDomainType:
     challenge_record_name: str
     challenge_record_value: str
     verified_at: dt.datetime | None
+    is_effective_default: bool = strawberry.field(
+        description=(
+            "Whether new apps get their hostnames under this zone now (#2572): the zone resolution "
+            "picks for the organization that owns it, the shared zone every organization without "
+            "its own falls through to, or an organization's explicit default. Deleting one asks "
+            "for force."
+        )
+    )
+    # Read once per instance, however many of the fields below are selected.
+    dependents: strawberry.Private[tuple[int, list] | None] = None
+
+    @strawberry.field(
+        description=(
+            "The first ten app environments bound to this zone (#2572), whose hostnames go with it "
+            "when it is deleted: your organization's apps you may read, and on a shared zone every "
+            "organization's for the platform operator."
+        )
+    )
+    def dependent_apps(self, info: strawberry.Info) -> list[ManagedDomainDependentType]:
+        _, environments = self._dependents(info)
+        return [dependent_to_type(environment) for environment in environments]
+
+    @strawberry.field(description="How many environments dependentApps draws from (#2572).")
+    def dependent_app_count(self, info: strawberry.Info) -> int:
+        total, _ = self._dependents(info)
+        return total
+
+    def _dependents(self, info: strawberry.Info) -> tuple[int, list]:
+        if self.dependents is None:
+            from django.db.models import Q
+
+            from astrolift_clusters.managed_domain_bindings import dependent_environments
+            from astrolift_clusters.models import ManagedDomain
+            from core.tenancy import get_current_tenant
+
+            # Re-scoped by caller org: a type carrying another org's guid
+            # must not widen into that org's environments.
+            tenant = get_current_tenant()
+            org_id = tenant.organization_id if tenant else None
+            domain = (
+                ManagedDomain.objects.filter(
+                    Q(organization_id=org_id) | Q(organization_id__isnull=True), guid=str(self.id)
+                ).first()
+                if org_id is not None
+                else None
+            )
+            request = getattr(info.context, "request", None)
+            user = getattr(request, "user", None) or getattr(info.context, "user", None)
+            self.dependents = (0, []) if domain is None else dependent_environments(domain, user)
+        return self.dependents
+
+
+def dependent_to_type(environment) -> ManagedDomainDependentType:
+    app = environment.registered_app
+    return ManagedDomainDependentType(
+        organization_slug=app.organization.slug,
+        app_slug=app.slug,
+        environment_name=environment.name,
+        url=environment.url,
+    )
 
 
 # ---- Certificate picker (#858) ------------------------------------
@@ -493,10 +563,13 @@ def cluster_to_type(cluster, *, operator_view: bool = True) -> TenantClusterType
     )
 
 
-def domain_to_type(domain, *, provision_clusters=None) -> ManagedDomainType:
+def domain_to_type(domain, *, provision_clusters=None, effective_defaults=None) -> ManagedDomainType:
     from astrolift_clusters.domain_diagnostics import provision_cluster
+    from astrolift_clusters.models import effective_default_ids
 
     cluster = provision_cluster(domain) if provision_clusters is None else provision_clusters.get(domain.pk)
+    if effective_defaults is None:
+        effective_defaults = effective_default_ids([domain])
     delegation_check = (domain.dns_config or {}).get("delegation_check", {})
     connection = domain.delegation_connection if domain.delegation_connection_id else None
     return ManagedDomainType(
@@ -522,6 +595,7 @@ def domain_to_type(domain, *, provision_clusters=None) -> ManagedDomainType:
         challenge_record_name=(f"_astrolift-challenge.{domain.zone}" if domain.verification_token else ""),
         challenge_record_value=domain.verification_token,
         verified_at=domain.verified_at,
+        is_effective_default=domain.pk in effective_defaults,
     )
 
 

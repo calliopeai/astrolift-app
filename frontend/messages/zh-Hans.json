@@ -5705,7 +5705,9 @@
         }
       },
       "allowStepUpPin": "允许使用个人 PIN 进行验证",
-      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。"
+      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。",
+      "trustedDomainSignup": "为受信任域创建账户",
+      "trustedDomainSignupHint": "使用本组织受信任域下已验证邮箱登录的人会获得账户，并以该域的默认角色加入。若只允许已有账户的人，请保持关闭。"
     },
     "sections": {
       "houseTheme": "内部主题",
@@ -11170,7 +11172,10 @@
       "feedbackDeployed": "代理部署已接受。收到心跳后才能确认连接。",
       "feedbackIssueFailed": "无法签发代理密钥。",
       "feedbackDeployFailed": "无法部署代理。",
-      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。"
+      "feedbackRefreshWarning": "更改已接受，但无法刷新集群详情。请刷新页面以查看当前状态。",
+      "managedDescription": "控制平面会同时安装凭据和代理。现有凭据会一直有效，直到替换代理连接成功。",
+      "managedPending": "正在安装代理并验证首次心跳…",
+      "managedConnected": "代理已连接，凭据和部署均已验证。"
     },
     "source": {
       "readFailed": "无法读取集群详情",
@@ -15147,6 +15152,16 @@
     "delete": "移除域名",
     "deleteTitle": "移除托管域名？",
     "deleteHelp": "这将启动现有的域名移除操作。提供商的托管记录和证书可能会被移除，应用主机名可能不再解析。继续前请检查当前路由。",
+    "effectiveDefault": "实际默认",
+    "defaultDeleteTitle": "移除默认区域？",
+    "defaultDeleteHelp": "新应用的主机名位于此区域之下。移除后注册的应用将使用下一个默认区域，若没有则不会获得主机名。",
+    "defaultDeleteRefused": "Astrolift 保留了此区域：它是新应用主机名的默认区域。",
+    "defaultDependentsLabel": "此区域下的环境",
+    "defaultDependentsNone": "尚无环境通过它解析。",
+    "defaultDependentsCount": "通过它解析的环境：{count} 个",
+    "defaultDependentsMore": "以及另外 {count} 个",
+    "defaultDeleteTypeToConfirm": "请输入区域名称以确认：",
+    "defaultDeleteConfirm": "移除默认区域",
     "actionFailed": "操作被拒绝。请读取当前状态后再重试。",
     "actionUncertain": "无法确认操作响应。请读取当前域名和提供商状态后再重试。",
     "acceptedUnverified": "写入已被接受，但无法验证返回的元数据。执行其他操作前请刷新当前状态。",
