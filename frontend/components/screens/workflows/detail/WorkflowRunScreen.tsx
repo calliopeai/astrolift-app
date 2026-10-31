@@ -434,6 +434,19 @@ export function WorkflowRunScreen({
           title={t("workflowView")}
           description={t("workflowViewDescription")}
           motion={motion}
+          stationLinks={Object.fromEntries(
+            plan.map((stage) => {
+              const execution = [...executions]
+                .reverse()
+                .find((row) => row.stageOrder === stage.order && row.agentRunGuid);
+              return [
+                `${slug}:o${stage.order}`,
+                execution?.agentRunGuid
+                  ? `/agents/runs/${encodeURIComponent(execution.agentRunGuid)}`
+                  : workflowTabHref(slug, "builder"),
+              ];
+            })
+          )}
         />
       )}
 

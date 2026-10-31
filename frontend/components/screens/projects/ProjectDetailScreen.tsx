@@ -101,6 +101,7 @@ export function ProjectDetailScreen({
 }: ProjectDetailScreenProps) {
   const fmt = useFormatters();
   const t = useTranslations("projectDetail");
+  const topologyText = useTranslations("projectTopology");
   const appStatus = useTranslations("apps.frame.status");
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -252,6 +253,11 @@ export function ProjectDetailScreen({
       }
       actions={
         <>
+          <Button asChild variant="outline">
+            <Link href={`/projects/${encodeURIComponent(project.slug)}/topology`}>
+              {topologyText("openBlueprint")}
+            </Link>
+          </Button>
           {!workloadQueriesLoading && hasAgents && (
             <Button asChild variant="outline">
               <Link href={`/agents?project=${encodeURIComponent(project.slug)}`}>
@@ -485,7 +491,9 @@ export function ProjectDetailScreen({
               <CardDescription>{t("topologyDescription")}</CardDescription>
             </div>
             <Button asChild size="sm" variant="outline">
-              <Link href="/workflows">{t("viewAll")}</Link>
+              <Link href={`/projects/${encodeURIComponent(project.slug)}/topology`}>
+                {topologyText("exploreWorkflow")}
+              </Link>
             </Button>
           </CardHeader>
           <CardContent>

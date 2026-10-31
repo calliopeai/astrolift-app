@@ -13014,6 +13014,16 @@
       "task": "単発の実行",
       "workflow": "複数ステップのパイプライン",
       "mixed": "複数の種類のワークロード"
+    },
+    "canvas": {
+      "legend": "凡例と記号",
+      "zoomOut": "縮小",
+      "zoomIn": "拡大",
+      "fit": "全体を表示",
+      "expand": "拡大",
+      "pan": "ワークフローの表示領域。スクロールで移動し、ズーム操作で表示倍率を変更できます。",
+      "inspector": "選択中のステップ",
+      "seeMore": "詳細を見る"
     }
   },
   "clusterConnection": {
@@ -16417,7 +16427,8 @@
     "substrate": "基盤",
     "sharing": "共有",
     "connect": "接続",
-    "agentInbox": "受信トレイ"
+    "agentInbox": "受信トレイ",
+    "topology": "構成図"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17322,5 +17333,65 @@
       "woke": "エージェントを起動済み",
       "queued": "エージェントの次回実行を待機中"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · 構成図",
+    "description": "プロジェクト全体や個別のワークフローを表示し、構成を見失わずに各コンポーネントを確認できます。",
+    "back": "プロジェクト概要",
+    "scope": "表示対象",
+    "wholeProject": "プロジェクト全体",
+    "canvas": "グラフ表示領域",
+    "componentList": "コンポーネント一覧",
+    "counts": "{nodes} 個のコンポーネント · {edges} 個の接続",
+    "partialError": "一部のプロジェクトデータを読み込めませんでした。このグラフは不完全です。",
+    "notFound": "プロジェクトが見つからないか、アクセスできません。",
+    "empty": "表示できるコンポーネントはまだありません。",
+    "inspector": "コンポーネントの詳細",
+    "status": "状態",
+    "seeMore": "詳細を見る",
+    "exploreWorkflow": "ワークフローのステップを表示",
+    "connections": "接続先コンポーネント",
+    "selectTitle": "コンポーネントを確認",
+    "selectDescription": "ノードを選択すると設定と接続を確認できます。「詳細を見る」で Astrolift の該当ページを開きます。表示対象を選ぶとワークフローの各ステップを表示できます。",
+    "evidenceNote": "接続は登録済みの設定に基づきます。最新の実行が現在のステップを特定できる場合のみ状態を表示します。レビューの繰り返しをまたいで以前の状態を推測することはありません。",
+    "kind": {
+      "workflow": "ワークフロー",
+      "stage": "ステップ",
+      "agent": "エージェント",
+      "app": "アプリ",
+      "repository": "リポジトリ"
+    },
+    "edge": {
+      "source": "ソース",
+      "dispatches": "タスクを割り当て",
+      "invokes": "呼び出し",
+      "next": "次へ",
+      "return": "戻り先",
+      "retry": "再試行"
+    },
+    "field": {
+      "pattern": "パターン",
+      "stages": "ステップ数",
+      "enabled": "有効",
+      "repository": "リポジトリ",
+      "source": "ソース参照",
+      "latestRun": "最新の実行",
+      "kind": "種類",
+      "order": "ステップ番号",
+      "agent": "エージェント",
+      "environment": "環境仕様",
+      "model": "モデル",
+      "output": "出力キー",
+      "skills": "スキル",
+      "failure": "失敗時の動作",
+      "attempts": "最大試行回数",
+      "timeout": "タイムアウト",
+      "workflow": "ワークフロー",
+      "mode": "実行モード",
+      "running": "実行中のタスク",
+      "lastRun": "最終実行"
+    },
+    "openBlueprint": "構成図を開く",
+    "expand": "拡大"
   }
 }

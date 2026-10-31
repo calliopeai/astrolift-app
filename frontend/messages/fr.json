@@ -13017,6 +13017,16 @@
       "task": "Des exécutions ponctuelles",
       "workflow": "Un pipeline en plusieurs étapes",
       "mixed": "Plusieurs types de charges de travail"
+    },
+    "canvas": {
+      "legend": "Légende et symboles",
+      "zoomOut": "Réduire le zoom",
+      "zoomIn": "Augmenter le zoom",
+      "fit": "Ajuster à la vue",
+      "expand": "Agrandir",
+      "pan": "Canevas du processus. Faites défiler pour vous déplacer et utilisez le zoom pour changer l’échelle.",
+      "inspector": "Étape sélectionnée",
+      "seeMore": "En savoir plus"
     }
   },
   "clusterConnection": {
@@ -16420,7 +16430,8 @@
     "substrate": "Substrat",
     "sharing": "Partage",
     "connect": "Connexion",
-    "agentInbox": "Boîte de réception"
+    "agentInbox": "Boîte de réception",
+    "topology": "Plan du système"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17325,5 +17336,65 @@
       "woke": "a démarré l'agent",
       "queued": "attend la prochaine exécution de l'agent"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Plan du système",
+    "description": "Explorez le projet, ciblez un processus et examinez chaque composant sans perdre le contexte.",
+    "back": "Vue du projet",
+    "scope": "Cibler",
+    "wholeProject": "Projet entier",
+    "canvas": "Canevas du graphe",
+    "componentList": "Liste des composants",
+    "counts": "{nodes} composants · {edges} connexions",
+    "partialError": "Certaines données du projet n’ont pas pu être chargées. Ce graphe est incomplet.",
+    "notFound": "Projet introuvable ou inaccessible.",
+    "empty": "Aucun composant visible pour le moment.",
+    "inspector": "Détails du composant",
+    "status": "État",
+    "seeMore": "En savoir plus",
+    "exploreWorkflow": "Explorer les étapes du processus",
+    "connections": "Composants connectés",
+    "selectTitle": "Examiner un composant",
+    "selectDescription": "Sélectionnez un nœud pour afficher sa configuration et ses connexions. En savoir plus ouvre sa page Astrolift. Ciblez un processus pour afficher ses étapes.",
+    "evidenceNote": "Les connexions proviennent de la configuration enregistrée. L’état d’une étape apparaît uniquement si la dernière exécution identifie l’étape actuelle ; les états précédents ne sont pas déduits entre les cycles de révision.",
+    "kind": {
+      "workflow": "Processus",
+      "stage": "Étape",
+      "agent": "Agent logiciel",
+      "app": "Application",
+      "repository": "Dépôt"
+    },
+    "edge": {
+      "source": "Origine",
+      "dispatches": "Distribue les tâches",
+      "invokes": "Appelle",
+      "next": "Suivant",
+      "return": "Retour",
+      "retry": "Réessayer"
+    },
+    "field": {
+      "pattern": "Structure",
+      "stages": "Étapes",
+      "enabled": "Activé",
+      "repository": "Dépôt",
+      "source": "Référence source",
+      "latestRun": "Dernière exécution",
+      "kind": "Catégorie",
+      "order": "Numéro d’étape",
+      "agent": "Agent logiciel",
+      "environment": "Spécification d’environnement",
+      "model": "Modèle",
+      "output": "Clé de sortie",
+      "skills": "Compétences",
+      "failure": "Comportement en cas d’échec",
+      "attempts": "Nombre maximal de tentatives",
+      "timeout": "Délai maximal",
+      "workflow": "Processus",
+      "mode": "Mode d’exécution",
+      "running": "Tâches en cours",
+      "lastRun": "Dernière exécution"
+    },
+    "openBlueprint": "Ouvrir le plan",
+    "expand": "Agrandir"
   }
 }

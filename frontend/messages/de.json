@@ -13017,6 +13017,16 @@
       "task": "Einmalige Läufe",
       "workflow": "Eine mehrstufige Pipeline",
       "mixed": "Mehrere Arten von Workloads"
+    },
+    "canvas": {
+      "legend": "Legende und Symbole",
+      "zoomOut": "Verkleinern",
+      "zoomIn": "Vergrößern",
+      "fit": "An Ansicht anpassen",
+      "expand": "Vergrößern",
+      "pan": "Ablaufdiagramm. Zum Verschieben scrollen; mit den Zoom-Steuerelementen die Größe ändern.",
+      "inspector": "Ausgewählter Schritt",
+      "seeMore": "Mehr anzeigen"
     }
   },
   "clusterConnection": {
@@ -16420,7 +16430,8 @@
     "substrate": "Substrat",
     "sharing": "Freigabe",
     "connect": "Verbinden",
-    "agentInbox": "Posteingang"
+    "agentInbox": "Posteingang",
+    "topology": "Systemübersicht"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17325,5 +17336,65 @@
       "woke": "hat den Agenten gestartet",
       "queued": "wartet auf den nächsten Lauf des Agenten"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Systemübersicht",
+    "description": "Erkunden Sie das Projekt, öffnen Sie einen Ablauf und prüfen Sie jede Komponente im Zusammenhang.",
+    "back": "Projektübersicht",
+    "scope": "Ansicht eingrenzen",
+    "wholeProject": "Gesamtes Projekt",
+    "canvas": "Diagrammfläche",
+    "componentList": "Komponentenliste",
+    "counts": "{nodes} Komponenten · {edges} Verbindungen",
+    "partialError": "Einige Projektdaten konnten nicht geladen werden. Dieses Diagramm ist unvollständig.",
+    "notFound": "Projekt nicht gefunden oder nicht zugänglich.",
+    "empty": "Noch keine sichtbaren Projektkomponenten.",
+    "inspector": "Komponentendetails",
+    "status": "Zustand",
+    "seeMore": "Mehr anzeigen",
+    "exploreWorkflow": "Ablaufschritte erkunden",
+    "connections": "Verbundene Komponenten",
+    "selectTitle": "Komponente prüfen",
+    "selectDescription": "Wählen Sie einen Knoten, um seine Konfiguration und Verbindungen anzuzeigen. Mehr anzeigen öffnet seine Astrolift-Seite. Grenzen Sie die Ansicht ein, um die Schritte eines Ablaufs zu sehen.",
+    "evidenceNote": "Die Verbindungen stammen aus der registrierten Konfiguration. Ein Schrittzustand wird nur angezeigt, wenn der letzte Lauf den aktuellen Schritt identifiziert; frühere Zustände werden bei Prüfschleifen nicht abgeleitet.",
+    "kind": {
+      "workflow": "Arbeitsablauf",
+      "stage": "Schritt",
+      "agent": "Agentenprozess",
+      "app": "Anwendung",
+      "repository": "Quellrepository"
+    },
+    "edge": {
+      "source": "Quelle",
+      "dispatches": "Startet Agenten",
+      "invokes": "Ruft auf",
+      "next": "Weiter",
+      "return": "Rücksprung",
+      "retry": "Wiederholen"
+    },
+    "field": {
+      "pattern": "Ablaufmuster",
+      "stages": "Schritte",
+      "enabled": "Aktiviert",
+      "repository": "Quellrepository",
+      "source": "Quellreferenz",
+      "latestRun": "Letzter Ablauf",
+      "kind": "Art",
+      "order": "Schrittnummer",
+      "agent": "Agentenprozess",
+      "environment": "Umgebungsvorlage",
+      "model": "Modell",
+      "output": "Ausgabeschlüssel",
+      "skills": "Fähigkeiten",
+      "failure": "Fehlerverhalten",
+      "attempts": "Maximale Versuche",
+      "timeout": "Zeitlimit",
+      "workflow": "Arbeitsablauf",
+      "mode": "Ausführungsmodus",
+      "running": "Laufende Aufgaben",
+      "lastRun": "Letzte Ausführung"
+    },
+    "openBlueprint": "Systemübersicht öffnen",
+    "expand": "Vergrößern"
   }
 }

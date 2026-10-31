@@ -51,8 +51,8 @@ export interface FlowGraphProps {
  * defaults, and hidden attribution. Callers own their layout (they pass
  * positioned nodes) and their node renderers (`nodeTypes`).
  *
- * Nodes/edges are read once on mount (React-Flow owns interaction state after
- * that). Remount via a `key` prop to re-flow when the source data changes.
+ * Data and selection update in place while preserving node positions and viewport.
+ * Remount via a `key` when a structural scope change requires a fresh layout.
  *
  * Motion: edge `animated` dashes and any node pulse are neutralised globally
  * by the `prefers-reduced-motion` reset in globals.css, so no per-graph gate.
@@ -85,8 +85,24 @@ export function FlowGraph({
     []
   );
 
-  const [flowNodes, , onNodesChange] = useNodesState(nodes);
-  const [flowEdges, , onEdgesChange] = useEdgesState(initialEdges);
+  const [flowNodes, setNodes, onNodesChange] = useNodesState(nodes);
+  const [flowEdges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  React.useEffect(() => {
+    setNodes((current) => {
+      const positions = new Map(current.map((node) => [node.id, node.position]));
+      return nodes.map((node) => ({ ...node, position: positions.get(node.id) ?? node.position }));
+    });
+  }, [nodes, setNodes]);
+  React.useEffect(() => {
+    setEdges(
+      edges.map((edge) => ({
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { strokeWidth: 1.5 },
+        ...edge,
+      }))
+    );
+  }, [edges, setEdges]);
 
   // ReactFlow needs a DOM-measurement pass before fitView can place nodes;
   // show a skeleton until onInit fires so the graph never flashes blank.
@@ -125,7 +141,11 @@ export function FlowGraph({
         proOptions={{ hideAttribution: true }}
       >
         <Background gap={16} size={1} />
-        <Controls position="bottom-right" showInteractive={false} />
+        <Controls
+          position="bottom-right"
+          showInteractive={false}
+          className="[&_button]:!bg-card [&_button]:!fill-foreground [&_button]:!border-border"
+        />
         {showMiniMap && (
           <MiniMap
             position="bottom-left"

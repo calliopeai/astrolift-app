@@ -13017,6 +13017,16 @@
       "task": "Ejecuciones puntuales",
       "workflow": "Una canalización de varios pasos",
       "mixed": "Varios tipos de carga de trabajo"
+    },
+    "canvas": {
+      "legend": "Leyenda y símbolos",
+      "zoomOut": "Alejar",
+      "zoomIn": "Acercar",
+      "fit": "Ajustar a la vista",
+      "expand": "Ampliar",
+      "pan": "Lienzo del flujo. Desplázate para moverlo y usa el zoom para cambiar la escala.",
+      "inspector": "Etapa seleccionada",
+      "seeMore": "Ver más"
     }
   },
   "clusterConnection": {
@@ -17185,7 +17195,8 @@
     "substrate": "Sustrato",
     "sharing": "Acceso compartido",
     "connect": "Conectar",
-    "agentInbox": "Bandeja de entrada"
+    "agentInbox": "Bandeja de entrada",
+    "topology": "Plano del sistema"
   },
   "support": {
     "title": "Soporte",
@@ -17325,5 +17336,65 @@
       "woke": "inició el agente",
       "queued": "espera la próxima ejecución del agente"
     }
+  },
+  "projectTopology": {
+    "title": "{project} · Plano del sistema",
+    "description": "Explora el proyecto, enfoca un flujo y examina cada componente sin perder el contexto.",
+    "back": "Resumen del proyecto",
+    "scope": "Enfoque",
+    "wholeProject": "Proyecto completo",
+    "canvas": "Lienzo del grafo",
+    "componentList": "Lista de componentes",
+    "counts": "{nodes} componentes · {edges} conexiones",
+    "partialError": "No se pudieron cargar algunos datos del proyecto. Este grafo está incompleto.",
+    "notFound": "Proyecto no encontrado o sin acceso.",
+    "empty": "Todavía no hay componentes visibles.",
+    "inspector": "Detalles del componente",
+    "status": "Estado",
+    "seeMore": "Ver más",
+    "exploreWorkflow": "Explorar etapas del flujo",
+    "connections": "Componentes conectados",
+    "selectTitle": "Examinar un componente",
+    "selectDescription": "Selecciona un nodo para ver su configuración y conexiones. Ver más abre su página en Astrolift. Usa Enfoque para mostrar las etapas de un flujo.",
+    "evidenceNote": "Las conexiones proceden de la configuración registrada. Solo se muestra el estado de una etapa cuando la última ejecución identifica la etapa actual; no se deducen estados anteriores entre ciclos de revisión.",
+    "kind": {
+      "workflow": "Flujo de trabajo",
+      "stage": "Etapa",
+      "agent": "Agente",
+      "app": "Aplicación",
+      "repository": "Repositorio"
+    },
+    "edge": {
+      "source": "Origen",
+      "dispatches": "Envía tareas",
+      "invokes": "Invoca",
+      "next": "Siguiente",
+      "return": "Retorno",
+      "retry": "Reintentar"
+    },
+    "field": {
+      "pattern": "Patrón",
+      "stages": "Etapas",
+      "enabled": "Habilitado",
+      "repository": "Repositorio",
+      "source": "Referencia de origen",
+      "latestRun": "Última ejecución",
+      "kind": "Tipo",
+      "order": "Número de etapa",
+      "agent": "Agente",
+      "environment": "Especificación del entorno",
+      "model": "Modelo",
+      "output": "Clave de salida",
+      "skills": "Habilidades",
+      "failure": "Comportamiento ante errores",
+      "attempts": "Intentos máximos",
+      "timeout": "Tiempo límite",
+      "workflow": "Flujo de trabajo",
+      "mode": "Modo de ejecución",
+      "running": "Tareas en ejecución",
+      "lastRun": "Última ejecución"
+    },
+    "openBlueprint": "Abrir plano",
+    "expand": "Ampliar"
   }
 }
