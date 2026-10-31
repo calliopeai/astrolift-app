@@ -69,6 +69,13 @@ class TenantClusterType:
     ingress_mode: str
     alb_auth_config: JSON | None
     oidc_auth_config: JSON | None
+    allow_public_apps: bool = strawberry.field(
+        description=(
+            "Whether an app on this cluster may answer without the edge login when it asks to "
+            "(#2504). Off: every app is gated whatever its own setting. Only the Envoy edge "
+            "honours an app's request."
+        )
+    )
     is_active: bool
     capabilities: JSON
     capabilities_probed_at: dt.datetime | None
@@ -529,6 +536,7 @@ def cluster_to_type(cluster, *, operator_view: bool = True) -> TenantClusterType
         ingress_mode=cluster.ingress_mode,
         oidc_auth_config=redact_oidc_auth_config(cluster.oidc_auth_config) if operator_view else None,
         alb_auth_config=cluster.alb_auth_config if operator_view else None,
+        allow_public_apps=cluster.allow_public_apps,
         is_active=cluster.is_active,
         capabilities=cluster.capabilities or {},
         capabilities_probed_at=cluster.capabilities_probed_at,

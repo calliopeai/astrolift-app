@@ -3112,6 +3112,29 @@
         "saveFailed": "Échec de l’enregistrement.",
         "membersDescription": "Qui peut voir et modifier cette application : les rôles attribués ici et les équipes avec lesquelles elle est partagée.",
         "edgeDescription": "Qui peut accéder à l’URL de l’application. La périphérie décide qui peut entrer ; les rôles décident qui peut la modifier."
+      },
+      "public": {
+        "title": "Accès public",
+        "on": "Publique",
+        "off": "Derrière la connexion",
+        "description": "Publique, l’URL de plateforme de l’app répond sans la connexion du cluster. La connexion propre de l’app s’applique toujours, et les domaines personnalisés gardent leur propre réglage.",
+        "states": {
+          "public": "répond sans connexion",
+          "gated": "derrière la connexion",
+          "no_gate": "ce cluster n’a pas de connexion, l’app est donc ouverte",
+          "not_envoy": "reste derrière la connexion : seul l’edge Envoy respecte ce réglage",
+          "cluster_disallows": "reste derrière la connexion : ce cluster n’autorise pas les apps publiques",
+          "restricted": "reste derrière la connexion : l’app a une liste d’accès"
+        },
+        "makePublic": "Rendre publique…",
+        "makePrivate": "Remettre derrière la connexion",
+        "restrictedHint": "Videz d’abord la liste d’accès ; elle ne s’applique que derrière la connexion.",
+        "confirmTitle": "Rendre {app} publique ?",
+        "confirmDescription": "Quiconque atteint l’URL de plateforme de l’app l’obtient sans se connecter au cluster. Seule l’authentification propre de l’app la protège. Il peut vous être demandé de confirmer votre identité.",
+        "confirm": "Rendre publique",
+        "madePublic": "L’app est publique là où son cluster l’autorise.",
+        "madePrivate": "L’app est de nouveau derrière la connexion.",
+        "saveFailed": "Échec de la modification."
       }
     },
     "members": {
@@ -11431,6 +11454,23 @@
       "searchReleases": "Rechercher des versions installées…",
       "noReleases": "Aucune version installée",
       "started": "Début"
+    },
+    "publicApps": {
+      "title": "Apps publiques",
+      "description": "Si une app de ce cluster peut répondre sans la connexion ci-dessus quand son propriétaire l’active. Désactivé garde chaque app derrière la connexion, quoi qu’elle demande.",
+      "allowed": "Autorisées",
+      "refused": "Non autorisées",
+      "notEnvoy": "Seul l’edge Envoy respecte la demande d’une app ; sur l’edge de ce cluster, chaque app reste derrière la connexion.",
+      "allow": "Autoriser les apps publiques",
+      "refuse": "Arrêter les apps publiques",
+      "allowTitle": "Autoriser les apps publiques sur ce cluster ?",
+      "allowReview": "Les apps que leurs propriétaires ont déjà rendues publiques répondent aussitôt sans connexion.",
+      "refuseTitle": "Arrêter les apps publiques sur ce cluster ?",
+      "refuseReview": "Chaque app publique de ce cluster repasse aussitôt derrière la connexion.",
+      "allowedToast": "Apps publiques autorisées.",
+      "refusedToast": "Apps publiques arrêtées ; chaque app est derrière la connexion.",
+      "changeFailed": "Échec de la modification.",
+      "refreshWarning": "La modification a été acceptée, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
     }
   },
   "obsPanelReason": {

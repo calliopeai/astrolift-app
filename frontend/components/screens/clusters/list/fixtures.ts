@@ -26,6 +26,7 @@ export function cluster(slug: string, patch: Partial<ClusterRow> = {}): ClusterR
     region: "us-west-2",
     ingressClass: "nginx",
     ingressMode: "shared",
+    allowPublicApps: true,
     authMethod: "exec_plugin",
     endpoint: "https://kube.example.com",
     capabilities: {

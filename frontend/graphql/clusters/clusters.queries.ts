@@ -267,6 +267,7 @@ export const GET_CLUSTER = gql`
     astroliftCluster(slug: $slug) {
       ...ClusterFields
       oidcAuthConfig
+      allowPublicApps
       viewerPermissions
       workloadIdentityRebind {
         state
@@ -303,6 +304,7 @@ export const UPDATE_TENANT_CLUSTER = gql`
         ingressClass
         albAuthConfig
         oidcAuthConfig
+        allowPublicApps
       }
     }
   }

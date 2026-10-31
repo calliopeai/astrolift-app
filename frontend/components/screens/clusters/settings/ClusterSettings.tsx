@@ -63,6 +63,8 @@ export interface ClusterSettingsCards {
   agent?: React.ReactNode;
   ingressClass?: React.ReactNode;
   centralAuth?: React.ReactNode;
+  /** Whether apps may skip the edge login (#2504), under central auth. */
+  publicApps?: React.ReactNode;
   ingressAuth?: React.ReactNode;
   authUsers?: React.ReactNode;
   bootstrapPlan?: React.ReactNode;
@@ -303,7 +305,10 @@ export function ClusterSettingsScreen({
             title: centralT("title"),
             content: (
               <Restricted mode={restrictedMode} allowed={access.update} permission="cluster.update">
-                {cards.centralAuth}
+                <div className="flex min-w-0 flex-col gap-10">
+                  {cards.centralAuth}
+                  {cards.publicApps}
+                </div>
               </Restricted>
             ),
           },

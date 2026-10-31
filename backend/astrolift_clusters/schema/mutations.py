@@ -365,6 +365,9 @@ class UpdateTenantClusterInput:
     # the manifest, so a class change moves each app on its next deploy
     # without it (#2122).
     sync_manifests: bool = False
+    # Whether an app may opt out of the edge login (#2504). Turning it off
+    # gates every app on the cluster again, at once.
+    allow_public_apps: bool | None = None
 
 
 @strawberry.input
@@ -1006,6 +1009,11 @@ class ClustersMutation:
             cluster.region = input.region
         if input.endpoint is not None:
             cluster.endpoint = input.endpoint
+        public_changed = (
+            input.allow_public_apps is not None and input.allow_public_apps != cluster.allow_public_apps
+        )
+        if public_changed:
+            cluster.allow_public_apps = bool(input.allow_public_apps)
         auth_config_changed = input.alb_auth_config is not strawberry.UNSET
         oidc_changed = input.oidc_auth_config is not strawberry.UNSET
 
@@ -1085,6 +1093,20 @@ class ClustersMutation:
             from astrolift_clusters.edge_install import ensure_edge_installed
 
             ensure_edge_installed(cluster)
+
+        # The apps that asked to be public move now, either way (#2504).
+        if public_changed:
+            from core.edge_public import reapply_cluster
+
+            errors = reapply_cluster(cluster)
+            if errors:
+                return gql_failure(
+                    ErrorCode.INTERNAL.value,
+                    "saved, but some apps' edge routes could not be updated: "
+                    + "; ".join(errors)
+                    + ". Each app's next deploy applies it.",
+                    field="allowPublicApps",
+                )
 
         return gql_success(cluster_to_type(cluster))
 

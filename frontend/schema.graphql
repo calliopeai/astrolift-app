@@ -1352,6 +1352,14 @@ type AstroliftAppAccess {
   restricted: Boolean!
   managedByManifest: Boolean!
   enforcedOn: [String!]!
+
+  """
+  The app asked for its platform hostname to answer without the edge login (#2504).
+  """
+  edgePublic: Boolean!
+
+  """What that means on each cluster the app runs on."""
+  publicStates: [AstroliftAppPublicState!]!
 }
 
 type AstroliftAppAccessMutationResult {
@@ -1754,6 +1762,15 @@ type AstroliftAppPodEvent {
   type: String!
   count: Int!
   lastSeen: String!
+}
+
+type AstroliftAppPublicState {
+  clusterSlug: String!
+
+  """
+  public: answers without the edge login. gated: behind it. no_gate: the cluster has no edge login at all. not_envoy: only the Envoy edge honours the switch, so the app stays gated. cluster_disallows: the cluster does not allow public apps. restricted: the app has an access list.
+  """
+  state: String!
 }
 
 type AstroliftAppReprovisionState {
@@ -6759,6 +6776,11 @@ type AstroliftTenantCluster {
   ingressMode: String!
   albAuthConfig: JSON
   oidcAuthConfig: JSON
+
+  """
+  Whether an app on this cluster may answer without the edge login when it asks to (#2504). Off: every app is gated whatever its own setting. Only the Envoy edge honours an app's request.
+  """
+  allowPublicApps: Boolean!
   isActive: Boolean!
   capabilities: JSON!
   capabilitiesProbedAt: DateTime
@@ -10471,6 +10493,11 @@ type Mutation {
   """
   setAppSource(input: SetAppSourceInput!): AstroliftAppSourceChangeMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
+
+  """
+  Let the app's platform hostname answer without the edge login, or put it back behind it (#2504). Needs app.access. Making it public also needs the organization's rules for app.edge.make_public (a fresh verification by default), is refused for agents unless the organization allows them, and takes effect only on an Envoy edge whose cluster allows public apps. The app's own authentication still applies, and custom domains keep their own setting. The live routes move at once; audited as app.edge.public.set.
+  """
+  setAppEdgePublic(input: SetAppEdgePublicInput!): AstroliftAppAccessMutationResult!
   setNotificationQuietHours(input: SetNotificationQuietHoursInput!): AstroliftNotificationQuietHoursMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
@@ -12562,6 +12589,11 @@ input SetAppAccessInput {
   users: [String!]! = []
 }
 
+input SetAppEdgePublicInput {
+  appSlug: String!
+  public: Boolean!
+}
+
 input SetAppExpiryInput {
   appSlug: String!
 
@@ -13287,6 +13319,7 @@ input UpdateTenantClusterInput {
   albAuthConfig: JSON
   oidcAuthConfig: JSON
   syncManifests: Boolean! = false
+  allowPublicApps: Boolean = null
 }
 
 input UpdateWebhookSubscriptionInput {

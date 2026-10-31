@@ -162,6 +162,9 @@ class TenantCluster(NamedBaseCoreModel):
     # app's access or an environment's hostnames change; the edge's shared
     # SecurityPolicy renders its authorization rules from it.
     edge_access_rules = models.JSONField(default=dict, blank=True)
+    # Whether an app on this cluster may opt out of the edge login (#2504).
+    # Off: every app is gated whatever its own ``edge_public`` says.
+    allow_public_apps = models.BooleanField(default=True, db_default=True)
     # An operator-managed ingress-nginx install moving to the Envoy edge
     # (#2117). Until the operator records the cutover complete, recipe runs
     # never delete these HelmReleases, nor any labelled
