@@ -740,6 +740,8 @@ def _install_cluster_prereqs_sync(
     option_overrides: dict[str, dict[str, str]],
     additive: bool = False,
 ) -> dict[str, Any]:
+    from django.utils import timezone
+
     from astrolift_clusters.models import TenantCluster
     from core.app_deploy import AppDeployError
     from core.cluster_management import (
@@ -748,6 +750,8 @@ def _install_cluster_prereqs_sync(
         bootstrap_components_dispatch,
     )
 
+    # Before the row, and with it the edge access rules, is read (#2534).
+    rules_read_at = timezone.now()
     cluster = TenantCluster.objects.select_related(
         "provider_plugin",
     ).get(pk=cluster_id)
@@ -1095,6 +1099,15 @@ def _install_cluster_prereqs_sync(
             type="BootstrapReadinessPending",
             non_retryable=True,
         )
+
+    # The edge now carries the access rules as they stood when this run read
+    # them (#2534). A post-install error may be the policy that holds them.
+    from providers.k8s_native.edge_gateway import EDGE_COMPONENT_KEY
+
+    if EDGE_COMPONENT_KEY in {a["name"] for a in applied} and not post_install_errors:
+        from core.edge_access import mark_edge_applied
+
+        mark_edge_applied(cluster_id, rules_read_at)
 
     # What the bootstrap-run row records as the recipe's set. An additive run
     # added to the recipe rather than replacing it, so it records what it

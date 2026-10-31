@@ -3360,6 +3360,76 @@ type AstroliftDomainRedirectRule {
   priority: Int!
 }
 
+input AstroliftEdgeAccessFilter {
+  team: String = null
+  project: String = null
+  cluster: String = null
+  status: [AstroliftEdgeAccessStatus!] = null
+}
+
+type AstroliftEdgeAccessPage {
+  items: [AstroliftEdgeAccessRow!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type AstroliftEdgeAccessPersonLogin {
+  clusterSlug: String!
+  resolved: Boolean!
+  reason: String!
+  hasLogin: Boolean
+  enabled: Boolean
+  groups: [String!]!
+}
+
+type AstroliftEdgeAccessPersonPage {
+  email: String!
+  logins: [AstroliftEdgeAccessPersonLogin!]!
+  items: [AstroliftEdgeAccessPersonRow!]!
+  nextCursor: String
+  totalCount: Int!
+  refusedCount: Int!
+}
+
+type AstroliftEdgeAccessPersonRow {
+  rule: AstroliftEdgeAccessRow!
+  enters: Boolean
+  via: String!
+  viaGroups: [String!]!
+}
+
+type AstroliftEdgeAccessRow {
+  id: String!
+  appSlug: String!
+  appName: String!
+  teamSlug: String
+  projectSlug: String
+  environment: String!
+  environmentId: String!
+  clusterSlug: String!
+  clusterName: String!
+  hosts: [String!]!
+  restricted: Boolean!
+  groups: [String!]!
+  users: [String!]!
+  source: String!
+  setBy: String
+  setAt: DateTime
+  status: AstroliftEdgeAccessStatus!
+  edgeChangedAt: DateTime
+  edgeAppliedAt: DateTime
+}
+
+enum AstroliftEdgeAccessStatus {
+  ENFORCED
+  OPEN
+  APPLYING
+  UNVERIFIED
+  PENDING_DEPLOY
+  DRIFT
+  NOT_ON_EDGE
+}
+
 type AstroliftElevatePayload {
   elevatedUntil: DateTime!
   secondsRemaining: Int!
@@ -11608,6 +11678,8 @@ type Query {
   scanAppManifests(sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAppManifestsResult!
   astroliftAppAccess(appSlug: String!): AstroliftAppAccess
   astroliftAppAccessPreview(appSlug: String!, groups: [String!]!, users: [String!]!): AstroliftAppAccessPreview
+  astroliftEdgeAccess(filter: AstroliftEdgeAccessFilter = null, search: String = null, first: Int! = 25, after: String = null): AstroliftEdgeAccessPage!
+  astroliftEdgeAccessForPerson(email: String!, filter: AstroliftEdgeAccessFilter = null, search: String = null, first: Int! = 25, after: String = null): AstroliftEdgeAccessPersonPage!
   managedDomainAppRouteSupport(domainId: GUID!, expectedDomainVersion: Int!): ManagedDomainAppRouteSupport!
   managedDomainAppTargetsPage(domainId: GUID!, expectedDomainVersion: Int!, first: Int! = 20, after: String = null): ManagedDomainAppRouteTargetsPage!
   managedDomainAppRouteReview(input: ManagedDomainAppRouteTargetInput!): ManagedDomainAppRouteReview!

@@ -389,7 +389,8 @@
       "documentation": "文档",
       "profile": "个人资料",
       "notifications": "通知",
-      "security": "安全"
+      "security": "安全",
+      "appAccess": "应用访问权限"
     }
   },
   "keyboardShortcuts": {
@@ -16266,7 +16267,8 @@
       "jobs": "计划作业",
       "environments": "环境",
       "previews": "预览",
-      "zentinelle": "Zentinelle"
+      "zentinelle": "Zentinelle",
+      "app-access": "应用访问权限"
     },
     "areas": {
       "home": "首页",
@@ -17045,6 +17047,36 @@
       "views": {
         "all": "全部"
       }
+    },
+    "appAccess": {
+      "search": "搜索应用、主机、组、邮箱…",
+      "fields": {
+        "status": "边缘",
+        "person": "人员",
+        "team": "团队",
+        "project": "项目",
+        "cluster": "集群"
+      },
+      "options": {
+        "status": {
+          "enforced": "已生效",
+          "applying": "正在应用",
+          "pending_deploy": "下次部署",
+          "drift": "不一致",
+          "unverified": "未确认",
+          "open": "开放",
+          "not_on_edge": "无边缘",
+          "attention": "未生效"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "attention": "未生效"
+      },
+      "notes": {
+        "mine": "你用自己的登录可以进入的应用。"
+      }
     }
   },
   "relativeAge": {
@@ -17193,6 +17225,7 @@
     "sharing": "共享",
     "connect": "连接",
     "agentInbox": "收件箱",
+    "appAccess": "应用访问权限",
     "topology": "系统蓝图"
   },
   "support": {
@@ -17332,6 +17365,62 @@
       "gate": "已回答智能体的请求",
       "woke": "已启动智能体",
       "queued": "等待智能体下次运行"
+    }
+  },
+  "adminAppAccess": {
+    "title": "应用访问权限",
+    "label": "环境",
+    "context": "按环境显示谁可以进入每个应用，以及边缘是否执行该规则。数据来自 Astrolift 上次应用边缘时的记录，而不是每次加载时查询集群。",
+    "columns": {
+      "app": "应用",
+      "where": "集群和主机",
+      "rule": "可进入者",
+      "entry": "进入途径",
+      "setBy": "设置者",
+      "status": "边缘"
+    },
+    "noHosts": "尚未记录主机名",
+    "open": "所有已登录用户",
+    "via": {
+      "user": "按邮箱列出",
+      "group": "组：{groups}",
+      "open": "对所有登录开放",
+      "unknown": "无法读取组"
+    },
+    "loginUnchecked": "未检查登录",
+    "notRecorded": "未记录",
+    "emptyTitle": "还没有应用环境",
+    "emptyDescription": "你可读取的每个应用的每个环境都会显示在这里，并注明谁可以进入。",
+    "status": {
+      "labels": {
+        "enforced": "已生效",
+        "applying": "正在应用",
+        "pending_deploy": "下次部署",
+        "drift": "不一致",
+        "unverified": "未确认",
+        "open": "开放",
+        "not_on_edge": "无边缘"
+      },
+      "hints": {
+        "enforced": "边缘已按此规则应用",
+        "applying": "正在等待边缘重新应用；如果一直如此，请重新部署",
+        "pending_deploy": "下次部署时生效",
+        "drift": "记录的规则不同；请重新部署应用",
+        "unverified": "在 Astrolift 记录边缘应用之前已应用",
+        "open": "边缘上没有规则",
+        "not_on_edge": "没有 Envoy 边缘；仅需登录"
+      },
+      "appliedAt": "边缘应用于 {time}"
+    },
+    "person": {
+      "title": "{email} 可以进入的内容",
+      "refused": "{count, plural, other {另有 # 个环境拒绝此人}}",
+      "noEdge": "这些应用都不在 Envoy 边缘之后。",
+      "unresolved": "未读取身份提供方：{reason}",
+      "noLogin": "此身份提供方中没有登录",
+      "disabled": "登录已停用",
+      "groups": "找到登录；组：{groups}",
+      "noGroups": "找到登录；不属于任何组"
     }
   },
   "projectTopology": {

@@ -88,12 +88,30 @@ def _hosts_from_rendered(rendered: list[dict[str, Any]], namespace: str) -> list
 
 def _save_rules(cluster: Any, rules: dict[str, Any]) -> bool:
     """Persist ``rules`` if they changed, re-applying the edge. Returns changed."""
+    from django.utils import timezone
+
     if rules == (cluster.edge_access_rules or {}):
         return False
     cluster.edge_access_rules = rules
-    cluster.save(update_fields=["edge_access_rules", "updated_at", "version"])
+    cluster.edge_access_changed_at = timezone.now()
+    cluster.save(update_fields=["edge_access_rules", "edge_access_changed_at", "updated_at", "version"])
     reapply_edge(cluster)
     return True
+
+
+def mark_edge_applied(cluster_id: int, read_at: Any) -> None:
+    """Record that an edge apply which read the rules at ``read_at`` succeeded.
+
+    ``read_at`` is taken before the rules are read, so a change made while the
+    apply ran still counts as after it. Never moves the mark backwards.
+    """
+    from django.db.models import Q
+
+    from astrolift_clusters.models import TenantCluster
+
+    TenantCluster.objects.filter(pk=cluster_id).filter(
+        Q(edge_access_applied_at__isnull=True) | Q(edge_access_applied_at__lt=read_at)
+    ).update(edge_access_applied_at=read_at)
 
 
 def record_environment(cluster: Any, app: Any, namespace: str, rendered: list[dict[str, Any]]) -> bool:
@@ -261,9 +279,12 @@ def _apply_access_policies(cluster: Any) -> bool:
     live in the edge namespace and are granted; the edge itself is the
     cluster owner's.
     """
+    from django.utils import timezone
+
     from core.cluster_management import _driver_for_cluster  # type: ignore[attr-defined]
     from providers.k8s_native.edge_gateway import EDGE_NAMESPACE, edge_access_manifests
 
+    read_at = timezone.now()
     manifests = edge_access_manifests(
         getattr(cluster, "oidc_auth_config", None), list((cluster.edge_access_rules or {}).values())
     )
@@ -281,6 +302,7 @@ def _apply_access_policies(cluster: Any) -> bool:
             "; ".join(str(e) for e in result.errors),
         )
         return False
+    mark_edge_applied(cluster.pk, read_at)
     return True
 
 
@@ -306,3 +328,81 @@ def access_preview(app: Any, cluster: Any, *, groups: Any, users: Any) -> dict[s
 
     losing = [p.email for p in people if allowed(p, current) and not allowed(p, access)]
     return {"allowed": sum(1 for p in people if allowed(p, access)), "total": len(people), "losing": losing}
+
+
+# What the edge carries, per environment (#2534). Read from what the control
+# plane recorded, never from the cluster: a list cannot call every cluster's
+# API, and the recorded rules are what the edge's policy is rendered from.
+ENFORCED = "enforced"
+"""Restricted, recorded, and an edge apply that read the rule has succeeded since."""
+OPEN = "open"
+"""No rule: every signed-in user of the cluster's identity provider may enter."""
+APPLYING = "applying"
+"""Recorded, but no edge apply that read it has succeeded yet."""
+UNVERIFIED = "unverified"
+"""Restricted and recorded on a cluster with no edge apply on record (one
+applied before the control plane recorded applies)."""
+PENDING_DEPLOY = "pending_deploy"
+"""Restricted, but the edge has no hostname for the environment: the rule
+takes effect on its next deploy."""
+DRIFT = "drift"
+"""The cluster's recorded rule is not the app's grant."""
+NOT_ON_EDGE = "not_on_edge"
+"""The cluster has no Envoy edge, so no per-app rule applies there."""
+
+EDGE_STATUSES = (ENFORCED, OPEN, APPLYING, UNVERIFIED, PENDING_DEPLOY, DRIFT, NOT_ON_EDGE)
+
+
+def environment_edge_state(app: Any, cluster: Any, namespace: str) -> tuple[str, list[str]]:
+    """``(status, hosts)`` for one environment of ``app`` on ``cluster``.
+
+    ``hosts`` are the hostnames the edge holds the rule for: the
+    environment's managed hostnames and its custom domains.
+    """
+    if getattr(cluster, "ingress_class", "") != "envoy":
+        return NOT_ON_EDGE, []
+    grant = app_access(app)
+    restricted = is_restricted(grant)
+    entry = (cluster.edge_access_rules or {}).get(_key(app, namespace)) or {}
+    hosts = sorted(
+        {str(h) for h in entry.get("hosts") or []}
+        | {str(r.get("hostname")) for r in entry.get("custom_routes") or [] if r.get("hostname")}
+    )
+    if not hosts:
+        return (PENDING_DEPLOY if restricted else OPEN), []
+    if normalize_access(entry.get("groups"), entry.get("users")) != grant:
+        return DRIFT, hosts
+    changed = getattr(cluster, "edge_access_changed_at", None)
+    applied = getattr(cluster, "edge_access_applied_at", None)
+    if changed is not None and (applied is None or applied < changed):
+        return APPLYING, hosts
+    if not restricted:
+        return OPEN, hosts
+    return (ENFORCED if applied is not None else UNVERIFIED), hosts
+
+
+def person_reach(grant: dict[str, list[str]], email: str, person: Any) -> tuple[bool | None, str, list[str]]:
+    """Whether a person may enter under ``grant``: ``(enters, via, groups)``.
+
+    ``person`` is their login in the cluster's identity provider (an
+    ``IdentityUser``), ``False`` when the provider has none, or ``None`` when
+    the provider could not be read. ``via`` names the grant that lets them in,
+    or why not: ``user``, ``group``, ``open``, ``denied``, ``no_login``,
+    ``disabled`` or ``unknown``. ``enters`` is ``None`` when it turns on
+    groups or a login that could not be read.
+    """
+    email = email.strip().lower()
+    if person is False:
+        return False, "no_login", []
+    if person is not None and not person.enabled:
+        return False, "disabled", []
+    if not is_restricted(grant):
+        return (True if person is not None else None), "open", []
+    if email in grant["users"]:
+        return (True if person is not None else None), "user", []
+    if person is None:
+        return (None, "unknown", []) if grant["groups"] else (False, "denied", [])
+    shared = sorted(set(person.groups) & set(grant["groups"]))
+    if shared:
+        return True, "group", shared
+    return False, "denied", []

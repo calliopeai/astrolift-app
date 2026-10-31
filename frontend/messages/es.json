@@ -389,7 +389,8 @@
       "documentation": "Documentación",
       "profile": "Perfil",
       "notifications": "Notificaciones",
-      "security": "Seguridad"
+      "security": "Seguridad",
+      "appAccess": "Acceso a aplicaciones"
     }
   },
   "keyboardShortcuts": {
@@ -16269,7 +16270,8 @@
       "jobs": "Jobs programados",
       "environments": "Entornos",
       "previews": "Vistas previas",
-      "zentinelle": "Zentinelle"
+      "zentinelle": "Zentinelle",
+      "app-access": "Acceso a aplicaciones"
     },
     "areas": {
       "home": "Inicio",
@@ -17048,6 +17050,36 @@
       "views": {
         "all": "Todas"
       }
+    },
+    "appAccess": {
+      "search": "Buscar aplicaciones, hosts, grupos, correos…",
+      "fields": {
+        "status": "Borde",
+        "person": "Persona",
+        "team": "Equipo",
+        "project": "Proyecto",
+        "cluster": "Clúster"
+      },
+      "options": {
+        "status": {
+          "enforced": "Aplicada",
+          "applying": "Aplicando",
+          "pending_deploy": "Próximo despliegue",
+          "drift": "Divergencia",
+          "unverified": "Sin verificar",
+          "open": "Abierta",
+          "not_on_edge": "Sin borde",
+          "attention": "Sin aplicar"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Mías",
+        "attention": "Sin aplicar"
+      },
+      "notes": {
+        "mine": "Las aplicaciones a las que puedes entrar con tu propio inicio de sesión."
+      }
     }
   },
   "relativeAge": {
@@ -17196,6 +17228,7 @@
     "sharing": "Acceso compartido",
     "connect": "Conectar",
     "agentInbox": "Bandeja de entrada",
+    "appAccess": "Acceso a aplicaciones",
     "topology": "Plano del sistema"
   },
   "support": {
@@ -17335,6 +17368,62 @@
       "gate": "respondió la solicitud del agente",
       "woke": "inició el agente",
       "queued": "espera la próxima ejecución del agente"
+    }
+  },
+  "adminAppAccess": {
+    "title": "Acceso a aplicaciones",
+    "label": "Entornos",
+    "context": "Quién puede entrar en cada aplicación, por entorno, y si el borde aplica la regla. Se lee de lo que Astrolift registró la última vez que aplicó el borde, no del clúster en cada carga.",
+    "columns": {
+      "app": "Aplicación",
+      "where": "Clúster y hosts",
+      "rule": "Quién puede entrar",
+      "entry": "Entra mediante",
+      "setBy": "Definida por",
+      "status": "Borde"
+    },
+    "noHosts": "Aún no hay nombre de host registrado",
+    "open": "Cualquier usuario con sesión iniciada",
+    "via": {
+      "user": "Incluido por correo",
+      "group": "Grupo: {groups}",
+      "open": "Abierta a cualquier inicio de sesión",
+      "unknown": "Grupos no legibles"
+    },
+    "loginUnchecked": "Inicio de sesión sin comprobar",
+    "notRecorded": "no registrado",
+    "emptyTitle": "Aún no hay entornos de aplicaciones",
+    "emptyDescription": "Cada entorno de cada aplicación que puedes ver aparece aquí, con quién puede entrar.",
+    "status": {
+      "labels": {
+        "enforced": "Aplicada",
+        "applying": "Aplicando",
+        "pending_deploy": "Próximo despliegue",
+        "drift": "Divergencia",
+        "unverified": "Sin verificar",
+        "open": "Abierta",
+        "not_on_edge": "Sin borde"
+      },
+      "hints": {
+        "enforced": "El borde se aplicó con esta regla",
+        "applying": "Esperando a que el borde se vuelva a aplicar; si no cambia, vuelve a desplegar",
+        "pending_deploy": "Surte efecto en el próximo despliegue",
+        "drift": "La regla registrada difiere; vuelve a desplegar la aplicación",
+        "unverified": "Aplicada antes de que Astrolift registrara las aplicaciones del borde",
+        "open": "Ninguna regla en el borde",
+        "not_on_edge": "Sin borde Envoy; solo inicio de sesión"
+      },
+      "appliedAt": "Borde aplicado {time}"
+    },
+    "person": {
+      "title": "A qué puede entrar {email}",
+      "refused": "{count, plural, one {# entorno más lo rechaza} other {# entornos más lo rechazan}}",
+      "noEdge": "Ninguna de estas aplicaciones está detrás de un borde Envoy.",
+      "unresolved": "Proveedor de identidad no leído: {reason}",
+      "noLogin": "Sin inicio de sesión en este proveedor de identidad",
+      "disabled": "Inicio de sesión desactivado",
+      "groups": "Inicio de sesión encontrado; grupos: {groups}",
+      "noGroups": "Inicio de sesión encontrado; sin grupo"
     }
   },
   "projectTopology": {

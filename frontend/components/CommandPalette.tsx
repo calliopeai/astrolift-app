@@ -193,6 +193,14 @@ export const PAGES: PaletteEntry[] = [
     module: "admin",
   },
   {
+    label: "App access",
+    labelKey: "appAccess",
+    href: "/administration/app-access",
+    group: "Pages",
+    module: "admin",
+    permission: "app.read",
+  },
+  {
     label: "Policies",
     labelKey: "policies",
     href: "/administration/policies",

@@ -162,6 +162,11 @@ class TenantCluster(NamedBaseCoreModel):
     # app's access or an environment's hostnames change; the edge's shared
     # SecurityPolicy renders its authorization rules from it.
     edge_access_rules = models.JSONField(default=dict, blank=True)
+    # Whether the edge carries those rules (#2534): when they last changed,
+    # and when the last edge apply that read them began. The edge enforces the
+    # current rules once the second is at or after the first.
+    edge_access_changed_at = models.DateTimeField(null=True, blank=True, editable=False)
+    edge_access_applied_at = models.DateTimeField(null=True, blank=True, editable=False)
     # Whether an app on this cluster may opt out of the edge login (#2504).
     # Off: every app is gated whatever its own ``edge_public`` says.
     allow_public_apps = models.BooleanField(default=True, db_default=True)

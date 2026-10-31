@@ -59,9 +59,11 @@ describe.each(Object.entries({ es, fr, ja }))("%s grant page", (locale, messages
         }))
       );
     }
+    const nav = createTranslator({ locale, messages, namespace: "navModel.functions" });
     expect(result.current.crumbs[0].switcher?.map((option) => option.label)).toEqual([
       t("links.organization"),
       t("access"),
+      nav("app-access"),
       t("links.projects"),
     ]);
     expect(result.current.crumbs[1].switcher?.map((option) => option.label)).toEqual([

@@ -907,13 +907,16 @@ def _run_install_sync(  # noqa: ANN001
     additive=False,
     recipe_before=frozenset(),
     cluster_fields=None,
+    edge_marks=None,
 ):
     """Drive ``_install_cluster_prereqs_sync`` with the DB row, dispatch, driver,
     and context all mocked, returning its result dict. The IRSA-provision helpers
     short-circuit because none of the test component keys are the AWS controller
-    keys, so no cloud calls are made."""
+    keys, so no cloud calls are made. ``edge_marks`` collects the edge-applied
+    marks the run records (#2534)."""
     import astrolift_clusters.models as models
     import core.cluster_management as cm
+    import core.edge_access as edge_access
     from astrolift_workflows.activities import install_prereqs
     from astrolift_workflows.activities.install_prereqs import _install_cluster_prereqs_sync
 
@@ -936,6 +939,10 @@ def _run_install_sync(  # noqa: ANN001
     fake_ctx = type("Ctx", (), {"slug": "aws-prod"})()
 
     monkeypatch.setattr(models, "TenantCluster", _FakeTenantCluster)
+    marks = edge_marks if edge_marks is not None else []
+    monkeypatch.setattr(
+        edge_access, "mark_edge_applied", lambda cluster_id, at: marks.append((cluster_id, at))
+    )
     monkeypatch.setattr(cm, "_driver_for_cluster", lambda cluster: driver)  # noqa: ARG005
     monkeypatch.setattr(cm, "_context_for_cluster", lambda cluster: fake_ctx)  # noqa: ARG005
     monkeypatch.setattr(cm, "bootstrap_components_dispatch", lambda cluster: components)  # noqa: ARG005
@@ -1187,6 +1194,32 @@ def test_a_failed_probe_stops_the_additive_edge_run(monkeypatch):
     with pytest.raises(ConnectionError):
         _run_install_sync(monkeypatch, _edge_recipe(), driver, {"envoy-gateway"}, additive=True)
     assert driver.calls == []
+
+
+def test_an_edge_run_marks_the_access_rules_applied(monkeypatch):
+    """#2534: the mark is taken before the rules are read, so a change made
+    while the run went on still reads as not yet applied."""
+    import datetime as dt
+
+    _probe_reports(monkeypatch, {"installed_crds": [], "external_dns": {"installed": True, "provider": None}})
+    before = dt.datetime.now(dt.UTC)
+    marks: list = []
+
+    _run_install_sync(
+        monkeypatch, _edge_recipe(), _FakeDriver(), {"envoy-gateway"}, additive=True, edge_marks=marks
+    )
+
+    assert len(marks) == 1
+    cluster_id, at = marks[0]
+    assert cluster_id == 1 and before <= at <= dt.datetime.now(dt.UTC)
+
+
+def test_a_run_without_the_edge_marks_nothing(monkeypatch):
+    marks: list = []
+
+    _run_install_sync(monkeypatch, _edge_recipe(), _FakeDriver(), {"cert-manager"}, edge_marks=marks)
+
+    assert marks == []
 
 
 def test_an_operator_run_never_probes_or_adds_controllers(monkeypatch):

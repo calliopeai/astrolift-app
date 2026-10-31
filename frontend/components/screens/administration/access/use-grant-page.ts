@@ -15,6 +15,7 @@ import { accessCrumbs, parseGrantParams } from "./access-nav";
  */
 export function useGrantPage() {
   const t = useTranslations("shared.access.grant");
+  const nav = useTranslations("navModel.functions");
   const router = useRouter();
   const params = useSearchParams();
   const { principal, scope, role, returnTo } = parseGrantParams(
@@ -25,6 +26,7 @@ export function useGrantPage() {
     "/administration/organization": t("links.organization"),
     "/administration/projects": t("links.projects"),
     "/administration/access": t("access"),
+    "/administration/app-access": nav("app-access"),
     "/administration/access/people": t("people"),
     "/administration/access/teams": t("links.teams"),
     "/administration/permissions": t("links.roles"),

@@ -756,6 +756,90 @@ export const SET_APP_EDGE_PUBLIC = gql`
   }
 `;
 
+const EDGE_ACCESS_ROW_FIELDS = gql`
+  fragment EdgeAccessRowFields on AstroliftEdgeAccessRow {
+    id
+    appSlug
+    appName
+    teamSlug
+    projectSlug
+    environment
+    environmentId
+    clusterSlug
+    clusterName
+    hosts
+    restricted
+    groups
+    users
+    source
+    setBy
+    setAt
+    status
+    edgeChangedAt
+    edgeAppliedAt
+  }
+`;
+
+/** Every environment of every app the viewer can read, and whether the edge holds its rule (#2534). */
+export const EDGE_ACCESS = gql`
+  query EdgeAccess(
+    $filter: AstroliftEdgeAccessFilter
+    $search: String
+    $first: Int!
+    $after: String
+  ) {
+    astroliftEdgeAccess(filter: $filter, search: $search, first: $first, after: $after) {
+      items {
+        ...EdgeAccessRowFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+  ${EDGE_ACCESS_ROW_FIELDS}
+`;
+
+/** The environments one person may enter, and through which grant (#2534). */
+export const EDGE_ACCESS_FOR_PERSON = gql`
+  query EdgeAccessForPerson(
+    $email: String!
+    $filter: AstroliftEdgeAccessFilter
+    $search: String
+    $first: Int!
+    $after: String
+  ) {
+    astroliftEdgeAccessForPerson(
+      email: $email
+      filter: $filter
+      search: $search
+      first: $first
+      after: $after
+    ) {
+      email
+      logins {
+        clusterSlug
+        resolved
+        reason
+        hasLogin
+        enabled
+        groups
+      }
+      items {
+        enters
+        via
+        viaGroups
+        rule {
+          ...EdgeAccessRowFields
+        }
+      }
+      nextCursor
+      totalCount
+      refusedCount
+    }
+  }
+  ${EDGE_ACCESS_ROW_FIELDS}
+`;
+
 export const GET_APP_DEPENDENCY_CONTEXT = gql`
   query GetAppDependencyContext(
     $appId: GUID!
