@@ -2180,23 +2180,23 @@
           "failed": "Tente novamente para recriar o repositório do registro e o namespace.",
           "pending": "Inicie para colocar o aplicativo online.",
           "provisioning": "Aguarde; execute novamente somente se o processo travar.",
-          "ready_missing_registry": "Provisione novamente para recriar o repositório do registro de contêineres e a credencial de envio. Até lá, as implantações não terão efeito nem exibirão avisos.",
-          "unknown": "Provisione novamente para recuperar o aplicativo."
+          "ready_missing_registry": "Force a reimplantação para recriar o repositório do registro de contêineres e a credencial de envio. Até lá, as implantações não terão efeito nem exibirão avisos.",
+          "unknown": "Force a reimplantação para recuperar o aplicativo."
         },
         "elapsed": "iniciado há {minutes} min",
-        "cta": "Provisionar novamente",
+        "cta": "Forçar reimplantação",
         "confirm": {
-          "title": "Provisionar {slug} novamente?",
+          "title": "Forçar a reimplantação de {slug}?",
           "description": "Cancela as implantações em andamento, exclui os objetos Kubernetes de cada carga de trabalho e executa novamente o workflow CI de implantação. As aprovações existentes são executadas novamente.",
-          "confirm": "Sim, provisionar novamente"
+          "confirm": "Sim, forçar reimplantação"
         },
         "toast": {
-          "dispatched": "Novo provisionamento iniciado: o workflow de implantação está sendo executado novamente.",
+          "dispatched": "Reimplantação forçada iniciada: o workflow de implantação está sendo executado novamente.",
           "partial": "Recuperação parcial: a limpeza foi realizada, mas o início da implantação falhou ({message})."
         },
         "error": {
-          "noResponse": "Falha no novo provisionamento: o servidor não respondeu.",
-          "generic": "Falha no novo provisionamento."
+          "noResponse": "Falha na reimplantação forçada: o servidor não respondeu.",
+          "generic": "Falha na reimplantação forçada."
         }
       },
       "configDrift": {
@@ -2778,7 +2778,8 @@
         "ci": "ci",
         "scheduled": "agendado",
         "rollback": "reversão",
-        "promotion": "promoção"
+        "promotion": "promoção",
+        "reprovision": "novo provisionamento"
       },
       "label": "Implantações",
       "emptyCurrentTitle": "Ainda não há implantações",
@@ -3878,6 +3879,8 @@
       "status": {
         "ready": "Pronto",
         "live": "Online",
+        "needs_reprovision": "Requer novo provisionamento",
+        "no_managed_domain": "Sem domínio gerenciado",
         "pending": "Pendente",
         "provisioning": "Provisionando",
         "failed": "Falhou",
@@ -7352,8 +7355,16 @@
         "failed": "Falha ao alterar o subdomínio.",
         "changed": "Subdomínio alterado para {subdomain}.",
         "copied": "URL copiada para a área de transferência.",
-        "copyFailed": "Não foi possível copiar: área de transferência indisponível."
-      }
+        "copyFailed": "Não foi possível copiar: área de transferência indisponível.",
+        "reprovisionRunning": "Provisionando novamente; o status será atualizado quando terminar.",
+        "reprovisionUnchanged": "Nada para provisionar novamente: tudo já está no lugar.",
+        "reprovisionDone": "Provisionado novamente: {created} criados, {updated} atualizados.",
+        "reprovisionFailed": "Falha no novo provisionamento.",
+        "reprovisionNoResponse": "Falha no novo provisionamento: o servidor não respondeu."
+      },
+      "noManagedDomain": "Sem domínio gerenciado",
+      "needsReprovision": "Requer novo provisionamento",
+      "reprovision": "Provisionar novamente"
     }
   },
   "projectResources": {
@@ -16746,7 +16757,8 @@
           "ci": "ci",
           "scheduled": "agendado",
           "rollback": "reversão",
-          "promotion": "promoção"
+          "promotion": "promoção",
+          "reprovision": "novo provisionamento"
         },
         "since": {
           "today": "Hoje",

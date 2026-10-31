@@ -2180,23 +2180,23 @@
           "failed": "请重试以重建镜像仓库和命名空间。",
           "pending": "启动预配使应用上线。",
           "provisioning": "请等待，仅在流程停滞时重新运行。",
-          "ready_missing_registry": "请重新预配以重建容器镜像仓库和推送凭据。在此之前，部署不会执行，也不会显示警告。",
-          "unknown": "重新预配以恢复应用。"
+          "ready_missing_registry": "请强制重新部署以重建容器镜像仓库和推送凭据。在此之前，部署不会执行，也不会显示警告。",
+          "unknown": "强制重新部署以恢复应用。"
         },
         "elapsed": "{minutes} 分钟前开始",
-        "cta": "重新预配",
+        "cta": "强制重新部署",
         "confirm": {
-          "title": "重新预配 {slug}？",
+          "title": "强制重新部署 {slug}？",
           "description": "取消进行中的部署，删除各工作负载的 Kubernetes 对象，并重新触发部署 CI 工作流。现有审批将重新执行。",
-          "confirm": "是，重新预配"
+          "confirm": "是，强制重新部署"
         },
         "toast": {
-          "dispatched": "已启动重新预配，部署工作流正在重新运行。",
+          "dispatched": "已开始强制重新部署，部署工作流正在重新运行。",
           "partial": "部分恢复：清理已完成，但启动部署失败（{message}）。"
         },
         "error": {
-          "noResponse": "重新预配失败：服务器没有响应。",
-          "generic": "重新预配失败。"
+          "noResponse": "强制重新部署失败：服务器没有响应。",
+          "generic": "强制重新部署失败。"
         }
       },
       "configDrift": {
@@ -2778,7 +2778,8 @@
         "ci": "CI",
         "scheduled": "定时",
         "rollback": "回滚",
-        "promotion": "提升"
+        "promotion": "提升",
+        "reprovision": "重新预配"
       },
       "label": "部署",
       "emptyCurrentTitle": "暂无部署",
@@ -3878,6 +3879,8 @@
       "status": {
         "ready": "就绪",
         "live": "在线",
+        "needs_reprovision": "需要重新预配",
+        "no_managed_domain": "无托管域名",
         "pending": "待处理",
         "provisioning": "预配中",
         "failed": "失败",
@@ -7352,8 +7355,16 @@
         "failed": "子域名更改失败。",
         "changed": "子域名已更改为 {subdomain}。",
         "copied": "URL 已复制到剪贴板。",
-        "copyFailed": "无法复制：剪贴板不可用。"
-      }
+        "copyFailed": "无法复制：剪贴板不可用。",
+        "reprovisionRunning": "正在重新预配，完成后状态会更新。",
+        "reprovisionUnchanged": "无需重新预配：所有对象都已就位。",
+        "reprovisionDone": "已重新预配：创建 {created} 个，更新 {updated} 个。",
+        "reprovisionFailed": "重新预配失败。",
+        "reprovisionNoResponse": "重新预配失败：服务器没有响应。"
+      },
+      "noManagedDomain": "无托管域名",
+      "needsReprovision": "需要重新预配",
+      "reprovision": "重新预配"
     }
   },
   "projectResources": {
@@ -16597,7 +16608,8 @@
           "ci": "CI",
           "scheduled": "定时",
           "rollback": "回滚",
-          "promotion": "提升"
+          "promotion": "提升",
+          "reprovision": "重新预配"
         },
         "since": {
           "today": "今天",

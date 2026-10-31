@@ -28,9 +28,9 @@ describe("reprovision translations and unknown states", () => {
     [
       "fr",
       "Le provisionnement nécessite votre attention",
-      "Reprovisionnez pour rétablir l’application.",
+      "Forcez le redéploiement pour rétablir l’application.",
     ],
-    ["ja", "プロビジョニングの確認が必要です", "再プロビジョニングして復旧してください。"],
+    ["ja", "プロビジョニングの確認が必要です", "強制再デプロイして復旧してください。"],
   ] as const)(
     "uses a translated fallback for a future %s state with no missing-message error",
     (locale, headline, body) => {
@@ -59,16 +59,18 @@ describe("reprovision translations and unknown states", () => {
         <ReprovisionCalloutView {...REPROVISION} onConfirm={onConfirm} />
       </NextIntlClientProvider>
     );
-    fireEvent.click(screen.getByRole("button", { name: "Reprovisionner" }));
+    fireEvent.click(screen.getByRole("button", { name: "Forcer le redéploiement" }));
     const dialog = await screen.findByRole("alertdialog");
     expect(within(dialog).getByRole("heading")).toHaveTextContent("checkout");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Oui, reprovisionner" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Oui, forcer le redéploiement" }));
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
     await waitFor(() =>
-      expect(within(dialog).getByRole("button", { name: "Oui, reprovisionner" })).toBeEnabled()
+      expect(
+        within(dialog).getByRole("button", { name: "Oui, forcer le redéploiement" })
+      ).toBeEnabled()
     );
-    fireEvent.click(within(dialog).getByRole("button", { name: "Oui, reprovisionner" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Oui, forcer le redéploiement" }));
     await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
     expect(onConfirm).toHaveBeenCalledTimes(2);
   });

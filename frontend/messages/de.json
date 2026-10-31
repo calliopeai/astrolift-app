@@ -2174,23 +2174,23 @@
           "failed": "Versuche es erneut, um das Registrierungsrepository und den Namensraum neu zu erstellen.",
           "pending": "Starte die Bereitstellung, um die Anwendung online zu bringen.",
           "provisioning": "Warte ab; führe den Vorgang nur erneut aus, wenn er hängen bleibt.",
-          "ready_missing_registry": "Stelle die Ressourcen erneut bereit, um das Repository der Containerregistrierung und die Zugangsdaten zum Hochladen neu zu erstellen. Bis dahin bleiben Bereitstellungen ohne Wirkung und ohne Warnung.",
-          "unknown": "Stelle die Ressourcen zur Wiederherstellung erneut bereit."
+          "ready_missing_registry": "Erzwinge eine erneute Bereitstellung, um das Repository der Containerregistrierung und die Zugangsdaten zum Hochladen neu zu erstellen. Bis dahin bleiben Bereitstellungen ohne Wirkung und ohne Warnung.",
+          "unknown": "Erzwinge zur Wiederherstellung eine erneute Bereitstellung."
         },
         "elapsed": "vor {minutes} Min. gestartet",
-        "cta": "Ressourcen erneut bereitstellen",
+        "cta": "Erneute Bereitstellung erzwingen",
         "confirm": {
-          "title": "Ressourcen für {slug} erneut bereitstellen?",
+          "title": "Erneute Bereitstellung von {slug} erzwingen?",
           "description": "Bricht laufende Bereitstellungen ab, löscht die Kubernetes-Objekte jeder Arbeitslast und startet den CI-Bereitstellungsworkflow erneut. Bestehende Genehmigungen werden erneut ausgeführt.",
-          "confirm": "Ja, erneut bereitstellen"
+          "confirm": "Ja, erneute Bereitstellung erzwingen"
         },
         "toast": {
-          "dispatched": "Erneute Ressourcenbereitstellung gestartet; der Bereitstellungsworkflow läuft erneut.",
+          "dispatched": "Erzwungene erneute Bereitstellung gestartet; der Bereitstellungsworkflow läuft erneut.",
           "partial": "Teilweise Wiederherstellung: Die Bereinigung wurde durchgeführt, aber der Bereitstellungsstart ist fehlgeschlagen ({message})."
         },
         "error": {
-          "noResponse": "Erneute Ressourcenbereitstellung fehlgeschlagen: keine Antwort vom Server.",
-          "generic": "Erneute Ressourcenbereitstellung fehlgeschlagen."
+          "noResponse": "Erzwungene erneute Bereitstellung fehlgeschlagen: keine Antwort vom Server.",
+          "generic": "Erzwungene erneute Bereitstellung fehlgeschlagen."
         }
       },
       "configDrift": {
@@ -2772,7 +2772,8 @@
         "ci": "CI",
         "scheduled": "geplant",
         "rollback": "Zurücksetzen",
-        "promotion": "Hochstufung"
+        "promotion": "Hochstufung",
+        "reprovision": "Neuprovisionierung"
       },
       "label": "Bereitstellungen",
       "emptyCurrentTitle": "Noch keine Bereitstellungen",
@@ -3872,6 +3873,8 @@
       "status": {
         "ready": "Bereit",
         "live": "Online",
+        "needs_reprovision": "Neuprovisionierung nötig",
+        "no_managed_domain": "Keine verwaltete Domain",
         "pending": "Ausstehend",
         "provisioning": "Wird eingerichtet",
         "failed": "Fehlgeschlagen",
@@ -7355,8 +7358,16 @@
         "failed": "Ändern der Subdomain fehlgeschlagen.",
         "changed": "Subdomain in {subdomain} geändert.",
         "copied": "URL in die Zwischenablage kopiert.",
-        "copyFailed": "Kopieren nicht möglich: Zwischenablage nicht verfügbar."
-      }
+        "copyFailed": "Kopieren nicht möglich: Zwischenablage nicht verfügbar.",
+        "reprovisionRunning": "Wird neu provisioniert; der Status aktualisiert sich, sobald es fertig ist.",
+        "reprovisionUnchanged": "Nichts neu zu provisionieren: Alles ist bereits vorhanden.",
+        "reprovisionDone": "Neu provisioniert: {created} erstellt, {updated} aktualisiert.",
+        "reprovisionFailed": "Neuprovisionierung fehlgeschlagen.",
+        "reprovisionNoResponse": "Neuprovisionierung fehlgeschlagen: keine Antwort vom Server."
+      },
+      "noManagedDomain": "Keine verwaltete Domain",
+      "needsReprovision": "Neuprovisionierung nötig",
+      "reprovision": "Neu provisionieren"
     }
   },
   "projectResources": {
@@ -16749,7 +16760,8 @@
           "ci": "CI",
           "scheduled": "geplant",
           "rollback": "Zurücksetzen",
-          "promotion": "Hochstufung"
+          "promotion": "Hochstufung",
+          "reprovision": "Neuprovisionierung"
         },
         "since": {
           "today": "Heute",

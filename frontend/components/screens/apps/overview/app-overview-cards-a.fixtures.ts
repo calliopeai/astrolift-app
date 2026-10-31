@@ -202,7 +202,11 @@ export const URL_CARD: Omit<UrlCardViewProps, "healthBadge"> = {
   isRoutable: true,
   isProvisioning: false,
   hasWorkload: true,
+  reachabilityStatus: "REACHABLE",
+  reachabilityDetail: null,
   saving: false,
+  reprovisioning: false,
   onSave: yes,
   onCopy: noop,
+  onReprovision: noop,
 };

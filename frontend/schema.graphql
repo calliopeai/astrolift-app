@@ -1523,6 +1523,16 @@ type AstroliftAppEnvironment {
   What the viewer may do here (#1867): app.deploy (pause and resume deploys or ingress), app.update (settings). From the same checker and environment facts as the mutations; advisory, the mutation still decides.
   """
   viewerPermissions: [String!]!
+
+  """
+  Whether this environment's public hosts answer, checked against the cluster when it can be read (#2573).
+  """
+  reachabilityStatus: ReachabilityStatus!
+
+  """
+  What is missing or still in progress, or why the cluster could not be checked; empty when there is nothing to say.
+  """
+  reachabilityDetail: String!
 }
 
 type AstroliftAppEnvironmentMutationResult {
@@ -1633,6 +1643,8 @@ type AstroliftAppKind {
 enum AstroliftAppListState {
   LIVE
   READY
+  NEEDS_REPROVISION
+  NO_MANAGED_DOMAIN
   PENDING
   PROVISIONING
   FAILED
@@ -5633,6 +5645,10 @@ type AstroliftRegisteredApp {
   latestDeployment: AstroliftAppDeploymentSummary
   lastDeployedAt: DateTime
   healthPulse: AstroliftAppHealthPulse
+
+  """
+  Onboarding recovery for the overview notice (#407): needsReprovision is set while registration has not finished, or finished without a container registry, and the notice's action is forceAstroliftRedeploy. It says nothing about reachability: reachabilityStatus says whether reprovisionApp is needed.
+  """
   reprovision: AstroliftAppReprovisionState!
   configDrift: AstroliftAppConfigDrift
   autowire: AstroliftAppAutowireStatus
@@ -5661,6 +5677,11 @@ type AstroliftRegisteredApp {
   Advisory set only on the registerApp result: no organization GitHub connection is visibly recorded on the source repository's owner. Empty everywhere else (#2297).
   """
   sourceConnectionWarning: String!
+
+  """
+  Whether the app's public hosts answer (#2573): the worst of its non-preview environments' reachabilityStatus, or PROVISIONING while any of them is being deployed or reprovisioned. provisioningStatus says whether registration finished; this says whether the app can be reached.
+  """
+  reachabilityStatus: ReachabilityStatus!
   provisioningProgress: AstroliftProvisioningProgress
 }
 
@@ -10694,6 +10715,11 @@ type Mutation {
   forceAstroliftRedeploy(input: ForceRedeployInput!): AstroliftForceRedeployPayloadMutationResult!
   runAstroliftJobOnce(input: RunJobOnceInput!): AstroliftRunJobOncePayloadMutationResult!
   rerunAstroliftOnboarding(input: RerunOnboardingInput!): AstroliftRerunOnboardingPayloadMutationResult!
+
+  """
+  Re-render and re-apply an app's environments (or the one named) against the release each is running (#2573): zone binding, URL, hostname claims, Ingress and certificate request, DNS and the rest of the platform half. No build and no new image; pods restart only when the rendered workload differs. Records a reprovision deployment per environment with a running release. Returns within seconds: an environment still being applied reads PROVISIONING and settles on its own. Calling it again while one runs joins that run.
+  """
+  reprovisionApp(input: ReprovisionAppInput!): ReprovisionAppPayloadMutationResult!
   setEnvironmentSetting(input: SetEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
   clearEnvironmentSetting(input: ClearEnvironmentSettingInput!): AstroliftEnvironmentSettingMutationResult!
   runTask(input: RunTaskInput!): AstroliftTaskRunPayloadMutationResult!
@@ -12046,6 +12072,16 @@ type Query {
   astroliftMyConnectedAccounts: [AstroliftMyConnectedAccount!]!
 }
 
+"""
+Whether public hosts answer (#2573). REACHABLE: every public host has its Ingress, a Ready certificate, a hostname claim and the environment URL. PROVISIONING: a deploy is in flight, a certificate is being issued, or the first deploy has not run. NO_MANAGED_DOMAIN: no zone resolves for the organization. NEEDS_REPROVISION: something else is missing; reprovisionApp puts it back.
+"""
+enum ReachabilityStatus {
+  REACHABLE
+  PROVISIONING
+  NEEDS_REPROVISION
+  NO_MANAGED_DOMAIN
+}
+
 input ReapCloudOrphanInput {
   kind: String!
   reapKey: String!
@@ -12272,6 +12308,49 @@ enum RepoVisibility {
   PRIVATE
   INTERNAL
   PUBLIC
+}
+
+input ReprovisionAppInput {
+  appSlug: String!
+  environmentName: String = null
+}
+
+type ReprovisionAppPayload {
+  appSlug: String!
+  environments: [ReprovisionEnvironmentResult!]!
+}
+
+type ReprovisionAppPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ReprovisionAppPayload
+}
+
+type ReprovisionEnvironmentResult {
+  environmentName: String!
+
+  """
+  The reprovision deployment: the one this call started, or the one already running that it joined. Null when the environment has no running release, so only its domain binding, URL and hostname claims were reconciled.
+  """
+  deploymentId: ID
+
+  """
+  The environment's reachabilityStatus when the call returned; PROVISIONING while its run goes on.
+  """
+  reachabilityStatus: ReachabilityStatus!
+
+  """
+  Kind/name of what this call created: hostname claims, and the objects the apply created when the run finished within the call. Empty while it runs.
+  """
+  objectsCreated: [String!]!
+
+  """
+  Kind/name of what this call changed: the environment row, and objects the apply patched.
+  """
+  objectsUpdated: [String!]!
+
+  """True when the run finished and nothing was created or updated."""
+  unchanged: Boolean!
 }
 
 input ReprovisionManagedServiceInput {

@@ -49,6 +49,7 @@ from astrolift_lifecycle.schema.mutations.maintenance import MaintenanceMutation
 from astrolift_lifecycle.schema.mutations.migration import MigrationMutations
 from astrolift_lifecycle.schema.mutations.previews import PreviewMutations
 from astrolift_lifecycle.schema.mutations.recovery import RecoveryMutations
+from astrolift_lifecycle.schema.mutations.reprovision import ReprovisionMutations
 from astrolift_lifecycle.schema.mutations.tasks import TaskMutations
 
 # Re-exported for the public import surface (tests / cross-app importers).
@@ -95,6 +96,9 @@ from astrolift_lifecycle.schema.mutations.types import (  # noqa: F401
     RecheckDomainValidationInput,
     RejectByTokenInput,
     RemoveAppDomainInput,
+    ReprovisionAppInput,
+    ReprovisionAppPayload,
+    ReprovisionEnvironmentResult,
     RestartWorkloadInput,
     RetryAstroliftAutowireInput,
     RetryAstroliftAutowirePayload,
@@ -136,6 +140,7 @@ class LifecycleMutation(
     AppOpsMutations,
     DeregisterMutations,
     RecoveryMutations,
+    ReprovisionMutations,
     EnvironmentSettingMutations,
     TaskMutations,
     MaintenanceMutations,

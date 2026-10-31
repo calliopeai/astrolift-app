@@ -930,7 +930,7 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
         qs = visible_operation_rows(qs, Permission.APP_READ, environment_path="self")
         rows = list(qs[:300])
         permissions = environment_viewer_permissions(rows)
-        return [app_env_to_type(e, viewer_permissions=permissions[e.pk]) for e in rows]
+        return [app_env_to_type(e, viewer_permissions=permissions[e.pk], info=info) for e in rows]
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)
@@ -988,7 +988,7 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
         qs = visible_operation_rows(qs, Permission.APP_READ, environment_path="self")
         result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
         permissions = environment_viewer_permissions(result.rows)
-        return result.map(lambda e: app_env_to_type(e, viewer_permissions=permissions[e.pk]))
+        return result.map(lambda e: app_env_to_type(e, viewer_permissions=permissions[e.pk], info=info))
 
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage.")

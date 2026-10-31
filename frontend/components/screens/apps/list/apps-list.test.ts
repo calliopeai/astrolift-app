@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { effectiveFilters, parseListState } from "@/components/list/list-state";
 
 import { APPS_LIST, appsCrumbs, appStatusKey, appsPageVariables, pinFirst } from "./apps-list";
-import { APPS } from "./fixtures";
+import { APPS, NO_ZONE_APP, UNREACHABLE_APP } from "./fixtures";
 
 function varsFor(qs: string) {
   const state = parseListState(APPS_LIST, qs);
@@ -95,6 +95,20 @@ describe("appsPageVariables", () => {
       deploy: ["NEVER"],
     });
     expect(appStatusKey(APPS[0])).toBe("live");
+  });
+
+  it("is live only while the hosts answer, and not ready while one does not (#2573, #2572)", () => {
+    expect(appStatusKey(UNREACHABLE_APP)).toBe("needs_reprovision");
+    expect(appStatusKey(NO_ZONE_APP)).toBe("no_managed_domain");
+    expect(appStatusKey({ ...APPS[0], reachabilityStatus: "PROVISIONING" })).toBe("provisioning");
+    expect(appStatusKey({ ...APPS[0], managedHostname: "" })).toBe("ready");
+    expect(appStatusKey({ ...UNREACHABLE_APP, provisioningStatus: "failed" })).toBe("failed");
+    expect(appStatusKey({ ...NO_ZONE_APP, isArchived: true })).toBe("archived");
+  });
+
+  it("sends the reachability states as the schema's members", () => {
+    expect(varsFor("status=needs_reprovision").filter).toEqual({ status: ["NEEDS_REPROVISION"] });
+    expect(varsFor("status=no_managed_domain").filter).toEqual({ status: ["NO_MANAGED_DOMAIN"] });
   });
 
   it("sends project, kind and cluster as one-value lists", () => {

@@ -135,7 +135,25 @@ export const TemporaryReadOnly: Story = {
 };
 
 export const Provisioning: Story = {
-  args: { app: { ...FRAME.app!, status: "provisioning", live: false } },
+  args: { app: { ...FRAME.app!, status: "provisioning", statusKey: "provisioning" } },
+};
+
+/** Rolled out, and its host does not answer (#2573): the header says so, not Ready. */
+export const NeedsReprovision: Story = {
+  args: { app: { ...FRAME.app!, statusKey: "needs_reprovision" } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Needs reprovision")).toBeInTheDocument();
+    await expect(canvas.queryByText("Ready")).toBeNull();
+  },
+};
+
+/** Registered while no zone resolved (#2572): no managed domain, not Ready. */
+export const NoManagedDomain: Story = {
+  args: { app: { ...FRAME.app!, statusKey: "no_managed_domain", appUrl: null } },
+  play: async ({ canvasElement }) => {
+    await expect(within(canvasElement).getByText("No managed domain")).toBeInTheDocument();
+  },
 };
 
 export const Loading: Story = {

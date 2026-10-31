@@ -556,8 +556,11 @@ def _annotate_apps_list(qs):
       it, in SQL, so ``deploy`` filters without the post-DB scan.
     * ``_failing``: provisioning failed or the latest deploy did.
     * ``_list_state`` / ``_state_rank``: the header status and its sort rank.
-      ``live`` is ``ready`` with a managed zone, resolved the way
-      ``_managed_hostnames_for_apps`` resolves it.
+      A ``ready`` app with a non-preview environment whose last
+      registration, deploy or reprovision recorded no managed domain, or a
+      missing host rule, reads that (#2573); otherwise ``live`` is ``ready``
+      with a managed zone, resolved the way ``_managed_hostnames_for_apps``
+      resolves it.
     """
     deploys = Deployment.objects.filter(registered_app=OuterRef("pk"), deleted_at__isnull=True).order_by(
         "-created_at"
@@ -565,6 +568,12 @@ def _annotate_apps_list(qs):
     stale_before = timezone.now() - dt.timedelta(days=STALE_DEPLOY_WINDOW_DAYS)
     org_zone = "organization__default_managed_domain"
     from astrolift_clusters.models import ManagedDomain
+    from astrolift_lifecycle.models import PreviewEnvironment
+
+    recorded = AppEnvironment.objects.filter(
+        registered_app=OuterRef("pk"), deleted_at__isnull=True, previewed_environment__isnull=True
+    ).exclude(Exists(PreviewEnvironment.all_objects.filter(app_environment=OuterRef("pk"))))
+    ready = Q(provisioning_status=RegisteredApp.ProvisioningStatus.READY.value)
 
     qs = qs.annotate(
         _latest_deploy_status=Subquery(deploys.values("status")[:1]),
@@ -604,11 +613,20 @@ def _annotate_apps_list(qs):
         ),
         _list_state=Case(
             When(archived_at__isnull=False, then=Value(AppListState.ARCHIVED.value)),
+            # The worst gap recorded wins. A recorded "provisioning" does not
+            # count: it can settle with nothing recording it, as a certificate
+            # that finishes issuing does.
             When(
-                provisioning_status=RegisteredApp.ProvisioningStatus.READY.value,
-                _has_zone=True,
-                then=Value(AppListState.LIVE.value),
+                ready
+                & Exists(recorded.filter(reachability_status=AppEnvironment.Reachability.NO_MANAGED_DOMAIN)),
+                then=Value(AppListState.NO_MANAGED_DOMAIN.value),
             ),
+            When(
+                ready
+                & Exists(recorded.filter(reachability_status=AppEnvironment.Reachability.NEEDS_REPROVISION)),
+                then=Value(AppListState.NEEDS_REPROVISION.value),
+            ),
+            When(ready & Q(_has_zone=True), then=Value(AppListState.LIVE.value)),
             default=F("provisioning_status"),
             output_field=models.CharField(),
         ),

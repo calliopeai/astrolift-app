@@ -15,6 +15,7 @@ import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/regist
 import { permissionMatches } from "@/lib/permissions/astrolift-permissions";
 import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { appStatusKey } from "../list/apps-list";
 import { useArchiveApp } from "../settings/use-archive-app";
 
 import type { AppFrameApp, AppFrameProps } from "./AppFrame";
@@ -89,7 +90,7 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
         slug: a.slug,
         name: a.name,
         status: a.provisioningStatus,
-        live: Boolean(a.managedHostname),
+        statusKey: appStatusKey(a),
         archived: Boolean(a.isArchived),
         failureReason: a.provisioningError || null,
         environment: env ? { name: env.name, clusterSlug: env.clusterSlug ?? null } : null,

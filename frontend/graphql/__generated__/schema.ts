@@ -1453,6 +1453,10 @@ export type AstroliftAppEnvironment = {
   ownedByMe: Scalars['Boolean']['output'];
   /** The owner's user pk: the environment's creator, else the app's. */
   ownerUserId?: Maybe<Scalars['String']['output']>;
+  /** What is missing or still in progress, or why the cluster could not be checked; empty when there is nothing to say. */
+  reachabilityDetail: Scalars['String']['output'];
+  /** Whether this environment's public hosts answer, checked against the cluster when it can be read (#2573). */
+  reachabilityStatus: ReachabilityStatus;
   /** The bound cluster's region; empty when unset. */
   region: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
@@ -1568,6 +1572,8 @@ export type AstroliftAppListState =
   | 'DEREGISTERED'
   | 'FAILED'
   | 'LIVE'
+  | 'NEEDS_REPROVISION'
+  | 'NO_MANAGED_DOMAIN'
   | 'PENDING'
   | 'PROVISIONING'
   | 'READY'
@@ -5260,7 +5266,10 @@ export type AstroliftRegisteredApp = {
   rawManifest: Scalars['String']['output'];
   rawManifestStaged: Scalars['String']['output'];
   rawManifestStagedHash: Scalars['String']['output'];
+  /** Whether the app's public hosts answer (#2573): the worst of its non-preview environments' reachabilityStatus, or PROVISIONING while any of them is being deployed or reprovisioned. provisioningStatus says whether registration finished; this says whether the app can be reached. */
+  reachabilityStatus: ReachabilityStatus;
   registryRepoUri: Scalars['String']['output'];
+  /** Onboarding recovery for the overview notice (#407): needsReprovision is set while registration has not finished, or finished without a container registry, and the notice's action is forceAstroliftRedeploy. It says nothing about reachability: reachabilityStatus says whether reprovisionApp is needed. */
   reprovision: AstroliftAppReprovisionState;
   requiresApproval: Scalars['Boolean']['output'];
   retentionPolicies: Array<AstroliftRetentionPolicy>;
@@ -9931,6 +9940,8 @@ export type Mutation = {
   reorderWorkflowStages: MutationResult;
   replyAgentTaskInput: AstroliftAgentTaskInputReplyMutationResult;
   replyToAgentMessage: AstroliftAgentMessageReplyMutationResult;
+  /** Re-render and re-apply an app's environments (or the one named) against the release each is running (#2573): zone binding, URL, hostname claims, Ingress and certificate request, DNS and the rest of the platform half. No build and no new image; pods restart only when the rendered workload differs. Records a reprovision deployment per environment with a running release. Returns within seconds: an environment still being applied reads PROVISIONING and settles on its own. Calling it again while one runs joins that run. */
+  reprovisionApp: ReprovisionAppPayloadMutationResult;
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
@@ -11569,6 +11580,11 @@ export type MutationReplyAgentTaskInputArgs = {
 
 export type MutationReplyToAgentMessageArgs = {
   input: AstroliftReplyToAgentMessageInput;
+};
+
+
+export type MutationReprovisionAppArgs = {
+  input: ReprovisionAppInput;
 };
 
 
@@ -16018,6 +16034,13 @@ export type QueryWorkflowsPageArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
+/** Whether public hosts answer (#2573). REACHABLE: every public host has its Ingress, a Ready certificate, a hostname claim and the environment URL. PROVISIONING: a deploy is in flight, a certificate is being issued, or the first deploy has not run. NO_MANAGED_DOMAIN: no zone resolves for the organization. NEEDS_REPROVISION: something else is missing; reprovisionApp puts it back. */
+export type ReachabilityStatus =
+  | 'NEEDS_REPROVISION'
+  | 'NO_MANAGED_DOMAIN'
+  | 'PROVISIONING'
+  | 'REACHABLE';
+
 export type ReapCloudOrphanInput = {
   clusterSlug: InputMaybe<Scalars['String']['input']>;
   forceDestroy: Scalars['Boolean']['input'];
@@ -16234,6 +16257,36 @@ export type RepoVisibility =
   | 'INTERNAL'
   | 'PRIVATE'
   | 'PUBLIC';
+
+export type ReprovisionAppInput = {
+  appSlug: Scalars['String']['input'];
+  environmentName: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ReprovisionAppPayload = {
+  appSlug: Scalars['String']['output'];
+  environments: Array<ReprovisionEnvironmentResult>;
+};
+
+export type ReprovisionAppPayloadMutationResult = {
+  data?: Maybe<ReprovisionAppPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ReprovisionEnvironmentResult = {
+  /** The reprovision deployment: the one this call started, or the one already running that it joined. Null when the environment has no running release, so only its domain binding, URL and hostname claims were reconciled. */
+  deploymentId?: Maybe<Scalars['ID']['output']>;
+  environmentName: Scalars['String']['output'];
+  /** Kind/name of what this call created: hostname claims, and the objects the apply created when the run finished within the call. Empty while it runs. */
+  objectsCreated: Array<Scalars['String']['output']>;
+  /** Kind/name of what this call changed: the environment row, and objects the apply patched. */
+  objectsUpdated: Array<Scalars['String']['output']>;
+  /** The environment's reachabilityStatus when the call returned; PROVISIONING while its run goes on. */
+  reachabilityStatus: ReachabilityStatus;
+  /** True when the run finished and nothing was created or updated. */
+  unchanged: Scalars['Boolean']['output'];
+};
 
 export type ReprovisionManagedServiceInput = {
   expectedContextRevision: InputMaybe<Scalars['String']['input']>;

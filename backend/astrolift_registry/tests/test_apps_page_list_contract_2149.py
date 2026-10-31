@@ -12,6 +12,8 @@ deployed (team A), Echo ok (team B), all on one cluster.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -19,6 +21,8 @@ from django.test.utils import CaptureQueriesContext
 from astrolift_clusters.models import ManagedDomain
 from astrolift_graphql import UnsupportedSort
 from astrolift_lifecycle.models import AppEnvironment
+from astrolift_lifecycle.reachability import CERTIFICATE_KIND, INGRESS_KIND
+from astrolift_lifecycle.schema.types import ReachabilityStatus
 from astrolift_registry.models import RegisteredApp, Workload
 from astrolift_registry.schema.queries import RegistryQuery
 from astrolift_registry.schema.types import (
@@ -210,6 +214,80 @@ def test_ready_with_a_managed_zone_is_live(world):
     ready = _page(world, world.user, filter=AppsListFilterInput(status=[AppListState.READY]), sort="name")
     assert _names(live) == ["Alpha", "Echo"]
     assert _names(ready) == []
+
+
+def test_a_ready_app_reads_the_worst_gap_its_environments_recorded(world):
+    """#2573: a deploy that recorded its host missing outranks a resolvable zone, and no
+    managed domain outranks a missing host rule; neither reads Ready."""
+    domain = ManagedDomain.objects.create(
+        organization=world.org, zone="apps-2573.example", dns_driver="route53", default_for="tenant_apps"
+    )
+    world.org.default_managed_domain = domain
+    world.org.save(update_fields=["default_managed_domain"])
+    staging = AppEnvironment.objects.get(registered_app=world.apps["ok-b"], name="staging")
+    AppEnvironment.objects.filter(pk__in=[world.envs["ok-a"].pk, world.envs["ok-b"].pk]).update(
+        reachability_status=AppEnvironment.Reachability.NEEDS_REPROVISION
+    )
+    staging.reachability_status = AppEnvironment.Reachability.NO_MANAGED_DOMAIN
+    staging.save(update_fields=["reachability_status"])
+
+    def state(*states):
+        return _names(_page(world, world.user, filter=AppsListFilterInput(status=list(states)), sort="name"))
+
+    assert state(AppListState.NEEDS_REPROVISION) == ["Alpha"]
+    assert state(AppListState.NO_MANAGED_DOMAIN) == ["Echo"]
+    assert state(AppListState.LIVE, AppListState.READY) == []
+
+    # A preview's gap is its own, and a recorded "provisioning" is transient:
+    # a certificate still issuing, a deploy still running.
+    AppEnvironment.objects.filter(pk__in=[world.envs["ok-a"].pk, world.envs["ok-b"].pk, staging.pk]).update(
+        reachability_status=AppEnvironment.Reachability.PROVISIONING
+    )
+    AppEnvironment.objects.create(
+        registered_app=world.apps["ok-b"],
+        tenant_cluster=world.other_cluster,
+        name="preview-pr-7",
+        url="",
+        previewed_environment=staging,
+        reachability_status=AppEnvironment.Reachability.NEEDS_REPROVISION,
+    )
+    assert state(AppListState.LIVE) == ["Alpha", "Echo"]
+
+
+def test_reachability_on_a_page_reads_each_cluster_once_not_once_per_row(world, monkeypatch):
+    """#2573: the Apps list asks every row for reachabilityStatus, which needs the cluster's
+    Ingresses and Certificates. One read of each per cluster serves the whole page."""
+    calls: list[str] = []
+
+    class ClusterApi:
+        def list_manifests(self, cluster, namespace, kind):
+            calls.append(kind)
+            return []
+
+    monkeypatch.setattr("astrolift_lifecycle.reachability._driver_for_cluster", lambda cluster: ClusterApi())
+    monkeypatch.setattr(
+        "astrolift_lifecycle.reachability._context_for_cluster",
+        lambda cluster: SimpleNamespace(slug=cluster.slug),
+    )
+    domain = ManagedDomain.objects.create(
+        organization=world.org, zone="apps-2573.example", dns_driver="route53", default_for="tenant_apps"
+    )
+    for key, app in world.apps.items():
+        Workload.objects.create(
+            registered_app=app, name="site", slug="site", kind="deployment", is_public=True
+        )
+        AppEnvironment.objects.filter(pk=world.envs[key].pk).update(
+            managed_domain=domain, url=f"https://{app.slug}.apps-2573.example"
+        )
+
+    page = _page(world, world.user, sort="name", page=1)
+    statuses = {row.name: row.reachability_status() for row in page.items}
+
+    deployed = {"Alpha", "Charlie", "Echo"}
+    assert {
+        name for name, status in statuses.items() if status is ReachabilityStatus.NEEDS_REPROVISION
+    } >= deployed
+    assert calls == [INGRESS_KIND, CERTIFICATE_KIND]
 
 
 def test_deploy_filter_matches_the_row_health_pulse(world):

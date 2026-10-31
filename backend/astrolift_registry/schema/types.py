@@ -6,6 +6,7 @@ import dataclasses
 import datetime as dt
 import enum
 from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated
 
 import strawberry
 from _sdk.k8s_naming import app_namespace
@@ -13,6 +14,9 @@ from django.db import models
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
+
+if TYPE_CHECKING:
+    from astrolift_lifecycle.schema.types import ReachabilityStatus
 
 JSON = strawberry.scalars.JSON
 
@@ -61,13 +65,18 @@ class AstroliftAppSourceKindFilter(enum.Enum):
 class AppListState(enum.Enum):
     """The status an app's own header shows, as a list filter (#2149).
 
-    ``live`` is ``ready`` with a platform-managed hostname; ``archived``
-    wins over everything. The rest are the raw ``provisioning_status``.
-    Same rule as ``appStatusKey`` in the frontend Apps list.
+    A ``ready`` app reads ``no_managed_domain`` or ``needs_reprovision`` when
+    a non-preview environment's last registration, deploy or reprovision
+    recorded that gap (#2573), else ``live`` with a platform-managed
+    hostname; ``archived`` wins over everything. The rest are the raw
+    ``provisioning_status``. The frontend's ``appStatusKey`` gives the same
+    answer from ``reachabilityStatus``, which is checked on read.
     """
 
     LIVE = "live"
     READY = "ready"
+    NEEDS_REPROVISION = "needs_reprovision"
+    NO_MANAGED_DOMAIN = "no_managed_domain"
     PENDING = "pending"
     PROVISIONING = "provisioning"
     FAILED = "failed"
@@ -659,7 +668,14 @@ class RegisteredAppType:
     # cost is O(1) on the row, so we don't gate it behind an opt-in.
     # ``needs_reprovision`` collapses to False on a healthy ready app
     # so the FE can short-circuit the banner with a single null check.
-    reprovision: AppReprovisionStateType
+    reprovision: AppReprovisionStateType = strawberry.field(
+        description=(
+            "Onboarding recovery for the overview notice (#407): needsReprovision is set while "
+            "registration has not finished, or finished without a container registry, and the notice's "
+            "action is forceAstroliftRedeploy. It says nothing about reachability: reachabilityStatus "
+            "says whether reprovisionApp is needed."
+        )
+    )
 
     # Config-drift signals (#407 C). Compares the latest applied
     # ``Deployment.config_snapshot`` against the live manifest hash;
@@ -740,6 +756,23 @@ class RegisteredAppType:
             "is visibly recorded on the source repository's owner. Empty everywhere else (#2297)."
         ),
     )
+    row_pk: strawberry.Private[int | None] = None
+    reachability: strawberry.Private[object] = None
+
+    @strawberry.field(
+        description=(
+            "Whether the app's public hosts answer (#2573): the worst of its non-preview environments' "
+            "reachabilityStatus, or PROVISIONING while any of them is being deployed or reprovisioned. "
+            "provisioningStatus says whether registration finished; this says whether the app can be reached."
+        )
+    )
+    def reachability_status(
+        self,
+    ) -> Annotated[ReachabilityStatus, strawberry.lazy("astrolift_lifecycle.schema.types")]:
+        # Imported here: the lifecycle schema package imports this module.
+        from astrolift_lifecycle.schema.types import ReachabilityStatus
+
+        return ReachabilityStatus(self.reachability.app(self.row_pk).status)
 
     @strawberry.field
     def provisioning_progress(self) -> ProvisioningProgressType | None:
@@ -1196,6 +1229,7 @@ def app_to_type(
     topology_kind: str | None = None,
     cluster_slugs: list[str] | None = None,
 ) -> RegisteredAppType:
+    from astrolift_lifecycle.reachability import request_reachability
     from astrolift_manifest.env_diff import changed_env_key_names
     from astrolift_manifest.sync_state import (
         SyncSnapshot,
@@ -1330,6 +1364,8 @@ def app_to_type(
         ),
         topology_kind=topology_kind,
         cluster_slugs=list(cluster_slugs or []),
+        row_pk=app.pk,
+        reachability=request_reachability(info).track_app(app),
     )
 
 

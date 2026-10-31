@@ -111,6 +111,7 @@ function overviewSlots(a: AstroliftRegisteredApp, wlList: AstroliftWorkload[]): 
         managedHostname={a.managedHostname}
         primaryWorkloadSlug={wlList.find((w) => w.isPublic)?.slug ?? null}
         provisioningStatus={a.provisioningStatus}
+        reachabilityStatus={a.reachabilityStatus}
       />
     ),
     topology: <TopologyClient slug={a.slug} />,

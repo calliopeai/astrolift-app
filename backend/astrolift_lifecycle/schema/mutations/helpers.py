@@ -54,7 +54,9 @@ def source_deployment_dispatch(dispatch):
         _source_dispatch.reset(marker)
 
 
-_VALID_TRIGGER_KINDS = {k.value for k in Deployment.TriggerKind}
+# A reprovision row re-applies the running release, so only reprovisionApp
+# may create one; startDeployment rolls a new release (#2573).
+_VALID_TRIGGER_KINDS = {k.value for k in Deployment.TriggerKind} - {Deployment.TriggerKind.REPROVISION.value}
 
 
 # Trigger kinds that the app-global ``webhook_deploys_paused`` gate

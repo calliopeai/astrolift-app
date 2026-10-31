@@ -37,6 +37,7 @@ function app(overrides: Partial<AppRow>): AppRow {
     provisioningStatus: "ready",
     provisioningError: "",
     managedHostname: "api-gateway.apps.example.com",
+    reachabilityStatus: "REACHABLE",
     isActive: true,
     isArchived: false,
     activePreviewCount: 0,
@@ -143,6 +144,30 @@ export const APPS: AppRow[] = [
     healthPulse: { status: "STALE", message: "archived", ageSeconds: 9000000 },
   }),
 ];
+
+/**
+ * Rolled out, with a zone, and its host does not answer (#2573): the Ingress
+ * never rendered. It reads Needs reprovision, not Live or Ready, until it is
+ * reprovisioned.
+ */
+export const UNREACHABLE_APP = app({
+  id: "a0000000-0000-4000-8000-000000000007",
+  slug: "storefront",
+  name: "Storefront",
+  description: "Registered while the platform zone was missing.",
+  managedHostname: "storefront.apps.example.com",
+  reachabilityStatus: "NEEDS_REPROVISION",
+});
+
+/** Registered while no zone resolved (#2572): no host to serve, so no managed domain. */
+export const NO_ZONE_APP = app({
+  id: "a0000000-0000-4000-8000-000000000008",
+  slug: "kiosk",
+  name: "Kiosk",
+  description: "Registered after the platform zone was deleted.",
+  managedHostname: "",
+  reachabilityStatus: "NO_MANAGED_DOMAIN",
+});
 
 /** A 64-char SHA for the image tag, a 200-char ARN in the description, an unbroken repo URL. */
 export const LONG_APP = app({

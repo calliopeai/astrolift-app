@@ -133,6 +133,7 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_rebuild_brain": app_scope_by_slug("slug", permission=Permission.APP_DEPLOY),
     "astrolift_host_app_on_brain": registration_project_scope("project_id", permission=Permission.APP_CREATE),
     "astrolift_set_app_expiry": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
+    "astrolift_reprovision_app": app_scope_by_slug("slug", permission=Permission.APP_DEPLOY),
     "astrolift_unshare_brain": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
     "astrolift_share_brain": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
     "astrolift_delete_brain": app_scope_by_slug("slug", permission=Permission.APP_DELETE),
@@ -626,6 +627,42 @@ def _set_app_expiry(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any
         "expires_at": data.expires_at.isoformat() if data.expires_at else None,
         "delete_data_on_expiry": data.delete_data_on_expiry,
     }
+
+
+def _reprovision_app(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    """The reprovisionApp resolver (#2573); a run that failed still reports every environment."""
+    from astrolift_lifecycle.schema.mutations.reprovision import ReprovisionMutations
+    from astrolift_lifecycle.schema.mutations.types import ReprovisionAppInput
+
+    result = ReprovisionMutations().reprovision_app(
+        _mutation_info(request),
+        input=ReprovisionAppInput(
+            app_slug=str(args.get("slug") or ""),
+            environment_name=str(args["environment_name"]) if args.get("environment_name") else None,
+        ),
+    )
+    if result.data is None:
+        _unwrap_mutation(result)
+    payload = {
+        "app_slug": result.data.app_slug,
+        "environments": [
+            {
+                "environment_name": env.environment_name,
+                "deployment_id": str(env.deployment_id) if env.deployment_id else None,
+                "reachability_status": env.reachability_status.name,
+                "objects_created": list(env.objects_created),
+                "objects_updated": list(env.objects_updated),
+                "unchanged": env.unchanged,
+            }
+            for env in result.data.environments
+        ],
+    }
+    if not result.ok:
+        message = "; ".join(error.message for error in result.errors)
+        raise McpCallError(
+            message, code="internal", result={"code": "internal", "message": message, **payload}
+        )
+    return payload
 
 
 def _brain_mutation(request: HttpRequest, name: str, action: str | None, input_obj) -> dict[str, Any]:
@@ -1433,6 +1470,7 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_rebuild_brain": _rebuild_brain,
     "astrolift_host_app_on_brain": _host_app_on_brain,
     "astrolift_set_app_expiry": _set_app_expiry,
+    "astrolift_reprovision_app": _reprovision_app,
     "astrolift_unshare_brain": _unshare_brain,
     "astrolift_share_brain": _share_brain,
     "astrolift_delete_brain": _delete_brain,

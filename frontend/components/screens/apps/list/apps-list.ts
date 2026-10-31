@@ -26,22 +26,60 @@ export type AppRow = AstroliftRegisteredApp & {
   clusters: string[];
 };
 
-/** The header status, as the app's own header shows it (AppFrame). */
-export type AppStatusKey = "live" | "ready" | "pending" | "provisioning" | "failed" | "archived";
+/**
+ * The header status, as the app's own header shows it (AppFrame). The values
+ * are the URL's, which upper-cased are the schema's AstroliftAppListState.
+ */
+export type AppStatusKey =
+  | "live"
+  | "ready"
+  | "needs_reprovision"
+  | "no_managed_domain"
+  | "pending"
+  | "provisioning"
+  | "failed"
+  | "archived";
 
 export const APP_STATUS_ORDER: AppStatusKey[] = [
   "live",
   "ready",
+  "needs_reprovision",
+  "no_managed_domain",
   "pending",
   "provisioning",
   "failed",
   "archived",
 ];
 
-export function appStatusKey(app: AstroliftRegisteredApp): AppStatusKey {
+/** Each status's dot, in the app's header and its Apps list row alike. */
+export const APP_STATUS_DOT: Record<AppStatusKey, "ok" | "warn" | "error" | "muted" | "pending"> = {
+  live: "ok",
+  ready: "ok",
+  needs_reprovision: "warn",
+  no_managed_domain: "warn",
+  pending: "warn",
+  provisioning: "pending",
+  failed: "error",
+  archived: "muted",
+};
+
+/**
+ * A ready app reads what its hosts answer (#2573): Live only when they do,
+ * and not Ready while something in front of a public workload is missing or
+ * still being put in place.
+ */
+export function appStatusKey(
+  app: Pick<
+    AstroliftRegisteredApp,
+    "isArchived" | "provisioningStatus" | "managedHostname" | "reachabilityStatus"
+  >
+): AppStatusKey {
   if (app.isArchived) return "archived";
-  if (app.provisioningStatus === "ready" && app.managedHostname) return "live";
-  return app.provisioningStatus;
+  if (app.provisioningStatus !== "ready") return app.provisioningStatus;
+  if (app.reachabilityStatus === "NO_MANAGED_DOMAIN") return "no_managed_domain";
+  if (app.reachabilityStatus === "NEEDS_REPROVISION") return "needs_reprovision";
+  if (app.reachabilityStatus === "PROVISIONING") return "provisioning";
+  return app.managedHostname ? "live" : "ready";
 }
 
 export const DEPLOY_LABEL: Record<AppHealthPulseStatus, string> = {

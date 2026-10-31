@@ -25,6 +25,19 @@ export const LIST_ENVIRONMENTS = gql`
   }
 `;
 
+/** What each environment is missing when its app is not reachable (#2573). */
+export const APP_REACHABILITY = gql`
+  query AppReachability($appSlug: String) {
+    astroliftEnvironments(appSlug: $appSlug) {
+      id
+      name
+      kind
+      reachabilityStatus
+      reachabilityDetail
+    }
+  }
+`;
+
 /**
  * ``LIST_ENVIRONMENTS`` on the §5.1 list contract (#2155): one numbered
  * page with an exact filtered ``totalCount``. ``filter`` takes kind, app,

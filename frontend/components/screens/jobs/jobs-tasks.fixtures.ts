@@ -134,6 +134,8 @@ function environment(name: string, app = "billing"): AstroliftAppEnvironment {
     kind: name === "production" ? "production" : name.startsWith("preview") ? "preview" : "other",
     region: "us-west-2",
     ownedByMe: false,
+    reachabilityStatus: "REACHABLE",
+    reachabilityDetail: "",
     viewerPermissions: ["app.deploy", "app.update"],
     createdAt: "2026-09-01T12:00:00Z",
     deploysPaused: false,

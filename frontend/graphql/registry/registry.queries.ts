@@ -42,6 +42,7 @@ const APP_FIELDS = gql`
     k8sNamespace
     subdomain
     managedHostname
+    reachabilityStatus
     isActive
     provisioningStatus
     provisioningError

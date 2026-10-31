@@ -11,11 +11,14 @@ created while no zone resolved.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from astrolift_clusters.models import ManagedDomain, resolve_managed_domain
 from core.permissions import Permission
 from core.tenancy import get_current_tenant
+
+log = logging.getLogger(__name__)
 
 # How many dependents a refusal names and the domain type lists.
 DEPENDENTS_SHOWN = 10
@@ -88,6 +91,25 @@ def default_zone_refusal(domain: ManagedDomain, total: int, environments: list) 
     )
 
 
+def environment_url(env, domain: ManagedDomain) -> str:
+    """The URL ``env`` advertises under ``domain``: ``https://<label>.<zone>``,
+    the label being the app's subdomain, else its slug.
+
+    An environment in a namespace of its own serves its own hostname (#1922):
+    a preview the one its row records, which its URL already names, any other
+    ``<label>-<env>``.
+    """
+    from astrolift_lifecycle.models import PreviewEnvironment
+    from core.app_deploy import environment_hostname_label
+
+    app = env.registered_app
+    host = (app.subdomain or app.slug or "").strip()
+    if host and (env.k8s_namespace or "").strip():
+        is_preview = PreviewEnvironment.all_objects.filter(app_environment=env).exists()
+        host = "" if is_preview else environment_hostname_label(host, env.name)
+    return f"https://{host}.{domain.zone}" if host else env.url
+
+
 @dataclass(frozen=True)
 class Binding:
     """One unbound environment, and the zone and URL the backfill gave it.
@@ -117,10 +139,10 @@ def backfill_managed_domain_bindings(*, dry_run: bool = False) -> BindingBackfil
     rows are never revisited. ``dry_run`` reports what would change and
     writes nothing.
     """
-    from astrolift_lifecycle.models import AppEnvironment, PreviewEnvironment
-    from core.app_deploy import environment_hostname_label
+    from astrolift_lifecycle.models import AppEnvironment
 
     bound: list[Binding] = []
+    rebound: list = []
     skipped: list[Binding] = []
     unbound = (
         AppEnvironment.objects.filter(managed_domain__isnull=True, deleted_at__isnull=True)
@@ -143,19 +165,13 @@ def backfill_managed_domain_bindings(*, dry_run: bool = False) -> BindingBackfil
                 )
             )
             continue
-        host = (app.subdomain or app.slug or "").strip()
-        if host and (env.k8s_namespace or "").strip():
-            # An environment in a namespace of its own serves its own
-            # hostname (#1922): a preview the one its row records, which
-            # its URL already names, any other ``<label>-<env>``.
-            is_preview = PreviewEnvironment.all_objects.filter(app_environment=env).exists()
-            host = "" if is_preview else environment_hostname_label(host, env.name)
-        url = f"https://{host}.{domain.zone}" if host else env.url
+        url = environment_url(env, domain)
         if not dry_run:
             changes: dict = {"managed_domain": domain}
             if url != env.url:
                 changes["url"] = url
             AppEnvironment.objects.filter(pk=env.pk).update(**changes)
+            rebound.append(env)
         bound.append(
             Binding(
                 organization_slug=getattr(org, "slug", ""),
@@ -166,4 +182,13 @@ def backfill_managed_domain_bindings(*, dry_run: bool = False) -> BindingBackfil
                 url=url,
             )
         )
+    if rebound:
+        # Registration recorded these as having no managed domain (#2573),
+        # which the Apps list reads until something records them again.
+        try:
+            from astrolift_lifecycle.reachability import record_environment_verdicts
+
+            record_environment_verdicts(rebound, read_cluster=False)
+        except Exception:  # noqa: BLE001 - the binding stands; the verdict is derived
+            log.warning("backfill: could not record reachability", exc_info=True)
     return BindingBackfill(dry_run=dry_run, bound=bound, skipped=skipped)

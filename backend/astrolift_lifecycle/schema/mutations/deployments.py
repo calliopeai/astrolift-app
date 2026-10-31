@@ -105,6 +105,21 @@ def _production_gate(info: Info, action: str, app, env, resolver_name: str):
     return gate(info, action, app=app, resolver_name=resolver_name)
 
 
+def _releases_repeated_by(deployment) -> set[int]:
+    """The deployments ``deployment`` re-applies: a reprovision repeats the one
+    it was pinned to (#2573), so a rollback from it must skip that one too."""
+    repeated: set[int] = set()
+    row = deployment
+    while row.trigger_kind == Deployment.TriggerKind.REPROVISION.value and row.promoted_from_id:
+        if row.promoted_from_id in repeated:
+            break
+        repeated.add(row.promoted_from_id)
+        row = Deployment.all_objects.only("pk", "trigger_kind", "promoted_from_id").get(
+            pk=row.promoted_from_id
+        )
+    return repeated
+
+
 def _start_native_rollback(info, deployment, prior, actor, tenant):
     """A native GKE rollback is the prior image through the ordinary native pipeline (#2278).
 
@@ -930,6 +945,7 @@ class DeploymentMutations:
                     created_at__lt=deployment.created_at,
                     deleted_at__isnull=True,
                 )
+                .exclude(pk__in=_releases_repeated_by(deployment))
                 .order_by("-created_at")
                 .first()
             )

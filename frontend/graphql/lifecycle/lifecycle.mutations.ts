@@ -714,6 +714,32 @@ export const FORCE_REDEPLOY = gql`
   }
 `;
 
+// Non-destructive reconcile of an app's environments against the release
+// each runs (#2573); the opposite of FORCE_REDEPLOY, which deletes them.
+export const REPROVISION_APP = gql`
+  mutation ReprovisionApp($input: ReprovisionAppInput!) {
+    reprovisionApp(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        appSlug
+        environments {
+          environmentName
+          deploymentId
+          reachabilityStatus
+          objectsCreated
+          objectsUpdated
+          unchanged
+        }
+      }
+    }
+  }
+`;
+
 // --- Danger-zone hard deregister (#392) ----------------------------
 //
 // Tears down every per-app cloud resource and soft-deletes the

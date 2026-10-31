@@ -14,6 +14,7 @@
 import type {
   AstroliftRegisteredApp,
   AstroliftWorkload,
+  ReachabilityStatus,
 } from "@/graphql/registry/registry.types";
 
 import type { TopologyEdge, TopologyNode, TopologyNodeStatus } from "./types";
@@ -29,10 +30,23 @@ export interface TopologyManagedService {
   environmentName: string;
 }
 
+/**
+ * The ingress node is what answers on the host (#2573), not the app's
+ * provisioning. With no managed domain there is no host, so no node (#2572).
+ */
+const INGRESS_STATUS: Record<
+  Exclude<ReachabilityStatus, "NO_MANAGED_DOMAIN">,
+  TopologyNodeStatus
+> = {
+  REACHABLE: "running",
+  PROVISIONING: "provisioning",
+  NEEDS_REPROVISION: "failed",
+};
+
 export function appTopology(
   app: AstroliftRegisteredApp,
   workloads: AstroliftWorkload[],
-  managedServices: TopologyManagedService[] = [],
+  managedServices: TopologyManagedService[] = []
 ): { nodes: TopologyNode[]; edges: TopologyEdge[] } {
   const nodes: TopologyNode[] = [];
   const edges: TopologyEdge[] = [];
@@ -45,14 +59,19 @@ export function appTopology(
         : "provisioning";
 
   const publicWorkloads = workloads.filter((w) => w.isPublic);
+  const reachability = app.reachabilityStatus;
+  const ingress = publicWorkloads.length > 0 && reachability !== "NO_MANAGED_DOMAIN";
 
-  if (publicWorkloads.length > 0) {
+  if (ingress) {
     nodes.push({
       id: "ingress",
       type: "ingress",
       label: "Public ingress",
       sublabel: app.subdomain,
-      status: appStatus,
+      status:
+        app.provisioningStatus === "ready" && reachability
+          ? INGRESS_STATUS[reachability]
+          : appStatus,
       hostnames: publicWorkloads.map((w) => `${w.slug}.${app.subdomain}`),
       // #706 — drill into the domains tab (TLS, custom-domain mapping,
       // alternate hostnames). The ingress IS the rendered ALB / nginx
@@ -78,7 +97,7 @@ export function appTopology(
         // always need the pod list + restart count, not the bare svc.
         href: `/apps/${app.slug}/workloads/${w.slug}`,
       });
-      edges.push({ id: `e-ingress-${svcId}`, source: "ingress", target: svcId });
+      if (ingress) edges.push({ id: `e-ingress-${svcId}`, source: "ingress", target: svcId });
       edges.push({
         id: `e-${svcId}-wl-${w.slug}`,
         source: svcId,

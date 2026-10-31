@@ -15,6 +15,12 @@ from core.models.base import BaseCoreModel
 
 
 class AppEnvironment(BaseCoreModel):
+    class Reachability(models.TextChoices):
+        REACHABLE = "reachable"
+        PROVISIONING = "provisioning"
+        NEEDS_REPROVISION = "needs_reprovision"
+        NO_MANAGED_DOMAIN = "no_managed_domain"
+
     registered_app = models.ForeignKey(
         "astrolift_registry.RegisteredApp",
         related_name="environments",
@@ -82,6 +88,19 @@ class AppEnvironment(BaseCoreModel):
         ),
     )
     url = models.URLField(blank=True, default="")
+    reachability_status = models.CharField(
+        max_length=32,
+        choices=Reachability.choices,
+        blank=True,
+        default="",
+        help_text=(
+            "Whether the environment's public hosts were reachable the last time a registration, "
+            "deploy or reprovision finished (#2573). Blank until one has. The API computes the "
+            "current answer on read; this is what the Apps list filters on."
+        ),
+    )
+    reachability_detail = models.TextField(blank=True, default="")
+    reachability_checked_at = models.DateTimeField(null=True, blank=True)
     deploy_config = models.JSONField(default=dict, blank=True)
     deploys_paused = models.BooleanField(default=False)
     ingress_paused = models.BooleanField(default=False)

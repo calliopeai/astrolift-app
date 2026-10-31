@@ -37,7 +37,7 @@ import { ExpiryBadge } from "../ExpiryBadge";
 
 import { AppFreshnessRow } from "./AppFreshnessRow";
 import { AppKindGlyph } from "./AppKindGlyph";
-import { type AppRow, type AppStatusKey, appStatusKey, appsCrumbs } from "./apps-list";
+import { APP_STATUS_DOT, type AppRow, appStatusKey, appsCrumbs } from "./apps-list";
 
 export interface AppsListScreenProps {
   list: ListStateController;
@@ -63,15 +63,6 @@ export interface AppsListScreenProps {
   ) => Promise<boolean>;
   onResyncManifest: (appSlugs: string[]) => Promise<boolean>;
 }
-
-const DOT: Record<AppStatusKey, "ok" | "warn" | "error" | "muted" | "pending"> = {
-  live: "ok",
-  ready: "ok",
-  pending: "warn",
-  provisioning: "pending",
-  failed: "error",
-  archived: "muted",
-};
 
 // The row's link is an ::after overlay stretched across the whole row; a
 // tooltip, link or button in a cell has to sit above it to be reachable.
@@ -115,7 +106,7 @@ function AppStatus({ app }: { app: AppRow }) {
   const key = appStatusKey(app);
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
-      <StatusDot status={DOT[key]} />
+      <StatusDot status={APP_STATUS_DOT[key]} />
       <span className="truncate">{t(`status.${key}`)}</span>
       <ExpiryBadge expiresAt={app.expiresAt} />
     </span>

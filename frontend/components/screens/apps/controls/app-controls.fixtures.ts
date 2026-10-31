@@ -29,6 +29,8 @@ export const ENV_PROD: AstroliftAppEnvironment = {
   kind: "production",
   region: "us-west-2",
   ownedByMe: false,
+  reachabilityStatus: "REACHABLE",
+  reachabilityDetail: "",
   viewerPermissions: ["app.deploy", "app.update"],
   clusterId: "c0ffee00-0000-4000-8000-000000000001",
   clusterSlug: "prod-west",

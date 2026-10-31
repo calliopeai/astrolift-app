@@ -2174,23 +2174,23 @@
           "failed": "Réessayez pour reconstruire le dépôt du registre et l’espace de noms.",
           "pending": "Démarrez-le pour mettre l’application en ligne.",
           "provisioning": "Patientez ; relancez uniquement en cas de blocage.",
-          "ready_missing_registry": "Reprovisionnez pour reconstruire le dépôt du registre de conteneurs et les identifiants de publication. Jusque-là, les déploiements resteront sans effet et sans avertissement.",
-          "unknown": "Reprovisionnez pour rétablir l’application."
+          "ready_missing_registry": "Forcez le redéploiement pour reconstruire le dépôt du registre de conteneurs et les identifiants de publication. Jusque-là, les déploiements resteront sans effet et sans avertissement.",
+          "unknown": "Forcez le redéploiement pour rétablir l’application."
         },
         "elapsed": "démarré il y a {minutes} min",
-        "cta": "Reprovisionner",
+        "cta": "Forcer le redéploiement",
         "confirm": {
-          "title": "Reprovisionner {slug} ?",
+          "title": "Forcer le redéploiement de {slug} ?",
           "description": "Annule les déploiements en cours, supprime les objets Kubernetes de chaque charge de travail et relance le workflow CI de déploiement. Les approbations existantes sont réexécutées.",
-          "confirm": "Oui, reprovisionner"
+          "confirm": "Oui, forcer le redéploiement"
         },
         "toast": {
-          "dispatched": "Reprovisionnement lancé : le workflow de déploiement est relancé.",
+          "dispatched": "Redéploiement forcé lancé : le workflow de déploiement est relancé.",
           "partial": "Récupération partielle : le nettoyage a été effectué, mais le lancement du déploiement a échoué ({message})."
         },
         "error": {
-          "noResponse": "Échec du reprovisionnement : aucune réponse du serveur.",
-          "generic": "Échec du reprovisionnement."
+          "noResponse": "Échec du redéploiement forcé : aucune réponse du serveur.",
+          "generic": "Échec du redéploiement forcé."
         }
       },
       "configDrift": {
@@ -2772,7 +2772,8 @@
         "ci": "ci",
         "scheduled": "planifié",
         "rollback": "restauration",
-        "promotion": "promotion"
+        "promotion": "promotion",
+        "reprovision": "reprovisionnement"
       },
       "label": "Déploiements",
       "emptyCurrentTitle": "Aucun déploiement pour le moment",
@@ -3872,6 +3873,8 @@
       "status": {
         "ready": "Prête",
         "live": "En ligne",
+        "needs_reprovision": "Reprovisionnement requis",
+        "no_managed_domain": "Aucun domaine géré",
         "pending": "En attente",
         "provisioning": "Provisionnement",
         "failed": "Échec",
@@ -7355,8 +7358,16 @@
         "failed": "Échec du changement de sous-domaine.",
         "changed": "Sous-domaine changé en {subdomain}.",
         "copied": "URL copiée dans le presse-papiers.",
-        "copyFailed": "Copie impossible : presse-papiers indisponible."
-      }
+        "copyFailed": "Copie impossible : presse-papiers indisponible.",
+        "reprovisionRunning": "Reprovisionnement en cours ; le statut sera mis à jour une fois terminé.",
+        "reprovisionUnchanged": "Rien à reprovisionner : tout est déjà en place.",
+        "reprovisionDone": "Reprovisionné : {created} créés, {updated} mis à jour.",
+        "reprovisionFailed": "Échec du reprovisionnement.",
+        "reprovisionNoResponse": "Échec du reprovisionnement : aucune réponse du serveur."
+      },
+      "noManagedDomain": "Aucun domaine géré",
+      "needsReprovision": "Reprovisionnement requis",
+      "reprovision": "Reprovisionner"
     }
   },
   "projectResources": {
@@ -16749,7 +16760,8 @@
           "ci": "ci",
           "scheduled": "planifié",
           "rollback": "restauration",
-          "promotion": "promotion"
+          "promotion": "promotion",
+          "reprovision": "reprovisionnement"
         },
         "since": {
           "today": "Aujourd’hui",

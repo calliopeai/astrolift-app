@@ -2180,23 +2180,23 @@
           "failed": "再試行してレジストリのリポジトリと名前空間を再構築してください。",
           "pending": "開始するとアプリがオンラインになります。",
           "provisioning": "しばらくお待ちください。停止した場合のみ再実行してください。",
-          "ready_missing_registry": "再プロビジョニングしてコンテナレジストリのリポジトリとプッシュ用認証情報を再構築してください。それまではデプロイが実行されず、警告も表示されません。",
-          "unknown": "再プロビジョニングして復旧してください。"
+          "ready_missing_registry": "強制再デプロイしてコンテナレジストリのリポジトリとプッシュ用認証情報を再構築してください。それまではデプロイが実行されず、警告も表示されません。",
+          "unknown": "強制再デプロイして復旧してください。"
         },
         "elapsed": "{minutes}分前に開始",
-        "cta": "再プロビジョニング",
+        "cta": "強制再デプロイ",
         "confirm": {
-          "title": "{slug}を再プロビジョニングしますか？",
+          "title": "{slug} を強制再デプロイしますか？",
           "description": "進行中のデプロイを取り消し、各ワークロードのKubernetesオブジェクトを削除し、デプロイ用CIワークフローを再実行します。既存の承認も再実行されます。",
-          "confirm": "はい、再プロビジョニングします"
+          "confirm": "はい、強制再デプロイします"
         },
         "toast": {
-          "dispatched": "再プロビジョニングを開始しました。デプロイワークフローを再実行しています。",
+          "dispatched": "強制再デプロイを開始しました。デプロイワークフローを再実行しています。",
           "partial": "一部のみ復旧しました。クリーンアップは完了しましたが、デプロイの開始に失敗しました（{message}）。"
         },
         "error": {
-          "noResponse": "再プロビジョニングに失敗しました。サーバーから応答がありません。",
-          "generic": "再プロビジョニングに失敗しました。"
+          "noResponse": "強制再デプロイに失敗しました。サーバーから応答がありません。",
+          "generic": "強制再デプロイに失敗しました。"
         }
       },
       "configDrift": {
@@ -2778,7 +2778,8 @@
         "ci": "CI",
         "scheduled": "スケジュール",
         "rollback": "ロールバック",
-        "promotion": "昇格"
+        "promotion": "昇格",
+        "reprovision": "再プロビジョニング"
       },
       "label": "デプロイ",
       "emptyCurrentTitle": "デプロイはまだありません",
@@ -3878,6 +3879,8 @@
       "status": {
         "ready": "準備完了",
         "live": "稼働中",
+        "needs_reprovision": "再プロビジョニングが必要",
+        "no_managed_domain": "管理対象ドメインがありません",
         "pending": "待機中",
         "provisioning": "プロビジョニング中",
         "failed": "失敗",
@@ -7352,8 +7355,16 @@
         "failed": "サブドメインの変更に失敗しました。",
         "changed": "サブドメインを {subdomain} に変更しました。",
         "copied": "URL をクリップボードにコピーしました。",
-        "copyFailed": "コピーできません: クリップボードを利用できません。"
-      }
+        "copyFailed": "コピーできません: クリップボードを利用できません。",
+        "reprovisionRunning": "再プロビジョニング中です。完了するとステータスが更新されます。",
+        "reprovisionUnchanged": "再プロビジョニングするものはありません。すべてそろっています。",
+        "reprovisionDone": "再プロビジョニングしました。作成 {created} 件、更新 {updated} 件。",
+        "reprovisionFailed": "再プロビジョニングに失敗しました。",
+        "reprovisionNoResponse": "再プロビジョニングに失敗しました。サーバーから応答がありません。"
+      },
+      "noManagedDomain": "管理対象ドメインがありません",
+      "needsReprovision": "再プロビジョニングが必要",
+      "reprovision": "再プロビジョニング"
     }
   },
   "projectResources": {
@@ -16746,7 +16757,8 @@
           "ci": "CI",
           "scheduled": "スケジュール",
           "rollback": "ロールバック",
-          "promotion": "昇格"
+          "promotion": "昇格",
+          "reprovision": "再プロビジョニング"
         },
         "since": {
           "today": "今日",

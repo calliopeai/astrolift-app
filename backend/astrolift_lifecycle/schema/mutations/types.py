@@ -9,6 +9,7 @@ from astrolift_graphql.errors import MutationErrorType
 from astrolift_lifecycle.schema.types import (
     DeploymentType,
     DeployTokenType,
+    ReachabilityStatus,
 )
 from astrolift_registry.schema.types import WorkloadActionTargetType
 
@@ -532,6 +533,48 @@ class ForceRedeployPayload:
     workflow_dispatched: bool
     run_url: str | None
     dispatch_message: str | None
+
+
+@strawberry.input(name="ReprovisionAppInput")
+class ReprovisionAppInput:
+    """Input for ``reprovisionApp`` (#2573). Omitting ``environment_name``
+    reprovisions every environment of the app."""
+
+    app_slug: str
+    environment_name: str | None = None
+
+
+@strawberry.type(name="ReprovisionEnvironmentResult")
+class ReprovisionEnvironmentResult:
+    environment_name: str
+    deployment_id: strawberry.ID | None = strawberry.field(
+        description=(
+            "The reprovision deployment: the one this call started, or the one already running that it "
+            "joined. Null when the environment has no running release, so only its domain binding, URL "
+            "and hostname claims were reconciled."
+        )
+    )
+    reachability_status: ReachabilityStatus = strawberry.field(
+        description="The environment's reachabilityStatus when the call returned; PROVISIONING while its run goes on."
+    )
+    objects_created: list[str] = strawberry.field(
+        description=(
+            "Kind/name of what this call created: hostname claims, and the objects the apply created when "
+            "the run finished within the call. Empty while it runs."
+        )
+    )
+    objects_updated: list[str] = strawberry.field(
+        description="Kind/name of what this call changed: the environment row, and objects the apply patched."
+    )
+    unchanged: bool = strawberry.field(
+        description="True when the run finished and nothing was created or updated."
+    )
+
+
+@strawberry.type(name="ReprovisionAppPayload")
+class ReprovisionAppPayload:
+    app_slug: str
+    environments: list[ReprovisionEnvironmentResult]
 
 
 @strawberry.input

@@ -2174,23 +2174,23 @@
           "failed": "Reintenta para reconstruir el repositorio del registro y el espacio de nombres.",
           "pending": "Inícialo para poner la aplicación en línea.",
           "provisioning": "Espera; vuelve a ejecutarlo solo si se bloquea.",
-          "ready_missing_registry": "Vuelve a aprovisionar para reconstruir el repositorio del registro de contenedores y la credencial de publicación. Hasta entonces, los despliegues no harán nada ni mostrarán avisos.",
-          "unknown": "Vuelve a aprovisionar para recuperar la aplicación."
+          "ready_missing_registry": "Fuerza un nuevo despliegue para reconstruir el repositorio del registro de contenedores y la credencial de publicación. Hasta entonces, los despliegues no harán nada ni mostrarán avisos.",
+          "unknown": "Fuerza un nuevo despliegue para recuperar la aplicación."
         },
         "elapsed": "iniciado hace {minutes} min",
-        "cta": "Volver a aprovisionar",
+        "cta": "Forzar un nuevo despliegue",
         "confirm": {
-          "title": "¿Volver a aprovisionar {slug}?",
+          "title": "¿Forzar un nuevo despliegue de {slug}?",
           "description": "Cancela los despliegues en curso, elimina los objetos de Kubernetes de cada carga de trabajo y vuelve a ejecutar el flujo de despliegue de CI. Las aprobaciones existentes se vuelven a ejecutar.",
-          "confirm": "Sí, volver a aprovisionar"
+          "confirm": "Sí, forzar un nuevo despliegue"
         },
         "toast": {
-          "dispatched": "Reaprovisionamiento solicitado: el flujo de despliegue se está ejecutando de nuevo.",
+          "dispatched": "Nuevo despliegue forzado solicitado: el flujo de despliegue se está ejecutando de nuevo.",
           "partial": "Recuperación parcial: se realizó la limpieza, pero no se pudo iniciar el despliegue ({message})."
         },
         "error": {
-          "noResponse": "El reaprovisionamiento falló: el servidor no respondió.",
-          "generic": "El reaprovisionamiento falló."
+          "noResponse": "El nuevo despliegue forzado falló: el servidor no respondió.",
+          "generic": "El nuevo despliegue forzado falló."
         }
       },
       "configDrift": {
@@ -2772,7 +2772,8 @@
         "ci": "ci",
         "scheduled": "programado",
         "rollback": "reversión",
-        "promotion": "promoción"
+        "promotion": "promoción",
+        "reprovision": "reaprovisionamiento"
       },
       "label": "Despliegues",
       "emptyCurrentTitle": "Aún no hay despliegues",
@@ -3872,6 +3873,8 @@
       "status": {
         "ready": "Lista",
         "live": "En línea",
+        "needs_reprovision": "Requiere reaprovisionar",
+        "no_managed_domain": "Sin dominio administrado",
         "pending": "Pendiente",
         "provisioning": "Aprovisionando",
         "failed": "Falló",
@@ -7355,8 +7358,16 @@
         "failed": "Error al cambiar el subdominio.",
         "changed": "Subdominio cambiado a {subdomain}.",
         "copied": "URL copiada al portapapeles.",
-        "copyFailed": "No se pudo copiar: portapapeles no disponible."
-      }
+        "copyFailed": "No se pudo copiar: portapapeles no disponible.",
+        "reprovisionRunning": "Reaprovisionando; el estado se actualizará cuando termine.",
+        "reprovisionUnchanged": "Nada que reaprovisionar: todo ya está en su lugar.",
+        "reprovisionDone": "Reaprovisionado: {created} creados, {updated} actualizados.",
+        "reprovisionFailed": "El reaprovisionamiento falló.",
+        "reprovisionNoResponse": "El reaprovisionamiento falló: el servidor no respondió."
+      },
+      "noManagedDomain": "Sin dominio administrado",
+      "needsReprovision": "Requiere reaprovisionar",
+      "reprovision": "Volver a aprovisionar"
     }
   },
   "projectResources": {
@@ -16600,7 +16611,8 @@
           "ci": "ci",
           "scheduled": "programado",
           "rollback": "reversión",
-          "promotion": "promoción"
+          "promotion": "promoción",
+          "reprovision": "reaprovisionamiento"
         },
         "since": {
           "today": "Hoy",

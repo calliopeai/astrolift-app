@@ -4,6 +4,8 @@ PreviewEnvironment, IngressRule, CustomDomain."""
 from __future__ import annotations
 
 import datetime as dt
+import enum
+from typing import Any
 
 import strawberry
 
@@ -11,6 +13,23 @@ from astrolift_graphql import GUID
 from core.schema.enums import ObservabilityPanelReason
 
 JSON = strawberry.scalars.JSON
+
+
+@strawberry.enum(
+    name="ReachabilityStatus",
+    description=(
+        "Whether public hosts answer (#2573). REACHABLE: every public host has its Ingress, a Ready "
+        "certificate, a hostname claim and the environment URL. PROVISIONING: a deploy is in flight, a "
+        "certificate is being issued, or the first deploy has not run. NO_MANAGED_DOMAIN: no zone "
+        "resolves for the organization. NEEDS_REPROVISION: something else is missing; reprovisionApp "
+        "puts it back."
+    ),
+)
+class ReachabilityStatus(enum.Enum):
+    REACHABLE = "reachable"
+    PROVISIONING = "provisioning"
+    NEEDS_REPROVISION = "needs_reprovision"
+    NO_MANAGED_DOMAIN = "no_managed_domain"
 
 
 @strawberry.type(name="AstroliftReleaseNotesCommit")
@@ -146,6 +165,26 @@ class AppEnvironmentType:
             "advisory, the mutation still decides."
         ),
     )
+    row_pk: strawberry.Private[int | None] = None
+    reachability: strawberry.Private[Any] = None
+
+    @strawberry.field(
+        description=(
+            "Whether this environment's public hosts answer, checked against the cluster when it can be "
+            "read (#2573)."
+        )
+    )
+    def reachability_status(self) -> ReachabilityStatus:
+        return ReachabilityStatus(self.reachability.environment(self.row_pk).status)
+
+    @strawberry.field(
+        description=(
+            "What is missing or still in progress, or why the cluster could not be checked; empty when "
+            "there is nothing to say."
+        )
+    )
+    def reachability_detail(self) -> str:
+        return self.reachability.environment(self.row_pk).detail
 
 
 @strawberry.type(name="AstroliftDeploymentApprover")
@@ -597,9 +636,12 @@ def _env_url(env) -> str:
 
 
 def app_env_to_type(
-    env, *, keys: list[str] | None = None, viewer_permissions: list[str] | None = None
+    env, *, keys: list[str] | None = None, viewer_permissions: list[str] | None = None, info: Any = None
 ) -> AppEnvironmentType:
-    """``viewer_permissions`` is a list resolver's batched answer; a single row works out its own."""
+    """``viewer_permissions`` is a list resolver's batched answer; a single row works out its own.
+    ``info`` lets the rows of one response share a reachability batch."""
+    from astrolift_lifecycle.reachability import request_reachability
+
     if viewer_permissions is None:
         from astrolift_lifecycle.viewer_permissions import environment_viewer_permissions
 
@@ -633,6 +675,8 @@ def app_env_to_type(
         owner_user_id=str(owner_id) if owner_id else None,
         owned_by_me=_viewer_started(owner_id),
         viewer_permissions=viewer_permissions,
+        row_pk=env.pk,
+        reachability=request_reachability(info).track_environment(env),
     )
 
 
