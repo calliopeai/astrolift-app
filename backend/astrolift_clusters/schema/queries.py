@@ -21,6 +21,7 @@ from astrolift_clusters.models import (
     ManagedDomain,
     ProviderPlugin,
     TenantCluster,
+    effective_default_ids,
 )
 from astrolift_clusters.schema.types import (
     BootstrapPlanType,
@@ -495,7 +496,8 @@ class ClustersQuery:
 
         domains = list(qs)
         clusters = provision_clusters(domains)
-        return [domain_to_type(d, provision_clusters=clusters) for d in domains]
+        defaults = effective_default_ids(domains)
+        return [domain_to_type(d, provision_clusters=clusters, effective_defaults=defaults) for d in domains]
 
     @strawberry.field
     @require_permission(

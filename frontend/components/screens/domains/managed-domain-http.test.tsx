@@ -9,7 +9,11 @@ import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainDetailClient } from "@/app/(app)/domains/[id]/domain-detail-client";
 import en from "@/messages/en.json";
-import { DOMAIN_ACTIVE, DOMAIN_DIAGNOSTICS } from "./domains-environments.fixtures";
+import {
+  DOMAIN_ACTIVE,
+  DOMAIN_DIAGNOSTICS,
+  ZONE_DEPENDENTS,
+} from "./domains-environments.fixtures";
 
 const identity = vi.hoisted(() => ({ org: "", actor: "" }));
 vi.mock("@/graphql/identity/identity.hooks", () => ({
@@ -19,6 +23,7 @@ vi.mock("@/graphql/user/user.hooks", () => ({
   useMe: () => ({ user: { id: identity.actor }, loading: false, error: null }),
 }));
 const schema = buildSchema(readFileSync(`${process.cwd()}/schema.graphql`, "utf8"));
+const KEPT = `${DOMAIN_ACTIVE.zone} is the effective default zone for new app hostnames.`;
 type Request = { operationName: string; variables: Record<string, unknown> };
 let server: Server,
   client: ApolloClient,
@@ -31,6 +36,7 @@ let server: Server,
   probeForeign: boolean,
   refusedDelete: boolean,
   unknownDelete: boolean,
+  keptDefault: boolean,
   canVerify: boolean,
   supportAllowed: boolean,
   supportFailure: boolean,
@@ -44,7 +50,7 @@ beforeEach(async () => {
   observation = structuredClone(DOMAIN_DIAGNOSTICS);
   requests = [];
   failures = [];
-  missing = refused = probeForeign = refusedDelete = unknownDelete = false;
+  missing = refused = probeForeign = refusedDelete = unknownDelete = keptDefault = false;
   canVerify = false;
   supportAllowed = true;
   supportFailure = false;
@@ -118,7 +124,7 @@ beforeEach(async () => {
       errors: [],
       data: { zone, signaled: true, message: "Accepted" },
     }),
-    softDeleteManagedDomain: ({ input }: { input: { id: string } }) =>
+    softDeleteManagedDomain: ({ input }: { input: { id: string; force: boolean } }) =>
       unknownDelete
         ? {
             ok: true,
@@ -131,7 +137,20 @@ beforeEach(async () => {
               errors: [{ code: "FORBIDDEN", message: "Current removal authority refused" }],
               data: null,
             }
-          : { ok: true, errors: [], data: { id: input.id, deleted: true } },
+          : keptDefault && !input.force
+            ? {
+                ok: false,
+                errors: [
+                  {
+                    code: "PRECONDITION",
+                    field: "force",
+                    message: KEPT,
+                    dependents: { total: 2, items: ZONE_DEPENDENTS.slice(0, 2) },
+                  },
+                ],
+                data: null,
+              }
+            : { ok: true, errors: [], data: { id: input.id, deleted: true } },
   };
   server = createServer(async (req, res) => {
     let body = "";
@@ -549,6 +568,59 @@ describe("actual exported domain schema over HttpLink", () => {
     );
     await screen.findByText(en.managedDomains.acceptedUnverified);
     expect(screen.queryByText(en.managedDomains.removed)).not.toBeInTheDocument();
+  });
+  it("asks for the zone before it forces the removal of the effective default (#2572)", async () => {
+    domain = {
+      ...domain,
+      isEffectiveDefault: true,
+      dependentApps: ZONE_DEPENDENTS,
+      dependentAppCount: 14,
+    };
+    render(<View />);
+    await ready();
+    expect(screen.getByText(en.managedDomains.effectiveDefault)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Remove domain" }));
+    const dialog = within(screen.getByRole("alertdialog"));
+    expect(dialog.getByText(en.managedDomains.defaultDeleteTitle)).toBeInTheDocument();
+    expect(dialog.getByText("storefront · staging")).toBeInTheDocument();
+    expect(dialog.getByText("and 11 more")).toBeInTheDocument();
+    const remove = dialog.getByRole("button", { name: en.managedDomains.defaultDeleteConfirm });
+    expect(remove).toBeDisabled();
+    fireEvent.change(
+      dialog.getByLabelText(`${en.managedDomains.defaultDeleteTypeToConfirm} ${domain.zone}`),
+      { target: { value: domain.zone } }
+    );
+    fireEvent.click(remove);
+    await screen.findByText(en.managedDomains.removed);
+    expect(requests.find((r) => r.operationName === "SoftDeleteManagedDomain")?.variables).toEqual({
+      input: { id: domain.id, force: true },
+    });
+  });
+  it("reopens a removal the server kept as the default-zone confirmation (#2572)", async () => {
+    keptDefault = true;
+    render(<View />);
+    await ready();
+    fireEvent.click(screen.getByRole("button", { name: "Remove domain" }));
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove domain" })
+    );
+    await screen.findByText(KEPT);
+    const dialog = within(screen.getByRole("alertdialog"));
+    expect(dialog.getByText(en.managedDomains.defaultDeleteRefused)).toBeInTheDocument();
+    expect(dialog.getByText("Environments that resolve through it: 2")).toBeInTheDocument();
+    expect(screen.queryByText(en.managedDomains.removed)).not.toBeInTheDocument();
+    fireEvent.change(
+      dialog.getByLabelText(`${en.managedDomains.defaultDeleteTypeToConfirm} ${domain.zone}`),
+      { target: { value: domain.zone } }
+    );
+    fireEvent.click(dialog.getByRole("button", { name: en.managedDomains.defaultDeleteConfirm }));
+    await screen.findByText(en.managedDomains.removed);
+    expect(
+      requests.filter((r) => r.operationName === "SoftDeleteManagedDomain").map((r) => r.variables)
+    ).toEqual([
+      { input: { id: domain.id, force: false } },
+      { input: { id: domain.id, force: true } },
+    ]);
   });
 });
 

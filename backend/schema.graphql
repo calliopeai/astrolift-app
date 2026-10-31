@@ -4024,6 +4024,49 @@ type AstroliftManagedDomain {
   challengeRecordName: String!
   challengeRecordValue: String!
   verifiedAt: DateTime
+
+  """
+  Whether new apps get their hostnames under this zone now (#2572): the zone resolution picks for the organization that owns it, the shared zone every organization without its own falls through to, or an organization's explicit default. Deleting one asks for force.
+  """
+  isEffectiveDefault: Boolean!
+
+  """
+  The first ten app environments bound to this zone (#2572), whose hostnames go with it when it is deleted: your organization's apps you may read, and on a shared zone every organization's for the platform operator.
+  """
+  dependentApps: [AstroliftManagedDomainDependent!]!
+
+  """How many environments dependentApps draws from (#2572)."""
+  dependentAppCount: Int!
+}
+
+type AstroliftManagedDomainBinding {
+  organizationSlug: String!
+  appSlug: String!
+  environmentName: String!
+  zone: String!
+  previousUrl: String!
+  url: String!
+}
+
+type AstroliftManagedDomainBindingBackfill {
+  dryRun: Boolean!
+  found: Int!
+  updated: Int!
+  skipped: Int!
+  bindings: [AstroliftManagedDomainBinding!]!
+}
+
+type AstroliftManagedDomainBindingBackfillMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftManagedDomainBindingBackfill
+}
+
+type AstroliftManagedDomainDependent {
+  organizationSlug: String!
+  appSlug: String!
+  environmentName: String!
+  url: String!
 }
 
 type AstroliftManagedDomainMutationResult {
@@ -7507,6 +7550,10 @@ type AvailableTransition {
   conditionsMet: Boolean!
 }
 
+input BackfillManagedDomainBindingsInput {
+  dryRun: Boolean! = false
+}
+
 type BedrockModelConnectionAction {
   enabled: Boolean!
   allowed: Boolean!
@@ -10482,6 +10529,7 @@ type Mutation {
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   softDeleteManagedDomain(input: SoftDeleteManagedDomainInput!): SoftdeletepayloadMutationResult!
+  backfillManagedDomainBindings(input: BackfillManagedDomainBindingsInput!): AstroliftManagedDomainBindingBackfillMutationResult!
   verifyManagedDomain(input: VerifyManagedDomainInput!): VerifyManagedDomainPayloadMutationResult!
   provisionManagedDomain(clusterId: GUID!, zone: String!, isPlatformManagedZone: Boolean! = false): ProvisionManagedDomainPayloadMutationResult!
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!
@@ -10838,6 +10886,19 @@ type MutationError {
   requestedVersion: Int
   supportedMethods: [String!]
   approvalRequestId: String
+  dependents: MutationErrorDependents
+}
+
+type MutationErrorDependent {
+  organizationSlug: String!
+  appSlug: String!
+  environmentName: String!
+  url: String!
+}
+
+type MutationErrorDependents {
+  total: Int!
+  items: [MutationErrorDependent!]!
 }
 
 """Standard mutation result with ok flag and validation errors."""
@@ -12704,6 +12765,7 @@ input SoftDeleteByGuidInput {
 
 input SoftDeleteManagedDomainInput {
   id: GUID!
+  force: Boolean! = false
 }
 
 type Softdeletepayload {
