@@ -103,3 +103,38 @@ export function useIngressClass(cluster: AstroliftTenantCluster) {
     onApply,
   };
 }
+
+/**
+ * Whether apps on this cluster may skip the edge login when they ask
+ * (#2504). Turning it off gates every app on the cluster again at once. The
+ * data half of PublicAppsView.
+ */
+export function usePublicApps(cluster: AstroliftTenantCluster) {
+  const t = useTranslations("clusterSettings.publicApps");
+  const [update, { loading }] = useMutation<{
+    updateTenantCluster: MutationResult<AstroliftTenantCluster>;
+  }>(UPDATE_TENANT_CLUSTER, {
+    refetchQueries: (result) => (result.data?.updateTenantCluster.ok ? ["GetCluster"] : []),
+    onQueryUpdated: (query) => refetchAfterMutation(query, t("refreshWarning")),
+    awaitRefetchQueries: true,
+  });
+
+  /** Throws on refusal, so the confirm dialog stays open with the error. */
+  async function onApply(allow: boolean) {
+    const { data } = await update({
+      variables: { input: { id: cluster.id, allowPublicApps: allow } },
+    });
+    if (!data?.updateTenantCluster.ok) {
+      throw new Error(data?.updateTenantCluster.errors?.[0]?.message ?? t("changeFailed"));
+    }
+    toast.success(allow ? t("allowedToast") : t("refusedToast"));
+  }
+
+  return {
+    clusterId: cluster.id,
+    allowed: cluster.allowPublicApps ?? true,
+    envoy: cluster.ingressClass === "envoy",
+    saving: loading,
+    onApply,
+  };
+}

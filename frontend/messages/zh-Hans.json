@@ -3118,6 +3118,29 @@
         "saveFailed": "保存失败。",
         "membersDescription": "谁可以查看和修改此应用：在此分配的角色及共享应用的团队。",
         "edgeDescription": "谁可以访问应用 URL。边缘决定谁能进入，角色决定谁能修改应用。"
+      },
+      "public": {
+        "title": "公开访问",
+        "on": "公开",
+        "off": "需要登录",
+        "description": "公开后，应用的平台 URL 无需集群登录即可访问。应用自身的登录仍然有效，自定义域名保留各自的设置。",
+        "states": {
+          "public": "无需登录即可访问",
+          "gated": "需要登录",
+          "no_gate": "此集群没有登录，应用处于开放状态",
+          "not_envoy": "仍需登录：只有 Envoy 边缘会执行此开关",
+          "cluster_disallows": "仍需登录：此集群不允许公开应用",
+          "restricted": "仍需登录：应用设置了访问列表"
+        },
+        "makePublic": "设为公开…",
+        "makePrivate": "恢复为需要登录",
+        "restrictedHint": "请先清空访问列表；它只在登录之后生效。",
+        "confirmTitle": "将 {app} 设为公开？",
+        "confirmDescription": "任何访问该应用平台 URL 的人都无需登录集群即可使用应用，只有应用自身的认证保护它。你可能需要再次验证身份。",
+        "confirm": "设为公开",
+        "madePublic": "在集群允许的位置，应用已公开。",
+        "madePrivate": "应用已恢复为需要登录。",
+        "saveFailed": "更改失败。"
       }
     },
     "members": {
@@ -5682,7 +5705,9 @@
         }
       },
       "allowStepUpPin": "允许使用个人 PIN 进行验证",
-      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。"
+      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。",
+      "trustedDomainSignup": "为受信任域创建账户",
+      "trustedDomainSignupHint": "使用本组织受信任域下已验证邮箱登录的人会获得账户，并以该域的默认角色加入。若只允许已有账户的人，请保持关闭。"
     },
     "sections": {
       "houseTheme": "内部主题",
@@ -11426,6 +11451,23 @@
       "searchReleases": "搜索发布版本、版本号…",
       "noReleases": "没有已安装的发布版本",
       "started": "开始时间"
+    },
+    "publicApps": {
+      "title": "公开应用",
+      "description": "所有者开启后，此集群上的应用是否可以无需上方的登录即可访问。关闭后，无论应用如何请求，所有应用都需要登录。",
+      "allowed": "已允许",
+      "refused": "不允许",
+      "notEnvoy": "只有 Envoy 边缘会执行应用的请求；在此集群的边缘上，所有应用仍需登录。",
+      "allow": "允许公开应用",
+      "refuse": "停止公开应用",
+      "allowTitle": "允许此集群上的公开应用？",
+      "allowReview": "所有者已设为公开的应用会立即无需登录即可访问。",
+      "refuseTitle": "停止此集群上的公开应用？",
+      "refuseReview": "此集群上的所有公开应用会立即恢复为需要登录。",
+      "allowedToast": "已允许公开应用。",
+      "refusedToast": "已停止公开应用；所有应用都需要登录。",
+      "changeFailed": "更改失败。",
+      "refreshWarning": "更改已接受，但无法刷新集群详情。请刷新以查看当前状态。"
     }
   },
   "obsPanelReason": {
@@ -15120,6 +15162,16 @@
     "delete": "移除域名",
     "deleteTitle": "移除托管域名？",
     "deleteHelp": "这将启动现有的域名移除操作。提供商的托管记录和证书可能会被移除，应用主机名可能不再解析。继续前请检查当前路由。",
+    "effectiveDefault": "实际默认",
+    "defaultDeleteTitle": "移除默认区域？",
+    "defaultDeleteHelp": "新应用的主机名位于此区域之下。移除后注册的应用将使用下一个默认区域，若没有则不会获得主机名。",
+    "defaultDeleteRefused": "Astrolift 保留了此区域：它是新应用主机名的默认区域。",
+    "defaultDependentsLabel": "此区域下的环境",
+    "defaultDependentsNone": "尚无环境通过它解析。",
+    "defaultDependentsCount": "通过它解析的环境：{count} 个",
+    "defaultDependentsMore": "以及另外 {count} 个",
+    "defaultDeleteTypeToConfirm": "请输入区域名称以确认：",
+    "defaultDeleteConfirm": "移除默认区域",
     "actionFailed": "操作被拒绝。请读取当前状态后再重试。",
     "actionUncertain": "无法确认操作响应。请读取当前域名和提供商状态后再重试。",
     "acceptedUnverified": "写入已被接受，但无法验证返回的元数据。执行其他操作前请刷新当前状态。",

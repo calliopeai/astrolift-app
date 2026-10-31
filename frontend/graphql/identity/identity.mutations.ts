@@ -164,13 +164,14 @@ export const UPDATE_ORGANIZATION = gql`
         auditLogRetentionDays
         appearanceDefault
         appearanceLocked
-      appearanceDefault
-      appearanceLocked
+        appearanceDefault
+        appearanceLocked
         restrictedSettingsDefault
         previewMaxActiveDefault
         logRetentionDaysDefault
         allowUserProfileEdit
         allowStepUpPin
+        trustedDomainSignup
       }
     }
   }

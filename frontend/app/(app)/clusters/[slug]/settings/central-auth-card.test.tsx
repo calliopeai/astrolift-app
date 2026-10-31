@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
-import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
+import { CentralAuthCard, IngressClassCard, PublicAppsCard } from "./central-auth-card";
 
 /**
  * Central auth and the ingress class, from the UI (#2119). Secrets are
@@ -111,5 +111,28 @@ describe("IngressClassCard (#2119)", () => {
     expect(calls.variables[0]).toEqual({
       input: { id: "c1", ingressClass: "envoy", syncManifests: false },
     });
+  });
+});
+
+describe("PublicAppsCard (#2504)", () => {
+  it("stops public apps on the cluster after asking", async () => {
+    render(<PublicAppsCard cluster={cluster({ ingressClass: "envoy", allowPublicApps: true })} />);
+    expect(screen.getByText("Allowed")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Stop public apps" }));
+
+    expect(
+      await screen.findByText("Every public app on this cluster goes behind the sign-in at once.")
+    ).toBeInTheDocument();
+    expect(calls.variables).toHaveLength(0);
+    fireEvent.click(screen.getAllByRole("button", { name: "Stop public apps" }).at(-1)!);
+
+    await waitFor(() => expect(calls.variables).toHaveLength(1));
+    expect(calls.variables[0]).toEqual({ input: { id: "c1", allowPublicApps: false } });
+  });
+
+  it("says an edge other than Envoy keeps every app behind the sign-in", () => {
+    render(<PublicAppsCard cluster={cluster({ ingressClass: "alb", allowPublicApps: false })} />);
+    expect(screen.getByText("Not allowed")).toBeInTheDocument();
+    expect(screen.getByText(/Only the Envoy edge honours/)).toBeInTheDocument();
   });
 });

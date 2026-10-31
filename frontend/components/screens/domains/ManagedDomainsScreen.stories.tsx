@@ -6,6 +6,7 @@ import { type ListState, useLocalListState } from "@/components/list/use-list-st
 
 import {
   DOMAIN_ACTIVE,
+  DOMAIN_DEFAULT,
   DOMAIN_LONG,
   DOMAIN_PROVISIONING,
   DOMAIN_STALLED,
@@ -77,6 +78,22 @@ export const NotProvisioned: Story = {
       initial={{ view: "pending" }}
     />
   ),
+};
+
+/** #2572: the zone new apps get their hostnames under is marked; no other row is. */
+export const EffectiveDefault: Story = {
+  render: () => (
+    <Screen
+      {...MANAGED_DOMAINS}
+      domains={[DOMAIN_DEFAULT, DOMAIN_PROVISIONING, DOMAIN_UNPROVISIONED]}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getAllByText("Effective default")).toHaveLength(1);
+    const row = canvas.getByText(DOMAIN_DEFAULT.zone).closest("tr");
+    await expect(row && within(row).getByText("Effective default")).toBeVisible();
+  },
 };
 
 /** A revalidate and a delete in flight: the row actions are disabled. */

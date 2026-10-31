@@ -3118,6 +3118,29 @@
         "saveFailed": "Falha ao salvar.",
         "membersDescription": "Quem pode ver e alterar este app: os papéis atribuídos aqui e as equipes com as quais ele é compartilhado.",
         "edgeDescription": "Quem pode acessar a URL do app. A borda decide quem pode entrar; os papéis decidem quem pode alterá-lo."
+      },
+      "public": {
+        "title": "Acesso público",
+        "on": "Pública",
+        "off": "Atrás do login",
+        "description": "Quando pública, a URL de plataforma do app responde sem o login do cluster. O login do próprio app continua valendo, e domínios personalizados mantêm sua própria configuração.",
+        "states": {
+          "public": "responde sem login",
+          "gated": "atrás do login",
+          "no_gate": "este cluster não tem login, então o app está aberto",
+          "not_envoy": "continua atrás do login: só o edge do Envoy respeita esta opção",
+          "cluster_disallows": "continua atrás do login: este cluster não permite apps públicos",
+          "restricted": "continua atrás do login: o app tem uma lista de acesso"
+        },
+        "makePublic": "Tornar público…",
+        "makePrivate": "Colocar atrás do login",
+        "restrictedHint": "Limpe primeiro a lista de acesso; ela só se aplica atrás do login.",
+        "confirmTitle": "Tornar {app} público?",
+        "confirmDescription": "Quem chegar à URL de plataforma do app o acessa sem entrar no cluster. Só a autenticação do próprio app o protege. Talvez seja preciso confirmar sua identidade.",
+        "confirm": "Tornar público",
+        "madePublic": "O app está público onde o cluster permite.",
+        "madePrivate": "O app voltou a ficar atrás do login.",
+        "saveFailed": "Falha ao alterar."
       }
     },
     "members": {
@@ -5682,7 +5705,9 @@
         }
       },
       "allowStepUpPin": "Permitir verificação com PIN pessoal",
-      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação."
+      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação.",
+      "trustedDomainSignup": "Criar contas para domínios confiáveis",
+      "trustedDomainSignupHint": "Quem entrar com um e-mail verificado de um dos domínios confiáveis desta organização recebe uma conta e entra com a função padrão desse domínio. Deixe desativado para admitir apenas quem já tem conta."
     },
     "sections": {
       "houseTheme": "Tema da casa",
@@ -11426,6 +11451,23 @@
       "searchReleases": "Buscar versões instaladas…",
       "noReleases": "Nenhuma versão instalada",
       "started": "Início"
+    },
+    "publicApps": {
+      "title": "Apps públicos",
+      "description": "Se um app deste cluster pode responder sem o login acima quando o dono ativa isso. Desativado mantém todo app atrás do login, seja o que for que ele peça.",
+      "allowed": "Permitidos",
+      "refused": "Não permitidos",
+      "notEnvoy": "Só o edge do Envoy respeita o pedido de um app; no edge deste cluster todo app continua atrás do login.",
+      "allow": "Permitir apps públicos",
+      "refuse": "Parar apps públicos",
+      "allowTitle": "Permitir apps públicos neste cluster?",
+      "allowReview": "Apps que os donos já tornaram públicos passam a responder sem login na hora.",
+      "refuseTitle": "Parar os apps públicos neste cluster?",
+      "refuseReview": "Todo app público deste cluster volta para trás do login na hora.",
+      "allowedToast": "Apps públicos permitidos.",
+      "refusedToast": "Apps públicos parados; todo app está atrás do login.",
+      "changeFailed": "Falha ao alterar.",
+      "refreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize para ver o estado atual."
     }
   },
   "obsPanelReason": {
@@ -15120,6 +15162,16 @@
     "delete": "Remover domínio",
     "deleteTitle": "Remover domínio gerenciado?",
     "deleteHelp": "Isso inicia a ação existente de remoção do domínio. Registros gerenciados do provedor e certificados podem ser removidos, e os nomes de host dos aplicativos podem deixar de resolver. Revise as rotas atuais antes de continuar.",
+    "effectiveDefault": "Padrão efetivo",
+    "defaultDeleteTitle": "Remover a zona padrão?",
+    "defaultDeleteHelp": "Os novos aplicativos recebem seus nomes de host nesta zona. Os aplicativos registrados depois da remoção recebem a próxima zona padrão, ou nenhum nome de host.",
+    "defaultDeleteRefused": "O Astrolift manteve esta zona: ela é a padrão para os nomes de host dos novos aplicativos.",
+    "defaultDependentsLabel": "Ambientes nesta zona",
+    "defaultDependentsNone": "Nenhum ambiente é resolvido por ela ainda.",
+    "defaultDependentsCount": "Ambientes resolvidos por ela: {count}",
+    "defaultDependentsMore": "e mais {count}",
+    "defaultDeleteTypeToConfirm": "Para confirmar, digite a zona:",
+    "defaultDeleteConfirm": "Remover zona padrão",
     "actionFailed": "A ação foi recusada. Consulte o estado atual antes de tentar novamente.",
     "actionUncertain": "A resposta da ação não foi confirmada. Consulte o estado atual do domínio e do provedor antes de tentar novamente.",
     "acceptedUnverified": "A gravação foi aceita, mas os metadados retornados não puderam ser verificados. Atualize o estado antes de outra ação.",

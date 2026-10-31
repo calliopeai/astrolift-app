@@ -724,6 +724,11 @@ class surface:
         return False
 
 
+def current_surface() -> str:
+    """``mcp`` inside :class:`surface`, else ``graphql``."""
+    return _surface.get()
+
+
 def audit_context() -> dict[str, str]:
     from astrolift_identity.api_tokens import get_current_api_token
 

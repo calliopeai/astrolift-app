@@ -20,7 +20,7 @@ import { useSettingsSection } from "@/components/settings/use-settings-section";
 import { useWithheldCapabilities } from "@/hooks/use-install-policy";
 
 import { AuthUsersCard } from "./auth-users-card";
-import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
+import { CentralAuthCard, IngressClassCard, PublicAppsCard } from "./central-auth-card";
 
 /**
  * Cluster settings tab, one section at a time (`?section=`). The screen owns
@@ -49,6 +49,7 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
               agent: <ClusterAgentCard cluster={cluster} />,
               ingressClass: <IngressClassCard cluster={cluster} />,
               centralAuth: <CentralAuthCard cluster={cluster} />,
+              publicApps: <PublicAppsCard cluster={cluster} />,
               ingressAuth: <IngressAuthCard cluster={cluster} />,
               authUsers: <AuthUsersCard clusterId={cluster.id} />,
               bootstrapPlan: <BootstrapPlanCard clusterId={cluster.id} />,

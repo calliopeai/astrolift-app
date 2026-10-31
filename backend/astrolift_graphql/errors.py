@@ -11,6 +11,24 @@ from __future__ import annotations
 import strawberry
 
 
+@strawberry.type(name="MutationErrorDependent")
+class MutationErrorDependentType:
+    """An app environment still relying on what a refused removal would take away (#2572)."""
+
+    organization_slug: str
+    app_slug: str
+    environment_name: str
+    url: str
+
+
+@strawberry.type(name="MutationErrorDependents")
+class MutationErrorDependentsType:
+    """How many environments rely on it, and the first ten (#2572)."""
+
+    total: int
+    items: list[MutationErrorDependentType]
+
+
 @strawberry.type(name="MutationError")
 class MutationErrorType:
     code: str
@@ -40,3 +58,7 @@ class MutationErrorType:
     # #2202 — the approval request an ``APPROVAL_REQUIRED`` envelope is
     # waiting on. Null on every other envelope.
     approval_request_id: str | None = None
+    # #2572 -- what still resolves through the managed domain a PRECONDITION
+    # refusal from ``softDeleteManagedDomain`` kept, so the client can show it
+    # before asking for ``force``. Null on every other envelope.
+    dependents: MutationErrorDependentsType | None = None

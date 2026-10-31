@@ -3112,6 +3112,29 @@
         "saveFailed": "Speichern fehlgeschlagen.",
         "membersDescription": "Wer diese App sehen und ändern darf: die hier zugewiesenen Rollen und die Teams, mit denen sie geteilt wird.",
         "edgeDescription": "Wer die URL der App erreichen darf. Der Edge entscheidet über den Zugang; Rollen entscheiden, wer die App ändern darf."
+      },
+      "public": {
+        "title": "Öffentlicher Zugriff",
+        "on": "Öffentlich",
+        "off": "Hinter der Anmeldung",
+        "description": "Wenn öffentlich, antwortet die Plattform-URL der App ohne die Anmeldung des Clusters. Die eigene Anmeldung der App gilt weiterhin, und eigene Domains behalten ihre eigene Einstellung.",
+        "states": {
+          "public": "antwortet ohne Anmeldung",
+          "gated": "hinter der Anmeldung",
+          "no_gate": "dieser Cluster hat keine Anmeldung, die App ist offen",
+          "not_envoy": "bleibt hinter der Anmeldung: nur der Envoy-Edge beachtet diesen Schalter",
+          "cluster_disallows": "bleibt hinter der Anmeldung: dieser Cluster erlaubt keine öffentlichen Apps",
+          "restricted": "bleibt hinter der Anmeldung: die App hat eine Zugriffsliste"
+        },
+        "makePublic": "Öffentlich machen…",
+        "makePrivate": "Hinter die Anmeldung stellen",
+        "restrictedHint": "Leeren Sie zuerst die Zugriffsliste; sie gilt nur hinter der Anmeldung.",
+        "confirmTitle": "{app} öffentlich machen?",
+        "confirmDescription": "Wer die Plattform-URL der App erreicht, erhält die App ohne Anmeldung am Cluster. Nur die eigene Authentifizierung der App schützt sie. Sie werden eventuell gebeten, sich erneut zu bestätigen.",
+        "confirm": "Öffentlich machen",
+        "madePublic": "Die App ist öffentlich, wo ihr Cluster es erlaubt.",
+        "madePrivate": "Die App ist wieder hinter der Anmeldung.",
+        "saveFailed": "Änderung fehlgeschlagen."
       }
     },
     "members": {
@@ -5676,7 +5699,9 @@
         }
       },
       "allowStepUpPin": "Bestätigung mit persönlicher PIN erlauben",
-      "allowStepUpPinHint": "Mitglieder können eine 6- bis 8-stellige PIN festlegen und sensible Aktionen damit statt mit einer erneuten Anmeldung bestätigen. Lass dies aus, wenn deine Compliance für jede Bestätigung den Identitätsanbieter verlangt."
+      "allowStepUpPinHint": "Mitglieder können eine 6- bis 8-stellige PIN festlegen und sensible Aktionen damit statt mit einer erneuten Anmeldung bestätigen. Lass dies aus, wenn deine Compliance für jede Bestätigung den Identitätsanbieter verlangt.",
+      "trustedDomainSignup": "Konten für vertrauenswürdige Domains anlegen",
+      "trustedDomainSignupHint": "Wer sich mit einer bestätigten E-Mail-Adresse unter einer vertrauenswürdigen Domain dieser Organisation anmeldet, erhält ein Konto und tritt mit der Standardrolle dieser Domain bei. Lass dies aus, um nur Personen mit bestehendem Konto zuzulassen."
     },
     "sections": {
       "houseTheme": "Hausdesign",
@@ -11429,6 +11454,23 @@
       "searchReleases": "Releases und Versionen suchen…",
       "noReleases": "Keine installierten Releases",
       "started": "Gestartet"
+    },
+    "publicApps": {
+      "title": "Öffentliche Apps",
+      "description": "Ob eine App auf diesem Cluster ohne die obige Anmeldung antworten darf, wenn ihr Eigentümer das einschaltet. Aus hält jede App hinter der Anmeldung, egal was sie anfordert.",
+      "allowed": "Erlaubt",
+      "refused": "Nicht erlaubt",
+      "notEnvoy": "Nur der Envoy-Edge beachtet die Anfrage einer App; am Edge dieses Clusters bleibt jede App hinter der Anmeldung.",
+      "allow": "Öffentliche Apps erlauben",
+      "refuse": "Öffentliche Apps beenden",
+      "allowTitle": "Öffentliche Apps auf diesem Cluster erlauben?",
+      "allowReview": "Apps, die ihre Eigentümer bereits öffentlich gemacht haben, antworten sofort ohne Anmeldung.",
+      "refuseTitle": "Öffentliche Apps auf diesem Cluster beenden?",
+      "refuseReview": "Jede öffentliche App auf diesem Cluster kommt sofort hinter die Anmeldung.",
+      "allowedToast": "Öffentliche Apps erlaubt.",
+      "refusedToast": "Öffentliche Apps beendet; jede App ist hinter der Anmeldung.",
+      "changeFailed": "Änderung fehlgeschlagen.",
+      "refreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
     }
   },
   "obsPanelReason": {
@@ -15123,6 +15165,16 @@
     "delete": "Domain entfernen",
     "deleteTitle": "Verwaltete Domain entfernen?",
     "deleteHelp": "Dies startet die bestehende Domainentfernung. Verwaltete Anbietereinträge und Zertifikate können entfernt werden; Anwendungs-Hostnamen können danach nicht mehr aufgelöst werden. Prüfe vor dem Fortfahren die aktuellen Routen.",
+    "effectiveDefault": "Tatsächlicher Standard",
+    "defaultDeleteTitle": "Standardzone entfernen?",
+    "defaultDeleteHelp": "Neue Anwendungen erhalten ihre Hostnamen unter dieser Zone. Anwendungen, die nach dem Entfernen registriert werden, erhalten die nächste Standardzone oder gar keinen Hostnamen.",
+    "defaultDeleteRefused": "Astrolift hat diese Zone behalten: Sie ist der Standard für die Hostnamen neuer Anwendungen.",
+    "defaultDependentsLabel": "Umgebungen unter dieser Zone",
+    "defaultDependentsNone": "Noch wird keine Umgebung über sie aufgelöst.",
+    "defaultDependentsCount": "Umgebungen, die über sie aufgelöst werden: {count}",
+    "defaultDependentsMore": "und {count} weitere",
+    "defaultDeleteTypeToConfirm": "Gib zur Bestätigung die Zone ein:",
+    "defaultDeleteConfirm": "Standardzone entfernen",
     "actionFailed": "Die Aktion wurde abgelehnt. Lies den aktuellen Zustand vor einem erneuten Versuch.",
     "actionUncertain": "Die Antwort auf die Aktion wurde nicht bestätigt. Lies vor einem erneuten Versuch den aktuellen Domain- und Anbieterzustand.",
     "acceptedUnverified": "Der Schreibvorgang wurde akzeptiert, aber die zurückgegebenen Metadaten konnten nicht geprüft werden. Aktualisiere den Zustand vor einer weiteren Aktion.",

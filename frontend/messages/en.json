@@ -2899,6 +2899,29 @@
         "saveFailed": "Save failed.",
         "membersDescription": "Who may see and change this app: their roles here, and teams it is shared with.",
         "edgeDescription": "Who may reach the app’s URL. The edge decides who gets through to the app; roles decide who may change it."
+      },
+      "public": {
+        "title": "Public access",
+        "on": "Public",
+        "off": "Behind sign-in",
+        "description": "When public, the app’s platform URL answers without the cluster’s sign-in. The app’s own sign-in still applies, and custom domains keep their own setting.",
+        "states": {
+          "public": "answers without the sign-in",
+          "gated": "behind the sign-in",
+          "no_gate": "this cluster has no sign-in, so the app is open",
+          "not_envoy": "stays behind the sign-in: only the Envoy edge honours this switch",
+          "cluster_disallows": "stays behind the sign-in: this cluster does not allow public apps",
+          "restricted": "stays behind the sign-in: the app has an access list"
+        },
+        "makePublic": "Make public…",
+        "makePrivate": "Put behind the sign-in",
+        "restrictedHint": "Clear the access list first; it only applies behind the sign-in.",
+        "confirmTitle": "Make {app} public?",
+        "confirmDescription": "Anyone who reaches the app’s platform URL gets the app without signing in to the cluster. Only the app’s own authentication protects it. You may be asked to verify it’s you.",
+        "confirm": "Make public",
+        "madePublic": "The app is public where its cluster allows it.",
+        "madePrivate": "The app is behind the sign-in again.",
+        "saveFailed": "Change failed."
       }
     },
     "members": {
@@ -5619,7 +5642,9 @@
         }
       },
       "allowStepUpPin": "Allow step-up with a personal PIN",
-      "allowStepUpPinHint": "Members can set a 6 to 8 digit PIN and confirm sensitive actions with it instead of signing in again. Leave this off if your compliance posture requires the identity provider for every step-up."
+      "allowStepUpPinHint": "Members can set a 6 to 8 digit PIN and confirm sensitive actions with it instead of signing in again. Leave this off if your compliance posture requires the identity provider for every step-up.",
+      "trustedDomainSignup": "Create accounts for trusted domains",
+      "trustedDomainSignupHint": "Anyone who signs in with a verified email under one of this organization's trusted domains gets an account and joins with that domain's default role. Leave this off to admit only people who already have an account."
     },
     "sections": {
       "houseTheme": "House theme",
@@ -11426,6 +11451,23 @@
       "searchReleases": "Search releases, versions…",
       "noReleases": "No installed releases",
       "started": "Started"
+    },
+    "publicApps": {
+      "title": "Public apps",
+      "description": "Whether an app on this cluster may answer without the sign-in above when its owner turns that on. Off keeps every app behind the sign-in, whatever it asks.",
+      "allowed": "Allowed",
+      "refused": "Not allowed",
+      "notEnvoy": "Only the Envoy edge honours an app’s request; on this cluster’s edge every app stays behind the sign-in.",
+      "allow": "Allow public apps",
+      "refuse": "Stop public apps",
+      "allowTitle": "Allow public apps on this cluster?",
+      "allowReview": "Apps whose owners already made them public answer without the sign-in at once.",
+      "refuseTitle": "Stop public apps on this cluster?",
+      "refuseReview": "Every public app on this cluster goes behind the sign-in at once.",
+      "allowedToast": "Public apps allowed.",
+      "refusedToast": "Public apps stopped; every app is behind the sign-in.",
+      "changeFailed": "Change failed.",
+      "refreshWarning": "The change was accepted, but cluster details could not be refreshed. Refresh to see current state."
     }
   },
   "obsPanelReason": {
@@ -15120,6 +15162,16 @@
     "delete": "Remove domain",
     "deleteTitle": "Remove managed domain?",
     "deleteHelp": "This starts the existing domain removal action. Managed provider records and certificates may be removed, and app hostnames may stop resolving. Review current routes before continuing.",
+    "effectiveDefault": "Effective default",
+    "defaultDeleteTitle": "Remove the default zone?",
+    "defaultDeleteHelp": "New apps get their hostnames under this zone. Apps registered after it is removed get the next default zone, or no hostname at all.",
+    "defaultDeleteRefused": "Astrolift kept this zone: it is the default for new app hostnames.",
+    "defaultDependentsLabel": "Environments under this zone",
+    "defaultDependentsNone": "No environment resolves through it yet.",
+    "defaultDependentsCount": "Environments that resolve through it: {count}",
+    "defaultDependentsMore": "and {count} more",
+    "defaultDeleteTypeToConfirm": "To confirm, type the zone:",
+    "defaultDeleteConfirm": "Remove default zone",
     "actionFailed": "The action was refused. Read the current state before trying again.",
     "actionUncertain": "The action reply was not confirmed. Read current domain and provider state before trying again.",
     "acceptedUnverified": "The write was accepted, but returned metadata could not be verified. Refresh current state before another action.",

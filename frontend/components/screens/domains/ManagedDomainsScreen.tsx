@@ -115,9 +115,12 @@ export function ManagedDomainsScreen({
       sortKey: "zone",
       cellClassName: "max-w-72",
       cell: (d) => (
-        <span className="block truncate font-mono" title={d.zone}>
-          {d.zone}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="block min-w-0 truncate font-mono" title={d.zone}>
+            {d.zone}
+          </span>
+          {d.isEffectiveDefault && <Badge>{t("effectiveDefault")}</Badge>}
+        </div>
       ),
     },
     {

@@ -5,11 +5,17 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
+import { gatedWrite } from "@/components/screens/brains/gated-write";
 import type { AstroliftAppAccess, AstroliftAppAccessPreview } from "@/graphql/__generated__/schema";
+import type {
+  SetAppEdgePublicMutation,
+  SetAppEdgePublicMutationVariables,
+} from "@/graphql/__generated__/operations";
 import {
   GET_APP_ACCESS,
   PREVIEW_APP_ACCESS,
   SET_APP_ACCESS,
+  SET_APP_EDGE_PUBLIC,
 } from "@/graphql/registry/registry.queries";
 
 /** The app's access rule (#2132). The data half of AccessCardView. */
@@ -68,4 +74,41 @@ export function useAccessEditor(access: AstroliftAppAccess) {
     saving,
     onSave,
   };
+}
+
+/**
+ * The public switch (#2504): the app's platform URL answers without the
+ * edge login. Making it public is a step-up action, so the write goes
+ * through `gatedWrite`; making it private never asks. The data half of
+ * PublicSwitchView; mounted only for an operator holding `app.access`.
+ */
+export function usePublicSwitch(access: AstroliftAppAccess) {
+  const t = useTranslations("apps.security.public");
+  const [confirming, setConfirming] = React.useState(false);
+  const [refusal, setRefusal] = React.useState<string | null>(null);
+  const [send, { loading: saving }] = useMutation<
+    SetAppEdgePublicMutation,
+    SetAppEdgePublicMutationVariables
+  >(SET_APP_EDGE_PUBLIC, {
+    refetchQueries: [{ query: GET_APP_ACCESS, variables: { appSlug: access.appSlug } }],
+  });
+
+  /** Resolves false on a refusal, which the view shows under the switch. */
+  async function onSet(isPublic: boolean): Promise<boolean> {
+    const outcome = await gatedWrite(
+      async () =>
+        (await send({ variables: { input: { appSlug: access.appSlug, public: isPublic } } })).data
+          ?.setAppEdgePublic,
+      t("saveFailed")
+    );
+    if (!outcome.ok) {
+      setRefusal(outcome.message);
+      return false;
+    }
+    setRefusal(null);
+    toast.success(isPublic ? t("madePublic") : t("madePrivate"));
+    return true;
+  }
+
+  return { confirming, setConfirming, refusal, saving, onSet };
 }

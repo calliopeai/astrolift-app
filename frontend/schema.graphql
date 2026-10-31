@@ -1352,6 +1352,14 @@ type AstroliftAppAccess {
   restricted: Boolean!
   managedByManifest: Boolean!
   enforcedOn: [String!]!
+
+  """
+  The app asked for its platform hostname to answer without the edge login (#2504).
+  """
+  edgePublic: Boolean!
+
+  """What that means on each cluster the app runs on."""
+  publicStates: [AstroliftAppPublicState!]!
 }
 
 type AstroliftAppAccessMutationResult {
@@ -1754,6 +1762,15 @@ type AstroliftAppPodEvent {
   type: String!
   count: Int!
   lastSeen: String!
+}
+
+type AstroliftAppPublicState {
+  clusterSlug: String!
+
+  """
+  public: answers without the edge login. gated: behind it. no_gate: the cluster has no edge login at all. not_envoy: only the Envoy edge honours the switch, so the app stays gated. cluster_disallows: the cluster does not allow public apps. restricted: the app has an access list.
+  """
+  state: String!
 }
 
 type AstroliftAppReprovisionState {
@@ -4024,6 +4041,49 @@ type AstroliftManagedDomain {
   challengeRecordName: String!
   challengeRecordValue: String!
   verifiedAt: DateTime
+
+  """
+  Whether new apps get their hostnames under this zone now (#2572): the zone resolution picks for the organization that owns it, the shared zone every organization without its own falls through to, or an organization's explicit default. Deleting one asks for force.
+  """
+  isEffectiveDefault: Boolean!
+
+  """
+  The first ten app environments bound to this zone (#2572), whose hostnames go with it when it is deleted: your organization's apps you may read, and on a shared zone every organization's for the platform operator.
+  """
+  dependentApps: [AstroliftManagedDomainDependent!]!
+
+  """How many environments dependentApps draws from (#2572)."""
+  dependentAppCount: Int!
+}
+
+type AstroliftManagedDomainBinding {
+  organizationSlug: String!
+  appSlug: String!
+  environmentName: String!
+  zone: String!
+  previousUrl: String!
+  url: String!
+}
+
+type AstroliftManagedDomainBindingBackfill {
+  dryRun: Boolean!
+  found: Int!
+  updated: Int!
+  skipped: Int!
+  bindings: [AstroliftManagedDomainBinding!]!
+}
+
+type AstroliftManagedDomainBindingBackfillMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftManagedDomainBindingBackfill
+}
+
+type AstroliftManagedDomainDependent {
+  organizationSlug: String!
+  appSlug: String!
+  environmentName: String!
+  url: String!
 }
 
 type AstroliftManagedDomainMutationResult {
@@ -4692,6 +4752,7 @@ type AstroliftOrganization {
   traceRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
   allowStepUpPin: Boolean!
+  trustedDomainSignup: Boolean!
   defaultResourceTags: JSON!
   managedServiceIsolationPolicy: JSON!
   appearanceDefault: JSON!
@@ -6715,6 +6776,11 @@ type AstroliftTenantCluster {
   ingressMode: String!
   albAuthConfig: JSON
   oidcAuthConfig: JSON
+
+  """
+  Whether an app on this cluster may answer without the edge login when it asks to (#2504). Off: every app is gated whatever its own setting. Only the Envoy edge honours an app's request.
+  """
+  allowPublicApps: Boolean!
   isActive: Boolean!
   capabilities: JSON!
   capabilitiesProbedAt: DateTime
@@ -7504,6 +7570,10 @@ type AvailableTransition {
   toState: String!
   label: String!
   conditionsMet: Boolean!
+}
+
+input BackfillManagedDomainBindingsInput {
+  dryRun: Boolean! = false
 }
 
 type BedrockModelConnectionAction {
@@ -10423,6 +10493,11 @@ type Mutation {
   """
   setAppSource(input: SetAppSourceInput!): AstroliftAppSourceChangeMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
+
+  """
+  Let the app's platform hostname answer without the edge login, or put it back behind it (#2504). Needs app.access. Making it public also needs the organization's rules for app.edge.make_public (a fresh verification by default), is refused for agents unless the organization allows them, and takes effect only on an Envoy edge whose cluster allows public apps. The app's own authentication still applies, and custom domains keep their own setting. The live routes move at once; audited as app.edge.public.set.
+  """
+  setAppEdgePublic(input: SetAppEdgePublicInput!): AstroliftAppAccessMutationResult!
   setNotificationQuietHours(input: SetNotificationQuietHoursInput!): AstroliftNotificationQuietHoursMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
@@ -10481,6 +10556,7 @@ type Mutation {
   createManagedDomain(input: CreateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   updateManagedDomain(input: UpdateManagedDomainInput!): AstroliftManagedDomainMutationResult!
   softDeleteManagedDomain(input: SoftDeleteManagedDomainInput!): SoftdeletepayloadMutationResult!
+  backfillManagedDomainBindings(input: BackfillManagedDomainBindingsInput!): AstroliftManagedDomainBindingBackfillMutationResult!
   verifyManagedDomain(input: VerifyManagedDomainInput!): VerifyManagedDomainPayloadMutationResult!
   provisionManagedDomain(clusterId: GUID!, zone: String!, isPlatformManagedZone: Boolean! = false): ProvisionManagedDomainPayloadMutationResult!
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!
@@ -10837,6 +10913,19 @@ type MutationError {
   requestedVersion: Int
   supportedMethods: [String!]
   approvalRequestId: String
+  dependents: MutationErrorDependents
+}
+
+type MutationErrorDependent {
+  organizationSlug: String!
+  appSlug: String!
+  environmentName: String!
+  url: String!
+}
+
+type MutationErrorDependents {
+  total: Int!
+  items: [MutationErrorDependent!]!
 }
 
 """Standard mutation result with ok flag and validation errors."""
@@ -12500,6 +12589,11 @@ input SetAppAccessInput {
   users: [String!]! = []
 }
 
+input SetAppEdgePublicInput {
+  appSlug: String!
+  public: Boolean!
+}
+
 input SetAppExpiryInput {
   appSlug: String!
 
@@ -12703,6 +12797,7 @@ input SoftDeleteByGuidInput {
 
 input SoftDeleteManagedDomainInput {
   id: GUID!
+  force: Boolean! = false
 }
 
 type Softdeletepayload {
@@ -13130,6 +13225,7 @@ input UpdateOrganizationInput {
   traceRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
   allowStepUpPin: Boolean = null
+  trustedDomainSignup: Boolean = null
   defaultResourceTags: JSON = null
   managedServiceIsolationPolicy: JSON = null
   appearanceDefault: JSON = null
@@ -13223,6 +13319,7 @@ input UpdateTenantClusterInput {
   albAuthConfig: JSON
   oidcAuthConfig: JSON
   syncManifests: Boolean! = false
+  allowPublicApps: Boolean = null
 }
 
 input UpdateWebhookSubscriptionInput {

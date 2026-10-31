@@ -25,6 +25,14 @@ export const GET_MANAGED_DOMAIN = gql`
       delegationConnectionId
       delegationZoneName
       delegationWrite
+      isEffectiveDefault
+      dependentAppCount
+      dependentApps {
+        organizationSlug
+        appSlug
+        environmentName
+        url
+      }
     }
   }
 `;

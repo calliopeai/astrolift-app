@@ -4,6 +4,7 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import type { AccessCardViewProps, AccessEditorViewProps } from "./AccessCard";
 import type { AppPreviewsScreenProps } from "./AppPreviewsScreen";
 import type { AppSecurityScreenProps } from "./AppSecurityScreen";
+import type { PublicSwitchViewProps } from "./PublicSwitch";
 import type { AstroliftEvent } from "./use-app-security";
 
 /**
@@ -182,6 +183,8 @@ export const ACCESS_OPEN: AccessCardViewProps = {
     restricted: false,
     managedByManifest: false,
     enforcedOn: ["astrolift-conflict"],
+    edgePublic: false,
+    publicStates: [{ clusterSlug: "astrolift-conflict", state: "gated" }],
   },
 };
 
@@ -194,6 +197,8 @@ export const ACCESS_RESTRICTED: AccessCardViewProps = {
     restricted: true,
     managedByManifest: false,
     enforcedOn: ["astrolift-conflict"],
+    edgePublic: false,
+    publicStates: [{ clusterSlug: "astrolift-conflict", state: "restricted" }],
   },
 };
 
@@ -243,6 +248,34 @@ export const EDITOR_CHANGED: AccessEditorViewProps = {
 };
 
 // ─── Previews ────────────────────────────────────────────────────────────────
+
+/** The public switch (#2504): behind the sign-in, with the switch to change it. */
+export const PUBLIC_OFF: Required<PublicSwitchViewProps> = {
+  access: {
+    appSlug: "checkout",
+    edgePublic: false,
+    restricted: false,
+    publicStates: [
+      { clusterSlug: "astrolift-conflict", state: "gated" },
+      { clusterSlug: "legacy-nginx", state: "gated" },
+    ],
+  },
+  control: { confirming: false, setConfirming: setter, refusal: null, saving: false, onSet: yes },
+};
+
+/** Public where the cluster allows it; the nginx cluster and a refusing one keep it gated. */
+export const PUBLIC_ON: Required<PublicSwitchViewProps> = {
+  ...PUBLIC_OFF,
+  access: {
+    ...PUBLIC_OFF.access,
+    edgePublic: true,
+    publicStates: [
+      { clusterSlug: "astrolift-conflict", state: "public" },
+      { clusterSlug: "legacy-nginx", state: "not_envoy" },
+      { clusterSlug: "shared-eu", state: "cluster_disallows" },
+    ],
+  },
+};
 
 const PREVIEW_BASE: AstroliftPreviewEnvironment = {
   version: 1,
