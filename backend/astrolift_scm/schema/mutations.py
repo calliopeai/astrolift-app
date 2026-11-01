@@ -592,13 +592,19 @@ class ScmMutation:
         try:
             with transaction.atomic():
                 conn = _get_or_create_app_install(org, app_id=app_id, account_login=account_login)
+                if conn.oauth_client_id != app_id:
+                    conn.app_client_id = ""
+                    conn.oauth_redirect_uri = ""
+                    conn.oauth_client_secret_backend_kind = ""
+                    conn.oauth_client_secret_ciphertext = b""
+                    conn.webhook_secret_backend_kind = ""
+                    conn.webhook_secret_ciphertext = b""
                 conn.oauth_client_id = app_id  # numeric App ID — webhook-payload lookups
                 if client_id:
                     conn.app_client_id = client_id[:64]  # OAuth Client ID — /authorize + JWT iss
                 conn.installation_id = installation_id[:64]
                 conn.account_login = account_login[:200]
-                if input.api_base_url:
-                    conn.api_base_url = api_base
+                conn.api_base_url = api_base
                 conn.display_name = display_name[:200]
                 conn.secret_backend_kind = pem_enc.backend_kind
                 conn.secret_ciphertext = pem_enc.backend_ref

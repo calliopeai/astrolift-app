@@ -470,6 +470,35 @@ def test_adopt_same_app_on_second_account_preserves_both_ci_identities(
     assert bytes(first_row.secret_ciphertext) == original_secret
 
 
+def test_replacing_another_app_drops_its_optional_credentials(monkeypatch, permission_resolver):
+    org, user = _org_user()
+    permission_resolver.grant(Permission.SCM_CONNECT)
+    old = SourceConnection.objects.create(
+        organization=org,
+        kind="github_app_install",
+        account_login="acme-corp",
+        oauth_client_id="1111111",
+        app_client_id="Iv23liOldAppClient",
+        oauth_redirect_uri="https://old-app.invalid/callback",
+        api_base_url="https://old-host.invalid/api/v3",
+        oauth_client_secret_backend_kind="local_fernet",
+        oauth_client_secret_ciphertext=b"old-app-oauth",
+        webhook_secret_backend_kind="local_fernet",
+        webhook_secret_ciphertext=b"old-app-webhook",
+        is_active=False,
+    )
+    _stub_github(monkeypatch, installations=[_install(42, "acme-corp")])
+    result = _adopt(org, user, client_id=None)
+    assert result.ok, result.errors
+    assert result.data.id == str(old.guid)
+    old.refresh_from_db()
+    assert old.oauth_client_id == "3705068" and old.installation_id == "42"
+    assert old.api_base_url == "https://api.github.com"
+    assert old.app_client_id == old.oauth_redirect_uri == ""
+    assert old.oauth_client_secret_backend_kind == old.webhook_secret_backend_kind == ""
+    assert bytes(old.oauth_client_secret_ciphertext) == bytes(old.webhook_secret_ciphertext) == b""
+
+
 # ---------------------------------------------------------------------------
 # Part 2 — self-orphan on 404 during installation-token mint
 # ---------------------------------------------------------------------------
