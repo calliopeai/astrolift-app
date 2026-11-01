@@ -24,6 +24,14 @@ APP_KINDS: dict[str, AppKind] = {
         label="Mimwell",
         description="The brain-centered app that serves the Semantic Context Ontology Layer (SCOL).",
     ),
+    "factory": AppKind(
+        key="factory",
+        label="Factory",
+        description=(
+            "The controller of an agent software factory, whose role agents and workflows turn "
+            "issues into reviewed draft pull requests."
+        ),
+    ),
 }
 
 # Kinds whose app serves a brain other apps, agents and workflows can read (#2320).

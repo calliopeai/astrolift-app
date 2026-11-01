@@ -169,12 +169,13 @@ describe("app kind badge", () => {
     const rows = [
       { ...APPS[0], appKind: "mimwell" },
       { ...APPS[1], appKind: "brainz" },
+      { ...APPS[2], appKind: "factory" },
     ];
     function KindApps() {
       const t = useTranslations("apps.list");
       const status = useTranslations("apps.frame");
       const list = useLocalListState(localizedAppsList(t, status));
-      return <AppsListScreen {...listProps({ rows, totalCount: 2 })} list={list} />;
+      return <AppsListScreen {...listProps({ rows, totalCount: 3 })} list={list} />;
     }
     render(
       <MockedProvider>
@@ -189,6 +190,13 @@ describe("app kind badge", () => {
     );
     expect(screen.getAllByText(en.apps.list.appKinds.mimwell).length).toBeGreaterThan(0);
     expect(screen.getAllByText("brainz").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(en.apps.list.appKinds.factory).length).toBeGreaterThan(0);
+    // A factory kind opens the generic app page; nothing routes on it yet.
+    expect(
+      screen
+        .getAllByRole("link")
+        .some((link) => link.getAttribute("href") === `/apps/${APPS[2].slug}`)
+    ).toBe(true);
     expect(onError).not.toHaveBeenCalled();
   });
 });
