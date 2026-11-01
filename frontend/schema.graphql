@@ -3638,59 +3638,6 @@ type AstroliftExecutePromqlResult {
   series: [AstroliftPromqlSeries!]!
 }
 
-type AstroliftFactoryRoom {
-  """The factory project's guid."""
-  projectId: String!
-  projectSlug: String!
-
-  """The factory project's name."""
-  name: String!
-
-  """
-  The factory's running runs the caller can read, newest first, at most 25.
-  """
-  activeRuns: [AstroliftFactoryRun!]!
-
-  """
-  Open human gates across the factory's running runs the caller can read: work waiting on a person, whoever may decide it.
-  """
-  approvalsWaiting: Int!
-
-  """
-  The factory's finished runs the caller can read, most recently ended first, at most 10: the outcome each run ended with.
-  """
-  finishedRuns: [AstroliftFactoryRun!]!
-}
-
-type AstroliftFactoryRun {
-  """The run's guid."""
-  id: String!
-
-  """The slug of the workflow definition the run follows."""
-  flow: String!
-
-  """That definition's name."""
-  flowName: String!
-
-  """
-  The step the run is on, or ended on: the stage's output key, else its role. Empty before the first stage starts.
-  """
-  stage: String!
-
-  """That stage's round; null before the first stage starts."""
-  round: Int
-
-  """
-  running, completed, failed, cancelled, terminated, timed_out or expired.
-  """
-  status: String!
-
-  """The run's current stage is an open human gate."""
-  waitingOnPerson: Boolean!
-  startedAt: DateTime
-  endedAt: DateTime
-}
-
 type AstroliftForceRedeployPayload {
   deploymentsCancelled: Int!
   k8sObjectsDeleted: Int!
@@ -5484,11 +5431,6 @@ type AstroliftProject {
   createdAt: DateTime!
   updatedAt: DateTime!
   deletedAt: DateTime
-
-  """
-  What the project is, from the [app] kind its live apps declare (#2556): factory when one declares factory, brain when every one declares a brain kind, otherwise generic. Read-only; it changes only through a manifest.
-  """
-  kind: String!
 }
 
 type AstroliftProjectMutationResult {
@@ -12114,11 +12056,6 @@ type Query {
 
   """One run of a workflow definition by guid, or null (#2155)."""
   workflowDefinitionRun(guid: String!, orgId: ID = null): WorkflowDefinitionRun
-
-  """
-  A factory project's control room (#2556): its running runs, the human gates they wait on and its finished runs, from Astrolift's run records, with the same run visibility as workflowDefinitionRuns. Null for a project that is not a factory, that the caller cannot read, or that is outside the caller's organization. Read-only.
-  """
-  factoryRoom(projectId: GUID!): AstroliftFactoryRoom
 
   """
   Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820).

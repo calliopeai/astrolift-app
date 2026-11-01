@@ -110,22 +110,6 @@ class ProjectType:
     created_at: dt.datetime
     updated_at: dt.datetime
     deleted_at: dt.datetime | None
-    # The kind the list query annotated on the row; None when it did not.
-    kind_hint: strawberry.Private[str | None] = None
-
-    @strawberry.field(
-        description=(
-            "What the project is, from the [app] kind its live apps declare (#2556): factory when one "
-            "declares factory, brain when every one declares a brain kind, otherwise generic. Read-only; "
-            "it changes only through a manifest."
-        )
-    )
-    def kind(self) -> str:
-        if self.kind_hint is not None:
-            return self.kind_hint
-        from astrolift_registry.project_kinds import project_kind
-
-        return project_kind(str(self.id))
 
 
 def organization_to_type(org) -> OrganizationType:
@@ -169,8 +153,6 @@ def team_to_type(team) -> TeamType:
 
 
 def project_to_type(project) -> ProjectType:
-    from astrolift_registry.project_kinds import ANNOTATION
-
     return ProjectType(
         id=GUID(str(project.guid)),
         slug=project.slug,
@@ -180,7 +162,6 @@ def project_to_type(project) -> ProjectType:
         created_at=project.created_at,
         updated_at=project.updated_at,
         deleted_at=project.deleted_at,
-        kind_hint=getattr(project, ANNOTATION, None),
     )
 
 
