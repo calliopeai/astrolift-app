@@ -4,23 +4,27 @@
 The nightly run measures every backend shard with per-test coverage contexts
 (``pytest --cov-context=test``). ``build`` folds that data into a map of
 source file -> line -> the test files that executed it, at one commit. A pull
-request then runs ``select`` against the newest map from main: the test files
-that executed the lines the change touches, every test file it adds or edits,
-and nothing else.
+request then runs ``select`` against the newest map from main built at an
+ancestor of its base: the test files that executed the lines the change
+touches, every test file it adds or edits, and the always tier
+(``always_tests``).
 
     python scripts/coverage_map.py build --data .coverage --commit <sha> --out map.json.gz
     python scripts/coverage_map.py select --map map.json.gz --base <sha> --head <sha> [--json]
 
 Run from ``backend/``. ``select`` prints the test files, one per line, or
-``ALL`` when coverage cannot answer for the change (settings, Django wiring by
-string, migrations, dependency locks, a root conftest, anything that is not
-Python). Main and nightly keep running the whole suite; this only decides
-what a pull request needs.
+``ALL`` when coverage cannot answer for the change: settings, Django wiring by
+string, migrations, dependency locks, test tooling and these scripts, code no
+test executes, anything that is not Python, or a map from outside the base's
+history. Main and nightly keep running the whole suite; this only decides what
+a pull request needs, and CI applies it only while the repository variable
+``CI_SELECTION_GATE`` is ``on``.
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import gzip
 import json
 import re
@@ -32,7 +36,9 @@ from pathlib import Path
 VERSION = 1
 BACKEND = "backend/"
 
-# Changes coverage cannot follow: run everything.
+# Changes coverage cannot follow: run everything. Test tooling and the CI
+# scripts, this one included, change how every test runs rather than a line
+# some test executes.
 BROAD_PREFIXES = (
     "config/",
     "conftest.py",
@@ -42,10 +48,15 @@ BROAD_PREFIXES = (
     "manage.py",
     "startup.py",
     "providers/pyproject.toml",
+    "core/testing/",
+    "scripts/",
 )
-BROAD_NAMES = ("apps.py", "signals.py", "urls.py", "receivers.py", "settings.py")
-# Not code, or code no backend test runs.
-IGNORED_SUFFIXES = (".md", ".txt", ".rst")
+BROAD_NAMES = ("apps.py", "signals.py", "urls.py", "receivers.py", "settings.py", "conftest.py")
+# The platform every app sits on (ci.yml's broad_roots). Its tests hold the
+# guardrails that read the code rather than run it (tenancy and surface
+# guardrails, module reachability, import resolvability, the migration gate),
+# so no line tells when they are needed: a selected run keeps all of them.
+ALWAYS_ROOTS = ("core/", "config/", "astrolift_graphql/", "auth1/")
 _HUNK = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@")
 
 
@@ -143,41 +154,102 @@ def unchanged_since(commit: str, base: str, path: str) -> bool:
         return False
 
 
-def select(coverage_map: dict, changes: list[tuple[str, str]], *, line_lookup, unchanged) -> dict:
-    """The test files a change reaches.
+def is_ancestor(commit: str, base: str) -> bool:
+    try:
+        git("merge-base", "--is-ancestor", commit, base)
+    except subprocess.CalledProcessError:
+        return False
+    return True
+
+
+def import_time_lines(source: str) -> set[int]:
+    """Lines whose code runs when the module is imported: every statement
+    outside a function body, decorators and signatures included. Every line
+    when the source does not parse."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return set(range(1, source.count("\n") + 2))
+    lines: set[int] = set()
+
+    def walk(body: list[ast.stmt]) -> None:
+        for node in body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                start = min([node.lineno, *(d.lineno for d in node.decorator_list)])
+                lines.update(range(start, max(node.body[0].lineno, node.lineno + 1)))
+                if isinstance(node, ast.ClassDef):
+                    walk(node.body)
+            else:
+                lines.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+
+    walk(tree.body)
+    return lines
+
+
+def test_files(head: str) -> set[str]:
+    """Every backend test file at ``head``, relative to backend/. The providers
+    package has a job and an environment of its own."""
+    return {
+        rel
+        for path in git("ls-tree", "-r", "--name-only", head, "--", BACKEND).splitlines()
+        if (rel := backend_relative(path))
+        and is_test(rel)
+        and "/migrations/" not in rel
+        and not rel.startswith("providers/")
+    }
+
+
+def tests_changed_since(commit: str, base: str) -> set[str]:
+    """Test files added or edited between the map's commit and the base."""
+    return {
+        rel
+        for path in git(
+            "diff", "--name-only", "--no-renames", "--diff-filter=AM", commit, base, "--", BACKEND
+        ).splitlines()
+        if (rel := backend_relative(path)) and is_test(rel)
+    }
+
+
+def select(
+    coverage_map: dict, changes: list[tuple[str, str]], *, line_lookup, unchanged, import_time
+) -> dict:
+    """The test files a change reaches, or ``all`` with the paths no map can answer for.
 
     ``line_lookup(repo_path)`` gives the touched lines at the merge base;
     ``unchanged(repo_path)`` says whether the file is the same at the merge
-    base as at the map's commit (line numbers only line up when it is).
+    base as at the map's commit (line numbers only line up when it is);
+    ``import_time(repo_path)`` gives its lines that run at import.
     """
     tests_by_index = coverage_map["tests"]
     files = coverage_map["files"]
     broad: list[str] = []
     notes: list[str] = []
     selected: set[str] = set()
-    conftest_dirs: list[str] = []
 
     for status, repo_path in changes:
         rel = backend_relative(repo_path)
-        if rel is None or rel.endswith(IGNORED_SUFFIXES):
+        if rel is None:
             continue
         name = rel.rsplit("/", 1)[-1]
-        if rel.startswith(BROAD_PREFIXES) or name in BROAD_NAMES or "/migrations/" in rel:
+        if "/" not in rel and rel.endswith(".md"):
+            continue  # backend/README.md and its siblings: no test reads them
+        if (
+            rel.startswith(BROAD_PREFIXES)
+            or name in BROAD_NAMES
+            or "/migrations/" in rel
+            or not rel.endswith(".py")
+        ):
             broad.append(repo_path)
-            continue
-        if not rel.endswith(".py"):
-            broad.append(repo_path)
-            continue
-        if name == "conftest.py":
-            conftest_dirs.append(rel.rsplit("/", 1)[0] + "/" if "/" in rel else "")
             continue
         if is_test(rel):
             if status != "D":
                 selected.add(rel)
             continue
         per_line = files.get(rel)
-        if per_line is None:
-            notes.append(f"{rel}: {'new, ' if status == 'A' else ''}no test executes it")
+        if per_line is None or "/tests/" in f"/{rel}":
+            # New, never run inside a test, or a helper the tests import:
+            # the map cannot say which tests it reaches.
+            broad.append(repo_path)
             continue
         everything = {tests_by_index[i] for ids in per_line.values() for i in ids}
         if status == "D" or not unchanged(repo_path):
@@ -185,27 +257,50 @@ def select(coverage_map: dict, changes: list[tuple[str, str]], *, line_lookup, u
             selected |= everything
             notes.append(f"{rel}: file-level ({'deleted' if status == 'D' else 'changed since the map'})")
             continue
-        hits = {tests_by_index[i] for line in line_lookup(repo_path) for i in per_line.get(str(line), ())}
-        if not hits:
-            # Module-level code (imports, constants, decorators) runs at
-            # import, outside any test: whoever ran the file stands in.
+        touched = line_lookup(repo_path)
+        hits = {tests_by_index[i] for line in touched for i in per_line.get(str(line), ())}
+        if not hits or touched & import_time(repo_path):
+            # Module and class bodies, decorators and signatures run at import,
+            # outside any test, and reach every caller: whoever ran the file
+            # stands in.
             selected |= everything
-            notes.append(f"{rel}: file-level (no test executed the touched lines)")
+            notes.append(
+                f"{rel}: file-level ({'import-time code' if hits else 'no test executed the touched lines'})"
+            )
             continue
         selected |= hits
 
     if broad:
         return {"all": True, "reasons": sorted(broad), "tests": [], "notes": notes}
-    for directory in conftest_dirs:
-        selected |= {t for t in tests_by_index if t.startswith(directory)}
     return {
         "all": False,
         "reasons": [],
-        "tests": sorted(t for t in selected if Path(t).exists()),
+        "tests": sorted(selected),
         "notes": notes,
         "map_commit": coverage_map.get("commit", ""),
         "map_tests": len(tests_by_index),
     }
+
+
+def always_tests(coverage_map: dict, all_tests: set[str], stale: set[str]) -> set[str]:
+    """The always tier of a selected run: the tests it keeps whatever changed.
+
+    The platform roots' tests (``ALWAYS_ROOTS``); the tests the map holds no
+    current record of (absent from it, or edited since its commit: ``stale``);
+    and the tests it ties to no line that less than half of the suite runs.
+    Those execute nothing beyond shared fixtures, so no change could select
+    them: they read code (AST scans, contracts) instead of running it.
+    """
+    tests_by_index = coverage_map["tests"]
+    half = len(tests_by_index) / 2
+    placed = {
+        tests_by_index[i]
+        for lines in coverage_map["files"].values()
+        for ids in lines.values()
+        if len(ids) <= half
+        for i in ids
+    }
+    return {t for t in all_tests if t.startswith(ALWAYS_ROOTS) or t not in placed or t in stale}
 
 
 def load_map(path: str) -> dict:
@@ -241,14 +336,29 @@ def main(argv: list[str] | None = None) -> int:
 
     coverage_map = load_map(args.map)
     commit = coverage_map.get("commit", "")
-    result = select(
-        coverage_map,
-        changed_files(args.base, args.head),
-        line_lookup=lambda path: old_lines(args.base, args.head, path),
-        unchanged=lambda path: (
-            bool(commit) and unchanged_since(commit, git("merge-base", args.base, args.head).strip(), path)
-        ),
-    )
+    if not commit or not is_ancestor(commit, args.base):
+        result = {
+            "all": True,
+            "reasons": [f"the map's commit {commit[:9] or '(none)'} is not an ancestor of the base"],
+            "tests": [],
+            "notes": [],
+        }
+    else:
+        merge_base = git("merge-base", args.base, args.head).strip()
+        result = select(
+            coverage_map,
+            changed_files(args.base, args.head),
+            line_lookup=lambda path: old_lines(args.base, args.head, path),
+            unchanged=lambda path: unchanged_since(commit, merge_base, path),
+            import_time=lambda path: import_time_lines(git("show", f"{merge_base}:{path}")),
+        )
+        if not result["all"]:
+            always = always_tests(
+                coverage_map, test_files(args.head), tests_changed_since(commit, merge_base)
+            )
+            result["selected"] = result["tests"]
+            result["always"] = sorted(always)
+            result["tests"] = sorted(t for t in always.union(result["selected"]) if Path(t).exists())
     if args.json:
         print(json.dumps(result, indent=2))
     elif result["all"]:
