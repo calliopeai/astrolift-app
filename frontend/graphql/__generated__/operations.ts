@@ -3430,6 +3430,39 @@ export type AstroliftExecutePromqlResult = {
   series: Array<AstroliftPromqlSeries>;
 };
 
+export type AstroliftFactoryRoom = {
+  /** The factory's running runs the caller can read, newest first, at most 25. */
+  activeRuns: Array<AstroliftFactoryRun>;
+  /** Open human gates across the factory's running runs the caller can read: work waiting on a person, whoever may decide it. */
+  approvalsWaiting: Scalars['Int']['output'];
+  /** The factory's finished runs the caller can read, most recently ended first, at most 10: the outcome each run ended with. */
+  finishedRuns: Array<AstroliftFactoryRun>;
+  /** The factory project's name. */
+  name: Scalars['String']['output'];
+  /** The factory project's guid. */
+  projectId: Scalars['String']['output'];
+  projectSlug: Scalars['String']['output'];
+};
+
+export type AstroliftFactoryRun = {
+  endedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** The slug of the workflow definition the run follows. */
+  flow: Scalars['String']['output'];
+  /** That definition's name. */
+  flowName: Scalars['String']['output'];
+  /** The run's guid. */
+  id: Scalars['String']['output'];
+  /** That stage's round; null before the first stage starts. */
+  round?: Maybe<Scalars['Int']['output']>;
+  /** The step the run is on, or ended on: the stage's output key, else its role. Empty before the first stage starts. */
+  stage: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  /** running, completed, failed, cancelled, terminated, timed_out or expired. */
+  status: Scalars['String']['output'];
+  /** The run's current stage is an open human gate. */
+  waitingOnPerson: Scalars['Boolean']['output'];
+};
+
 export type AstroliftForceRedeployPayload = {
   deploymentsCancelled: Scalars['Int']['output'];
   dispatchMessage?: Maybe<Scalars['String']['output']>;
@@ -5062,6 +5095,8 @@ export type AstroliftProject = {
   createdAt: Scalars['DateTime']['output'];
   deletedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
+  /** What the project is, from the [app] kind its live apps declare (#2556): factory when one declares factory, brain when every one declares a brain kind, otherwise generic. Read-only; it changes only through a manifest. */
+  kind: Scalars['String']['output'];
   name: Scalars['String']['output'];
   organization: AstroliftOrganization;
   slug: Scalars['String']['output'];
@@ -13413,6 +13448,8 @@ export type Query = {
   emailDeliveryTests: Array<EmailDeliveryTest>;
   emailDeliveryTestsPage: EmailDeliveryTestPage;
   exportWorkflowManifest: WorkflowManifestExportType;
+  /** A factory project's control room (#2556): its running runs, the human gates they wait on and its finished runs, from Astrolift's run records, with the same run visibility as workflowDefinitionRuns. Null for a project that is not a factory, that the caller cannot read, or that is outside the caller's organization. Read-only. */
+  factoryRoom?: Maybe<AstroliftFactoryRoom>;
   formDefinition?: Maybe<AstroliftFormDefinition>;
   formDefinitions: Array<AstroliftFormDefinition>;
   formFieldTypes: Array<Scalars['String']['output']>;
@@ -15620,6 +15657,11 @@ export type QueryEmailDeliveryTestsPageArgs = {
 
 export type QueryExportWorkflowManifestArgs = {
   definitionSlug: Scalars['String']['input'];
+};
+
+
+export type QueryFactoryRoomArgs = {
+  projectId: Scalars['GUID']['input'];
 };
 
 
