@@ -349,7 +349,7 @@ def _match_installation(installations: list[dict], login: str) -> dict | None:
 def _get_or_create_app_install(org, *, app_id: str, account_login: str) -> SourceConnection:
     """Idempotent target row for the BYO adopt flow. Re-adopt targets, in order:
 
-      1. the same App (matched by numeric App ID) already on this org, else
+      1. the same App on the same GitHub account already on this org, else
       2. any existing ``github_app_install`` on the same GitHub ``account_login``
          — e.g. the dead auto-created App connection from the manifest flow;
          adopting the real App reuses that row and clears its orphan state,
@@ -363,9 +363,13 @@ def _get_or_create_app_install(org, *, app_id: str, account_login: str) -> Sourc
         kind=SourceConnection.Kind.GITHUB_APP_INSTALL.value,
         deleted_at__isnull=True,
     )
-    conn = base.filter(oauth_client_id=app_id).order_by("created_at", "pk").first()
+    conn = (
+        base.filter(oauth_client_id=app_id, account_login__iexact=account_login)
+        .order_by("created_at", "pk")
+        .first()
+    )
     if conn is None and account_login:
-        conn = base.filter(account_login=account_login).order_by("created_at", "pk").first()
+        conn = base.filter(account_login__iexact=account_login).order_by("created_at", "pk").first()
     if conn is None:
         conn = SourceConnection(
             organization=org,
@@ -453,7 +457,7 @@ class ScmMutation:
         the PEM → discover the org's installation of the App → mint a real
         installation access token to prove the creds work. Only then do we
         store an encrypted ``github_app_install`` connection. Idempotent per
-        (org, app_id): re-running re-adopts / rotates the creds on the existing
+        (org, app_id, account): re-running re-adopts / rotates the creds on the existing
         row instead of duplicating. Never logs or returns the PEM / secrets.
         """
         from django.db import IntegrityError
