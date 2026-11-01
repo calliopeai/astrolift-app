@@ -416,6 +416,89 @@ def test_adopt_heals_orphaned_connection_for_same_account(monkeypatch, permissio
     assert dead.installation_id == "42"
 
 
+@pytest.mark.parametrize("pending_target", [False, True])
+def test_adopt_same_app_on_second_account_preserves_both_ci_identities(
+    monkeypatch, permission_resolver, pending_target
+):
+    from astrolift_scm.services import webhooks, workflow_sync, workflows
+    from astrolift_scm.services.connection_resolver import (
+        ORG_REPO_WRITE,
+        PLATFORM_REPO_WRITE,
+        resolve_connection,
+    )
+
+    org, user = _org_user()
+    permission_resolver.grant(Permission.SCM_CONNECT)
+    _stub_github(monkeypatch, installations=[_install(11, "first-org"), _install(22, "second-org")])
+    first = _adopt(org, user, org_login="first-org")
+    assert first.ok, first.errors
+    first_row = SourceConnection.objects.get(guid=first.data.id)
+    original_secret = bytes(first_row.secret_ciphertext)
+    if pending_target:
+        pending = SourceConnection.objects.create(
+            organization=org,
+            kind="github_app_install",
+            account_login="second-org",
+            oauth_client_id=first_row.oauth_client_id,
+            is_active=False,
+        )
+
+    second = _adopt(org, user, org_login="second-org")
+    assert second.ok, second.errors
+    second_row = SourceConnection.objects.get(guid=second.data.id)
+    assert second_row.pk != first_row.pk
+    if pending_target:
+        assert second_row.pk == pending.pk
+    assert SourceConnection.objects.filter(organization=org, kind="github_app_install").count() == 2
+    first_row.refresh_from_db()
+    assert (first_row.account_login, first_row.installation_id) == ("first-org", "11")
+    assert bytes(first_row.secret_ciphertext) == original_secret
+
+    for owner, connection in (("first-org", first_row), ("second-org", second_row)):
+        app = SimpleNamespace(organization_id=org.pk, source_kind="github", source_repo=f"{owner}/repo")
+        for purpose in (ORG_REPO_WRITE, PLATFORM_REPO_WRITE):
+            assert resolve_connection(org, purpose=purpose, repo=app.source_repo).pk == connection.pk
+        for service in (webhooks, workflow_sync, workflows):
+            assert service._pick_source_connection(app).pk == connection.pk
+
+    _stub_github(monkeypatch, installations=[_install(33, "SECOND-ORG"), _install(11, "first-org")])
+    rotated = _adopt(org, user, org_login="second-org")
+    assert rotated.ok, rotated.errors
+    assert rotated.data.id == second.data.id
+    first_row.refresh_from_db()
+    assert first_row.installation_id == "11"
+    assert bytes(first_row.secret_ciphertext) == original_secret
+
+
+def test_replacing_another_app_drops_its_optional_credentials(monkeypatch, permission_resolver):
+    org, user = _org_user()
+    permission_resolver.grant(Permission.SCM_CONNECT)
+    old = SourceConnection.objects.create(
+        organization=org,
+        kind="github_app_install",
+        account_login="acme-corp",
+        oauth_client_id="1111111",
+        app_client_id="Iv23liOldAppClient",
+        oauth_redirect_uri="https://old-app.invalid/callback",
+        api_base_url="https://old-host.invalid/api/v3",
+        oauth_client_secret_backend_kind="local_fernet",
+        oauth_client_secret_ciphertext=b"old-app-oauth",
+        webhook_secret_backend_kind="local_fernet",
+        webhook_secret_ciphertext=b"old-app-webhook",
+        is_active=False,
+    )
+    _stub_github(monkeypatch, installations=[_install(42, "acme-corp")])
+    result = _adopt(org, user, client_id=None)
+    assert result.ok, result.errors
+    assert result.data.id == str(old.guid)
+    old.refresh_from_db()
+    assert old.oauth_client_id == "3705068" and old.installation_id == "42"
+    assert old.api_base_url == "https://api.github.com"
+    assert old.app_client_id == old.oauth_redirect_uri == ""
+    assert old.oauth_client_secret_backend_kind == old.webhook_secret_backend_kind == ""
+    assert bytes(old.oauth_client_secret_ciphertext) == bytes(old.webhook_secret_ciphertext) == b""
+
+
 # ---------------------------------------------------------------------------
 # Part 2 — self-orphan on 404 during installation-token mint
 # ---------------------------------------------------------------------------
