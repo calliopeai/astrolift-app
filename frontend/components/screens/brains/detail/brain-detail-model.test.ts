@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BRAIN_KINDS,
   DEFAULT_ASK,
   environmentNames,
   gateAsk,
@@ -37,6 +38,12 @@ const row = (patch: Partial<SafetyRow>): SafetyRow => ({
   approval: false,
   minimumApprovals: 0,
   ...patch,
+});
+
+describe("brain kinds", () => {
+  it("are only the brain kind, so a factory app never opens as a semantic layer", () => {
+    expect(BRAIN_KINDS).toEqual(["mimwell"]);
+  });
 });
 
 describe("what an action-safety gate asks", () => {

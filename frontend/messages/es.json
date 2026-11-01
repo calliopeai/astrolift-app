@@ -1480,7 +1480,8 @@
       },
       "previewCount": "{count, plural, one {# vista previa} other {# vistas previas}}",
       "appKinds": {
-        "mimwell": "Mimwell"
+        "mimwell": "Mimwell",
+        "factory": "Fábrica"
       }
     },
     "tabs": {
