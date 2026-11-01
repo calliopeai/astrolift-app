@@ -185,9 +185,18 @@ def _step_secrets(app: RegisteredApp, *, actor) -> tuple[str, str]:
     # Secrets are the one step that needs the org GitHub App
     # (PLATFORM_REPO_WRITE) — a user OAuth/PAT can't push Actions secrets. An
     # org that wired webhook+workflow through an OAuth/PAT connection but
-    # never installed the App gets a clear secrets error, not a crash.
-    if not _has_connection(app, PLATFORM_REPO_WRITE):
-        return ERROR, "CI secrets need the org GitHub App installed; an org OAuth/PAT can't push them."
+    # never installed the App gets a clear secrets error, not a crash: the
+    # resolver's, which names the repo owner's missing or inactive
+    # installation rather than calling the App uninstalled (#2576).
+    try:
+        resolve_connection(
+            app.organization_id,
+            purpose=PLATFORM_REPO_WRITE,
+            source_kind=app.source_kind,
+            repo=app.source_repo,
+        )
+    except ConnectionResolutionError as exc:
+        return ERROR, exc.message
 
     platform_api_url = (getattr(settings, "PLATFORM_API_URL", "") or "").rstrip("/")
     try:

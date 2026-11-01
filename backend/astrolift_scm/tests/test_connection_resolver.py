@@ -291,29 +291,66 @@ def test_several_installations_resolve_by_repo_owner(org, purpose, repo):
     assert got.pk == second.pk
 
 
-@pytest.mark.parametrize("purpose", [PLATFORM_REPO_WRITE, ORG_REPO_WRITE])
-def test_several_installations_none_on_the_owner_keeps_the_old_pick(org, purpose):
-    """Adversarial review: rows from the manifest flow carry the App owner,
-    not the installed account, so a login that matches no installation
-    proves nothing. Adding a second installation must not cut off the apps
-    the first one served: with no match the oldest installation still wins."""
-    first = _mk(
-        org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ"
-    )
+def test_no_installation_on_the_owner_never_falls_back_to_another_account(org):
+    """#2576: the oldest installation (ConflictHQ) used to serve a repo no
+    installation was recorded on, and its token cannot see that repo. A
+    token connection still reaches what its account can; secrets, which
+    only an installation may write, fail and name the owner."""
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
     _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
-    _mk(org, SourceConnection.Kind.GITHUB_PAT, account_login="ci-bot")
-    got = resolve_connection(org, purpose=purpose, source_kind="github", repo="installed-elsewhere/app")
-    assert got.pk == first.pk
+    pat = _mk(org, SourceConnection.Kind.GITHUB_PAT, account_login="ci-bot")
 
-
-def test_a_single_installation_still_resolves_for_any_owner(org):
-    """Manifest-flow rows record the App owner, not the installed account,
-    so a lone installation keeps the org-wide behaviour."""
-    only = _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
     got = resolve_connection(
-        org, purpose=PLATFORM_REPO_WRITE, source_kind="github", repo="ragelink/leo-brain"
+        org, purpose=ORG_REPO_WRITE, source_kind="github", repo="Installed-Elsewhere/app"
     )
-    assert got.pk == only.pk
+    assert got.pk == pat.pk
+    with pytest.raises(ConnectionResolutionError) as exc:
+        resolve_connection(
+            org, purpose=PLATFORM_REPO_WRITE, source_kind="github", repo="Installed-Elsewhere/app"
+        )
+    assert exc.value.code == "PRECONDITION"
+    assert exc.value.message.startswith(
+        "no active GitHub App installation for Installed-Elsewhere: this organization has no connection "
+        "for Installed-Elsewhere."
+    )
+
+
+@pytest.mark.parametrize("purpose", [PLATFORM_REPO_WRITE, ORG_REPO_WRITE])
+def test_a_lone_installation_on_another_account_is_not_used(org, purpose):
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    with pytest.raises(ConnectionResolutionError) as exc:
+        resolve_connection(org, purpose=purpose, source_kind="github", repo="ragelink/leo-brain")
+    assert exc.value.code == "PRECONDITION"
+    assert "no active GitHub App installation for ragelink" in exc.value.message
+
+
+@pytest.mark.parametrize("state", [{"is_active": False}, {"is_orphaned": True}])
+def test_an_unusable_installation_on_the_owner_is_named_inactive(org, state):
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    _mk(
+        org,
+        SourceConnection.Kind.GITHUB_APP_INSTALL,
+        installation_id="2",
+        account_login="ragelink",
+        display_name="GitHub App: astrolift-conflict",
+        **state,
+    )
+    with pytest.raises(ConnectionResolutionError) as exc:
+        resolve_connection(org, purpose=PLATFORM_REPO_WRITE, source_kind="github", repo="RageLink/leo-brain")
+    assert exc.value.message == (
+        "no active GitHub App installation for RageLink: this organization's connection for RageLink "
+        "(GitHub App: astrolift-conflict) is inactive. Reconnect it under Providers → Source → Connect to "
+        "GitHub → Connect an existing GitHub App, with RageLink as the GitHub org / user login."
+    )
+
+
+def test_several_installations_on_the_owner_pick_the_newest(org):
+    """Live rows on one account can only differ in the login's case."""
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="RageLink")
+    newest = _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="3", account_login="ConflictHQ")
+    for purpose in (PLATFORM_REPO_WRITE, ORG_REPO_WRITE):
+        assert resolve_connection(org, purpose=purpose, repo="ragelink/leo-brain").pk == newest.pk
 
 
 # ---------------------------------------------------------------------------
@@ -337,11 +374,13 @@ def test_owner_warning_empty_when_an_account_token_can_reach_it(org, user, kind)
 def test_owner_warning_names_the_owner_when_installations_cover_other_accounts(org):
     _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
     warning = repo_owner_connection_warning(org, "ragelink/leo-brain")
-    assert "recorded on ragelink" in warning
-    assert "Settings → Connections" in warning
+    assert warning.startswith(
+        "no active GitHub App installation for ragelink: this organization has no connection for ragelink."
+    )
+    assert "with ragelink as the GitHub org / user login" in warning
 
 
-def test_owner_warning_when_the_org_has_no_github_connection(org):
+def test_owner_warning_names_an_inactive_connection_on_the_owner(org):
     _mk(
         org,
         SourceConnection.Kind.GITHUB_APP_INSTALL,
@@ -350,7 +389,7 @@ def test_owner_warning_when_the_org_has_no_github_connection(org):
         is_active=False,
     )
     warning = repo_owner_connection_warning(org, "ragelink/leo-brain")
-    assert warning.startswith("This organization has no GitHub connection")
+    assert "this organization's connection for ragelink (github_app_install:ragelink) is inactive" in warning
 
 
 @pytest.mark.parametrize(

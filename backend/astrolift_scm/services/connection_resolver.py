@@ -142,9 +142,9 @@ def resolve_connection(
     """Return the one SourceConnection that authenticates ``purpose`` for
     ``organization``, or raise ``ConnectionResolutionError``.
 
-    ``repo`` (``owner/name`` or a clone URL) picks among several GitHub App
-    installations: each covers one GitHub account, so the one recorded on
-    the repo's owner is preferred (#2297). See :func:`covering_repo_owner`.
+    ``repo`` (``owner/name`` or a clone URL) decides which GitHub App
+    installation may serve the call: only one recorded on the repo's owner
+    (#2297, #2576). See :func:`select_org_connection`.
     """
     if purpose is PLATFORM_REPO_WRITE:
         return _resolve_org_ranked(
@@ -193,58 +193,103 @@ def _resolve_org_ranked(
             "UNSUPPORTED_SOURCE",
             f"no {policy} connection policy for source_kind={source_kind!r}",
         )
+    return select_org_connection(org_id, kinds=accepted, repo=repo, no_conn_message=no_conn_message)
+
+
+def select_org_connection(
+    organization,
+    *,
+    kinds: tuple[str, ...],
+    repo: str | None,
+    no_conn_message: str,
+) -> SourceConnection:
+    """The active org connection of ``kinds`` that serves ``repo``, best kind
+    first, or ``ConnectionResolutionError`` (PRECONDITION).
+
+    The one selector behind CI secrets, workflow writes, webhook setup and
+    manifest reads (#2576). A GitHub App installation reaches only the
+    account it is installed on, so for a repo with an owner the only
+    installations considered are those recorded on that owner,
+    case-insensitively, and among several the newest wins. An installation
+    on another account is never used: with none on the owner the error says
+    whether this organization's connection for the owner is inactive or
+    missing. OAuth-user and PAT connections reach whatever their account
+    can, so they stay candidates. Without an owner the oldest row of the
+    best kind wins, so repeated resolutions are stable.
+    """
+    org_id = _org_id(organization)
     rows = list(
         SourceConnection.objects.filter(
             organization_id=org_id,
-            kind__in=accepted,
+            kind__in=kinds,
             is_active=True,
             is_orphaned=False,
             deleted_at__isnull=True,
         )
     )
+    install = SourceConnection.Kind.GITHUB_APP_INSTALL
+    owner = _repo_owner(repo) if install in kinds else ""
+    if owner:
+        rows = [r for r in rows if r.kind != install or (r.account_login or "").lower() == owner.lower()]
+        if not rows:
+            raise ConnectionResolutionError("PRECONDITION", _no_installation_for_owner(org_id, owner))
     if not rows:
         raise ConnectionResolutionError("PRECONDITION", no_conn_message)
-    rows = covering_repo_owner(rows, repo)
-    # Preference order first (App-install wins on GitHub), then oldest
-    # pk so repeated resolutions against the same org are stable.
-    rank = {k: i for i, k in enumerate(accepted)}
-    rows.sort(key=lambda r: (rank.get(r.kind, len(accepted)), r.pk))
-    return rows[0]
+    rank = {k: i for i, k in enumerate(kinds)}
+    picked = min(rows, key=lambda r: (rank[r.kind], r.pk))
+    if owner and picked.kind == install:
+        # Live rows on one account differ only in the login's case.
+        picked = max((r for r in rows if r.kind == install), key=lambda r: (r.created_at, r.pk))
+    return picked
 
 
 def _repo_owner(repo: str | None) -> str:
-    """The lower-cased owner of ``owner/name``, a clone URL or an SSH remote;
+    """The owner of ``owner/name``, a clone URL or an SSH remote, as written;
     "" when there is no owner segment."""
     parts = [p for p in (repo or "").strip().replace(":", "/").split("/") if p]
-    return parts[-2].lower() if len(parts) >= 2 else ""
+    return parts[-2] if len(parts) >= 2 else ""
 
 
-def covering_repo_owner(rows: list[SourceConnection], repo: str | None) -> list[SourceConnection]:
-    """Prefer the GitHub App installation on ``repo``'s owner (#2297).
+def _no_installation_for_owner(org_id, owner: str) -> str:
+    """Why no active GitHub App installation serves ``owner``'s repositories.
 
-    An installation covers one GitHub account, so when an org holds several
-    and one of them is recorded on the repo's owner, the others are dropped.
-    When none is, every row is kept and ranking picks as before: rows from
-    the manifest flow and older reuse installs record the App's owner rather
-    than the account it was installed on, so a login mismatch proves
-    nothing. Other connection kinds pass through untouched.
+    Names the Astrolift side that is wrong: this organization's connection
+    for ``owner`` is inactive, or there is none. Neither shows the App is
+    uninstalled on GitHub, so the message never says so (#2576).
     """
-    owner = _repo_owner(repo)
-    install = SourceConnection.Kind.GITHUB_APP_INSTALL
-    if not owner or not any(r.kind == install and (r.account_login or "").lower() == owner for r in rows):
-        return rows
-    return [r for r in rows if r.kind != install or (r.account_login or "").lower() == owner]
+    stored = (
+        SourceConnection.objects.filter(
+            organization_id=org_id,
+            kind=SourceConnection.Kind.GITHUB_APP_INSTALL,
+            account_login__iexact=owner,
+            deleted_at__isnull=True,
+        )
+        .order_by("-created_at", "-pk")
+        .first()
+    )
+    where = (
+        "under Providers → Source → Connect to GitHub → Connect an existing GitHub App, "
+        f"with {owner} as the GitHub org / user login"
+    )
+    if stored is None:
+        return (
+            f"no active GitHub App installation for {owner}: this organization has no connection "
+            f"for {owner}. Add one {where}."
+        )
+    return (
+        f"no active GitHub App installation for {owner}: this organization's connection for "
+        f"{owner} ({stored.name}) is inactive. Reconnect it {where}."
+    )
 
 
 def repo_owner_connection_warning(organization, repo: str | None, *, source_kind: str = "github") -> str:
-    """Explain at registration when nothing visibly covers ``repo``'s owner (#2297).
+    """Explain at registration when nothing covers ``repo``'s owner (#2297).
 
     Returns "" when an org-level GitHub connection could reach the repo: an
     App installation recorded on its owner, or an OAuth-user/PAT connection
-    (those reach whatever their account can). Otherwise names the owner so
-    a later fetch, build or webhook failure is not a surprise. Advisory
-    only: older installation rows record the App's owner rather than the
-    account it was installed on, so a mismatch does not prove a failure.
+    (those reach whatever their account can). Otherwise returns the error
+    the CI setup, webhook and manifest paths will give, since they never use
+    an installation on another account (#2576).
     """
     owner = _repo_owner(repo)
     if source_kind != "github" or not owner:
@@ -259,18 +304,9 @@ def repo_owner_connection_warning(organization, repo: str | None, *, source_kind
         ).only("kind", "account_login")
     )
     install = SourceConnection.Kind.GITHUB_APP_INSTALL
-    if any(r.kind != install or (r.account_login or "").lower() == owner for r in rows):
+    if any(r.kind != install or (r.account_login or "").lower() == owner.lower() for r in rows):
         return ""
-    if not rows:
-        return (
-            f"This organization has no GitHub connection, so Astrolift cannot fetch, build or "
-            f"receive webhooks for {owner}'s repositories. Connect GitHub under Settings → Connections."
-        )
-    return (
-        f"No GitHub App installation in this organization is recorded on {owner}. If fetches, "
-        f"builds or webhooks for this repository fail, install the App on {owner} under "
-        f"Settings → Connections."
-    )
+    return _no_installation_for_owner(_org_id(organization), owner)
 
 
 def _resolve_user_discovery(org_id, *, source_kind: str, user_id: int | None) -> SourceConnection:
