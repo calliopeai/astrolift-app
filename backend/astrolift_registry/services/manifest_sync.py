@@ -433,6 +433,7 @@ def resync_app_manifest_from_repo(
                     "branch": app.deploy_branch or app.default_branch or "main",
                     "ref": ref or app.deploy_branch or app.default_branch or "main",
                     "error": result.error or "",
+                    **({"severity": "warn"} if result.status == "fetch_failed" else {}),
                 },
                 resource_kind="registered_app",
                 resource_id=app.pk,

@@ -168,12 +168,24 @@ class DeployAppWorkflow:
                 # Fail here instead, naming the reason, so the deploy says
                 # what the log used to only whisper.
                 if resync.get("status") in ("diverged", "fetch_failed") and not resync.get("workload_count"):
-                    raise ApplicationError(
+                    reason = (
                         "manifest resync "
                         f"{resync.get('status')} and this app has no workloads to deploy: "
-                        f"{resync.get('error') or 'no detail'}",
-                        non_retryable=True,
+                        f"{resync.get('error') or 'no detail'}"
                     )
+                    # A raise here bypasses the ActivityError handler and its
+                    # mark_failed, leaving the row pending with no reason (#2578).
+                    # Patched so runs that already raised still replay.
+                    if not workflow.patched("resync-refusal-marks-failed"):
+                        raise ApplicationError(reason, non_retryable=True)
+                    await workflow.execute_activity(
+                        mark_failed,
+                        args=[deployment_id, reason],
+                        start_to_close_timeout=_MARK_TIMEOUT,
+                        heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                        retry_policy=_STANDARD_RETRY,
+                    )
+                    return WorkflowResult(ok=False, message=f"deploy failed: {reason}")
             await workflow.execute_activity(
                 pre_flight,
                 deployment_id,
