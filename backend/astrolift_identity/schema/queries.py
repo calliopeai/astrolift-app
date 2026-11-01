@@ -345,6 +345,7 @@ def _projects_qs(*, search: str | None = None):
     if org_id is None:
         return Project.objects.none()
     from astrolift_identity.visibility import visible_identity_projects
+    from astrolift_registry.project_kinds import with_project_kind
 
     qs = visible_identity_projects(
         Project.objects.filter(organization_id=org_id).select_related("organization", "team"),
@@ -353,7 +354,7 @@ def _projects_qs(*, search: str | None = None):
     term = (search or "").strip()
     if term:
         qs = qs.filter(search_q(term, "slug", "name", "description", "team__slug", "team__name"))
-    return qs
+    return with_project_kind(qs)
 
 
 def _members_qs(*, search: str | None = None):

@@ -52,7 +52,7 @@ def test_unknown_or_malformed_kind_is_a_located_error(value):
         parse_raw(manifest(f"[app]\nkind = {value}\n"))
     assert exc.value.path == "app.kind"
     if value == '"brainz"':
-        assert "supported kinds: mimwell" in str(exc.value)
+        assert "supported kinds: factory, mimwell" in str(exc.value)
 
 
 def test_a_generic_manifest_keeps_its_normalized_shape_and_hash():

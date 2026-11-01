@@ -28,6 +28,7 @@ from astrolift_identity.operation_context import (
     execution_operation,
     workflow_id_operation,
 )
+from astrolift_identity.scopes import project_scope_by_guid
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.client import (
     describe_workflow_instance,
@@ -44,6 +45,12 @@ from astrolift_workflows.schema.delivery_types import (
     selection_to_type,
 )
 from astrolift_workflows.schema.execution_types import WorkflowExecutionStages, WorkflowExecutionType
+from astrolift_workflows.schema.factory_room_types import (
+    ACTIVE_RUNS_LIMIT,
+    FINISHED_RUNS_LIMIT,
+    FactoryRoomType,
+    factory_run_to_type,
+)
 from astrolift_workflows.schema.human_gate_types import HumanGateDecisionState
 from astrolift_workflows.schema.schedule_types import WorkflowScheduleState, schedule_to_type
 from astrolift_workflows.schema.types import (
@@ -1099,6 +1106,64 @@ class WorkflowsQuery:
             return None
         run = _definition_runs_qs(caller).filter(guid=run_guid, organization_id=caller).first()
         return definition_run_to_type(run) if run is not None else None
+
+    @strawberry.field(
+        description=(
+            "A factory project's control room (#2556): its running runs, the human gates they wait on "
+            "and its finished runs, from Astrolift's run records, with the same run visibility as "
+            "workflowDefinitionRuns. Null for a project that is not a factory, that the caller cannot "
+            "read, or that is outside the caller's organization. Read-only."
+        )
+    )
+    @require_permission(
+        Permission.WORKFLOW_READ,
+        scope=project_scope_by_guid("project_id", permission=Permission.WORKFLOW_READ),
+    )
+    @tenant_scoped()
+    def factory_room(self, info: Info, project_id: GUID) -> FactoryRoomType | None:
+        from astrolift_identity.models import Project
+        from astrolift_identity.visibility import visible_identity_projects
+        from astrolift_registry.project_kinds import ANNOTATION, FACTORY, with_project_kind
+        from workflows.models import WorkflowStageExecution
+
+        caller = _caller_org_pk()
+        if caller is None:
+            return None
+        project = (
+            with_project_kind(
+                visible_identity_projects(
+                    Project.objects.filter(organization_id=caller, team__deleted_at__isnull=True),
+                    Permission.PROJECT_READ,
+                )
+            )
+            .filter(guid=str(project_id))
+            .first()
+        )
+        if project is None or getattr(project, ANNOTATION) != FACTORY:
+            return None
+        runs = _definition_runs_qs(caller).filter(workflow_definition__project=project)
+        active = runs.filter(status=WorkflowRun.Status.RUNNING, ended_at__isnull=True)
+        approvals_waiting = WorkflowStageExecution.objects.filter(
+            stage_kind_filter("human_gate"),
+            stage__deleted_at__isnull=True,
+            status=WorkflowStageExecution.Status.RUNNING,
+            workflow_run_id__in=active.values("pk"),
+        ).count()
+        finished = runs.exclude(status=WorkflowRun.Status.RUNNING).filter(ended_at__isnull=False)
+        return FactoryRoomType(
+            project_id=str(project.guid),
+            project_slug=project.slug,
+            name=project.name,
+            active_runs=[
+                factory_run_to_type(run)
+                for run in active.order_by("-started_at", "-guid")[:ACTIVE_RUNS_LIMIT]
+            ],
+            approvals_waiting=approvals_waiting,
+            finished_runs=[
+                factory_run_to_type(run)
+                for run in finished.order_by("-ended_at", "-guid")[:FINISHED_RUNS_LIMIT]
+            ],
+        )
 
     @strawberry.field(
         description=(

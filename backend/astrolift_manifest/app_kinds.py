@@ -4,6 +4,10 @@ Workload kinds (``deployment``, ``task``, ``agent``...) describe scheduling.
 An app kind tells the platform and UI which purpose-built category an app
 belongs to, so app-specific setup, navigation and defaults can key off it.
 An omitted kind is a generic app. Register a new kind here.
+
+A project has no kind field. Its kind is derived from what its live apps
+declare (``astrolift_registry.project_kinds``), so it too changes only through
+a manifest.
 """
 
 from __future__ import annotations
@@ -24,10 +28,21 @@ APP_KINDS: dict[str, AppKind] = {
         label="Mimwell",
         description="The brain-centered app that serves the Semantic Context Ontology Layer (SCOL).",
     ),
+    "factory": AppKind(
+        key="factory",
+        label="Factory",
+        description=(
+            "The controller of an agent software factory. Its project is the factory: the role "
+            "agents and workflows that turn issues into reviewed draft pull requests."
+        ),
+    ),
 }
 
 # Kinds whose app serves a brain other apps, agents and workflows can read (#2320).
 BRAIN_KINDS = frozenset({"mimwell"})
+
+# Kinds whose app makes its project an agent software factory (#2556).
+FACTORY_KINDS = frozenset({"factory"})
 
 # Spec 05 once documented ``[app] kind = "web" | "worker"``; no parser read
 # it. Those values stay accepted and mean a generic app, so no manifest that
