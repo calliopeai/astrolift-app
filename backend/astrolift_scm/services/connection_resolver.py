@@ -51,6 +51,7 @@ purposes resolve identically.
 
 from __future__ import annotations
 
+import dataclasses
 import enum
 
 from astrolift_scm.models import SourceConnection
@@ -236,19 +237,51 @@ def covering_repo_owner(rows: list[SourceConnection], repo: str | None) -> list[
     return [r for r in rows if r.kind != install or (r.account_login or "").lower() == owner]
 
 
-def repo_owner_connection_warning(organization, repo: str | None, *, source_kind: str = "github") -> str:
-    """Explain at registration when nothing visibly covers ``repo``'s owner (#2297).
+CONNECTED = "connected"
+NOT_CONNECTED = "not_connected"
+UNKNOWN = "unknown"
 
-    Returns "" when an org-level GitHub connection could reach the repo: an
+
+@dataclasses.dataclass(frozen=True)
+class RepoOwnerConnection:
+    """What the organization's records say about a connection for a repo's owner.
+
+    ``state`` is CONNECTED, NOT_CONNECTED or UNKNOWN; ``owner`` is the repo
+    owner's login, lower-cased; ``detail`` says why, and for NOT_CONNECTED
+    names the console step. Empty when CONNECTED.
+    """
+
+    state: str
+    owner: str
+    detail: str
+
+
+def repo_owner_connection(
+    organization, repo: str | None, *, source_kind: str = "github"
+) -> RepoOwnerConnection:
+    """Whether an org-level connection is recorded for ``repo``'s owner (#2297, #2579).
+
+    CONNECTED when an org-level GitHub connection could reach the repo: an
     App installation recorded on its owner, or an OAuth-user/PAT connection
-    (those reach whatever their account can). Otherwise names the owner so
-    a later fetch, build or webhook failure is not a surprise. Advisory
-    only: older installation rows record the App's owner rather than the
-    account it was installed on, so a mismatch does not prove a failure.
+    (those reach whatever their account can). NOT_CONNECTED when the
+    organization has no GitHub connection, or only App installations recorded
+    on other accounts. UNKNOWN for a repo with no owner or a host other than
+    GitHub. Records only: older installation rows record the App's owner
+    rather than the account it was installed on, so NOT_CONNECTED does not
+    prove that a read fails.
     """
     owner = _repo_owner(repo)
-    if source_kind != "github" or not owner:
-        return ""
+    if not owner:
+        detail = (
+            "The app's source repository names no owner."
+            if (repo or "").strip()
+            else "The app has no source repository."
+        )
+        return RepoOwnerConnection(UNKNOWN, "", detail)
+    if source_kind != "github":
+        return RepoOwnerConnection(
+            UNKNOWN, owner, "Astrolift checks source connections for GitHub repositories only."
+        )
     rows = list(
         SourceConnection.objects.filter(
             organization_id=_org_id(organization),
@@ -260,17 +293,32 @@ def repo_owner_connection_warning(organization, repo: str | None, *, source_kind
     )
     install = SourceConnection.Kind.GITHUB_APP_INSTALL
     if any(r.kind != install or (r.account_login or "").lower() == owner for r in rows):
-        return ""
+        return RepoOwnerConnection(CONNECTED, owner, "")
     if not rows:
-        return (
+        return RepoOwnerConnection(
+            NOT_CONNECTED,
+            owner,
             f"This organization has no GitHub connection, so Astrolift cannot fetch, build or "
-            f"receive webhooks for {owner}'s repositories. Connect GitHub under Settings → Connections."
+            f"receive webhooks for {owner}'s repositories. Connect GitHub under Providers → Source.",
         )
-    return (
+    return RepoOwnerConnection(
+        NOT_CONNECTED,
+        owner,
         f"No GitHub App installation in this organization is recorded on {owner}. If fetches, "
-        f"builds or webhooks for this repository fail, install the App on {owner} under "
-        f"Settings → Connections."
+        f"builds or webhooks for this repository fail, add a GitHub connection for {owner} under "
+        f"Providers → Source: Connect to GitHub, or Connect an existing GitHub App with {owner} "
+        f"as the GitHub org / user login.",
     )
+
+
+def repo_owner_connection_warning(organization, repo: str | None, *, source_kind: str = "github") -> str:
+    """Explain at registration when nothing visibly covers ``repo``'s owner (#2297).
+
+    The detail of :func:`repo_owner_connection` when it is NOT_CONNECTED,
+    else "". Advisory: a registration it accompanies went ahead.
+    """
+    found = repo_owner_connection(organization, repo, source_kind=source_kind)
+    return found.detail if found.state == NOT_CONNECTED else ""
 
 
 def _resolve_user_discovery(org_id, *, source_kind: str, user_id: int | None) -> SourceConnection:

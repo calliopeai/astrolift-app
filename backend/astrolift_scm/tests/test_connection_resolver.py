@@ -338,7 +338,7 @@ def test_owner_warning_names_the_owner_when_installations_cover_other_accounts(o
     _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
     warning = repo_owner_connection_warning(org, "ragelink/leo-brain")
     assert "recorded on ragelink" in warning
-    assert "Settings → Connections" in warning
+    assert "Providers → Source" in warning
 
 
 def test_owner_warning_when_the_org_has_no_github_connection(org):
