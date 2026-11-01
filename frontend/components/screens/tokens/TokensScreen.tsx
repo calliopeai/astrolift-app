@@ -329,7 +329,10 @@ export function TokensScreen({
             <SheetTitle>{t("createTitle")}</SheetTitle>
             <SheetDescription>{t("createDescription")}</SheetDescription>
           </SheetHeader>
-          <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
+          {/* Scrolls inside the sheet: the scope catalog is taller than the
+              window, and the sheet itself does not scroll, so without it the
+              Create button sits below the screen (#2569). */}
+          <form onSubmit={submit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
             <div className="space-y-2">
               <Label htmlFor="token-name">{t("name")}</Label>
               <Input
