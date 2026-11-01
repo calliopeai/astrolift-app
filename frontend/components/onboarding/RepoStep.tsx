@@ -55,9 +55,12 @@ export function RepoStep({
   // doesn't see an empty <select> placeholder when they actually
   // have one wired up. Only seed when the field is still empty so
   // we don't clobber a manual switch.
+  // Seed only when the choice is unambiguous. With several connections the
+  // first one may belong to a different GitHub account than the repo, so the
+  // repo selection below picks the connection that covers the repo's owner.
   React.useEffect(() => {
     if (state.sourceConnectionId) return;
-    if (availableConnections.length === 0) return;
+    if (availableConnections.length !== 1) return;
     setState((prev) =>
       prev.sourceConnectionId ? prev : { ...prev, sourceConnectionId: availableConnections[0].id }
     );
@@ -147,11 +150,18 @@ export function RepoStep({
               value={state.sourceRepo}
               onValueChange={(value) => {
                 const repo = reposList.find((r) => r.fullName === value);
+                // Route the app to the connection whose GitHub account owns the repo.
+                // No match clears the choice so the operator must pick one explicitly.
+                const owner = value.split("/")[0]?.toLowerCase() ?? "";
+                const owning = availableConnections.find(
+                  (c) => c.isActive && (c.accountLogin ?? "").toLowerCase() === owner
+                );
                 setState((prev) => ({
                   ...prev,
                   sourceRepo: value,
                   sourceUrl: repo?.webUrl ?? "",
                   sourceDefaultBranch: repo?.defaultBranch || prev.sourceDefaultBranch,
+                  sourceConnectionId: owning ? owning.id : "",
                 }));
               }}
             >
