@@ -201,8 +201,12 @@ def operator(settings):
     return SimpleNamespace(org=org, user=user, client=client)
 
 
+# What the Providers > Source card sends: its section, on the Source tab.
+RETURN_TO = "/providers?section=factory-gate#source"
+
+
 def _start(op, org_login="acme-corp"):
-    return op.client.get(START, {"purpose": "factory_gate", "org": org_login, "return_to": "/providers"})
+    return op.client.get(START, {"purpose": "factory_gate", "org": org_login, "return_to": RETURN_TO})
 
 
 def _register(op, org_login="acme-corp"):
@@ -331,10 +335,13 @@ def test_the_app_name_comes_from_the_setting(operator, settings):
 
 
 def test_registration_needs_the_github_organization(operator):
-    response = operator.client.get(START, {"purpose": "factory_gate", "return_to": "/providers"})
+    response = operator.client.get(START, {"purpose": "factory_gate", "return_to": RETURN_TO})
 
     assert response.status_code == 302
-    assert "scm_error=factory_gate_org_required" in response["Location"]
+    # Ahead of the fragment, where the UI reads it; the tab stays in the fragment.
+    assert (
+        response["Location"] == "/providers?section=factory-gate&scm_error=factory_gate_org_required#source"
+    )
     assert not SourceConnection.objects.filter(organization=operator.org, kind=factory_gate.KIND).exists()
 
 
@@ -372,7 +379,10 @@ def test_registration_and_install_store_the_ids_and_the_key_encrypted_and_audit_
 
     setup = _install(operator)
 
-    assert setup.status_code == 302 and "scm_connected=" in setup["Location"]
+    assert setup.status_code == 302
+    assert setup["Location"] == (
+        "/providers?section=factory-gate&scm_connected=GitHub%20App%3A%20calliope-factory-gate#source"
+    )
     app.refresh_from_db()
     assert (app.installation_id, app.is_active) == ("777", True)
     assert factory_gate.state_of(app) is factory_gate.State.INSTALLED

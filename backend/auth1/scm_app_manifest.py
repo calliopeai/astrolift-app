@@ -110,14 +110,21 @@ def _safe_return_to(raw: str | None) -> str:
     return raw
 
 
+def _with_param(return_to: str, param: str) -> str:
+    """Add ``param`` to the query of ``return_to``, ahead of any fragment: the
+    Providers page keeps its tab in the fragment (``/providers#source``), and a
+    parameter after ``#`` would be read as part of it."""
+    path, hash_mark, fragment = return_to.partition("#")
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{param}{hash_mark}{fragment}"
+
+
 def _redirect_with_error(return_to: str, code: str) -> HttpResponseRedirect:
-    sep = "&" if "?" in return_to else "?"
-    return HttpResponseRedirect(f"{return_to}{sep}scm_error={code}")
+    return HttpResponseRedirect(_with_param(return_to, f"scm_error={code}"))
 
 
 def _redirect_with_ok(return_to: str, label: str) -> HttpResponseRedirect:
-    sep = "&" if "?" in return_to else "?"
-    return HttpResponseRedirect(f"{return_to}{sep}scm_connected={urllib.parse.quote(label)}")
+    return HttpResponseRedirect(_with_param(return_to, f"scm_connected={urllib.parse.quote(label)}"))
 
 
 def _active_org_id(request: HttpRequest) -> int | None:
