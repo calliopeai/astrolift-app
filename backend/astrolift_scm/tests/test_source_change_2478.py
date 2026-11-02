@@ -168,7 +168,9 @@ def test_without_a_github_app_installation_nothing_is_accepted(org, github, kind
         installed_repository(org.pk, "ConflictHQ/fossilrepos")
 
     assert refused.value.code == "PRECONDITION"
-    assert "GitHub App is not installed" in refused.value.message
+    # The App may be installed on GitHub; what is missing is this
+    # organization's connection for the owner (#2576).
+    assert "no active GitHub App installation for ConflictHQ" in refused.value.message
     assert calls == []
 
 

@@ -86,6 +86,31 @@ jobs:
           path: ${{ runner.temp }}/testdb
           key: ${{ steps.testdb.outputs.key }}
           lookup-only: true
+      # The coverage map a pull request selects its backend tests by: the
+      # newest one the nightly run built on main at an ancestor of the base
+      # (scripts/coverage_map.py). Any failure here leaves no map, and without
+      # a map the full suite runs.
+      - name: Fetch the coverage map
+        if: ${{ github.event_name == 'pull_request' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=test-coverage-map&per_page=30" \
+            --jq '.artifacts | sort_by(.created_at) | reverse | .[]
+              | select((.expired | not) and .workflow_run.head_branch == "main")
+              | "\(.id) \(.workflow_run.head_sha)"' > "$RUNNER_TEMP/maps.txt"
+          while read -r id sha; do
+            if git merge-base --is-ancestor "$sha" "$BASE_SHA" 2>/dev/null; then
+              gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/map.zip"
+              unzip -o -q "$RUNNER_TEMP/map.zip" -d "$RUNNER_TEMP/coverage-map"
+              echo "Coverage map built at $sha (artifact $id)."
+              exit 0
+            fi
+          done < "$RUNNER_TEMP/maps.txt"
+          echo "No coverage map from main at an ancestor of $BASE_SHA."
       - name: Classify changed paths
         id: classify
         env:
@@ -95,6 +120,9 @@ jobs:
           TIER: ${{ inputs.tier }}
           GH_TOKEN: ${{ github.token }}
           TESTDB_CACHED: ${{ steps.testdb-cached.outputs.cache-hit }}
+          # Kill switch for change-aware pull-request runs: anything but "on"
+          # runs the full suite, exactly as before the gate.
+          SELECTION_GATE: ${{ vars.CI_SELECTION_GATE }}
         run: |
           if [[ "$EVENT_NAME" != workflow_dispatch && -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
             if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
@@ -236,12 +264,21 @@ jobs:
                   f"repos/{repo}/actions/workflows/ci.yml/runs"
                   f"?event=pull_request&status=success&head_sha={pull['head']['sha']}&per_page=20"
               )["workflow_runs"]
+              selected_only = []
               for run in runs:
                   if when(run["run_started_at"] or run["created_at"]) < landed:
                       continue
                   jobs = api(f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100")["jobs"]
-                  if any(j["name"] == "classify changes" and j["conclusion"] == "success" for j in jobs):
-                      return True, f"#{pull['number']} passed run {run['id']} on this base"
+                  if not any(j["name"] == "classify changes" and j["conclusion"] == "success" for j in jobs):
+                      continue
+                  # A run that selected its tests by coverage skipped the rest
+                  # of the pull-request tier; main runs them.
+                  if any(j["name"].startswith("test shard (") and j["name"].endswith(" selected)") for j in jobs):
+                      selected_only.append(run["id"])
+                      continue
+                  return True, f"#{pull['number']} passed run {run['id']} on this base"
+              if selected_only:
+                  return False, f"#{pull['number']} ran only selected tests (run {selected_only[0]})"
               return False, f"#{pull['number']} has no passing run on this base"
 
           event = os.environ["EVENT_NAME"]
@@ -268,8 +305,13 @@ jobs:
 
           backend = frontend = routes = contracts = providers = full
           selected = set(shards) if full else set()
+          # Changed paths outside backend/ that backend tests read, or that run
+          # everything: the coverage map cannot answer for them.
+          outside = []
           for path in paths:
               selected |= readers.get(path, set())
+              if path in readers:
+                  outside.append(path)
               if path.startswith("backend/"):
                   # backend/README.md and its siblings: no test reads them.
                   if path.count("/") == 1 and path.endswith(".md"):
@@ -285,6 +327,8 @@ jobs:
                       selected |= impacts.get(root, {owners[root]})
               elif path.startswith("frontend/"):
                   frontend = True
+                  if path.endswith(("package-lock.json", ".lock")):
+                      outside.append(path)
                   contracts = contracts or path == "frontend/schema.graphql"
                   # The route walk renders en-US only, so another locale's
                   # catalogue cannot change it. The layout job's Storybook
@@ -296,6 +340,7 @@ jobs:
               }:
                   backend = frontend = routes = contracts = providers = True
                   selected = set(shards)
+                  outside.append(path)
               elif path.startswith("docs/") or path.endswith(".md") or path in {
                   "LICENSE", ".gitignore"
               }:
@@ -307,6 +352,7 @@ jobs:
               else:
                   backend = frontend = routes = contracts = providers = True
                   selected = set(shards)
+                  outside.append(path)
           if backend and not selected:
               selected = set(shards)
 
@@ -344,6 +390,96 @@ jobs:
           if tier == "slow":
               # The pull request's own run already covered everything else.
               backend = frontend = routes = contracts = providers = False
+
+          def test_files(top):
+              return [
+                  os.path.relpath(os.path.join(root, fname), "backend")
+                  for root, _dirs, names in os.walk(os.path.join("backend", top))
+                  for fname in names
+                  if (fname.startswith("test_") or fname.endswith("_tests.py")) and fname.endswith(".py")
+              ]
+
+          # Change-aware pull-request runs (scripts/coverage_map.py): the
+          # always tier plus the tests the changed lines reach, by the nightly
+          # coverage map. Applied only while the repository variable
+          # CI_SELECTION_GATE is "on"; otherwise, or when the map cannot answer
+          # for every changed path, the full suite runs. Selected shards end
+          # their names in " selected", so the push to main that merges this
+          # runs the whole main tier instead of only the slow tests.
+          def select_by_coverage():
+              """(why the full suite runs, or "" when it need not; the selected
+              matrix; the step summary's account of it)."""
+              coverage_map = os.path.join(os.environ["RUNNER_TEMP"], "coverage-map", "test-coverage-map.json.gz")
+              if outside:
+                  return "the coverage map cannot answer for " + ", ".join(f"`{p}`" for p in outside[:10]), [], []
+              if not os.path.isfile(coverage_map):
+                  return "no coverage map from main at an ancestor of the base", [], []
+              run = subprocess.run(
+                  ["python3", "scripts/coverage_map.py", "select", "--map", coverage_map,
+                   "--base", base, "--head", head, "--json"],
+                  cwd="backend", capture_output=True, text=True,
+              )
+              if run.returncode:
+                  return f"the selection failed: {run.stderr.strip()[-500:]}", [], []
+              selection = json.loads(run.stdout)
+              if selection["all"] and selection["reasons"][0].startswith("backend/"):
+                  return "the coverage map cannot answer for " + ", ".join(
+                      f"`{r}`" for r in selection["reasons"][:10]
+                  ), [], []
+              if selection["all"]:
+                  return selection["reasons"][0], [], []
+              if not all(re.fullmatch(r"[\w./-]+", test) for test in selection["tests"]):
+                  return "a test path outside [A-Za-z0-9_./-]", [], []
+              gated = []
+              for name, shard in shards.items():
+                  roots = shard["paths"].split()
+                  files = [test for test in selection["tests"] if test.split("/", 1)[0] in roots]
+                  if not files:
+                      continue
+                  # As many jobs as the shard needs for its share of the files.
+                  total = sum(len(test_files(top)) for top in roots)
+                  count = -(-shard.get("partitions", 1) * len(files) // max(total, len(files)))
+                  for index in range(count):
+                      gated.append({
+                          "name": (f"{name}-{string.ascii_lowercase[index]}" if count > 1 else name) + " selected",
+                          "shard": name,
+                          "paths": " ".join(files),
+                          "temporal": shard["temporal"],
+                          "partition": index,
+                          "partitions": count,
+                      })
+              running = {test for entry in gated for test in entry["paths"].split()}
+              full_suite = sum(len(test_files(top)) for entry in include for top in entry["paths"].split()
+                               if entry["partition"] == 0)
+              account = [
+                  f"{len(running)} test files instead of the full suite's {full_suite}: the always tier "
+                  f"({len(running & set(selection['always']))}) and the tests the change reaches "
+                  f"({len(running & set(selection['selected']))}), by the map at `{selection['map_commit'][:9]}`.",
+                  "",
+                  *(f"- `{test}`" for test in selection["selected"][:100]),
+                  *(f"- {note}" for note in selection["notes"][:20]),
+              ]
+              return "", gated, account
+
+          if event == "pull_request" and tier == "pr" and include:
+              gate = os.environ.get("SELECTION_GATE") == "on"
+              summary = [
+                  "### Backend test selection", "",
+                  f"Gate {'on' if gate else 'off'} (repository variable `CI_SELECTION_GATE`).", "",
+              ]
+              try:
+                  why, gated, account = select_by_coverage()
+              except Exception as exc:  # a broken selection never breaks the run: the full suite runs
+                  why, gated, account = f"the selection failed: {exc!r}", [], []
+              if why:
+                  summary.append(f"Full suite: {why}.")
+              else:
+                  summary += [f"{'Running' if gate else 'With the gate on this would run'} {account[0]}", *account[1:]]
+                  if gate:
+                      include = gated
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+                  handle.write("\n".join(summary) + "\n")
+              print("\n".join(summary))
           if event == "push" and not include and os.environ.get("TESTDB_CACHED") != "true":
               # Nothing here would migrate, yet main has no dump for this
               # schema: build it once now rather than in every shard of every
@@ -704,57 +840,6 @@ jobs:
           name: test-coverage-map
           path: ${{ runner.temp }}/test-coverage-map.json.gz
           retention-days: 14
-
-  test-selection:
-    # Report only, while the selection is checked against what pull requests
-    # actually break: the backend tests this change's lines reach, from the
-    # newest nightly coverage map on main. Never fails the run.
-    name: test selection (report)
-    needs: changes
-    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.backend == 'true' }}
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      contents: read
-      actions: read
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Select by coverage
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=test-coverage-map&per_page=20" \
-            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "main")][0].id // empty')
-          if [[ -z "$id" ]]; then
-            echo "No coverage map from main yet; the nightly run builds one." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > "$RUNNER_TEMP/map.zip"
-          unzip -o -q "$RUNNER_TEMP/map.zip" -d "$RUNNER_TEMP"
-          git fetch -q origin "$(python3 -c "import gzip,json;print(json.load(gzip.open('$RUNNER_TEMP/test-coverage-map.json.gz','rt'))['commit'])")" || true
-          python3 scripts/coverage_map.py select --map "$RUNNER_TEMP/test-coverage-map.json.gz" \
-            --base "$BASE_SHA" --head "$HEAD_SHA" --json > "$RUNNER_TEMP/selection.json"
-          python3 - "$RUNNER_TEMP/selection.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
-          import json, sys
-          d = json.load(open(sys.argv[1]))
-          print("### Backend tests this change reaches (report only)\n")
-          if d["all"]:
-              print("**All**: coverage cannot follow " + ", ".join(f"`{r}`" for r in d["reasons"]))
-          else:
-              print(f"**{len(d['tests'])}** of {d['map_tests']} test files, by the map at `{d['map_commit'][:9]}`.\n")
-              print("\n".join(f"- `{t}`" for t in d["tests"]) or "_none_")
-          if d["notes"]:
-              print("\nNotes:\n" + "\n".join(f"- {n}" for n in d["notes"]))
-          PY
-          cat "$GITHUB_STEP_SUMMARY"
 
   test:
     name: test (real postgres)

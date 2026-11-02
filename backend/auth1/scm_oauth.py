@@ -462,6 +462,14 @@ def _github_install_time_callback(request: HttpRequest) -> Any:
         connection.orphaned_at = None
         connection.orphaned_reason = ""
         connection.save()
+        # The row still carries the App owner's login or the account the
+        # flow defaulted to. Routing serves a repo only through the
+        # installation on its owner (#2576), so record the account GitHub
+        # installed on, as the setup callback does; Apps that request OAuth
+        # on install land here instead.
+        from auth1.scm_app_manifest import _record_installed_accounts
+
+        _record_installed_accounts(connection)
 
     # Upsert the per-user OAuth token row — mirrors github_callback's
     # regular path so a user who installs via this flow gets the same

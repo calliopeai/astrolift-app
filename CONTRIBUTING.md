@@ -81,6 +81,27 @@ push runs the default and `slow` tiers. Both run only the shards the change
 can affect, and the `nightly` workflow (07:17 UTC, or on dispatch) runs every
 shard and every tier except `manual`.
 
+A pull request can run only the backend tests its change reaches, while the
+repository variable `CI_SELECTION_GATE` is `on`. `classify changes` takes the
+newest coverage map the nightly built on `main` at an ancestor of the base
+(`backend/scripts/coverage_map.py`) and runs the always tier plus the test
+files that executed the changed lines. The always tier is every test under
+`core/`, `config/`, `astrolift_graphql/` and `auth1/` (the codebase-wide
+guardrails live there), every test the map cannot place on a line of its own,
+and every test edited since the map. The full suite runs instead when there is
+no such map, when the gate is not `on`, or when the change touches anything
+coverage cannot follow: CI and test tooling, the selection script, locks,
+configuration, migrations, Django wiring, non-Python files, files outside
+`backend/` that backend tests read, new modules, or code no test executes.
+Either way the run's summary shows the selection. Selected shards are named
+`... selected`, and the push to `main` that merges such a pull request runs
+the default and `slow` tiers, not only the `slow` tests. To see a selection
+locally, with a map downloaded from a nightly run:
+
+```bash
+cd backend && python scripts/coverage_map.py select --map test-coverage-map.json.gz --base origin/main --head HEAD
+```
+
 Markers are strict: a misspelt one fails collection. Run a tier locally:
 
 ```bash

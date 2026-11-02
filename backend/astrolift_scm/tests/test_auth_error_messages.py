@@ -391,7 +391,7 @@ def test_sync_github_threads_ci_workflow_permission_hint(monkeypatch):
     monkeypatch.setattr(ws, "_is_github_branch_protected", lambda *a, **k: False)
     monkeypatch.setattr(
         ws,
-        "_pick_source_connection",
+        "_source_connection",
         lambda app: SimpleNamespace(kind="github_app_install", api_base_url=""),
     )
     monkeypatch.setattr(ws, "render_astrolift_ci_workflow", lambda app: "name: ci\n")

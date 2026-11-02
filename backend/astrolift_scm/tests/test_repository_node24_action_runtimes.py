@@ -30,7 +30,7 @@ _REVIEWED_NODE24_ACTIONS = {
 
 _MIGRATED_NODE24_REFS = Counter(
     {
-        "actions/checkout@v5": 18,
+        "actions/checkout@v5": 17,
         "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd": 1,
         "actions/setup-node@v5": 5,
         "actions/setup-python@v6": 7,
