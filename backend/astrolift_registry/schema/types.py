@@ -322,6 +322,36 @@ class AppAutowireStatusType:
     detail: str
 
 
+@strawberry.enum(
+    name="AstroliftSourceConnectionState",
+    description=(
+        "Whether the organization's records show a source connection for an app's repository owner "
+        "(#2579). CONNECTED: a GitHub App installation recorded on the owner, or an organization "
+        "OAuth or PAT connection. NOT_CONNECTED: no GitHub connection, or App installations recorded "
+        "on other accounts only. UNKNOWN: not a GitHub repository, or no owner to check."
+    ),
+)
+class SourceConnectionState(enum.Enum):
+    CONNECTED = "connected"
+    NOT_CONNECTED = "not_connected"
+    UNKNOWN = "unknown"
+
+
+@strawberry.type(
+    name="AstroliftAppSourceConnection",
+    description=(
+        "The source connection for an app's repository owner, from the organization's records (#2579). "
+        "owner is the repository owner's login, lower-cased; detail says why, and for NOT_CONNECTED "
+        "names the console step that adds the connection. Records only: an older installation record "
+        "may name the App's owner rather than the account it was installed on."
+    ),
+)
+class AppSourceConnectionType:
+    state: SourceConnectionState
+    owner: str
+    detail: str
+
+
 @strawberry.type(name="AstroliftCiWorkflowSyncStatus")
 class AppCiWorkflowSyncStatusType:
     """Versioned-sync status for an app's managed CI workflow file (#1209).
@@ -754,6 +784,13 @@ class RegisteredAppType:
         description=(
             "Advisory set only on the registerApp result: no organization GitHub connection "
             "is visibly recorded on the source repository's owner. Empty everywhere else (#2297)."
+        ),
+    )
+    source_connection: AppSourceConnectionType | None = strawberry.field(
+        default=None,
+        description=(
+            "The source connection for the app's repository owner (#2579). Filled on astroliftApp "
+            "only; null on list reads."
         ),
     )
     row_pk: strawberry.Private[int | None] = None
@@ -1220,6 +1257,7 @@ def app_to_type(
     freshness: AppFreshness | None = None,
     drift: AppConfigDriftType | None = None,
     autowire: AppAutowireStatusType | None = None,
+    source_connection: AppSourceConnectionType | None = None,
     ci_workflow_sync_status: AppCiWorkflowSyncStatusType | None = None,
     settings_last_modified: AppSettingsLastModifiedType | None = None,
     viewer_permissions: Iterable[str] | None = None,
@@ -1351,6 +1389,7 @@ def app_to_type(
         reprovision=reprovision,
         config_drift=drift,
         autowire=autowire,
+        source_connection=source_connection,
         ci_workflow_sync_status=ci_workflow_sync_status,
         settings_last_modified=settings_last_modified,
         viewer_permissions=sorted(viewer_permissions) if viewer_permissions is not None else [],
@@ -1660,6 +1699,16 @@ def build_autowire_status(app) -> AppAutowireStatusType:
         secrets=state.get("secrets") or MISSING,
         checked_at=checked_at,
         detail=detail,
+    )
+
+
+def build_source_connection(app) -> AppSourceConnectionType:
+    """The source connection for the app's repository owner (#2579). DB-only."""
+    from astrolift_scm.services.connection_resolver import repo_owner_connection
+
+    found = repo_owner_connection(app.organization_id, app.source_repo, source_kind=app.source_kind)
+    return AppSourceConnectionType(
+        state=SourceConnectionState(found.state), owner=found.owner, detail=found.detail
     )
 
 

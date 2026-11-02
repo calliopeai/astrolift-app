@@ -374,13 +374,11 @@ def test_owner_warning_empty_when_an_account_token_can_reach_it(org, user, kind)
 def test_owner_warning_names_the_owner_when_installations_cover_other_accounts(org):
     _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
     warning = repo_owner_connection_warning(org, "ragelink/leo-brain")
-    assert warning.startswith(
-        "no active GitHub App installation for ragelink: this organization has no connection for ragelink."
-    )
-    assert "with ragelink as the GitHub org / user login" in warning
+    assert "recorded on ragelink" in warning
+    assert "Providers → Source" in warning
 
 
-def test_owner_warning_names_an_inactive_connection_on_the_owner(org):
+def test_owner_warning_when_the_org_has_no_github_connection(org):
     _mk(
         org,
         SourceConnection.Kind.GITHUB_APP_INSTALL,
@@ -389,7 +387,7 @@ def test_owner_warning_names_an_inactive_connection_on_the_owner(org):
         is_active=False,
     )
     warning = repo_owner_connection_warning(org, "ragelink/leo-brain")
-    assert "this organization's connection for ragelink (github_app_install:ragelink) is inactive" in warning
+    assert warning.startswith("This organization has no GitHub connection")
 
 
 @pytest.mark.parametrize(

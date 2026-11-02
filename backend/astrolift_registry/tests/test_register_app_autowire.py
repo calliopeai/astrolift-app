@@ -137,10 +137,7 @@ def test_register_without_connection_lands_unwired(monkeypatch, permission_resol
     app = RegisteredApp.objects.get(slug="unwired-app")
     assert app.autowire_state["connected"] is False
     assert "ci_workflow" not in app.autowire_state
-    # The error CI setup would give for this owner (#2576).
-    assert result.data.source_connection_warning.startswith(
-        "no active GitHub App installation for acme: this organization has no connection for acme."
-    )
+    assert result.data.source_connection_warning.startswith("This organization has no GitHub connection")
 
 
 def test_register_autowire_failure_does_not_fail_registration(monkeypatch, permission_resolver, seed_cluster):
