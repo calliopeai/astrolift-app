@@ -66,86 +66,52 @@ def _persisted_manifest_sets_build_paths(app: RegisteredApp) -> bool:
     return any(sets_build_paths(dockerfile, context) for dockerfile, context in containers)
 
 
-# A source host's answers that settle whether a connection can read a repo.
-# Anything else (a rate limit, a network failure, a 5xx, a missing ref on a
-# readable repo) settles nothing, and registration goes ahead with the warning.
-_UNREADABLE_SOURCE_CODES = frozenset({"NOT_FOUND", "AUTH_FAILED", "CREDENTIAL_UNAVAILABLE"})
-
-
 def _unreadable_source_refusal(
     organization, *, source_kind: str, source_repo: str, manifest_path: str, branch: str
 ) -> str:
     """Why registration refuses ``source_repo``, or "" when it may go ahead (#2579).
 
     Only a repo whose owner has no connection in the organization's records
-    is read, through what deploys and registration already use: the
-    connection a deploy would pick and its revision read, or, when the
-    organization has no connection at all, the anonymous read of a public
-    repo (#2051). A record on the owner is trusted without a read.
+    is read. No connection serves such a repo, not even an installation on
+    another account (#2576), so a deploy would clone it anonymously, and
+    registration reads it the same way: the anonymous read of a public repo
+    (#2051). A record on the owner is trusted without a read.
     """
-    from astrolift_scm.providers import ProviderError
+    from astrolift_scm.models import SourceConnection
     from astrolift_scm.providers.repo_tree import fetch_public_file
-    from astrolift_scm.providers.revisions import fetch_commit
-    from astrolift_scm.services.connection_resolver import (
-        NOT_CONNECTED,
-        ORG_REPO_WRITE,
-        ConnectionResolutionError,
-        repo_owner_connection,
-        resolve_connection,
-    )
+    from astrolift_scm.services.connection_resolver import NOT_CONNECTED, repo_owner_connection
 
     found = repo_owner_connection(organization, source_repo, source_kind=source_kind)
     if found.state != NOT_CONNECTED:
         return ""
-    remedy = (
-        f"Add a GitHub connection for {found.owner} under Providers → Source: Connect to GitHub, or "
-        f"Connect an existing GitHub App with {found.owner} as the GitHub org / user login. To register "
-        "before the connection exists, send the manifest with the registration "
-        "(astro app register --manifest-raw)."
-    )
     try:
-        connection = resolve_connection(
-            organization, purpose=ORG_REPO_WRITE, source_kind=source_kind, repo=source_repo
-        )
-    except ConnectionResolutionError:
-        connection = None
-
-    if connection is None:
-        try:
-            public_text = fetch_public_file(repo_full_name=source_repo, path=manifest_path, ref=branch)
-        except Exception as exc:  # noqa: BLE001 - an unreachable host is no verdict
-            logging.getLogger(__name__).warning(
-                "register_app: anonymous read of %s failed: %s", source_repo, exc.__class__.__name__
-            )
-            return ""
-        if public_text is not None:
-            return ""
-        return (
-            f"Astrolift cannot read {source_repo}: this organization has no GitHub connection, and "
-            f"{manifest_path} on {branch} could not be read without one (the repository is private, or "
-            f"the file is not there). {remedy}"
-        )
-
-    try:
-        fetch_commit(connection, repo_full_name=source_repo, ref=branch)
-        return ""
-    except ProviderError as exc:
-        if exc.code not in _UNREADABLE_SOURCE_CODES:
-            return ""
-        reason = f"{exc.code}: {exc.message}"
-    except Exception as exc:  # noqa: BLE001 - the read settles nothing unless the host answered
+        public_text = fetch_public_file(repo_full_name=source_repo, path=manifest_path, ref=branch)
+    except Exception as exc:  # noqa: BLE001 - an unreachable host is no verdict
         logging.getLogger(__name__).warning(
-            "register_app: source read of %s failed: %s", source_repo, exc.__class__.__name__
+            "register_app: anonymous read of %s failed: %s", source_repo, exc.__class__.__name__
         )
         return ""
-    via = (
-        f"the GitHub App installation recorded on {connection.account_login}"
-        if connection.account_login
-        else "the organization's GitHub App installation"
+    if public_text is not None:
+        return ""
+    # NOT_CONNECTED leaves only installations on other accounts, if anything.
+    elsewhere = SourceConnection.objects.filter(
+        organization=organization,
+        kind=SourceConnection.Kind.GITHUB_APP_INSTALL,
+        is_active=True,
+        is_orphaned=False,
+        deleted_at__isnull=True,
+    ).exists()
+    missing = (
+        f"no GitHub connection in this organization is recorded on {found.owner}"
+        if elsewhere
+        else "this organization has no GitHub connection"
     )
     return (
-        f"Astrolift cannot read {source_repo}: no GitHub connection in this organization is recorded on "
-        f"{found.owner}, and {via} could not read it ({reason}). {remedy}"
+        f"Astrolift cannot read {source_repo}: {missing}, and {manifest_path} on {branch} could not be "
+        f"read without one (the repository is private, or the file is not there). Add a GitHub connection "
+        f"for {found.owner} under Providers → Source: Connect to GitHub, or Connect an existing GitHub App "
+        f"with {found.owner} as the GitHub org / user login. To register before the connection exists, "
+        "send the manifest with the registration (astro app register --manifest-raw)."
     )
 
 

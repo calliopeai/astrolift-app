@@ -67,7 +67,7 @@ from astrolift_manifest.types import (
 )
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
-from astrolift_scm.services.connection_resolver import covering_repo_owner
+from astrolift_scm.services.connection_resolver import ConnectionResolutionError, select_org_connection
 from core.events import Event
 
 log = logging.getLogger(__name__)
@@ -199,23 +199,14 @@ def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
     accepted = _PLATFORM_OP_KINDS.get(app.source_kind, ())
     if not accepted:
         return None
-    rows = list(
-        SourceConnection.objects.filter(
-            organization_id=app.organization_id,
-            kind__in=accepted,
-            is_active=True,
-            is_orphaned=False,
-            deleted_at__isnull=True,
+    # The selector the CI setup uses: an installation serves only repos on
+    # the account it is recorded on (#2576).
+    try:
+        return select_org_connection(
+            app.organization_id, kinds=accepted, repo=app.source_repo, no_conn_message=""
         )
-    )
-    # An org with installations on several GitHub accounts reads through
-    # the one on the repo's owner (#2297).
-    rows = covering_repo_owner(rows, app.source_repo)
-    if not rows:
+    except ConnectionResolutionError:
         return None
-    rank = {k: i for i, k in enumerate(accepted)}
-    rows.sort(key=lambda r: (rank.get(r.kind, len(accepted)), r.pk))
-    return rows[0]
 
 
 def _normalize_text(raw_text: str) -> NormalizedManifest:

@@ -747,21 +747,26 @@ def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
     Returns None (not raising) so the caller keeps its existing
     no-connection handling.
     """
-    from astrolift_scm.services.connection_resolver import (
-        ORG_REPO_WRITE,
-        ConnectionResolutionError,
-        resolve_connection,
-    )
+    from astrolift_scm.services.connection_resolver import ConnectionResolutionError
 
     try:
-        return resolve_connection(
-            app.organization_id,
-            purpose=ORG_REPO_WRITE,
-            source_kind=app.source_kind,
-            repo=app.source_repo,
-        )
+        return _source_connection(app)
     except ConnectionResolutionError:
         return None
+
+
+def _source_connection(app: RegisteredApp) -> SourceConnection:
+    """``_pick_source_connection``, raising ``ConnectionResolutionError``
+    with the reason when there is none, so a GitHub sync can say which
+    installation is missing or inactive (#2576)."""
+    from astrolift_scm.services.connection_resolver import ORG_REPO_WRITE, resolve_connection
+
+    return resolve_connection(
+        app.organization_id,
+        purpose=ORG_REPO_WRITE,
+        source_kind=app.source_kind,
+        repo=app.source_repo,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1457,13 +1462,12 @@ def _has_operator_edits(app: RegisteredApp, existing: str | None) -> bool:
 
 
 def _sync_github(app: RegisteredApp, *, force_pr: bool = False) -> WorkflowSyncResult:
-    connection = _pick_source_connection(app)
-    if connection is None:
-        raise WorkflowSyncError(
-            "NO_CONNECTION",
-            "no active source connection for this app's org. "
-            "Connect a GitHub identity under Settings → Source connections, then retry.",
-        )
+    from astrolift_scm.services.connection_resolver import ConnectionResolutionError
+
+    try:
+        connection = _source_connection(app)
+    except ConnectionResolutionError as exc:
+        raise WorkflowSyncError("NO_CONNECTION", exc.message) from exc
 
     rendered = render_astrolift_ci_workflow(app)
     rendered_size = len(rendered.encode("utf-8"))

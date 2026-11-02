@@ -429,7 +429,9 @@ async def test_another_organizations_github_connection_is_never_used(temporal_en
     result, _ = await run_gate(temporal_env, plan, {"pr": 7})
 
     assert not result.ok
-    assert "no active GitHub connection for this organization" in result.message
+    assert "no active GitHub App installation for acme: this organization has no connection for acme" in (
+        result.message
+    )
     [row] = await gate_rows(plan)
     gate = row.output["github_checks"]
     assert (row.status, gate["outcome"], gate["sha"]) == ("failed", "error", None)

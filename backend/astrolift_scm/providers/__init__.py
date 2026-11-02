@@ -453,10 +453,12 @@ def install_webhook(
                 "no per-repo webhook is needed",
                 recoverable=True,
             )
+        # Named, because an organization can hold several Apps and accounts
+        # and "the GitHub App" does not say which installation answered (#2576).
         raise ProviderError(
             "APP_NOT_INSTALLED",
-            f"the GitHub App is not installed on {repo_full_name}; install it on that "
-            "repo so the platform hears pushes",
+            f"{connection.name} is not installed on {repo_full_name}; add the repository "
+            "to its installation on GitHub so the platform hears pushes",
             recoverable=True,
         )
 

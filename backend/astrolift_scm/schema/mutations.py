@@ -314,26 +314,6 @@ def _validate_connect(input: ConnectSourceInput):
     return None
 
 
-def _derive_org_login(org_id: int) -> str:
-    """Best-effort org GitHub login from an existing active github
-    connection. Used only as a hint to disambiguate which installation to
-    adopt when the App is installed on more than one account and the operator
-    didn't pass ``org_login`` — never authoritative (the persisted
-    ``account_login`` always comes from the matched installation itself)."""
-    row = (
-        SourceConnection.objects.filter(
-            organization_id=org_id,
-            kind__startswith="github",
-            is_active=True,
-            deleted_at__isnull=True,
-        )
-        .exclude(account_login="")
-        .order_by("created_at", "pk")
-        .first()
-    )
-    return row.account_login if row else ""
-
-
 def _match_installation(installations: list[dict], login: str) -> dict | None:
     """The installation whose ``account.login`` equals ``login`` (case-insensitive)."""
     want = login.strip().lower()
@@ -526,13 +506,13 @@ class ScmMutation:
         logins = [x for x in ((i.get("account") or {}).get("login", "") for i in installations) if x]
 
         explicit_login = (input.org_login or "").strip()
-        # A derived login is only a hint (see _derive_org_login); an explicit
-        # one is authoritative. So an explicit login that matches nothing is a
-        # hard error — we never silently adopt a different install — whereas a
-        # non-matching derived login falls through to single-install / ambiguity
-        # handling below.
-        target_login = explicit_login or _derive_org_login(org_id)
-        matched = _match_installation(installations, target_login) if target_login else None
+        # Only the operator picks the account. An explicit login that matches
+        # nothing is a hard error, so a different install is never adopted
+        # silently; without one, a single installation is unambiguous and
+        # several are refused. Defaulting to an account this organization
+        # already holds re-adopted that account instead of the one the
+        # operator came to add (#2576).
+        matched = _match_installation(installations, explicit_login) if explicit_login else None
         if matched is None:
             if explicit_login:
                 return gql_failure(

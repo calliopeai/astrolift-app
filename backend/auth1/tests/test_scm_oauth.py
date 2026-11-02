@@ -657,6 +657,64 @@ def test_github_install_time_callback_success(org_user_member):
     assert plain == fake_token.encode()
 
 
+def test_github_install_time_callback_records_the_account_github_installed_on(org_user_member):
+    """#2576: an install started without naming an account is labelled with
+    the App's default owner, ConflictHQ. GitHub installed it on calliopeai,
+    and a repository is served only by the connection recorded on its owner,
+    so the callback records the account from GitHub's installation list, as
+    the setup callback does. Apps that request OAuth on install land here."""
+    from astrolift_scm.services.connection_resolver import PLATFORM_REPO_WRITE, resolve_connection
+
+    org, user = org_user_member
+    connection = _make_github_app_install(org)
+    connection.account_login = "ConflictHQ"
+    connection.is_active = False
+    connection.installation_id = ""
+    connection.save()
+
+    client = Client()
+    _login(client, user)
+    session = client.session
+    session["scm_github_install_state"] = {
+        "state": "github-generated-state",
+        "connection_guid": str(connection.guid),
+        "return_to": "/settings/source-providers",
+    }
+    session.save()
+
+    installations = [
+        {"id": 1001, "account": {"login": "ConflictHQ"}},
+        {"id": 2002, "account": {"login": "calliopeai"}},
+    ]
+    with (
+        patch("auth1.scm_oauth._resolve_user_token_via_post", return_value=("ghu_install_time_token", None)),
+        patch("auth1.scm_oauth._resolve_github_login", return_value="leo"),
+        patch("astrolift_scm.providers.github_app._mint_jwt", return_value="jwt"),
+        patch(
+            "astrolift_scm.providers.github_app.list_app_installations", return_value=(installations, None)
+        ),
+    ):
+        resp = client.get(
+            "/app/auth1/scm/github/callback",
+            {
+                "code": "install-code",
+                "state": "github-generated-state",
+                "installation_id": "2002",
+                "setup_action": "install",
+            },
+        )
+
+    assert resp.status_code == 302
+    assert "scm_connected=" in resp["Location"]
+    connection.refresh_from_db()
+    assert (connection.account_login, connection.installation_id, connection.is_active) == (
+        "calliopeai",
+        "2002",
+        True,
+    )
+    assert resolve_connection(org, purpose=PLATFORM_REPO_WRITE, repo="calliopeai/cykick").pk == connection.pk
+
+
 def test_github_install_time_callback_no_pending_state(org_user_member):
     """Install-time callback with no scm_github_install_state cookie → install_state error."""
     org, user = org_user_member

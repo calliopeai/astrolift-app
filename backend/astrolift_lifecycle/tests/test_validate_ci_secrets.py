@@ -206,8 +206,11 @@ def test_validate_no_app_install_returns_precondition(permission_resolver, org, 
         )
     assert not result.ok
     assert result.errors[0].code == "PRECONDITION"
-    msg = result.errors[0].message.lower()
-    assert "github app" in msg and "not installed" in msg
+    # Names the missing connection for the repo owner; the App itself may
+    # well be installed on GitHub (#2576).
+    msg = result.errors[0].message
+    assert "no active GitHub App installation for acme" in msg
+    assert "not installed" not in msg
 
 
 def test_validate_unsupported_source_returns_precondition(permission_resolver, org, app, actor):

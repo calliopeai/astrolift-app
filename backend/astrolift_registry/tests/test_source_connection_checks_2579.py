@@ -14,6 +14,7 @@ import urllib.error
 from types import SimpleNamespace
 
 import pytest
+import requests
 
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_registry.models import RegisteredApp
@@ -92,11 +93,14 @@ def github(monkeypatch):
 @pytest.fixture
 def anonymous(monkeypatch):
     """The anonymous read of a public repo (#2051): ``text`` is what it finds,
-    None for GitHub's 404. Every read is recorded."""
-    state = SimpleNamespace(text=None, reads=[])
+    None for GitHub's 404; ``error`` is raised instead when set. Every read is
+    recorded."""
+    state = SimpleNamespace(text=None, error=None, reads=[])
 
     def read(*, repo_full_name, path, ref):
         state.reads.append((repo_full_name, path, ref))
+        if state.error is not None:
+            raise state.error
         return state.text
 
     monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_public_file", read)
@@ -147,38 +151,39 @@ def _refusal(result):
 # ---------------------------------------------------------------------------
 
 
-def test_a_repo_the_installation_cannot_read_is_refused_before_anything_is_created(
-    github, permission_resolver, seed_cluster
+def test_a_private_repo_on_an_owner_with_no_connection_is_refused_before_anything_is_created(
+    github, anonymous, permission_resolver, seed_cluster
 ):
+    """No connection serves a repo whose owner none is recorded on (#2576), so
+    the ConflictHQ installation is never asked: the anonymous read a deploy's
+    clone would make decides."""
     org, project = _org(seed_cluster, "refused")
     _installation(org, "ConflictHQ")
-    github.commit = 404
     permission_resolver.grant(Permission.APP_CREATE)
 
     result = _register(org, project, "calliopeai/cykick")
 
     assert _refusal(result) == (
         "Astrolift cannot read calliopeai/cykick: no GitHub connection in this organization is recorded on "
-        "calliopeai, and the GitHub App installation recorded on ConflictHQ could not read it (NOT_FOUND: "
-        "Source ref 'main' was not found or is not accessible). " + REMEDY.format(owner="calliopeai")
+        "calliopeai, and astrolift.toml on main could not be read without one (the repository is private, "
+        "or the file is not there). " + REMEDY.format(owner="calliopeai")
     )
     assert not RegisteredApp.all_objects.filter(organization=org).exists()
-    # The deploy's own revision read, through the connection a deploy would pick.
-    assert github.calls == ["https://api.github.com/repos/calliopeai/cykick/commits/main"]
+    assert github.calls == []
+    assert anonymous.reads == [("calliopeai/cykick", "astrolift.toml", "main")]
 
 
-@pytest.mark.parametrize("status,code", [(401, "AUTH_FAILED"), (403, "AUTH_FAILED")])
-def test_a_credential_github_rejects_is_refused(github, permission_resolver, seed_cluster, status, code):
-    org, project = _org(seed_cluster, f"rejected-{status}")
+def test_the_deploy_branch_is_the_ref_read(github, anonymous, permission_resolver, seed_cluster):
+    org, project = _org(seed_cluster, "release")
     _installation(org, "ConflictHQ")
-    github.commit = status
     permission_resolver.grant(Permission.APP_CREATE)
 
     message = _refusal(_register(org, project, "calliopeai/cykick", deploy_branch="release"))
 
-    assert f"could not read it ({code}: " in message
+    assert "astrolift.toml on release could not be read without one" in message
     assert not RegisteredApp.all_objects.filter(organization=org).exists()
-    assert github.calls == ["https://api.github.com/repos/calliopeai/cykick/commits/release"]
+    assert anonymous.reads == [("calliopeai/cykick", "astrolift.toml", "release")]
+    assert github.calls == []
 
 
 def test_a_repo_with_no_connection_and_no_anonymous_read_is_refused(
@@ -203,13 +208,15 @@ def test_a_repo_with_no_connection_and_no_anonymous_read_is_refused(
 # ---------------------------------------------------------------------------
 
 
-def test_an_installation_that_reads_the_repo_lets_registration_proceed(
-    github, permission_resolver, seed_cluster
+def test_a_public_repo_registers_through_no_other_accounts_installation(
+    github, anonymous, permission_resolver, seed_cluster
 ):
-    """An older row can record the App's owner rather than the account it was
-    installed on, so a record that misses the owner is confirmed, not trusted."""
+    """An installation recorded on another account is not asked to confirm
+    a read (#2576): a repo goes ahead, with the warning, when it reads
+    anonymously, as a deploy's clone of it would."""
     org, project = _org(seed_cluster, "stale-label")
     _installation(org, "ConflictHQ")
+    anonymous.text = MANIFEST
     permission_resolver.grant(Permission.APP_CREATE)
 
     result = _register(org, project, "calliopeai/cykick")
@@ -218,19 +225,24 @@ def test_an_installation_that_reads_the_repo_lets_registration_proceed(
     app = RegisteredApp.objects.get(organization=org, slug="cykick")
     assert app.manifest_bootstrap_status == "applied"
     assert result.data.source_connection_warning == NOT_ON_OWNER.format(owner="calliopeai")
+    assert github.calls == []
 
 
 @pytest.mark.parametrize(
-    "answer",
-    [429, 500, 422, urllib.error.URLError("down")],
-    ids=["rate-limited", "server-error", "missing-ref", "unreachable"],
+    "error",
+    [
+        requests.HTTPError("429 Too Many Requests"),
+        requests.HTTPError("500 Internal Server Error"),
+        requests.ConnectionError("down"),
+    ],
+    ids=["rate-limited", "server-error", "unreachable"],
 )
 def test_a_host_that_gives_no_verdict_lets_registration_proceed(
-    github, permission_resolver, seed_cluster, answer
+    github, anonymous, permission_resolver, seed_cluster, error
 ):
     org, project = _org(seed_cluster, "no-verdict")
     _installation(org, "ConflictHQ")
-    github.commit = answer
+    anonymous.error = error
     permission_resolver.grant(Permission.APP_CREATE)
 
     result = _register(org, project, "calliopeai/cykick")
@@ -238,6 +250,9 @@ def test_a_host_that_gives_no_verdict_lets_registration_proceed(
     assert result.ok, result.errors
     assert RegisteredApp.objects.filter(organization=org, slug="cykick").exists()
     assert result.data.source_connection_warning == NOT_ON_OWNER.format(owner="calliopeai")
+    # The check's own read; the manifest bootstrap that follows reads again.
+    assert anonymous.reads[0] == ("calliopeai/cykick", "astrolift.toml", "main")
+    assert github.calls == []
 
 
 def test_a_public_repo_registers_without_a_connection(anonymous, permission_resolver, seed_cluster):
