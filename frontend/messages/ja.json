@@ -4115,6 +4115,7 @@
     "description": "Astrolift をコードホスティングサービスに接続すると、リポジトリのクローンとプッシュの監視ができるようになります。組織全体のアクセスには OAuth App / GitHub App、セルフホストの GitLab や Gitea には PAT、任意のホストへの直接の git アクセスには SSH デプロイキーを使用します。",
     "hostsTitle": "ホスト",
     "keysTitle": "SSH デプロイキー",
+    "factoryGateTitle": "ファクトリーゲート App",
     "kind": {
       "github_oauth_app": "GitHub OAuth App",
       "github_oauth_user": "GitHub (OAuth ユーザートークン)",
@@ -4378,6 +4379,49 @@
       "cancel": "キャンセル",
       "saving": "保存中…",
       "save": "クライアント ID を保存"
+    },
+    "factoryGate": {
+      "title": "ファクトリーゲート App",
+      "description": "組織メンバー (読み取り専用) の権限だけを持つ GitHub App です。Calliope AI のファクトリーが GitHub 組織のオーナーを確認するために使います。Astrolift は秘密鍵を暗号化して保管し、表示することはありません。",
+      "state": {
+        "NOT_REGISTERED": "未登録",
+        "REGISTERED": "登録済み、未インストール",
+        "INSTALLED": "インストール済み",
+        "MISSING_KEY": "鍵がありません"
+      },
+      "stateHelp": {
+        "NOT_REGISTERED": "GitHub 組織に App を登録します。作成前に GitHub が名前と唯一の権限を表示します。",
+        "REGISTERED": "App は GitHub 上にありますが、インストールされていません。{owner} にインストールして完了してください。",
+        "INSTALLED": "{owner} にインストール済みです。ファクトリーのワークフローは、組織のメンバーシップだけを読み取る短期トークンを発行できます。",
+        "MISSING_KEY": "Astrolift はこの App の秘密鍵を保持していないため、トークンを発行できません。GitHub で新しい鍵を生成し、ここで更新してください。"
+      },
+      "appId": "App ID",
+      "installationId": "インストール ID",
+      "owner": "オーナー",
+      "permissions": "権限",
+      "notSet": "未設定",
+      "orgLabel": "GitHub 組織",
+      "orgHelp": "App を所有し、インストールする組織です。登録にはその組織のオーナーまたは App マネージャーの権限が必要です。",
+      "orgInvalid": "組織のログイン名を使ってください (英数字とハイフン、39 文字まで)。",
+      "register": "GitHub で登録",
+      "install": "GitHub でインストール",
+      "rotate": "鍵を更新",
+      "loadFailed": "ファクトリーゲート App を読み込めませんでした。",
+      "retry": "再試行",
+      "rotateSheet": {
+        "title": "ファクトリーゲートの鍵を更新",
+        "description": "GitHub には App の鍵を発行する API がありません。GitHub の App 設定で新しい秘密鍵を生成してここに貼り付け、その後 GitHub で古い鍵を削除してください。",
+        "openGithub": "{owner} の GitHub Apps を開く",
+        "label": "新しい秘密鍵 (PEM)",
+        "help": "Astrolift は保存済みの鍵を置き換える前に GitHub で鍵を確認し、暗号化して保管します。二度と表示されません。",
+        "cancel": "キャンセル",
+        "submit": "鍵を更新",
+        "submitting": "更新中…"
+      },
+      "toasts": {
+        "rotated": "ファクトリーゲートの鍵を更新しました",
+        "rotateFailed": "ファクトリーゲートの鍵を更新できませんでした"
+      }
     },
     "toasts": {
       "rotationFailed": "更新に失敗しました",

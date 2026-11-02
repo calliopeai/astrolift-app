@@ -50,6 +50,12 @@ class SourceConnection(BaseCoreModel):
         GITEA_OAUTH_APP = "gitea_oauth_app"
         GITEA_OAUTH_USER = "gitea_oauth_user"
         GITEA_PAT = "gitea_pat"
+        # The factory gate's GitHub App (#2589): organization Members read
+        # only. Its own kind so no source path ever picks it for repository
+        # work, and so it never collides with the org's source App on the
+        # (organization, kind, account_login) key. See
+        # astrolift_scm.services.factory_gate.
+        GITHUB_FACTORY_GATE_APP = "github_factory_gate_app"
 
     class VisibilityScope(models.TextChoices):
         PRIVATE_ORG = "private_org"

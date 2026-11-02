@@ -1,10 +1,12 @@
 "use client";
 
+import { FactoryGateAppView } from "@/components/screens/settings/source-providers/FactoryGateAppView";
 import {
   DeployKeysView,
   SourceHostsView,
   SourceProvidersScreen,
 } from "@/components/screens/settings/source-providers/SourceProvidersScreen";
+import { useFactoryGateApp } from "@/components/screens/settings/source-providers/use-factory-gate-app";
 import {
   useDeployKeys,
   useSourceHosts,
@@ -16,6 +18,7 @@ import { ConnectGitHubDialog } from "./connect-github-dialog";
 import { ConnectGitLabDialog } from "./connect-gitlab-dialog";
 import { ConnectSourceDialog } from "./connect-source-dialog";
 import { GenerateSshKeyDialog } from "./generate-ssh-key-dialog";
+import { RotateFactoryGateKeyDialog } from "./rotate-factory-gate-key-dialog";
 
 /**
  * The SCM panel rendered under /providers' Source tab. The screen owns the
@@ -28,6 +31,18 @@ export function SourceProvidersPanel() {
       section={useSourceSection()}
       hosts={<HostsSection />}
       keys={<KeysSection />}
+      factoryGate={<FactoryGateSection />}
+    />
+  );
+}
+
+function FactoryGateSection() {
+  return (
+    <FactoryGateAppView
+      {...useFactoryGateApp()}
+      renderRotateKey={(open, onOpenChange, owner) => (
+        <RotateFactoryGateKeyDialog open={open} onOpenChange={onOpenChange} owner={owner} />
+      )}
     />
   );
 }

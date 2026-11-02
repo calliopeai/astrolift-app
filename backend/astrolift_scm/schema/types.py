@@ -7,6 +7,7 @@ import datetime as dt
 import strawberry
 
 from astrolift_graphql import GUID
+from astrolift_scm.services import factory_gate
 
 
 @strawberry.type(name="AstroliftSourceConnection")
@@ -204,4 +205,43 @@ def remote_repo_to_type(r) -> RemoteRepoType:
         is_archived=r.is_archived,
         is_fork=r.is_fork,
         pushed_at=r.pushed_at,
+    )
+
+
+FactoryGateAppState = strawberry.enum(factory_gate.State, name="AstroliftFactoryGateAppState")
+
+
+@strawberry.type(name="AstroliftGithubAppPermission")
+class GithubAppPermissionType:
+    name: str
+    access: str
+
+
+@strawberry.type(name="AstroliftFactoryGateApp")
+class FactoryGateAppType:
+    """The factory gate GitHub App (#2589): its state, ids, organization and
+    permissions. Never its key."""
+
+    state: FactoryGateAppState
+    app_id: str | None
+    installation_id: str | None
+    owner_login: str | None
+    permissions: list[GithubAppPermissionType]
+
+
+def factory_gate_app_to_type(app) -> FactoryGateAppType:
+    state = factory_gate.state_of(app)
+    if app is None:
+        return FactoryGateAppType(
+            state=state, app_id=None, installation_id=None, owner_login=None, permissions=[]
+        )
+    return FactoryGateAppType(
+        state=state,
+        app_id=app.oauth_client_id,
+        installation_id=app.installation_id or None,
+        owner_login=app.account_login or None,
+        permissions=[
+            GithubAppPermissionType(name=name, access=access)
+            for name, access in factory_gate.PERMISSIONS.items()
+        ],
     )

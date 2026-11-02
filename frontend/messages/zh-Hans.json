@@ -4115,6 +4115,7 @@
     "description": "将 Astrolift 连接到代码托管服务，以便克隆你的仓库并监听推送。组织范围的访问使用 OAuth App / GitHub App，自托管的 GitLab 或 Gitea 使用 PAT，直接以 git 访问任意主机使用 SSH 部署密钥。",
     "hostsTitle": "主机",
     "keysTitle": "SSH 部署密钥",
+    "factoryGateTitle": "工厂门禁 App",
     "kind": {
       "github_oauth_app": "GitHub OAuth 应用",
       "github_oauth_user": "GitHub（OAuth 用户令牌）",
@@ -4378,6 +4379,49 @@
       "cancel": "取消",
       "saving": "正在保存…",
       "save": "保存 Client ID"
+    },
+    "factoryGate": {
+      "title": "工厂门禁 App",
+      "description": "一个只有一项权限（组织成员，只读）的 GitHub App，让 Calliope AI 的工厂能够确认谁是你的 GitHub 组织的所有者。Astrolift 会加密保存它的私钥，且从不显示。",
+      "state": {
+        "NOT_REGISTERED": "未注册",
+        "REGISTERED": "已注册，未安装",
+        "INSTALLED": "已安装",
+        "MISSING_KEY": "缺少私钥"
+      },
+      "stateHelp": {
+        "NOT_REGISTERED": "在你的 GitHub 组织中注册此 App。创建之前，GitHub 会显示它的名称和唯一的权限。",
+        "REGISTERED": "此 App 已在 GitHub 上创建，但尚未安装。将它安装到 {owner} 即可完成。",
+        "INSTALLED": "已安装到 {owner}。工厂的工作流可以签发只读取组织成员关系的短期令牌。",
+        "MISSING_KEY": "Astrolift 没有此 App 的私钥，因此无法签发令牌。请在 GitHub 上生成新私钥并在这里轮换。"
+      },
+      "appId": "App ID",
+      "installationId": "安装 ID",
+      "owner": "所有者",
+      "permissions": "权限",
+      "notSet": "未设置",
+      "orgLabel": "GitHub 组织",
+      "orgHelp": "拥有并安装此 App 的组织。只有该组织的所有者或 App 管理员才能注册。",
+      "orgInvalid": "请使用组织的登录名：字母、数字和连字符，最多 39 个字符。",
+      "register": "在 GitHub 上注册",
+      "install": "在 GitHub 上安装",
+      "rotate": "轮换私钥",
+      "loadFailed": "无法加载工厂门禁 App。",
+      "retry": "重试",
+      "rotateSheet": {
+        "title": "轮换工厂门禁私钥",
+        "description": "GitHub 没有签发 App 私钥的 API。请在 GitHub 上的 App 设置中生成新私钥，粘贴到这里，然后在 GitHub 上删除旧私钥。",
+        "openGithub": "打开 {owner} 的 GitHub Apps",
+        "label": "新私钥 (PEM)",
+        "help": "Astrolift 会先向 GitHub 验证私钥，再替换已存储的私钥；私钥加密保存，不会再次显示。",
+        "cancel": "取消",
+        "submit": "轮换私钥",
+        "submitting": "正在轮换…"
+      },
+      "toasts": {
+        "rotated": "已轮换工厂门禁私钥",
+        "rotateFailed": "无法轮换工厂门禁私钥"
+      }
     },
     "toasts": {
       "rotationFailed": "轮换失败",

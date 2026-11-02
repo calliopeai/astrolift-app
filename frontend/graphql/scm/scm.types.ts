@@ -7,6 +7,7 @@
  */
 
 import type {
+  AstroliftFactoryGateApp as GeneratedFactoryGateApp,
   AstroliftRemoteRepo as GeneratedRemoteRepo,
   AstroliftRemoteRepoList as GeneratedRemoteRepoList,
   AstroliftScmPushCiWorkflowResult as GeneratedPushCiWorkflowResult,
@@ -33,11 +34,7 @@ export type ScmConnectionKind =
   | "gitea_oauth_user"
   | "gitea_pat";
 
-export type ScmVisibilityScope =
-  | "private_org"
-  | "public_org"
-  | "user_repos"
-  | "public_non_org";
+export type ScmVisibilityScope = "private_org" | "public_org" | "user_repos" | "public_non_org";
 
 export type AstroliftSourceConnection = Omit<
   GeneratedSourceConnection,
@@ -60,5 +57,7 @@ export type AstroliftRemoteRepoList = GeneratedRemoteRepoList;
 export type AstroliftSourceFile = GeneratedSourceFile;
 
 export type AstroliftPushCiWorkflowResult = GeneratedPushCiWorkflowResult;
+
+export type AstroliftFactoryGateApp = GeneratedFactoryGateApp;
 
 export type { AstroliftGuid, MutationResult };

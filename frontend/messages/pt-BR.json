@@ -4115,6 +4115,7 @@
     "description": "Conecte o Astrolift a um serviço de hospedagem de código para que ele clone seus repositórios e acompanhe os pushes. Use OAuth Apps / GitHub Apps para acesso em toda a organização, PATs para GitLab ou Gitea auto-hospedados e chaves SSH de deploy para acesso git direto a qualquer host.",
     "hostsTitle": "Hosts",
     "keysTitle": "Chaves SSH de deploy",
+    "factoryGateTitle": "App de controle da fábrica",
     "kind": {
       "github_oauth_app": "OAuth App do GitHub",
       "github_oauth_user": "GitHub (token de usuário OAuth)",
@@ -4378,6 +4379,49 @@
       "cancel": "Cancelar",
       "saving": "Salvando…",
       "save": "Salvar Client ID"
+    },
+    "factoryGate": {
+      "title": "App de controle da fábrica",
+      "description": "Um GitHub App com uma única permissão, Membros da organização (somente leitura), para que a fábrica da Calliope AI confira quem é proprietário da sua organização no GitHub. O Astrolift guarda a chave privada criptografada e nunca a exibe.",
+      "state": {
+        "NOT_REGISTERED": "Não registrado",
+        "REGISTERED": "Registrado, não instalado",
+        "INSTALLED": "Instalado",
+        "MISSING_KEY": "Chave ausente"
+      },
+      "stateHelp": {
+        "NOT_REGISTERED": "Registre o App na sua organização do GitHub. O GitHub mostra o nome e a única permissão dele antes de criar qualquer coisa.",
+        "REGISTERED": "O App existe no GitHub, mas não está instalado. Instale-o em {owner} para concluir.",
+        "INSTALLED": "Instalado em {owner}. Os workflows da fábrica podem emitir tokens de curta duração que só leem a participação na organização.",
+        "MISSING_KEY": "O Astrolift não tem chave privada para este App e por isso não pode emitir tokens. Gere uma nova chave no GitHub e faça a rotação aqui."
+      },
+      "appId": "ID do App",
+      "installationId": "ID da instalação",
+      "owner": "Proprietário",
+      "permissions": "Permissões",
+      "notSet": "Não definido",
+      "orgLabel": "Organização do GitHub",
+      "orgHelp": "A organização dona do App e onde ele é instalado. Para registrá-lo é preciso ser proprietário ou gerente de Apps dessa organização.",
+      "orgInvalid": "Use o login da organização: letras, dígitos e hífens, até 39 caracteres.",
+      "register": "Registrar no GitHub",
+      "install": "Instalar no GitHub",
+      "rotate": "Rotacionar chave",
+      "loadFailed": "Não foi possível carregar o App de controle da fábrica.",
+      "retry": "Tentar novamente",
+      "rotateSheet": {
+        "title": "Rotacionar a chave de controle da fábrica",
+        "description": "O GitHub não tem uma API que emita chaves de App. Gere uma nova chave privada nas configurações do App no GitHub, cole-a aqui e depois exclua a chave antiga no GitHub.",
+        "openGithub": "Abrir os GitHub Apps de {owner}",
+        "label": "Nova chave privada (PEM)",
+        "help": "O Astrolift confere a chave com o GitHub antes de substituir a armazenada, guarda-a criptografada e nunca mais a exibe.",
+        "cancel": "Cancelar",
+        "submit": "Rotacionar chave",
+        "submitting": "Rotacionando…"
+      },
+      "toasts": {
+        "rotated": "Chave de controle da fábrica rotacionada",
+        "rotateFailed": "Não foi possível rotacionar a chave de controle da fábrica"
+      }
     },
     "toasts": {
       "rotationFailed": "Falha na rotação",

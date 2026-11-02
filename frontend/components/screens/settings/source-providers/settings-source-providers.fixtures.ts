@@ -1,9 +1,11 @@
 import type {
+  AstroliftFactoryGateApp,
   AstroliftSourceConnection,
   AstroliftSshDeployKey,
   AstroliftWebhookSecretReveal,
 } from "@/graphql/scm/scm.types";
 
+import type { FactoryGateAppData, RotateFactoryGateKeyData } from "./use-factory-gate-app";
 import type {
   AddClientIdData,
   DeployKeysData,
@@ -13,8 +15,8 @@ import type {
 
 /**
  * Hand-typed fixtures for the settings source-providers group: the
- * Source providers screen, the Add Client ID sheet and the Generate SSH
- * key sheet.
+ * Source providers screen, the Add Client ID sheet, the Generate SSH
+ * key sheet and the factory gate App.
  */
 
 const noop = () => {};
@@ -174,4 +176,38 @@ export const ADD_CLIENT_ID: AddClientIdData = {
 export const GENERATE_KEY: GenerateSshKeyData = {
   generating: false,
   generate: async () => KEYS[0],
+};
+
+export function factoryGateApp(
+  patch: Partial<AstroliftFactoryGateApp> = {}
+): AstroliftFactoryGateApp {
+  return {
+    state: "INSTALLED",
+    appId: "2214897",
+    installationId: "84120533",
+    ownerLogin: "acme-corp",
+    permissions: [{ name: "members", access: "read" }],
+    ...patch,
+  };
+}
+
+export const NO_FACTORY_GATE_APP = factoryGateApp({
+  state: "NOT_REGISTERED",
+  appId: null,
+  installationId: null,
+  ownerLogin: null,
+  permissions: [],
+});
+
+export const FACTORY_GATE: FactoryGateAppData = {
+  app: factoryGateApp(),
+  loading: false,
+  error: null,
+  onRetry: noop,
+  onRegister: noop,
+};
+
+export const ROTATE_FACTORY_GATE_KEY: RotateFactoryGateKeyData = {
+  rotating: false,
+  rotate: async () => true,
 };

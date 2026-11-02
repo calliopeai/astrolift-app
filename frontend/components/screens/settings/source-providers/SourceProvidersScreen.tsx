@@ -82,14 +82,21 @@ export interface SourceProvidersScreenProps {
   hosts: React.ReactNode;
   /** The SSH deploy keys section (DeployKeysView), filled by the route. */
   keys: React.ReactNode;
+  /** The factory gate App section (FactoryGateAppView), filled by the route. */
+  factoryGate: React.ReactNode;
 }
 
 /**
- * Providers › Source: hosts and SSH deploy keys, one section at a time
- * (list rules 1 to 3), so the tab holds one list and fetches only the
- * section on screen. Pure.
+ * Providers › Source: hosts, SSH deploy keys and the factory gate App, one
+ * section at a time (list rules 1 to 3), so the tab holds one list and
+ * fetches only the section on screen. Pure.
  */
-export function SourceProvidersScreen({ section, hosts, keys }: SourceProvidersScreenProps) {
+export function SourceProvidersScreen({
+  section,
+  hosts,
+  keys,
+  factoryGate,
+}: SourceProvidersScreenProps) {
   const t = useTranslations("sourceProviders");
   return (
     <Section
@@ -102,6 +109,7 @@ export function SourceProvidersScreen({ section, hosts, keys }: SourceProvidersS
         sections={[
           { id: "hosts", title: t("hostsTitle"), content: hosts },
           { id: "keys", title: t("keysTitle"), content: keys },
+          { id: "factory-gate", title: t("factoryGateTitle"), content: factoryGate },
         ]}
       />
     </Section>

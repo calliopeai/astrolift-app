@@ -4109,6 +4109,7 @@
     "description": "Verbinden Sie Astrolift mit einem Code-Hosting-Dienst, damit es Ihre Repositorys klonen und auf Pushes reagieren kann. Nutzen Sie OAuth-Apps / GitHub-Apps für organisationsweiten Zugriff, PATs für selbst gehostetes GitLab oder Gitea und SSH-Deploy-Keys für direkten Git-Zugriff auf jeden Host.",
     "hostsTitle": "Hosts",
     "keysTitle": "SSH-Deploy-Keys",
+    "factoryGateTitle": "Fabrik-Gate-App",
     "kind": {
       "github_oauth_app": "GitHub-OAuth-App",
       "github_oauth_user": "GitHub (OAuth-Benutzertoken)",
@@ -4372,6 +4373,49 @@
       "cancel": "Abbrechen",
       "saving": "Wird gespeichert…",
       "save": "Client-ID speichern"
+    },
+    "factoryGate": {
+      "title": "Fabrik-Gate-App",
+      "description": "Eine GitHub-App mit einer einzigen Berechtigung, Organisationsmitglieder (nur Lesen), damit die Fabrik von Calliope AI prüfen kann, wem Ihre GitHub-Organisation gehört. Astrolift speichert ihren privaten Schlüssel verschlüsselt und zeigt ihn nie an.",
+      "state": {
+        "NOT_REGISTERED": "Nicht registriert",
+        "REGISTERED": "Registriert, nicht installiert",
+        "INSTALLED": "Installiert",
+        "MISSING_KEY": "Schlüssel fehlt"
+      },
+      "stateHelp": {
+        "NOT_REGISTERED": "Registrieren Sie die App in Ihrer GitHub-Organisation. GitHub zeigt ihren Namen und ihre einzige Berechtigung, bevor etwas erstellt wird.",
+        "REGISTERED": "Die App existiert auf GitHub, ist aber nicht installiert. Installieren Sie sie in {owner}, um abzuschließen.",
+        "INSTALLED": "Installiert in {owner}. Die Workflows der Fabrik können kurzlebige Tokens erzeugen, die nur die Mitgliedschaft in der Organisation lesen.",
+        "MISSING_KEY": "Astrolift hat keinen privaten Schlüssel für diese App und kann daher keine Tokens erzeugen. Erzeugen Sie auf GitHub einen neuen Schlüssel und hinterlegen Sie ihn per Rotation."
+      },
+      "appId": "App-ID",
+      "installationId": "Installations-ID",
+      "owner": "Eigentümer",
+      "permissions": "Berechtigungen",
+      "notSet": "Nicht gesetzt",
+      "orgLabel": "GitHub-Organisation",
+      "orgHelp": "Die Organisation, der die App gehört und in der sie installiert wird. Registrieren kann sie nur ein Eigentümer oder App-Manager dieser Organisation.",
+      "orgInvalid": "Verwenden Sie den Login der Organisation: Buchstaben, Ziffern und Bindestriche, höchstens 39 Zeichen.",
+      "register": "Auf GitHub registrieren",
+      "install": "Auf GitHub installieren",
+      "rotate": "Schlüssel rotieren",
+      "loadFailed": "Die Fabrik-Gate-App konnte nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "rotateSheet": {
+        "title": "Fabrik-Gate-Schlüssel rotieren",
+        "description": "GitHub bietet keine API, die App-Schlüssel ausstellt. Erzeugen Sie in den Einstellungen der App auf GitHub einen neuen privaten Schlüssel, fügen Sie ihn hier ein und löschen Sie danach den alten Schlüssel auf GitHub.",
+        "openGithub": "GitHub-Apps von {owner} öffnen",
+        "label": "Neuer privater Schlüssel (PEM)",
+        "help": "Astrolift prüft den Schlüssel bei GitHub, bevor er den gespeicherten ersetzt, speichert ihn verschlüsselt und zeigt ihn nie wieder an.",
+        "cancel": "Abbrechen",
+        "submit": "Schlüssel rotieren",
+        "submitting": "Wird rotiert…"
+      },
+      "toasts": {
+        "rotated": "Fabrik-Gate-Schlüssel rotiert",
+        "rotateFailed": "Fabrik-Gate-Schlüssel konnte nicht rotiert werden"
+      }
     },
     "toasts": {
       "rotationFailed": "Rotation fehlgeschlagen",

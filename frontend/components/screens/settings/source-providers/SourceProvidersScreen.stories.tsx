@@ -8,15 +8,19 @@ import { useLocalSettingsSection } from "@/components/settings/use-settings-sect
 import type { AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 
 import { AddClientIdSheet } from "./AddClientIdSheet";
+import { FactoryGateAppView } from "./FactoryGateAppView";
 import { GenerateSshKeySheet } from "./GenerateSshKeySheet";
+import { RotateFactoryGateKeySheet } from "./RotateFactoryGateKeySheet";
 import {
   ADD_CLIENT_ID,
   DEPLOY_KEYS,
+  FACTORY_GATE,
   GENERATE_KEY,
   HOSTS,
   LONG_CONNECTIONS,
   LONG_KEYS,
   REVEAL,
+  ROTATE_FACTORY_GATE_KEY,
 } from "./settings-source-providers.fixtures";
 import { DEPLOY_KEYS_LIST, SOURCE_HOSTS_LIST } from "./source-providers-list";
 import {
@@ -68,6 +72,20 @@ function Keys({ initial, ...over }: Partial<Omit<DeployKeysViewProps, "list">> &
   );
 }
 
+const factoryGate = (
+  <FactoryGateAppView
+    {...FACTORY_GATE}
+    renderRotateKey={(open, onOpenChange, owner) => (
+      <RotateFactoryGateKeySheet
+        {...ROTATE_FACTORY_GATE_KEY}
+        open={open}
+        onOpenChange={onOpenChange}
+        owner={owner}
+      />
+    )}
+  />
+);
+
 function Screen({
   section = null,
   hosts = <Hosts />,
@@ -78,7 +96,12 @@ function Screen({
   keys?: React.ReactNode;
 }) {
   return (
-    <SourceProvidersScreen section={useLocalSettingsSection(section)} hosts={hosts} keys={keys} />
+    <SourceProvidersScreen
+      section={useLocalSettingsSection(section)}
+      hosts={hosts}
+      keys={keys}
+      factoryGate={factoryGate}
+    />
   );
 }
 
@@ -87,6 +110,9 @@ export const Full: Story = { render: () => <Screen /> };
 
 /** SSH deploy keys: only that section is mounted. */
 export const KeysSection: Story = { render: () => <Screen section="keys" /> };
+
+/** The factory gate App: only that section is mounted. */
+export const FactoryGateSection: Story = { render: () => <Screen section="factory-gate" /> };
 
 export const Loading: Story = {
   render: () => <Screen hosts={<Hosts rows={[]} loading incompleteClientIdConnections={[]} />} />,
