@@ -90,7 +90,7 @@ export const DEPLOY_LABEL: Record<AppHealthPulseStatus, string> = {
 };
 
 /** Registered app kinds (backend `astrolift_manifest.app_kinds`). */
-export const APP_KIND_OPTIONS = ["mimwell"] as const;
+export const APP_KIND_OPTIONS = ["mimwell", "factory"] as const;
 
 export const APPS_LIST: ListDefinition = {
   id: "apps",

@@ -1,0 +1,71 @@
+/*
+ * White-label theme for the factory console. Scoped to [data-theme="whitelabel"]
+ * so the rest of the app keeps its own tokens. Grayscale only for now. A brand
+ * or colour pack overrides these variables and nothing else.
+ */
+[data-theme="whitelabel"],
+[data-theme="whitelabel-dark"] {
+  --background: #0f0f10;
+  --foreground: #ececee;
+  --card: #161618;
+  --card-foreground: #ececee;
+  --popover: #161618;
+  --popover-foreground: #ececee;
+  --primary: #e6e6e6;
+  --primary-foreground: #0f0f10;
+  --secondary: #1d1d20;
+  --secondary-foreground: #ececee;
+  --muted: #1d1d20;
+  --muted-foreground: #7d7d86;
+  --accent: #1d1d20;
+  --accent-foreground: #ececee;
+  --destructive: #ffffff;
+  --border: #2a2a2e;
+  --input: #2a2a2e;
+  --ring: #b4b4bb;
+  --radius: 2px;
+}
+
+[data-theme="whitelabel-medium"] {
+  --background: #2b2b2e;
+  --foreground: #fafafb;
+  --card: #353539;
+  --card-foreground: #fafafb;
+  --popover: #353539;
+  --popover-foreground: #fafafb;
+  --primary: #fafafb;
+  --primary-foreground: #1c1c1f;
+  --secondary: #434348;
+  --secondary-foreground: #fafafb;
+  --muted: #434348;
+  --muted-foreground: #a6a6b0;
+  --accent: #434348;
+  --accent-foreground: #fafafb;
+  --destructive: #ffffff;
+  --border: #4f4f56;
+  --input: #4f4f56;
+  --ring: #dcdce2;
+  --radius: 2px;
+}
+
+[data-theme="whitelabel-light"] {
+  --background: #f5f5f6;
+  --foreground: #111113;
+  --card: #ffffff;
+  --card-foreground: #111113;
+  --popover: #ffffff;
+  --popover-foreground: #111113;
+  --primary: #111113;
+  --primary-foreground: #ffffff;
+  --secondary: #ececef;
+  --secondary-foreground: #111113;
+  --muted: #ececef;
+  --muted-foreground: #71717a;
+  --accent: #ececef;
+  --accent-foreground: #111113;
+  --destructive: #000000;
+  --border: #d8d8dd;
+  --input: #d8d8dd;
+  --ring: #3f3f46;
+  --radius: 2px;
+}

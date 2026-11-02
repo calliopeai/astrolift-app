@@ -1486,7 +1486,8 @@
       },
       "previewCount": "{count, plural, other {미리 보기 #개}}",
       "appKinds": {
-        "mimwell": "Mimwell"
+        "mimwell": "Mimwell",
+        "factory": "팩토리"
       }
     },
     "tabs": {

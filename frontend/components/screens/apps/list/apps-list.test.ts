@@ -51,6 +51,12 @@ describe("APPS_LIST", () => {
     expect(vars.filter).toEqual({ appKind: ["mimwell"] });
   });
 
+  it("offers the factory kind beside mimwell and sends it as the appKind filter", () => {
+    const appKind = APPS_LIST.fields.find((f) => f.key === "appKind");
+    expect(appKind?.options?.map((o) => o.value)).toEqual(["mimwell", "factory"]);
+    expect(varsFor("appKind=factory").filter).toEqual({ appKind: ["factory"] });
+  });
+
   it("sends the Temporary view as the temporary filter (#2433)", () => {
     const view = APPS_LIST.views.find((v) => v.key === "temporary");
     const vars = appsPageVariables({

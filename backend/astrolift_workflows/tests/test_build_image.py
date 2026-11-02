@@ -691,7 +691,8 @@ def _connection(app, kind="github_app_install"):
     return SourceConnection.objects.create(
         organization=app.organization,
         kind=kind,
-        account_login="acme",
+        # An installation serves only repos on its own account (#2576).
+        account_login=app.source_repo.split("/")[0],
         installation_id="987" if kind == "github_app_install" else "",
         secret_backend_kind=encrypted.backend_kind,
         secret_ciphertext=encrypted.backend_ref,

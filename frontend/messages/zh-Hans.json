@@ -1486,7 +1486,8 @@
       },
       "previewCount": "{count, plural, other {# 个预览}}",
       "appKinds": {
-        "mimwell": "Mimwell"
+        "mimwell": "Mimwell",
+        "factory": "工厂"
       }
     },
     "tabs": {

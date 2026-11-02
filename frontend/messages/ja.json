@@ -1486,7 +1486,8 @@
       },
       "previewCount": "{count, plural, other {# 件のプレビュー}}",
       "appKinds": {
-        "mimwell": "Mimwell"
+        "mimwell": "Mimwell",
+        "factory": "ファクトリー"
       }
     },
     "tabs": {

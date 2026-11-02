@@ -418,5 +418,5 @@ def test_app_kinds_catalogue_lists_mimwell(world):
         {"organization_id": world.org.id, "actor_user_id": world.user.id},
         lambda: RegistryQuery().astrolift_app_kinds(_info()),
     )
-    assert [kind.key for kind in kinds] == ["mimwell"]
+    assert [kind.key for kind in kinds] == ["mimwell", "factory"]
     assert kinds[0].label == "Mimwell"

@@ -213,7 +213,8 @@ def test_secrets_requires_the_org_app(monkeypatch, org):
     assert outcome.steps["ci_workflow"] == "ok"
     assert outcome.steps["webhook"] == "ok"
     assert outcome.steps["secrets"] == "error"
-    assert "GitHub App" in outcome.errors["secrets"]
+    # The resolver's reason, naming the repo owner (#2576).
+    assert "no active GitHub App installation for acme" in outcome.errors["secrets"]
     # The push service was short-circuited — never called.
     assert "secrets" not in calls
 

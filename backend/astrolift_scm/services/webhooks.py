@@ -49,7 +49,7 @@ from astrolift_scm.providers.github import (
     GithubProviderError,
     github_installation_includes_repo,
 )
-from astrolift_scm.services.connection_resolver import covering_repo_owner
+from astrolift_scm.services.connection_resolver import ConnectionResolutionError, select_org_connection
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
 logger = logging.getLogger(__name__)
@@ -144,26 +144,31 @@ def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
     exception note above). App-first, then OAuth-user, then PAT; None
     when no usable row exists, which every caller maps to its own
     ``no_connection`` / 401 response."""
+    try:
+        return _source_connection(app)
+    except ConnectionResolutionError:
+        return None
+
+
+def _source_connection(app: RegisteredApp) -> SourceConnection:
+    """``_pick_source_connection``, raising ``ConnectionResolutionError``
+    with the reason when there is none. The selector is the one CI secrets
+    and workflow writes use, so a GitHub App installation serves only a repo
+    on the account it is recorded on (#2576)."""
     accepted = _KIND_PREFERENCE.get(app.source_kind, ())
     if not accepted:
-        return None
-    rows = list(
-        SourceConnection.objects.filter(
-            organization_id=app.organization_id,
-            kind__in=accepted,
-            is_active=True,
-            is_orphaned=False,
-            deleted_at__isnull=True,
+        raise ConnectionResolutionError(
+            "UNSUPPORTED_SOURCE", f"no webhook connection policy for source_kind={app.source_kind!r}"
         )
+    host_label = "GitLab" if app.source_kind == "gitlab" else "GitHub"
+    return select_org_connection(
+        app.organization_id,
+        kinds=accepted,
+        repo=app.source_repo,
+        no_conn_message=(
+            f"no active source connection for this app's org. Connect a {host_label} identity, then retry."
+        ),
     )
-    # An org with installations on several GitHub accounts installs the
-    # hook through the one on the repo's owner (#2297).
-    rows = covering_repo_owner(rows, app.source_repo)
-    if not rows:
-        return None
-    rank = {k: i for i, k in enumerate(accepted)}
-    rows.sort(key=lambda r: (rank.get(r.kind, len(accepted)), r.pk))
-    return rows[0]
 
 
 # ---------------------------------------------------------------------------
@@ -267,15 +272,10 @@ def install_astrolift_source_webhook(app: RegisteredApp) -> InstallSourceWebhook
             error=f"unsupported source_kind {app.source_kind!r}",
         )
 
-    connection = _pick_source_connection(app)
-    if connection is None:
-        host_label = "GitLab" if app.source_kind == "gitlab" else "GitHub"
-        return InstallSourceWebhookResult(
-            status="no_connection",
-            error=(
-                f"no active source connection for this app's org. Connect a {host_label} identity, then retry."
-            ),
-        )
+    try:
+        connection = _source_connection(app)
+    except ConnectionResolutionError as exc:
+        return InstallSourceWebhookResult(status="no_connection", error=exc.message)
 
     target_url = _receiver_url(app)
     # A github_app_install connection never uses this URL: the App's own

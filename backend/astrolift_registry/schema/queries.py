@@ -81,6 +81,7 @@ from astrolift_registry.schema.types import (
     build_ci_workflow_sync_status,
     build_config_drift,
     build_settings_last_modified,
+    build_source_connection,
     container_to_type,
     workload_action_target_to_type,
     workload_to_type,
@@ -1802,6 +1803,9 @@ class RegistryQuery:
             freshness=_freshness_for_apps([app]).get(app.pk),
             drift=drift,
             autowire=autowire,
+            # Detail-only and DB-only, like autowire: the records for the
+            # repo's owner, never a read of the repo (#2579).
+            source_connection=build_source_connection(app),
             ci_workflow_sync_status=ci_workflow_sync,
             settings_last_modified=settings_last_modified,
             # App-scoped, not account-wide: the settings tab gates its
