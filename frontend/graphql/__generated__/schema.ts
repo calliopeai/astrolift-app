@@ -3437,6 +3437,26 @@ export type AstroliftExecutePromqlResult = {
   series: Array<AstroliftPromqlSeries>;
 };
 
+export type AstroliftFactoryGateApp = {
+  appId?: Maybe<Scalars['String']['output']>;
+  installationId?: Maybe<Scalars['String']['output']>;
+  ownerLogin?: Maybe<Scalars['String']['output']>;
+  permissions: Array<AstroliftGithubAppPermission>;
+  state: AstroliftFactoryGateAppState;
+};
+
+export type AstroliftFactoryGateAppMutationResult = {
+  data?: Maybe<AstroliftFactoryGateApp>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftFactoryGateAppState =
+  | 'INSTALLED'
+  | 'MISSING_KEY'
+  | 'NOT_REGISTERED'
+  | 'REGISTERED';
+
 export type AstroliftForceRedeployPayload = {
   deploymentsCancelled: Scalars['Int']['output'];
   dispatchMessage?: Maybe<Scalars['String']['output']>;
@@ -3517,6 +3537,11 @@ export type AstroliftFormSubmissionMutationResult = {
   data?: Maybe<AstroliftFormSubmission>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftGithubAppPermission = {
+  access: Scalars['String']['output'];
+  name: Scalars['String']['output'];
 };
 
 export type AstroliftGoldenSignalMeasurement = {
@@ -9996,6 +10021,7 @@ export type Mutation = {
   rollbackDeployment: AstroliftDeploymentMutationResult;
   rotateAppSecret: AppsecretwritepayloadMutationResult;
   rotateDeployToken: DeployTokenSecretRevealMutationResult;
+  rotateFactoryGateAppKey: AstroliftFactoryGateAppMutationResult;
   rotateOutboundWebhookSecret: WebhookSecretRevealMutationResult;
   rotateSecretBundle: AstroliftSecretBundleMutationResult;
   rotateWebhookSecret: AstroliftScmWebhookSecretRevealMutationResult;
@@ -11795,6 +11821,11 @@ export type MutationRotateDeployTokenArgs = {
 };
 
 
+export type MutationRotateFactoryGateAppKeyArgs = {
+  input: RotateFactoryGateAppKeyInput;
+};
+
+
 export type MutationRotateOutboundWebhookSecretArgs = {
   input: RotateOutboundWebhookSecretInput;
 };
@@ -13205,6 +13236,7 @@ export type Query = {
   astroliftEventsAggregatedPage: AstroliftAggregatedEventPage;
   astroliftEventsPage: AstroliftEventPage;
   astroliftExecutePromql: AstroliftExecutePromqlResult;
+  astroliftFactoryGateApp: AstroliftFactoryGateApp;
   astroliftGrantPreview: AstroliftGrantPreview;
   astroliftGroupRoleMappingsPage: AstroliftGroupRoleMappingPage;
   astroliftHuggingFaceModel: HuggingFaceModelResult;
@@ -16502,6 +16534,10 @@ export type RotateAppSecretInput = {
 
 export type RotateDeployTokenInput = {
   id: Scalars['GUID']['input'];
+};
+
+export type RotateFactoryGateAppKeyInput = {
+  privateKeyPem: Scalars['String']['input'];
 };
 
 export type RotateOutboundWebhookSecretInput = {

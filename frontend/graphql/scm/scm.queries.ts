@@ -129,17 +129,26 @@ export const GET_SOURCE_FILE = gql`
   }
 `;
 
+// The factory gate GitHub App (#2589): its state, ids and permissions. The
+// schema has no field for its key.
+export const GET_FACTORY_GATE_APP = gql`
+  query FactoryGateApp {
+    astroliftFactoryGateApp {
+      state
+      appId
+      installationId
+      ownerLogin
+      permissions {
+        name
+        access
+      }
+    }
+  }
+`;
+
 export const LIST_AVAILABLE_REPOS = gql`
-  query ListAvailableRepos(
-    $connectionId: String!
-    $search: String
-    $limit: Int
-  ) {
-    astroliftAvailableRepos(
-      connectionId: $connectionId
-      search: $search
-      limit: $limit
-    ) {
+  query ListAvailableRepos($connectionId: String!, $search: String, $limit: Int) {
+    astroliftAvailableRepos(connectionId: $connectionId, search: $search, limit: $limit) {
       repos {
         fullName
         name

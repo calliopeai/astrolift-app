@@ -4109,6 +4109,7 @@
     "description": "Connectez Astrolift à un service d’hébergement de code pour qu’il clone vos dépôts et suive les push. Utilisez des OAuth Apps / GitHub Apps pour un accès à toute l’organisation, des PAT pour GitLab ou Gitea auto-hébergés, et des clés SSH de déploiement pour un accès git direct à n’importe quel hôte.",
     "hostsTitle": "Hôtes",
     "keysTitle": "Clés SSH de déploiement",
+    "factoryGateTitle": "App de contrôle de l’usine",
     "kind": {
       "github_oauth_app": "OAuth App GitHub",
       "github_oauth_user": "GitHub (jeton utilisateur OAuth)",
@@ -4372,6 +4373,49 @@
       "cancel": "Annuler",
       "saving": "Enregistrement…",
       "save": "Enregistrer le Client ID"
+    },
+    "factoryGate": {
+      "title": "App de contrôle de l’usine",
+      "description": "Une GitHub App avec une seule autorisation, Membres de l’organisation (lecture seule), pour que l’usine Calliope AI puisse vérifier qui possède votre organisation GitHub. Astrolift conserve sa clé privée chiffrée et ne l’affiche jamais.",
+      "state": {
+        "NOT_REGISTERED": "Non enregistrée",
+        "REGISTERED": "Enregistrée, non installée",
+        "INSTALLED": "Installée",
+        "MISSING_KEY": "Clé manquante"
+      },
+      "stateHelp": {
+        "NOT_REGISTERED": "Enregistrez l’App dans votre organisation GitHub. GitHub affiche son nom et sa seule autorisation avant toute création.",
+        "REGISTERED": "L’App existe sur GitHub mais n’est pas installée. Installez-la sur {owner} pour terminer.",
+        "INSTALLED": "Installée sur {owner}. Les workflows de l’usine peuvent émettre des jetons de courte durée qui ne lisent que l’appartenance à l’organisation.",
+        "MISSING_KEY": "Astrolift ne détient aucune clé privée pour cette App et ne peut donc émettre aucun jeton. Générez une nouvelle clé sur GitHub et renouvelez-la ici."
+      },
+      "appId": "ID de l’App",
+      "installationId": "ID d’installation",
+      "owner": "Propriétaire",
+      "permissions": "Autorisations",
+      "notSet": "Non défini",
+      "orgLabel": "Organisation GitHub",
+      "orgHelp": "L’organisation qui possède l’App et l’installe. L’enregistrement exige un propriétaire ou un gestionnaire d’Apps de cette organisation.",
+      "orgInvalid": "Utilisez l’identifiant de l’organisation : lettres, chiffres et tirets, 39 caractères au maximum.",
+      "register": "Enregistrer sur GitHub",
+      "install": "Installer sur GitHub",
+      "rotate": "Renouveler la clé",
+      "loadFailed": "Impossible de charger l’App de contrôle de l’usine.",
+      "retry": "Réessayer",
+      "rotateSheet": {
+        "title": "Renouveler la clé de contrôle de l’usine",
+        "description": "GitHub n’a pas d’API qui émet des clés d’App. Générez une nouvelle clé privée dans les paramètres de l’App sur GitHub, collez-la ici, puis supprimez l’ancienne clé sur GitHub.",
+        "openGithub": "Ouvrir les GitHub Apps de {owner}",
+        "label": "Nouvelle clé privée (PEM)",
+        "help": "Astrolift vérifie la clé auprès de GitHub avant qu’elle remplace celle enregistrée, la conserve chiffrée et ne l’affiche plus jamais.",
+        "cancel": "Annuler",
+        "submit": "Renouveler la clé",
+        "submitting": "Renouvellement…"
+      },
+      "toasts": {
+        "rotated": "Clé de contrôle de l’usine renouvelée",
+        "rotateFailed": "Impossible de renouveler la clé de contrôle de l’usine"
+      }
     },
     "toasts": {
       "rotationFailed": "Échec du renouvellement",

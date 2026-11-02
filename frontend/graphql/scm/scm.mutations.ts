@@ -290,3 +290,28 @@ export const OPEN_CI_WORKFLOW_RECONCILE_PR = gql`
     }
   }
 `;
+
+// Replace the factory gate App's private key (#2589) with one generated in the
+// App's settings on GitHub. The key goes in; nothing about it comes back.
+export const ROTATE_FACTORY_GATE_APP_KEY = gql`
+  mutation RotateFactoryGateAppKey($input: RotateFactoryGateAppKeyInput!) {
+    rotateFactoryGateAppKey(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        state
+        appId
+        installationId
+        ownerLogin
+        permissions {
+          name
+          access
+        }
+      }
+    }
+  }
+`;

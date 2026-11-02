@@ -4829,6 +4829,7 @@
     "description": "Connect Astrolift to a code-hosting service so it can clone your repos and watch for pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for self-hosted GitLab or Gitea, and SSH deploy keys for direct git access to any host.",
     "hostsTitle": "Hosts",
     "keysTitle": "SSH deploy keys",
+    "factoryGateTitle": "Factory gate app",
     "kind": {
       "github_oauth_app": "GitHub OAuth App",
       "github_oauth_user": "GitHub (OAuth user token)",
@@ -5092,6 +5093,49 @@
       "cancel": "Cancel",
       "saving": "Saving…",
       "save": "Save Client ID"
+    },
+    "factoryGate": {
+      "title": "Factory gate app",
+      "description": "A GitHub App with one permission, organization Members (read-only), so the Calliope AI factory can check who owns your GitHub organization. Astrolift keeps its private key encrypted and never shows it.",
+      "state": {
+        "NOT_REGISTERED": "Not registered",
+        "REGISTERED": "Registered, not installed",
+        "INSTALLED": "Installed",
+        "MISSING_KEY": "Missing key"
+      },
+      "stateHelp": {
+        "NOT_REGISTERED": "Register the App on your GitHub organization. GitHub shows its name and its one permission before anything is created.",
+        "REGISTERED": "The App exists on GitHub but is not installed. Install it on {owner} to finish.",
+        "INSTALLED": "Installed on {owner}. The factory's workflows can mint short-lived tokens that read organization membership and nothing else.",
+        "MISSING_KEY": "Astrolift holds no private key for this App, so it cannot mint tokens. Generate a new key on GitHub and rotate it in."
+      },
+      "appId": "App ID",
+      "installationId": "Installation ID",
+      "owner": "Owner",
+      "permissions": "Permissions",
+      "notSet": "Not set",
+      "orgLabel": "GitHub organization",
+      "orgHelp": "The organization that owns and installs the App. Registering takes an owner or App manager of that organization.",
+      "orgInvalid": "Use the organization's login: letters, digits and hyphens, up to 39 characters.",
+      "register": "Register on GitHub",
+      "install": "Install on GitHub",
+      "rotate": "Rotate key",
+      "loadFailed": "Couldn't load the factory gate app.",
+      "retry": "Retry",
+      "rotateSheet": {
+        "title": "Rotate the factory gate key",
+        "description": "GitHub has no API that issues App keys. Generate a new private key in the App's settings on GitHub, paste it here, then delete the old key on GitHub.",
+        "openGithub": "Open the GitHub Apps of {owner}",
+        "label": "New private key (PEM)",
+        "help": "Astrolift checks the key with GitHub before it replaces the stored one, keeps it encrypted, and never shows it again.",
+        "cancel": "Cancel",
+        "submit": "Rotate key",
+        "submitting": "Rotating…"
+      },
+      "toasts": {
+        "rotated": "Factory gate key rotated",
+        "rotateFailed": "Couldn't rotate the factory gate key"
+      }
     },
     "toasts": {
       "rotationFailed": "Rotation failed",

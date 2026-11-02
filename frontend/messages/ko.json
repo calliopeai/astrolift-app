@@ -4115,6 +4115,7 @@
     "description": "Astrolift를 코드 호스팅 서비스에 연결하면 저장소를 클론하고 푸시를 감시할 수 있습니다. 조직 전체 접근에는 OAuth App / GitHub App, 자체 호스팅 GitLab 또는 Gitea에는 PAT, 모든 호스트에 대한 직접 git 접근에는 SSH 배포 키를 사용하세요.",
     "hostsTitle": "호스트",
     "keysTitle": "SSH 배포 키",
+    "factoryGateTitle": "팩토리 게이트 App",
     "kind": {
       "github_oauth_app": "GitHub OAuth App",
       "github_oauth_user": "GitHub (OAuth 사용자 토큰)",
@@ -4378,6 +4379,49 @@
       "cancel": "취소",
       "saving": "저장 중…",
       "save": "클라이언트 ID 저장"
+    },
+    "factoryGate": {
+      "title": "팩토리 게이트 App",
+      "description": "조직 구성원(읽기 전용) 권한 하나만 가진 GitHub App입니다. Calliope AI 팩토리가 GitHub 조직의 소유자를 확인할 때 사용합니다. Astrolift는 개인 키를 암호화해 보관하며 표시하지 않습니다.",
+      "state": {
+        "NOT_REGISTERED": "등록되지 않음",
+        "REGISTERED": "등록됨, 설치되지 않음",
+        "INSTALLED": "설치됨",
+        "MISSING_KEY": "키 없음"
+      },
+      "stateHelp": {
+        "NOT_REGISTERED": "GitHub 조직에 App을 등록하세요. 생성하기 전에 GitHub가 App 이름과 단 하나의 권한을 보여 줍니다.",
+        "REGISTERED": "App이 GitHub에 있지만 설치되지 않았습니다. {owner}에 설치하면 완료됩니다.",
+        "INSTALLED": "{owner}에 설치되었습니다. 팩토리 워크플로가 조직 멤버십만 읽는 단기 토큰을 발급할 수 있습니다.",
+        "MISSING_KEY": "Astrolift에 이 App의 개인 키가 없어 토큰을 발급할 수 없습니다. GitHub에서 새 키를 생성한 뒤 여기서 교체하세요."
+      },
+      "appId": "App ID",
+      "installationId": "설치 ID",
+      "owner": "소유자",
+      "permissions": "권한",
+      "notSet": "설정되지 않음",
+      "orgLabel": "GitHub 조직",
+      "orgHelp": "App을 소유하고 설치하는 조직입니다. 등록하려면 해당 조직의 소유자 또는 App 관리자여야 합니다.",
+      "orgInvalid": "조직 로그인을 사용하세요. 영문자, 숫자, 하이픈으로 최대 39자입니다.",
+      "register": "GitHub에서 등록",
+      "install": "GitHub에서 설치",
+      "rotate": "키 교체",
+      "loadFailed": "팩토리 게이트 App을 불러오지 못했습니다.",
+      "retry": "다시 시도",
+      "rotateSheet": {
+        "title": "팩토리 게이트 키 교체",
+        "description": "GitHub에는 App 키를 발급하는 API가 없습니다. GitHub의 App 설정에서 새 개인 키를 생성해 여기에 붙여 넣은 다음, GitHub에서 이전 키를 삭제하세요.",
+        "openGithub": "{owner}의 GitHub Apps 열기",
+        "label": "새 개인 키 (PEM)",
+        "help": "Astrolift는 저장된 키를 바꾸기 전에 GitHub에서 키를 확인하고, 암호화해 보관하며, 다시 표시하지 않습니다.",
+        "cancel": "취소",
+        "submit": "키 교체",
+        "submitting": "교체 중…"
+      },
+      "toasts": {
+        "rotated": "팩토리 게이트 키를 교체했습니다",
+        "rotateFailed": "팩토리 게이트 키를 교체하지 못했습니다"
+      }
     },
     "toasts": {
       "rotationFailed": "교체하지 못했습니다",
