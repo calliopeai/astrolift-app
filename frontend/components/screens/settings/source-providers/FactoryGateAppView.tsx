@@ -38,10 +38,10 @@ export type FactoryGateAppViewProps = FactoryGateAppData & {
 };
 
 /**
- * Providers > Source > Factory gate app (#2589): the GitHub App the Calliope
- * AI factory reads organization membership with. Its state, ids and one
- * permission, the manifest-flow hand-off that registers or installs it, and
- * the key rotation. The key itself is never shown. Pure; the data half is
+ * Providers > Source > Factory gate app (#2589): the GitHub App the
+ * Calliope AI factory reads organization membership with. Its state, ids and
+ * one permission, the manifest-flow hand-off that registers or installs it,
+ * and the key rotation. The key itself is never shown. Pure; the data half is
  * useFactoryGateApp.
  */
 export function FactoryGateAppView({

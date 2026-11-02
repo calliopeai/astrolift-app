@@ -13,7 +13,7 @@ Routes:
   (#778). Classifies PR events and starts ``BuildPreviewWorkflow`` /
   ``TearDownPreviewWorkflow`` against the matching RegisteredApp's
   preview environment.
-* ``POST /api/scm/v1/factory-gate/token/`` — the factory gate App's
+* ``POST /api/scm/v1/factory-gate/token/``: the factory gate App's
   installation token for an allowlisted API token (#2589). Bearer auth, so
   also ``csrf_exempt``.
 """
