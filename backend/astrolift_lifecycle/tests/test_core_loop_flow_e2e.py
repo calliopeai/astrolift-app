@@ -80,6 +80,19 @@ _CORE_LOOP_PERMS = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _no_anonymous_github_reads(monkeypatch):
+    """With no source connection, registration reads a public repo anonymously
+    (#2051), and GitHub's 404 there refuses it (#2579). Fail the read as if
+    offline, as the registry tests do, so the loop never reaches GitHub."""
+    import requests
+
+    def _offline(**_kwargs):
+        raise requests.ConnectionError("network disabled in tests")
+
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_public_file", _offline)
+
+
 # ---------------------------------------------------------------------------
 # Envelope assertions — the MutationResult{ok, errors, data} contract.
 # ---------------------------------------------------------------------------

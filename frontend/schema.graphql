@@ -1853,6 +1853,15 @@ type AstroliftAppSourceChangeMutationResult {
   data: AstroliftAppSourceChange
 }
 
+"""
+The source connection for an app's repository owner, from the organization's records (#2579). owner is the repository owner's login, lower-cased; detail says why, and for NOT_CONNECTED names the console step that adds the connection. Records only: an older installation record may name the App's owner rather than the account it was installed on.
+"""
+type AstroliftAppSourceConnection {
+  state: AstroliftSourceConnectionState!
+  owner: String!
+  detail: String!
+}
+
 enum AstroliftAppSourceKindFilter {
   ALL
   GITHUB
@@ -5679,6 +5688,11 @@ type AstroliftRegisteredApp {
   sourceConnectionWarning: String!
 
   """
+  The source connection for the app's repository owner (#2579). Filled on astroliftApp only; null on list reads.
+  """
+  sourceConnection: AstroliftAppSourceConnection
+
+  """
   Whether the app's public hosts answer (#2573): the worst of its non-preview environments' reachabilityStatus, or PROVISIONING while any of them is being deployed or reprovisioned. provisioningStatus says whether registration finished; this says whether the app can be reached.
   """
   reachabilityStatus: ReachabilityStatus!
@@ -6455,6 +6469,15 @@ type AstroliftSourceConnectionPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+"""
+Whether the organization's records show a source connection for an app's repository owner (#2579). CONNECTED: a GitHub App installation recorded on the owner, or an organization OAuth or PAT connection. NOT_CONNECTED: no GitHub connection, or App installations recorded on other accounts only. UNKNOWN: not a GitHub repository, or no owner to check.
+"""
+enum AstroliftSourceConnectionState {
+  CONNECTED
+  NOT_CONNECTED
+  UNKNOWN
 }
 
 type AstroliftSourceFile {

@@ -1772,6 +1772,13 @@ export type AstroliftAppSourceChangeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+/** The source connection for an app's repository owner, from the organization's records (#2579). owner is the repository owner's login, lower-cased; detail says why, and for NOT_CONNECTED names the console step that adds the connection. Records only: an older installation record may name the App's owner rather than the account it was installed on. */
+export type AstroliftAppSourceConnection = {
+  detail: Scalars['String']['output'];
+  owner: Scalars['String']['output'];
+  state: AstroliftSourceConnectionState;
+};
+
 export type AstroliftAppSourceKindFilter =
   | 'ALL'
   | 'BITBUCKET'
@@ -5276,6 +5283,8 @@ export type AstroliftRegisteredApp = {
   securityPolicy: AstroliftSecurityPolicy;
   settingsLastModified?: Maybe<AstroliftAppSettingsLastModified>;
   slug: Scalars['String']['output'];
+  /** The source connection for the app's repository owner (#2579). Filled on astroliftApp only; null on list reads. */
+  sourceConnection?: Maybe<AstroliftAppSourceConnection>;
   /** Advisory set only on the registerApp result: no organization GitHub connection is visibly recorded on the source repository's owner. Empty everywhere else (#2297). */
   sourceConnectionWarning: Scalars['String']['output'];
   sourceKind: Scalars['String']['output'];
@@ -5982,6 +5991,12 @@ export type AstroliftSourceConnectionPage = {
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
+
+/** Whether the organization's records show a source connection for an app's repository owner (#2579). CONNECTED: a GitHub App installation recorded on the owner, or an organization OAuth or PAT connection. NOT_CONNECTED: no GitHub connection, or App installations recorded on other accounts only. UNKNOWN: not a GitHub repository, or no owner to check. */
+export type AstroliftSourceConnectionState =
+  | 'CONNECTED'
+  | 'NOT_CONNECTED'
+  | 'UNKNOWN';
 
 export type AstroliftSourceFile = {
   content?: Maybe<Scalars['String']['output']>;
