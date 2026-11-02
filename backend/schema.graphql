@@ -3647,6 +3647,27 @@ type AstroliftExecutePromqlResult {
   series: [AstroliftPromqlSeries!]!
 }
 
+type AstroliftFactoryGateApp {
+  state: AstroliftFactoryGateAppState!
+  appId: String
+  installationId: String
+  ownerLogin: String
+  permissions: [AstroliftGithubAppPermission!]!
+}
+
+type AstroliftFactoryGateAppMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftFactoryGateApp
+}
+
+enum AstroliftFactoryGateAppState {
+  NOT_REGISTERED
+  REGISTERED
+  INSTALLED
+  MISSING_KEY
+}
+
 type AstroliftForceRedeployPayload {
   deploymentsCancelled: Int!
   k8sObjectsDeleted: Int!
@@ -3727,6 +3748,11 @@ type AstroliftFormSubmissionMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftFormSubmission
+}
+
+type AstroliftGithubAppPermission {
+  name: String!
+  access: String!
 }
 
 type AstroliftGoldenSignalMeasurement {
@@ -10749,6 +10775,7 @@ type Mutation {
   reapCloudOrphan(input: ReapCloudOrphanInput!): ReapCloudOrphanPayloadMutationResult!
   connectSource(input: ConnectSourceInput!): AstroliftSourceConnectionMutationResult!
   connectExistingGithubApp(input: ConnectExistingGithubAppInput!): AstroliftSourceConnectionMutationResult!
+  rotateFactoryGateAppKey(input: RotateFactoryGateAppKeyInput!): AstroliftFactoryGateAppMutationResult!
   updateSourceConnection(input: UpdateSourceConnectionInput!): AstroliftSourceConnectionMutationResult!
   disconnectSource(input: DisconnectSourceInput!): AstroliftSourceConnectionMutationResult!
   generateSshDeployKey(input: GenerateSshDeployKeyInput!): AstroliftSshDeployKeyCreatedMutationResult!
@@ -11812,6 +11839,7 @@ type Query {
   astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!
   astroliftSourceConnections: [AstroliftSourceConnection!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage.")
   astroliftSourceConnectionsPage(search: String = null, limit: Int! = 50, after: String = null): AstroliftSourceConnectionPage!
+  astroliftFactoryGateApp: AstroliftFactoryGateApp!
   astroliftSshDeployKeys(appSlug: String = null): [AstroliftSshDeployKey!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSshDeployKeysPage.")
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
@@ -12575,6 +12603,10 @@ input RotateAppSecretInput {
 
 input RotateDeployTokenInput {
   id: GUID!
+}
+
+input RotateFactoryGateAppKeyInput {
+  privateKeyPem: String!
 }
 
 input RotateOutboundWebhookSecretInput {

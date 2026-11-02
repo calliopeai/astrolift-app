@@ -11,15 +11,18 @@ from astrolift_scm.models import SourceConnection, SshDeployKey
 from astrolift_scm.org_repo_policy import filter_repos
 from astrolift_scm.providers import ProviderError, fetch_file, list_repos
 from astrolift_scm.schema.types import (
+    FactoryGateAppType,
     RemoteRepoListType,
     SourceConnectionType,
     SourceFileType,
     SshDeployKeyType,
+    factory_gate_app_to_type,
     remote_repo_to_type,
     source_connection_to_type,
     ssh_key_to_type,
 )
 from astrolift_scm.scopes import scm_org_scope, visible_ssh_keys
+from astrolift_scm.services import factory_gate
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
@@ -82,6 +85,9 @@ def _source_connections_qs(*, viewer_pk: int | None, search: str | None = None):
 
     qs = (
         SourceConnection.objects.filter(organization_id=org_id, deleted_at__isnull=True)
+        # The factory gate App reads org membership, never repositories; it
+        # has its own query, astroliftFactoryGateApp (#2589).
+        .exclude(kind=SourceConnection.Kind.GITHUB_FACTORY_GATE_APP)
         .filter(scope)
         .select_related("user", "parent_oauth_app")
     )
@@ -162,6 +168,15 @@ class ScmQuery:
             limit=limit,
         )
         return page.map(source_connection_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.SCM_READ, scope=scm_org_scope(Permission.SCM_READ))
+    @tenant_scoped()
+    def astrolift_factory_gate_app(self, info: Info) -> FactoryGateAppType:
+        """The org's factory gate GitHub App (#2589): state, App id,
+        installation id, owner login and permissions. Never the key."""
+        tenant = get_current_tenant()
+        return factory_gate_app_to_type(factory_gate.current_app(tenant.organization_id if tenant else None))
 
     @strawberry.field(
         deprecation_reason=(

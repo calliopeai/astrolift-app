@@ -13,6 +13,9 @@ Routes:
   (#778). Classifies PR events and starts ``BuildPreviewWorkflow`` /
   ``TearDownPreviewWorkflow`` against the matching RegisteredApp's
   preview environment.
+* ``POST /api/scm/v1/factory-gate/token/`` — the factory gate App's
+  installation token for an allowlisted API token (#2589). Bearer auth, so
+  also ``csrf_exempt``.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ from __future__ import annotations
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
+from astrolift_scm.factory_gate_views import factory_gate_token
 from astrolift_scm.webhook_views import pr_webhook
 
 app_name = "astrolift_scm"
@@ -29,5 +33,10 @@ urlpatterns = [
         "api/webhooks/github/<str:app_guid>/",
         csrf_exempt(pr_webhook),
         name="scm-github-webhook",
+    ),
+    path(
+        "api/scm/v1/factory-gate/token/",
+        csrf_exempt(factory_gate_token),
+        name="scm-factory-gate-token",
     ),
 ]

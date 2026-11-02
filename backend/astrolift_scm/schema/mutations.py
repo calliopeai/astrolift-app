@@ -20,15 +20,18 @@ from astrolift_registry.schema.types import (
 from astrolift_scm.keygen import generate_ed25519_keypair
 from astrolift_scm.models import ScmWebhookInstallation, SourceConnection, SshDeployKey
 from astrolift_scm.schema.types import (
+    FactoryGateAppType,
     ScmWebhookInstallationType,
     SourceConnectionType,
     SshDeployKeyCreatedType,
     SshDeployKeyType,
+    factory_gate_app_to_type,
     source_connection_to_type,
     ssh_key_to_type,
     webhook_install_to_type,
 )
 from astrolift_scm.scopes import scm_app_scope, scm_org_scope, ssh_key_scope
+from astrolift_scm.services import factory_gate
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, check_platform_operator, require_permission
@@ -131,6 +134,15 @@ class ConnectExistingGithubAppInput:
     webhook_secret: str | None = None
     api_base_url: str | None = None
     org_login: str | None = None
+
+
+@strawberry.input
+class RotateFactoryGateAppKeyInput:
+    """A new private key for the factory gate App (#2589), generated in the
+    App's settings on GitHub. Checked against GitHub before it replaces the
+    stored key; never returned."""
+
+    private_key_pem: str
 
 
 @strawberry.input
@@ -383,6 +395,13 @@ def _get_or_create_app_install(org, *, app_id: str, account_login: str) -> Sourc
 # ---------------------------------------------------------------------------
 
 
+def _factory_gate_audit_extras(_result) -> dict[str, str]:
+    """The App id and purpose on every rotation's audit row, refused ones too."""
+    tenant = get_current_tenant()
+    app = factory_gate.current_app(tenant.organization_id if tenant else None)
+    return {"purpose": factory_gate.PURPOSE, "app_id": app.oauth_client_id if app is not None else ""}
+
+
 def _ci_drift_app(app_id) -> RegisteredApp | None:
     """Org-scoped app lookup for the drift actions. Slugs/guids are
     unique only within an org; fails closed (returns None) when the
@@ -632,6 +651,31 @@ class ScmMutation:
             )
 
         return gql_success(source_connection_to_type(conn))
+
+    @strawberry.field
+    @mutation_audit(action=factory_gate.ROTATE, extras=_factory_gate_audit_extras)
+    @require_permission(Permission.SCM_CONNECT, scope=scm_org_scope(Permission.SCM_CONNECT))
+    @tenant_scoped()
+    def rotate_factory_gate_app_key(
+        self, info: Info, input: RotateFactoryGateAppKeyInput
+    ) -> MutationResultType[FactoryGateAppType]:
+        """Replace the factory gate App's private key (#2589). GitHub has no
+        API that issues App keys: the operator generates one in the App's
+        settings, pastes it here, then deletes the old one on GitHub."""
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+        app = factory_gate.current_app(org_id)
+        if app is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "register the factory gate App first")
+        if not (input.private_key_pem or "").strip():
+            return gql_failure(ErrorCode.VALIDATION.value, "privateKeyPem is required", field="privateKeyPem")
+        refusal = factory_gate.rotate_key(app, input.private_key_pem)
+        if refusal is not None:
+            code, message = refusal
+            return gql_failure(code, message, field="privateKeyPem")
+        return gql_success(factory_gate_app_to_type(app))
 
     @strawberry.field
     @mutation_audit(action="scm.update")

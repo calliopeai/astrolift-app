@@ -297,6 +297,17 @@ ASTROLIFT_CLOUDFLARE_OAUTH_READ_SCOPES = tuple(env_str("ASTROLIFT_CLOUDFLARE_OAU
 # per_org at read time (see auth1.scm_app_manifest._connection_scope).
 GITHUB_APP_CONNECTION_SCOPE = env_str("GITHUB_APP_CONNECTION_SCOPE", "per_org")
 
+# The factory gate's GitHub App (#2589), organization Members read only.
+# FACTORY_GATE_APP_NAME is the name its manifest proposes; App names are
+# unique across github.com, so a second registration edits it on GitHub's
+# form. FACTORY_GATE_TOKEN_CALLERS lists the API tokens, by GUID and comma
+# separated, that may mint its installation token: the factory's workflows.
+# Empty allows nobody.
+FACTORY_GATE_APP_NAME = env_str("FACTORY_GATE_APP_NAME", "calliope-factory-gate")
+FACTORY_GATE_TOKEN_CALLERS = tuple(
+    caller.strip() for caller in env_str("FACTORY_GATE_TOKEN_CALLERS", "").split(",") if caller.strip()
+)
+
 # Mobile universal-link / app-link well-known manifest values (#541).
 # The two strings below feed the JSON payload served at
 # /.well-known/apple-app-site-association and /.well-known/assetlinks.json

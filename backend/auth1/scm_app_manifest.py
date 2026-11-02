@@ -30,6 +30,11 @@ GitHub bounces back to our ``setup_url`` with
 installation id to the connection row at that point and the connection
 becomes usable for repo listing + commit-status writes.
 
+The same three views register the factory gate App (#2589) when the start
+URL carries ``purpose=factory_gate``: one GitHub organization, organization
+Members read and nothing else, no webhook, no user OAuth. Its row is a
+``github_factory_gate_app`` connection; see ``astrolift_scm.services.factory_gate``.
+
 Refs:
   https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
 
@@ -68,6 +73,7 @@ from django.views.decorators.http import require_GET
 from astrolift_identity.models import Member
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.scopes import require_scm_connect
+from astrolift_scm.services import factory_gate
 from core.permissions import Permission, route_auth
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
@@ -253,6 +259,25 @@ def _manifest_json(
             "workflows": "write",
         },
         "default_events": ["push", "pull_request"],
+    }
+
+
+def _factory_gate_manifest_json(request: HttpRequest) -> dict[str, Any]:
+    """The factory gate App's manifest (#2589): organization Members read and
+    nothing else, so its tokens can read org membership and nothing more. No
+    webhook, no events and no user OAuth: the App only mints installation
+    tokens. Private, so only its own organization can install it."""
+    base = _app_base_url(request)
+    return {
+        "name": settings.FACTORY_GATE_APP_NAME,
+        "url": base,
+        "description": "Reads organization membership for the Calliope AI factory's quarantine gate.",
+        "redirect_url": f"{base}/app/auth1/scm/github/app-manifest/callback",
+        "setup_url": f"{base}/app/auth1/scm/github/app-manifest/setup",
+        "setup_on_update": True,
+        "public": False,
+        "default_permissions": dict(factory_gate.PERMISSIONS),
+        "default_events": [],
     }
 
 
@@ -533,6 +558,127 @@ def _start_reuse_install(
 
 
 # ---------------------------------------------------------------------------
+# Factory gate App (#2589): the same flow, one GitHub organization, Members
+# read only. Each org has at most one; a start never creates a second.
+# ---------------------------------------------------------------------------
+
+
+def _factory_gate_install_redirect(
+    request: HttpRequest, app: SourceConnection, *, slug: str, return_to: str
+) -> HttpResponseRedirect:
+    install_state = secrets.token_urlsafe(24)
+    request.session["scm_github_install_state"] = {
+        "state": install_state,
+        "connection_guid": str(app.guid),
+        "return_to": return_to,
+        "purpose": factory_gate.PURPOSE,
+    }
+    request.session.save()
+    return HttpResponseRedirect(
+        f"https://github.com/apps/{urllib.parse.quote(slug)}/installations/new"
+        f"?state={urllib.parse.quote(install_state)}"
+    )
+
+
+def _start_factory_gate(request: HttpRequest, *, org_id: int, gh_org: str, return_to: str) -> HttpResponse:
+    if not gh_org:
+        return _redirect_with_error(return_to, "factory_gate_org_required")
+    app = factory_gate.current_app(org_id)
+    state = factory_gate.state_of(app)
+    if app is not None:
+        if state is factory_gate.State.MISSING_KEY:
+            return _redirect_with_error(return_to, "factory_gate_missing_key")
+        if state is factory_gate.State.INSTALLED:
+            return _redirect_with_ok(return_to, app.display_name or "GitHub App")
+        # Registered but never installed: install that App rather than create another.
+        if app.account_login.lower() != gh_org.lower():
+            return _redirect_with_error(return_to, "factory_gate_org_mismatch")
+        slug = _app_slug_from_connection(app)
+        if not _validate_gh_slug(slug):
+            return _redirect_with_error(return_to, "factory_gate_slug_unknown")
+        return _factory_gate_install_redirect(request, app, slug=slug, return_to=return_to)
+
+    # A pending row from an abandoned registration has no App id; clear it so
+    # the new pending row fits the (organization, kind, account_login) key.
+    SourceConnection.objects.filter(organization_id=org_id, kind=factory_gate.KIND, oauth_client_id="").update(
+        deleted_at=timezone.now()
+    )
+    pending = SourceConnection.objects.create(
+        organization_id=org_id,
+        guid=uuid.uuid4(),
+        kind=factory_gate.KIND,
+        display_name="Factory gate App (pending registration)",
+        is_active=False,
+    )
+    state_token = secrets.token_urlsafe(32)
+    request.session["scm_github_manifest_state"] = {
+        "state": state_token,
+        "connection_guid": str(pending.guid),
+        "return_to": return_to,
+        "gh_org": gh_org,
+        "purpose": factory_gate.PURPOSE,
+    }
+    request.session.save()
+    html = _render_autosubmit_form(
+        action_url=(
+            f"https://github.com/organizations/{urllib.parse.quote(gh_org)}"
+            f"/settings/apps/new?state={urllib.parse.quote(state_token)}"
+        ),
+        manifest_payload=json.dumps(_factory_gate_manifest_json(request), separators=(",", ":")),
+        target_label=f"organization “{gh_org}”",
+    )
+    return HttpResponse(html, content_type="text/html; charset=utf-8")
+
+
+def _finish_factory_gate_registration(
+    request: HttpRequest,
+    connection: SourceConnection,
+    *,
+    app_id: str,
+    client_id: str,
+    pem: bytes,
+    app_slug: str,
+    owner: dict[str, Any],
+    expected_org: str,
+    return_to: str,
+) -> HttpResponseRedirect:
+    """Keep what the factory gate App needs: its ids, its organization and its
+    key, encrypted. The exchange also returns an OAuth client secret; this App
+    has no user OAuth and no webhook, so no other secret is stored."""
+    owner_login = (owner.get("login") or "").strip()
+    if owner_login.lower() != expected_org.lower() or owner.get("type") not in (None, "Organization"):
+        connection.soft_delete()
+        factory_gate.audit(
+            factory_gate.REGISTER,
+            actor_user_id=request.user.pk,
+            organization_id=connection.organization_id,
+            app_id=app_id,
+            decision="DENY",
+            error_code="WRONG_OWNER",
+            error_message=f"the App was created on {owner_login or 'an unknown account'}, not {expected_org}",
+            extra={"owner_login": owner_login},
+        )
+        return _redirect_with_error(return_to, "factory_gate_owner_mismatch")
+
+    pem_encrypted = encrypt_at_rest(pem)
+    connection.oauth_client_id = app_id
+    connection.app_client_id = client_id[:64]
+    connection.account_login = owner_login[:200]
+    connection.display_name = f"{_APP_DISPLAY_PREFIX}{app_slug}"[:200]
+    connection.secret_backend_kind = pem_encrypted.backend_kind
+    connection.secret_ciphertext = pem_encrypted.backend_ref
+    connection.save()
+    factory_gate.audit(
+        factory_gate.REGISTER,
+        actor_user_id=request.user.pk,
+        organization_id=connection.organization_id,
+        app_id=app_id,
+        extra={"owner_login": owner_login, "app_slug": app_slug},
+    )
+    return _factory_gate_install_redirect(request, connection, slug=app_slug, return_to=return_to)
+
+
+# ---------------------------------------------------------------------------
 # Views
 # ---------------------------------------------------------------------------
 
@@ -561,6 +707,9 @@ def github_app_manifest_start(request: HttpRequest) -> Any:
     org_id = _active_org_id(request)
     if org_id is None:
         return _redirect_with_error(return_to, "no_org")
+
+    if request.GET.get("purpose") == factory_gate.PURPOSE:
+        return _start_factory_gate(request, org_id=org_id, gh_org=gh_org, return_to=return_to)
 
     # Dedup: before minting a brand-new App, look for a reusable one in
     # scope. Resolved here — ahead of the pending-row + manifest render —
@@ -728,9 +877,10 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
     if not code:
         return _redirect_with_error(return_to, "no_code")
 
+    purpose = pending.get("purpose") or ""
     connection = SourceConnection.objects.filter(
         guid=pending["connection_guid"],
-        kind="github_app_install",
+        kind=factory_gate.KIND if purpose == factory_gate.PURPOSE else "github_app_install",
         deleted_at__isnull=True,
     ).first()
     if connection is None:
@@ -764,6 +914,19 @@ def github_app_manifest_callback(request: HttpRequest) -> Any:
     if not app_id or not pem or not app_slug:
         connection.soft_delete()
         return _redirect_with_error(return_to, "exchange_no_credentials")
+
+    if purpose == factory_gate.PURPOSE:
+        return _finish_factory_gate_registration(
+            request,
+            connection,
+            app_id=app_id,
+            client_id=client_id,
+            pem=pem,
+            app_slug=app_slug,
+            owner=owner,
+            expected_org=pending.get("gh_org") or "",
+            return_to=return_to,
+        )
 
     pem_encrypted = encrypt_at_rest(pem)
     update_fields: dict[str, Any] = {
@@ -838,9 +1001,10 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
     if not state_in or not secrets.compare_digest(state_in, pending["state"]):
         return _redirect_with_error(return_to, "state_mismatch")
 
+    purpose = pending.get("purpose") or ""
     connection = SourceConnection.objects.filter(
         guid=pending["connection_guid"],
-        kind="github_app_install",
+        kind=factory_gate.KIND if purpose == factory_gate.PURPOSE else "github_app_install",
         deleted_at__isnull=True,
     ).first()
     if connection is None:
@@ -848,6 +1012,16 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
 
     if _active_org_id(request) != connection.organization_id:
         return _redirect_with_error(return_to, "org_mismatch")
+
+    if purpose == factory_gate.PURPOSE:
+        # ``update`` too: re-saving the installation on GitHub runs the
+        # confirmation again after a first one failed.
+        if setup_action not in ("install", "update") or not installation_id.isdigit():
+            return _redirect_with_error(return_to, "install_incomplete")
+        err = factory_gate.record_installation(connection, installation_id, actor_user_id=request.user.pk)
+        if err is not None:
+            return _redirect_with_error(return_to, err)
+        return _redirect_with_ok(return_to, connection.display_name or "GitHub App")
 
     if setup_action != "install" or not installation_id.isdigit():
         # Operator may have cancelled or requested-rather-than-installed.

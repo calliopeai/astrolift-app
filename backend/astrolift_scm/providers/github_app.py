@@ -116,20 +116,43 @@ def _mint_jwt(issuer: str, private_pem: bytes) -> str:
     return jwt.encode(payload, private_pem, algorithm="RS256")
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class InstallationToken:
+    token: str
+    expires_at: float
+    # What GitHub says the token may do; empty when the response names nothing.
+    permissions: dict[str, str]
+
+
 def _exchange_for_installation_token(
     api_base: str, jwt_token: str, installation_id: str
 ) -> tuple[str, float]:
+    minted = request_installation_token(api_base, jwt_token, installation_id)
+    return minted.token, minted.expires_at
+
+
+def request_installation_token(
+    api_base: str,
+    jwt_token: str,
+    installation_id: str,
+    *,
+    permissions: dict[str, str] | None = None,
+) -> InstallationToken:
+    """Mint an installation token. ``permissions`` narrows it to that subset of
+    the installation's grants (GitHub refuses one it was not granted); without
+    it the token carries everything the installation holds."""
     url = f"{api_base}/app/installations/{installation_id}/access_tokens"
-    req = urllib.request.Request(
-        url,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {jwt_token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "astrolift",
-        },
-    )
+    headers = {
+        "Authorization": f"Bearer {jwt_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "astrolift",
+    }
+    body = None
+    if permissions is not None:
+        body = json.dumps({"permissions": permissions}).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=body, method="POST", headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
@@ -152,6 +175,8 @@ def _exchange_for_installation_token(
     except urllib.error.URLError as exc:
         raise GithubAppError("NETWORK", f"Couldn't reach GitHub: {exc.reason}") from exc
 
+    if not isinstance(payload, dict):
+        raise GithubAppError("UNEXPECTED_SHAPE", "GitHub's installation token response is not an object")
     token = payload.get("token") or ""
     expires_at_iso = payload.get("expires_at") or ""
     if not token:
@@ -170,7 +195,12 @@ def _exchange_for_installation_token(
     except (ValueError, TypeError):
         expires_at = time.time() + 50 * 60  # conservative ~50min
 
-    return token, expires_at
+    granted = payload.get("permissions")
+    return InstallationToken(
+        token=token,
+        expires_at=expires_at,
+        permissions=dict(granted) if isinstance(granted, dict) else {},
+    )
 
 
 def installation_token(connection) -> str:
@@ -313,4 +343,19 @@ def fetch_app_metadata(api_base: str, jwt_token: str) -> tuple[dict, GithubAppEr
         return {}, err
     if not isinstance(data, dict):
         return {}, GithubAppError("UNEXPECTED_SHAPE", "GitHub /app didn't return an object")
+    return data, None
+
+
+def fetch_installation(
+    api_base: str, jwt_token: str, installation_id: str
+) -> tuple[dict, GithubAppError | None]:
+    """One installation of the App the JWT was signed for (GET /app/installations/<id>);
+    GitHub answers 404 for an installation of any other App."""
+    data, err = _github_app_api_get(api_base, f"/app/installations/{installation_id}", jwt_token)
+    if err is not None:
+        return {}, err
+    if not isinstance(data, dict):
+        return {}, GithubAppError(
+            "UNEXPECTED_SHAPE", "GitHub /app/installations/<id> didn't return an object"
+        )
     return data, None
