@@ -34,6 +34,9 @@ def emitted(monkeypatch):
     d = _deployment()
     fake_models = mock.MagicMock()
     fake_models.Deployment.all_objects.get.return_value = d
+    # The activity compares against Deployment.Status.FAILED, so the fake must
+    # carry the real enum or the terminal-state check never matches.
+    fake_models.Deployment.Status = lifecycle_models.Deployment.Status
     monkeypatch.setattr(lifecycle_models, "Deployment", fake_models.Deployment)
     monkeypatch.setattr(app_lifecycle, "_record_reachability", lambda *a, **k: None)
 
