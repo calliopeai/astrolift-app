@@ -220,7 +220,11 @@ def _ensure_records_sync(custom_domain_id: int) -> dict[str, Any]:
     ingress_name = f"ingress.{parent_zone}"
     try:
         dns_driver.ensure_record(
-            zone=parent_zone, name=ingress_name, type="ALIAS", value=ingress_host, ttl=300,
+            zone=parent_zone,
+            name=ingress_name,
+            type="ALIAS",
+            value=ingress_host,
+            ttl=300,
         )
         ensured.append(ingress_name)
     except Exception as exc:  # noqa: BLE001
@@ -249,9 +253,15 @@ def _ingress_controller_hostname(cluster: Any) -> str:
     read from the controller Service's status. An ALIAS record targets it."""
     from core.cluster_management import _driver_for_cluster
 
-    svc = _driver_for_cluster(cluster).get_manifest(
-        cluster.slug, "astrolift-system", "v1/Service", "astrolift-ingress-nginx-controller",
-    ) or {}
+    svc = (
+        _driver_for_cluster(cluster).get_manifest(
+            cluster.slug,
+            "astrolift-system",
+            "v1/Service",
+            "astrolift-ingress-nginx-controller",
+        )
+        or {}
+    )
     rows = ((svc.get("status") or {}).get("loadBalancer") or {}).get("ingress") or []
     host = next((str(row.get("hostname") or "") for row in rows if row.get("hostname")), "")
     if not host:

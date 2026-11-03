@@ -202,8 +202,25 @@ def test_a_hostname_under_another_orgs_zone_is_self_serve_like_an_unregistered_o
 @pytest.mark.parametrize("kind", ["single", "wildcard"])
 @pytest.mark.parametrize("which", ["own", "shared"])
 def test_a_hostname_under_the_orgs_own_or_a_shared_zone_is_platform_managed(
-    kind, which, org, app_on_cluster, zones, actor, fake_info, permission_resolver, no_temporal, dns
+    kind,
+    which,
+    org,
+    app_on_cluster,
+    zones,
+    actor,
+    fake_info,
+    permission_resolver,
+    no_temporal,
+    dns,
+    monkeypatch,
 ):
+    import astrolift_workflows.activities.custom_domain as custom_domain_activity
+
+    monkeypatch.setattr(
+        custom_domain_activity,
+        "_ingress_controller_hostname",
+        lambda cluster: "k8s-astrolif-astrolif-e24d703b6d-1c04953f90ba7b1e.elb.us-west-2.amazonaws.com",
+    )
     zone = getattr(zones, which).zone
     permission_resolver.grant(Permission.APP_UPDATE)
     with _as(org, actor):
@@ -216,7 +233,7 @@ def test_a_hostname_under_the_orgs_own_or_a_shared_zone_is_platform_managed(
 
     _ensure_records_sync(row.pk)
     written = [(c[1]["zone"], c[1]["type"]) for c in dns.calls if c[0] == "ensure_record"]
-    assert written == [(zone, "CNAME"), (zone, "TXT")]
+    assert written == [(zone, "ALIAS"), (zone, "CNAME"), (zone, "TXT")]
 
 
 # ---- ensure_platform_managed_records -------------------------------------
