@@ -21,6 +21,7 @@ from temporalio import activity
 
 from astrolift_lifecycle.run_history import observed_phase
 from astrolift_workflows.activity_heartbeat import heartbeat_while
+from astrolift_workflows.rollout_detail import container_detail
 
 log = logging.getLogger("astrolift_workflows.activities")
 
@@ -1881,9 +1882,31 @@ def _poll_rollout_sync(deployment_id: int, timeout_seconds: int) -> bool:
         if not result.success:
             raise AppDeployError(
                 f"rollout {kind}/{name} in {namespace} failed: {result.message}"
-                + (" (timed out)" if result.timed_out else ""),
+                + (" (timed out)" if result.timed_out else "")
+                + _workload_container_detail(d, namespace, name),
             )
     return True
+
+
+def _workload_container_detail(d, namespace: str, workload: str) -> str:
+    """Name the containers of ``workload`` that are not ready (#2607).
+
+    Best-effort: a pod list that cannot be read leaves the rollout error as it
+    was. The clause is appended to the deploy reason, so it reaches app show
+    and the deploy.failed event.
+    """
+    from core.cluster_observability import list_app_pods
+
+    try:
+        pods = list_app_pods(
+            cluster=d.app_environment.tenant_cluster,
+            namespace=namespace,
+            app_slug=str(d.registered_app.slug),
+        )
+    except Exception:  # noqa: BLE001 — the detail is extra; the failure itself still stands
+        log.warning("could not list pods for container detail on deploy %s", d.pk, exc_info=True)
+        return ""
+    return container_detail(pods, workload)
 
 
 @activity.defn(name="astrolift.deploy.poll_rollout")
@@ -1925,7 +1948,8 @@ def _health_check_sync(deployment_id: int) -> bool:
         if status.ready_replicas < status.desired_replicas:
             raise AppDeployError(
                 f"workload {kind}/{name} in {namespace} not healthy: "
-                f"ready={status.ready_replicas} desired={status.desired_replicas}",
+                f"ready={status.ready_replicas} desired={status.desired_replicas}"
+                + _workload_container_detail(d, namespace, name),
             )
     return True
 
