@@ -214,19 +214,49 @@ def _ensure_records_sync(custom_domain_id: int) -> dict[str, Any]:
 
     ensured: list[str] = []
     errors: list[str] = []
+    # The app's CNAME target is ``ingress.<zone>``, and an apex cannot be a CNAME.
+    # Both become ALIAS records to the ingress controller's load balancer.
+    ingress_host = _ingress_controller_hostname(cluster)
+    ingress_name = f"ingress.{parent_zone}"
+    try:
+        dns_driver.ensure_record(
+            zone=parent_zone, name=ingress_name, type="ALIAS", value=ingress_host, ttl=300,
+        )
+        ensured.append(ingress_name)
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"{ingress_name}: {exc}")
     for r in d.required_dns_records or []:
+        name = r.get("name", "").rstrip(".")
+        kind, value = r.get("kind", ""), r.get("value", "")
+        if kind == "CNAME" and name == parent_zone:
+            kind, value = "ALIAS", ingress_host
         try:
             dns_driver.ensure_record(
                 zone=parent_zone,
-                name=r.get("name", "").rstrip("."),
-                type=r.get("kind", ""),
-                value=r.get("value", ""),
+                name=name,
+                type=kind,
+                value=value,
                 ttl=int(r.get("ttl", 300)),
             )
             ensured.append(r.get("name", ""))
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{r.get('name', '')}: {exc}")
     return {"ensured": ensured, "errors": errors, "skipped": []}
+
+
+def _ingress_controller_hostname(cluster: Any) -> str:
+    """The DNS name of the load balancer in front of the cluster's ingress controller,
+    read from the controller Service's status. An ALIAS record targets it."""
+    from core.cluster_management import _driver_for_cluster
+
+    svc = _driver_for_cluster(cluster).get_manifest(
+        cluster.slug, "astrolift-system", "v1/Service", "astrolift-ingress-nginx-controller",
+    ) or {}
+    rows = ((svc.get("status") or {}).get("loadBalancer") or {}).get("ingress") or []
+    host = next((str(row.get("hostname") or "") for row in rows if row.get("hostname")), "")
+    if not host:
+        raise ValueError("the ingress controller has no provisioned load balancer hostname")
+    return host
 
 
 @activity.defn(name="astrolift.custom_domain.ensure_platform_records")
