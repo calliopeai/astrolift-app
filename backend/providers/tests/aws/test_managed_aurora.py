@@ -169,7 +169,8 @@ def test_serverless_provision_reconciles_cluster_and_writer():
     create = rds.cluster_creates[0]
     assert create["Engine"] == "aurora-postgresql"
     assert create["StorageEncrypted"] is True
-    assert create["PubliclyAccessible"] is False
+    assert "PubliclyAccessible" not in create
+    assert rds.instance_creates[0]["PubliclyAccessible"] is False
     assert create["ServerlessV2ScalingConfiguration"] == {"MinCapacity": 1.5, "MaxCapacity": 12.0}
     assert rds.instance_creates[0]["DBInstanceClass"] == "db.serverless"
     assert any(name.endswith("/master") for name in sm.values)
