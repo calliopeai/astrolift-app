@@ -30,6 +30,10 @@ log = logging.getLogger("astrolift_providers.aws.dns_route53")
 _VALIDATION_RECORDS_WAIT_SECONDS = 60.0
 #: The pauses between its reads of the certificate; the last one repeats.
 _VALIDATION_RECORDS_BACKOFF_SECONDS = (1.0, 2.0, 3.0, 5.0)
+#: Canonical hosted zone of the internet-facing network load balancer that fronts an
+#: install's ingress, per region. An alias to a load balancer must name it. Only
+#: regions checked against a live balancer are listed; any other fails closed.
+_NLB_ALIAS_ZONE_ID_BY_REGION = {"us-west-2": "Z18D5FSROUN65G"}
 
 
 def _validation_records(certificate: dict[str, Any]) -> tuple[list[dict[str, str]], bool]:
@@ -349,22 +353,29 @@ class Route53Driver(DnsDriver):
     ) -> Record:
         zone_id = self._resolve_zone(zone)
         fqdn = self._fqdn(name=name, zone=zone)
+        if type == "ALIAS":
+            # An apex cannot be a CNAME. ALIAS is an A record to a load balancer,
+            # which needs that balancer's canonical hosted zone for this region.
+            alias_zone_id = _NLB_ALIAS_ZONE_ID_BY_REGION.get(self._config.region)
+            if alias_zone_id is None:
+                raise ConflictError(f"no load balancer alias zone is known for region {self._config.region}")
+            record = {
+                "Name": fqdn,
+                "Type": "A",
+                "AliasTarget": {
+                    "HostedZoneId": alias_zone_id,
+                    "DNSName": value.rstrip(".") + ".",
+                    "EvaluateTargetHealth": False,
+                },
+            }
+        else:
+            record = {"Name": fqdn, "Type": type, "TTL": ttl, "ResourceRecords": [{"Value": value}]}
         try:
             self._r53.change_resource_record_sets(
                 HostedZoneId=zone_id,
                 ChangeBatch={
                     "Comment": "managed by astrolift",
-                    "Changes": [
-                        {
-                            "Action": "UPSERT",
-                            "ResourceRecordSet": {
-                                "Name": fqdn,
-                                "Type": type,
-                                "TTL": ttl,
-                                "ResourceRecords": [{"Value": value}],
-                            },
-                        }
-                    ],
+                    "Changes": [{"Action": "UPSERT", "ResourceRecordSet": record}],
                 },
             )
         except Exception as exc:

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from aws._errors import NotFoundError, ThrottledError, TransientError
+from aws._errors import ConflictError, NotFoundError, ThrottledError, TransientError
 from aws.dns_route53 import Route53Config, Route53Driver
 
 
@@ -543,3 +543,32 @@ def test_poll_cert_status_lists_what_a_pending_certificate_waits_on() -> None:
 
     assert pending == {"status": "pending", "cert_arn": None, "validation_records": [_record(_APEX)]}
     assert issued == {"status": "issued", "cert_arn": _ARN}
+
+
+def test_ensure_record_alias_writes_an_a_alias_to_the_ingress_load_balancer(route53_client) -> None:
+    """An apex cannot be a CNAME, so ALIAS writes an A alias to the load balancer."""
+    response = route53_client.create_hosted_zone(Name="apex.platform.example.", CallerReference="alias")
+    zone_id = response["HostedZone"]["Id"].rsplit("/", 1)[-1]
+    driver = Route53Driver(config=Route53Config(region="us-west-2"), client=route53_client)
+    driver.ensure_record(
+        zone="apex.platform.example",
+        name="apex.platform.example",
+        type="ALIAS",
+        value="k8s-astrolif-astrolif-e24d703b6d-1c04953f90ba7b1e.elb.us-west-2.amazonaws.com",
+    )
+    records = route53_client.list_resource_record_sets(HostedZoneId=zone_id)["ResourceRecordSets"]
+    alias = next(r for r in records if r["Type"] == "A" and "AliasTarget" in r)
+    assert alias["AliasTarget"]["HostedZoneId"] == "Z18D5FSROUN65G"
+    assert alias["AliasTarget"]["DNSName"].rstrip(".").endswith(".elb.us-west-2.amazonaws.com")
+
+
+def test_ensure_record_alias_fails_closed_in_an_unknown_region(route53_client) -> None:
+    route53_client.create_hosted_zone(Name="other.platform.example.", CallerReference="unknown-region")
+    driver = Route53Driver(config=Route53Config(region="eu-west-1"), client=route53_client)
+    with pytest.raises(ConflictError):
+        driver.ensure_record(
+            zone="other.platform.example",
+            name="other.platform.example",
+            type="ALIAS",
+            value="x.elb.eu-west-1.amazonaws.com",
+        )
