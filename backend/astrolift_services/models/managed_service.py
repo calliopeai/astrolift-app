@@ -165,6 +165,9 @@ class ManagedService(BaseCoreModel):
     provider_placement_identity = models.JSONField(null=True, blank=True, default=None, editable=False)
     status = models.CharField(max_length=32, choices=Status.choices, default=Status.PENDING)
     status_error = models.TextField(blank=True, default="")
+    # The provision step the last failed attempt stopped at (#2606). The next
+    # attempt resumes from it; a successful finalize clears it.
+    failed_step = models.CharField(max_length=32, blank=True, default="")
     operation_kind = models.CharField(max_length=32, blank=True, default="")
     operation_workflow_id = models.CharField(max_length=512, blank=True, default="")
     operation_run_id = models.CharField(max_length=128, blank=True, default="")

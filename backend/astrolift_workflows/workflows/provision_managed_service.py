@@ -37,6 +37,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 from astrolift_workflows.inputs import ProvisionManagedServiceInput, WorkflowResult
+from astrolift_workflows.managed_service_resume import FINALIZE, PROVISION, WAIT_READY, resume_step
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
@@ -46,6 +47,7 @@ with workflow.unsafe.imports_passed_through():
         mark_managed_service_failed,
         mark_managed_service_provisioning,
         provision_managed_service,
+        record_managed_service_failed_step,
     )
     from astrolift_workflows.activity_heartbeat import HEARTBEAT_TIMEOUT
 
@@ -107,42 +109,63 @@ def _reviewed_args(input, arguments):
     return arguments if input.reviewed_binding is None else [*arguments, input.reviewed_binding]
 
 
+async def _fail(input: ProvisionManagedServiceInput, step: str, message: str) -> WorkflowResult:
+    """Flip the row to FAILED with ``message`` and remember ``step``, so the
+    next attempt resumes there (#2606)."""
+    svc_id = input.managed_service_id
+    await workflow.execute_activity(
+        mark_managed_service_failed,
+        args=_reviewed_args(input, [svc_id, message]),
+        start_to_close_timeout=_QUICK_TIMEOUT,
+        retry_policy=_STATUS_RETRY,
+    )
+    await workflow.execute_activity(
+        record_managed_service_failed_step,
+        args=_reviewed_args(input, [svc_id, step]),
+        start_to_close_timeout=_QUICK_TIMEOUT,
+        retry_policy=_STATUS_RETRY,
+    )
+    return WorkflowResult(ok=False, message=message)
+
+
 @workflow.defn(name="ProvisionManagedServiceWorkflow")
 class ProvisionManagedServiceWorkflow:
     @workflow.run
     async def run(self, input: ProvisionManagedServiceInput) -> WorkflowResult:
         svc_id = input.managed_service_id
 
-        await workflow.execute_activity(
+        # The row's failed step and handle as they stood before this attempt
+        # (#2606). A resume skips the steps the last failed attempt got past.
+        begun = await workflow.execute_activity(
             mark_managed_service_provisioning,
             args=_reviewed_args(input, [svc_id]),
             start_to_close_timeout=_QUICK_TIMEOUT,
             retry_policy=_STATUS_RETRY,
         )
+        begun = begun if isinstance(begun, dict) else {}
+        start = resume_step(str(begun.get("failed_step") or ""), str(begun.get("backend_ref") or ""))
+        handle = str(begun.get("backend_ref") or "") if start != PROVISION else ""
+        ready = False
+        result: dict | None = None
 
-        try:
-            result = await workflow.execute_activity(
-                provision_managed_service,
-                args=_reviewed_args(input, [svc_id]),
-                start_to_close_timeout=_PROVISION_TIMEOUT,
-                heartbeat_timeout=HEARTBEAT_TIMEOUT,
-                retry_policy=_PROVISION_RETRY,
-            )
-        except Exception as exc:  # noqa: BLE001 — surface to operator
-            # #1916: str(exc) on the ActivityError Temporal raises here is
-            # the generic "Activity task failed" -- the driver's own reason
-            # lives on the innermost cause.
-            message = _truncate(f"provision_managed_service failed: {_redact(_cause(exc))}")
-            await workflow.execute_activity(
-                mark_managed_service_failed,
-                args=_reviewed_args(input, [svc_id, message]),
-                start_to_close_timeout=_QUICK_TIMEOUT,
-                retry_policy=_STATUS_RETRY,
-            )
-            return WorkflowResult(ok=False, message=message)
+        if start == PROVISION:
+            try:
+                result = await workflow.execute_activity(
+                    provision_managed_service,
+                    args=_reviewed_args(input, [svc_id]),
+                    start_to_close_timeout=_PROVISION_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                    retry_policy=_PROVISION_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001 — surface to operator
+                # #1916: str(exc) on the ActivityError Temporal raises here is
+                # the generic "Activity task failed" -- the driver's own reason
+                # lives on the innermost cause.
+                message = _truncate(f"provision_managed_service failed: {_redact(_cause(exc))}")
+                return await _fail(input, PROVISION, message)
 
-        handle = result.get("handle", "") if isinstance(result, dict) else ""
-        ready = bool(result.get("ready")) if isinstance(result, dict) else False
+            handle = result.get("handle", "") if isinstance(result, dict) else ""
+            ready = bool(result.get("ready")) if isinstance(result, dict) else False
 
         # Wait until the backing resource is actually ready before finalize
         # materializes the connection bindings — RDS/ElastiCache report
@@ -157,7 +180,7 @@ class ProvisionManagedServiceWorkflow:
         # them false-failed with "backend not ready: state=deprovisioned"
         # because the driver's record is per-instance and absent in the
         # fresh check-activity driver (#1038).
-        if handle and not ready:
+        if start != FINALIZE and handle and not ready:
             for _ in range(60):
                 state = await workflow.execute_activity(
                     check_managed_service_ready,
@@ -169,31 +192,23 @@ class ProvisionManagedServiceWorkflow:
                 if state == "available":
                     break
                 if state in ("error", "deprovisioned"):
-                    msg = f"managed service backend not ready: state={state}"
-                    await workflow.execute_activity(
-                        mark_managed_service_failed,
-                        args=_reviewed_args(input, [svc_id, msg]),
-                        start_to_close_timeout=_QUICK_TIMEOUT,
-                        retry_policy=_STATUS_RETRY,
-                    )
-                    return WorkflowResult(ok=False, message=msg)
+                    return await _fail(input, WAIT_READY, f"managed service backend not ready: state={state}")
                 await workflow.sleep(timedelta(seconds=20))
             else:
-                msg = "managed service backend timed out waiting for available state"
-                await workflow.execute_activity(
-                    mark_managed_service_failed,
-                    args=_reviewed_args(input, [svc_id, msg]),
-                    start_to_close_timeout=_QUICK_TIMEOUT,
-                    retry_policy=_STATUS_RETRY,
+                return await _fail(
+                    input, WAIT_READY, "managed service backend timed out waiting for available state"
                 )
-                return WorkflowResult(ok=False, message=msg)
 
-        rebound = await workflow.execute_activity(
-            finalize_managed_service_provision,
-            args=_reviewed_args(input, [svc_id, handle]),
-            start_to_close_timeout=_QUICK_TIMEOUT,
-            retry_policy=_STATUS_RETRY,
-        )
+        try:
+            rebound = await workflow.execute_activity(
+                finalize_managed_service_provision,
+                args=_reviewed_args(input, [svc_id, handle]),
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_STATUS_RETRY,
+            )
+        except Exception as exc:  # noqa: BLE001 — the handle is not persisted; the next attempt resumes here
+            message = _truncate(f"finalize_managed_service_provision failed: {_redact(_cause(exc))}")
+            return await _fail(input, FINALIZE, message)
 
         # Spec §4.7 step 5: workloads already running in the environments this
         # service is bound to mount the connection envelope as a Secret and

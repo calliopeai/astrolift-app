@@ -151,6 +151,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     mark_managed_service_failed,
     mark_managed_service_provisioning,
     provision_managed_service,
+    record_managed_service_failed_step,
     update_managed_service,
 )
 from astrolift_workflows.activities.migration import (
@@ -361,6 +362,7 @@ __all__ = [
     "mark_managed_service_deprovisioning",
     "mark_managed_service_failed",
     "mark_managed_service_provisioning",
+    "record_managed_service_failed_step",
     "mark_managing",
     "mark_pipeline_run_failed",
     "mark_pipeline_run_running",

@@ -11,6 +11,7 @@ from astrolift_workflows.activities import (
     mark_managed_service_failed,
     mark_managed_service_provisioning,
     provision_managed_service,
+    record_managed_service_failed_step,
     update_managed_service,
 )
 from astrolift_workflows.inputs import (
@@ -71,16 +72,20 @@ def test_update_timeout_marks_failed_instead_of_finalizing(monkeypatch) -> None:
 
 def test_provision_timeout_marks_failed_instead_of_finalizing(monkeypatch) -> None:
     failed_messages: list[str] = []
+    failed_steps: list[str] = []
 
     async def execute(activity_fn, *args, **kwargs):
         if activity_fn is mark_managed_service_provisioning:
-            return None
+            return {"failed_step": "", "backend_ref": ""}
         if activity_fn is provision_managed_service:
             return {"handle": "postgres/example", "ready": False}
         if activity_fn is check_managed_service_ready:
             return "provisioning"
         if activity_fn is mark_managed_service_failed:
             failed_messages.append(kwargs["args"][1])
+            return None
+        if activity_fn is record_managed_service_failed_step:
+            failed_steps.append(kwargs["args"][1])
             return None
         if activity_fn is finalize_managed_service_provision:
             raise AssertionError("timed-out provision must not finalize")
@@ -100,3 +105,4 @@ def test_provision_timeout_marks_failed_instead_of_finalizing(monkeypatch) -> No
     assert result.ok is False
     assert "timed out" in result.message
     assert failed_messages == [result.message]
+    assert failed_steps == ["wait_ready"]
