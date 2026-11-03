@@ -182,6 +182,11 @@ type AppdomainremovedpayloadMutationResult {
   data: Appdomainremovedpayload
 }
 
+input ApplyManagedServiceMatchInput {
+  appSlug: String!
+  expectedDigest: String!
+}
+
 input ApplyStagedManifestInput {
   id: GUID!
   expectedStagedHash: String = null
@@ -9801,6 +9806,40 @@ enum ManagedDomainRoutingPolicy {
   UNKNOWN
 }
 
+type ManagedServiceMatchAppliedPayload {
+  appSlug: String!
+  digest: String!
+  changes: [ManagedServiceMatchChange!]!
+}
+
+type ManagedServiceMatchAppliedPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ManagedServiceMatchAppliedPayload
+}
+
+type ManagedServiceMatchChange {
+  action: String!
+  ownerScope: String!
+  environment: String!
+  kind: String!
+  name: String!
+  reason: String!
+}
+
+type ManagedServiceMatchPlanPayload {
+  appSlug: String!
+  digest: String!
+  blocked: Boolean!
+  changes: [ManagedServiceMatchChange!]!
+}
+
+type ManagedServiceMatchPlanPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ManagedServiceMatchPlanPayload
+}
+
 type Managedresourceadoptionpayload {
   id: GUID!
   managedServiceId: GUID!
@@ -9879,6 +9918,10 @@ type MarkallreadpayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Markallreadpayload
+}
+
+input MatchManagedServicesInput {
+  appSlug: String!
 }
 
 input MigrateAppInputGql {
@@ -10834,6 +10877,8 @@ type Mutation {
   provisionManagedService(input: ProvisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
   updateManagedService(input: UpdateManagedServiceInput!): AstroliftManagedServiceMutationResult!
   reprovisionManagedService(input: ReprovisionManagedServiceInput!): AstroliftManagedServiceMutationResult!
+  previewManagedServiceMatch(input: MatchManagedServicesInput!): ManagedServiceMatchPlanPayloadMutationResult!
+  applyManagedServiceMatch(input: ApplyManagedServiceMatchInput!): ManagedServiceMatchAppliedPayloadMutationResult!
   deprovisionManagedService(input: DeprovisionManagedServiceInput!): ManagedservicedeletedpayloadMutationResult!
   adoptManagedResource(input: AdoptManagedResourceInput!): ManagedresourceadoptionpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
