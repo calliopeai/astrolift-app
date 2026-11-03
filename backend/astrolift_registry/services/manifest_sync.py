@@ -523,6 +523,14 @@ def _fetch_repo_manifest_text(
         return None, str(exc) or exc.__class__.__name__
 
     if repo_text is None:
+        if not anonymous and str(getattr(connection, "kind", "")).startswith("github"):
+            from astrolift_scm.providers.github import repo_visible
+
+            if not repo_visible(connection, app.source_repo):
+                return None, (
+                    f"REPO_NOT_ACCESSIBLE: GitHub can't show {app.source_repo!r} to this connection. "
+                    "Check that the GitHub App installation includes the repository."
+                )
         return None, (
             _NO_CONNECTION_PUBLIC_READ.format(
                 repo=app.source_repo, reason=f"{manifest_path!r} not found on {deploy_branch!r}"

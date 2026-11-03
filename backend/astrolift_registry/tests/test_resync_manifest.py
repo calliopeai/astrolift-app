@@ -316,9 +316,13 @@ def test_fetch_failed_no_source_connection_short_circuits():
     assert "source connection" in (result.error or "").lower()
 
 
-def test_fetch_returning_none_is_file_not_found():
+def test_fetch_returning_none_is_file_not_found(monkeypatch):
     """fetch_file returning None means the file isn't on the
     branch. We treat this as fetch_failed with a useful message."""
+    import astrolift_scm.providers.github as github
+
+    # Repo is visible; only the file is missing.
+    monkeypatch.setattr(github, "repo_visible", lambda connection, repo: True)
     _org, app = _scaffold(manifest_raw=_BASE_TOML)
     result = resync_app_manifest_from_repo(app, fetch=_stub_fetch(None))
 
