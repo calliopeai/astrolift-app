@@ -533,6 +533,37 @@ def test_a_failed_provision_is_retried(monkeypatch, django_capture_on_commit_cal
     assert _provision_names(started) == ["ProvisionManagedServiceWorkflow"]
 
 
+def test_a_failed_service_with_a_backend_is_retried_as_an_update(
+    monkeypatch, django_capture_on_commit_callbacks
+):
+    """An update that failed after the resource existed leaves backend_ref
+    set. The manifest is unchanged, so only the retry can recover it; it must
+    re-run the update against the existing backend, not stay FAILED (#2593)."""
+
+    from astrolift_services.models import ManagedService
+
+    _catalog(monkeypatch)
+    started = []
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow",
+        lambda name, *, args, workflow_id: started.append((name, args[0], workflow_id)),
+    )
+    app = _scaffold()
+    _add_environment(app)
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    ManagedService.objects.filter(registered_app=app).update(
+        backend_ref="postgres/records", status=ManagedService.Status.FAILED
+    )
+    started.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        persist_manifest(app, _normalize(_PG_MANIFEST), raw_text=_PG_MANIFEST)
+
+    assert [name for name, _i, _w in started] == ["UpdateManagedServiceWorkflow"]
+    assert _provision_names(started) == []
+
+
 # ---------------------------------------------------------------------
 # Deferred declarations and project scope without a project (#1759)
 # ---------------------------------------------------------------------
