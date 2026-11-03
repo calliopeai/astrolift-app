@@ -373,6 +373,39 @@ def fetch_github_repo_numeric_ids(connection, *, repo_full_name: str) -> tuple[i
     return owner_id, repo_id
 
 
+def repo_visible(connection, repo_full_name: str) -> bool:
+    """True unless GitHub answers 404 for the repo itself (``GET /repos/{repo}``)
+    with this connection's credential. Used only to explain a missing manifest:
+    a 404 for a file in an invisible repo means the credential lacks access, not
+    that the file is absent. Any other failure counts as visible, so a flaky
+    probe never blames the operator's access. Never used on write paths, which
+    may pick a different installation per repo owner.
+    """
+    try:
+        token = _token(connection)
+    except GithubProviderError:
+        return True
+    base = _api_base(connection)
+    safe_repo = "/".join(urllib.parse.quote(p, safe="") for p in repo_full_name.split("/", 1))
+    api_base = base
+    req = urllib.request.Request(
+        f"{api_base}/repos/{safe_repo}",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "astrolift",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10):
+            return True
+    except urllib.error.HTTPError as exc:
+        return exc.code != 404
+    except urllib.error.URLError:
+        return True
+
+
 def fetch_github_file(
     connection,
     *,
