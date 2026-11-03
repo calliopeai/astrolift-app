@@ -203,6 +203,40 @@ def request_installation_token(
     )
 
 
+def _discover_installation_id(connection, issuer: str) -> str:
+    """Find the App installation for ``connection.account_login`` via
+    ``GET /app/installations`` (signed with the App's key) and persist it
+    on the row. Returns "" when GitHub has no installation for that account
+    or the lookup fails, so the caller reports the original config error."""
+    account = (connection.account_login or "").strip().lower()
+    if not account:
+        return ""
+    try:
+        private_pem = _decrypt_pem(connection)
+        jwt_token = _mint_jwt(issuer, private_pem)
+        installs, err = list_app_installations(_api_base(connection), jwt_token)
+    except Exception:  # noqa: BLE001 — discovery is best-effort; the caller reports the config gap
+        logger.warning("installation discovery failed for connection %s", connection.guid, exc_info=True)
+        return ""
+    if err is not None:
+        logger.warning("installation discovery failed for connection %s: %s", connection.guid, err.code)
+        return ""
+    for item in installs:
+        login = str(((item.get("account") or {}).get("login")) or "").lower()
+        if login == account and item.get("id") is not None:
+            installation_id = str(item["id"])
+            connection.installation_id = installation_id[:64]
+            connection.save(update_fields=["installation_id", "updated_at", "version"])
+            logger.info(
+                "attached installation %s to connection %s (%s)",
+                installation_id,
+                connection.guid,
+                account,
+            )
+            return installation_id
+    return ""
+
+
 def installation_token(connection) -> str:
     """Return a fresh-ish installation access token for the given
     github_app_install connection.
@@ -231,6 +265,11 @@ def installation_token(connection) -> str:
             )
             issuer = legacy_app_id
     installation_id = connection.installation_id or ""
+    if issuer and not installation_id:
+        # The App is installed on this account but the row never got the
+        # installation id (e.g. a second org added after the first). Ask
+        # GitHub which installation covers the account and store it.
+        installation_id = _discover_installation_id(connection, issuer)
     if not issuer or not installation_id:
         raise GithubAppError(
             "INCOMPLETE_CONFIG",
