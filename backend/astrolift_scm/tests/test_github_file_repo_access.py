@@ -64,6 +64,8 @@ def test_file_404_still_reads_as_missing(monkeypatch, stub_connection):
 
     monkeypatch.setattr(github.urllib.request, "urlopen", _open)
     assert (
-        github.fetch_github_file(object(), repo_full_name="ConflictHQ/leo-brain", path="astrolift.toml", ref="main")
+        github.fetch_github_file(
+            object(), repo_full_name="ConflictHQ/leo-brain", path="astrolift.toml", ref="main"
+        )
         is None
     )
