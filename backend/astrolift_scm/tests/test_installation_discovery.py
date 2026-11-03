@@ -5,7 +5,6 @@ keeps the original INCOMPLETE_CONFIG error."""
 from __future__ import annotations
 
 import uuid
-from types import SimpleNamespace
 
 import pytest
 
