@@ -5,7 +5,6 @@ keeps the original INCOMPLETE_CONFIG error."""
 from __future__ import annotations
 
 import uuid
-from types import SimpleNamespace
 
 import pytest
 
@@ -49,7 +48,12 @@ def stub(monkeypatch):
 
 
 def test_discovers_and_stores_installation_for_account(stub):
-    stub([{"id": 158055468, "account": {"login": "ConflictHQ"}}, {"id": 167938702, "account": {"login": "calliopeai"}}])
+    stub(
+        [
+            {"id": 158055468, "account": {"login": "ConflictHQ"}},
+            {"id": 167938702, "account": {"login": "calliopeai"}},
+        ]
+    )
     conn = _Conn(account_login="ConflictHQ")
 
     token = installation_token(conn)

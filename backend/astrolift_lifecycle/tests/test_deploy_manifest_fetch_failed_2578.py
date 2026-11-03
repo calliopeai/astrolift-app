@@ -64,8 +64,16 @@ kind = "deployment"
 
 @pytest.fixture
 def unreadable_repo(monkeypatch):
-    """The source host answers 404 for the manifest, as it did in the issue."""
+    """The source host answers 404 for the manifest, as it did in the issue.
+
+    The repo itself is visible, so the probe that explains an invisible repo
+    (#2600) is stubbed to say so. Without the stub it decrypts the test's PAT,
+    which was never given a credential, and the deploy fails with InvalidToken.
+    """
     monkeypatch.setattr(manifest_sync, "_default_fetch", lambda connection, repo, path, ref: None)
+    from astrolift_scm.providers import github
+
+    monkeypatch.setattr(github, "repo_visible", lambda connection, repo_full_name: True)
 
 
 def _source(app) -> None:
