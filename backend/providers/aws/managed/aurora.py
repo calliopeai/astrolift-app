@@ -148,7 +148,6 @@ class AuroraDriver(ManagedServiceDriver):
                 "MasterUserPassword": password,
                 "DBSubnetGroupName": self._config.db_subnet_group,
                 "VpcSecurityGroupIds": list(self._config.security_group_ids),
-                "PubliclyAccessible": False,
                 "Port": _ENGINE_PORT[self._config.engine],
                 "BackupRetentionPeriod": int(
                     cfg.get("backup_retention_days", self._config.backup_retention_days),
