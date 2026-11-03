@@ -2080,6 +2080,27 @@ def _mark_failed_sync(deployment_id: int, reason: str) -> None:
     except Exception:  # noqa: BLE001
         log.warning("github reflect_deploy_failed errored for deploy %s", deployment_id, exc_info=True)
 
+    # Every deploy.started has a matching outcome in the app's events feed.
+    # Without this a failed deploy left the feed on "started" with no reason
+    # (#2596). Best-effort: an events write must never fail the transition.
+    try:
+        from core.events import Event
+
+        Event.emit(
+            "deploy.failed",
+            payload={
+                "deployment_guid": str(d.guid),
+                "reason": (d.aborted_reason or "")[:500],
+                "severity": "error",
+            },
+            resource_kind="deployment",
+            resource_id=str(d.guid),
+            organization_id=d.registered_app.organization_id,
+            registered_app_id=d.registered_app_id,
+        )
+    except Exception:  # noqa: BLE001
+        log.warning("could not emit deploy.failed event for deploy %s", deployment_id, exc_info=True)
+
     _record_reachability([d.app_environment], read_cluster=True)
 
 
