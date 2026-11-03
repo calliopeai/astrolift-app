@@ -408,6 +408,11 @@ def _needs_provision_retry(row) -> bool:
 
     from astrolift_services.models import ManagedService
 
+    if row.status == ManagedService.Status.FAILED:
+        # A failed row is retried whether or not it has a backend: an update
+        # that failed after the resource existed leaves backend_ref set, and
+        # it must not be stranded just because the resource was created once (#2593).
+        return True
     if row.backend_ref:
         return False
     return row.status not in (
@@ -546,7 +551,9 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
             elif _needs_provision_retry(row):
                 # Unchanged, but never provisioned -- the enqueue that
                 # should have happened at create time never landed (#1688).
-                _enqueue_provision(row)
+                # A failed row with a backend is retried as an update, the
+                # same routing as a changed manifest block (#2593).
+                _enqueue_update(row) if row.backend_ref else _enqueue_provision(row)
             continue
 
         project_key = (service.kind, name)
@@ -588,7 +595,7 @@ def reconcile_managed_services(app, services: tuple[ManagedServiceManifest, ...]
                     )
                 if _needs_provision_retry(row):
                     # Same lost-enqueue gap as the app-scoped branch (#1688).
-                    _enqueue_provision(row)
+                    _enqueue_update(row) if row.backend_ref else _enqueue_provision(row)
             project_rows[project_key] = row
 
         attachment = ManagedServiceAttachment.objects.filter(

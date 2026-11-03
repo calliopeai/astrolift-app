@@ -187,6 +187,31 @@ def _reject_conflicting_container_build_fields(workloads: tuple[WorkloadManifest
         )
 
 
+def _reject_bad_container_sets(workloads: tuple[WorkloadManifest, ...]) -> None:
+    """Container names are unique within a workload, and at most one is primary (#2596).
+
+    Kubernetes refuses a pod whose containers share a name, but only at the
+    server-side dry-run inside apply, where the deploy just fails with no
+    pointer to the manifest. Two primaries would make the Service and the
+    agent/worker target a container chosen by list order. Both are refused
+    here so the operator sees them at manifest sync time.
+    """
+    for w in workloads:
+        names = [c.name for c in w.containers]
+        repeated = sorted({n for n in names if names.count(n) > 1})
+        if repeated:
+            raise ManifestError(
+                f"workload {w.name!r} declares container name(s) more than once: {', '.join(repeated)}",
+                path="workloads",
+            )
+        primaries = [c.name for c in w.containers if c.is_primary]
+        if len(primaries) > 1:
+            raise ManifestError(
+                f"workload {w.name!r} marks more than one container primary: {', '.join(primaries)}",
+                path="workloads",
+            )
+
+
 def parse_raw(toml_text: str) -> RawManifest:
     try:
         data: dict[str, Any] = tomllib.loads(toml_text)
@@ -294,6 +319,7 @@ def parse_raw(toml_text: str) -> RawManifest:
             pass
 
     _reject_conflicting_container_build_fields(workloads)
+    _reject_bad_container_sets(workloads)
 
     return RawManifest(
         name=name,
