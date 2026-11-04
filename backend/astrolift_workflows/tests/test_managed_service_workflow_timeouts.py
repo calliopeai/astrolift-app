@@ -6,6 +6,7 @@ from temporalio import workflow as temporalio_workflow
 
 from astrolift_workflows.activities import (
     check_managed_service_ready,
+    emit_managed_service_provision_failed_event,
     finalize_managed_service_provision,
     finalize_managed_service_update,
     mark_managed_service_failed,
@@ -73,6 +74,7 @@ def test_update_timeout_marks_failed_instead_of_finalizing(monkeypatch) -> None:
 def test_provision_timeout_marks_failed_instead_of_finalizing(monkeypatch) -> None:
     failed_messages: list[str] = []
     failed_steps: list[str] = []
+    events: list[list] = []
 
     async def execute(activity_fn, *args, **kwargs):
         if activity_fn is mark_managed_service_provisioning:
@@ -87,12 +89,16 @@ def test_provision_timeout_marks_failed_instead_of_finalizing(monkeypatch) -> No
         if activity_fn is record_managed_service_failed_step:
             failed_steps.append(kwargs["args"][1])
             return None
+        if activity_fn is emit_managed_service_provision_failed_event:
+            events.append(kwargs["args"])
+            return None
         if activity_fn is finalize_managed_service_provision:
             raise AssertionError("timed-out provision must not finalize")
         raise AssertionError(f"unexpected activity {activity_fn}")
 
     monkeypatch.setattr(temporalio_workflow, "execute_activity", execute)
     monkeypatch.setattr(temporalio_workflow, "sleep", _no_sleep)
+    monkeypatch.setattr(temporalio_workflow, "patched", lambda patch_id: True)
     result = _run(
         ProvisionManagedServiceWorkflow().run(
             ProvisionManagedServiceInput(
@@ -106,3 +112,4 @@ def test_provision_timeout_marks_failed_instead_of_finalizing(monkeypatch) -> No
     assert "timed out" in result.message
     assert failed_messages == [result.message]
     assert failed_steps == ["wait_ready"]
+    assert events == [[1, "wait_ready", result.message]]

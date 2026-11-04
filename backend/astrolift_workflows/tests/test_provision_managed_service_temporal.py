@@ -41,6 +41,7 @@ from astrolift_services.models import ManagedService, ManagedServiceBinding
 from astrolift_workflows.activities import (
     bounce_workloads_bound_to_managed_service,
     check_managed_service_ready,
+    emit_managed_service_provision_failed_event,
     finalize_managed_service_provision,
     mark_managed_service_failed,
     mark_managed_service_provisioning,
@@ -171,6 +172,7 @@ async def test_provision_workflow_calls_driver_and_populates_binding_rows(tempor
                 finalize_managed_service_provision,
                 mark_managed_service_failed,
                 record_managed_service_failed_step,
+                emit_managed_service_provision_failed_event,
                 bounce_workloads_bound_to_managed_service,
             ],
         ):
@@ -234,6 +236,7 @@ async def test_provision_workflow_marks_failed_without_ever_calling_the_driver_w
                 finalize_managed_service_provision,
                 mark_managed_service_failed,
                 record_managed_service_failed_step,
+                emit_managed_service_provision_failed_event,
                 bounce_workloads_bound_to_managed_service,
             ],
         ):
@@ -297,6 +300,7 @@ async def test_provision_workflow_redacts_a_credential_in_the_drivers_message(te
                 finalize_managed_service_provision,
                 mark_managed_service_failed,
                 record_managed_service_failed_step,
+                emit_managed_service_provision_failed_event,
                 bounce_workloads_bound_to_managed_service,
             ],
         ):
