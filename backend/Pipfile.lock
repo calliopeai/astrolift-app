@@ -1379,11 +1379,11 @@
         },
         "joserfc": {
             "hashes": [
-                "sha256:22fb31a69094a5e6f44632002a9df2c30c941fc6c8ce1b037e92c03de954cf9f",
-                "sha256:878620c553a6ebdd76ccdc356782fee3f735f21a356d079a546b42a4670ace5f"
+                "sha256:e2d72e3fa937ed8ddd42ad8c1cc337a43e7ffd02efa572a2aa15e2764a05b506",
+                "sha256:fb1cf6d2977318bef976c2ed2ef2167cc5f8ade8fc96f034e38f7abd656907c4"
             ],
-            "markers": "python_version >= '3.9'",
-            "version": "==1.6.8"
+            "markers": "python_version >= '3.10'",
+            "version": "==1.7.6"
         },
         "jsonschema": {
             "hashes": [
@@ -4062,11 +4062,11 @@
         },
         "virtualenv": {
             "hashes": [
-                "sha256:4d1bee354cd81c820da3bee56e38be3426490f8d1fc54e10ea5b2072ebad8ef8",
-                "sha256:ac51744da66ae56ff814b087d65096c94de698ec520adc624b108b679655809b"
+                "sha256:5fbb04138a4861580b78ba9110d529a26bc48fcc93c8ec36bc0202eeed96a788",
+                "sha256:de5307ba4b9a0001d9c8ea02832d38f63ca432880f416c1bface61c4323fd905"
             ],
             "markers": "python_version >= '3.9'",
-            "version": "==21.14.9"
+            "version": "==21.14.13"
         },
         "werkzeug": {
             "hashes": [
