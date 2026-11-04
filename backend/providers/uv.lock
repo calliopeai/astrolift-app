@@ -173,7 +173,7 @@ requires-dist = [
     { name = "azure-mgmt-network", marker = "extra == 'azure'", specifier = ">=31.0.1" },
     { name = "azure-mgmt-postgresqlflexibleservers", marker = "extra == 'azure'", specifier = ">=2.0" },
     { name = "azure-mgmt-redis", marker = "extra == 'azure'", specifier = ">=14.4" },
-    { name = "azure-mgmt-redisenterprise", marker = "extra == 'azure'", specifier = ">=3.1" },
+    { name = "azure-mgmt-redisenterprise", marker = "extra == 'azure'", specifier = ">=3.1,<4" },
     { name = "azure-mgmt-resource-locks", marker = "extra == 'azure'", specifier = ">=1.0.0b1" },
     { name = "azure-mgmt-search", marker = "extra == 'azure'", specifier = ">=9.1" },
     { name = "azure-mgmt-servicebus", marker = "extra == 'azure'", specifier = ">=10.0" },
