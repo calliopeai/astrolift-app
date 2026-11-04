@@ -938,20 +938,56 @@ async def finalize_managed_service_deletion(
 # forever — provisioning never ran.
 
 
+def _begin_provision_sync(managed_service_id: int, status: str) -> dict[str, str]:
+    """Flip the row to ``status`` and report where the last failed attempt
+    stopped. ``failed_step`` is kept: only a successful finalize clears it."""
+    from astrolift_services.models import ManagedService
+
+    svc = ManagedService.all_objects.get(pk=managed_service_id)
+    resume = {"failed_step": svc.failed_step or "", "backend_ref": svc.backend_ref or ""}
+    svc.status = status
+    svc.save(update_fields=["status", "updated_at", "version"])
+    return resume
+
+
 @activity.defn(name="astrolift.managed_service.mark_provisioning")
 async def mark_managed_service_provisioning(
     managed_service_id: int,
     reviewed_binding: ReviewedManagedServiceBinding | None = None,
-) -> None:
+) -> dict[str, str] | None:
+    """Start an attempt. Returns ``{"failed_step", "backend_ref"}`` as they
+    stood before this attempt, so the workflow can resume (#2606)."""
     from asgiref.sync import sync_to_async
 
     from astrolift_services.models import ManagedService
 
-    await sync_to_async(reviewed_service_call)(
-        _mark_status_sync,
+    return await sync_to_async(reviewed_service_call)(
+        _begin_provision_sync,
         managed_service_id,
         reviewed_binding,
         ManagedService.Status.PROVISIONING,
+    )
+
+
+def _record_failed_step_sync(managed_service_id: int, failed_step: str) -> None:
+    from astrolift_services.models import ManagedService
+
+    svc = ManagedService.all_objects.get(pk=managed_service_id)
+    svc.failed_step = failed_step
+    svc.save(update_fields=["failed_step", "updated_at", "version"])
+
+
+@activity.defn(name="astrolift.managed_service.record_failed_step")
+async def record_managed_service_failed_step(
+    managed_service_id: int,
+    failed_step: str,
+    reviewed_binding: ReviewedManagedServiceBinding | None = None,
+) -> None:
+    """Remember which provision step failed, so the next attempt resumes there (#2606)."""
+    from asgiref.sync import sync_to_async
+
+    await sync_to_async(reviewed_service_call)(
+        _record_failed_step_sync, managed_service_id, reviewed_binding, failed_step
     )
 
 
@@ -1266,6 +1302,7 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> list[int]:
     svc.connection_secret_ref = _connection_secret_path(svc)
     svc.status = ManagedService.Status.ACTIVE
     svc.status_error = ""
+    svc.failed_step = ""
     svc.save(
         update_fields=[
             "backend_ref",
@@ -1273,6 +1310,7 @@ def _finalize_provision_sync(managed_service_id: int, handle: str) -> list[int]:
             "connection_secret_ref",
             "status",
             "status_error",
+            "failed_step",
             "updated_at",
             "version",
         ],
@@ -1296,6 +1334,7 @@ def _finalize_update_sync(managed_service_id: int, handle: str) -> list[int]:
     svc.applied_config = dict(svc.config or {})
     svc.status = ManagedService.Status.ACTIVE
     svc.status_error = ""
+    svc.failed_step = ""
     svc.operation_completed_at = timezone.now()
     svc.save(
         update_fields=[
@@ -1303,6 +1342,7 @@ def _finalize_update_sync(managed_service_id: int, handle: str) -> list[int]:
             "applied_config",
             "status",
             "status_error",
+            "failed_step",
             "operation_completed_at",
             "updated_at",
             "version",

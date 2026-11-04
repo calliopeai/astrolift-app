@@ -607,3 +607,55 @@ class _ManagedResourceAdoptionPayload:
     actor_display: str
     status: str
     adopted_at: dt.datetime
+
+
+@strawberry.input
+class MatchManagedServicesInput:
+    """Preview what an app's stored manifest would change on the platform (#2606).
+
+    Read-only: nothing is created, reconfigured, bound or removed."""
+
+    app_slug: str
+
+
+@strawberry.input
+class ApplyManagedServiceMatchInput:
+    """Apply the plan a preview returned (#2606).
+
+    ``expected_digest`` is the ``digest`` from that preview. The apply
+    refuses with CONFLICT when the plan has moved since, so an operator
+    applies exactly the changes they reviewed."""
+
+    app_slug: str
+    expected_digest: str
+
+
+@strawberry.type
+class ManagedServiceMatchChange:
+    action: str
+    """create | reconfigure | bind | retry | remove | detach | blocked"""
+    owner_scope: str
+    """app | project"""
+    environment: str
+    kind: str
+    name: str
+    reason: str = ""
+    """Why an entry is blocked; empty otherwise."""
+
+
+@strawberry.type
+class ManagedServiceMatchPlanPayload:
+    app_slug: str
+    digest: str
+    """Pass back as ``expectedDigest`` to apply this exact plan."""
+    blocked: bool
+    """True when any change is blocked; such a plan cannot be applied."""
+    changes: list[ManagedServiceMatchChange]
+
+
+@strawberry.type
+class ManagedServiceMatchAppliedPayload:
+    app_slug: str
+    digest: str
+    changes: list[ManagedServiceMatchChange]
+    """The planned changes the apply performed, in plan order."""

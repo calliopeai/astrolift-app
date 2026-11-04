@@ -206,6 +206,11 @@ export type AppdomainremovedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ApplyManagedServiceMatchInput = {
+  appSlug: Scalars['String']['input'];
+  expectedDigest: Scalars['String']['input'];
+};
+
 export type ApplyStagedManifestInput = {
   expectedStagedHash: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
@@ -9146,6 +9151,40 @@ export type ManagedDomainRoutingPolicy =
   | 'UNKNOWN'
   | 'WEIGHTED';
 
+export type ManagedServiceMatchAppliedPayload = {
+  appSlug: Scalars['String']['output'];
+  changes: Array<ManagedServiceMatchChange>;
+  digest: Scalars['String']['output'];
+};
+
+export type ManagedServiceMatchAppliedPayloadMutationResult = {
+  data?: Maybe<ManagedServiceMatchAppliedPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ManagedServiceMatchChange = {
+  action: Scalars['String']['output'];
+  environment: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  ownerScope: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type ManagedServiceMatchPlanPayload = {
+  appSlug: Scalars['String']['output'];
+  blocked: Scalars['Boolean']['output'];
+  changes: Array<ManagedServiceMatchChange>;
+  digest: Scalars['String']['output'];
+};
+
+export type ManagedServiceMatchPlanPayloadMutationResult = {
+  data?: Maybe<ManagedServiceMatchPlanPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type Managedresourceadoptionpayload = {
   acknowledgedPriorOwner: Scalars['String']['output'];
   actorDisplay: Scalars['String']['output'];
@@ -9224,6 +9263,10 @@ export type MarkallreadpayloadMutationResult = {
   data?: Maybe<Markallreadpayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type MatchManagedServicesInput = {
+  appSlug: Scalars['String']['input'];
 };
 
 export type MigrateAppInputGql = {
@@ -9681,6 +9724,7 @@ export type Mutation = {
   addWildcardDomain: AstroliftAppDomainMutationResult;
   adoptManagedResource: ManagedresourceadoptionpayloadMutationResult;
   adoptRepoCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
+  applyManagedServiceMatch: ManagedServiceMatchAppliedPayloadMutationResult;
   applyStagedManifest: ManifeststagepayloadMutationResult;
   approveActionRequest: AstroliftActionApprovalRequestMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
@@ -9919,6 +9963,7 @@ export type Mutation = {
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
   prepareConversationTransfer: AstroliftConversationTransferMutationResult;
   prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
+  previewManagedServiceMatch: ManagedServiceMatchPlanPayloadMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
   /** Update any user's profile via ProfileSerializer. Platform operator only; self-service profile edits go through updateMyProfile. */
@@ -10250,6 +10295,11 @@ export type MutationAdoptManagedResourceArgs = {
 
 export type MutationAdoptRepoCiWorkflowArgs = {
   input: CiWorkflowSyncActionInput;
+};
+
+
+export type MutationApplyManagedServiceMatchArgs = {
+  input: ApplyManagedServiceMatchInput;
 };
 
 
@@ -11340,6 +11390,11 @@ export type MutationPrepareConversationTransferArgs = {
 
 export type MutationPrepareManagedDomainAppRouteArgs = {
   input: ManagedDomainAppRouteWriteInput;
+};
+
+
+export type MutationPreviewManagedServiceMatchArgs = {
+  input: MatchManagedServicesInput;
 };
 
 

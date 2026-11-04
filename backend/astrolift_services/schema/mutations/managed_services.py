@@ -41,9 +41,14 @@ from astrolift_services.schema.mutations.helpers import (
 )
 from astrolift_services.schema.mutations.types import (
     AdoptManagedResourceInput,
+    ApplyManagedServiceMatchInput,
     AttachProjectManagedServiceInput,
     DeprovisionManagedServiceInput,
     DetachProjectManagedServiceInput,
+    ManagedServiceMatchAppliedPayload,
+    ManagedServiceMatchChange,
+    ManagedServiceMatchPlanPayload,
+    MatchManagedServicesInput,
     ProvisionManagedServiceInput,
     ProvisionProjectManagedServiceInput,
     ReprovisionManagedServiceInput,
@@ -466,6 +471,25 @@ def _mark_update_enqueue_failed(svc: ManagedService, exc: Exception) -> None:
             "updated_at",
             "version",
         ],
+    )
+
+
+def _match_app_for_caller(app_slug: str):
+    """The caller's app by slug, org-scoped; ``None`` when there is no tenant (#1183)."""
+    org_id = _caller_org_id()
+    if org_id is None:
+        return None
+    return RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id).first()
+
+
+def _match_change_type(change) -> ManagedServiceMatchChange:
+    return ManagedServiceMatchChange(
+        action=change.action,
+        owner_scope=change.owner_scope,
+        environment=change.environment,
+        kind=change.kind,
+        name=change.name,
+        reason=change.reason,
     )
 
 
@@ -1244,6 +1268,116 @@ class ManagedServiceMutations:
             workflow_id=f"ProvisionManagedServiceWorkflow-{svc.guid}",
         )
         return gql_success(managed_service_to_type(svc))
+
+    @strawberry.field
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("input.app_slug", permissions=(Permission.APP_UPDATE,)),
+        operation=named_environment(all_if_absent=True),
+    )
+    @tenant_scoped()
+    def preview_managed_service_match(
+        self,
+        info: Info,
+        input: MatchManagedServicesInput,
+    ) -> MutationResultType[ManagedServiceMatchPlanPayload]:
+        """Dry run: what the app's stored manifest would change on the platform (#2606).
+
+        Compares each declared ``[[managed_services]]`` entry with the platform
+        record and lists the create, reconfigure, bind, retry, remove and detach
+        changes an apply would make. Nothing is written."""
+        from astrolift_manifest.managed_service_match import plan_digest, plan_is_blocked
+        from astrolift_manifest.managed_service_match_db import build_match_plan
+        from astrolift_manifest.parser import ManifestError
+
+        app = _match_app_for_caller(input.app_slug)
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+        try:
+            declared, changes = build_match_plan(app)
+        except (ManifestError, ValueError) as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        return gql_success(
+            ManagedServiceMatchPlanPayload(
+                app_slug=app.slug,
+                digest=plan_digest(declared, changes),
+                blocked=plan_is_blocked(changes),
+                changes=[_match_change_type(c) for c in changes],
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="managed_service.match.apply")
+    @require_permission(
+        Permission.APP_UPDATE,
+        scope=app_scope_by_slug("input.app_slug", permissions=(Permission.APP_UPDATE,)),
+        operation=named_environment(all_if_absent=True),
+    )
+    @tenant_scoped()
+    def apply_managed_service_match(
+        self,
+        info: Info,
+        input: ApplyManagedServiceMatchInput,
+    ) -> MutationResultType[ManagedServiceMatchAppliedPayload]:
+        """Apply the plan a preview returned (#2606).
+
+        Refuses when the plan has moved since the preview (``expectedDigest``),
+        when any change is blocked, or when a project service would be attached
+        without project.update. Otherwise runs the same reconcile the deploy uses."""
+        from astrolift_manifest.managed_service_match import (
+            BIND,
+            CREATE,
+            PROJECT,
+            plan_digest,
+            plan_is_blocked,
+        )
+        from astrolift_manifest.managed_service_match_db import build_match_plan
+        from astrolift_manifest.parser import ManifestError
+        from astrolift_manifest.persist import (
+            actor_may_attach_project_services,
+            allow_project_attach,
+            reconcile_managed_services,
+        )
+
+        app = _match_app_for_caller(input.app_slug)
+        if app is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+        try:
+            declared, changes = build_match_plan(app)
+        except (ManifestError, ValueError) as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        digest = plan_digest(declared, changes)
+        if digest != input.expected_digest:
+            return gql_failure(
+                ErrorCode.CONFLICT.value,
+                "the manifest or the platform changed since this plan was previewed; preview it again",
+                field="expectedDigest",
+            )
+        if plan_is_blocked(changes):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "the plan has blocked changes; resolve them before applying",
+                field="appSlug",
+            )
+        may_attach = actor_may_attach_project_services(app)
+        if not may_attach and any(c.owner_scope == PROJECT and c.action in (CREATE, BIND) for c in changes):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                "attaching a project managed service needs project.update",
+                field="appSlug",
+            )
+        try:
+            with transaction.atomic(), allow_project_attach(may_attach):
+                reconcile_managed_services(app, declared)
+        except ValueError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
+        return gql_success(
+            ManagedServiceMatchAppliedPayload(
+                app_slug=app.slug,
+                digest=digest,
+                changes=[_match_change_type(c) for c in changes],
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="managed_service.deprovision")

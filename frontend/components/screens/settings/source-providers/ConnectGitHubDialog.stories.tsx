@@ -30,7 +30,7 @@ export const Bootstrap: Story = {
   render: () => <ConnectGitHubDialogView {...CONNECT_GITHUB_PROPS} />,
   play: async () => {
     const s = await sheet();
-    await userEvent.click(s.getByRole("button", { name: /Create a new GitHub App/ }));
+    await userEvent.click(s.getByRole("button", { name: /Install Astrolift on a GitHub org/ }));
     await expect(s.getByRole("button", { name: "Continue on GitHub →" })).toBeEnabled();
   },
 };
@@ -74,8 +74,8 @@ export const LongStrings: Story = {
   render: () => <ConnectGitHubDialogView {...CONNECT_GITHUB_PROPS} />,
   play: async () => {
     const s = await sheet();
-    await userEvent.click(s.getByRole("button", { name: /Create a new GitHub App/ }));
-    await userEvent.type(s.getByLabelText("Where should the App live?"), LONG_TEXT);
+    await userEvent.click(s.getByRole("button", { name: /Install Astrolift on a GitHub org/ }));
+    await userEvent.type(s.getByLabelText("Which GitHub org should install the App?"), LONG_TEXT);
     await expect(
       s.getByText("GitHub org slugs are alphanumeric + hyphen, max 39 characters.")
     ).toBeInTheDocument();
