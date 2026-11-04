@@ -1346,6 +1346,20 @@ def render_resources_for_deployment(
         resources.extend(
             envoy_custom_domain_routes(deployment, manifest, namespace=namespace, cluster=cluster)
         )
+    # The CustomDomain Ingresses and BYO TLS Secrets. This is the render
+    # apply_manifests ships, so a domain that is only folded in by the
+    # render_manifests activity never reaches the cluster (#1003 again).
+    if cluster is not None and cluster.ingress_class != "envoy":
+        from astrolift_workflows.activities.app_lifecycle import _render_app_ingresses_and_tls
+
+        custom_domain_resources = _render_app_ingresses_and_tls(
+            deployment.pk, namespace, manifest, custom_domains_only=True
+        )
+        if custom_domain_resources:
+            resources = sorted(
+                [*resources, *custom_domain_resources],
+                key=lambda r: (r.get("kind", ""), r["metadata"]["name"]),
+            )
     if managed_domain is not None and cluster is not None:
         ingress_resources = (
             _render_managed_subdomain_ingress(deployment, manifest, namespace, managed_domain, cluster) or []

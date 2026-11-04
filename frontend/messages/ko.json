@@ -4165,7 +4165,9 @@
       "personal": "개인",
       "noScopeRestriction": "(범위 제한 없음)",
       "active": "활성",
-      "disabled": "비활성",
+      "inactive": "비활성",
+      "installationMissing": "설치 없음",
+      "unverified": "미확인",
       "addClientId": "클라이언트 ID 추가",
       "connectMyGithub": "내 GitHub 연결",
       "connectMyGitlab": "내 GitLab 연결",
@@ -16899,7 +16901,9 @@
       "options": {
         "status": {
           "active": "활성",
-          "disabled": "비활성"
+          "inactive": "비활성",
+          "installation_missing": "설치 없음",
+          "unverified": "미확인"
         }
       },
       "views": {

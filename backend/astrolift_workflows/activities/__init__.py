@@ -114,6 +114,7 @@ from astrolift_workflows.activities.cron_deploy import (
     reconcile_agent_deployments,
 )
 from astrolift_workflows.activities.custom_domain import (
+    ensure_edge_certificate,
     ensure_platform_managed_records,
     issue_custom_domain_certificate,
     probe_required_records,
@@ -321,6 +322,7 @@ __all__ = [
     "ensure_cloudfront_cert",
     "ensure_cluster_drained",
     "ensure_faas_services",
+    "ensure_edge_certificate",
     "ensure_platform_managed_records",
     "ensure_static_dns",
     "ensure_static_site_services",

@@ -48,6 +48,8 @@ export function connection(
     tokenExpiresAt: null,
     createdAt: "2026-09-01T12:00:00Z",
     updatedAt: "2026-09-27T14:05:00Z",
+    status: "ACTIVE",
+    statusDetail: "",
     ...patch,
   };
 }
@@ -84,6 +86,36 @@ export const CONNECTIONS: AstroliftSourceConnection[] = [
     accountLogin: "ci-bot",
     isActive: false,
     repoVisibilityScopes: ["public_non_org"],
+    status: "INACTIVE",
+    statusDetail: "Inactive in Astrolift.",
+  }),
+];
+
+/**
+ * One GitHub App row per status the server reports (#2601). ConflictHQ is the
+ * reported case: the App is installed on calliopeai only, so that row is
+ * active in Astrolift and has no installation on GitHub.
+ */
+export const STATUS_CONNECTIONS: AstroliftSourceConnection[] = [
+  connection("GitHub App: astrolift-ai", { accountLogin: "calliopeai", repoVisibilityScopes: [] }),
+  connection("GitHub App: astrolift-ai (ConflictHQ)", {
+    accountLogin: "ConflictHQ",
+    installationId: "",
+    repoVisibilityScopes: [],
+    status: "INSTALLATION_MISSING",
+    statusDetail:
+      "GitHub has no installation of this App on ConflictHQ. Install it under Providers → Source → Connect to GitHub → Install Astrolift on a GitHub org, with ConflictHQ as the org.",
+  }),
+  connection("GitHub App: astrolift-ai (acme-legacy)", {
+    accountLogin: "acme-legacy",
+    status: "INACTIVE",
+    statusDetail:
+      "GitHub refused this App's credentials (HTTP 401). Check that the App exists and is not suspended, and that its private key is current.",
+  }),
+  connection("GitHub App: astrolift-ai (acme-labs)", {
+    accountLogin: "acme-labs",
+    status: "UNVERIFIED",
+    statusDetail: "GitHub answered HTTP 502 to the installation check.",
   }),
 ];
 
@@ -153,6 +185,9 @@ export const LONG_CONNECTIONS: AstroliftSourceConnection[] = [
     needsClientId: true,
     appClientId: "",
     repoVisibilityScopes: ["private_org", "public_org", "user_repos", "public_non_org"],
+    status: "INSTALLATION_MISSING",
+    statusDetail:
+      "GitHub has no installation of this App on acme-corporation-platform-engineering-organization. Install it under Providers → Source → Connect to GitHub → Install Astrolift on a GitHub org, with acme-corporation-platform-engineering-organization as the org.",
   }),
   connection("personal-token", {
     kind: "gitlab_oauth_user",
