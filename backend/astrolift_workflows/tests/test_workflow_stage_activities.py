@@ -1140,14 +1140,17 @@ def test_gate_open_emits_notified_event_with_delivery_outcome(run, definition):
     assert event.resource_id == str(run.guid)
     assert event.payload["stage_name"] == gate.slug
     assert event.payload["delivery"] == {"email": True}
+    assert event.payload["reasons"] == {}
     assert event.payload["status"] == "notified"
     assert event.severity == "info"
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("backend", ["RefusedBackend", "NoDeliveryBackend"])
+@pytest.mark.parametrize(
+    ("backend", "reason"), [("RefusedBackend", "RuntimeError"), ("NoDeliveryBackend", "not_accepted")]
+)
 def test_gate_mail_refusal_persists_a_visible_failure_without_stalling_review(
-    run, definition, settings, backend
+    run, definition, settings, backend, reason
 ):
     from django.core import mail
 
@@ -1166,6 +1169,7 @@ def test_gate_mail_refusal_persists_a_visible_failure_without_stalling_review(
     assert event.organization_id == run.organization_id
     assert event.resource_id == str(run.guid)
     assert event.payload["delivery"] == {"email": False}
+    assert event.payload["reasons"] == {"email": reason}
     assert event.payload["status"] == "failed"
     assert event.severity == "error"
     assert "reviewer@example.test" not in str(event.payload)
@@ -1189,9 +1193,101 @@ def test_gate_without_any_recipient_persists_failure_instead_of_claiming_deliver
     event = Event.objects.get(event_type="workflow.human_gate.notified")
     assert event.organization_id == run.organization_id
     assert event.payload["delivery"] == {"email": False}
+    assert event.payload["reasons"] == {"email": "no_recipient"}
     assert event.payload["status"] == "failed"
     assert event.severity == "error"
     assert mail.outbox == []
+
+
+@pytest.fixture
+def ses_mail(settings, monkeypatch):
+    """Gate mail through the production django-ses backend, against a stubbed SES."""
+    import django_ses
+
+    # django-ses caches the send quota for the life of the process, so only a
+    # worker's first send asks SES for it. Every send here is a first send.
+    monkeypatch.setattr(django_ses, "cached_rate_limits", {})
+
+    def use(backend: str) -> None:
+        settings.EMAIL_BACKEND = f"astrolift_agents.tests.email_backends_1823.{backend}"
+
+    return use
+
+
+def _gate_notifications_over_the_api(organization_id: int) -> list[dict]:
+    """The gate notification events as an operator reads them, through the schema."""
+    from types import SimpleNamespace
+
+    from config.schema import schema
+    from core.tenancy import TenantContext, tenant_context
+
+    document = """{ astroliftEventsPage(eventType: "workflow.human_gate.notified") {
+        items { resourceId severity payload } } }"""
+    with tenant_context(TenantContext(organization_id=organization_id)):
+        result = schema.execute_sync(document, context_value=SimpleNamespace(user=None, request=None))
+    assert result.errors is None, result.errors
+    return result.data["astroliftEventsPage"]["items"]
+
+
+@pytest.mark.django_db
+def test_gate_mail_accepted_by_ses_reads_notified_through_the_api(
+    run, definition, settings, ses_mail, permission_resolver
+):
+    """SES accepting the review request, sent from the configured sender,
+    leaves a ``notified`` status an operator reads through the API (#1823)."""
+    from core.permissions import Permission
+
+    ses_mail("SESAcceptedBackend")
+    settings.FROM_EMAIL = "no-reply@astrolift.example.test"
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    gate = _stage(definition, 1)
+    gate.approvers = ["reviewer@example.test"]
+    gate.save()
+
+    _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    [item] = _gate_notifications_over_the_api(run.organization_id)
+    assert item["resourceId"] == str(run.guid)
+    assert item["severity"] == "info"
+    assert item["payload"]["status"] == "notified"
+    assert item["payload"]["delivery"] == {"email": True}
+    assert item["payload"]["reasons"] == {}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("backend", "reason"),
+    [("SESQuotaDeniedBackend", "AccessDenied"), ("SESUnverifiedSenderBackend", "MessageRejected")],
+)
+def test_gate_mail_refused_by_ses_reads_failed_with_its_reason_through_the_api(
+    run, definition, ses_mail, permission_resolver, backend, reason
+):
+    """The Conflict failure (#1823): SES refusing the send leaves a ``failed``
+    status naming the provider's reason, which the gate's organization reads
+    through the API instead of a worker log line. The provider's message,
+    with its role ARN, account id and addresses, stays out of it."""
+    from astrolift_identity.models import Organization
+    from core.permissions import Permission
+
+    ses_mail(backend)
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    gate = _stage(definition, 1)
+    gate.approvers = ["reviewer@example.test"]
+    gate.save()
+
+    execution_id = _create_stage_execution_sync(str(run.pk), str(gate.pk), 1)
+
+    assert WorkflowStageExecution.objects.get(pk=int(execution_id)).status == "running"
+    [item] = _gate_notifications_over_the_api(run.organization_id)
+    assert item["resourceId"] == str(run.guid)
+    assert item["severity"] == "error"
+    assert item["payload"]["status"] == "failed"
+    assert item["payload"]["delivery"] == {"email": False}
+    assert item["payload"]["reasons"] == {"email": reason}
+    for private in ("123456789012", "conflict-astrolift-task", "@example"):
+        assert private not in str(item["payload"])
+    elsewhere = Organization.objects.create(name="Elsewhere", slug="gate-mail-elsewhere")
+    assert _gate_notifications_over_the_api(elsewhere.id) == []
 
 
 @pytest.mark.django_db
