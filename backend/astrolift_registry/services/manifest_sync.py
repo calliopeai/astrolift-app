@@ -459,6 +459,38 @@ def _clear_stale_bootstrap_failure(app: RegisteredApp) -> list[str]:
     return ["manifest_bootstrap_status", "manifest_bootstrap_error"]
 
 
+def materialize_stored_manifest(app: RegisteredApp) -> str:
+    """Create ``app``'s workloads from its stored manifest when it has none (#2578).
+
+    A deploy whose resync is ``fetch_failed`` deploys the stored manifest: the
+    one sent with the registration (``astro app register --manifest-raw``) or
+    the last one synced. An app whose workloads were never created from it was
+    refused as having nothing to deploy, although the render reads that
+    manifest. Creates them the way registration does and returns "", or
+    returns why the stored manifest cannot stand in for the repo's.
+    """
+    with transaction.atomic():
+        RegisteredApp.all_objects.select_for_update(no_key=True).filter(pk=app.pk).first()
+        app.refresh_from_db()
+        if app.workloads.filter(deleted_at__isnull=True).exists():
+            return ""
+        raw_text = app.manifest_raw or ""
+        if not raw_text.strip():
+            return "there is no stored manifest to deploy instead, so a resync from the repo is required"
+        try:
+            manifest = _normalize_text(raw_text)
+        except ManifestError as exc:
+            return f"the stored manifest does not parse ({exc}), so a resync from the repo is required"
+        if not manifest.workloads:
+            return "the stored manifest declares no workloads, so a resync from the repo is required"
+        persist_manifest(app, manifest, raw_text=raw_text)
+        healed = _clear_stale_bootstrap_failure(app)
+        if healed:
+            app.save(update_fields=[*healed, "updated_at", "version"])
+    log.info("created the workloads of app %s from its stored manifest", app.pk)
+    return ""
+
+
 _NO_CONNECTION_PUBLIC_READ = (
     "no active source connection found for this organization, and {repo!r} could not be read "
     "anonymously ({reason}); a private repo needs a connection under Settings -> Source connections"

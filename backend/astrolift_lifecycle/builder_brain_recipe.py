@@ -97,9 +97,26 @@ def manifest(*, app_slug, brain_slug, image, admission):
 
     from astrolift_registry.brain_apps import brain_app_manifest
 
-    raw = tomllib.loads(
-        brain_app_manifest(slug=app_slug, brain_slug=brain_slug, image=image, port=admission["port"])
-    )
+    if brain_slug is None:
+        # An ordinary project app (#2471): the same public web workload with no
+        # [brain] table, so no binding or BRAIN_* secret is ever rendered.
+        raw = {
+            "name": app_slug,
+            "workloads": [
+                {
+                    "name": "web",
+                    "kind": "deployment",
+                    "is_public": True,
+                    "containers": [
+                        {"name": "app", "is_primary": True, "image_ref": image, "port": admission["port"]}
+                    ],
+                }
+            ],
+        }
+    else:
+        raw = tomllib.loads(
+            brain_app_manifest(slug=app_slug, brain_slug=brain_slug, image=image, port=admission["port"])
+        )
     workload = raw["workloads"][0]
     workload["fs_group"] = 10001
     workload["volumes"] = [

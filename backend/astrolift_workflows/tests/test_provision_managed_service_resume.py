@@ -13,6 +13,7 @@ from temporalio import workflow as temporalio_workflow
 from astrolift_workflows.activities import (
     bounce_workloads_bound_to_managed_service,
     check_managed_service_ready,
+    emit_managed_service_provision_failed_event,
     finalize_managed_service_provision,
     mark_managed_service_failed,
     mark_managed_service_provisioning,
@@ -92,6 +93,7 @@ def test_a_first_attempt_with_no_failed_step_runs_from_the_beginning(monkeypatch
 def test_a_finalize_failure_records_the_step_and_keeps_the_error(monkeypatch) -> None:
     recorded: list[str] = []
     failed: list[str] = []
+    events: list[list] = []
 
     async def execute(activity_fn, *args, **kwargs):
         if activity_fn is mark_managed_service_provisioning:
@@ -106,14 +108,19 @@ def test_a_finalize_failure_records_the_step_and_keeps_the_error(monkeypatch) ->
         if activity_fn is record_managed_service_failed_step:
             recorded.append(kwargs["args"][1])
             return None
+        if activity_fn is emit_managed_service_provision_failed_event:
+            events.append(kwargs["args"])
+            return None
         raise AssertionError(f"unexpected activity {activity_fn}")
 
     monkeypatch.setattr(temporalio_workflow, "execute_activity", execute)
     monkeypatch.setattr(temporalio_workflow, "sleep", _no_sleep)
+    monkeypatch.setattr(temporalio_workflow, "patched", lambda patch_id: True)
 
     result = _run(ProvisionManagedServiceWorkflow().run(_input()))
 
     assert result.ok is False
     assert recorded == ["finalize"]
     assert failed == [result.message]
+    assert events == [[1, "finalize", result.message]]
     assert "finalize_managed_service_provision failed" in result.message
