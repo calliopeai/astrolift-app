@@ -23,7 +23,9 @@ Steps:
      hiccup can be retried without re-issuing the cloud provision.
 
 On terminal failure the row is flipped to ``FAILED`` with the error on
-``status_error`` so the operator sees why.
+``status_error`` so the operator sees why. For an app-owned service the
+same reason is recorded in the app's event log as a
+``managed_service.provision.failed`` event (#2608).
 
 Workflow id pattern: ``ProvisionManagedServiceWorkflow-<svc-guid>``.
 """
@@ -35,6 +37,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 
 from astrolift_workflows.inputs import ProvisionManagedServiceInput, WorkflowResult
 from astrolift_workflows.managed_service_resume import FINALIZE, PROVISION, WAIT_READY, resume_step
@@ -43,6 +46,7 @@ with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
         bounce_workloads_bound_to_managed_service,
         check_managed_service_ready,
+        emit_managed_service_provision_failed_event,
         finalize_managed_service_provision,
         mark_managed_service_failed,
         mark_managed_service_provisioning,
@@ -111,7 +115,8 @@ def _reviewed_args(input, arguments):
 
 async def _fail(input: ProvisionManagedServiceInput, step: str, message: str) -> WorkflowResult:
     """Flip the row to FAILED with ``message`` and remember ``step``, so the
-    next attempt resumes there (#2606)."""
+    next attempt resumes there (#2606). Then record the failure in the app's
+    event log (#2608)."""
     svc_id = input.managed_service_id
     await workflow.execute_activity(
         mark_managed_service_failed,
@@ -125,6 +130,18 @@ async def _fail(input: ProvisionManagedServiceInput, step: str, message: str) ->
         start_to_close_timeout=_QUICK_TIMEOUT,
         retry_policy=_STATUS_RETRY,
     )
+    if workflow.patched("managed-service-failure-event-2608"):
+        try:
+            # No reviewed binding: only app-owned rows get an event, and they never carry one.
+            await workflow.execute_activity(
+                emit_managed_service_provision_failed_event,
+                args=[svc_id, step, message],
+                start_to_close_timeout=_QUICK_TIMEOUT,
+                retry_policy=_STATUS_RETRY,
+            )
+        except ActivityError:
+            # The row already records the failure; a lost event must not fail the run.
+            workflow.logger.warning("managed service %s: provision failure event not recorded", svc_id)
     return WorkflowResult(ok=False, message=message)
 
 
