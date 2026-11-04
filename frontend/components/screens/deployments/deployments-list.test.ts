@@ -13,6 +13,7 @@ import { appsDetailCrumbs, appsListCrumbs, sinceIso } from "./apps-area";
 import {
   DEPLOYMENTS_LIST,
   deploymentFailure,
+  deploymentLogLines,
   deploymentSteps,
   deploymentsVariables,
 } from "./deployments-list";
@@ -188,6 +189,29 @@ describe("deploymentFailure", () => {
       title: "Deployment failed",
       reason: DEPLOY_FAILED.statusReason,
     });
+  });
+});
+
+describe("a deploy a newer one stopped", () => {
+  const stopped = {
+    ...DEPLOY_FAILED,
+    status: "superseded" as const,
+    abortedReason: "superseded by a newer deploy",
+    statusReason: "superseded by a newer deploy",
+  };
+
+  it("shows no failure panel: the API reads it as superseded", () => {
+    expect(deploymentFailure(stopped, [])).toBeNull();
+  });
+
+  it("logs its stop as superseded, not as an error", () => {
+    const [line] = deploymentLogLines([entry("failed", 3, "superseded by a newer deploy")]);
+    expect(line).toMatchObject({
+      message: "superseded: superseded by a newer deploy",
+      level: "debug",
+    });
+    const [real] = deploymentLogLines([entry("failed", 4, "rollout timed out")]);
+    expect(real).toMatchObject({ message: "failed: rollout timed out", level: "error" });
   });
 });
 

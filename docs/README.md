@@ -43,7 +43,7 @@ brackets with the command that produces them.
 |---|---|
 | Roll the control plane forward (migrations, paired releases) | [operators/control-plane-upgrades.md](operators/control-plane-upgrades.md) |
 | Move a preserved ingress-nginx install to the Envoy edge | [operators/ingress-nginx-cutover-2117.md](operators/ingress-nginx-cutover-2117.md) |
-| Re-sync managed CI templates after a generation bump | [operators/managed-monorepo-ci.md](operators/managed-monorepo-ci.md), [operators/ci-workflow-region.md](operators/ci-workflow-region.md) |
+| Re-sync managed CI templates after a generation bump | [operators/managed-monorepo-ci.md](operators/managed-monorepo-ci.md), [operators/ci-workflow-region.md](operators/ci-workflow-region.md), [operators/ci-deploy-wait.md](operators/ci-deploy-wait.md) |
 
 ## Domains and certificates
 

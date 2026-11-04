@@ -216,14 +216,27 @@ const LEVEL: Partial<Record<string, LogLine["level"]>> = {
   superseded: "debug",
 };
 
+// A deploy a newer one stopped is stored as a failure with one of these
+// reasons (backend astrolift_lifecycle/supersede.py); the API already reads
+// its status as superseded, and its log entry should agree.
+const SUPERSEDED_REASONS = new Set([
+  "superseded by a newer deploy",
+  "aborted: superseded by a newer deploy or cancelled",
+]);
+
 /** The lifecycle log as log lines: the transition and its message, then any detail. */
 export function deploymentLogLines(log: AstroliftDeploymentLogEntry[]): LogLine[] {
   return log.flatMap((e) => {
-    const status = e.phase ? `${e.phase}/${e.event}` : e.status.replace(/_/g, " ");
+    const superseded = e.status === "failed" && SUPERSEDED_REASONS.has(e.message.trim());
+    const status = superseded
+      ? "superseded"
+      : e.phase
+        ? `${e.phase}/${e.event}`
+        : e.status.replace(/_/g, " ");
     const head: LogLine = {
       ts: e.occurredAt,
       message: e.message ? `${status}: ${e.message}` : status,
-      level: LEVEL[e.status] ?? LEVEL[e.event] ?? "info",
+      level: superseded ? "debug" : (LEVEL[e.status] ?? LEVEL[e.event] ?? "info"),
     };
     const detail =
       e.detail && typeof e.detail === "object" && Object.keys(e.detail).length > 0

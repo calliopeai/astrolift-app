@@ -530,7 +530,63 @@ def test_deployment_status_returns_current_state(app_with_manifest, env, deploy_
         "created_at",
         "updated_at",
         "environment",
+        "superseded",
+        "reason",
     }
+    assert body["superseded"] is False
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["superseded by a newer deploy", "aborted: superseded by a newer deploy or cancelled"],
+)
+def test_deployment_status_reads_a_superseded_failure_as_superseded(
+    app_with_manifest, env, deploy_token, reason
+):
+    """A deploy a newer one stopped is stored FAILED; the managed CI workflow
+    polls this endpoint and must tell it apart from a broken deploy."""
+    _, plaintext = deploy_token
+    deployment = _make_deployment(app_with_manifest, env, aborted_reason=reason)
+    deployment.transition_to(Deployment.Status.FAILED)
+
+    r = Client().get(
+        f"/api/cli/v1/deployments/{deployment.guid}/status/",
+        HTTP_AUTHORIZATION=f"Bearer {plaintext}",
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "superseded"
+    assert body["superseded"] is True
+    assert body["state"] == "cancelled"  # terminal for older CLIs
+    assert body["reason"] == reason
+
+
+def test_deployment_status_real_failure_keeps_failed_and_reason(app_with_manifest, env, deploy_token):
+    _, plaintext = deploy_token
+    deployment = _make_deployment(app_with_manifest, env, aborted_reason="rollout timed out")
+    deployment.transition_to(Deployment.Status.FAILED)
+
+    body = (
+        Client()
+        .get(f"/api/cli/v1/deployments/{deployment.guid}/status/", HTTP_AUTHORIZATION=f"Bearer {plaintext}")
+        .json()
+    )
+    assert (body["status"], body["state"], body["superseded"]) == ("failed", "failed", False)
+    assert body["reason"] == "rollout timed out"
+
+
+def test_deployment_status_replaced_after_running_is_a_success(app_with_manifest, env, deploy_token):
+    _, plaintext = deploy_token
+    deployment = _make_deployment(app_with_manifest, env)
+    for status in (Deployment.Status.DEPLOYING, Deployment.Status.RUNNING, Deployment.Status.SUPERSEDED):
+        deployment.transition_to(status)
+
+    body = (
+        Client()
+        .get(f"/api/cli/v1/deployments/{deployment.guid}/status/", HTTP_AUTHORIZATION=f"Bearer {plaintext}")
+        .json()
+    )
+    assert (body["status"], body["state"], body["superseded"]) == ("superseded", "succeeded", True)
 
 
 def test_deployment_status_reflects_transitions(app_with_manifest, env, deploy_token):
