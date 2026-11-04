@@ -11,10 +11,15 @@ import pytest
 from astrolift_scm.providers import github_app
 from astrolift_scm.providers.github_app import GithubAppError, installation_token
 
+# Discovery asks the database whether another organization holds the
+# installation it found (#2631).
+pytestmark = pytest.mark.django_db
+
 
 class _Conn:
     def __init__(self, *, account_login="ConflictHQ", installation_id=""):
         self.guid = uuid.uuid4()
+        self.organization_id = None
         self.kind = "github_app_install"
         self.app_client_id = "Iv23liKcR2jWTgzpuweb"
         self.oauth_client_id = ""

@@ -33,6 +33,7 @@ from django.utils import timezone
 
 from astrolift_identity.models import Member, Organization
 from astrolift_scm.models import SourceConnection
+from auth1.tests.test_relink_app_installation_2601 import _GitHub
 from core.permissions import Permission
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 from core.tests.utils.scope_world import bind_role
@@ -81,6 +82,25 @@ def org_user_member(settings):
 
 def _login(client, user):
     client.force_login(user)
+
+
+@pytest.fixture
+def github_app(monkeypatch):
+    """A local GitHub for one App that checks each App JWT against the App's
+    key: the setup URL stores an installation only once GitHub confirms it
+    (#2631)."""
+    started = []
+
+    def start(app_id: str, client_id: str) -> _GitHub:
+        stub = _GitHub(app_id=int(app_id), client_id=client_id)
+        monkeypatch.setattr("astrolift_scm.providers.github_app.GITHUB_API_DEFAULT", stub.base)
+        started.append(stub)
+        return stub
+
+    yield start
+    for stub in started:
+        stub.server.shutdown()
+        stub.server.server_close()
 
 
 # ---------------------------------------------------------------------------
@@ -339,15 +359,17 @@ def test_manifest_callback_rolls_back_pending_row_on_exchange_failure(org_user_m
 # ---------------------------------------------------------------------------
 
 
-def test_manifest_setup_records_installation_id_and_activates(org_user_member):
+def test_manifest_setup_records_installation_id_and_activates(org_user_member, github_app):
     org, user = org_user_member
+    github = github_app("12345", "Iv1.fake")
+    github.installations = {"987654321": (12345, "acme-corp")}
     client = Client()
     _login(client, user)
     client.get("/app/auth1/scm/github/app-manifest/start", {"org": "acme-corp"})
     state = client.session["scm_github_manifest_state"]["state"]
     with patch(
         "auth1.scm_app_manifest._exchange_manifest_code",
-        return_value=(_fake_manifest_payload(), None),
+        return_value=({**_fake_manifest_payload(), "pem": github.pem}, None),
     ):
         client.get(
             "/app/auth1/scm/github/app-manifest/callback",
@@ -369,6 +391,8 @@ def test_manifest_setup_records_installation_id_and_activates(org_user_member):
     row = SourceConnection.objects.get(organization=org, kind="github_app_install")
     assert row.installation_id == "987654321"
     assert row.is_active is True
+    # GitHub confirmed the id, asked with the new App's own key.
+    assert github.reads() == ["987654321"]
 
 
 def test_manifest_setup_refuses_non_install_action(org_user_member):
@@ -473,10 +497,11 @@ def _make_installed_app(
     is_active=True,
     is_orphaned=False,
     created_at=None,
+    pem=_CANONICAL_PEM,
 ):
     """A fully-created + installed github_app_install connection (the shape
     the manifest callback + setup leave behind)."""
-    enc_pem = encrypt_at_rest(_CANONICAL_PEM)
+    enc_pem = encrypt_at_rest(pem)
     enc_cs = encrypt_at_rest(_CANONICAL_CLIENT_SECRET)
     enc_ws = encrypt_at_rest(_CANONICAL_WEBHOOK_SECRET)
     conn = SourceConnection.objects.create(
@@ -533,13 +558,17 @@ def test_start_per_org_reuses_existing_app(org_user_member, settings):
     ).exists()
 
 
-def test_start_per_org_installs_the_app_on_a_further_account(org_user_member, settings):
+def test_start_per_org_installs_the_app_on_a_further_account(org_user_member, settings, github_app):
     """#2297: an org whose App is installed on acme-corp asks to connect a
     second GitHub account. Case (a) used to short-circuit; now the existing
     App is installed there on its own row, keyed by that account."""
     settings.GITHUB_APP_CONNECTION_SCOPE = "per_org"
     org, user = org_user_member
-    first = _make_installed_app(org, slug="astrolift-acme", app_id="555", owner="acme-corp")
+    github = github_app("555", "Iv1.canonical")
+    github.installations = {"111222": (555, "acme-corp"), "424242": (555, "ragelink")}
+    first = _make_installed_app(
+        org, slug="astrolift-acme", app_id="555", owner="acme-corp", pem=github.pem.encode()
+    )
     client = Client()
     _login(client, user)
 
@@ -567,33 +596,27 @@ def test_start_per_org_installs_the_app_on_a_further_account(org_user_member, se
     assert "scm_connected=" in again["Location"]
 
 
-def test_setup_records_the_account_each_installation_sits_on(org_user_member, settings):
+def test_setup_records_the_account_each_installation_sits_on(org_user_member, settings, github_app):
     """Adversarial review (#2297): the first row carries the App owner's
     login although GitHub installed it on another account. The setup
     callback reads /app/installations and relabels the org's rows, so
     repo-owner routing sees the real accounts."""
     settings.GITHUB_APP_CONNECTION_SCOPE = "per_org"
     org, user = org_user_member
-    first = _make_installed_app(org, slug="astrolift-acme", app_id="555", owner="acme-corp")
+    github = github_app("555", "Iv1.canonical")
+    github.installations = {"111222": (555, "BigCo"), "424242": (555, "RageLink")}
+    first = _make_installed_app(
+        org, slug="astrolift-acme", app_id="555", owner="acme-corp", pem=github.pem.encode()
+    )
     client = Client()
     _login(client, user)
     client.get("/app/auth1/scm/github/app-manifest/start", {"org": "ragelink"})
     install_state = client.session["scm_github_install_state"]
 
-    installations = [
-        {"id": 111222, "account": {"login": "BigCo"}},
-        {"id": 424242, "account": {"login": "RageLink"}},
-    ]
-    with (
-        patch("astrolift_scm.providers.github_app._mint_jwt", return_value="jwt"),
-        patch(
-            "astrolift_scm.providers.github_app.list_app_installations", return_value=(installations, None)
-        ),
-    ):
-        client.get(
-            "/app/auth1/scm/github/app-manifest/setup",
-            {"state": install_state["state"], "installation_id": "424242", "setup_action": "install"},
-        )
+    client.get(
+        "/app/auth1/scm/github/app-manifest/setup",
+        {"state": install_state["state"], "installation_id": "424242", "setup_action": "install"},
+    )
 
     first.refresh_from_db()
     assert first.account_login == "BigCo"
@@ -662,7 +685,7 @@ def test_start_per_org_does_not_reuse_other_orgs_app(settings):
     assert pending_b.oauth_client_id == ""  # a fresh pending, not a copy
 
 
-def test_start_per_install_installs_existing_app_for_new_org(settings):
+def test_start_per_install_installs_existing_app_for_new_org(settings, github_app):
     """per_install, case (b): org B connecting when org A already owns the
     canonical App is redirected to INSTALL that existing App — the manifest
     CREATE flow never runs, the App's credentials are copied onto a pending
@@ -670,6 +693,8 @@ def test_start_per_install_installs_existing_app_for_new_org(settings):
     installation_id to that row."""
     settings.APP_BASE_URL = "https://astrolift.test"
     settings.GITHUB_APP_CONNECTION_SCOPE = "per_install"
+    github = github_app("900900", "Iv1.canon")
+    github.installations = {"111": (900900, "acme-corp"), "222333": (900900, "beta-corp")}
 
     user = User.objects.create_user(username="install-b", email="ib@x.example", password="x")
     org_a = Organization.objects.create(name="Org A", slug="install-a")
@@ -681,6 +706,7 @@ def test_start_per_install_installs_existing_app_for_new_org(settings):
         client_id="Iv1.canon",
         owner="acme-corp",
         installation_id="111",
+        pem=github.pem.encode(),
     )
 
     client = Client()
@@ -709,7 +735,7 @@ def test_start_per_install_installs_existing_app_for_new_org(settings):
                 backend_ref=bytes(pending_b.secret_ciphertext),
             )
         )
-        == _CANONICAL_PEM
+        == github.pem.encode()
     )
     assert (
         decrypt(

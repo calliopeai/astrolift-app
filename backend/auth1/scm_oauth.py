@@ -464,22 +464,28 @@ def _github_install_time_callback(request: HttpRequest) -> Any:
     if err is not None or access_token is None:
         return _redirect_with_error(return_to, err or "exchange_failed")
 
-    # Write installation_id + activate the connection row — mirrors what
-    # github_app_manifest_setup did on the non-OAuth-during-install path.
+    # Write the installation id GitHub confirms + activate the connection row,
+    # as github_app_manifest_setup does on the non-OAuth-during-install path.
+    # A refusal stores neither the installation nor the user token (#2631).
     if installation_id.isdigit():
-        connection.installation_id = installation_id[:64]
-        connection.is_active = True
-        connection.is_orphaned = False
-        connection.orphaned_at = None
-        connection.orphaned_reason = ""
-        connection.save()
+        from astrolift_scm.providers.github_app import INSTALL
+        from auth1.scm_app_manifest import _attach_installation, _record_installed_accounts
+
+        err = _attach_installation(
+            request,
+            connection,
+            installation_id,
+            setup_action=setup_action,
+            action=INSTALL,
+            account_login=pending.get("account_login") or "",
+        )
+        if err is not None:
+            return _redirect_with_error(return_to, err)
         # The row still carries the App owner's login or the account the
         # flow defaulted to. Routing serves a repo only through the
         # installation on its owner (#2576), so record the account GitHub
         # installed on, as the setup callback does; Apps that request OAuth
         # on install land here instead.
-        from auth1.scm_app_manifest import _record_installed_accounts
-
         _record_installed_accounts(connection)
 
     # Upsert the per-user OAuth token row — mirrors github_callback's

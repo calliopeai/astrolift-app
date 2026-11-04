@@ -26,9 +26,10 @@ After persistence we redirect the operator to
 ``https://github.com/apps/<slug>/installations/new?state=<state>`` so
 they can install the App on whichever org they actually want it on.
 GitHub bounces back to our ``setup_url`` with
-``?installation_id=<id>&setup_action=install`` — we attach the
-installation id to the connection row at that point and the connection
-becomes usable for repo listing + commit-status writes.
+``?installation_id=<id>&setup_action=install``. Once GitHub, asked with
+the App's own key, confirms that id (#2631), we attach it to the connection
+row and the connection becomes usable for repo listing + commit-status
+writes.
 
 The same three views register the factory gate App (#2589) when the start
 URL carries ``purpose=factory_gate``: one GitHub organization, organization
@@ -76,6 +77,7 @@ from django.views.decorators.http import require_GET
 
 from astrolift_identity.models import Member
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.providers.github_app import INSTALL
 from astrolift_scm.scopes import require_scm_connect
 from astrolift_scm.services import connection_status, factory_gate
 from core.mutations import AuditEntry, emit_audit
@@ -563,6 +565,10 @@ def _start_reuse_install(
         "state": install_state,
         "connection_guid": str(pending.guid),
         "return_to": return_to,
+        # The return's installation must sit on the account the operator
+        # named (#2631). Without one the row carries a default login, and the
+        # account GitHub installed on replaces it (_record_installed_accounts).
+        "account_login": account_login,
     }
     request.session.save()
 
@@ -737,16 +743,23 @@ def _start_relink(request: HttpRequest, *, org_id: int, raw_guid: str, return_to
     )
 
 
-def _relink_installation(
-    request: HttpRequest, connection: SourceConnection, installation_id: str, *, setup_action: str
+def _attach_installation(
+    request: HttpRequest,
+    connection: SourceConnection,
+    installation_id: str,
+    *,
+    setup_action: str,
+    action: str,
+    account_login: str,
 ) -> str | None:
     """Store ``installation_id`` on ``connection`` once GitHub, asked with the
-    App's own key, confirms it is this App's installation on the connection's
-    account, and no other organization's connection holds it. The id arrives
-    in the browser's redirect, so it is checked, not trusted. ``update`` is
-    what GitHub sends when the App was already installed on the account. A
-    refusal leaves the row as it was. Returns an error code for the redirect,
-    or None."""
+    App's own key, confirms it is this App's installation, on ``account_login``
+    when one is expected, and no other organization's connection holds it
+    (``github_app.confirm_installation``). The id arrives in the browser's
+    redirect, so it is checked, not trusted. ``update`` is what GitHub sends
+    when the App was already installed on the account; only a re-link passes
+    it here. A refusal leaves the row as it was. Each outcome is audited as
+    ``action``. Returns an error code for the redirect, or None."""
     from astrolift_scm.providers import github_app as gh_app
 
     def audit(
@@ -756,7 +769,7 @@ def _relink_installation(
             AuditEntry(
                 actor_user_id=request.user.pk,
                 organization_id=connection.organization_id,
-                action=RELINK,
+                action=action,
                 decision=decision,
                 target_kind="source_connection",
                 target_id=str(connection.guid),
@@ -776,45 +789,16 @@ def _relink_installation(
 
     if setup_action not in ("install", "update") or not installation_id.isdigit():
         return "install_incomplete"
-    try:
-        jwt_token = gh_app._mint_jwt(
-            connection.app_client_id or connection.oauth_client_id, gh_app._decrypt_pem(connection)
-        )
-    except Exception:  # noqa: BLE001 -- an unusable key is reported, never raised
-        audit(error_code="KEY_UNUSABLE", error_message="the stored key cannot sign for the App")
+    code, message, installed_on = gh_app.confirm_installation(
+        connection, installation_id, account_login=account_login
+    )
+    if code in (gh_app.WRONG_INSTALLATION, gh_app.INSTALLATION_IN_USE):
+        audit("DENY", code, message, installed_on=installed_on)
+        return "install_wrong_account" if code == gh_app.WRONG_INSTALLATION else "install_in_use"
+    if code is not None:
+        # GitHub was not asked or did not answer: an allowed attempt that failed.
+        audit(error_code=code, error_message=message)
         return "install_unconfirmed"
-    installation, err = gh_app.fetch_installation(gh_app._api_base(connection), jwt_token, installation_id)
-    if err is not None and err.http_status != 404:
-        audit(error_code="INSTALLATION_UNCONFIRMED", error_message=err.message)
-        return "install_unconfirmed"
-    # GitHub answers 404 for an installation of any other App.
-    installed_on = str((installation.get("account") or {}).get("login") or "")
-    if (
-        err is not None
-        or str(installation.get("app_id") or "") != connection.oauth_client_id
-        or installed_on.lower() != connection.account_login.lower()
-    ):
-        audit(
-            "DENY",
-            "WRONG_INSTALLATION",
-            f"installation {installation_id} is not this App's installation on {connection.account_login}",
-            installed_on=installed_on,
-        )
-        return "install_wrong_account"
-    if (
-        SourceConnection.objects.filter(
-            kind="github_app_install", installation_id=installation_id, deleted_at__isnull=True
-        )
-        .exclude(organization_id=connection.organization_id)
-        .exists()
-    ):
-        audit(
-            "DENY",
-            "INSTALLATION_IN_USE",
-            f"installation {installation_id} is held by another organization's connection",
-            installed_on=installed_on,
-        )
-        return "install_in_use"
 
     previous = connection.installation_id
     connection.installation_id = installation_id[:64]
@@ -844,7 +828,14 @@ def _finish_relink(
         return _redirect_with_error(return_to, "connection_missing")
     if _active_org_id(request) != connection.organization_id:
         return _redirect_with_error(return_to, "org_mismatch")
-    err = _relink_installation(request, connection, installation_id, setup_action=setup_action)
+    err = _attach_installation(
+        request,
+        connection,
+        installation_id,
+        setup_action=setup_action,
+        action=RELINK,
+        account_login=connection.account_login,
+    )
     if err is not None:
         return _redirect_with_error(return_to, err)
     return _redirect_with_ok(return_to, connection.display_name or "GitHub App")
@@ -1160,12 +1151,11 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
     """Land here after the operator installs the App on an org.
 
     GitHub appends ``installation_id`` + ``setup_action``. We attach
-    the installation id to the pending SourceConnection row + flip it
-    active so the repo-listing path picks it up. Any other value of
-    ``setup_action`` (e.g. ``request`` from a private-App "request
-    install" flow) leaves the row inactive and surfaces an info toast.
-    A re-link also takes ``update`` and confirms the id with GitHub
-    (``_relink_installation``).
+    the installation id GitHub confirms (``_attach_installation``) to the
+    pending SourceConnection row + flip it active so the repo-listing path
+    picks it up. Any other value of ``setup_action`` (e.g. ``request``
+    from a private-App "request install" flow) leaves the row inactive
+    and surfaces an info toast. A re-link also takes ``update``.
     """
     require_scm_connect()
     state_in = request.GET.get("state", "")
@@ -1210,12 +1200,16 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
         # from the GitHub App's settings later.
         return _redirect_with_error(return_to, "install_incomplete")
 
-    connection.installation_id = installation_id[:64]
-    connection.is_active = True
-    connection.is_orphaned = False
-    connection.orphaned_at = None
-    connection.orphaned_reason = ""
-    connection.save()
+    err = _attach_installation(
+        request,
+        connection,
+        installation_id,
+        setup_action=setup_action,
+        action=INSTALL,
+        account_login=pending.get("account_login") or "",
+    )
+    if err is not None:
+        return _redirect_with_error(return_to, err)
     _record_installed_accounts(connection)
     connection.refresh_from_db()
     label = connection.display_name or connection.account_login or "GitHub App"

@@ -17,6 +17,7 @@ from django.test import Client
 
 from astrolift_identity.models import Member, Organization
 from astrolift_scm.models import SourceConnection
+from auth1.tests.test_relink_app_installation_2601 import APP_ID, CLIENT_ID, github  # noqa: F401 (fixture)
 from core.permissions import Permission
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 from core.tests.utils.scope_world import bind_role
@@ -592,15 +593,17 @@ def test_gitlab_callback_wrong_kind_in_session(org_user_member):
 # ---------------------------------------------------------------------------
 
 
-def test_github_install_time_callback_success(org_user_member):
+def test_github_install_time_callback_success(org_user_member, github):
     """Install-time: GitHub sends code + installation_id + setup_action=install.
     The callback skips state validation, anchors via scm_github_install_state,
     exchanges the code, activates the connection, and upserts github_oauth_user."""
     org, user = org_user_member
-    connection = _make_github_app_install(org)
+    connection = _make_github_app_install(org, client_id=CLIENT_ID, pem=github.pem.encode())
+    connection.oauth_client_id = str(APP_ID)
     connection.is_active = False
     connection.installation_id = ""
     connection.save()
+    github.installations = {"99999": (APP_ID, "acme-corp")}
 
     client = Client()
     _login(client, user)
@@ -634,10 +637,12 @@ def test_github_install_time_callback_success(org_user_member):
     assert resp.status_code == 302
     assert "scm_connected=" in resp["Location"]
 
-    # Connection row should now be active with the installation_id written.
+    # Connection row should now be active with the installation_id written,
+    # once GitHub confirmed it with the App's key (#2631).
     connection.refresh_from_db()
     assert connection.is_active is True
     assert connection.installation_id == "99999"
+    assert github.reads() == ["99999"]
 
     # Per-user github_oauth_user row should exist.
     user_conn = SourceConnection.objects.filter(
@@ -657,7 +662,7 @@ def test_github_install_time_callback_success(org_user_member):
     assert plain == fake_token.encode()
 
 
-def test_github_install_time_callback_records_the_account_github_installed_on(org_user_member):
+def test_github_install_time_callback_records_the_account_github_installed_on(org_user_member, github):
     """#2576: an install started without naming an account is labelled with
     the App's default owner, ConflictHQ. GitHub installed it on calliopeai,
     and a repository is served only by the connection recorded on its owner,
@@ -666,11 +671,13 @@ def test_github_install_time_callback_records_the_account_github_installed_on(or
     from astrolift_scm.services.connection_resolver import PLATFORM_REPO_WRITE, resolve_connection
 
     org, user = org_user_member
-    connection = _make_github_app_install(org)
+    connection = _make_github_app_install(org, client_id=CLIENT_ID, pem=github.pem.encode())
+    connection.oauth_client_id = str(APP_ID)
     connection.account_login = "ConflictHQ"
     connection.is_active = False
     connection.installation_id = ""
     connection.save()
+    github.installations = {"1001": (APP_ID, "ConflictHQ"), "2002": (APP_ID, "calliopeai")}
 
     client = Client()
     _login(client, user)
@@ -682,17 +689,9 @@ def test_github_install_time_callback_records_the_account_github_installed_on(or
     }
     session.save()
 
-    installations = [
-        {"id": 1001, "account": {"login": "ConflictHQ"}},
-        {"id": 2002, "account": {"login": "calliopeai"}},
-    ]
     with (
         patch("auth1.scm_oauth._resolve_user_token_via_post", return_value=("ghu_install_time_token", None)),
         patch("auth1.scm_oauth._resolve_github_login", return_value="leo"),
-        patch("astrolift_scm.providers.github_app._mint_jwt", return_value="jwt"),
-        patch(
-            "astrolift_scm.providers.github_app.list_app_installations", return_value=(installations, None)
-        ),
     ):
         resp = client.get(
             "/app/auth1/scm/github/callback",

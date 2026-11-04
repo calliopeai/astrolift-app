@@ -59,6 +59,12 @@ _KINDS_REQUIRING_APP_CLIENT_ID = {
     SourceConnection.Kind.GITHUB_OAUTH_APP.value,
     SourceConnection.Kind.GITHUB_APP_INSTALL.value,
 }
+# Kinds whose installation id mints GitHub App tokens: a typed one is
+# confirmed with GitHub before the row is kept (#2631).
+_KINDS_WITH_INSTALLATION = {
+    SourceConnection.Kind.GITHUB_APP_INSTALL.value,
+    SourceConnection.Kind.GITHUB_FACTORY_GATE_APP.value,
+}
 
 
 def _looks_like_github_client_id(value: str) -> bool:
@@ -378,6 +384,41 @@ def _validate_connect(input: ConnectSourceInput):
     return None
 
 
+def _unconfirmed_installation(conn: SourceConnection):
+    """The failure for an installation id typed on the Connect source form
+    that GitHub, asked with the pasted key, does not confirm as this App's,
+    on ``accountLogin`` when one is given, or that another organization's
+    connection holds; None once confirmed."""
+    from astrolift_scm.providers import github_app as gh_app
+
+    if not conn.installation_id.isdigit():
+        return gql_failure(
+            ErrorCode.VALIDATION.value,
+            "installationId must be the numeric GitHub App installation id",
+            field="installationId",
+        )
+    code, message, _installed_on = gh_app.confirm_installation(
+        conn, conn.installation_id, account_login=conn.account_login
+    )
+    if code is None:
+        return None
+    if code == "KEY_UNUSABLE":
+        return gql_failure(
+            ErrorCode.VALIDATION.value,
+            "secretPlaintext is not a private key that can sign for this App",
+            field="secretPlaintext",
+        )
+    if code == "INSTALLATION_UNCONFIRMED":
+        return gql_failure(
+            ErrorCode.PRECONDITION.value,
+            f"couldn't confirm installation {conn.installation_id} with GitHub: {message}",
+            field="installationId",
+        )
+    # Another App's or another account's installation, or one another
+    # organization holds: a refusal, audited as DENY.
+    return gql_failure(ErrorCode.PERMISSION_DENIED.value, message, field="installationId")
+
+
 def _match_installation(installations: list[dict], login: str) -> dict | None:
     """The installation whose ``account.login`` equals ``login`` (case-insensitive)."""
     want = login.strip().lower()
@@ -477,22 +518,27 @@ class ScmMutation:
 
         encrypted = encrypt_at_rest(input.secret_plaintext.encode("utf-8"))
 
+        conn = SourceConnection(
+            organization=org,
+            kind=input.kind,
+            display_name=(input.display_name or "")[:200],
+            account_login=(input.account_login or "")[:200],
+            installation_id=(input.installation_id or "")[:64],
+            api_base_url=input.api_base_url or "",
+            oauth_client_id=input.oauth_client_id or "",
+            app_client_id=(input.app_client_id or "").strip()[:64],
+            oauth_redirect_uri=input.oauth_redirect_uri or "",
+            repo_visibility_scopes=list(input.repo_visibility_scopes or []),
+            secret_backend_kind=encrypted.backend_kind,
+            secret_ciphertext=encrypted.backend_ref,
+            is_active=True,
+        )
+        if conn.installation_id and conn.kind in _KINDS_WITH_INSTALLATION:
+            refused = _unconfirmed_installation(conn)
+            if refused is not None:
+                return refused
         with transaction.atomic():
-            conn = SourceConnection.objects.create(
-                organization=org,
-                kind=input.kind,
-                display_name=(input.display_name or "")[:200],
-                account_login=(input.account_login or "")[:200],
-                installation_id=(input.installation_id or "")[:64],
-                api_base_url=input.api_base_url or "",
-                oauth_client_id=input.oauth_client_id or "",
-                app_client_id=(input.app_client_id or "").strip()[:64],
-                oauth_redirect_uri=input.oauth_redirect_uri or "",
-                repo_visibility_scopes=list(input.repo_visibility_scopes or []),
-                secret_backend_kind=encrypted.backend_kind,
-                secret_ciphertext=encrypted.backend_ref,
-                is_active=True,
-            )
+            conn.save()
         return gql_success(source_connection_to_type(conn))
 
     @strawberry.field
@@ -618,6 +664,15 @@ class ScmMutation:
                 ErrorCode.PRECONDITION.value,
                 f"GitHub returned an installation with no id for App {app_id}",
                 field="appId",
+            )
+        if gh_app.held_by_another_organization(
+            installation_id, kind=SourceConnection.Kind.GITHUB_APP_INSTALL.value, organization_id=org_id
+        ):
+            return gql_failure(
+                ErrorCode.PERMISSION_DENIED.value,
+                f"installation {installation_id} on {account_login or 'that account'} is held by another "
+                "organization's connection",
+                field="orgLogin",
             )
 
         # Prove the creds end-to-end before persisting: mint a real
