@@ -252,17 +252,30 @@ def test_only_the_delivering_installations_organization_moves(world, github, aut
 
 @pytest.mark.parametrize(
     "case,code,message",
-    [("outside_installation", "PRECONDITION", OUTSIDE), ("taken", "CONFLICT", TAKEN)],
+    [
+        ("outside_installation", "PRECONDITION", OUTSIDE),
+        ("taken", "CONFLICT", TAKEN),
+        ("taken_while_asking_github", "CONFLICT", TAKEN),
+    ],
 )
 def test_a_refused_rename_leaves_the_app_on_the_old_name_and_audits_why(
-    world, github, autowired, case, code, message
+    world, github, autowired, monkeypatch, case, code, message
 ):
+    import astrolift_scm.services.source_change as source_change
+
     app = world.medops_app
     if case == "outside_installation":
         github.installed = [OLD]
-    else:
+    elif case == "taken":
         world.platform_app.source_repo = NEW
         world.platform_app.save()
+    else:
+
+        def registered_meanwhile(organization_id, repo):
+            RegisteredApp.objects.filter(pk=world.platform_app.pk).update(source_repo=NEW)
+            return NEW
+
+        monkeypatch.setattr(source_change, "installed_repository", registered_meanwhile)
     before = _snapshot(app)
 
     resp = _deliver(world.conn, _renamed())
