@@ -995,6 +995,7 @@ def _sync_agent_repo(_request: HttpRequest, args: dict[str, Any]) -> dict[str, A
         deploy_branch=deploy_branch,
         default_cluster=default_cluster,
         manifest_paths=args.get("manifest_paths") or None,
+        reconcile_workflows=not args.get("manifest_paths"),
     )
     if result.status != "ok":
         raise McpCallError(result.error or result.status, code=result.status)

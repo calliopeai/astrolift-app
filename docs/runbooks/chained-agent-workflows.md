@@ -30,7 +30,14 @@ maps one `[[stage]]` table to one row:
 For an organization-owned agent repository, commit definitions under
 `workflows/*.toml` (nested paths under `workflows/` are also accepted). Agent
 repo registration, manual resync, and source push reconciliation parse and
-upsert those definitions after the repo's agents are reconciled. The
+upsert those definitions after the repo's agents are reconciled. Registration
+that names agent manifests (`astro agent register-repo --manifest-path`,
+`registerAgentRepo(manifestPaths:)`, `manifest_paths` on
+`astrolift_sync_agent_repo`) registers only those agents and leaves
+`workflows/` and every definition as they are. A workflow moved to another
+file keeps its definition, stages and configured workflows under the new path;
+a slug held by another repository or by a definition imported by hand still
+refuses. The
 `backend/workflows/catalogue/*.toml` directory is reserved for platform-owned
 built-in templates and is not the tenant configuration path.
 
