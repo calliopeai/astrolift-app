@@ -10,6 +10,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="managedservice",
             name="failed_step",
-            field=models.CharField(blank=True, default="", max_length=32),
+            field=models.CharField(blank=True, default="", db_default="", max_length=32),
         ),
     ]
