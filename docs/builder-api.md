@@ -2,7 +2,9 @@
 
 For source deployment into a selected project and existing brain, use the
 [two-step source-build/brain-hosting protocol](operators/builder-brain-source.md).
-The legacy team promotion route below does not enroll an app on a brain.
+For an ordinary app in a selected project without a brain, use the
+[project source protocol](operators/builder-project-source.md).
+The legacy team promotion route below selects neither a project nor a brain.
 
 Preconditions: an API token (`alft_at_...`) issued by the CLI device flow
 (`astro auth login`) carrying `write:apps` or `admin`, for an organization whose

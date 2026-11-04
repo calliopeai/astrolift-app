@@ -73,6 +73,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "apps.dependency_context",
     "apps.temporary_expiry",
     "builder.brain_source_artifacts",
+    # Ordinary Builder apps in an exact project, no brain (#2471).
+    "builder.project_source_artifacts",
     "providers.reference_read",
     "domains.managed_diagnostics",
     "workloads.environment_targets",

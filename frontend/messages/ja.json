@@ -4165,7 +4165,9 @@
       "personal": "個人",
       "noScopeRestriction": "(スコープ制限なし)",
       "active": "有効",
-      "disabled": "無効",
+      "inactive": "無効",
+      "installationMissing": "インストールなし",
+      "unverified": "未確認",
       "addClientId": "クライアント ID を追加",
       "connectMyGithub": "自分の GitHub を接続",
       "connectMyGitlab": "自分の GitLab を接続",
@@ -17047,7 +17049,9 @@
       "options": {
         "status": {
           "active": "有効",
-          "disabled": "無効"
+          "inactive": "無効",
+          "installation_missing": "インストールなし",
+          "unverified": "未確認"
         }
       },
       "views": {

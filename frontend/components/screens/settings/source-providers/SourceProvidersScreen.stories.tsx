@@ -21,6 +21,7 @@ import {
   LONG_KEYS,
   REVEAL,
   ROTATE_FACTORY_GATE_KEY,
+  STATUS_CONNECTIONS,
 } from "./settings-source-providers.fixtures";
 import { DEPLOY_KEYS_LIST, SOURCE_HOSTS_LIST } from "./source-providers-list";
 import {
@@ -174,6 +175,37 @@ export const MineHosts: Story = {
       }
     />
   ),
+};
+
+/**
+ * The Status column reads the server's check (#2601): an App with no
+ * installation on its account reads installation missing, with the step that
+ * fixes it, though Astrolift still has it switched on.
+ */
+export const ConnectionStatuses: Story = {
+  render: () => (
+    <Screen
+      hosts={
+        <Hosts
+          rows={STATUS_CONNECTIONS}
+          totalCount={STATUS_CONNECTIONS.length}
+          incompleteClientIdConnections={[]}
+        />
+      }
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const missing = canvas.getByText("GitHub App: astrolift-ai (ConflictHQ)").closest("tr")!;
+    await expect(within(missing).getByText("installation missing")).toBeVisible();
+    await expect(
+      within(missing).getByText(/no installation of this App on ConflictHQ/)
+    ).toBeVisible();
+    await expect(within(missing).queryByText("active")).toBeNull();
+    for (const label of ["active", "inactive", "not verified"]) {
+      await expect(canvas.getByText(label)).toBeVisible();
+    }
+  },
 };
 
 export const LongStrings: Story = {

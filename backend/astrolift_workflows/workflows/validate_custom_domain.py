@@ -34,6 +34,7 @@ from astrolift_workflows.inputs import (
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
+        ensure_edge_certificate,
         ensure_platform_managed_records,
         issue_custom_domain_certificate,
         probe_required_records,
@@ -164,6 +165,20 @@ class ValidateCustomDomainWorkflow:
                 )
             except Exception as exc:  # noqa: BLE001
                 cert_result = {"ok": False, "message": str(exc)}
+            # The certificate is on the domain; the ingress load balancer
+            # still has to be told to present it. The activity records its
+            # own failure on the row and does not raise.
+            edge_result: dict | None = None
+            try:
+                edge_result = await workflow.execute_activity(
+                    ensure_edge_certificate,
+                    domain_id,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    heartbeat_timeout=HEARTBEAT_TIMEOUT,
+                    retry_policy=_ENSURE_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001
+                edge_result = {"ok": False, "message": str(exc)}
             return WorkflowResult(
                 ok=True,
                 message="custom domain validated",
@@ -171,6 +186,7 @@ class ValidateCustomDomainWorkflow:
                     "ensure": ensure_result if isinstance(ensure_result, dict) else None,
                     "probe": last_probe,
                     "cert": cert_result,
+                    "edge_cert": edge_result,
                 },
             )
 

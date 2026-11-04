@@ -4879,7 +4879,9 @@
       "personal": "personal",
       "noScopeRestriction": "(no scope restriction)",
       "active": "active",
-      "disabled": "disabled",
+      "inactive": "inactive",
+      "installationMissing": "installation missing",
+      "unverified": "not verified",
       "addClientId": "Add Client ID",
       "connectMyGithub": "Connect my GitHub",
       "connectMyGitlab": "Connect my GitLab",
@@ -16840,7 +16842,9 @@
       "options": {
         "status": {
           "active": "active",
-          "disabled": "disabled"
+          "inactive": "inactive",
+          "installation_missing": "installation missing",
+          "unverified": "not verified"
         }
       },
       "views": {

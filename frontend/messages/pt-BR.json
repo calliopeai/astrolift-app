@@ -4165,7 +4165,9 @@
       "personal": "pessoal",
       "noScopeRestriction": "(sem restrição de escopo)",
       "active": "ativa",
-      "disabled": "desativada",
+      "inactive": "inativa",
+      "installationMissing": "instalação ausente",
+      "unverified": "não verificada",
       "addClientId": "Adicionar Client ID",
       "connectMyGithub": "Conectar meu GitHub",
       "connectMyGitlab": "Conectar meu GitLab",
@@ -17047,7 +17049,9 @@
       "options": {
         "status": {
           "active": "ativa",
-          "disabled": "desativada"
+          "inactive": "inativa",
+          "installation_missing": "instalação ausente",
+          "unverified": "não verificada"
         }
       },
       "views": {

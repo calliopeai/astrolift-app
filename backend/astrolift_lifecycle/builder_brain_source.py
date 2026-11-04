@@ -1,8 +1,10 @@
-"""Admission and immutable build artifacts for Builder-to-brain hosting (#2456).
+"""Admission and immutable build artifacts for Builder source hosting.
 
 No cloud resource creation or identity grants occur here. The operator supplies
 an exact project-isolated target; hosting consumes a verified artifact in a new
-HTTP request and uses the ordinary brain-binding and deployment mechanisms.
+HTTP request and uses the ordinary registration and deployment mechanisms. A
+brain intent (#2456) also binds the app to a readable brain in that project; a
+project intent (#2471) hosts an ordinary app there and never reads a brain.
 """
 
 from __future__ import annotations
@@ -40,10 +42,15 @@ from core.permissions import Permission, PermissionScope, ScopeKind, check_permi
 from core.tenancy import TenantContext, tenant_context
 
 PROTOCOL = "builder-brain-source-v1"
+PROJECT_PROTOCOL = "builder-project-source-v1"
 ARCHIVE_SALT = "astrolift.builder.brain-build-archive.v1"
 LABEL = "astrolift.io/builder-brain-build"
 BUILD_SECONDS = 1800
 GRANT_SECONDS = 1800
+BRAIN = BuilderBrainBuild.HostingMode.BRAIN
+PROJECT = BuilderBrainBuild.HostingMode.PROJECT
+PROTOCOLS = {BRAIN: PROTOCOL, PROJECT: PROJECT_PROTOCOL}
+ROUTES = {BRAIN: "brain-source-builds", PROJECT: "project-source-builds"}
 
 
 class SourceError(ValueError):
@@ -64,24 +71,24 @@ def _binding(token):
     ).hexdigest()
 
 
-def _audit(row, action):
+def _audit(row, event):
     from core.mutations import AuditEntry, emit_audit
 
+    extra = {"project": str(row.project.guid)}
+    if row.hosting_mode == BRAIN:
+        extra["brain"] = str(row.brain.guid)
+    extra["archive_sha256"] = row.archive_sha256
     emit_audit(
         AuditEntry(
             actor_user_id=row.actor_id,
             organization_id=row.organization_id,
-            action=action,
+            action=f"builder.{row.hosting_mode}_source.{event}",
             decision="ALLOW",
             target_kind="BuilderBrainBuild",
             target_id=str(row.guid),
             duration_ms=0,
             permissions=("app.create", "app.deploy"),
-            extra={
-                "project": str(row.project.guid),
-                "brain": str(row.brain.guid),
-                "archive_sha256": row.archive_sha256,
-            },
+            extra=extra,
         )
     )
 
@@ -107,7 +114,7 @@ def source_owner(token, org, dev):
     _deny_response(builder_views._owner_denied(token, dev))
 
 
-def destination(token, org, project_guid, brain_slug):
+def project_destination(token, org, project_guid):
     project = (
         Project.objects.select_related("team", "organization")
         .filter(
@@ -126,6 +133,11 @@ def destination(token, org, project_guid, brain_slug):
         raise SourceError("PERMISSION_DENIED", "destination is outside the credential's team", 403)
     for permission in (Permission.APP_CREATE, Permission.APP_DEPLOY):
         check_permission(permission, scope=PermissionScope(ScopeKind.PROJECT, project.pk))
+    return project
+
+
+def destination(token, org, project_guid, brain_slug):
+    project = project_destination(token, org, project_guid)
     brain = brain_apps.readable_brain_for(token.user, org.pk, brain_slug)
     if brain is None or brain.project_id != project.pk or brain.team_id != project.team_id:
         raise SourceError("NOT_FOUND", "readable brain in the selected project not found", 404)
@@ -260,10 +272,9 @@ def source_descriptor(dev):
     }, raw
 
 
-def admit(request, token, org, dev_guid, body):
+def admit(request, token, org, dev_guid, body, *, mode=BRAIN):
     allowed = {
         "project_guid",
-        "brain_slug",
         "app_name",
         "app_slug",
         "idempotency_key",
@@ -272,13 +283,17 @@ def admit(request, token, org, dev_guid, body):
         "expires_at",
         "delete_data_on_expiry",
     }
+    if mode == BRAIN:
+        allowed.add("brain_slug")
     if set(body) - allowed or any(
         not isinstance(body.get(k), str) or not body[k].strip()
         for k in allowed - {"expires_in", "expires_at", "delete_data_on_expiry"}
     ):
         raise SourceError(
             "VALIDATION",
-            "exact project, brain, name, slug, idempotency key and expected archive digest are required",
+            "exact project, brain, name, slug, idempotency key and expected archive digest are required"
+            if mode == BRAIN
+            else "exact project, name, slug, idempotency key and expected archive digest are required",
             400,
         )
     if not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", body["idempotency_key"]) or not re.fullmatch(
@@ -322,7 +337,10 @@ def admit(request, token, org, dev_guid, body):
         if dev is None:
             raise SourceError("NOT_FOUND", "source environment not found", 404)
         source_owner(token, org, dev)
-        project, brain = destination(token, org, project_guid, body["brain_slug"])
+        if mode == BRAIN:
+            project, brain = destination(token, org, project_guid, body["brain_slug"])
+        else:
+            project, brain = project_destination(token, org, project_guid), None
         existing = BuilderBrainBuild.objects.filter(
             organization_id=org.pk, actor_id=token.user_id, idempotency_key=body["idempotency_key"]
         ).first()
@@ -359,6 +377,7 @@ def admit(request, token, org, dev_guid, body):
             organization=org,
             project=project,
             brain=brain,
+            hosting_mode=mode,
             dev_environment=dev,
             actor_id=token.user_id,
             credential=token,
@@ -389,7 +408,7 @@ def admit(request, token, org, dev_guid, body):
             },
             build_deadline=timezone.now() + dt.timedelta(seconds=BUILD_SECONDS + 300),
         )
-        _audit(row, "builder.brain_source.admit")
+        _audit(row, "admit")
         return row, True
 
 
@@ -458,6 +477,11 @@ def validate(row):
         ):
             raise SourceError("SOURCE_OWNER_CHANGED", "the admitted source owner changed", 403)
         source_owner(token, row.organization, dev)
+        if row.hosting_mode == PROJECT:
+            project = project_destination(token, row.organization, str(row.project.guid))
+            if project.team_id != row.admission["project_team_id"]:
+                raise SourceError("DESTINATION_CHANGED", "the admitted destination ownership changed", 403)
+            return project
         project, brain = destination(token, row.organization, str(row.project.guid), row.brain.slug)
         if project.team_id != row.admission["project_team_id"] or brain.pk != row.brain_id:
             raise SourceError("DESTINATION_CHANGED", "the admitted destination ownership changed", 403)
@@ -572,7 +596,7 @@ def build(row_id):
             )
             base = builder_artifacts.reference_base_url()
             archive = BuildContextArchive(
-                url=base + f"/api/builder/v1/brain-source-builds/{row.guid}/archive/",
+                url=base + f"/api/builder/v1/{ROUTES[row.hosting_mode]}/{row.guid}/archive/",
                 token=grant,
                 sha256=row.archive_sha256,
                 size_bytes=row.archive_bytes,
@@ -690,7 +714,7 @@ def build(row_id):
         row.save(
             update_fields=["image_digest", "image_ref", "status", "failure_code", "updated_at", "version"]
         )
-        _audit(row, "builder.brain_source.artifact_ready")
+        _audit(row, "artifact_ready")
         return {"ok": True, "status": row.status}
     except Exception as exc:
         code = exc.code if isinstance(exc, SourceError) else "BUILD_NATIVE_FAILURE"
@@ -705,7 +729,46 @@ def build(row_id):
             cursor.execute("SELECT pg_advisory_unlock(%s, %s)", [2456, row_id])
 
 
-def host(request, token, org, row_guid, expected_image_digest):
+def _register_project_app(info, row, project, cluster, expires_at):
+    """An ordinary app through shared registration; no brain is read or bound."""
+    from astrolift_graphql import GUID
+    from astrolift_lifecycle.builder_brain_recipe import manifest
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.schema.mutations.registration import register_app_record
+    from astrolift_registry.schema.mutations.types import RegisterAppInput
+    from astrolift_registry.scopes import registration_project_scope
+
+    initial = row.admission
+    data = RegisterAppInput(
+        project_id=GUID(str(project.guid)),
+        name=initial["app_name"],
+        slug=initial["app_slug"],
+        source_repo="",
+        build_mode=RegisteredApp.BuildMode.NONE.value,
+        manifest_raw=manifest(
+            app_slug=initial["app_slug"], brain_slug=None, image=row.image_ref, admission=initial
+        ),
+        expires_in=initial["expires_in"],
+        expires_at=expires_at,
+        delete_data_on_expiry=initial["delete_data_on_expiry"],
+    )
+    # Shared registration leaves exact-project admission to its caller, as
+    # hostAppOnBrain checks it before registering.
+    scope = registration_project_scope("input.project_id", permission=Permission.APP_CREATE)({"input": data})
+    check_permission(Permission.APP_CREATE, scope=scope)
+    result = register_app_record(info, data, cluster=cluster, defer_workflow=True)
+    if not result.ok or result.data is None:
+        raise SourceError(
+            "HOST_ADMISSION_REFUSED",
+            "normal app registration refused the request; check current expiry policy and destination permissions",
+            403,
+        )
+    return RegisteredApp.objects.get(
+        guid=result.data.id, organization_id=row.organization_id, project=project
+    )
+
+
+def host(request, token, org, row_guid, expected_image_digest, *, mode=BRAIN):
     from astrolift_graphql import GUID
     from astrolift_lifecycle.builder_brain_dispatch import Capture, dispatch
     from astrolift_lifecycle.builder_brain_recipe import manifest
@@ -727,7 +790,13 @@ def host(request, token, org, row_guid, expected_image_digest):
                 "hosted_app",
                 "deployment",
             )
-            .filter(guid=row_guid, organization_id=org.pk, actor_id=token.user_id, credential_id=token.pk)
+            .filter(
+                guid=row_guid,
+                organization_id=org.pk,
+                actor_id=token.user_id,
+                credential_id=token.pk,
+                hosting_mode=mode,
+            )
             .first()
         )
         if row is None:
@@ -766,34 +835,39 @@ def host(request, token, org, row_guid, expected_image_digest):
         # No surrogate HTTP request, native receipt or system deployer is
         # synthesized. The real fresh request reaches ordinary deploy admission.
         with surface("chat_studio"):
-            result = host_app_record(
-                info,
-                HostAppOnBrainInput(
-                    project_id=GUID(str(project.guid)),
-                    brain_slug=row.brain.slug,
-                    image=row.image_ref,
-                    name=initial["app_name"],
-                    slug=initial["app_slug"],
-                    port=initial["port"],
-                    expires_in=initial["expires_in"],
-                    expires_at=expires_at,
-                    delete_data_on_expiry=initial["delete_data_on_expiry"],
-                ),
-                cluster=cluster,
-                manifest_raw=manifest(
-                    app_slug=initial["app_slug"],
-                    brain_slug=row.brain.slug,
-                    image=row.image_ref,
-                    admission=initial,
-                ),
-            )
-            if not result.ok or result.data is None:
-                raise SourceError(
-                    "HOST_ADMISSION_REFUSED",
-                    "normal brain hosting admission refused the request; check current expiry policy and destination permissions",
-                    403,
+            if row.hosting_mode == PROJECT:
+                app = _register_project_app(info, row, project, cluster, expires_at)
+            else:
+                result = host_app_record(
+                    info,
+                    HostAppOnBrainInput(
+                        project_id=GUID(str(project.guid)),
+                        brain_slug=row.brain.slug,
+                        image=row.image_ref,
+                        name=initial["app_name"],
+                        slug=initial["app_slug"],
+                        port=initial["port"],
+                        expires_in=initial["expires_in"],
+                        expires_at=expires_at,
+                        delete_data_on_expiry=initial["delete_data_on_expiry"],
+                    ),
+                    cluster=cluster,
+                    manifest_raw=manifest(
+                        app_slug=initial["app_slug"],
+                        brain_slug=row.brain.slug,
+                        image=row.image_ref,
+                        admission=initial,
+                    ),
                 )
-            app = RegisteredApp.objects.get(guid=result.data.app.id, organization_id=org.pk, project=project)
+                if not result.ok or result.data is None:
+                    raise SourceError(
+                        "HOST_ADMISSION_REFUSED",
+                        "normal brain hosting admission refused the request; check current expiry policy and destination permissions",
+                        403,
+                    )
+                app = RegisteredApp.objects.get(
+                    guid=result.data.app.id, organization_id=org.pk, project=project
+                )
             with source_deployment_dispatch(Capture(row)):
                 deployed = DeploymentMutations().start_deployment(
                     info,
@@ -826,7 +900,7 @@ def host(request, token, org, row_guid, expected_image_digest):
                 "version",
             ]
         )
-        _audit(row, "builder.brain_source.host")
+        _audit(row, "host")
         return row
 
 
@@ -834,14 +908,14 @@ def response(row):
     app, deployment = row.hosted_app, row.deployment
     return {
         "id": str(row.guid),
-        "protocol": PROTOCOL,
+        "protocol": PROTOCOLS[row.hosting_mode],
         "status": row.status,
         "build_submission": row.build_submission,
         "build_execution_status": row.build_engine_status or None,
         "archive_sha256": row.archive_sha256,
         "project_guid": str(row.project.guid),
-        "brain_guid": str(row.brain.guid),
-        "brain_slug": row.brain.slug,
+        "brain_guid": str(row.brain.guid) if row.brain_id else None,
+        "brain_slug": row.brain.slug if row.brain_id else None,
         "image_digest": row.image_digest or None,
         "image_ref": row.image_ref or None,
         "failure_code": row.failure_code or None,

@@ -114,6 +114,7 @@ from astrolift_workflows.activities.cron_deploy import (
     reconcile_agent_deployments,
 )
 from astrolift_workflows.activities.custom_domain import (
+    ensure_edge_certificate,
     ensure_platform_managed_records,
     issue_custom_domain_certificate,
     probe_required_records,
@@ -144,6 +145,7 @@ from astrolift_workflows.activities.managed_service_lifecycle import (
     bounce_workloads_bound_to_managed_service,
     check_managed_service_ready,
     deprovision_managed_service,
+    emit_managed_service_provision_failed_event,
     finalize_managed_service_deletion,
     finalize_managed_service_provision,
     finalize_managed_service_update,
@@ -320,6 +322,7 @@ __all__ = [
     "ensure_cloudfront_cert",
     "ensure_cluster_drained",
     "ensure_faas_services",
+    "ensure_edge_certificate",
     "ensure_platform_managed_records",
     "ensure_static_dns",
     "ensure_static_site_services",
@@ -363,6 +366,7 @@ __all__ = [
     "mark_managed_service_failed",
     "mark_managed_service_provisioning",
     "record_managed_service_failed_step",
+    "emit_managed_service_provision_failed_event",
     "mark_managing",
     "mark_pipeline_run_failed",
     "mark_pipeline_run_running",

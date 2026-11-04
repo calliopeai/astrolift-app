@@ -6,6 +6,11 @@ stayed ``pending`` with no reason, ``app show`` had nothing to say and
 ``app deploy --wait`` timed out. The ``fetch_failed`` event that held the reason
 was recorded at ``info``.
 
+The stored manifest stands in for the repo's. An app registered with one
+(``astro app register --manifest-raw``) whose workloads were never created
+from it gets them at deploy and deploys it. When nothing can stand in, the
+reason says that a resync from the repo is required.
+
 The workflow tests run the real ``DeployAppWorkflow`` on the Temporal test
 server with the real resync and ``mark_failed`` activities, against Postgres;
 only the source host's reply is stubbed.
@@ -33,7 +38,11 @@ from astrolift_manifest.persist import persist_manifest
 from astrolift_operations.models import Event
 from astrolift_registry.services import manifest_sync
 from astrolift_scm.models import SourceConnection
-from astrolift_workflows.activities.app_lifecycle import mark_failed, resync_manifest_for_deploy
+from astrolift_workflows.activities.app_lifecycle import (
+    _resync_manifest_for_deploy_sync,
+    mark_failed,
+    resync_manifest_for_deploy,
+)
 from astrolift_workflows.inputs import Actor, DeployAppInput
 from astrolift_workflows.tests.test_deploy_workflows_sandboxed_1758 import fake_activities
 from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
@@ -60,6 +69,16 @@ kind = "deployment"
   is_primary = true
   port = 8080
 """
+
+_UNPARSEABLE_TOML = """\
+name = "hello"
+
+[[workloads]]
+name = "web"
+kind = "not-a-kind"
+"""
+
+NOTHING_STORED = "there is no stored manifest to deploy instead, so a resync from the repo is required"
 
 
 @pytest.fixture
@@ -100,6 +119,19 @@ def _sourced_deploy(app, env, *, stored_manifest: str = "") -> Deployment:
         status=Deployment.Status.PENDING.value,
         image_tag="v1",
     )
+
+
+def _stored_without_workloads(app, text: str) -> None:
+    """What registration leaves when it keeps an inline manifest but creates
+    no workloads from it."""
+    app.manifest_raw = text
+    app.manifest_bootstrap_status = "parse_failed"
+    app.manifest_bootstrap_error = "ValueError"
+    app.save()
+
+
+def _live_workloads(app) -> list[str]:
+    return sorted(app.workloads.filter(deleted_at__isnull=True).values_list("slug", flat=True))
 
 
 @activity.defn(name="validate_deployment_identity_origin")
@@ -171,7 +203,7 @@ async def test_an_unreadable_manifest_with_nothing_stored_fails_the_deploy_and_s
     assert row.failed_at is not None
     assert row.manifest_resync_status == "fetch_failed"
     assert row.manifest_resync_error == NOT_FOUND
-    assert NOT_FOUND in row.aborted_reason
+    assert row.aborted_reason.endswith(f"{NOT_FOUND}; {NOTHING_STORED}")
     assert await sync_to_async(deployment_status_reason)(row) == row.aborted_reason
     await _replay(history)
 
@@ -199,6 +231,61 @@ async def test_an_unreadable_manifest_still_deploys_the_stored_workloads(
     assert row.manifest_resync_error == NOT_FOUND
     assert row.aborted_reason == ""
     assert row.registered_app.manifest_raw == _STORED_TOML
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_an_unreadable_manifest_deploys_the_stored_one_whose_workloads_were_never_created(
+    app, env, temporal_env, unreadable_repo
+):
+    """The render reads the stored manifest, so it deploys, and the app gets
+    the workloads registration would have created from it."""
+    await sync_to_async(_stored_without_workloads)(app, _STORED_TOML)
+    deployment = await sync_to_async(_sourced_deploy)(app, env)
+    calls: list[str] = []
+    fakes = [
+        a for a in fake_activities(calls) if a.__name__ not in ("resync_manifest_for_deploy", "mark_failed")
+    ]
+
+    result, history = await _run_deploy(
+        temporal_env, deployment, [*fakes, resync_manifest_for_deploy, mark_failed]
+    )
+
+    assert result.ok is True, result.message
+    assert "astrolift.deploy.mark_failed" not in _scheduled(history)
+    assert {"render_manifests", "apply_manifests", "mark_running"} <= set(calls)
+    row = await sync_to_async(Deployment.objects.select_related("registered_app").get)(pk=deployment.pk)
+    assert row.manifest_resync_status == "fetch_failed"
+    assert row.manifest_resync_error == NOT_FOUND
+    assert row.aborted_reason == ""
+    stored = row.registered_app
+    assert stored.manifest_raw == _STORED_TOML
+    assert await sync_to_async(_live_workloads)(stored) == ["web"]
+    assert (stored.manifest_bootstrap_status, stored.manifest_bootstrap_error) == ("applied", "")
+    await _replay(history)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("stored", "why"),
+    [
+        (_UNPARSEABLE_TOML, "the stored manifest does not parse ("),
+        ('name = "hello"\n', "the stored manifest declares no workloads"),
+    ],
+)
+def test_a_stored_manifest_that_cannot_stand_in_says_a_resync_is_required(
+    app, env, unreadable_repo, stored, why
+):
+    _stored_without_workloads(app, stored)
+    deployment = _sourced_deploy(app, env)
+
+    outcome = _resync_manifest_for_deploy_sync(deployment.pk)
+
+    assert (outcome["status"], outcome["workload_count"]) == ("fetch_failed", 0)
+    assert outcome["error"].startswith(f"{NOT_FOUND}; {why}")
+    assert outcome["error"].endswith(", so a resync from the repo is required")
+    assert _live_workloads(app) == []
+    deployment.refresh_from_db()
+    assert deployment.manifest_resync_error == NOT_FOUND
 
 
 @pytest.mark.django_db
