@@ -4165,7 +4165,9 @@
       "personal": "个人",
       "noScopeRestriction": "（无范围限制）",
       "active": "已启用",
-      "disabled": "已停用",
+      "inactive": "已停用",
+      "installationMissing": "缺少安装",
+      "unverified": "未验证",
       "addClientId": "添加 Client ID",
       "connectMyGithub": "连接我的 GitHub",
       "connectMyGitlab": "连接我的 GitLab",
@@ -16899,7 +16901,9 @@
       "options": {
         "status": {
           "active": "已启用",
-          "disabled": "已停用"
+          "inactive": "已停用",
+          "installation_missing": "缺少安装",
+          "unverified": "未验证"
         }
       },
       "views": {

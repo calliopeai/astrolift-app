@@ -5998,6 +5998,10 @@ export type AstroliftSourceConnection = {
   oauthRedirectUri: Scalars['String']['output'];
   parentOauthAppId?: Maybe<Scalars['GUID']['output']>;
   repoVisibilityScopes: Array<Scalars['String']['output']>;
+  /** Whether the connection can be used now (#2601); isActive is only the stored switch. A GitHub App installation is checked against GitHub by minting an installation token: at most 10 per response and none started after 5 seconds (later rows read UNVERIFIED), each verdict cached for 60 seconds. Other kinds answer from their stored flags. */
+  status: AstroliftSourceConnectionStatus;
+  /** Why the connection has its status: what is missing, and the console step that fixes it. Empty when ACTIVE. */
+  statusDetail: Scalars['String']['output'];
   tokenExpiresAt?: Maybe<Scalars['DateTime']['output']>;
   updatedAt: Scalars['DateTime']['output'];
   userUsername?: Maybe<Scalars['String']['output']>;
@@ -6027,6 +6031,13 @@ export type AstroliftSourceConnectionState =
   | 'CONNECTED'
   | 'NOT_CONNECTED'
   | 'UNKNOWN';
+
+/** Whether a source connection can be used now (#2601). ACTIVE: usable; for a GitHub App, GitHub minted an installation token. INACTIVE: inactive in Astrolift, orphaned, or GitHub refused the App's credentials. INSTALLATION_MISSING: a GitHub App with no installation on its account, or whose install never finished. UNVERIFIED: GitHub could not be asked, or the connection was not checked on this load. */
+export type AstroliftSourceConnectionStatus =
+  | 'ACTIVE'
+  | 'INACTIVE'
+  | 'INSTALLATION_MISSING'
+  | 'UNVERIFIED';
 
 export type AstroliftSourceFile = {
   content?: Maybe<Scalars['String']['output']>;

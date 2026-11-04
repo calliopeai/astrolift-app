@@ -13,6 +13,7 @@ import type {
   AstroliftScmPushCiWorkflowResult as GeneratedPushCiWorkflowResult,
   AstroliftScmWebhookSecretReveal as GeneratedScmWebhookSecretReveal,
   AstroliftSourceConnection as GeneratedSourceConnection,
+  AstroliftSourceConnectionStatus as GeneratedSourceConnectionStatus,
   AstroliftSourceFile as GeneratedSourceFile,
   AstroliftSshDeployKey as GeneratedSshDeployKey,
   AstroliftSshDeployKeyCreated as GeneratedSshDeployKeyCreated,
@@ -36,12 +37,17 @@ export type ScmConnectionKind =
 
 export type ScmVisibilityScope = "private_org" | "public_org" | "user_repos" | "public_non_org";
 
+export type ScmConnectionStatus = GeneratedSourceConnectionStatus;
+
 export type AstroliftSourceConnection = Omit<
   GeneratedSourceConnection,
-  "kind" | "repoVisibilityScopes"
+  "kind" | "repoVisibilityScopes" | "status" | "statusDetail"
 > & {
   kind: ScmConnectionKind;
   repoVisibilityScopes: ScmVisibilityScope[];
+  /** Checked against GitHub for a GitHub App (#2601). Only the Source page's list query selects these. */
+  status?: ScmConnectionStatus;
+  statusDetail?: string;
 };
 
 export type AstroliftSshDeployKey = GeneratedSshDeployKey;

@@ -5,9 +5,22 @@ from __future__ import annotations
 import datetime as dt
 
 import strawberry
+from strawberry.types import Info
 
 from astrolift_graphql import GUID
-from astrolift_scm.services import factory_gate
+from astrolift_scm.services import connection_status, factory_gate
+
+SourceConnectionStatus = strawberry.enum(
+    connection_status.Status,
+    name="AstroliftSourceConnectionStatus",
+    description=(
+        "Whether a source connection can be used now (#2601). ACTIVE: usable; for a GitHub App, GitHub "
+        "minted an installation token. INACTIVE: inactive in Astrolift, orphaned, or GitHub refused the "
+        "App's credentials. INSTALLATION_MISSING: a GitHub App with no installation on its account, or "
+        "whose install never finished. UNVERIFIED: GitHub could not be asked, or the connection was not "
+        "checked on this load."
+    ),
+)
 
 
 @strawberry.type(name="AstroliftSourceConnection")
@@ -42,6 +55,28 @@ class SourceConnectionType:
     is_personal: bool
     user_username: str | None
     parent_oauth_app_id: GUID | None
+    row: strawberry.Private[object]
+
+    @strawberry.field(
+        description=(
+            "Whether the connection can be used now (#2601); isActive is only the stored switch. A GitHub "
+            "App installation is checked against GitHub by minting an installation token: at most "
+            f"{connection_status.CHECKS_PER_RESPONSE} per response and none started after "
+            f"{connection_status.CHECK_BUDGET_SECONDS:g} seconds (later rows read UNVERIFIED), each verdict "
+            f"cached for {connection_status.CACHE_SECONDS} seconds. Other kinds answer from their stored flags."
+        )
+    )
+    def status(self, info: Info) -> SourceConnectionStatus:
+        return connection_status.response_status(info).verdict(self.row).status
+
+    @strawberry.field(
+        description=(
+            "Why the connection has its status: what is missing, and the console step that fixes it. Empty "
+            "when ACTIVE."
+        )
+    )
+    def status_detail(self, info: Info) -> str:
+        return connection_status.response_status(info).verdict(self.row).detail
 
 
 @strawberry.type(name="AstroliftSshDeployKey")
@@ -176,6 +211,7 @@ def source_connection_to_type(c) -> SourceConnectionType:
         is_personal=c.user_id is not None,
         user_username=user_username,
         parent_oauth_app_id=parent_guid,
+        row=c,
     )
 
 

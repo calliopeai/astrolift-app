@@ -70,12 +70,18 @@ export const LIST_SSH_DEPLOY_KEYS = gql`
  * file is excluded from the codegen document set for exactly that reason
  * (see ``codegen.ts``). Converting all of them together — and dropping the
  * exclusion — is a separate change.
+ *
+ * Only the Source page's list asks for ``status`` / ``statusDetail``: for a
+ * GitHub App they cost a token mint against GitHub (#2601), so they stay out
+ * of ``CONNECTION_FIELDS``, which the repo pickers share.
  */
 export const LIST_SOURCE_CONNECTIONS_PAGE = gql`
   query ListSourceConnectionsPage($search: String, $limit: Int, $after: String) {
     astroliftSourceConnectionsPage(search: $search, limit: $limit, after: $after) {
       items {
         ${CONNECTION_FIELDS}
+        status
+        statusDetail
       }
       nextCursor
       totalCount
