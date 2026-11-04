@@ -10857,7 +10857,7 @@
     "emptyDescription": "创建团队以开始对项目和应用分组。",
     "deleteTitle": "删除团队 {slug}？",
     "deleteGenericTitle": "删除团队？",
-    "deleteDescription": "停用团队并允许重复使用其标识符。这不会重新分配团队的项目或应用。",
+    "deleteDescription": "停用团队并允许重复使用其标识符。只要团队中仍有项目、应用、代理、托管资源或共享密钥包，停用就会被拒绝。",
     "confirmDelete": "删除团队",
     "createDescription": "团队限定项目、成员和令牌的范围。标识符必须唯一，团队停用后可重复使用。",
     "displayName": "显示名称",

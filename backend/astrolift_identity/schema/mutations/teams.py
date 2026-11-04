@@ -15,10 +15,12 @@ from astrolift_graphql import (
     success as gql_success,
 )
 from astrolift_identity.models import (
+    Project,
     Team,
 )
 from astrolift_identity.schema.mutations.helpers import (
     _actor,
+    _listed,
     _resolve_org,
     _resolve_team,
 )
@@ -125,10 +127,44 @@ class TeamMutations:
     def soft_delete_team(
         self, info: Info, input: SoftDeleteByGuidInput
     ) -> MutationResultType[_SoftDeletePayload]:
+        from astrolift_registry.models import RegisteredApp
+        from astrolift_services.models import ManagedService, SecretBundle
+
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
         team = _resolve_team(input.id, org_id)
         if team is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "team not found")
+        # Projects and apps keep pointing at a soft-deleted team, and the
+        # routes and lists that walk live owners drop them, so they could no
+        # longer be moved, deregistered or deleted (#2627). They leave first,
+        # as a project's apps do (#2479), and the refusal also names what its
+        # projects still own. Rows still tearing down are live. A bundle owned
+        # by the team itself (no project) is legacy and no mutation deletes
+        # one, so it does not block.
+        team_projects = Project.objects.filter(team_id=team.pk, organization_id=org_id)
+        apps = RegisteredApp.objects.filter(team_id=team.pk, organization_id=org_id).count()
+        resources = ManagedService.objects.filter(project__in=team_projects).count()
+        bundles = SecretBundle.objects.filter(project__in=team_projects, organization_id=org_id).count()
+        projects = team_projects.count()
+        if apps or resources or bundles or projects:
+            held: list[str] = []
+            steps: list[str] = []
+            if apps:
+                held.append(f"{apps} app{'' if apps == 1 else 's'}")
+                steps.append("move its apps to another team or deregister them")
+            if resources:
+                held.append(f"{resources} managed resource{'' if resources == 1 else 's'}")
+                steps.append("deprovision its managed resources")
+            if bundles:
+                held.append(f"{bundles} secret bundle{'' if bundles == 1 else 's'}")
+                steps.append("delete its secret bundles")
+            if projects:
+                held.append(f"{projects} project{'' if projects == 1 else 's'}")
+                steps.append("delete its projects")
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"team still has {_listed(held)}; {_listed(steps)} before deleting it",
+            )
         team.soft_delete(by=_actor())
         return gql_success(_SoftDeletePayload(id=input.id, deleted=True))
