@@ -4,10 +4,15 @@ Gate creation remains available when a notification channel fails. The
 `workflow.human_gate.notified` event records each requested channel's boolean
 delivery result, the workflow-run GUID and stage name. A refused mail send,
 a transport returning zero deliveries, or no resolved recipient records
-`delivery.email: false`, `status: failed` and event severity `error`.
-Successful sends record `status: notified`; a configuration requesting no
-channels records `status: skipped`. Email success means the configured transport
-accepted one message, not proof that a recipient received it.
+`delivery.email: false`, `status: failed` and event severity `error`, and
+`reasons.email` says why: the provider's error code when the transport reports
+one (`AccessDenied` for a role without `ses:GetSendQuota` or the send grant,
+`MessageRejected` for a sender no verified identity covers), else the
+transport's exception type, `not_accepted` for a send that accepted nothing, or
+`no_recipient`. Successful sends record `status: notified` and empty `reasons`;
+a configuration requesting no channels records `status: skipped`. Email success
+means the configured transport accepted one message, not proof that a recipient
+received it.
 
 Preconditions: reading the event needs `audit_log.read` in the active
 organization (`astroliftEventsPage`, or the console `/events`). The SES
@@ -19,7 +24,7 @@ the event payload.
 
 The event uses the standard organization-confined append-only event writer and
 is visible through authorized activity/event reads. No recipient address or
-provider exception is included in its payload. Persistence relies on the event
+provider message is included in its payload. Persistence relies on the event
 store being available; the general event writer remains best-effort during a
 database failure. The gate stays RUNNING and can be reviewed despite delivery
 failure. Activity retries may notify again; this is not an exactly-once send.
@@ -64,10 +69,20 @@ operator-applied DNS records, paired task sender configuration and an authorized
 external-mail test remain required. #1823 remains open; these local delivery
 tests do not establish a working production sender.
 
+## Conflict follow-up, 2026-10-18
+
+Both identities verified once their DKIM CNAMEs were renamed without a stray
+leading underscore. AWS granted the account production SES access in us-west-2
+on 2026-10-16. The installer (calliopeai/calliope-installer#528, applied on
+Conflict with 0.1.61) sets `FROM_EMAIL`, the SES region and endpoint, and owns
+the task-role grant: `ses:GetSendQuota` on `*`, `ses:SendEmail`/`ses:SendRawEmail`
+on the verified identity. With the reason on the event, the next gate's outcome
+reads from the event below, not the worker log.
+
 ## Verify
 
 ```sh
 astro api graphql -q '{ astroliftEventsPage(eventType: "workflow.human_gate.notified", limit: 5) { items { occurredAt severity payload } } }'
 ```
 
-The newest event's `payload.status` is `notified` with `payload.delivery.email: true`; `failed` with `delivery.email: false` and severity `error` means the transport refused, returned zero deliveries or found no recipient.
+The newest event's `payload.status` is `notified` with `payload.delivery.email: true`; `failed` with `delivery.email: false` and severity `error` means the transport refused, returned zero deliveries or found no recipient, and `payload.reasons.email` names which.
