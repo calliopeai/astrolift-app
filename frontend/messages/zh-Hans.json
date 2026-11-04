@@ -4168,6 +4168,7 @@
       "inactive": "已停用",
       "installationMissing": "缺少安装",
       "unverified": "未验证",
+      "installOnGithub": "在 GitHub 上安装",
       "addClientId": "添加 Client ID",
       "connectMyGithub": "连接我的 GitHub",
       "connectMyGitlab": "连接我的 GitLab",

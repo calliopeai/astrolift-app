@@ -22,6 +22,21 @@ export function connectionStatus(c: AstroliftSourceConnection): ScmConnectionSta
   return c.status ?? (c.isActive ? "ACTIVE" : "INACTIVE");
 }
 
+/**
+ * Whether a row offers Install on GitHub (#2601): a GitHub App with no
+ * installation, registered (an App ID) for an account on github.com. Its App's
+ * install flow stores the installation back on this row. The backend's
+ * `connection_status.can_relink` holds the same rule.
+ */
+export function offersInstallOnGithub(c: AstroliftSourceConnection): boolean {
+  return (
+    c.kind === "github_app_install" &&
+    connectionStatus(c) === "INSTALLATION_MISSING" &&
+    Boolean(c.oauthClientId && c.accountLogin) &&
+    (!c.apiBaseUrl || c.apiBaseUrl.replace(/\/+$/, "") === "https://api.github.com")
+  );
+}
+
 const HOST_FAMILIES = ["github", "gitlab", "bitbucket", "gitea"];
 
 export const SOURCE_HOSTS_LIST: CopiedListDefinition = {

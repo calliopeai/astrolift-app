@@ -4168,6 +4168,7 @@
       "inactive": "無効",
       "installationMissing": "インストールなし",
       "unverified": "未確認",
+      "installOnGithub": "GitHub にインストール",
       "addClientId": "クライアント ID を追加",
       "connectMyGithub": "自分の GitHub を接続",
       "connectMyGitlab": "自分の GitLab を接続",
