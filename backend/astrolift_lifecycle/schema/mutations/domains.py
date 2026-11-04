@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import functools
+import logging
 from datetime import UTC
 
 import strawberry
@@ -13,6 +15,7 @@ from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_lifecycle.models import (
+    AppEnvironment,
     CustomDomain,
     DomainPathRoute,
     DomainRedirectRule,
@@ -25,6 +28,7 @@ from astrolift_lifecycle.schema.mutations.types import (
     AddWildcardDomainInput,
     RecheckDomainValidationInput,
     RemoveAppDomainInput,
+    SetCustomDomainPausedInput,
     SetDomainPathRoutesInput,
     SetDomainRedirectsInput,
     UploadCustomDomainCertificateInput,
@@ -42,6 +46,59 @@ from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+log = logging.getLogger(__name__)
+
+
+def _audit_pause_or_resume(fn):
+    """Audit under ``app.domain.pause`` or ``app.domain.resume`` by the requested state."""
+    pause = mutation_audit(action="app.domain.pause")(fn)
+    resume = mutation_audit(action="app.domain.resume")(fn)
+
+    @functools.wraps(fn)
+    def wrapper(self, info, input):
+        return (pause if getattr(input, "paused", False) else resume)(self, info, input)
+
+    return wrapper
+
+
+def _reapply_domain_app(domain, info) -> None:
+    """Re-apply the app's environments so a pause lands now, not on the next deploy.
+
+    Best effort: the flag is saved, and the next deploy applies it if this cannot start.
+    """
+    from astrolift_lifecycle.models import PreviewEnvironment
+    from astrolift_lifecycle.reprovision import reprovision
+    from astrolift_lifecycle.schema.mutations.helpers import _actor_from_request, _deploy_pipeline_disabled
+
+    if _deploy_pipeline_disabled():
+        return
+    app = domain.registered_app
+    try:
+        actor = _actor_from_request(info)
+        names = [
+            env.name
+            for env in live_lifecycle_rows(AppEnvironment.objects.all())
+            .filter(registered_app=app, previewed_environment__isnull=True)
+            .order_by("name")
+            if not PreviewEnvironment.all_objects.filter(app_environment=env).exists()
+        ]
+        for name in names:
+            try:
+                for result in reprovision(
+                    app, environment_name=name, actor=actor, organization_id=app.organization_id
+                ):
+                    if result.error:
+                        log.warning(
+                            "custom domain pause: re-apply of %s/%s failed: %s",
+                            app.slug,
+                            result.environment_name,
+                            result.error,
+                        )
+            except Exception:  # noqa: BLE001 - the flag is saved; the next deploy applies it
+                log.warning("custom domain pause: could not re-apply %s/%s", app.slug, name, exc_info=True)
+    except Exception:  # noqa: BLE001
+        log.warning("custom domain pause: could not re-apply %s", app.slug, exc_info=True)
 
 
 @strawberry.type
@@ -400,6 +457,49 @@ class DomainMutations:
                 "Protected domain route requires its original managed-route operation.",
             )
         _kick_validate_custom_domain(domain)
+        return gql_success(app_domain_to_type(domain))
+
+    @strawberry.field
+    @_audit_pause_or_resume
+    @require_permission(
+        Permission.APP_UPDATE, scope=custom_domain_app_scope("input.id", permission=Permission.APP_UPDATE)
+    )
+    @tenant_scoped()
+    def set_custom_domain_paused(
+        self,
+        info: Info,
+        input: SetCustomDomainPausedInput,
+    ) -> MutationResultType[AppDomainType]:
+        """Pause or resume one custom domain: while paused its host answers a
+        503 and the app's other hosts are unaffected.
+
+        Idempotent: setting the state the row already has changes nothing.
+        The app is re-applied afterwards so the Ingress changes at once; if
+        that cannot start, the next deploy renders it.
+        """
+        # Org-scope the by-guid lookup; CustomDomain reaches the org via
+        # registered_app. Fails closed (NOT_FOUND) when org_id is None (#1183).
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        domain = (
+            live_lifecycle_rows(CustomDomain.objects.all())
+            .filter(
+                guid=str(input.id),
+                deleted_at__isnull=True,
+                registered_app__organization_id=org_id,
+            )
+            .select_related("registered_app")
+            .first()
+        )
+        if domain is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "domain not found",
+            )
+        if domain.paused != input.paused:
+            domain.paused = input.paused
+            domain.save(update_fields=["paused", "updated_at", "version"])
+            _reapply_domain_app(domain, info)
         return gql_success(app_domain_to_type(domain))
 
     @strawberry.field

@@ -1403,6 +1403,7 @@ export type AstroliftAppDomain = {
   hostname: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isActive: Scalars['Boolean']['output'];
+  isPaused: Scalars['Boolean']['output'];
   isPlatformManagedZone: Scalars['Boolean']['output'];
   isWildcard: Scalars['Boolean']['output'];
   lastCertificateError: Scalars['String']['output'];
@@ -10139,6 +10140,7 @@ export type Mutation = {
   setClusterAuthUserEnabled: AstroliftClusterAuthUserChangeMutationResult;
   setClusterAuthUserGroups: AstroliftClusterAuthUserChangeMutationResult;
   setClusterAuthUserPassword: AstroliftClusterAuthUserChangeMutationResult;
+  setCustomDomainPaused: AstroliftAppDomainMutationResult;
   setDomainPathRoutes: AstroliftAppDomainMutationResult;
   setDomainRedirects: AstroliftAppDomainMutationResult;
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
@@ -12092,6 +12094,11 @@ export type MutationSetClusterAuthUserGroupsArgs = {
 
 export type MutationSetClusterAuthUserPasswordArgs = {
   input: SetClusterAuthUserPasswordInput;
+};
+
+
+export type MutationSetCustomDomainPausedArgs = {
+  input: SetCustomDomainPausedInput;
 };
 
 
@@ -16888,6 +16895,11 @@ export type SetClusterAuthUserPasswordInput = {
   password: Scalars['String']['input'];
   permanent: Scalars['Boolean']['input'];
   username: Scalars['String']['input'];
+};
+
+export type SetCustomDomainPausedInput = {
+  id: Scalars['GUID']['input'];
+  paused: Scalars['Boolean']['input'];
 };
 
 export type SetDomainPathRoutesInput = {

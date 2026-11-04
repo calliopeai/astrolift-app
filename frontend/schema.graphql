@@ -1454,6 +1454,7 @@ type AstroliftAppDomain {
   validationToken: String!
   lastCheckedAt: DateTime
   isActive: Boolean!
+  isPaused: Boolean!
   registeredAppSlug: String!
   createdAt: DateTime!
   txtChallengeToken: String!
@@ -10830,6 +10831,7 @@ type Mutation {
   addWildcardDomain(input: AddWildcardDomainInput!): AstroliftAppDomainMutationResult!
   removeAppDomain(input: RemoveAppDomainInput!): AppdomainremovedpayloadMutationResult!
   recheckDomainValidation(input: RecheckDomainValidationInput!): AstroliftAppDomainMutationResult!
+  setCustomDomainPaused(input: SetCustomDomainPausedInput!): AstroliftAppDomainMutationResult!
   uploadCustomDomainCertificate(input: UploadCustomDomainCertificateInput!): AstroliftAppDomainMutationResult!
   setDomainRedirects(input: SetDomainRedirectsInput!): AstroliftAppDomainMutationResult!
   setDomainPathRoutes(input: SetDomainPathRoutesInput!): AstroliftAppDomainMutationResult!
@@ -12966,6 +12968,11 @@ input SetClusterAuthUserPasswordInput {
   expectedUserId: String = null
   password: String!
   permanent: Boolean! = false
+}
+
+input SetCustomDomainPausedInput {
+  id: GUID!
+  paused: Boolean!
 }
 
 input SetDomainPathRoutesInput {

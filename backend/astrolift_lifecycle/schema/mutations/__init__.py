@@ -109,6 +109,7 @@ from astrolift_lifecycle.schema.mutations.types import (  # noqa: F401
     RunJobOncePayload,
     RunTaskInput,
     ScaleWorkloadInput,
+    SetCustomDomainPausedInput,
     SetDomainPathRoutesInput,
     SetDomainRedirectsInput,
     SetEnvironmentSettingInput,
