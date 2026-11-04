@@ -104,7 +104,7 @@ export const STATUS_CONNECTIONS: AstroliftSourceConnection[] = [
     repoVisibilityScopes: [],
     status: "INSTALLATION_MISSING",
     statusDetail:
-      "GitHub has no installation of this App on ConflictHQ. Install it under Providers → Source → Connect to GitHub → Install Astrolift on a GitHub org, with ConflictHQ as the org.",
+      "GitHub has no installation of this App on ConflictHQ. Use Install on GitHub in this row's actions, and pick ConflictHQ on GitHub.",
   }),
   connection("GitHub App: astrolift-ai (acme-legacy)", {
     accountLogin: "acme-legacy",

@@ -10,6 +10,7 @@ import {
   GitlabIcon,
   InfoIcon,
   KeyRoundIcon,
+  LinkIcon,
   PlusIcon,
   RotateCwIcon,
   Trash2Icon,
@@ -47,7 +48,7 @@ import { useLocalStorage } from "@/hooks/use-local-storage";
 import { DOC_LINKS } from "@/lib/docs/urls";
 import { cn } from "@/lib/utils";
 
-import { connectionStatus } from "./source-providers-list";
+import { connectionStatus, offersInstallOnGithub } from "./source-providers-list";
 import type { DeployKeysData, SourceHostsData } from "./use-source-providers";
 
 // localStorage key for the Advanced (paste-credentials) toggle.
@@ -270,6 +271,18 @@ export function SourceHostsView({
       (c.kind === "github_oauth_app" && c.isOauthAppConfig) || c.kind === "github_app_install";
     return (
       <>
+        {offersInstallOnGithub(c) && (
+          <Can permission="scm.connect">
+            <DropdownMenuItem asChild>
+              <a
+                href={`/app/auth1/scm/github/app-manifest/start?connection=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
+              >
+                <LinkIcon className="size-4" />
+                {t("hosts.installOnGithub")}
+              </a>
+            </DropdownMenuItem>
+          </Can>
+        )}
         {githubUserOauth &&
           (c.needsClientId ? (
             <Can permission="scm.connect">

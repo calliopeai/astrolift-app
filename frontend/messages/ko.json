@@ -4168,6 +4168,7 @@
       "inactive": "비활성",
       "installationMissing": "설치 없음",
       "unverified": "미확인",
+      "installOnGithub": "GitHub에 설치",
       "addClientId": "클라이언트 ID 추가",
       "connectMyGithub": "내 GitHub 연결",
       "connectMyGitlab": "내 GitLab 연결",

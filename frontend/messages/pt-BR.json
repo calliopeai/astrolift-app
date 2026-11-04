@@ -4168,6 +4168,7 @@
       "inactive": "inativa",
       "installationMissing": "instalação ausente",
       "unverified": "não verificada",
+      "installOnGithub": "Instalar no GitHub",
       "addClientId": "Adicionar Client ID",
       "connectMyGithub": "Conectar meu GitHub",
       "connectMyGitlab": "Conectar meu GitLab",

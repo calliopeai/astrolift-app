@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "@/components/ui/button";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
@@ -205,6 +205,47 @@ export const ConnectionStatuses: Story = {
     for (const label of ["active", "inactive", "not verified"]) {
       await expect(canvas.getByText(label)).toBeVisible();
     }
+  },
+};
+
+/**
+ * Install on GitHub (#2601): the row whose installation is missing offers its
+ * App's install flow, which stores the installation back on that row. An
+ * installed row does not; both keep Connect my GitHub.
+ */
+export const InstallOnGithub: Story = {
+  render: () => (
+    <Screen
+      hosts={
+        <Hosts
+          rows={STATUS_CONNECTIONS}
+          totalCount={STATUS_CONNECTIONS.length}
+          incompleteClientIdConnections={[]}
+        />
+      }
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const page = within(document.body);
+    const openActions = (name: string) =>
+      userEvent.click(
+        within(canvas.getByText(name).closest("tr")!).getByRole("button", { name: /row actions/i })
+      );
+    const missing = STATUS_CONNECTIONS[1]!;
+
+    await openActions(missing.name);
+    await expect(await page.findByRole("menuitem", { name: "Install on GitHub" })).toHaveAttribute(
+      "href",
+      `/app/auth1/scm/github/app-manifest/start?connection=${encodeURIComponent(missing.id)}&return_to=/providers%23source`
+    );
+    await expect(page.getByRole("menuitem", { name: "Connect my GitHub" })).toBeVisible();
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(page.queryByRole("menu")).toBeNull());
+
+    await openActions("GitHub App: astrolift-ai");
+    await expect(await page.findByRole("menuitem", { name: "Connect my GitHub" })).toBeVisible();
+    await expect(page.queryByRole("menuitem", { name: "Install on GitHub" })).toBeNull();
   },
 };
 
