@@ -10860,7 +10860,7 @@
     "emptyDescription": "Erstelle ein Team, um Projekte und Apps zu gruppieren.",
     "deleteTitle": "Team {slug} löschen?",
     "deleteGenericTitle": "Team löschen?",
-    "deleteDescription": "Das Team wird stillgelegt und sein Slug kann wiederverwendet werden. Seine Projekte und Anwendungen werden dabei nicht neu zugeordnet.",
+    "deleteDescription": "Das Team wird stillgelegt und sein Slug kann wiederverwendet werden. Das Stilllegen wird abgelehnt, solange das Team noch Projekte, Apps, Agenten, verwaltete Ressourcen oder gemeinsame Geheimnispakete hat.",
     "confirmDelete": "Team löschen",
     "createDescription": "Teams begrenzen Projekte, Mitglieder und Tokens. Slugs sind eindeutig und können nach der Stilllegung wiederverwendet werden.",
     "displayName": "Anzeigename",

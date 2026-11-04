@@ -255,10 +255,14 @@ def _owner_denied(world, name, **kwargs):
 
 
 def _empty_owned_project(world, name):
-    # A project that still has apps is not deleted (#2479); these cases are
-    # about who may delete one.
+    # A project that still has apps is not deleted (#2479), nor a team that
+    # still has projects or apps (#2627); these cases are about who may
+    # delete one.
     if name == "soft_delete_project":
         RegisteredApp.objects.filter(pk=world.medops_app.pk).update(project=None)
+    if name == "soft_delete_team":
+        world.medops_app.soft_delete()
+        world.medops_project.soft_delete()
 
 
 @pytest.mark.parametrize("name", OWNER_ROUTES)

@@ -188,7 +188,14 @@ def test_generated_shell_preserves_app_build_inputs_and_stops_before_notify_on_f
         assert notify_call[0] == "curl"
         assert "https://platform.example.test/api/cli/v1/apps/" + app.slug + "/deploy/" in notify_call
         body = json.loads(notify_call[notify_call.index("-d") + 1])
-        assert body == {"image_tags": {"*": sha}, "commit_sha": sha, "branch": "main", "trigger_kind": "ci"}
+        # No environment yet: an empty one leaves the choice to the endpoint.
+        assert body == {
+            "image_tags": {"*": sha},
+            "commit_sha": sha,
+            "branch": "main",
+            "trigger_kind": "ci",
+            "environment": "",
+        }
 
 
 @pytest.mark.parametrize(
