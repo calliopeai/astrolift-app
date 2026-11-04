@@ -764,10 +764,52 @@ def _render_app_network_policy(deployment_id: int, namespace: str) -> list[dict]
     return render_app_network_policy(d.registered_app, namespace=namespace)
 
 
+def _custom_domain_skip_reason(cd, *, state: str | None = None) -> str | None:
+    """Why a validated, active custom domain gets no Ingress, or None when it does.
+
+    Exists so a skipped domain says why in the log (the cert state, a corrupt
+    BYO bundle) instead of needing cluster access to find out.
+    """
+    from astrolift_lifecycle.models import CustomDomain
+
+    state = state or cd.certificate_state
+    if state not in (CustomDomain.CertificateState.ACTIVE, CustomDomain.CertificateState.BYO):
+        return f"certificate_state is {state!r}, not ACTIVE or BYO"
+    if state == CustomDomain.CertificateState.BYO and "-----END CERTIFICATE-----" not in (
+        cd.byo_certificate_pem or ""
+    ):
+        return "BYO certificate bundle has no END CERTIFICATE marker"
+    return None
+
+
+def _no_route_reason(primary_workload, primary_container) -> str | None:
+    """Why the app has nothing a custom-domain Ingress could route to, or None."""
+    if primary_workload is None:
+        return "the manifest has no deployment workload"
+    if primary_container is None:
+        return f"workload {primary_workload.name!r} has no containers"
+    if primary_container.port <= 0:
+        return f"primary container of workload {primary_workload.name!r} has no port"
+    return None
+
+
+def _warn_custom_domains_skipped(app, domains, reason: str) -> None:
+    """Warn once per validated + active domain that this render leaves unserved."""
+    for cd in domains:
+        log.warning(
+            "custom domain %s of app %s is validated and active but gets no Ingress: %s",
+            cd.hostname,
+            app.slug,
+            reason,
+        )
+
+
 def _render_app_ingresses_and_tls(
     deployment_id: int,
     namespace: str,
     manifest,
+    *,
+    custom_domains_only: bool = False,
 ) -> list[dict[str, Any]]:
     """Emit Ingress resources for both CustomDomains and the platform-
     assigned managed subdomain, plus TLS Secrets for BYO certs.
@@ -785,6 +827,11 @@ def _render_app_ingresses_and_tls(
     For ALB clusters the wildcard ACM cert ARN comes from
     ``managed_domain.dns_config["certificate_arn"]``. For other
     ingress classes (nginx, traefik) cert-manager handles issuance.
+
+    ``custom_domains_only`` stops after the CustomDomain resources: the
+    applied render (``core.app_deploy.render_resources_for_deployment``)
+    already renders the managed subdomain and the envoy routes itself and
+    folds in only this part.
     """
     import base64
 
@@ -804,7 +851,7 @@ def _render_app_ingresses_and_tls(
         else None
     )
     out: list[dict[str, Any]] = []
-    if edge_cluster is not None and edge_cluster.ingress_class == "envoy":
+    if not custom_domains_only and edge_cluster is not None and edge_cluster.ingress_class == "envoy":
         from core.app_deploy import envoy_custom_domain_routes
 
         out.extend(envoy_custom_domain_routes(d, manifest, namespace=namespace, cluster=edge_cluster))
@@ -816,13 +863,26 @@ def _render_app_ingresses_and_tls(
         (w for w in manifest.workloads if w.kind == "deployment"),
         None,
     )
-    if primary_workload is None or not primary_workload.containers:
-        return out
-    primary_container = next(
-        (c for c in primary_workload.containers if c.is_primary),
-        primary_workload.containers[0],
+    primary_container = (
+        next(
+            (c for c in primary_workload.containers if c.is_primary),
+            primary_workload.containers[0],
+        )
+        if primary_workload is not None and primary_workload.containers
+        else None
     )
-    if primary_container.port <= 0:
+    no_route = _no_route_reason(primary_workload, primary_container)
+    if no_route is not None:
+        _warn_custom_domains_skipped(
+            d.registered_app,
+            CustomDomain.objects.filter(
+                registered_app=d.registered_app,
+                deleted_at__isnull=True,
+                is_active=True,
+                validation_status=CustomDomain.ValidationStatus.VALIDATED,
+            ),
+            no_route,
+        )
         return out
     backend_port = int(primary_container.port)
     backend_service = primary_workload.name
@@ -874,13 +934,18 @@ def _render_app_ingresses_and_tls(
         # A custom domain is the app's, served from the app namespace. An
         # environment in a namespace of its own (a preview, #1922) emitting
         # it too would be a second Ingress for the same host on the cluster.
+        _warn_custom_domains_skipped(
+            d.registered_app,
+            domains,
+            "the environment has its own namespace or the cluster is envoy; "
+            "a custom domain is served from the app namespace",
+        )
         domains = domains.none()
     for cd in domains:
         state = cd.certificate_state
-        if state not in (
-            CustomDomain.CertificateState.ACTIVE,
-            CustomDomain.CertificateState.BYO,
-        ):
+        skip_reason = _custom_domain_skip_reason(cd, state=state)
+        if skip_reason is not None:
+            _warn_custom_domains_skipped(d.registered_app, [cd], skip_reason)
             continue
         host_slug = cd.hostname.replace(".", "-")
         secret_name = f"{d.registered_app.slug}-{host_slug}-tls"
@@ -1011,6 +1076,9 @@ def _render_app_ingresses_and_tls(
                 },
             }
         )
+
+    if custom_domains_only:
+        return out
 
     # --- Managed subdomain Ingress ---
     # AppEnvironment.managed_domain provides the platform-assigned
