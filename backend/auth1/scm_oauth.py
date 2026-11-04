@@ -57,6 +57,7 @@ from django.views.decorators.http import require_GET
 
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.scopes import require_scm_connect
+from auth1.scm_app_manifest import _redirect_with_error, _redirect_with_ok, _safe_return_to
 from core.permissions import Permission, route_auth
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
@@ -76,30 +77,6 @@ GITHUB_DEFAULT_SCOPE = "read:user repo workflow"
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
-
-
-def _safe_return_to(raw: str | None, default: str = "/settings/source-providers") -> str:
-    """Limit ``return_to`` to same-origin paths so an attacker can't
-    bounce a victim through our OAuth dance to a third-party URL.
-
-    A value must be a rooted path (single leading ``/``); a
-    protocol-relative ``//host`` is an external URL and is rejected.
-    ``default`` is the fallback when ``raw`` is missing or not a
-    same-origin path (callers that reconnect from a specific surface,
-    e.g. the onboarding wizard, pass their own)."""
-    if not raw or not raw.startswith("/") or raw.startswith("//"):
-        return default
-    return raw
-
-
-def _redirect_with_error(return_to: str, code: str) -> HttpResponseRedirect:
-    sep = "&" if "?" in return_to else "?"
-    return HttpResponseRedirect(f"{return_to}{sep}scm_error={code}")
-
-
-def _redirect_with_ok(return_to: str, account_login: str) -> HttpResponseRedirect:
-    sep = "&" if "?" in return_to else "?"
-    return HttpResponseRedirect(f"{return_to}{sep}scm_connected={urllib.parse.quote(account_login)}")
 
 
 def _active_org_id(request: HttpRequest) -> int | None:

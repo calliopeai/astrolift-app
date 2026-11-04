@@ -10857,7 +10857,7 @@
     "emptyDescription": "Create a team to start grouping projects and apps.",
     "deleteTitle": "Delete team {slug}?",
     "deleteGenericTitle": "Delete team?",
-    "deleteDescription": "Retire the team and make its slug reusable. This does not reassign its projects or applications.",
+    "deleteDescription": "Retire the team and make its slug reusable. Refused while the team still has projects, apps, agents, managed resources or shared secret bundles.",
     "confirmDelete": "Delete team",
     "createDescription": "Teams scope projects, members and tokens. Slugs are unique and can be reused after retirement.",
     "displayName": "Display name",

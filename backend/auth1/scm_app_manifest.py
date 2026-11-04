@@ -80,6 +80,7 @@ from astrolift_scm.models import SourceConnection
 from astrolift_scm.providers.github_app import INSTALL
 from astrolift_scm.scopes import require_scm_connect
 from astrolift_scm.services import connection_status, factory_gate
+from auth1.return_urls import safe_relative_path
 from core.mutations import AuditEntry, emit_audit
 from core.permissions import Permission, route_auth
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
@@ -113,10 +114,12 @@ _GH_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]{0,38}$")
 # ---------------------------------------------------------------------------
 
 
-def _safe_return_to(raw: str | None) -> str:
-    if not raw or not raw.startswith("/"):
-        return "/settings/source-providers"
-    return raw
+def _safe_return_to(raw: str | None, default: str = "/settings/source-providers") -> str:
+    """``raw`` when it is a path on this host, else ``default``, so a redirect
+    built from it cannot send the browser to another host. Callers that
+    reconnect from a specific surface (the onboarding wizard) pass their own
+    ``default``."""
+    return safe_relative_path(raw) or default
 
 
 def _with_param(return_to: str, param: str) -> str:

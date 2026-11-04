@@ -10860,7 +10860,7 @@
     "emptyDescription": "Créez une équipe pour commencer à regrouper les projets et les applications.",
     "deleteTitle": "Supprimer l’équipe {slug} ?",
     "deleteGenericTitle": "Supprimer l’équipe ?",
-    "deleteDescription": "Retirez l’équipe et rendez son identifiant réutilisable. Ses projets et applications ne sont pas réaffectés.",
+    "deleteDescription": "Retirez l’équipe et rendez son identifiant réutilisable. Le retrait est refusé tant que l’équipe contient des projets, des applications, des agents, des ressources gérées ou des paquets de secrets partagés.",
     "confirmDelete": "Supprimer l’équipe",
     "createDescription": "Les équipes délimitent les projets, les membres et les jetons. Les identifiants sont uniques et réutilisables après le retrait d’une équipe.",
     "displayName": "Nom affiché",

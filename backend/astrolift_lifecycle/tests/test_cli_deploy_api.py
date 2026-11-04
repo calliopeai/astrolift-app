@@ -23,7 +23,7 @@ from django.test import Client
 from astrolift_clusters.models import TenantCluster
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.deploy_tokens import issue_token
-from astrolift_lifecycle.models import AppEnvironment, Deployment
+from astrolift_lifecycle.models import AppEnvironment, Deployment, PreviewEnvironment
 from astrolift_registry.models import RegisteredApp
 
 pytestmark = pytest.mark.django_db
@@ -122,6 +122,34 @@ def _valid_body(**overrides):
     }
     base.update(overrides)
     return base
+
+
+def _without_environment():
+    body = _valid_body()
+    del body["environment"]
+    return body
+
+
+def _preview(app, cluster, *, previewed=None, status=PreviewEnvironment.Status.RUNNING):
+    """A PR preview as the webhook creates one: its own environment plus the
+    PreviewEnvironment row that marks it a preview."""
+    preview_env = AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=cluster,
+        name="preview-pr-7",
+        k8s_namespace="acme-hello-app-pr-7",
+        previewed_environment=previewed,
+    )
+    PreviewEnvironment.objects.create(
+        registered_app=app,
+        pr_number=7,
+        branch="feature/x",
+        hostname="pr-7-hello-app.example.test",
+        namespace="acme-hello-app-pr-7",
+        app_environment=preview_env,
+        status=status,
+    )
+    return preview_env
 
 
 # ---- smoke import ----------------------------------------------------
@@ -774,12 +802,12 @@ def test_ci_deploy_other_org_app_with_own_token_succeeds(provider_plugin, workfl
 
 # ---- wildcard image_tags + environment default (#1220) ----------------
 #
-# The managed CI workflow templates are stateless: they can't know the
-# app's workload or environment names, and rendering either into the
-# pushed file would go stale on the next manifest edit. So CI sends
-# ``image_tags: {"*": tag}`` (expanded server-side against the CURRENT
-# manifest) and omits ``environment`` (defaulted when the app has exactly
-# one active env).
+# The managed CI workflow templates can't know the app's workload names:
+# rendering them into the pushed file would go stale on the next manifest
+# edit. So CI sends ``image_tags: {"*": tag}`` (expanded server-side
+# against the CURRENT manifest). It may omit ``environment``, defaulted
+# when the app has exactly one non-preview env; GitHub workflows from
+# template v13 name that env (#2635).
 
 _MANIFEST_WEB_AND_SITE = """
 name = "hello-app"
@@ -880,8 +908,9 @@ def test_ci_deploy_omitted_environment_defaults_when_single_env(
 
 
 def test_ci_deploy_omitted_environment_ambiguous_with_two_envs_returns_400(
-    app_with_manifest, env, env_requires_approval, auth_headers, workflow_starts
+    app_with_manifest, env, env_requires_approval, cluster, auth_headers, workflow_starts
 ):
+    _preview(app_with_manifest, cluster, previewed=env)
     body = _valid_body()
     del body["environment"]
     client = Client()
@@ -892,8 +921,124 @@ def test_ci_deploy_omitted_environment_ambiguous_with_two_envs_returns_400(
         auth_headers,
     )
     assert r.status_code == 400
-    assert "environment" in r.json()["detail"]
+    assert r.json()["detail"] == (
+        "environment is required: app 'hello-app' has 2 environments (prod, staging); "
+        'name one in "environment"'
+    )
     assert workflow_starts == []
+
+
+# ---- environment default ignores previews (#2635) ---------------------
+#
+# A preview is a live environment, and teardown leaves it live, so once an
+# app had been previewed the single-environment default stopped applying
+# and every managed deploy got "environment is required".
+
+
+@pytest.mark.parametrize("status", [PreviewEnvironment.Status.RUNNING, PreviewEnvironment.Status.TORN_DOWN])
+@pytest.mark.parametrize("linked", [True, False], ids=["previews-prod", "no-lineage"])
+def test_ci_deploy_omitted_environment_ignores_previews(
+    app_with_manifest, env, cluster, auth_headers, workflow_starts, status, linked
+):
+    _preview(app_with_manifest, cluster, previewed=env if linked else None, status=status)
+    r = _post_json(
+        Client(), f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/", _without_environment(), auth_headers
+    )
+    assert r.status_code == 201, r.content
+    assert Deployment.objects.get(guid=r.json()["deployment_id"]).app_environment_id == env.id
+
+
+def test_ci_deploy_omitted_environment_with_only_previews_returns_400(
+    app_with_manifest, cluster, auth_headers, workflow_starts
+):
+    """A deploy-branch build never lands in a pull request's preview."""
+    _preview(app_with_manifest, cluster)
+    r = _post_json(
+        Client(), f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/", _without_environment(), auth_headers
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == (
+        "environment is required: app 'hello-app' has no environment besides its previews; "
+        'name one in "environment"'
+    )
+    assert workflow_starts == []
+
+
+def test_ci_deploy_named_preview_environment_is_still_accepted(
+    app_with_manifest, env, cluster, auth_headers, workflow_starts
+):
+    preview_env = _preview(app_with_manifest, cluster, previewed=env)
+    r = _post_json(
+        Client(),
+        f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/",
+        _valid_body(environment=preview_env.name),
+        auth_headers,
+    )
+    assert r.status_code == 201, r.content
+    assert Deployment.objects.get(guid=r.json()["deployment_id"]).app_environment_id == preview_env.id
+
+
+def test_ci_deploy_omitted_environment_does_not_widen_a_token_to_another_app(
+    org, team, project, cluster, app_with_manifest, env, auth_headers, workflow_starts
+):
+    """The default is resolved after the token check: another app's only
+    environment gives a token for this one no way in."""
+    other_app = RegisteredApp.objects.create(
+        organization=org,
+        project=project,
+        team=team,
+        name="Other App",
+        slug="other-app",
+        provisioning_status="ready",
+        manifest_raw=_MANIFEST_WITH_WEB,
+    )
+    AppEnvironment.objects.create(registered_app=other_app, tenant_cluster=cluster, name="prod")
+    r = _post_json(
+        Client(), f"/api/cli/v1/apps/{other_app.slug}/deploy/", _without_environment(), auth_headers
+    )
+    assert r.status_code == 403
+    assert r.json()["code"] == "PERMISSION_DENIED"
+    assert workflow_starts == []
+    assert Deployment.objects.count() == 0
+
+
+def test_ci_deploy_omitted_environment_reads_the_tokens_app_not_a_same_slug_app(
+    provider_plugin, app_with_manifest, env, cluster, auth_headers, workflow_starts
+):
+    """Slugs are unique only within an organization (#1183): the default
+    comes from the token's own app, never another organization's app that
+    shares the slug and has a single environment."""
+    other_org = Organization.objects.create(name="Globex", slug="globex-2635")
+    other_team = Team.objects.create(organization=other_org, name="Eng", slug="eng-2635")
+    other_cluster = TenantCluster.objects.create(
+        organization=other_org,
+        name="globex-cluster",
+        slug="globex-cluster-2635",
+        provider_plugin=provider_plugin,
+        provider_config={},
+        endpoint="https://globex.cluster.invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+    twin = RegisteredApp.objects.create(
+        organization=other_org,
+        team=other_team,
+        name="Hello",
+        slug=app_with_manifest.slug,
+        provisioning_status="ready",
+        manifest_raw=_MANIFEST_WITH_WEB,
+    )
+    AppEnvironment.objects.create(registered_app=twin, tenant_cluster=other_cluster, name="production")
+    _preview(app_with_manifest, cluster, previewed=env)
+
+    r = _post_json(
+        Client(), f"/api/cli/v1/apps/{app_with_manifest.slug}/deploy/", _without_environment(), auth_headers
+    )
+    assert r.status_code == 201, r.content
+    deployment = Deployment.objects.get(guid=r.json()["deployment_id"])
+    assert (deployment.registered_app_id, deployment.app_environment_id) == (app_with_manifest.id, env.id)
+    assert not Deployment.objects.filter(registered_app=twin).exists()
 
 
 def test_ci_deploy_accepts_legacy_deploy_scope(app_with_manifest, env, workflow_starts):

@@ -10,12 +10,14 @@ default.
 Browsers read a URL by the WHATWG rules, not Python's: they drop tab and
 newline anywhere and treat ``\\`` as ``/``. A return address is plain ASCII
 (the frontend builds it with ``encodeURIComponent``), so a control character,
-space, backslash or non-ASCII character refuses it outright.
+space, backslash or non-ASCII character refuses it outright. A path must also
+stay on this host once percent-decoded, so a hop that decodes it (a proxy, a
+router normalizing the path) cannot find ``//host`` in ``/%2F%2Fhost``.
 """
 
 from __future__ import annotations
 
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, unquote, urlencode, urlsplit, urlunsplit
 
 from django.conf import settings
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -66,6 +68,11 @@ def safe_relative_path(value: object) -> str | None:
         return None
     parts = urlsplit(path)
     if parts.scheme or parts.netloc:
+        return None
+    decoded = path
+    while (step := unquote(decoded)) != decoded:
+        decoded = step
+    if not url_has_allowed_host_and_scheme(decoded, allowed_hosts=set()):
         return None
     return path
 

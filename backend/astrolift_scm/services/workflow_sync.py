@@ -473,8 +473,18 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     ):
         raise ValueError("Managed CI build arguments must have valid names and string values.")
     aws_region = _github_aws_region(app, ecr_uri)
+    # The environment the endpoint would default to (#2635), named so a
+    # later second environment does not leave the request ambiguous. Empty
+    # with none or several: the endpoint then says which to name. An
+    # unsaved app has no environments.
+    from astrolift_lifecycle.ci_deploy import non_preview_environment_names
+
+    environments = non_preview_environment_names(app) if getattr(app, "pk", None) is not None else []
+    environment = environments[0] if len(environments) == 1 else ""
     values = {
         "app_slug": app.slug,
+        # JSON-escaped: the step splices it into the request body.
+        "environment": json.dumps(environment)[1:-1],
         "deploy_branch": (app.deploy_branch or "main").strip() or "main",
         "ecr_uri": ecr_uri,
         "ecr_repo_name": ecr_uri.split("/", 1)[1] if platform_built and "/" in ecr_uri else "",

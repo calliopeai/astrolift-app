@@ -19,6 +19,7 @@ from astrolift_identity.models import (
 )
 from astrolift_identity.schema.mutations.helpers import (
     _actor,
+    _listed,
     _resolve_project,
     _resolve_team,
 )
@@ -39,11 +40,6 @@ from core.mutations import ErrorCode, mutation_audit
 from core.naming import PROJECT_SLUG, NamingViolation
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
-
-
-def _listed(parts: list[str]) -> str:
-    """``a``, ``a and b``, ``a, b and c``."""
-    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
 
 
 @strawberry.type

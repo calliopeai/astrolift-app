@@ -1,11 +1,15 @@
 """
 CI deploy endpoint policy (#17, spec 07 §9).
 
-Pure-Python policy. POST /api/cli/v1/apps/<slug>/deploy/ consults
-this for:
+Pure-Python policy, except ``non_preview_environment_names``, which
+reads the app's environments. POST /api/cli/v1/apps/<slug>/deploy/
+consults this for:
 
 * **Request validation** — image_tags, commit_sha, branch,
   environment, trigger_kind. Refuses malformed input loudly.
+* **Environment default**: a request that names no environment
+  means the app's only non-preview environment, the one the
+  managed GitHub workflow names.
 * **Trigger-kind whitelist** — closed vocabulary of CI sources
   the endpoint accepts.
 * **Idempotency key** — optional client-supplied; deduplicates
@@ -155,6 +159,30 @@ def validate_environment(
             f"environment {name!r} not registered for this app (known: {sorted(registered_envs)})"
         )
     return name
+
+
+def non_preview_environment_names(app) -> list[str]:
+    """Names of ``app``'s live environments that are not previews.
+
+    A CI deploy that names no environment means the only one of these
+    (#2635). A push to the deploy branch never targets a preview, which
+    deploys from its pull request, and a torn-down preview keeps its live
+    environment, so counting previews refused every such deploy once the
+    app had been previewed. A preview is known by its persisted relation,
+    as the reachability verdict reads it, not by its name.
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+
+    return list(
+        AppEnvironment.objects.filter(
+            registered_app=app,
+            deleted_at__isnull=True,
+            previewed_environment__isnull=True,
+            preview_environments__isnull=True,
+        )
+        .order_by("name")
+        .values_list("name", flat=True)
+    )
 
 
 def validate_trigger_kind(*, value: str) -> TriggerKind:

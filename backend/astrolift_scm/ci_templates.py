@@ -81,7 +81,11 @@ import re
 # minutes: success exits 0, a deploy superseded by a newer one exits 0 and
 # says so, a failure exits 1 with the platform's reason, and so does the
 # timeout. GitLab, Bitbucket and Gitea bodies are unchanged.
-TEMPLATE_VERSION = 12
+# v13 (#2635): the GitHub notify step sends ``environment`` from the
+# step's ``ENVIRONMENT``: the app's only non-preview environment, so a
+# second one added later does not leave the request ambiguous. Empty with
+# none or several. GitLab, Bitbucket and Gitea bodies are unchanged.
+TEMPLATE_VERSION = 13
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

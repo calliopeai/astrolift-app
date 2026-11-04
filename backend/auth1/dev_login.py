@@ -11,8 +11,6 @@ production. Rate-limited per IP for the same reason.
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
-
 from django.conf import settings
 from django.contrib.auth import get_user_model, login
 from django.contrib.auth.backends import ModelBackend
@@ -20,20 +18,21 @@ from django.http import HttpResponseRedirect, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
+from .return_urls import _origin, _plain, safe_relative_path
+
 
 def _safe_next(raw: str | None) -> str:
-    """Constrain ``?next=`` to the local dev origin set we expect."""
-    if not raw:
-        return "/app/admin/"
-    parsed = urlparse(raw)
-    # Empty netloc => relative path on this server.
-    if parsed.netloc == "":
-        return raw
-    if parsed.netloc.startswith(("localhost:", "127.0.0.1:")) or parsed.netloc in {
-        "localhost",
-        "127.0.0.1",
-    }:
-        return raw
+    """Constrain ``?next=`` to a path on this host or a loopback origin. The
+    host is the parsed one, so ``http://localhost:@evil.example`` (userinfo
+    ``localhost:``) is not loopback."""
+    path = safe_relative_path(raw)
+    if path is not None:
+        return path
+    url = _plain(raw)
+    if url is not None:
+        origin = _origin(url)
+        if origin is not None and origin[1] in {"localhost", "127.0.0.1"}:
+            return url
     return "/app/admin/"
 
 
