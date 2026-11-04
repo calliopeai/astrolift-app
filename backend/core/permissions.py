@@ -497,11 +497,14 @@ class PermissionScope:
 
 
 class PermissionDenied(Exception):
-    def __init__(self, permission: Permission, scope: PermissionScope | None, reason: str = ""):
+    def __init__(
+        self, permission: Permission, scope: PermissionScope | None, reason: str = "", hint: str = ""
+    ):
         self.permission = permission
         self.scope = scope
         self.reason = reason or "permission denied"
-        super().__init__(f"{self.reason}: {permission.value}")
+        message = f"{self.reason}: {permission.value}"
+        super().__init__(f"{message}. {hint}" if hint else message)
 
 
 # ---- Resolver plug-point ---------------------------------------------
@@ -649,12 +652,14 @@ def _check_permission_decision(permission, scope, decision) -> None:
     from astrolift_identity.api_tokens import (
         get_current_api_token,
         token_scope_allows_permission,
+        token_scope_hint,
         token_scope_reaches,
     )
 
     api_token = get_current_api_token()
     if api_token is not None and not token_scope_allows_permission(api_token, permission.value):
-        raise PermissionDenied(permission, scope, "api token scope does not allow this permission")
+        hint = token_scope_hint(permission.value)
+        raise PermissionDenied(permission, scope, "api token scope does not allow this permission", hint)
     if api_token is not None and not token_scope_reaches(api_token, permission.value, scope):
         raise PermissionDenied(permission, scope, "api token scope holds only at its own organization")
     granted, reason = decision()
@@ -678,12 +683,14 @@ def check_permission_any_scope(permission: Permission) -> None:
     from astrolift_identity.api_tokens import (
         get_current_api_token,
         token_scope_allows_permission,
+        token_scope_hint,
         token_scope_reaches,
     )
 
     api_token = get_current_api_token()
     if api_token is not None and not token_scope_allows_permission(api_token, permission.value):
-        raise PermissionDenied(permission, None, "api token scope does not allow this permission")
+        hint = token_scope_hint(permission.value)
+        raise PermissionDenied(permission, None, "api token scope does not allow this permission", hint)
     if api_token is not None and not token_scope_reaches(api_token, permission.value, None):
         raise PermissionDenied(permission, None, "api token scope holds only at its own organization")
     if not granted_scopes(tenant, permission):

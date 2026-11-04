@@ -291,6 +291,117 @@ def _ingress_controller_hostname(cluster: Any) -> str:
     return host
 
 
+_EDGE_SERVICE_NAMESPACE = "astrolift-system"
+_EDGE_SERVICE_NAME = "astrolift-ingress-nginx-controller"
+_SSL_CERT_ANNOTATION = "service.beta.kubernetes.io/aws-load-balancer-ssl-cert"
+_EDGE_ATTACH_ERROR_PREFIX = "edge certificate attach failed: "
+
+
+def _ssl_cert_annotation_with(current: str | None, arn: str, present: bool) -> str | None:
+    """The controller Service's ``aws-load-balancer-ssl-cert`` value with ``arn``
+    added or removed.
+
+    The annotation is a comma-separated list of ACM ARNs: the first is the TLS
+    listener's default certificate and never moves or leaves; the rest are SNI
+    certificates. ``None`` means not applicable: with no annotation TLS is not
+    terminated at the load balancer, so there is no listener to add to. When
+    nothing changes, ``current`` is returned as it was."""
+    entries = [e.strip() for e in (current or "").split(",") if e.strip()]
+    arn = arn.strip()
+    if not entries or not arn:
+        return None
+    if present:
+        if arn in entries:
+            return current
+        entries.append(arn)
+    else:
+        if arn not in entries[1:]:
+            return current
+        entries = [entries[0], *(e for e in entries[1:] if e != arn)]
+    deduped: list[str] = []
+    for e in entries:
+        if e not in deduped:
+            deduped.append(e)
+    return ",".join(deduped)
+
+
+def _set_edge_certificate(cluster: Any, arn: str, present: bool) -> str:
+    """Add or remove ``arn`` on the ingress controller Service's ssl-cert
+    annotation; the load balancer controller reconciles the listener from it.
+
+    Returns ``attached``, ``detached``, ``unchanged`` or ``not_applicable``.
+    Raises on any cluster error."""
+    from core.cluster_management import _driver_for_cluster
+
+    driver = _driver_for_cluster(cluster)
+    svc = driver.get_manifest(cluster.slug, _EDGE_SERVICE_NAMESPACE, "v1/Service", _EDGE_SERVICE_NAME) or {}
+    current = ((svc.get("metadata") or {}).get("annotations") or {}).get(_SSL_CERT_ANNOTATION)
+    new = _ssl_cert_annotation_with(current, arn, present)
+    if new is None:
+        return "not_applicable"
+    if new == current:
+        return "unchanged"
+    driver.patch_service_annotations(
+        cluster.slug,
+        _EDGE_SERVICE_NAMESPACE,
+        _EDGE_SERVICE_NAME,
+        {_SSL_CERT_ANNOTATION: new},
+    )
+    return "attached" if present else "detached"
+
+
+def _ensure_edge_certificate_sync(custom_domain_id: int) -> dict[str, Any]:
+    """Put an ACTIVE platform-managed domain's ACM certificate on the NLB's TLS
+    listener, through the controller Service annotation. Never raises: a
+    failure is recorded on ``last_certificate_error``."""
+    from astrolift_lifecycle.domain_app_route import require_legacy_custom_domain
+    from astrolift_lifecycle.models import CustomDomain
+
+    d = CustomDomain.all_objects.select_related("registered_app").get(pk=custom_domain_id)
+    require_legacy_custom_domain(d)
+    cert_id = (d.certificate_id or "").strip()
+    if (
+        not d.is_platform_managed_zone
+        or d.certificate_state != CustomDomain.CertificateState.ACTIVE
+        or not cert_id.startswith("arn:")
+    ):
+        return {"ok": True, "result": "skipped", "message": "not a platform-managed ACM certificate"}
+    cluster = getattr(d.registered_app, "default_tenant_cluster", None)
+    if (
+        cluster is None
+        or (getattr(getattr(cluster, "provider_plugin", None), "slug", "") or "").lower() != "aws"
+    ):
+        return {"ok": True, "result": "skipped", "message": "not an aws cluster"}
+
+    def _record(message: str) -> None:
+        d.last_certificate_error = message[:512]
+        d.save(update_fields=["last_certificate_error", "updated_at", "version"])
+
+    try:
+        result = _set_edge_certificate(cluster, cert_id, True)
+    except Exception as exc:  # noqa: BLE001
+        message = f"{_EDGE_ATTACH_ERROR_PREFIX}{exc}"
+        _record(message)
+        return {"ok": False, "result": "failed", "message": message}
+    if result != "not_applicable" and (d.last_certificate_error or "").startswith(_EDGE_ATTACH_ERROR_PREFIX):
+        _record("")
+    return {"ok": True, "result": result, "message": f"edge certificate {result}"}
+
+
+@activity.defn(name="astrolift.custom_domain.ensure_edge_certificate")
+async def ensure_edge_certificate(custom_domain_id: int) -> dict[str, Any]:
+    """Add the domain's ACM certificate to the ingress load balancer's SNI list."""
+    from asgiref.sync import sync_to_async
+
+    result = await heartbeat_while(sync_to_async(_ensure_edge_certificate_sync)(custom_domain_id))
+    log.info(
+        "ensure_edge_certificate result=%s",
+        result.get("result"),
+        extra={"custom_domain_id": custom_domain_id},
+    )
+    return result
+
+
 @activity.defn(name="astrolift.custom_domain.ensure_platform_records")
 async def ensure_platform_managed_records(
     custom_domain_id: int,
