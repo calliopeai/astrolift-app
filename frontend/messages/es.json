@@ -10860,7 +10860,7 @@
     "emptyDescription": "Crea un equipo para empezar a agrupar proyectos y aplicaciones.",
     "deleteTitle": "¿Eliminar el equipo {slug}?",
     "deleteGenericTitle": "¿Eliminar el equipo?",
-    "deleteDescription": "Retira el equipo y permite reutilizar su identificador. Esto no reasigna sus proyectos ni aplicaciones.",
+    "deleteDescription": "Retira el equipo y permite reutilizar su identificador. Se rechaza mientras el equipo tenga proyectos, aplicaciones, agentes, recursos gestionados o paquetes de secretos compartidos.",
     "confirmDelete": "Eliminar equipo",
     "createDescription": "Los equipos delimitan proyectos, miembros y tokens. Los identificadores son únicos y pueden reutilizarse tras retirar el equipo.",
     "displayName": "Nombre visible",

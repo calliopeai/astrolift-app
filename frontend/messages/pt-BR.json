@@ -10857,7 +10857,7 @@
     "emptyDescription": "Crie uma equipe para começar a agrupar projetos e aplicativos.",
     "deleteTitle": "Excluir a equipe {slug}?",
     "deleteGenericTitle": "Excluir a equipe?",
-    "deleteDescription": "Desative a equipe e permita reutilizar seu identificador. Isso não reatribui seus projetos nem aplicativos.",
+    "deleteDescription": "Desative a equipe e permita reutilizar seu identificador. A desativação é recusada enquanto a equipe ainda tiver projetos, aplicativos, agentes, recursos gerenciados ou pacotes de segredos compartilhados.",
     "confirmDelete": "Excluir equipe",
     "createDescription": "As equipes delimitam projetos, membros e tokens. Os identificadores são únicos e podem ser reutilizados após a desativação da equipe.",
     "displayName": "Nome de exibição",
