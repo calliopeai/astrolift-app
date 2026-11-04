@@ -7,8 +7,9 @@ event log, which ``astro app events`` reads through
 ``managed_service.provision.failed`` for an app-owned service, scoped to the
 app and its organization, with the same redacted reason the card shows.
 
-Runs the real workflow and its real activities against a Temporal test server
-and Postgres; only the provider driver is faked.
+The workflow tests run the real workflow and its real activities against a
+Temporal test server and Postgres, with only the provider driver faked. The
+others call the activity's body and the events resolver directly.
 """
 
 from __future__ import annotations
@@ -161,3 +162,39 @@ def test_a_project_owned_service_has_no_app_log_and_emits_nothing():
 
     assert EVENT_TYPE not in seen
     assert not Event.objects.filter(event_type=EVENT_TYPE).exists()
+
+
+def test_astro_app_events_lists_the_failure_for_its_own_organization_only(permission_resolver):
+    from types import SimpleNamespace
+
+    from astrolift_identity.models import Organization, Project, Team
+    from astrolift_operations.schema.queries import OperationsQuery
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_workflows.activities.managed_service_lifecycle import _emit_provision_failed_event_sync
+    from core.permissions import Permission
+    from core.tenancy import TenantContext, tenant_context
+
+    svc = _make_service()
+    app = svc.registered_app
+    # App slugs are unique per organization, so a same-slug app in another
+    # organization is the realistic shape of a cross-tenant leak.
+    other = Organization.objects.create(name="Other", slug="other-2608")
+    other_team = Team.objects.create(organization=other, name="Eng", slug="eng-2608")
+    other_project = Project.objects.create(organization=other, team=other_team, name="Demo", slug="demo-2608")
+    RegisteredApp.objects.create(
+        organization=other, team=other_team, project=other_project, name="App", slug=app.slug
+    )
+
+    _emit_provision_failed_event_sync(svc.pk, "provision", "provision_managed_service failed: refused")
+
+    # The query astro app events sends: astroliftEventsPage(appSlug:).
+    permission_resolver.grant(Permission.AUDIT_LOG_READ)
+    info = SimpleNamespace(context=SimpleNamespace(user=None))
+    with tenant_context(TenantContext(organization_id=app.organization_id)):
+        page = OperationsQuery().astrolift_events_page(info, app_slug=app.slug, severity="error")
+    assert [item.event_type for item in page.items] == [EVENT_TYPE]
+    assert page.items[0].payload["reason"] == "provision_managed_service failed: refused"
+
+    with tenant_context(TenantContext(organization_id=other.id)):
+        page = OperationsQuery().astrolift_events_page(info, app_slug=app.slug)
+    assert page.items == []
