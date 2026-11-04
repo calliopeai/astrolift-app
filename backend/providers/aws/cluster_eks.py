@@ -713,6 +713,21 @@ class EKSClusterDriver(ClusterDriver):
             self._k8s(cluster).list(kind=kind, namespace=namespace),
         )
 
+    @driver_op(cloud="aws", driver="cluster")
+    def patch_service_annotations(
+        self,
+        cluster: str,
+        namespace: str,
+        name: str,
+        annotations: dict[str, str],
+    ) -> dict[str, Any]:
+        """Merge-patch only the given annotation keys on a Service."""
+        return self._k8s(cluster).merge_patch_service_annotations(
+            namespace=namespace,
+            name=name,
+            annotations=annotations,
+        )
+
     # ---- workload status ------------------------------------------
 
     @driver_op(cloud="aws", driver="cluster")
