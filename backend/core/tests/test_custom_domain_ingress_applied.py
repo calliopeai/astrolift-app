@@ -133,3 +133,16 @@ def test_skip_reason_helpers():
     assert _custom_domain_skip_reason(active) is None
     failed = CustomDomain(certificate_state=CustomDomain.CertificateState.FAILED)
     assert "FAILED" in _custom_domain_skip_reason(failed) or "failed" in _custom_domain_skip_reason(failed)
+
+
+@pytest.mark.parametrize("ingress_class", ["nginx", "traefik"])
+def test_a_custom_domain_ingress_carries_the_clusters_class(ingress_class) -> None:
+    """Without a class an nginx controller ignores the Ingress and answers its own 404."""
+    (ingress,) = _custom_ingresses(_world(ingress_class=ingress_class))
+    assert ingress["spec"]["ingressClassName"] == ingress_class
+
+
+def test_an_alb_cluster_custom_domain_ingress_is_not_given_a_class() -> None:
+    """An ALB Ingress needs ALB annotations this builder does not write, so it is left as it was."""
+    ingresses = _custom_ingresses(_world(ingress_class="alb"))
+    assert all("ingressClassName" not in i["spec"] for i in ingresses)
