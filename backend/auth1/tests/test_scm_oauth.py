@@ -17,7 +17,7 @@ from django.test import Client
 
 from astrolift_identity.models import Member, Organization
 from astrolift_scm.models import SourceConnection
-from auth1.tests.test_relink_app_installation_2601 import APP_ID, CLIENT_ID, github  # noqa: F401 (fixture)
+from auth1.tests.test_relink_app_installation_2601 import APP_ID, CLIENT_ID, _GitHub
 from core.permissions import Permission
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 from core.tests.utils.scope_world import bind_role
@@ -125,6 +125,18 @@ def _make_github_app_install(
 
 def _login(client, user):
     client.force_login(user)
+
+
+@pytest.fixture
+def github(monkeypatch):
+    """A local GitHub that checks each App JWT against the App's key: an
+    install-time return stores an installation only once GitHub confirms it
+    (#2631)."""
+    stub = _GitHub()
+    monkeypatch.setattr("astrolift_scm.providers.github_app.GITHUB_API_DEFAULT", stub.base)
+    yield stub
+    stub.server.shutdown()
+    stub.server.server_close()
 
 
 # ---------------------------------------------------------------------------
