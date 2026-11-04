@@ -127,6 +127,9 @@ class Permission(enum.StrEnum):
 
     # --- SCM integration ------------------------------------------
     SCM_READ = "scm.read"
+    # Create repositories through a stored connection (#2605); file writes
+    # will ride the same grant.
+    SCM_WRITE = "scm.write"
     SCM_CONNECT = "scm.connect"
     SCM_DISCONNECT = "scm.disconnect"
     SCM_KEY_CREATE = "scm.key_create"
@@ -646,11 +649,14 @@ def _check_permission_decision(permission, scope, decision) -> None:
     from astrolift_identity.api_tokens import (
         get_current_api_token,
         token_scope_allows_permission,
+        token_scope_reaches,
     )
 
     api_token = get_current_api_token()
     if api_token is not None and not token_scope_allows_permission(api_token, permission.value):
         raise PermissionDenied(permission, scope, "api token scope does not allow this permission")
+    if api_token is not None and not token_scope_reaches(api_token, permission.value, scope):
+        raise PermissionDenied(permission, scope, "api token scope holds only at its own organization")
     granted, reason = decision()
     if not granted:
         raise PermissionDenied(permission, scope, reason)
@@ -672,11 +678,14 @@ def check_permission_any_scope(permission: Permission) -> None:
     from astrolift_identity.api_tokens import (
         get_current_api_token,
         token_scope_allows_permission,
+        token_scope_reaches,
     )
 
     api_token = get_current_api_token()
     if api_token is not None and not token_scope_allows_permission(api_token, permission.value):
         raise PermissionDenied(permission, None, "api token scope does not allow this permission")
+    if api_token is not None and not token_scope_reaches(api_token, permission.value, None):
+        raise PermissionDenied(permission, None, "api token scope holds only at its own organization")
     if not granted_scopes(tenant, permission):
         raise PermissionDenied(permission, None, "no grant for this permission at any scope")
 

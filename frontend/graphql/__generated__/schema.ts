@@ -6038,6 +6038,19 @@ export type AstroliftSourceFile = {
   repoFullName: Scalars['String']['output'];
 };
 
+export type AstroliftSourceRepository = {
+  created: Scalars['Boolean']['output'];
+  defaultBranch: Scalars['String']['output'];
+  repoFullName: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+};
+
+export type AstroliftSourceRepositoryMutationResult = {
+  data?: Maybe<AstroliftSourceRepository>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftSshDeployKey = {
   createdAt: Scalars['DateTime']['output'];
   fingerprintSha256: Scalars['String']['output'];
@@ -7903,6 +7916,15 @@ export type CreateRoleInput = {
   permissions: Array<Scalars['String']['input']>;
   scopeLevel: Scalars['String']['input'];
   slug: Scalars['String']['input'];
+};
+
+export type CreateSourceRepositoryInput = {
+  autoInit: InputMaybe<Scalars['Boolean']['input']>;
+  connectionId: Scalars['GUID']['input'];
+  description: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+  owner: Scalars['String']['input'];
+  visibility: Scalars['String']['input'];
 };
 
 export type CreateTeamInput = {
@@ -9816,6 +9838,7 @@ export type Mutation = {
   createProjectSecretBundle: AstroliftSecretBundleMutationResult;
   createRole: AstroliftRoleMutationResult;
   createSkill: AstroliftSkillMutationResult;
+  createSourceRepository: AstroliftSourceRepositoryMutationResult;
   createTeam: AstroliftTeamMutationResult;
   createToolDef: AstroliftToolDefMutationResult;
   createTrigger: AstroliftTriggerMutationResult;
@@ -10753,6 +10776,11 @@ export type MutationCreateRoleArgs = {
 export type MutationCreateSkillArgs = {
   input: SkillInput;
   orgId: Scalars['ID']['input'];
+};
+
+
+export type MutationCreateSourceRepositoryArgs = {
+  input: CreateSourceRepositoryInput;
 };
 
 

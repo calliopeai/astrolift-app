@@ -9,7 +9,8 @@ file per commit). Each call dispatches on ``connection.kind`` like
 * ``repository_state`` - missing, empty, or its commits; "empty" also covers a
   repository whose only commit is a host-generated README.
 * ``create_repository`` - under the owner (a user or an organization) with a
-  visibility. A GitHub App installation token cannot create repositories
+  visibility, an optional description and, when ``auto_init`` is given, an
+  initial commit or none (each host keeps its own default otherwise). A GitHub App installation token cannot create repositories
   (the Astrolift AI App has no ``administration: write``), so it refuses
   with ``PRECONDITION`` before any call.
 * ``commit_tree`` - GitHub's git data API (blobs, trees, commit, ref), GitLab's
@@ -60,6 +61,8 @@ class RepoState:
     commit_count: int = 0
     files: tuple[str, ...] = ()
     file_shas: dict[str, str] = dataclasses.field(default_factory=dict)
+    #: May the connection's credential push here? None when the host does not say.
+    writable: bool | None = None
 
 
 def _error(code: str, message: str, *, recoverable: bool = False):
@@ -193,6 +196,8 @@ def _github_state(connection, repo_full_name: str) -> RepoState:
             return RepoState(exists=False)
         raise _translate(exc, f"reading {repo_full_name}") from exc
     branch = (meta or {}).get("default_branch") or "main"
+    perms = (meta or {}).get("permissions")
+    writable = bool(perms.get("push") or perms.get("admin")) if isinstance(perms, dict) else None
     try:
         _, commits, _ = _http(
             "GET",
@@ -203,14 +208,16 @@ def _github_state(connection, repo_full_name: str) -> RepoState:
     except _HttpError as exc:
         # 409 "Git Repository is empty"; 404 when the default branch is unborn.
         if exc.status in (404, 409):
-            return RepoState(exists=True, empty=True, default_branch=branch)
+            return RepoState(exists=True, empty=True, default_branch=branch, writable=writable)
         raise _translate(exc, f"listing commits of {repo_full_name}") from exc
     commits = commits or []
     if not commits:
-        return RepoState(exists=True, empty=True, default_branch=branch)
+        return RepoState(exists=True, empty=True, default_branch=branch, writable=writable)
     head = commits[0]["sha"]
     if len(commits) > 1:
-        return RepoState(exists=True, empty=False, default_branch=branch, head_sha=head, commit_count=2)
+        return RepoState(
+            exists=True, empty=False, default_branch=branch, head_sha=head, commit_count=2, writable=writable
+        )
     try:
         _, tree, _ = _http("GET", f"{base}/repos/{repo}/git/trees/{head}", headers, host="GitHub")
     except _HttpError as exc:
@@ -225,10 +232,13 @@ def _github_state(connection, repo_full_name: str) -> RepoState:
         commit_count=1,
         files=files,
         file_shas={e.get("path", ""): e.get("sha", "") for e in entries},
+        writable=writable,
     )
 
 
-def _github_create(connection, owner: str, name: str, visibility: str) -> RepoState:
+def _github_create(
+    connection, owner: str, name: str, visibility: str, description: str = "", auto_init: bool | None = None
+) -> RepoState:
     if connection.kind == "github_app_install":
         raise _error(
             "PRECONDITION",
@@ -244,7 +254,9 @@ def _github_create(connection, owner: str, name: str, visibility: str) -> RepoSt
     personal = str((me or {}).get("login") or "").lower() == owner.lower()
     if personal and visibility == "internal":
         raise _error("VALIDATION", "internal visibility needs an organization owner")
-    body = {"name": name, "private": visibility != "public", "auto_init": True}
+    body = {"name": name, "private": visibility != "public", "auto_init": auto_init is not False}
+    if description:
+        body["description"] = description
     if not personal:
         body["visibility"] = visibility
     url = f"{base}/user/repos" if personal else f"{base}/orgs/{urllib.parse.quote(owner, safe='')}/repos"
@@ -429,7 +441,9 @@ def _gitlab_state(connection, repo_full_name: str) -> RepoState:
     )
 
 
-def _gitlab_create(connection, owner: str, name: str, visibility: str) -> RepoState:
+def _gitlab_create(
+    connection, owner: str, name: str, visibility: str, description: str = "", auto_init: bool | None = None
+) -> RepoState:
     base, headers = _gl(connection)
     try:
         _, namespace, _ = _http(
@@ -444,7 +458,8 @@ def _gitlab_create(connection, owner: str, name: str, visibility: str) -> RepoSt
                 "path": name,
                 "namespace_id": (namespace or {}).get("id"),
                 "visibility": visibility,
-                "initialize_with_readme": False,
+                "initialize_with_readme": bool(auto_init),
+                **({"description": description} if description else {}),
             },
             host="GitLab",
         )
@@ -541,7 +556,9 @@ def _gitea_state(connection, repo_full_name: str) -> RepoState:
     )
 
 
-def _gitea_create(connection, owner: str, name: str, visibility: str) -> RepoState:
+def _gitea_create(
+    connection, owner: str, name: str, visibility: str, description: str = "", auto_init: bool | None = None
+) -> RepoState:
     if visibility == "internal":
         raise _error("VALIDATION", "Gitea repositories are private or public")
     base, headers = _gt(connection)
@@ -560,8 +577,9 @@ def _gitea_create(connection, owner: str, name: str, visibility: str) -> RepoSta
             body={
                 "name": name,
                 "private": visibility != "public",
-                "auto_init": False,
+                "auto_init": bool(auto_init),
                 "default_branch": "main",
+                **({"description": description} if description else {}),
             },
             host="Gitea",
         )
@@ -654,7 +672,10 @@ def _bitbucket_state(connection, repo_full_name: str) -> RepoState:
     )
 
 
-def _bitbucket_create(connection, owner: str, name: str, visibility: str) -> RepoState:
+def _bitbucket_create(
+    connection, owner: str, name: str, visibility: str, description: str = "", auto_init: bool | None = None
+) -> RepoState:
+    # Bitbucket's create has no initial-commit option; ``auto_init`` is ignored.
     if visibility == "internal":
         raise _error("VALIDATION", "Bitbucket repositories are private or public")
     base, headers = _bb(connection)
@@ -663,7 +684,11 @@ def _bitbucket_create(connection, owner: str, name: str, visibility: str) -> Rep
             "POST",
             f"{base}/2.0/repositories/{_quote_repo(f'{owner}/{name}')}",
             headers,
-            body={"scm": "git", "is_private": visibility != "public"},
+            body={
+                "scm": "git",
+                "is_private": visibility != "public",
+                **({"description": description} if description else {}),
+            },
             host="Bitbucket",
         )
     except _HttpError as exc:
@@ -739,11 +764,40 @@ def repository_state(connection, repo_full_name: str) -> RepoState:
     return _wrap(_STATE[_host(connection)], connection, repo_full_name)
 
 
-def create_repository(connection, owner: str, name: str, visibility: str) -> RepoState:
+def create_repository(
+    connection,
+    owner: str,
+    name: str,
+    visibility: str,
+    *,
+    description: str = "",
+    auto_init: bool | None = None,
+) -> RepoState:
     if visibility not in VISIBILITIES:
         raise _error("VALIDATION", f"visibility must be one of {', '.join(VISIBILITIES)}")
     _split(f"{owner}/{name}")
-    return _wrap(_CREATE[_host(connection)], connection, owner, name, visibility)
+    return _wrap(
+        _CREATE[_host(connection)],
+        connection,
+        owner,
+        name,
+        visibility,
+        description=description,
+        auto_init=auto_init,
+    )
+
+
+def repository_web_url(connection, repo_full_name: str) -> str:
+    """The browser URL of ``owner/name`` on the connection's host."""
+    host = _host(connection)
+    base = (connection.api_base_url or "").rstrip("/")
+    if host == "github":
+        base = base.removesuffix("/api/v3") if base and "api.github.com" not in base else "https://github.com"
+    elif host == "gitlab":
+        base = base or "https://gitlab.com"
+    elif host == "bitbucket":
+        base = "https://bitbucket.org"
+    return f"{base}/{repo_full_name}"
 
 
 def commit_tree(
