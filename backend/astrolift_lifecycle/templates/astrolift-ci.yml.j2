@@ -73,12 +73,13 @@ jobs:
         env:
           API_URL: {{ api_url }}
           APP_SLUG: {{ app_slug }}
+          ENVIRONMENT: {{ environment }}
           TOKEN: ${{ secrets[{{ token_secret }}] }}
         run: |
           code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{http_code}' -X POST "$API_URL/api/cli/v1/apps/$APP_SLUG/deploy/" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"image_tags\":{\"*\":\"${{ github.sha }}\"},\"commit_sha\":\"${{ github.sha }}\",\"branch\":\"${{ github.ref_name }}\",\"trigger_kind\":\"ci\"}")
+            -d "{\"image_tags\":{\"*\":\"${{ github.sha }}\"},\"commit_sha\":\"${{ github.sha }}\",\"branch\":\"${{ github.ref_name }}\",\"trigger_kind\":\"ci\",\"environment\":\"$ENVIRONMENT\"}")
           cat /tmp/astrolift-deploy-response.json; echo
           case "$code" in
             2*) echo "Astrolift accepted the deploy (HTTP $code)." ;;
