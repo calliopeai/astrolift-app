@@ -775,6 +775,21 @@ def _render_app_network_policy(deployment_id: int, namespace: str) -> list[dict]
     return render_app_network_policy(d.registered_app, namespace=namespace)
 
 
+def _custom_domain_ingress_class(cluster) -> dict[str, str]:
+    """``spec.ingressClassName`` for a custom domain's Ingress.
+
+    A controller serves only the Ingresses of its own class, so an Ingress with
+    no class is ignored by an nginx controller and the host answers nginx's own
+    404. The managed-subdomain Ingress sets the cluster's class; this one must
+    too. An ALB cluster is left alone: its Ingress needs ALB annotations this
+    builder does not write, and envoy clusters route custom domains elsewhere.
+    """
+    ingress_class = (getattr(cluster, "ingress_class", "") or "").strip()
+    if not ingress_class or ingress_class in ("alb", "envoy"):
+        return {}
+    return {"ingressClassName": ingress_class}
+
+
 def _custom_domain_skip_reason(cd, *, state: str | None = None) -> str | None:
     """Why a validated, active custom domain gets no Ingress, or None when it does.
 
@@ -1064,6 +1079,7 @@ def _render_app_ingresses_and_tls(
                     },
                 },
                 "spec": {
+                    **_custom_domain_ingress_class(edge_cluster),
                     "tls": [{"hosts": [cd.hostname], "secretName": secret_name}],
                     "rules": [
                         {
