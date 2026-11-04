@@ -26,6 +26,11 @@ from core.tenancy import get_current_tenant
 SoftDeleteOrganizationInput = SoftDeleteByGuidInput  # back-compat alias
 
 
+def _listed(parts: list[str]) -> str:
+    """``a``, ``a and b``, ``a, b and c``."""
+    return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
+
+
 def _actor():
     tenant = get_current_tenant()
     actor_id = tenant.actor_user_id if tenant else None
