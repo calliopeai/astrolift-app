@@ -52,6 +52,32 @@ urlpatterns = [
         builder_brain_views.archive,
         name="builder-brain-build-archive",
     ),
+    # Ordinary apps in an exact project, no brain (#2471).
+    path(
+        "api/builder/v1/dev-environments/<str:guid>/project-source/",
+        builder_brain_views.project_descriptor,
+        name="builder-project-source",
+    ),
+    path(
+        "api/builder/v1/dev-environments/<str:guid>/project-source-builds/",
+        csrf_exempt(builder_brain_views.project_create),
+        name="builder-project-build-create",
+    ),
+    path(
+        "api/builder/v1/project-source-builds/<str:intent_guid>/",
+        builder_brain_views.project_status,
+        name="builder-project-build-status",
+    ),
+    path(
+        "api/builder/v1/project-source-builds/<str:intent_guid>/host/",
+        csrf_exempt(builder_brain_views.project_host),
+        name="builder-project-build-host",
+    ),
+    path(
+        "api/builder/v1/project-source-builds/<str:intent_guid>/archive/",
+        builder_brain_views.project_archive,
+        name="builder-project-build-archive",
+    ),
     path("api/builder/v1/capabilities/", builder_views.capabilities, name="builder-capabilities"),
     path(
         "api/builder/v1/dev-environments/<str:guid>/artifact/",
