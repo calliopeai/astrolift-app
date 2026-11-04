@@ -6,15 +6,21 @@
  * Hosts: `astroliftSourceConnectionsPage` takes `search`, `limit`, `after`.
  * Kind and Status narrow a wider page (`NARROW_LIMIT`) in the client; Mine
  * is your personal (OAuth user or PAT) connections, narrowed the same way.
+ * Status is the server's `status` (#2601), the one the Status column shows.
  *
  * SSH deploy keys: `astroliftSshDeployKeysPage` also takes `appSlug`, where
  * `null` is every key and `""` the org-scoped ones only, so Scope goes to
  * the server. Keys record no creator, so Mine is empty until they do.
  */
 import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
-import type { AstroliftSourceConnection } from "@/graphql/scm/scm.types";
+import type { AstroliftSourceConnection, ScmConnectionStatus } from "@/graphql/scm/scm.types";
 
 export const NARROW_LIMIT = 100;
+
+/** A row's status: the server's check, or its stored flag where the query asked for none. */
+export function connectionStatus(c: AstroliftSourceConnection): ScmConnectionStatus {
+  return c.status ?? (c.isActive ? "ACTIVE" : "INACTIVE");
+}
 
 const HOST_FAMILIES = ["github", "gitlab", "bitbucket", "gitea"];
 
@@ -32,7 +38,9 @@ export const SOURCE_HOSTS_LIST: CopiedListDefinition = {
       label: "Status",
       options: [
         { value: "active", label: "active" },
-        { value: "disabled", label: "disabled" },
+        { value: "inactive", label: "inactive" },
+        { value: "installation_missing", label: "installation missing" },
+        { value: "unverified", label: "not verified" },
       ],
     },
   ],
@@ -70,7 +78,7 @@ export function narrowHosts(
     narrowed: true,
     rows: rows.filter((c) => {
       if (filters.host && !c.kind.startsWith(`${filters.host}_`)) return false;
-      if (filters.status && (c.isActive ? "active" : "disabled") !== filters.status) return false;
+      if (filters.status && connectionStatus(c).toLowerCase() !== filters.status) return false;
       if (filters.personal && !c.isPersonal) return false;
       return true;
     }),

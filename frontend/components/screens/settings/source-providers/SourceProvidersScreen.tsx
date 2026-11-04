@@ -41,10 +41,13 @@ import type {
   AstroliftSourceConnection,
   AstroliftSshDeployKey,
   AstroliftWebhookSecretReveal,
+  ScmConnectionStatus,
 } from "@/graphql/scm/scm.types";
 import { useLocalStorage } from "@/hooks/use-local-storage";
 import { DOC_LINKS } from "@/lib/docs/urls";
+import { cn } from "@/lib/utils";
 
+import { connectionStatus } from "./source-providers-list";
 import type { DeployKeysData, SourceHostsData } from "./use-source-providers";
 
 // localStorage key for the Advanced (paste-credentials) toggle.
@@ -252,15 +255,8 @@ export function SourceHostsView({
     {
       id: "status",
       header: t("hosts.columns.status"),
-      cell: (c) =>
-        c.isActive ? (
-          <Badge className="bg-success/15 text-success-fg gap-1" variant="secondary">
-            <CheckCircle2Icon className="size-3" />
-            {t("hosts.active")}
-          </Badge>
-        ) : (
-          <Badge variant="outline">{t("hosts.disabled")}</Badge>
-        ),
+      cellClassName: "max-w-64",
+      cell: (c) => <ConnectionStatusCell connection={c} />,
     },
   ];
 
@@ -781,6 +777,42 @@ export function WebhookSecretReveal({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const STATUS_LABEL = {
+  ACTIVE: "hosts.active",
+  INACTIVE: "hosts.inactive",
+  INSTALLATION_MISSING: "hosts.installationMissing",
+  UNVERIFIED: "hosts.unverified",
+} as const satisfies Record<ScmConnectionStatus, string>;
+
+const STATUS_TONE: Record<ScmConnectionStatus, string> = {
+  ACTIVE: "bg-success/15 text-success-fg",
+  INACTIVE: "",
+  INSTALLATION_MISSING: "bg-danger/15 text-danger-fg",
+  UNVERIFIED: "bg-warning/15 text-warning-fg",
+};
+
+/** The Status cell (#2601): the server's check and, unless it is active, why. */
+function ConnectionStatusCell({ connection }: { connection: AstroliftSourceConnection }) {
+  const t = useTranslations("sourceProviders");
+  const status = connectionStatus(connection);
+  return (
+    <span className="block min-w-0">
+      <Badge
+        variant={status === "INACTIVE" ? "outline" : "secondary"}
+        className={cn("gap-1", STATUS_TONE[status])}
+      >
+        {status === "ACTIVE" && <CheckCircle2Icon className="size-3" />}
+        {t(STATUS_LABEL[status])}
+      </Badge>
+      {status !== "ACTIVE" && connection.statusDetail ? (
+        <span className="text-muted-foreground text-2xs mt-1 block [overflow-wrap:anywhere] whitespace-normal">
+          {connection.statusDetail}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
