@@ -4397,6 +4397,8 @@ export type AstroliftModelPromptReadinessState =
   | 'UNSUPPORTED';
 
 export type AstroliftModuleEntitlement = {
+  /** Whether this install offers the per-org module to its organizations: its install switch is on and the licence does not withhold it (#2551). An org admin can turn on only an available module, so the modules card lists no other. On a new install the Chat Studio integration is not available until the install admin turns it on. Always true for the install-wide modules. */
+  available: Scalars['Boolean']['output'];
   canCreate: Scalars['Boolean']['output'];
   canManage: Scalars['Boolean']['output'];
   canRun: Scalars['Boolean']['output'];

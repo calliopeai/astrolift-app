@@ -3,10 +3,12 @@
 A module such as the Chat Studio integration is install-wide code but a
 per-organization decision. Two switches decide whether it is on for an org:
 
-* the install admin's Constance switch, on by default, which forces the
-  module off for every org when turned off (the platform-admin feature
-  flipper already manages these, so it doubles as the kill switch the AHP
-  fallback contract asks for, calliopeai/calliope-vscode#796);
+* the install admin's Constance switch, which forces the module off for
+  every org when turned off (the platform-admin feature flipper already
+  manages these, so it doubles as the kill switch the AHP fallback contract
+  asks for, calliopeai/calliope-vscode#796). On by default, except the Chat
+  Studio integration's, which an install offers only once its admin turns it
+  on (#2551);
 * the install's signed licence, when it carries the modules claim
   (``astrolift_identity.licence``, #1879): a module it withholds is off for
   every org, whatever the org admin set. A grant only allows a module; it
@@ -54,6 +56,15 @@ def withheld_by_licence(key: str) -> bool:
     """True when the licence speaks to modules and does not grant this one."""
     granted = licensed_modules()
     return granted is not None and key not in granted
+
+
+def available(key: str) -> bool:
+    """True when the install offers the module to its organizations (#2551).
+
+    An org admin can turn on only an available module, so the modules card
+    lists no other.
+    """
+    return allowed_by_install(key) and not withheld_by_licence(key)
 
 
 def module_state(organization_id: int | None, key: str) -> tuple[bool, str | None]:

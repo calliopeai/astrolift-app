@@ -5800,8 +5800,7 @@
     "title": "Modules",
     "description": "Optional integrations for this organization. An install admin can still force one off for every organization.",
     "loadError": "Could not load modules",
-    "installOff": "Turned off on this install",
-    "licenceWithheld": "Not included in this install's license",
+    "none": "No modules are available on this install.",
     "licenceTurnedOff": "Turned off when the license withheld it. An org admin can turn it back on.",
     "enable": "Enable {module}",
     "disable": "Disable {module}",
@@ -5811,7 +5810,7 @@
     "items": {
       "chat_studio_integration": {
         "label": "Chat Studio integration",
-        "description": "Lets Chat Studio reach this organization's apps through the builder API."
+        "description": "Lets Chat Studio ship apps to this organization through the builder API."
       },
       "agent_live_attach": {
         "label": "Agent live attach",

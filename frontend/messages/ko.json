@@ -5863,8 +5863,7 @@
     "title": "모듈",
     "description": "이 조직의 선택적 통합입니다. 설치 관리자는 여전히 모든 조직에서 강제로 끌 수 있습니다.",
     "loadError": "모듈을 불러올 수 없습니다",
-    "installOff": "이 설치에서 꺼져 있음",
-    "licenceWithheld": "이 설치의 라이선스에 포함되지 않음",
+    "none": "이 설치에서 사용할 수 있는 모듈이 없습니다.",
     "licenceTurnedOff": "라이선스에서 제외되었을 때 꺼졌습니다. 조직 관리자가 다시 켤 수 있습니다.",
     "enable": "{module} 사용",
     "disable": "{module} 사용 안 함",
@@ -5874,7 +5873,7 @@
     "items": {
       "chat_studio_integration": {
         "label": "Chat Studio 통합",
-        "description": "Chat Studio가 builder API를 통해 이 조직의 앱에 접근할 수 있게 합니다."
+        "description": "Chat Studio가 builder API를 통해 이 조직에 앱을 배포할 수 있게 합니다."
       },
       "agent_live_attach": {
         "label": "에이전트 실시간 연결",

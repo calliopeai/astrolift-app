@@ -184,6 +184,16 @@ class ModuleEntitlementType:
             "Always true for the install-wide modules and when the licence has no say."
         ),
     )
+    available: bool = strawberry.field(
+        default=True,
+        description=(
+            "Whether this install offers the per-org module to its organizations: its "
+            "install switch is on and the licence does not withhold it (#2551). An org admin "
+            "can turn on only an available module, so the modules card lists no other. On a "
+            "new install the Chat Studio integration is not available until the install admin "
+            "turns it on. Always true for the install-wide modules."
+        ),
+    )
     source: str | None = strawberry.field(
         default=None,
         description=(
@@ -254,6 +264,7 @@ class MeType:
         from astrolift_identity.model_entitlements import models_entitlement
         from astrolift_identity.org_modules import (
             INSTALL_SWITCHES,
+            available,
             enabled_modules,
             module_sources,
             withheld_by_licence,
@@ -301,6 +312,7 @@ class MeType:
                 can_run=r.can_run,
                 enabled=r.enabled,
                 licensed=not (r.key in INSTALL_SWITCHES and withheld_by_licence(r.key)),
+                available=r.key not in INSTALL_SWITCHES or available(r.key),
                 source=sources.get(r.key) if r.key in INSTALL_SWITCHES else None,
             )
             for r in rows

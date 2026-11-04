@@ -5857,8 +5857,7 @@
     "title": "Module",
     "description": "Optionale Integrationen für diese Organisation. Ein Installations-Admin kann eine davon trotzdem für alle Organisationen abschalten.",
     "loadError": "Module konnten nicht geladen werden",
-    "installOff": "Auf dieser Installation abgeschaltet",
-    "licenceWithheld": "Nicht in der Lizenz dieser Installation enthalten",
+    "none": "Auf dieser Installation sind keine Module verfügbar.",
     "licenceTurnedOff": "Abgeschaltet, als die Lizenz das Modul nicht enthielt. Ein Org-Admin kann es wieder einschalten.",
     "enable": "{module} aktivieren",
     "disable": "{module} deaktivieren",
@@ -5868,7 +5867,7 @@
     "items": {
       "chat_studio_integration": {
         "label": "Chat-Studio-Integration",
-        "description": "Erlaubt Chat Studio, über die Builder-API auf die Apps dieser Organisation zuzugreifen."
+        "description": "Erlaubt Chat Studio, über die Builder-API Apps in dieser Organisation bereitzustellen."
       },
       "agent_live_attach": {
         "label": "Live-Verbindung zu Agents",

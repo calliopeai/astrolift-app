@@ -5863,8 +5863,7 @@
     "title": "模块",
     "description": "此组织的可选集成。安装管理员仍可为所有组织强制关闭其中任一项。",
     "loadError": "无法加载模块",
-    "installOff": "已在此安装中关闭",
-    "licenceWithheld": "未包含在此安装的许可证中",
+    "none": "此安装中没有可用的模块。",
     "licenceTurnedOff": "许可证不再包含该模块时已将其关闭。组织管理员可以重新开启。",
     "enable": "启用 {module}",
     "disable": "停用 {module}",
@@ -5874,7 +5873,7 @@
     "items": {
       "chat_studio_integration": {
         "label": "Chat Studio 集成",
-        "description": "允许 Chat Studio 通过 builder API 访问此组织的应用。"
+        "description": "允许 Chat Studio 通过 builder API 将应用部署到此组织。"
       },
       "agent_live_attach": {
         "label": "智能体实时接入",

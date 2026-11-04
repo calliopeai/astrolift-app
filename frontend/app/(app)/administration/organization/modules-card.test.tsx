@@ -8,10 +8,11 @@ import { ModulesCard } from "./modules-card";
 /**
  * Modules flips a per-org switch through setOrganizationModule (#1880).
  *
- * The claims worth pinning: the install-wide kill switch disables the
- * toggle and says why regardless of what this org's own row says, a
+ * The claims worth pinning: only the modules the server reports available
+ * are listed at all (#2551), so a new install does not advertise the Chat
+ * Studio integration and an install that offers it keeps the control; a
  * viewer without org.update gets read-only switches rather than a hidden
- * section (the issue's explicit "visible but read-only" contract), and a
+ * section (the issue's explicit "visible but read-only" contract); and a
  * click sends exactly the flipped {key, enabled} pair — not a toggle of
  * some other module and not a stale value.
  */
@@ -19,7 +20,6 @@ import { ModulesCard } from "./modules-card";
 const state = vi.hoisted(() => ({
   modules: [] as Record<string, unknown>[],
   permissions: [] as string[],
-  featureFlags: [] as Record<string, unknown>[],
   setModule: vi.fn(),
 }));
 
@@ -40,13 +40,6 @@ vi.mock("@apollo/client/react", () => ({
         error: undefined,
       };
     }
-    if (op === "AstroliftServerInfo") {
-      return {
-        data: { astroliftServerInfo: { featureFlags: state.featureFlags } },
-        loading: false,
-        error: undefined,
-      };
-    }
     return { data: undefined, loading: false, error: undefined };
   },
   useMutation: () => [state.setModule, { loading: false }],
@@ -58,7 +51,7 @@ vi.mock("sonner", () => ({ toast }));
 function moduleEntitlement(
   key: string,
   enabled: boolean,
-  licence: { licensed?: boolean; source?: string | null } = {}
+  install: { available?: boolean; licensed?: boolean; source?: string | null } = {}
 ) {
   return {
     key,
@@ -67,8 +60,9 @@ function moduleEntitlement(
     canManage: true,
     canRun: true,
     enabled,
-    licensed: licence.licensed ?? true,
-    source: licence.source ?? null,
+    licensed: install.licensed ?? true,
+    available: install.available ?? true,
+    source: install.source ?? null,
   };
 }
 
@@ -81,12 +75,6 @@ describe("ModulesCard", () => {
       moduleEntitlement("agent_policy_enforcement", false),
     ];
     state.permissions = ["org.update"];
-    state.featureFlags = [
-      { key: "modules.chat_studio_integration_allowed", enabled: true },
-      { key: "modules.agent_live_attach_allowed", enabled: false },
-      { key: "modules.chat_studio_agent_runs_allowed", enabled: true },
-      { key: "modules.agent_policy_enforcement_allowed", enabled: true },
-    ];
     state.setModule = vi.fn().mockResolvedValue({
       data: {
         setOrganizationModule: {
@@ -114,14 +102,52 @@ describe("ModulesCard", () => {
     );
   });
 
-  it("disables a module the install has forced off and says why", () => {
+  it("does not list the Chat Studio integration on an install that does not offer it (#2551)", () => {
+    state.modules[0] = moduleEntitlement("chat_studio_integration", false, { available: false });
     render(<ModulesCard />);
 
-    expect(screen.getByRole("switch", { name: /enable agent live attach/i })).toBeDisabled();
-    expect(screen.getByText("Turned off on this install")).toBeInTheDocument();
+    expect(screen.queryByText("Chat Studio integration")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch", { name: /chat studio integration/i })).toBeNull();
+    // The modules the install does offer stay listed and switchable.
+    expect(screen.getByRole("switch", { name: /enable agent live attach/i })).toBeEnabled();
+    expect(screen.getByRole("switch", { name: /enable chat studio agent runs/i })).toBeEnabled();
+  });
 
-    // The install-allowed module stays interactive for an org.update viewer.
+  it("keeps the Chat Studio integration's control where the install offers it", async () => {
+    state.modules[0] = moduleEntitlement("chat_studio_integration", false);
+    render(<ModulesCard />);
+
+    const toggle = screen.getByRole("switch", { name: /enable chat studio integration/i });
+    expect(toggle).toBeEnabled();
+    expect(
+      screen.getByText("Lets Chat Studio ship apps to this organization through the builder API.")
+    ).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(state.setModule).toHaveBeenCalled());
+    expect(state.setModule.mock.calls[0][0].variables).toEqual({
+      input: { key: "chat_studio_integration", enabled: true },
+    });
+  });
+
+  it("does not list a module the licence withholds (#1879)", () => {
+    state.modules[2] = moduleEntitlement("chat_studio_agent_runs", false, {
+      available: false,
+      licensed: false,
+      source: "licence",
+    });
+    render(<ModulesCard />);
+
+    expect(screen.queryByRole("switch", { name: /chat studio agent runs/i })).toBeNull();
     expect(screen.getByRole("switch", { name: /disable chat studio integration/i })).toBeEnabled();
+  });
+
+  it("says so when the install offers no module", () => {
+    state.modules = state.modules.map((m) => ({ ...m, enabled: false, available: false }));
+    render(<ModulesCard />);
+
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.getByText("No modules are available on this install.")).toBeInTheDocument();
   });
 
   it("is read-only for a viewer without org.update", () => {
@@ -141,17 +167,6 @@ describe("ModulesCard", () => {
     expect(state.setModule.mock.calls[0][0].variables).toEqual({
       input: { key: "chat_studio_integration", enabled: false },
     });
-  });
-
-  it("disables a module the licence withholds and says why (#1879)", () => {
-    state.modules[2] = moduleEntitlement("chat_studio_agent_runs", false, {
-      licensed: false,
-      source: "licence",
-    });
-    render(<ModulesCard />);
-
-    expect(screen.getByRole("switch", { name: /enable chat studio agent runs/i })).toBeDisabled();
-    expect(screen.getByText("Not included in this install's license")).toBeInTheDocument();
   });
 
   it("says when the licence turned a module off and leaves it for the org admin", () => {

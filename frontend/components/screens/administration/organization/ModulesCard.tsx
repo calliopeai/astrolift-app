@@ -67,14 +67,12 @@ function ModuleRow({
   pending: boolean;
   onToggle: (next: boolean) => void;
 }) {
-  // Install-wide kill switch (#1859) — off forces the module off for every
-  // organization, regardless of what this org's own row says.
-  // A licence that withholds the module (#1879) also keeps it off; one the
-  // licence turned off stays off once granted again, until an org admin
-  // turns it back on.
-  const { installAllowed, licensed, enabled } = item;
-  const disabled = pending || permsLoading || !canManage || !installAllowed || !licensed;
-  const licenceTurnedOff = licensed && !enabled && item.source === "licence";
+  // Only modules the install offers reach this row (#2551). One the licence
+  // turned off (#1879) stays off once granted again, until an org admin turns
+  // it back on.
+  const { enabled } = item;
+  const disabled = pending || permsLoading || !canManage;
+  const licenceTurnedOff = !enabled && item.source === "licence";
   const t = useTranslations("adminModules");
 
   return (
@@ -84,11 +82,7 @@ function ModuleRow({
         <p className="text-muted-foreground mt-0.5 text-sm [overflow-wrap:anywhere]">
           {item.description}
         </p>
-        {!installAllowed && <p className="text-muted-foreground mt-1 text-xs">{t("installOff")}</p>}
-        {installAllowed && !licensed && (
-          <p className="text-muted-foreground mt-1 text-xs">{t("licenceWithheld")}</p>
-        )}
-        {installAllowed && licenceTurnedOff && (
+        {licenceTurnedOff && (
           <p className="text-muted-foreground mt-1 text-xs">{t("licenceTurnedOff")}</p>
         )}
       </div>
@@ -101,6 +95,9 @@ function ModuleRow({
     </div>
   );
 }
+
+// Which modules the install offers is not known until me.modules lands.
+const SKELETON_ROWS = [0, 1, 2];
 
 export function ModulesCard({
   items,
@@ -120,8 +117,8 @@ export function ModulesCard({
           <QueryError title={t("loadError")} error={error} onRetry={onRetry} />
         ) : loading ? (
           <div className="flex flex-col gap-3 py-2">
-            {items.map((m) => (
-              <div key={m.key} className="flex min-w-0 items-center gap-4">
+            {SKELETON_ROWS.map((row) => (
+              <div key={row} className="flex min-w-0 items-center gap-4">
                 <div className="min-w-0 flex-1 space-y-2">
                   <Skeleton className="h-4 w-48 max-w-full" />
                   <Skeleton className="h-3 w-72 max-w-full" />
@@ -130,6 +127,8 @@ export function ModulesCard({
               </div>
             ))}
           </div>
+        ) : items.length === 0 ? (
+          <p className="text-muted-foreground py-3 text-sm">{t("none")}</p>
         ) : (
           items.map((item) => (
             <ModuleRow

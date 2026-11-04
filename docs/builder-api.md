@@ -8,7 +8,8 @@ The legacy team promotion route below selects neither a project nor a brain.
 
 Preconditions: an API token (`alft_at_...`) issued by the CLI device flow
 (`astro auth login`) carrying `write:apps` or `admin`, for an organization whose
-`chat_studio_integration` module is on; the token's user holds `app.create` in
+`chat_studio_integration` module is on, on an install whose
+`CHAT_STUDIO_INTEGRATION_ALLOWED` switch is on (off on a new install); the token's user holds `app.create` in
 the organization for create and sync, and `app.create` plus `app.deploy` on the
 destination team for promote (`backend/core/permissions.py`); the surface is the
 REST routes under `/api/builder/v1/` on the control-plane API origin, which the
@@ -41,8 +42,12 @@ an SSO challenge, the same bypass `/api/cli/v1/*` needs.
 
 ## Authorization
 
-The organization must have the `chat_studio_integration` module on. After
-that, the caller needs:
+The install must offer the `chat_studio_integration` module and the
+organization must have it on. A new install does not offer it (#2551): the
+install admin turns on `CHAT_STUDIO_INTEGRATION_ALLOWED` under Administration ›
+Platform settings › Organization modules, and an org admin then turns the
+module on under Administration › Organization › Modules. After that, the
+caller needs:
 
 | Route | Permission |
 |---|---|
@@ -67,6 +72,7 @@ A refusal is `403` with a reason, in the same shape as the module check:
 {"detail": "the api token lacks the write:apps scope", "reason": "missing_scope", "scope": "write:apps"}
 {"detail": "app.deploy is required on team 'eng'", "reason": "missing_permission", "permission": "app.deploy"}
 {"detail": "the chat_studio_integration module is not enabled for this organization", "reason": "module_not_enabled", "module": "chat_studio_integration"}
+{"detail": "the chat_studio_integration module is turned off on this install", "reason": "module_disabled_by_install", "module": "chat_studio_integration"}
 ```
 
 ## Create a dev environment
@@ -255,5 +261,5 @@ curl -I <app_url>
 The first call must answer `200` with `"artifact_transport": "private-archive-v1"`,
 `max_files`, `max_file_bytes` and `max_data_bytes`; `401` with
 `api_token_required` means no bearer reached the API, and `403` names
-`missing_scope` or `module_not_enabled`. After a promote, the second call must
+`missing_scope`, `module_not_enabled` or `module_disabled_by_install`. After a promote, the second call must
 return an HTTP 200 status line from the promoted app.

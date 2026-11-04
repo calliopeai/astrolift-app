@@ -27,6 +27,10 @@ export type ModuleEntitlement = {
   // False when the install's signed licence withholds this per-org module
   // (#1879): off for every org and an org admin cannot turn it on.
   licensed?: boolean;
+  // Whether the install offers this per-org module to its organizations
+  // (#2551): its install switch is on and the licence does not withhold it.
+  // Always true for the install-wide modules.
+  available?: boolean;
   // Who last switched a per-org module: "org_admin" or "licence" (#1879).
   source?: string | null;
 };

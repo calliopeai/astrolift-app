@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@apollo/client/react";
+import { useMutation } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
@@ -10,38 +10,33 @@ import type {
   AstroliftOrganizationModule,
   MutationResult,
 } from "@/graphql/identity/identity.types";
-import { SERVER_INFO } from "@/graphql/server/server.queries";
 import { useModules } from "@/graphql/user/user.hooks";
 import { GET_ME } from "@/graphql/user/user.queries";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 // The per-org modules an org admin can turn on/off for their org (#1859).
-// The install admin can still force one off for every org — checked below
-// against astroliftServerInfo.featureFlags.
+// Only the ones this install offers are listed: me.modules[].available says
+// which (#2551), so an install admin's switch or the licence keeps one out.
 export const MODULE_CONFIG = [
   {
     key: "chat_studio_integration",
     label: "Chat Studio integration",
-    description: "Lets Chat Studio reach this organization's apps through the builder API.",
-    installFlagKey: "modules.chat_studio_integration_allowed",
+    description: "Lets Chat Studio ship apps to this organization through the builder API.",
   },
   {
     key: "agent_live_attach",
     label: "Agent live attach",
     description: "Lets members attach live to a running agent session.",
-    installFlagKey: "modules.agent_live_attach_allowed",
   },
   {
     key: "chat_studio_agent_runs",
     label: "Chat Studio agent runs",
     description: "Lets Chat Studio launch this organization's registered agents.",
-    installFlagKey: "modules.chat_studio_agent_runs_allowed",
   },
   {
     key: "agent_policy_enforcement",
     label: "Agent policy enforcement",
     description: "Lets Zentinelle apply policy actions to this organization's agents and boxes.",
-    installFlagKey: "modules.agent_policy_enforcement_allowed",
   },
 ] as const;
 
@@ -50,10 +45,6 @@ export interface ModuleItem {
   label: string;
   description: string;
   enabled: boolean;
-  /** Install-wide kill switch (#1859): false forces the module off for every org. */
-  installAllowed: boolean;
-  /** False when the install's signed licence withholds the module (#1879). */
-  licensed: boolean;
   /** Who last switched it: "org_admin", "licence" or null when never switched. */
   source: string | null;
 }
@@ -61,21 +52,12 @@ export interface ModuleItem {
 // Refusal codes from setOrganizationModule the card has its own words for.
 const REFUSAL_CODES = ["MODULE_DISABLED_BY_INSTALL", "MODULE_NOT_LICENSED"] as const;
 
-/** The server half of ModulesCard: entitlements, the install gate and the toggle. */
+/** The server half of ModulesCard: the modules this install offers and the toggle. */
 export function useModulesCard() {
   const t = useTranslations("adminModules");
-  const { modules, loading: modulesLoading, error, refetch, hasData } = useModules();
+  const { modules, loading, error, refetch, hasData } = useModules();
   const { can, loading: permsLoading } = useMyPermissions();
   const canManage = can("org.update");
-
-  const flags = useQuery<{
-    astroliftServerInfo: { featureFlags: { key: string; enabled: boolean }[] };
-  }>(SERVER_INFO, { fetchPolicy: "cache-first" });
-  const installAllowed = MODULE_CONFIG.map((config) =>
-    (flags.data?.astroliftServerInfo.featureFlags ?? []).some(
-      (flag) => flag.key === config.installFlagKey && flag.enabled
-    )
-  );
 
   const [setModule] = useMutation<{
     setOrganizationModule: MutationResult<AstroliftOrganizationModule>;
@@ -113,22 +95,22 @@ export function useModulesCard() {
     }
   }
 
-  const items: ModuleItem[] = MODULE_CONFIG.map((config, i) => ({
+  const items: ModuleItem[] = MODULE_CONFIG.filter(
+    (config) => modules.get(config.key)?.available
+  ).map((config) => ({
     key: config.key,
     label: t(`items.${config.key}.label`),
     description: t(`items.${config.key}.description`),
     enabled: modules.get(config.key)?.enabled ?? false,
-    installAllowed: installAllowed[i],
-    licensed: modules.get(config.key)?.licensed ?? true,
     source: modules.get(config.key)?.source ?? null,
   }));
 
   return {
     items,
-    loading: (modulesLoading && !hasData) || (flags.loading && !flags.data),
-    error: (hasData ? null : error) ?? (flags.data ? null : flags.error) ?? null,
+    loading: loading && !hasData,
+    error: hasData ? null : (error ?? null),
     onRetry: () => {
-      void Promise.allSettled([refetch(), flags.refetch()]);
+      void refetch().catch(() => {});
     },
     canManage,
     permsLoading,

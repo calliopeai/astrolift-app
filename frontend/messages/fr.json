@@ -5857,8 +5857,7 @@
     "title": "Modules",
     "description": "Intégrations facultatives pour cette organisation. Un admin de l'installation peut toujours en désactiver une pour toutes les organisations.",
     "loadError": "Impossible de charger les modules",
-    "installOff": "Désactivé sur cette installation",
-    "licenceWithheld": "Non inclus dans la licence de cette installation",
+    "none": "Aucun module n'est disponible sur cette installation.",
     "licenceTurnedOff": "Désactivé quand la licence ne l'incluait pas. Un administrateur de l'organisation peut le réactiver.",
     "enable": "Activer {module}",
     "disable": "Désactiver {module}",
@@ -5868,7 +5867,7 @@
     "items": {
       "chat_studio_integration": {
         "label": "Intégration Chat Studio",
-        "description": "Permet à Chat Studio d'accéder aux apps de cette organisation via l'API builder."
+        "description": "Permet à Chat Studio de déployer des apps dans cette organisation via l'API builder."
       },
       "agent_live_attach": {
         "label": "Connexion en direct aux agents",
