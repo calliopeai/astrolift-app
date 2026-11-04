@@ -18,9 +18,10 @@ retried when that activity is retried — all I/O here should be idempotent.
 
 Notification delivery is best-effort per channel: a failed Slack post does
 not prevent the email from sending, and vice versa. Every failure is logged
-and reported back to the caller, and the per-channel outcome rides the
-``workflow.human_gate.notified`` event so operators can see what happened
-without polling external systems.
+and reported back to the caller, and the per-channel outcome, with the reason
+a failed email gave, rides the ``workflow.human_gate.notified`` event so
+operators can see what happened without polling external systems or reading
+worker logs (#1823).
 """
 
 from __future__ import annotations
@@ -68,12 +69,15 @@ def notify_human_gate(workflow_run: WorkflowRun, stage: dict) -> dict[str, bool]
         )
 
     results: dict[str, bool] = {}
+    reasons: dict[str, str] = {}
 
     if "email" in channels:
-        ok = bool(recipients)
+        reason = "" if recipients else "no_recipient"
         for recipient_email in recipients:
-            ok = send_gate_notification_email(recipient_email, workflow_run, stage) and ok
-        results["email"] = ok
+            reason = send_gate_notification_email(recipient_email, workflow_run, stage) or reason
+        results["email"] = not reason
+        if reason:
+            reasons["email"] = reason
 
     if "slack" in channels:
         webhook_url = notification_config.get("slack_webhook_url") or getattr(
@@ -90,7 +94,7 @@ def notify_human_gate(workflow_run: WorkflowRun, stage: dict) -> dict[str, bool]
 
     # Emit platform event so webhooks / activity feed pick it up.
     try:
-        _emit_gate_event(workflow_run, stage, results)
+        _emit_gate_event(workflow_run, stage, results, reasons)
     except Exception:
         log.exception("failed to emit human_gate event for workflow_run %s", workflow_run.pk)
 
@@ -101,10 +105,11 @@ def send_gate_notification_email(
     recipient_email: str,
     workflow_run: WorkflowRun,
     stage: dict,
-) -> bool:
+) -> str:
     """Send a human-gate review request email to *recipient_email*.
 
-    Returns True on success, False on any failure. Never raises.
+    Returns ``""`` once the transport accepted the message, else the reason
+    the gate event records for the failure. Never raises.
     """
     try:
         workflow_name = _workflow_label(workflow_run)
@@ -141,18 +146,32 @@ def send_gate_notification_email(
             to=[recipient_email],
         )
         msg.attach_alternative(html_body, "text/html")
-        return msg.send(fail_silently=False) == 1
+        return "" if msg.send(fail_silently=False) == 1 else "not_accepted"
 
-    except Exception:
+    except Exception as exc:
         log.exception(
             "failed to send human_gate email to %s for workflow_run %s",
             recipient_email,
             workflow_run.pk,
         )
-        return False
+        return _failure_reason(exc)
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
+
+
+def _failure_reason(exc: Exception) -> str:
+    """Name a refused send without its message.
+
+    The provider's error code when the transport reports one (SES
+    ``AccessDenied``, ``MessageRejected``), else the exception type. The
+    message stays in the worker log: it can carry the role ARN, the account
+    id and the recipient address.
+    """
+    response = getattr(exc, "response", None)
+    error = response.get("Error") if isinstance(response, dict) else None
+    code = error.get("Code") if isinstance(error, dict) else None
+    return code if isinstance(code, str) and code else type(exc).__name__
 
 
 def _resolve_recipients(workflow_run: WorkflowRun, stage: dict) -> list[str]:
@@ -278,6 +297,7 @@ def _emit_gate_event(
     workflow_run: WorkflowRun,
     stage: dict,
     delivery_results: dict[str, bool],
+    reasons: dict[str, str],
 ) -> None:
     """Emit a ``workflow.human_gate.notified`` platform event."""
     Event.emit(
@@ -286,6 +306,7 @@ def _emit_gate_event(
             "workflow_run_guid": str(workflow_run.guid),
             "stage_name": stage.get("name"),
             "delivery": delivery_results,
+            "reasons": reasons,
             "status": (
                 "failed"
                 if any(not ok for ok in delivery_results.values())
