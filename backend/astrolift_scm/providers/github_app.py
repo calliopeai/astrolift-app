@@ -225,6 +225,11 @@ def _discover_installation_id(connection, issuer: str) -> str:
         login = str(((item.get("account") or {}).get("login")) or "").lower()
         if login == account and item.get("id") is not None:
             installation_id = str(item["id"])
+            if held_by_another_organization(
+                installation_id, kind=connection.kind, organization_id=connection.organization_id
+            ):
+                _refuse_found_installation(connection, installation_id)
+                return ""
             connection.installation_id = installation_id[:64]
             connection.save(update_fields=["installation_id", "updated_at", "version"])
             logger.info(
@@ -235,6 +240,37 @@ def _discover_installation_id(connection, issuer: str) -> str:
             )
             return installation_id
     return ""
+
+
+def _refuse_found_installation(connection, installation_id: str) -> None:
+    """The account's installation is held by another organization's connection,
+    so finding it by account must not attach it here (#2631)."""
+    from core.mutations import AuditEntry, emit_audit
+    from core.tenancy import get_current_tenant
+
+    message = f"installation {installation_id} is held by another organization's connection"
+    logger.warning("%s; not attached to connection %s", message, connection.guid)
+    tenant = get_current_tenant()
+    emit_audit(
+        AuditEntry(
+            actor_user_id=tenant.actor_user_id if tenant else None,
+            organization_id=connection.organization_id,
+            action=INSTALL,
+            decision="DENY",
+            target_kind="source_connection",
+            target_id=str(connection.guid),
+            duration_ms=0,
+            permissions=(),
+            error_code=INSTALLATION_IN_USE,
+            error_message=message,
+            extra={
+                "app_id": connection.oauth_client_id,
+                "account_login": connection.account_login,
+                "installation_id": installation_id,
+                "found_by": "account",
+            },
+        )
+    )
 
 
 def installation_token(connection) -> str:
@@ -398,3 +434,72 @@ def fetch_installation(
             "UNEXPECTED_SHAPE", "GitHub /app/installations/<id> didn't return an object"
         )
     return data, None
+
+
+# ---------------------------------------------------------------------------
+# Storing an installation id (#2601, #2631). The id an install return, the
+# Connect source form or an adopt names is checked with GitHub before any
+# connection keeps it.
+# ---------------------------------------------------------------------------
+
+# Audit action for storing an installation id outside a re-link
+# (auth1.scm_app_manifest.RELINK): an install's return, or an installation
+# found by account.
+INSTALL = "scm.github_app.install"
+# GitHub's answer refuses the id: audited as DENY. KEY_UNUSABLE and
+# INSTALLATION_UNCONFIRMED mean GitHub could not be asked or did not answer.
+WRONG_INSTALLATION = "WRONG_INSTALLATION"
+INSTALLATION_IN_USE = "INSTALLATION_IN_USE"
+
+
+def held_by_another_organization(installation_id: str, *, kind: str, organization_id: int | None) -> bool:
+    """Whether a connection of another organization, not deleted, holds ``installation_id``."""
+    from astrolift_scm.models import SourceConnection
+
+    return (
+        SourceConnection.objects.filter(kind=kind, installation_id=installation_id, deleted_at__isnull=True)
+        .exclude(organization_id=organization_id)
+        .exists()
+    )
+
+
+def confirm_installation(
+    connection, installation_id: str, *, account_login: str
+) -> tuple[str | None, str, str]:
+    """Whether ``connection`` may keep ``installation_id``, a digit string from
+    the browser: GitHub, asked with the App's own JWT, reports it as this App's
+    installation, on ``account_login`` when one is expected, and no connection
+    of another organization holds it. GitHub answers 404 for an installation of
+    any other App, which also settles a row that records no App ID.
+
+    Returns ``(error code, message, the account GitHub reports it on)``; the
+    code is None once confirmed."""
+    try:
+        jwt_token = _mint_jwt(
+            connection.app_client_id or connection.oauth_client_id, _decrypt_pem(connection)
+        )
+    except Exception:  # noqa: BLE001 -- an unusable key is reported, never raised
+        return "KEY_UNUSABLE", "the stored key cannot sign for the App", ""
+    installation, err = fetch_installation(_api_base(connection), jwt_token, installation_id)
+    if err is not None and err.http_status != 404:
+        return "INSTALLATION_UNCONFIRMED", err.message, ""
+    installed_on = str((installation.get("account") or {}).get("login") or "")
+    if (
+        err is not None
+        or (
+            connection.oauth_client_id and str(installation.get("app_id") or "") != connection.oauth_client_id
+        )
+        or (account_login and installed_on.lower() != account_login.lower())
+    ):
+        on = f" on {account_login}" if account_login else ""
+        return (
+            WRONG_INSTALLATION,
+            f"installation {installation_id} is not this App's installation{on}",
+            installed_on,
+        )
+    if held_by_another_organization(
+        installation_id, kind=connection.kind, organization_id=connection.organization_id
+    ):
+        message = f"installation {installation_id} is held by another organization's connection"
+        return INSTALLATION_IN_USE, message, installed_on
+    return None, "", installed_on

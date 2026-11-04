@@ -86,7 +86,9 @@ def _pem() -> str:
 class _GitHub:
     """GitHub's App endpoints for one App: its installations and the token mint."""
 
-    def __init__(self):
+    def __init__(self, app_id: int = APP_ID, client_id: str = CLIENT_ID):
+        self.app_id = app_id
+        self.client_id = client_id
         self.pem = _pem()
         self.public_key = serialization.load_pem_private_key(self.pem.encode(), password=None).public_key()
         # installation id -> (the App id GitHub reports for it, the account it is on)
@@ -144,7 +146,7 @@ class _GitHub:
     def _answer(self, method: str, path: str, authorization: str) -> tuple[int, object]:
         if not self._signed_by_the_app(authorization):
             return 401, {"message": "A JSON web token could not be decoded"}
-        ours = {i: login for i, (app_id, login) in self.installations.items() if app_id == APP_ID}
+        ours = {i: login for i, (app_id, login) in self.installations.items() if app_id == self.app_id}
         if method == "GET" and path.startswith("/app/installations?"):
             return 200, [{"id": int(i), "account": {"login": login}} for i, login in ours.items()]
         match = _ONE.fullmatch(path)
@@ -172,7 +174,7 @@ class _GitHub:
             claims = jwt.decode(authorization[len("Bearer ") :], self.public_key, algorithms=["RS256"])
         except jwt.PyJWTError:
             return False
-        return claims.get("iss") in {str(APP_ID), CLIENT_ID}
+        return claims.get("iss") in {str(self.app_id), self.client_id}
 
 
 @pytest.fixture

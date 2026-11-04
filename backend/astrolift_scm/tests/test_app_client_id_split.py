@@ -123,7 +123,8 @@ def test_connect_source_accepts_github_app_install_with_both_ids(org_user_member
             input=ConnectSourceInput(
                 kind="github_app_install",
                 display_name="Acme GitHub App",
-                installation_id="987654321",
+                # No installation id: a typed one is confirmed with GitHub
+                # (test_installation_id_checks_2631), which this fake key cannot sign for.
                 secret_plaintext="-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n",
                 oauth_client_id="3705068",
                 app_client_id="Iv23lic8662KXwe4XKEI",
