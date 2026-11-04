@@ -31,6 +31,9 @@ We:
      the resolved connection's organization. Standing apps with
      ``trigger_mode==auto_on_push`` fire ``DeployAppWorkflow``; agent apps
      freeze a new immutable package without dispatching an agent task.
+  6. A GitHub ``repository`` ``renamed`` delivery points that organization's
+     apps on the old name at the new one (#2478), the change
+     ``setAppSource`` makes, so later pushes keep finding them.
 
 What this *doesn't* do (filed for follow-up):
   - Replay protection beyond HMAC (no nonce/timestamp window). For
@@ -56,6 +59,7 @@ from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection, WebhookDelivery
 from astrolift_workflows.client import start_workflow
 from astrolift_workflows.inputs import Actor, DeployAppInput
+from core.mutations import AuditEntry, emit_audit
 from core.secrets import EncryptedSecret, decrypt
 
 logger = logging.getLogger(__name__)
@@ -276,6 +280,120 @@ def _connection_for_installation(installation_id: str) -> SourceConnection | Non
     )
 
 
+def _field(payload, *keys):
+    for key in keys:
+        payload = payload.get(key) if isinstance(payload, dict) else None
+    return payload
+
+
+def _parse_github_rename(request: HttpRequest, body: bytes) -> tuple[str, str] | None:
+    """``(old, new)`` full names from a ``repository`` ``renamed`` delivery,
+    or None for any other delivery."""
+    if request.headers.get("X-GitHub-Event") != "repository":
+        return None
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if _field(payload, "action") != "renamed":
+        return None
+    new = _field(payload, "repository", "full_name")
+    old_name = _field(payload, "changes", "repository", "name", "from")
+    if not (isinstance(new, str) and isinstance(old_name, str) and old_name):
+        return None
+    owner, _, name = new.partition("/")
+    if not (owner and name):
+        return None
+    return f"{owner}/{old_name}", new
+
+
+def _follow_rename(request: HttpRequest, conn: SourceConnection, old: str, new: str) -> HttpResponse:
+    """Point the organization's apps on ``old`` at ``new`` (#2478).
+
+    Each app gets the change ``setAppSource`` makes, with its checks, so an
+    app the change is refused or fails for stays on the old name, and the
+    others still move. Every outcome is audited as ``app.set_source`` with no
+    actor.
+    """
+    from astrolift_scm.services.source_change import TORN_DOWN, SourceChangeRefused, change_source
+
+    delivery_id = request.headers.get("X-GitHub-Delivery") or ""
+    if delivery_id:
+        try:
+            with transaction.atomic():
+                WebhookDelivery.objects.create(
+                    connection=conn, delivery_id=delivery_id, host_event="repository", repo_full_name=new
+                )
+        except IntegrityError:
+            return JsonResponse({"ok": True, "ignored": "duplicate", "delivery_id": delivery_id}, status=202)
+
+    conn.webhook_last_received_at = timezone.now()
+    conn.save(update_fields=["webhook_last_received_at"])
+
+    apps = list(
+        RegisteredApp.objects.select_related("organization")
+        .filter(
+            organization_id=conn.organization_id,
+            source_kind=RegisteredApp.SourceKind.GITHUB.value,
+            source_repo__iexact=old,
+            deleted_at__isnull=True,
+        )
+        .exclude(provisioning_status__in=TORN_DOWN)
+        .order_by("created_at", "pk")
+    )
+    if not apps:
+        return JsonResponse({"ok": True, "ignored": "no_matching_app", "repo": old}, status=202)
+
+    moved = []
+    refused = []
+    for app in apps:
+        previous = app.source_repo
+        error: tuple[str, str] | None = None
+        try:
+            if not change_source(app, new):
+                continue
+        except SourceChangeRefused as exc:
+            error = (exc.code, exc.message)
+        except Exception as exc:  # noqa: BLE001 - one app's failure must not leave the others on the old name
+            logger.exception("scm_webhook: following the rename of %s failed for %s", old, app.slug)
+            error = ("INTERNAL", str(exc))
+        if error is None:
+            moved.append({"app": app.slug, "source_repo": app.source_repo})
+        else:
+            refused.append({"app": app.slug, "reason": error[0]})
+        emit_audit(
+            AuditEntry(
+                actor_user_id=None,
+                organization_id=app.organization_id,
+                action="app.set_source",
+                decision="ALLOW",
+                target_kind="RegisteredApp",
+                target_id=str(app.guid),
+                duration_ms=0,
+                permissions=(),
+                error_code=error[0] if error else None,
+                error_message=error[1] if error else None,
+                extra={
+                    "trigger": "github.repository.renamed",
+                    "delivery_id": delivery_id,
+                    "previous_source_repo": previous,
+                    "source_repo": previous if error else app.source_repo,
+                    "renamed_to": new,
+                },
+            )
+        )
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "renamed": {"from": old, "to": new},
+            "moved": moved,
+            **({"refused": refused} if refused else {}),
+        },
+        status=202,
+    )
+
+
 @csrf_exempt
 @require_POST
 def github_webhook(request: HttpRequest, connection_id: str) -> HttpResponse:
@@ -332,6 +450,10 @@ def _handle(kind: str, request: HttpRequest, connection_id: str) -> HttpResponse
                     status=202,
                 )
             conn = owner_conn
+
+        renamed = _parse_github_rename(request, body)
+        if renamed is not None:
+            return _follow_rename(request, conn, *renamed)
 
     parser = _PARSERS.get(kind)
     parsed = parser(body) if parser else None

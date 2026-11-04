@@ -265,7 +265,9 @@ def _manifest_json(
             "secrets": "write",
             "workflows": "write",
         },
-        "default_events": ["push", "pull_request"],
+        # ``repository`` carries the rename the receiver follows (#2478); it
+        # needs only metadata read.
+        "default_events": ["push", "pull_request", "repository"],
     }
 
 

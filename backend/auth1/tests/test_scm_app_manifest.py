@@ -444,7 +444,7 @@ def test_manifest_payload_declares_the_permissions_autowire_uses(org_user_member
         "secrets": "write",  # push Actions secrets
         "workflows": "write",  # GitHub gates .github/workflows separately
     }
-    assert set(manifest["default_events"]) == {"push", "pull_request"}
+    assert set(manifest["default_events"]) == {"push", "pull_request", "repository"}
     assert manifest["url"].startswith("https://astrolift.test")
     assert manifest["redirect_url"].endswith("/app/auth1/scm/github/app-manifest/callback")
     assert manifest["setup_url"].endswith("/app/auth1/scm/github/app-manifest/setup")
