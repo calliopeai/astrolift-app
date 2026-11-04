@@ -276,6 +276,12 @@ class RecheckDomainValidationInput:
 
 
 @strawberry.input
+class SetCustomDomainPausedInput:
+    id: GUID
+    paused: bool
+
+
+@strawberry.input
 class UploadCustomDomainCertificateInput:
     """BYO-cert payload — operator pastes (or pipes via CLI) the full
     PEM chain + private key. Used when the platform can't auto-issue

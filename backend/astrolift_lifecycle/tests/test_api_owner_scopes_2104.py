@@ -68,6 +68,7 @@ ROUTES = (
     ("add_wildcard_domain", "mutation", "app_scope_by_slug", "input.app_slug"),
     ("remove_app_domain", "mutation", "custom_domain_app_scope", "input.id"),
     ("recheck_domain_validation", "mutation", "custom_domain_app_scope", "input.id"),
+    ("set_custom_domain_paused", "mutation", "custom_domain_app_scope", "input.id"),
     ("upload_custom_domain_certificate", "mutation", "custom_domain_app_scope", "input.id"),
     ("set_domain_redirects", "mutation", "custom_domain_app_scope", "input.domain_id"),
     ("set_domain_path_routes", "mutation", "custom_domain_app_scope", "input.domain_id"),

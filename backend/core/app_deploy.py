@@ -1782,7 +1782,7 @@ def envoy_custom_domain_routes(
                 hostname=domain.hostname,
                 service=workload.name,
                 port=int(container.port),
-                paused=env.ingress_paused,
+                paused=env.ingress_paused or bool(domain.paused),
                 gated=gated,
                 config=config,
                 access=app_access(app),

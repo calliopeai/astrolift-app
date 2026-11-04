@@ -90,6 +90,17 @@ class CustomDomain(BaseCoreModel):
     validation_value = models.CharField(max_length=255, blank=True, default="")
     certificate_id = models.CharField(max_length=255, blank=True, default="")
     is_active = models.BooleanField(default=True)
+    paused = models.BooleanField(
+        default=False,
+        db_default=False,
+        help_text=(
+            "Operator pause for this hostname alone: the host answers a 503 "
+            "instead of the app while the app's other hosts are unaffected. "
+            "Rendered into the domain's Ingress, so it takes effect on the next "
+            "apply. The environment pause (``AppEnvironment.ingress_paused``) "
+            "still pauses every host."
+        ),
+    )
     edge_auth_enabled = models.BooleanField(
         default=False,
         help_text=(

@@ -973,6 +973,8 @@ def _render_app_ingresses_and_tls(
         if skip_reason is not None:
             _warn_custom_domains_skipped(d.registered_app, [cd], skip_reason)
             continue
+        # The environment pause covers every host; a domain pause only this one.
+        domain_paused = ingress_paused or bool(cd.paused)
         host_slug = cd.hostname.replace(".", "-")
         secret_name = f"{d.registered_app.slug}-{host_slug}-tls"
         ingress_name = f"{d.registered_app.slug}-{host_slug}"
@@ -1004,7 +1006,7 @@ def _render_app_ingresses_and_tls(
                 f"https://{cd.hostname}/oauth2/start?rd=$escaped_request_uri"
             )
 
-        if ingress_paused:
+        if domain_paused:
             # nginx-ingress-controller honors server-snippet to inject
             # raw nginx config into the per-host server block; a bare
             # 503 short-circuits before reaching the upstream service.
@@ -1070,7 +1072,7 @@ def _render_app_ingresses_and_tls(
                         "astrolift.dev/cert-source": (
                             "byo" if state == CustomDomain.CertificateState.BYO else "auto"
                         ),
-                        "astrolift.dev/ingress-state": ingress_state_label,
+                        "astrolift.dev/ingress-state": "paused" if domain_paused else "live",
                         "astrolift.dev/edge-auth": custom_domain_edge_auth_state(
                             edge_cluster,
                             cd.hostname,

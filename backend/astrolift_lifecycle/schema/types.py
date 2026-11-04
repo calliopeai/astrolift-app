@@ -1545,6 +1545,10 @@ class AppDomainType:
     validation_token: str
     last_checked_at: dt.datetime | None
     is_active: bool
+    is_paused: bool
+    """The operator paused this hostname: it answers a 503 instead of
+    the app while the app's other hosts are unaffected."""
+
     registered_app_slug: str
     created_at: dt.datetime
 
@@ -1667,6 +1671,7 @@ def app_domain_to_type(d, cluster=None) -> AppDomainType:
         validation_token=d.validation_value or "",
         last_checked_at=d.last_checked_at or d.updated_at,
         is_active=d.is_active,
+        is_paused=bool(d.paused),
         registered_app_slug=d.registered_app.slug,
         created_at=d.created_at,
         txt_challenge_token=d.txt_challenge_token or "",
