@@ -219,6 +219,29 @@ def _deprovision_certificate_sync(*, custom_domain_id: int) -> dict[str, Any]:
     revoked = False
     skipped = False
     if cert_id:
+        # ACM refuses to delete a certificate the load balancer still uses.
+        # Best effort: a failure here must not block the deprovision.
+        try:
+            from astrolift_workflows.activities.custom_domain import _set_edge_certificate
+
+            if (
+                domain.is_platform_managed_zone
+                and cert_id.startswith("arn:")
+                and (cluster.provider_plugin.slug or "").lower() == "aws"
+            ):
+                log.info(
+                    "deprovision certificate edge detach cluster=%s domain_id=%s result=%s",
+                    cluster.slug,
+                    custom_domain_id,
+                    _set_edge_certificate(cluster, cert_id, False),
+                )
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "deprovision certificate edge detach failed cluster=%s domain_id=%s: %s",
+                cluster.slug,
+                custom_domain_id,
+                exc,
+            )
         try:
             revoke(cert_id)
             revoked = True
