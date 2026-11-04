@@ -6521,6 +6521,19 @@ type AstroliftSourceFile {
   recoverable: Boolean!
 }
 
+type AstroliftSourceRepository {
+  repoFullName: String!
+  url: String!
+  defaultBranch: String!
+  created: Boolean!
+}
+
+type AstroliftSourceRepositoryMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftSourceRepository
+}
+
 type AstroliftSshDeployKey {
   id: GUID!
   name: String!
@@ -8507,6 +8520,15 @@ input CreateRoleInput {
   permissions: [String!]!
   description: String! = ""
   duplicatedFromId: GUID = null
+}
+
+input CreateSourceRepositoryInput {
+  connectionId: GUID!
+  owner: String!
+  name: String!
+  visibility: String!
+  description: String = null
+  autoInit: Boolean = null
 }
 
 input CreateTeamInput {
@@ -10825,6 +10847,7 @@ type Mutation {
   rotateWebhookSecret(input: RotateWebhookSecretInput!): AstroliftScmWebhookSecretRevealMutationResult!
   installScmWebhook(input: InstallScmWebhookInput!): AstroliftScmWebhookInstallationMutationResult!
   deleteSshDeployKey(input: DeleteSshDeployKeyInput!): AstroliftSshDeployKeyMutationResult!
+  createSourceRepository(input: CreateSourceRepositoryInput!): AstroliftSourceRepositoryMutationResult!
   pushCiWorkflow(input: PushCiWorkflowInput!): AstroliftScmPushCiWorkflowResultMutationResult!
   resyncAstroliftCiWorkflow(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!
   pullCiWorkflowFromRepo(input: CiWorkflowSyncActionInput!): AstroliftCiWorkflowSyncStatusMutationResult!

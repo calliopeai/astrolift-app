@@ -83,6 +83,7 @@ export const ASTROLIFT_PERMISSIONS = [
   "scm.key_create",
   "scm.key_delete",
   "scm.read",
+  "scm.write",
   "secret.approve",
   "secret.list",
   "secret.read",

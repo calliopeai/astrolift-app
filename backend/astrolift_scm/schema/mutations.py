@@ -211,6 +211,58 @@ class PushCiWorkflowResult:
 
 
 @strawberry.input
+class CreateSourceRepositoryInput:
+    """Create ``owner/name`` through ``connection_id`` (#2605).
+
+    ``visibility`` is ``private``, ``internal`` or ``public``. ``auto_init``
+    left unset keeps the host's default initial commit (GitHub makes one,
+    the others do not).
+    """
+
+    connection_id: GUID
+    owner: str
+    name: str
+    visibility: str
+    description: str | None = None
+    auto_init: bool | None = None
+
+
+@strawberry.type(name="AstroliftSourceRepository")
+class SourceRepositoryResult:
+    """``created`` is false when the repository already existed and the
+    connection can push to it: a retried create returns it, not an error."""
+
+    repo_full_name: str
+    url: str
+    default_branch: str
+    created: bool
+
+
+# Host refusals of a create, as the safe codes the caller branches on. The
+# host's own message never reaches the caller; it can quote a response body.
+_CREATE_REPO_ERRORS = {
+    "CONFLICT": ("NAME_TAKEN", "a repository with that name already exists"),
+    "NOT_FOUND": ("OWNER_NOT_ALLOWED", "the connection cannot create repositories under that owner"),
+    "AUTH_FAILED": ("FORBIDDEN", "the source host refused the connection's credential"),
+    "PRECONDITION": ("FORBIDDEN", "this connection cannot create repositories"),
+    "VALIDATION": ("VALIDATION", "the source host does not accept that visibility for this owner"),
+}
+_REPO_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
+
+
+def _create_repo_audit_extras(result) -> dict[str, str] | None:
+    data = getattr(result, "data", None)
+    if data is None:
+        return None
+    return {"repo_full_name": data.repo_full_name, "outcome": "created" if data.created else "existing"}
+
+
+def _create_repo_target(*_args, **kwargs):
+    input = kwargs.get("input")
+    return ("SourceConnection", str(input.connection_id)) if input is not None else None
+
+
+@strawberry.input
 class CiWorkflowSyncActionInput:
     """Target an app for a managed-CI-workflow drift action (#1210).
 
@@ -1068,6 +1120,90 @@ class ScmMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "key not found")
         row.soft_delete()
         return gql_success(ssh_key_to_type(row))
+
+    @strawberry.field
+    @mutation_audit(
+        action="scm.repository.create", target=_create_repo_target, extras=_create_repo_audit_extras
+    )
+    @require_permission(Permission.SCM_WRITE, scope=scm_org_scope(Permission.SCM_WRITE))
+    @tenant_scoped()
+    def create_source_repository(
+        self, info: Info, input: CreateSourceRepositoryInput
+    ) -> MutationResultType[SourceRepositoryResult]:
+        """Create a repository through a stored connection of the active
+        organization (#2605). Idempotent: an existing ``owner/name`` the
+        connection can push to comes back with ``created`` false."""
+        from astrolift_scm.org_repo_policy import rejection_reason
+        from astrolift_scm.providers import ProviderError
+        from astrolift_scm.providers.repo_writes import (
+            VISIBILITIES,
+            create_repository,
+            repository_state,
+            repository_web_url,
+        )
+        from astrolift_scm.schema.queries import _source_connections_qs, _viewer_user_id
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        if org_id is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no organization")
+        owner, name = (input.owner or "").strip(), (input.name or "").strip()
+        if not _REPO_SEGMENT.match(owner):
+            return gql_failure(ErrorCode.VALIDATION.value, "owner is not a valid account name", field="owner")
+        if not _REPO_SEGMENT.match(name) or name.endswith(".git"):
+            return gql_failure(
+                ErrorCode.VALIDATION.value, "name is not a valid repository name", field="name"
+            )
+        if input.visibility not in VISIBILITIES:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"visibility must be one of {', '.join(VISIBILITIES)}",
+                field="visibility",
+            )
+        description = (input.description or "").strip()[:350]
+
+        conn = (
+            _source_connections_qs(viewer_pk=_viewer_user_id(info))
+            .filter(organization_id=org_id, guid=str(input.connection_id))
+            .first()
+        )
+        if conn is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "connection not found", field="connectionId")
+        if not conn.is_active or conn.is_orphaned:
+            return gql_failure(
+                "CONNECTION_INACTIVE", "the connection is inactive; reconnect it first", field="connectionId"
+            )
+        full_name = f"{owner}/{name}"
+        if rejection_reason(full_name, conn.organization) is not None:
+            return gql_failure(
+                "OWNER_NOT_ALLOWED", "this install only accepts repositories of connected organizations"
+            )
+
+        try:
+            state = repository_state(conn, full_name)
+            created = not state.exists
+            if state.exists and state.writable is False:
+                return gql_failure("NAME_TAKEN", "a repository with that name already exists", field="name")
+            if created:
+                state = create_repository(
+                    conn,
+                    owner,
+                    name,
+                    input.visibility,
+                    description=description,
+                    auto_init=input.auto_init,
+                )
+        except ProviderError as exc:
+            code, message = _CREATE_REPO_ERRORS.get(exc.code, (exc.code, "the source host request failed"))
+            return gql_failure(code, message)
+        return gql_success(
+            SourceRepositoryResult(
+                repo_full_name=full_name,
+                url=repository_web_url(conn, full_name),
+                default_branch=state.default_branch or "main",
+                created=created,
+            )
+        )
 
     @strawberry.field
     @mutation_audit(action="scm.push_ci_workflow")

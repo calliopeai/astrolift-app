@@ -60,7 +60,7 @@ EVERY_PERMISSION = frozenset(
         "org.manage_members org.read org.update pipeline.cancel pipeline.create pipeline.delete "
         "pipeline.read pipeline.secret_manage pipeline.trigger pipeline.update project.create "
         "project.delete project.read project.update provider_plugin.configure provider_plugin.read "
-        "scm.connect scm.disconnect scm.key_create scm.key_delete scm.read secret.approve secret.list "
+        "scm.connect scm.disconnect scm.key_create scm.key_delete scm.read scm.write secret.approve secret.list "
         "secret.read secret.write skill.import skill.read skill.write team.create team.delete "
         "team.manage_members team.read team.update webhook.create webhook.delete webhook.update "
         "workflow.create workflow.delete workflow.read workflow.trigger workflow.update "

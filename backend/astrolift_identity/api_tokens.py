@@ -10,7 +10,7 @@ the auth integration in :mod:`astrolift_identity.auth_drf` calls
 
 Scopes are access classes (``read:apps``, ``write:apps``,
 ``agent-env-spec:write``, ``project:write``, ``secret:write``, ``workflow:write``,
-``workflow:trigger``, ``read:clusters``, ``admin``). They narrow the
+``workflow:trigger``, ``read:clusters``, ``scm:read``, ``scm:write``, ``admin``). They narrow the
 *user's* permission set down to the subset the token may exercise —
 they never widen it. ``admin`` implies all other scopes (operators
 intentionally treat it as the "full power" wildcard so they don't
@@ -59,6 +59,11 @@ SCOPE_WORKFLOW_WRITE = "workflow:write"
 SCOPE_WORKFLOW_TRIGGER = "workflow:trigger"
 SCOPE_APP_ONBOARD = "app:onboard"
 SCOPE_TEAM_WRITE = "team:write"
+# Source connections and repositories of the token's own organization (#2605):
+# list connections and repos, create a repository. Held only at that
+# organization, never through an any-scope collection gate.
+SCOPE_SCM_READ = "scm:read"
+SCOPE_SCM_WRITE = "scm:write"
 SCOPE_ADMIN = "admin"
 
 ALLOWED_SCOPES: frozenset[str] = frozenset(
@@ -82,6 +87,8 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_WORKFLOW_TRIGGER,
         SCOPE_APP_ONBOARD,
         SCOPE_TEAM_WRITE,
+        SCOPE_SCM_READ,
+        SCOPE_SCM_WRITE,
         SCOPE_ADMIN,
     }
 )
@@ -258,7 +265,33 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         return True
     if SCOPE_APP_ONBOARD in scopes and permission in {"app.create", "app.update"}:
         return True
+    if SCOPE_SCM_READ in scopes and permission == "scm.read":
+        return True
+    if SCOPE_SCM_WRITE in scopes and permission == "scm.write":
+        return True
     return False
+
+
+# Permissions the SCM scopes grant only at the token's own organization.
+_ORG_ONLY_SCOPE_PERMISSIONS = frozenset({"scm.read", "scm.write"})
+
+
+def token_scope_reaches(token, permission: str, scope) -> bool:
+    """Does the token's scope reach ``scope`` for ``permission``?
+
+    ``scm:read`` and ``scm:write`` hold only on an explicit organization
+    scope equal to the token's own organization (#2605). An any-scope
+    collection gate (``scope`` None) or a team, project or app scope does
+    not qualify. ``admin`` keeps its existing reach; every other scope is
+    unaffected.
+    """
+    if token is None or permission not in _ORG_ONLY_SCOPE_PERMISSIONS or has_scope(token, SCOPE_ADMIN):
+        return True
+    return (
+        scope is not None
+        and getattr(scope, "kind", None) == "ORG"
+        and scope.id == getattr(token, "organization_id", None)
+    )
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -353,6 +386,18 @@ SCOPE_CATALOG: tuple[ScopeInfo, ...] = (
     ScopeInfo(SCOPE_WORKFLOW_WRITE, "Write workflows", "workflows", "Create, update and delete workflows."),
     ScopeInfo(
         SCOPE_WORKFLOW_TRIGGER, "Run workflows", "workflows", "Start workflow runs, without editing them."
+    ),
+    ScopeInfo(
+        SCOPE_SCM_READ,
+        "Read source",
+        "apps",
+        "List the organization's source connections and the repositories they reach.",
+    ),
+    ScopeInfo(
+        SCOPE_SCM_WRITE,
+        "Create repositories",
+        "apps",
+        "Create repositories through the organization's source connections.",
     ),
     ScopeInfo(SCOPE_PROJECT_WRITE, "Write projects", "administration", "Create, update and delete projects."),
     ScopeInfo(SCOPE_TEAM_WRITE, "Write teams", "administration", "Create, update and delete teams."),
