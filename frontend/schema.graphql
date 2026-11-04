@@ -4707,6 +4707,11 @@ type AstroliftModuleEntitlement {
   licensed: Boolean!
 
   """
+  Whether this install offers the per-org module to its organizations: its install switch is on and the licence does not withhold it (#2551). An org admin can turn on only an available module, so the modules card lists no other. On a new install the Chat Studio integration is not available until the install admin turns it on. Always true for the install-wide modules.
+  """
+  available: Boolean!
+
+  """
   Who last switched this per-org module for the active organization: ``org_admin`` or ``licence`` (the licence turned it off by withholding it). Null when the org has never switched it, and for the install-wide modules.
   """
   source: String

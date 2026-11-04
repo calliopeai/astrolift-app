@@ -172,6 +172,19 @@ def _action_safety_defaults_off(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _chat_studio_integration_offered(monkeypatch):
+    """A new install does not offer the Chat Studio integration (#2551): its
+    install switch defaults off, so the builder API refuses every organization.
+    Most tests that turn the module on test something else; they run as an
+    install that offers it, with the default on. Tests of the shipped default
+    read it at import and turn the switch off themselves."""
+    from django.conf import settings
+
+    shipped = settings.CONSTANCE_CONFIG["CHAT_STUDIO_INTEGRATION_ALLOWED"]
+    monkeypatch.setitem(settings.CONSTANCE_CONFIG, "CHAT_STUDIO_INTEGRATION_ALLOWED", (True, *shipped[1:]))
+
+
+@pytest.fixture(autouse=True)
 def _reset_request_id():
     rid = generate_ulid()
     token = set_request_id(rid)

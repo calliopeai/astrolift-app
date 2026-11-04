@@ -678,10 +678,14 @@ CONSTANCE_CONFIG = {
     # Install-wide force-off for modules an org admin turns on per org
     # (astrolift_identity.org_modules). On by default: the org decides.
     # Turning one off disables the module for every organization at once.
+    # The Chat Studio integration is off by default (#2551): nothing on a new
+    # install makes the builder API usable, so it is not offered until the
+    # install admin turns it on.
     "CHAT_STUDIO_INTEGRATION_ALLOWED": (
-        True,
+        False,
         "Organizations may turn on the Chat Studio integration module (shipping apps "
-        "through the builder API). Off forces the module off for every organization.",
+        "through the builder API). Off by default; turn it on once Chat Studio can reach "
+        "this install's builder API. Off forces the module off for every organization.",
     ),
     "AGENT_POLICY_ENFORCEMENT_ALLOWED": (
         True,
