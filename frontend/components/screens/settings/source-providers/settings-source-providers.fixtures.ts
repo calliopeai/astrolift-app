@@ -185,6 +185,9 @@ export const LONG_CONNECTIONS: AstroliftSourceConnection[] = [
     needsClientId: true,
     appClientId: "",
     repoVisibilityScopes: ["private_org", "public_org", "user_repos", "public_non_org"],
+    status: "INSTALLATION_MISSING",
+    statusDetail:
+      "GitHub has no installation of this App on acme-corporation-platform-engineering-organization. Install it under Providers → Source → Connect to GitHub → Install Astrolift on a GitHub org, with acme-corporation-platform-engineering-organization as the org.",
   }),
   connection("personal-token", {
     kind: "gitlab_oauth_user",

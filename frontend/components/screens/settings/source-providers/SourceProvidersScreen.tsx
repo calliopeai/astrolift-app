@@ -808,7 +808,7 @@ function ConnectionStatusCell({ connection }: { connection: AstroliftSourceConne
         {t(STATUS_LABEL[status])}
       </Badge>
       {status !== "ACTIVE" && connection.statusDetail ? (
-        <span className="text-muted-foreground text-2xs mt-1 block [overflow-wrap:anywhere] whitespace-normal">
+        <span className="text-muted-foreground text-2xs mt-1 block min-w-56 [overflow-wrap:anywhere] whitespace-normal">
           {connection.statusDetail}
         </span>
       ) : null}
