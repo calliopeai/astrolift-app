@@ -991,6 +991,48 @@ async def record_managed_service_failed_step(
     )
 
 
+def _emit_provision_failed_event_sync(managed_service_id: int, failed_step: str, error: str) -> None:
+    from astrolift_services.models import ManagedService
+    from core.events import Event
+
+    svc = ManagedService.all_objects.select_related("registered_app", "app_environment").get(
+        pk=managed_service_id
+    )
+    # Only an app-owned service has an app event log; project and cluster rows have no app.
+    if svc.registered_app_id is None:
+        return
+    Event.emit(
+        "managed_service.provision.failed",
+        payload={
+            "managed_service_guid": str(svc.guid),
+            "name": svc.name,
+            "kind": svc.kind,
+            "variant": svc.variant,
+            "environment": svc.app_environment.name,
+            "step": failed_step,
+            # The workflow redacts this before the row or the event sees it, and the
+            # payload leaves out config and secret refs, which can name credentials.
+            "reason": error[:4000],
+            "severity": "error",
+        },
+        resource_kind="managed_service",
+        resource_id=str(svc.guid),
+        organization_id=svc.registered_app.organization_id,
+        registered_app_id=svc.registered_app_id,
+    )
+
+
+@activity.defn(name="astrolift.managed_service.emit_provision_failed_event")
+async def emit_managed_service_provision_failed_event(
+    managed_service_id: int, failed_step: str, error: str
+) -> None:
+    """Record a terminal provision failure in the owning app's event log (#2608),
+    where ``astro app events`` reads it; before, only the row's status_error said why."""
+    from asgiref.sync import sync_to_async
+
+    await sync_to_async(_emit_provision_failed_event_sync)(managed_service_id, failed_step, error)
+
+
 @guard_spanner_container
 def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     from astrolift_drivers.managed_resolution import resolve_managed_driver
