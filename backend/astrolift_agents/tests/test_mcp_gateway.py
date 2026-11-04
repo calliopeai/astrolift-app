@@ -930,6 +930,65 @@ def test_import_tool_previews_and_persists_only_runnable_packages(permission_res
     assert result["persisted"]["agent_slug"] == "review-import"
 
 
+def test_sync_agent_repo_with_manifest_paths_leaves_workflows_alone(permission_resolver, monkeypatch):
+    """Selected manifests only: a workflow slug a hand-imported definition
+    holds neither refuses the sync nor changes that definition (#2610)."""
+    import astrolift_registry.services.manifest_sync as ms
+    from astrolift_scm.models import SourceConnection
+    from workflows.manifest import create_definition_from_manifest, parse_workflow_manifest
+
+    org = Organization.objects.create(name="MCP Org", slug="mcp-sync")
+    team = Team.objects.create(organization=org, name="Sync Team", slug="mcp-sync-team")
+    project = Project.objects.create(
+        organization=org, team=team, name="Sync Project", slug="mcp-sync-project"
+    )
+    SourceConnection.objects.create(
+        organization=org,
+        kind=SourceConnection.Kind.GITHUB_PAT,
+        display_name="Sync PAT",
+        account_login="acme",
+    )
+    user, token = _token(org, scopes=[SCOPE_MCP_WRITE])
+    permission_resolver.grant(Permission.AGENT_CREATE)
+    permission_resolver.grant(Permission.AGENT_UPDATE)
+    workflow = '[workflow]\nslug = "github-issue"\nname = "GitHub issue"\n\n[[stage]]\nkind = "checkpoint"\n'
+    imported = create_definition_from_manifest(parse_workflow_manifest(workflow), organization=org)
+    launcher = (
+        'name = "launcher"\n[[workloads]]\nname = "launcher"\nkind = "agent"\n'
+        '[[workloads.containers]]\nname = "launcher"\nis_primary = true\nimage_ref = "ecr.example/agent:1"\n'
+    )
+    monkeypatch.setattr(
+        ms,
+        "_default_tree_fetch",
+        lambda connection, repo, ref: {
+            "agents/launcher/astrolift.toml": launcher,
+            "workflows/github-issue.toml": workflow,
+        },
+    )
+
+    _, payload = _call(
+        org,
+        user,
+        token,
+        "tools/call",
+        {
+            "name": "astrolift_sync_agent_repo",
+            "arguments": {
+                "project_id": str(project.guid),
+                "source_repo": "acme/factory",
+                "manifest_paths": ["agents/launcher/astrolift.toml"],
+            },
+        },
+    )
+
+    assert payload["result"]["isError"] is False, payload
+    result = payload["result"]["structuredContent"]
+    assert [agent["manifest_path"] for agent in result["agents"]] == ["agents/launcher/astrolift.toml"]
+    assert result["workflows"] == []
+    imported.refresh_from_db()
+    assert (imported.source_repo, imported.deleted_at) == ("", None)
+
+
 def test_streamable_http_auth_scope_tenant_and_session_run_through_middleware(permission_resolver):
     org = Organization.objects.create(name="MCP Org", slug="mcp-http")
     team = Team.objects.create(organization=org, name="HTTP Team", slug="mcp-http-team")

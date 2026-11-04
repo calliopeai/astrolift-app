@@ -173,6 +173,113 @@ def test_reconcile_retires_definition_removed_from_source_tree(org, project, age
 
 
 @pytest.mark.django_db
+def test_reconcile_keeps_the_definition_when_its_file_moves_in_the_repo(org, project, agent):
+    """A workflow moved to another file under ``workflows/`` keeps its
+    definition: same row, same stages, new path (#2610)."""
+    from workflows.models import WorkflowDefinition
+
+    reconcile_repository_workflows(
+        organization=org,
+        project=project,
+        source_repo="steadymd/smd-agents",
+        source_ref="one",
+        manifests=discover_repository_workflows({"workflows/triage.toml": WORKFLOW}),
+    )
+    definition = WorkflowDefinition.objects.get(source_path="workflows/triage.toml")
+    stage_pks = list(definition.stages.order_by("order").values_list("pk", flat=True))
+
+    result = reconcile_repository_workflows(
+        organization=org,
+        project=project,
+        source_repo="steadymd/smd-agents",
+        source_ref="two",
+        manifests=discover_repository_workflows({"workflows/triage/chain.toml": WORKFLOW}),
+    )
+
+    assert [(row.path, row.slug, row.created) for row in result] == [
+        ("workflows/triage/chain.toml", "triage-chain", False)
+    ]
+    definition.refresh_from_db()
+    assert definition.source_path == "workflows/triage/chain.toml"
+    assert definition.source_ref == "two"
+    assert definition.deleted_at is None
+    assert list(definition.stages.order_by("order").values_list("pk", flat=True)) == stage_pks
+    assert WorkflowDefinition.objects.filter(source_repo="steadymd/smd-agents").count() == 1
+
+
+@pytest.mark.django_db
+def test_reconcile_refuses_one_slug_declared_by_two_files(org, project, agent):
+    """Two files of one tree declaring a slug are not a move."""
+    from workflows.models import WorkflowDefinition
+
+    reconcile_repository_workflows(
+        organization=org,
+        project=project,
+        source_repo="steadymd/smd-agents",
+        source_ref="one",
+        manifests=discover_repository_workflows({"workflows/triage.toml": WORKFLOW}),
+    )
+
+    with pytest.raises(ValueError, match="already owned by another definition"):
+        reconcile_repository_workflows(
+            organization=org,
+            project=project,
+            source_repo="steadymd/smd-agents",
+            source_ref="two",
+            manifests=discover_repository_workflows(
+                {"workflows/triage.toml": WORKFLOW, "workflows/triage-copy.toml": WORKFLOW}
+            ),
+        )
+
+    definition = WorkflowDefinition.objects.get(slug="triage-chain")
+    assert (definition.source_path, definition.source_ref) == ("workflows/triage.toml", "one")
+
+
+def _imported_definition(org, project):
+    from workflows.manifest import create_definition_from_manifest, parse_workflow_manifest
+
+    return create_definition_from_manifest(parse_workflow_manifest(WORKFLOW), organization=org)
+
+
+def _other_repos_definition(org, project):
+    from workflows.models import WorkflowDefinition
+
+    reconcile_repository_workflows(
+        organization=org,
+        project=project,
+        source_repo="steadymd/other-agents",
+        source_ref="one",
+        manifests=discover_repository_workflows({"workflows/triage.toml": WORKFLOW}),
+    )
+    return WorkflowDefinition.objects.get(source_repo="steadymd/other-agents")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("make_holder", [_imported_definition, _other_repos_definition])
+def test_reconcile_refuses_a_slug_held_outside_the_repo(org, project, agent, make_holder):
+    """Only the repo's own definition follows its file. One imported by hand
+    (no source repo) or owned by another repo keeps the slug (#2610)."""
+    from workflows.models import WorkflowDefinition
+
+    holder = make_holder(org, project)
+    before = (holder.source_repo, holder.source_path, holder.source_ref)
+
+    with pytest.raises(ValueError, match="already owned by another definition"):
+        reconcile_repository_workflows(
+            organization=org,
+            project=project,
+            source_repo="steadymd/smd-agents",
+            source_ref="two",
+            manifests=discover_repository_workflows({"workflows/moved.toml": WORKFLOW}),
+        )
+
+    holder.refresh_from_db()
+    assert (holder.source_repo, holder.source_path, holder.source_ref) == before
+    assert holder.deleted_at is None
+    assert not WorkflowDefinition.objects.filter(source_repo="steadymd/smd-agents").exists()
+
+
+@pytest.mark.django_db
 def test_reconcile_rejects_project_outside_repository_org(org, project):
     from astrolift_identity.models import Organization, Project, Team
 

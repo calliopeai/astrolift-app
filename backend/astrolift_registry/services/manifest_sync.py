@@ -1516,6 +1516,7 @@ def register_agent_repo(
     deploy_branch: str = "",
     default_cluster=None,
     manifest_paths: list[str] | None = None,
+    reconcile_workflows: bool = True,
     tree: _TreeFn | None = None,
 ) -> RegisterAgentRepoResult:
     """Register every agent manifest in ``source_repo`` under ``project``.
@@ -1531,6 +1532,11 @@ def register_agent_repo(
     are registered (the wizard's checked agents); requested paths that don't
     match a discovered manifest are ignored. When omitted/empty, every
     discovered agent manifest is registered.
+
+    ``reconcile_workflows=False`` leaves ``workflows/**/*.toml`` unread and
+    every workflow definition as it is: no update, no retirement, no slug
+    check (#2610). Registering named agent manifests turns it off; manual
+    resync and push sync keep it on.
 
     Returns ``no_agents`` when the repo has neither agent nor workflow manifests, ``no_match``
     when a ``manifest_paths`` filter excluded every discovered manifest,
@@ -1552,7 +1558,7 @@ def register_agent_repo(
     )
 
     try:
-        workflow_manifests = discover_repository_workflows(files)
+        workflow_manifests = discover_repository_workflows(files) if reconcile_workflows else []
     except ManifestError as exc:
         return RegisterAgentRepoResult(status="error", error=str(exc))
     if not discovered and not workflow_manifests:
@@ -1639,12 +1645,18 @@ def register_agent_repo(
                 )
                 for d in discovered
             ]
-            workflows = reconcile_repository_workflows(
-                organization=project.organization,
-                project=project,
-                source_repo=source_repo,
-                source_ref=ref,
-                manifests=workflow_manifests,
+            # Even an empty pass retires the repo's definitions as removed,
+            # so a skipped pass must not call the reconcile at all.
+            workflows = (
+                reconcile_repository_workflows(
+                    organization=project.organization,
+                    project=project,
+                    source_repo=source_repo,
+                    source_ref=ref,
+                    manifests=workflow_manifests,
+                )
+                if reconcile_workflows
+                else []
             )
     except Exception as exc:  # noqa: BLE001 — surface as a clean envelope
         log.exception("agent-repo registration failed (repo=%s)", source_repo)

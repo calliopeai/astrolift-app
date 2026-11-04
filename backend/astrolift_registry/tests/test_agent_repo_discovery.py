@@ -545,6 +545,68 @@ def test_manifest_paths_all_unknown_is_no_match(org, with_connection):
 
 
 # ---------------------------------------------------------------------------
+# #2610: a pass that skips workflows leaves them as they are
+# ---------------------------------------------------------------------------
+
+_ISSUE_WORKFLOW = """\
+[workflow]
+slug = "github-issue"
+name = "GitHub issue"
+
+[[stage]]
+kind = "checkpoint"
+output_key = "issue"
+"""
+
+
+def test_a_pass_without_workflows_leaves_the_repos_definitions_alone(org, with_connection):
+    """``reconcile_workflows=False`` neither parses ``workflows/`` (a broken
+    file does not fail it) nor reconciles: a definition whose file is gone is
+    not retired, as a full pass would."""
+    from workflows.models import WorkflowDefinition
+
+    with_connection(org)
+    project = _project(org)
+    first = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/factory",
+        ref="one",
+        tree=_tree_of(
+            {
+                "agents/triage/astrolift.toml": _agent_toml("triage"),
+                "workflows/github-issue.toml": _ISSUE_WORKFLOW,
+            }
+        ),
+    )
+    assert first.status == "ok", first.error
+
+    result = register_agent_repo(
+        project=project,
+        source_kind="github",
+        source_repo="acme/factory",
+        ref="two",
+        manifest_paths=["agents/launcher/astrolift.toml"],
+        reconcile_workflows=False,
+        tree=_tree_of(
+            {
+                "agents/triage/astrolift.toml": _agent_toml("triage"),
+                "agents/launcher/astrolift.toml": _agent_toml("launcher"),
+                "workflows/broken.toml": "[workflow\n",
+            }
+        ),
+    )
+
+    assert result.status == "ok", result.error
+    assert [a.manifest_path for a in result.agents] == ["agents/launcher/astrolift.toml"]
+    assert result.workflows == []
+    definition = WorkflowDefinition.objects.get(organization=org, slug="github-issue")
+    assert (definition.source_path, definition.source_ref) == ("workflows/github-issue.toml", "one")
+    assert definition.deleted_at is None
+    assert definition.is_enabled is True
+
+
+# ---------------------------------------------------------------------------
 # Acceptance 5: tenancy — rows scoped to the project's org
 # ---------------------------------------------------------------------------
 
@@ -840,3 +902,80 @@ def test_register_agent_repo_mutation_manifest_paths_subset(
         ).count()
         == 1
     )
+
+
+def test_register_agent_repo_mutation_manifest_paths_skip_workflows(
+    monkeypatch, org, with_connection, permission_resolver
+):
+    """``astro agent register-repo --manifest-path`` registers the named agent
+    even though the repo declares a workflow whose slug a hand-imported
+    definition holds, and leaves that definition as it was (#2610)."""
+    from workflows.manifest import create_definition_from_manifest, parse_workflow_manifest
+
+    with_connection(org)
+    project = _project(org)
+    permission_resolver.grant(Permission.AGENT_CREATE)
+    imported = create_definition_from_manifest(parse_workflow_manifest(_ISSUE_WORKFLOW), organization=org)
+
+    import astrolift_registry.services.manifest_sync as ms
+
+    monkeypatch.setattr(
+        ms,
+        "_default_tree_fetch",
+        lambda connection, repo, ref: {
+            "agents/launcher/astrolift.toml": _agent_toml("launcher"),
+            "workflows/github-issue.toml": _ISSUE_WORKFLOW,
+        },
+    )
+
+    with _enter(org):
+        result = RegistryMutation().register_agent_repo(
+            _info(),
+            input=RegisterAgentRepoInput(
+                project_id=str(project.guid),
+                source_repo="acme/factory",
+                manifest_paths=["agents/launcher/astrolift.toml"],
+            ),
+        )
+
+    assert result.ok is True, result.errors
+    assert [a.manifest_path for a in result.data.agents] == ["agents/launcher/astrolift.toml"]
+    assert result.data.workflows == []
+    imported.refresh_from_db()
+    assert (imported.source_repo, imported.source_path, imported.deleted_at) == ("", "", None)
+
+
+def test_register_agent_repo_mutation_without_manifest_paths_follows_a_moved_workflow(
+    monkeypatch, org, with_connection, permission_resolver
+):
+    """Without manifestPaths the repo's workflows are reconciled, and a slug
+    the same repo already owns at a removed path is an update (#2610)."""
+    from workflows.models import WorkflowDefinition
+
+    with_connection(org)
+    project = _project(org)
+    permission_resolver.grant(Permission.AGENT_CREATE)
+    tree = {"agents/triage/astrolift.toml": _agent_toml("triage"), "workflows/issue.toml": _ISSUE_WORKFLOW}
+
+    import astrolift_registry.services.manifest_sync as ms
+
+    monkeypatch.setattr(ms, "_default_tree_fetch", lambda connection, repo, ref: dict(tree))
+
+    def register():
+        with _enter(org):
+            return RegistryMutation().register_agent_repo(
+                _info(),
+                input=RegisterAgentRepoInput(project_id=str(project.guid), source_repo="acme/factory"),
+            )
+
+    assert register().ok is True
+    definition = WorkflowDefinition.objects.get(organization=org, slug="github-issue")
+
+    tree["workflows/github-issue.toml"] = tree.pop("workflows/issue.toml")
+    result = register()
+
+    assert result.ok is True, result.errors
+    assert result.data.workflows == ["github-issue"]
+    moved = WorkflowDefinition.objects.get(organization=org, slug="github-issue", deleted_at__isnull=True)
+    assert moved.pk == definition.pk
+    assert moved.source_path == "workflows/github-issue.toml"

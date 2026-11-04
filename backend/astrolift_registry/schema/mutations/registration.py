@@ -205,6 +205,7 @@ class RegistrationMutations:
             deploy_branch=input.deploy_branch or "",
             default_cluster=default_cluster,
             manifest_paths=input.manifest_paths or None,
+            reconcile_workflows=not input.manifest_paths,
         )
 
         if result.status == "fetch_failed":

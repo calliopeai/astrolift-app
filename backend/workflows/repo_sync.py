@@ -69,9 +69,8 @@ def reconcile_repository_workflows(
         raise ValueError("workflow project must belong to the repository organization")
 
     results: list[ReconciledWorkflow] = []
-    retained_paths: set[str] = set()
+    retained_paths = {item.path for item in manifests}
     for item in manifests:
-        retained_paths.add(item.path)
         parsed = item.parsed
         definition = WorkflowDefinition.objects.filter(
             organization=organization,
@@ -80,22 +79,35 @@ def reconcile_repository_workflows(
         ).first()
         created = definition is None
         if definition is None:
-            collision = WorkflowDefinition.objects.filter(
+            holder = WorkflowDefinition.objects.filter(
                 organization=organization,
                 slug=parsed.definition.slug,
                 deleted_at__isnull=True,
-            ).exists()
-            if collision:
+            ).first()
+            if (
+                holder is not None
+                and holder.source_repo
+                and holder.source_repo == source_repo
+                and holder.source_path not in retained_paths
+            ):
+                # The repo moved this workflow to another file. Keep the
+                # definition, so its stages and the configured workflows
+                # bound to it survive the move (#2610).
+                definition = holder
+                definition.source_path = item.path
+                created = False
+            elif holder is not None:
                 raise ValueError(
                     f"workflow slug {parsed.definition.slug!r} from {item.path} is already owned "
                     "by another definition"
                 )
-            definition = WorkflowDefinition(
-                organization=organization,
-                project=project,
-                source_repo=source_repo,
-                source_path=item.path,
-            )
+            else:
+                definition = WorkflowDefinition(
+                    organization=organization,
+                    project=project,
+                    source_repo=source_repo,
+                    source_path=item.path,
+                )
         elif (
             WorkflowDefinition.objects.filter(
                 organization=organization,
