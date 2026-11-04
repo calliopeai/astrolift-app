@@ -37,7 +37,7 @@ import math
 import secrets
 import time
 from types import SimpleNamespace
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus
 
 from authlib.integrations.django_client import OAuth
 from authlib.oidc.core import UserInfo as VerifiedUserInfo
@@ -52,6 +52,7 @@ from django_ratelimit.decorators import ratelimit
 
 from astrolift_identity.session_elevation import METHOD_SSO, elevate
 from auth1.models import UserInfo
+from auth1.return_urls import safe_relative_path
 from core.mutations import AuditEntry, emit_audit
 
 logger = logging.getLogger(__name__)
@@ -111,24 +112,11 @@ def freshness_window_seconds() -> int:
 
 
 def is_safe_return_url(raw: str | None) -> bool:
-    """Return True when ``raw`` is a safe relative return URL.
-
-    Accepts only ``/`` -leading paths with no scheme and no host so a
-    malicious caller can't turn the elevate-sso endpoint into an open
-    redirect. Schemeless URLs like ``//evil.example.com/x`` are
-    rejected — ``urlparse`` reports them with ``netloc != ""``.
-    """
-    if not raw or not isinstance(raw, str):
-        return False
-    if not raw.startswith("/"):
-        return False
-    # Reject protocol-relative URLs (``//evil.example.com/x``).
-    if raw.startswith("//"):
-        return False
-    parsed = urlparse(raw)
-    if parsed.scheme or parsed.netloc:
-        return False
-    return True
+    """Return True when ``raw`` is a path on this host, so a malicious
+    caller can't turn the elevate-sso endpoint into an open redirect.
+    ``//host``, ``/\\host`` and their percent-encoded forms are refused
+    (``auth1.return_urls.safe_relative_path``)."""
+    return safe_relative_path(raw) is not None
 
 
 def _normalize_return(raw: str | None) -> str:
