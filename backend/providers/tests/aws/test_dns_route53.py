@@ -49,6 +49,38 @@ def test_ensure_record_apex(driver_with_zone, route53_client) -> None:
     assert record.type == "TXT"
 
 
+def _txt_values(route53_client, zone_id: str, fqdn: str) -> list[str]:
+    sets = route53_client.list_resource_record_sets(HostedZoneId=zone_id)["ResourceRecordSets"]
+    return [r["Value"] for rs in sets if rs["Type"] == "TXT" and rs["Name"] == fqdn for r in rs["ResourceRecords"]]
+
+
+def test_ensure_record_quotes_a_txt_value(driver_with_zone, route53_client) -> None:
+    """Route53 takes a TXT value only inside double quotes (#custom-domain challenge)."""
+    driver, zone_id = driver_with_zone
+    record = driver.ensure_record(
+        zone="acme.platform.example",
+        name="_astrolift-challenge",
+        type="TXT",
+        value="t7y1caufd5t4oxi21itv0cnmlzl12hvu",
+    )
+    assert record.value == "t7y1caufd5t4oxi21itv0cnmlzl12hvu"
+    assert _txt_values(route53_client, zone_id, "_astrolift-challenge.acme.platform.example.") == [
+        '"t7y1caufd5t4oxi21itv0cnmlzl12hvu"'
+    ]
+
+
+def test_ensure_record_leaves_a_quoted_txt_value_alone(driver_with_zone, route53_client) -> None:
+    driver, zone_id = driver_with_zone
+    driver.ensure_record(zone="acme.platform.example", name="spf", type="TXT", value='"v=spf1 -all"')
+    assert _txt_values(route53_client, zone_id, "spf.acme.platform.example.") == ['"v=spf1 -all"']
+
+
+def test_ensure_record_escapes_quotes_inside_a_txt_value(driver_with_zone, route53_client) -> None:
+    driver, zone_id = driver_with_zone
+    driver.ensure_record(zone="acme.platform.example", name="note", type="TXT", value='say "hi"')
+    assert _txt_values(route53_client, zone_id, "note.acme.platform.example.") == ['"say \\"hi\\""']
+
+
 def test_ensure_record_idempotent(driver_with_zone) -> None:
     """Re-applying same record is a no-op (UPSERT)."""
     driver, _ = driver_with_zone
