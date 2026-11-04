@@ -111,6 +111,8 @@ def _resolve_authoritative_records(
             # strip and decode for substring matching.
             text = "".join(s.decode("utf-8") if isinstance(s, bytes) else str(s) for s in rdata.strings)
             values.append(text)
+        elif record_type in ("A", "AAAA"):
+            values.append(str(rdata.address))
         else:
             values.append(str(rdata.target).rstrip("."))
     return values, ""
@@ -128,6 +130,26 @@ def _probe_one_record(record: dict[str, Any], apex: str) -> dict[str, Any]:
     name = record.get("name", "")
     kind = record.get("kind", "")
     expected = record.get("value", "")
+    from astrolift_lifecycle.custom_domain_handshake import hostname_parent_zone
+
+    if kind == "CNAME" and name.rstrip(".").lower() == hostname_parent_zone(apex):
+        # A zone apex cannot hold a CNAME, so the platform writes an ALIAS there:
+        # an A record to the load balancer the target resolves to. Looking for a
+        # CNAME would fail for ever, so compare the addresses of the two names.
+        have, error = _resolve_authoritative_records(apex=apex, name=name, record_type="A")
+        want, want_error = _resolve_authoritative_records(apex=apex, name=expected, record_type="A")
+        out["last_checked_at"] = datetime.now(UTC).isoformat()
+        if error or want_error:
+            out["propagated"] = False
+            out["message"] = error or want_error
+            return out
+        out["propagated"] = bool(set(have) & set(want))
+        out["message"] = (
+            "apex ALIAS propagated"
+            if out["propagated"]
+            else f"apex resolves to {sorted(have)!r}, expected the addresses of {expected!r} ({sorted(want)!r})"
+        )
+        return out
     values, error = _resolve_authoritative_records(
         apex=apex,
         name=name,
