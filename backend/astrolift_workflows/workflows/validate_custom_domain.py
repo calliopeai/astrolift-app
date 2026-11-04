@@ -63,6 +63,22 @@ def _truncate(message: str, *, limit: int = 4000) -> str:
     return message[: limit - 3] + "..."
 
 
+def _failure_reason(ensure_result: object, last_probe: object) -> str:
+    """One operator-facing reason for a validation that did not settle.
+
+    Errors from the platform's own DNS write come first. When a record could
+    not be written, the probe's "not found, still propagating" is only a
+    symptom, and it points the operator at the wrong cause.
+    """
+    parts: list[str] = []
+    errors = ensure_result.get("errors") if isinstance(ensure_result, dict) else None
+    if errors:
+        parts.append("platform DNS write failed: " + "; ".join(str(e) for e in errors))
+    rows = last_probe.get("records", []) if isinstance(last_probe, dict) else []
+    parts.extend(r.get("message", "") for r in rows if not r.get("propagated", False))
+    return "; ".join(p for p in parts if p) or "DNS records have not propagated"
+
+
 @workflow.defn(name="ValidateCustomDomainWorkflow")
 class ValidateCustomDomainWorkflow:
     @workflow.run
@@ -160,18 +176,7 @@ class ValidateCustomDomainWorkflow:
 
         # Compose a single operator-facing reason from the per-row
         # messages on the last probe.
-        rows = (
-            last_probe.get("records", []) if isinstance(last_probe, dict)
-            else []
-        )
-        failed_msgs = [
-            r.get("message", "") for r in rows
-            if not r.get("propagated", False)
-        ]
-        reason = (
-            "; ".join(m for m in failed_msgs if m)
-            or "DNS records have not propagated"
-        )
+        reason = _failure_reason(ensure_result, last_probe)
         await workflow.execute_activity(
             transition_domain_status,
             args=[domain_id, False, reason],

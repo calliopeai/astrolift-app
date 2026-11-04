@@ -83,6 +83,18 @@ def _record_scoped_to_host(record: DnsRecord, app_host: str) -> bool:
     return False
 
 
+def _quote_txt(value: str) -> str:
+    """Route53 accepts a TXT value only inside double quotes.
+
+    A value that is already quoted is left alone, so a caller that quotes
+    stays correct. Anything else is wrapped, with backslashes and inner quotes
+    escaped.
+    """
+    if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+        return value
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
 class Route53Driver(DnsDriver):
     def __init__(
         self,
@@ -369,7 +381,8 @@ class Route53Driver(DnsDriver):
                 },
             }
         else:
-            record = {"Name": fqdn, "Type": type, "TTL": ttl, "ResourceRecords": [{"Value": value}]}
+            wire_value = _quote_txt(value) if type == "TXT" else value
+            record = {"Name": fqdn, "Type": type, "TTL": ttl, "ResourceRecords": [{"Value": wire_value}]}
         try:
             self._r53.change_resource_record_sets(
                 HostedZoneId=zone_id,
