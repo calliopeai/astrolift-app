@@ -1,4 +1,8 @@
-"""Bearer-only two-step source-build then fresh-person brain hosting."""
+"""Bearer-only two-step source-build then fresh-person hosting.
+
+The brain routes (#2456) and the project routes (#2471) share one
+implementation; each family reads and hosts only its own intents.
+"""
 
 import functools
 
@@ -53,14 +57,14 @@ def auth(request):
     scope="source live TEAM/ORG plus creator or administrator; bearer write:apps",
 )
 @errors
-def descriptor(request, guid):
+def descriptor(request, guid, *, mode=source.BRAIN):
     token, org = auth(request)
     dev = DevEnvironment.objects.select_related("team").filter(guid=guid, organization_id=org.pk).first()
     if dev is None:
         raise source.SourceError("NOT_FOUND", "source environment not found", 404)
     source.source_owner(token, org, dev)
     data, _ = source.source_descriptor(dev)
-    return JsonResponse({"protocol": source.PROTOCOL, **data})
+    return JsonResponse({"protocol": source.PROTOCOLS[mode], **data})
 
 
 def enqueue(row):
@@ -76,12 +80,12 @@ def enqueue(row):
     scope="source live owner plus exact live project and readable brain; bearer write:apps",
 )
 @errors
-def create(request, guid):
+def create(request, guid, *, mode=source.BRAIN):
     token, org = auth(request)
     body, err = builder_views._load_json(request)
     if err is not None:
         return err
-    row, _ = source.admit(request, token, org, guid, body)
+    row, _ = source.admit(request, token, org, guid, body, mode=mode)
     try:
         row = enqueue(row)
     except source.SourceError:
@@ -102,7 +106,7 @@ def create(request, guid):
     scope="original current bearer and source owner; exact live project and readable brain",
 )
 @errors
-def status(request, intent_guid):
+def status(request, intent_guid, *, mode=source.BRAIN):
     token, org = auth(request)
     row = (
         BuilderBrainBuild.objects.select_related(
@@ -113,6 +117,7 @@ def status(request, intent_guid):
             organization_id=org.pk,
             actor_id=token.user_id,
             credential_id=token.pk,
+            hosting_mode=mode,
         )
         .first()
     )
@@ -135,14 +140,14 @@ def status(request, intent_guid):
     scope="fresh original person request; source owner; exact project app.create/deploy and readable brain; native origin preserved",
 )
 @errors
-def host(request, intent_guid):
+def host(request, intent_guid, *, mode=source.BRAIN):
     token, org = auth(request)
     body, err = builder_views._load_json(request)
     if err is not None:
         return err
     if set(body) != {"expected_image_digest"} or not isinstance(body["expected_image_digest"], str):
         raise source.SourceError("VALIDATION", "only expected_image_digest is accepted", 400)
-    row = source.host(request, token, org, intent_guid, body["expected_image_digest"])
+    row = source.host(request, token, org, intent_guid, body["expected_image_digest"], mode=mode)
     row.refresh_from_db()
     return JsonResponse(source.response(row), status=202)
 
@@ -152,7 +157,7 @@ def host(request, intent_guid):
     credential="builder-build-archive",
     scope="bounded immutable archive grant for the current original build authority only",
 )
-def archive(request, intent_guid):
+def archive(request, intent_guid, *, mode=source.BRAIN):
     from django.utils import timezone
 
     header = request.headers.get("Authorization", "")
@@ -166,7 +171,7 @@ def archive(request, intent_guid):
             return HttpResponse(status=403)
         row = (
             BuilderBrainBuild.objects.select_related("organization", "project", "brain")
-            .filter(guid=intent_guid, organization_id=claim["org"])
+            .filter(guid=intent_guid, organization_id=claim["org"], hosting_mode=mode)
             .first()
         )
         if (
@@ -193,3 +198,55 @@ def archive(request, intent_guid):
         FileNotFoundError,
     ):
         return HttpResponse(status=403)
+
+
+# -- Ordinary apps in an exact project, no brain (#2471) ---------------------
+
+
+@require_GET
+@route_auth(
+    credential="api-token",
+    permissions=(Permission.APP_CREATE,),
+    scope="source live TEAM/ORG plus creator or administrator; bearer write:apps",
+)
+def project_descriptor(request, guid):
+    return descriptor(request, guid, mode=source.PROJECT)
+
+
+@require_POST
+@route_auth(
+    credential="api-token",
+    permissions=(Permission.APP_CREATE, Permission.APP_DEPLOY),
+    scope="source live owner plus exact live PROJECT, no brain; bearer write:apps and team ceiling",
+)
+def project_create(request, guid):
+    return create(request, guid, mode=source.PROJECT)
+
+
+@require_GET
+@route_auth(
+    credential="api-token",
+    permissions=(Permission.APP_CREATE, Permission.APP_DEPLOY),
+    scope="original current bearer and source owner; exact live PROJECT",
+)
+def project_status(request, intent_guid):
+    return status(request, intent_guid, mode=source.PROJECT)
+
+
+@require_POST
+@route_auth(
+    credential="api-token",
+    permissions=(Permission.APP_CREATE, Permission.APP_DEPLOY),
+    scope="fresh original person request; source owner; exact PROJECT app.create/deploy; native origin preserved",
+)
+def project_host(request, intent_guid):
+    return host(request, intent_guid, mode=source.PROJECT)
+
+
+@require_GET
+@route_auth(
+    credential="builder-build-archive",
+    scope="bounded immutable archive grant for the current original build authority only",
+)
+def project_archive(request, intent_guid):
+    return archive(request, intent_guid, mode=source.PROJECT)
