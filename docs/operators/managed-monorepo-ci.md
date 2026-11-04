@@ -10,7 +10,8 @@ use the ordinary app workflow. Source delivery for agent tasks remains separate.
 
 Preconditions: `app.update` at the app for `astro ci setup`,
 `astro app set-build-context`, the webhook, secret and workflow pushes and
-`setAppSource`; `app.read` for `validateAstroliftCiSecrets`. The organization's
+`setAppSource` (`astro app set-source`); `app.read` for
+`validateAstroliftCiSecrets`. The organization's
 GitHub App installation must include the source repository with Contents and
 Workflows write permissions; the OIDC push role lives in the cluster's AWS
 account and must authorize the app's ECR repository. Surface:
@@ -119,8 +120,9 @@ name stops matching: the GitHub App webhook receiver finds apps by repository
 name, the per-repository receiver refuses a delivery from any other
 repository, and the push role trusts `repo:<owner>/<name>:*`. The
 `setAppSource(input: {id, sourceRepo, ifMatchVersion})` mutation points the app
-at the new name, or at a different repository (#2478). It needs `app.update` on
-the app and is audited as `app.set_source` with both names.
+at the new name, or at a different repository (#2478); `astro app set-source
+<app-slug> --source-repo <owner/name>` calls it. It needs `app.update` on the
+app and is audited as `app.set_source` with both names.
 
 ```graphql
 mutation MoveSource($input: SetAppSourceInput!) {
@@ -139,8 +141,22 @@ repository policy applies, and another app in the organization registered from
 the same repository and manifest path is a conflict. A `sourceUrl` that named
 the old repository follows it.
 
-Each app moves on its own, so after a rename change every app the organization
-registered from the repository. The workflow definitions the old repository
+A rename is also followed without a person, through the GitHub App's
+`repository` event. Apps created from the Astrolift manifest subscribe to it.
+An App created before that needs **Repository** turned on under **Permissions &
+events** › **Subscribe to events** in its settings on GitHub; the event needs
+only Metadata read. On a `renamed` delivery the App webhook receiver gives each
+of the organization's GitHub apps on the old name (in any case, and not being
+torn down) the change `setAppSource` makes, with the same checks. An app the
+change is refused for stays on the old name; move it with `setAppSource` once
+the cause is fixed. Each app is audited as `app.set_source` with no actor, the
+delivery id and both names, and a refusal also records its error code and
+message. A delivery is applied once. A transfer to another owner is not
+followed.
+
+Through `setAppSource` each app moves on its own, so after a rename the event
+did not cover, change every app the organization registered from the
+repository. The workflow definitions the old repository
 declared (`workflows/*.toml`) are keyed on its name; once no other app of the
 organization names it, they follow, and the next sync updates them in place and
 retires the ones the repository no longer declares. They never merge into a

@@ -120,6 +120,8 @@ class RegisterAgentRepoInput:
     those paths are registered — the wizard's checked agents. Paths that
     aren't among the discovered manifests are ignored. When omitted/empty,
     every discovered agent manifest is registered (unchanged behaviour).
+    When given, ``workflows/**/*.toml`` is not read and no workflow
+    definition is touched (#2610).
     """
 
     project_id: GUID
