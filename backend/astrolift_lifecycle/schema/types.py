@@ -10,6 +10,7 @@ from typing import Any
 import strawberry
 
 from astrolift_graphql import GUID
+from astrolift_lifecycle.supersede import display_status
 from core.schema.enums import ObservabilityPanelReason
 
 JSON = strawberry.scalars.JSON
@@ -479,7 +480,7 @@ def preview_deployment_to_type(deployment) -> PreviewDeploymentType:
         version=int(deployment.version),
         app_id=GUID(str(deployment.registered_app.guid)),
         environment_id=GUID(str(deployment.app_environment.guid)),
-        status=deployment.status,
+        status=display_status(deployment.status, deployment.aborted_reason),
         trigger_kind=deployment.trigger_kind,
         commit_sha=deployment.commit_sha or "",
         image_tag=deployment.image_tag or "",
@@ -715,7 +716,9 @@ def deployment_to_type(d, *, viewer_user_id: int | None = None) -> DeploymentTyp
         workload_slug=d.workload.slug if d.workload_id else None,
         trigger_kind=d.trigger_kind,
         strategy=getattr(d, "strategy", "") or "unknown",
-        status=d.status,
+        # A deploy stopped by a newer one is FAILED in storage; it reads as
+        # superseded so it is not mistaken for a broken deploy.
+        status=display_status(d.status, getattr(d, "aborted_reason", "") or ""),
         image_tag=d.image_tag or "",
         image_digest=d.image_digest or "",
         cluster_revision=d.cluster_revision or "",

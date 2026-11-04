@@ -31,9 +31,37 @@ logger = logging.getLogger(__name__)
 
 _SUPERSEDE_REASON = "superseded by a newer deploy"
 
+# The reason a live DeployAppWorkflow writes on itself when it observes the
+# abort signal (deploy_app.py, reprovision_app.py). Every other abort
+# initiator (reject, abort mutation) writes its own reason first, and
+# ``mark_failed`` keeps a reason already written, so a row carrying this text
+# was stopped by a newer deploy.
+_WORKFLOW_ABORT_REASON = "aborted: superseded by a newer deploy or cancelled"
+
+# A superseded in-flight row is FAILED in the state machine (no in-flight
+# status may move to SUPERSEDED), so readers classify it by this reason.
+SUPERSEDED_REASONS = (_SUPERSEDE_REASON, _WORKFLOW_ABORT_REASON)
+
 # In-flight = created but not yet terminal. REDEPLOYING is in-flight
 # too (a redeploy that stalls blocks the next deploy the same way).
 _IN_FLIGHT_STATUSES = ("pending", "deploying", "redeploying")
+
+
+def is_superseded_failure(status: str, aborted_reason: str) -> bool:
+    """True when a FAILED row was stopped by a newer deploy, not broken."""
+    return status == "failed" and (aborted_reason or "").strip() in SUPERSEDED_REASONS
+
+
+def display_status(status: str, aborted_reason: str) -> str:
+    """The status a reader should see: a superseded failure reads ``superseded``."""
+    return "superseded" if is_superseded_failure(status, aborted_reason) else status
+
+
+def superseded_failure_q():
+    """``Q`` matching FAILED rows that :func:`is_superseded_failure` reclassifies."""
+    from django.db.models import Q
+
+    return Q(status="failed", aborted_reason__in=SUPERSEDED_REASONS)
 
 
 def supersede_in_flight_deploys(app, env, *, reason: str = _SUPERSEDE_REASON) -> int:

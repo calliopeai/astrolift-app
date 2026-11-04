@@ -76,7 +76,12 @@ import re
 # field the app left at its default, as the platform build does.
 # v11 (#2473): GitHub-managed workflows use Node 24 action majors for
 # checkout and AWS OIDC credentials; GitHub runners began warning on Node 20.
-TEMPLATE_VERSION = 11
+# v12: the GitHub notify step no longer ends green on an accepted (2xx)
+# deploy. It polls the response's ``polling_url`` every 10 s for up to 15
+# minutes: success exits 0, a deploy superseded by a newer one exits 0 and
+# says so, a failure exits 1 with the platform's reason, and so does the
+# timeout. GitLab, Bitbucket and Gitea bodies are unchanged.
+TEMPLATE_VERSION = 12
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

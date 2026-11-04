@@ -14,6 +14,7 @@ from django.db import models
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
+from astrolift_lifecycle.supersede import display_status
 
 if TYPE_CHECKING:
     from astrolift_lifecycle.schema.types import ReachabilityStatus
@@ -1110,7 +1111,7 @@ def _deployment_to_summary(deployment) -> AppDeploymentSummaryType:
     env_name = deployment.app_environment.name if deployment.app_environment_id else ""
     return AppDeploymentSummaryType(
         id=GUID(str(deployment.guid)),
-        status=deployment.status,
+        status=display_status(deployment.status, deployment.aborted_reason),
         started_at=deployment.started_at,
         ended_at=deployment.ended_at,
         created_at=deployment.created_at,

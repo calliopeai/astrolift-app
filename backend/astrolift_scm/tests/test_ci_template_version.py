@@ -80,7 +80,7 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 11
+PINNED_TEMPLATE_VERSION = 12
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
@@ -92,8 +92,9 @@ PINNED_TEMPLATE_VERSION = 11
 # is covered by ``test_deploy_only_workflow.py`` instead.
 # v11 (#2473): GitHub uses checkout@v6 and configure-aws-credentials@v6
 # for Node 24. Non-GitHub renderers keep their host-specific runner actions.
+# v12: the GitHub notify step waits for the deployment to be terminal.
 PINNED_CONTENT_HASHES = {
-    "github": "dcba53023f1835c0df726cc680b24ca3fc9e8ad2f91a9932dccfe19d3d8dfc35",
+    "github": "ced14e67a639a1f727a86a3c1edbbbcafd2d051c597627bb6ac0e82659029d2d",
     "gitlab": "77f0d228c7b159e6040b7ec10a348b039f94ef188a565ea901b7c422b6dbcbc8",
     "gitea": "d370f2cf4f0080e7c04ad7e00ee735163c688a4222f8415114d894f6a9b83170",
     "bitbucket": "7821f3ac5724b4b30b3e48473652c39eb3f1edff8d771dcdad7e89b10e43e213",

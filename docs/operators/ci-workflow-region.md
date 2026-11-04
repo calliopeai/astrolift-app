@@ -26,7 +26,7 @@ GitLab, Bitbucket and Gitea retain their existing operator-supplied
 reference steps remain provider-specific and use the app's deploy branch;
 this correction does not add cloud support to the managed ECR build templates.
 
-Template version 8 (the current template is 11) made previous managed GitHub bodies eligible for the
+Template version 8 (the current template is 12) made previous managed GitHub bodies eligible for the
 existing drift/safe-sync flow. Existing operator edits still require review
 through that flow. Rendering and previewing do not change AWS resources or
 repository files; syncing remains an explicit existing operation.
@@ -38,4 +38,4 @@ astro api graphql -q 'query { astroliftApp(slug: "<app-slug>") { ciWorkflowSyncS
 cd backend && pytest astrolift_scm/tests/test_ci_region_2148.py
 ```
 
-`renderedText` contains an `aws-actions/configure-aws-credentials` step whose `aws-region` is the region in the app's ECR repository URI (no such step without an ECR URI and cluster region), `currentTemplateVersion` is `11`, and the test module passes.
+`renderedText` contains an `aws-actions/configure-aws-credentials` step whose `aws-region` is the region in the app's ECR repository URI (no such step without an ECR URI and cluster region), `currentTemplateVersion` is `12`, and the test module passes.

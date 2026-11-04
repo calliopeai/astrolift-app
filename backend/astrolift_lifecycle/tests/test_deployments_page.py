@@ -131,6 +131,31 @@ def test_status_filter_applies(app, env, org, permission_resolver):
     assert [i.image_tag for i in page.items] == ["bad"]
 
 
+def test_a_superseded_failure_reads_and_filters_as_superseded(app, env, org, permission_resolver):
+    """A deploy a newer one stopped is stored FAILED; the list shows it as
+    superseded and the status filter agrees with what is shown."""
+    permission_resolver.grant(Permission.APP_READ)
+    _deploy(app, env, "replaced", status=Deployment.Status.SUPERSEDED.value)
+    _deploy(
+        app,
+        env,
+        "stopped",
+        status=Deployment.Status.FAILED.value,
+        aborted_reason="superseded by a newer deploy",
+    )
+    _deploy(app, env, "broken", status=Deployment.Status.FAILED.value, aborted_reason="rollout timed out")
+
+    query = LifecycleQuery()
+    with tenant_context(TenantContext(organization_id=org.id)):
+        shown = {i.image_tag: i.status for i in query.astrolift_deployments_page(_info()).items}
+        failed = query.astrolift_deployments_page(_info(), status=Deployment.Status.FAILED.value)
+        superseded = query.astrolift_deployments_page(_info(), statuses=[Deployment.Status.SUPERSEDED.value])
+
+    assert shown == {"replaced": "superseded", "stopped": "superseded", "broken": "failed"}
+    assert [i.image_tag for i in failed.items] == ["broken"]
+    assert sorted(i.image_tag for i in superseded.items) == ["replaced", "stopped"]
+
+
 def test_page_hides_deregistered_apps_like_the_list_field_does(
     app, env, org, project, team, cluster, permission_resolver
 ):

@@ -119,6 +119,7 @@ from astrolift_lifecycle.scopes import (
     scheduled_job_run_app_scope,
     task_run_app_scope,
 )
+from astrolift_lifecycle.supersede import display_status, superseded_failure_q
 from astrolift_lifecycle.viewer_permissions import environment_viewer_permissions
 from astrolift_lifecycle.visibility import (
     cluster_owned_and_live,
@@ -500,6 +501,16 @@ class CloudOrphanReportType:
     complete: bool
 
 
+def _displayed_status_q(values: set[str]) -> Q:
+    """Match deployments by the status a reader sees, not the stored one."""
+    q = Q(status__in=values)
+    if "superseded" in values:
+        q |= superseded_failure_q()
+    elif "failed" in values:
+        q &= ~superseded_failure_q()
+    return q
+
+
 def _deployments_qs(
     *,
     app_slug: str | None,
@@ -538,10 +549,12 @@ def _deployments_qs(
         qs = qs.filter(registered_app__slug=app_slug)
     if environment_name:
         qs = qs.filter(app_environment__name=environment_name)
+    # A superseded in-flight row is FAILED in storage but reads "superseded"
+    # (``deployment_to_type``); filter on what the reader sees.
     if status:
-        qs = qs.filter(status=status)
+        qs = qs.filter(_displayed_status_q({status}))
     if statuses:
-        qs = qs.filter(status__in=statuses)
+        qs = qs.filter(_displayed_status_q(set(statuses)))
     if is_preview is not None:
         # A preview deployment is one raised from a pull request; the
         # /deployments tabs split on exactly this (`prNumber > 0`) and
@@ -1952,7 +1965,9 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
                     Deployment.Status.FAILED.value,
                     Deployment.Status.ROLLED_BACK.value,
                 ],
-            ).values_list("registered_app_id", flat=True)
+            )
+            .exclude(superseded_failure_q())
+            .values_list("registered_app_id", flat=True)
         )
 
         out: list[AppHealthSummaryType] = []
@@ -1964,7 +1979,9 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
                     app_name=app.name,
                     primitive_kind=("agent" if app.id in agent_app_ids else "app"),
                     environment_count=env_counts.get(app.id, 0),
-                    latest_deployment_status=(latest.status if latest else None),
+                    latest_deployment_status=(
+                        display_status(latest.status, latest.aborted_reason) if latest else None
+                    ),
                     latest_image_tag=(latest.image_tag if latest else ""),
                     last_deployed_at=(latest.created_at if latest else None),
                     has_recent_failure=app.id in failed_app_ids,

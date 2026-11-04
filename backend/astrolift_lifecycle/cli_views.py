@@ -60,7 +60,9 @@ Wire protocol
     {
       "deployment_id": "<guid>",
       "state":         "running",         # CLI-facing; polled for terminal detection
-      "status":        "running",         # platform-native (pending|deploying|running|failed|aborted)
+      "status":        "running",         # platform-native (pending|deploying|running|failed|superseded|...)
+      "superseded":    false,             # true when a newer deploy replaced or stopped it
+      "reason":        "",                # one line: why it failed or what it waits on
       "image_tag":     "abc1234",
       "commit_sha":    "<sha>",
       "branch":        "main",
@@ -667,6 +669,8 @@ _STATUS_TO_CLI_STATE: dict[str, str] = {
     "running": "succeeded",  # terminal success
     "failed": "failed",  # terminal failure
     "aborted": "cancelled",  # terminal — aborted by signal
+    # It reached running before a newer deploy replaced it: a success.
+    "superseded": "succeeded",
 }
 
 
@@ -683,21 +687,32 @@ def deployment_status(request: HttpRequest, guid: str) -> JsonResponse:
       * ``cancelled``  — deployment was aborted.
       * ``pending`` / ``deploying`` — in-progress (not terminal).
 
-    The ``status`` field preserves the raw Deployment.Status value for
-    callers that need the platform-native vocabulary.
+    The ``status`` field carries the platform-native vocabulary, except that
+    a deploy a newer one stopped mid-flight (stored FAILED) reads
+    ``superseded``; ``superseded`` is true for it and for a deploy a newer
+    one replaced after it ran. ``reason`` is the one-line why.
     """
     token, deployment, err = _resolve_deploy_token_for_deployment(request, guid)
     if err is not None:
         return err
 
-    raw_status = deployment.status
-    cli_state = _STATUS_TO_CLI_STATE.get(raw_status, raw_status)
+    from astrolift_lifecycle.schema.types import deployment_status_reason
+    from astrolift_lifecycle.supersede import display_status, is_superseded_failure
+
+    stopped_by_newer = is_superseded_failure(deployment.status, deployment.aborted_reason)
+    # A deploy a newer one stopped mid-flight is terminal but not broken:
+    # ``cancelled`` keeps older CLIs terminal, ``superseded`` says why.
+    cli_state = (
+        "cancelled" if stopped_by_newer else _STATUS_TO_CLI_STATE.get(deployment.status, deployment.status)
+    )
 
     return JsonResponse(
         {
             "deployment_id": str(deployment.guid),
             "state": cli_state,  # CLI polls this field for terminal detection
-            "status": raw_status,  # platform-native value preserved
+            "status": display_status(deployment.status, deployment.aborted_reason),
+            "superseded": stopped_by_newer or deployment.status == "superseded",
+            "reason": deployment_status_reason(deployment),
             "image_tag": deployment.image_tag,
             "commit_sha": deployment.commit_sha,
             "branch": deployment.branch,
