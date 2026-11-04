@@ -865,6 +865,28 @@ class KubernetesDynamicClient:
         net_v1 = self._client_module.NetworkingV1Api(self._api_client)
         return net_v1.list_namespaced_ingress(namespace, **kwargs)
 
+    def merge_patch_service_annotations(
+        self,
+        *,
+        namespace: str,
+        name: str,
+        annotations: dict[str, str],
+    ) -> dict[str, Any]:
+        """JSON merge patch of only ``metadata.annotations`` on a namespaced Service.
+
+        The body is ``{"metadata": {"annotations": <annotations>}}``: the keys
+        given are set and every other field and annotation is left alone.
+        Returns the patched object as a dict."""
+        self._refresh_token()
+        resource = self._resource_for("v1", "Service")
+        result = resource.patch(
+            name=name,
+            namespace=namespace,
+            body={"metadata": {"annotations": dict(annotations)}},
+            content_type="application/merge-patch+json",
+        )
+        return self._to_dict(result)
+
     def merge_patch_ingress(
         self,
         *,
