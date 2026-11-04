@@ -36,7 +36,7 @@ Wire protocol
       "image_tags":    {"web": "abc1234", "worker": "abc1234"},
       "commit_sha":    "abc1234abcdef...",       # ≥ 40 hex chars
       "branch":        "main",
-      "environment":   "production",
+      "environment":   "production",            # optional: the only non-preview env
       "trigger_kind":  "ci",                    # or "manual_cli"
       "idempotency_key": ""                     # optional
     }
@@ -82,7 +82,7 @@ from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from astrolift_lifecycle.ci_deploy import CiDeployError, parse_request
+from astrolift_lifecycle.ci_deploy import CiDeployError, non_preview_environment_names, parse_request
 from astrolift_lifecycle.deploy_tokens import PLAINTEXT_PREFIX, verify_token
 
 log = logging.getLogger("astrolift_lifecycle.cli_views")
@@ -309,13 +309,22 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
             status=409,
         )
 
-    # Environment default (#1220): the managed workflows don't render an
-    # environment name (it would go stale on rename). When the caller
-    # omits it and the app has exactly one active environment, that env
-    # is unambiguous — use it. Multi-env apps still get the explicit
-    # validate_environment error telling them to specify.
-    if not str(body.get("environment") or "").strip() and len(registered_envs) == 1:
-        body["environment"] = registered_envs[0]
+    # Environment default (#1220, #2635): a request that names no
+    # environment means the app's only non-preview one. Workflows rendered
+    # before template v13 never name one, and a preview, live or torn down,
+    # keeps a live environment, so counting previews refused them. With
+    # none or several the caller has to name one.
+    if not str(body.get("environment") or "").strip():
+        candidates = non_preview_environment_names(app)
+        if len(candidates) != 1:
+            found = (
+                f"{len(candidates)} environments ({', '.join(candidates)})"
+                if candidates
+                else "no environment besides its previews"
+            )
+            detail = f'environment is required: app {app_slug!r} has {found}; name one in "environment"'
+            return JsonResponse({"detail": detail}, status=400)
+        body["environment"] = candidates[0]
 
     try:
         ci_req = parse_request(
