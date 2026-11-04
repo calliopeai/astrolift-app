@@ -272,6 +272,22 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     return False
 
 
+def token_scope_hint(permission: str) -> str:
+    """How to get ``permission`` once a token's scopes refused it, or "" (#2578).
+
+    ``audit_log.read`` gates the event feed ``astro app events`` reads, and no
+    scope but ``admin`` carries it, so the CLI's default sign-in is refused it
+    whatever the account's roles hold. The default sign-in keeps its scopes;
+    the refusal says how to get this one.
+    """
+    if permission != "audit_log.read":
+        return ""
+    return (
+        "Only the admin scope carries it: sign in with astro auth login --scope admin, "
+        "which only the platform operator can approve, or use an API token with the admin scope"
+    )
+
+
 # Permissions the SCM scopes grant only at the token's own organization.
 _ORG_ONLY_SCOPE_PERMISSIONS = frozenset({"scm.read", "scm.write"})
 

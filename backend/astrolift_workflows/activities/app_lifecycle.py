@@ -359,7 +359,10 @@ async def provision_registry_repo(registered_app_id: int) -> str:
 
 def _resync_manifest_for_deploy_sync(deployment_id: int) -> dict:
     from astrolift_lifecycle.models import Deployment
-    from astrolift_registry.services.manifest_sync import resync_app_manifest_from_repo
+    from astrolift_registry.services.manifest_sync import (
+        materialize_stored_manifest,
+        resync_app_manifest_from_repo,
+    )
 
     deployment = Deployment.objects.select_related("registered_app").get(pk=deployment_id)
     app = deployment.registered_app
@@ -383,9 +386,16 @@ def _resync_manifest_for_deploy_sync(deployment_id: int) -> dict:
         ]
     )
 
+    # A failed fetch leaves the stored manifest to deploy (#2578). An app whose
+    # workloads were never created from it gets them here; when nothing can
+    # stand in for the repo's manifest, the refusal says why.
+    error = result.error or ""
+    if result.status == "fetch_failed" and not app.workloads.filter(deleted_at__isnull=True).exists():
+        error = "; ".join(part for part in (error, materialize_stored_manifest(app)) if part)
+
     return {
         "status": result.status,
-        "error": result.error or "",
+        "error": error,
         "app_slug": app.slug,
         # Zero workloads after a refused resync is the shape of the bug in
         # #1553: the deploy would go green having deployed nothing. The
@@ -407,7 +417,8 @@ async def resync_manifest_for_deploy(deployment_id: int) -> dict:
     raises. ``applied``/``in_sync`` proceed with fresh state; ``diverged``
     keeps the operator's staged draft (clobbering it is the destructive
     sync's job, not a deploy's); ``fetch_failed`` logs loudly and the
-    deploy proceeds with the last-known-good registration.
+    deploy proceeds with the last-known-good registration, whose workloads
+    are created from its stored manifest if they never were (#2578).
     """
     from asgiref.sync import sync_to_async
 
