@@ -8,7 +8,7 @@ async-timeout = "*"
 psycopg2-binary = "*"
 redis = "*"
 whitenoise = "*"   # Serves Django static assets from the app server (e.g. /static/admin/css/*) without a separate static-asset host
-authlib = "==1.6.9" # Required for Auth0
+authlib = "==1.9.1" # Required for Auth0
 boto3 = "==1.43.71"
 cachetools = "==5.3.1"
 python-dotenv = "*"
