@@ -5861,8 +5861,7 @@
     "title": "モジュール",
     "description": "この組織向けのオプション連携です。インストール管理者は、すべての組織で強制的にオフにできます。",
     "loadError": "モジュールを読み込めませんでした",
-    "installOff": "このインストールではオフです",
-    "licenceWithheld": "このインストールのライセンスに含まれていません",
+    "none": "このインストールで利用できるモジュールはありません。",
     "licenceTurnedOff": "ライセンスに含まれなくなったときにオフになりました。組織管理者が再びオンにできます。",
     "enable": "{module} を有効にする",
     "disable": "{module} を無効にする",
@@ -5872,7 +5871,7 @@
     "items": {
       "chat_studio_integration": {
         "label": "Chat Studio 連携",
-        "description": "Chat Studio が builder API 経由でこの組織のアプリにアクセスできるようにします。"
+        "description": "Chat Studio が builder API 経由でこの組織にアプリをデプロイできるようにします。"
       },
       "agent_live_attach": {
         "label": "エージェントへのライブ接続",

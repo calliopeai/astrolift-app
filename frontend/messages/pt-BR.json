@@ -5861,8 +5861,7 @@
     "title": "Módulos",
     "description": "Integrações opcionais para esta organização. Um admin da instalação ainda pode desativar uma delas para todas as organizações.",
     "loadError": "Não foi possível carregar os módulos",
-    "installOff": "Desativado nesta instalação",
-    "licenceWithheld": "Não incluído na licença desta instalação",
+    "none": "Nenhum módulo está disponível nesta instalação.",
     "licenceTurnedOff": "Desativado quando a licença deixou de incluí-lo. Um administrador da organização pode reativá-lo.",
     "enable": "Ativar {module}",
     "disable": "Desativar {module}",
@@ -5872,7 +5871,7 @@
     "items": {
       "chat_studio_integration": {
         "label": "Integração com o Chat Studio",
-        "description": "Permite que o Chat Studio acesse os apps desta organização pela API de builder."
+        "description": "Permite que o Chat Studio implante apps nesta organização pela API de builder."
       },
       "agent_live_attach": {
         "label": "Conexão ao vivo com agentes",

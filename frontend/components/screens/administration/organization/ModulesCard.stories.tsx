@@ -2,10 +2,11 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import {
   modules,
-  modulesAllOff,
+  modulesFreshInstall,
   modulesLicence,
   modulesLoading,
   modulesLong,
+  modulesNone,
   modulesReadOnly,
 } from "./fixtures";
 import { ModulesCard } from "./ModulesCard";
@@ -19,12 +20,16 @@ export default meta;
 
 type Story = StoryObj<typeof ModulesCard>;
 
+/** An install that offers the Chat Studio integration keeps its switch. */
 export const Full: Story = {};
 
 export const Loading: Story = { args: modulesLoading };
 
-/** Every module off and forced off by the install. */
-export const Empty: Story = { args: modulesAllOff };
+/** A new install does not offer the Chat Studio integration, so it is not listed (#2551). */
+export const FreshInstall: Story = { args: modulesFreshInstall };
+
+/** The install offers no module. */
+export const Empty: Story = { args: modulesNone };
 
 /** A viewer without org.update: every switch is read-only. */
 export const ReadOnly: Story = { args: modulesReadOnly };
@@ -32,7 +37,7 @@ export const Error: Story = {
   args: { error: { name: "Error", message: "Permission denied while loading this section" } },
 };
 
-/** A module the licence withholds, and one it turned off before granting it again. */
+/** A module the licence turned off before granting it again. */
 export const Licence: Story = { args: modulesLicence };
 
 export const Pending: Story = { args: { ...modules, pendingKey: "chat_studio_integration" } };
