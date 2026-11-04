@@ -38,6 +38,7 @@ CACHE_SECONDS = 60
 
 _APP_KIND = "github_app_install"
 _INSTALL_STEP = "Providers → Source → Connect to GitHub → Install Astrolift on a GitHub org"
+_RELINK_STEP = "Install on GitHub in this row's actions"
 
 
 class Status(enum.Enum):
@@ -68,14 +69,31 @@ def _on(login: str) -> str:
     return f" on {login}" if login else ""
 
 
-def _install_hint(login: str) -> str:
+def can_relink(row: Any) -> bool:
+    """Whether the row's own Install on GitHub action applies: a registered App
+    on github.com with an account, whose install flow can store the
+    installation back on this row (auth1.scm_app_manifest). The Source page
+    offers the action by the same rule."""
+    from astrolift_scm.providers import github_app
+
+    return (
+        row.kind == _APP_KIND
+        and bool(row.oauth_client_id and row.account_login)
+        and github_app._api_base(row) == github_app.GITHUB_API_DEFAULT
+    )
+
+
+def _install_hint(row: Any) -> str:
+    login = row.account_login or ""
+    if can_relink(row):
+        return f"Use {_RELINK_STEP}, and pick {login} on GitHub."
     return f"Install it under {_INSTALL_STEP}" + (f", with {login} as the org." if login else ".")
 
 
-def _gone(login: str) -> Verdict:
+def _gone(row: Any) -> Verdict:
     return Verdict(
         Status.INSTALLATION_MISSING,
-        f"GitHub no longer has this App's installation{_on(login)}. {_install_hint(login)}",
+        f"GitHub no longer has this App's installation{_on(row.account_login or '')}. {_install_hint(row)}",
     )
 
 
@@ -87,12 +105,12 @@ def stored_verdict(row: Any) -> Verdict | None:
         if row.kind == _APP_KIND and not row.installation_id:
             return Verdict(
                 Status.INSTALLATION_MISSING,
-                f"The install{_on(login)} never finished, so there is no installation. {_install_hint(login)}",
+                f"The install{_on(login)} never finished, so there is no installation. {_install_hint(row)}",
             )
         return Verdict(Status.INACTIVE, "Inactive in Astrolift.")
     if row.is_orphaned:
         if row.kind == _APP_KIND:
-            return _gone(login)
+            return _gone(row)
         return Verdict(Status.INACTIVE, f"Orphaned: {row.orphaned_reason or 'no reason recorded'}.")
     if row.kind != _APP_KIND:
         return Verdict(Status.ACTIVE)
@@ -115,11 +133,11 @@ def check_installation(row: Any) -> Verdict:
         if exc.code == "INCOMPLETE_CONFIG":
             return Verdict(
                 Status.INSTALLATION_MISSING,
-                f"GitHub has no installation of this App{_on(login)}. {_install_hint(login)}",
+                f"GitHub has no installation of this App{_on(login)}. {_install_hint(row)}",
             )
         if exc.http_status == 404:
             # installation_token has orphaned the row: the recorded installation is gone.
-            return _gone(login)
+            return _gone(row)
         if exc.http_status in (401, 403):
             return Verdict(
                 Status.INACTIVE,

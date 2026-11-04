@@ -35,6 +35,10 @@ URL carries ``purpose=factory_gate``: one GitHub organization, organization
 Members read and nothing else, no webhook, no user OAuth. Its row is a
 ``github_factory_gate_app`` connection; see ``astrolift_scm.services.factory_gate``.
 
+A start URL carrying ``connection=<guid>`` re-links that App connection
+(#2601): GitHub's install page for its App, then the installation id GitHub
+confirms on the row's account goes back on the same row.
+
 Refs:
   https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest
 
@@ -73,13 +77,16 @@ from django.views.decorators.http import require_GET
 from astrolift_identity.models import Member
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.scopes import require_scm_connect
-from astrolift_scm.services import factory_gate
+from astrolift_scm.services import connection_status, factory_gate
+from core.mutations import AuditEntry, emit_audit
 from core.permissions import Permission, route_auth
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
 logger = logging.getLogger(__name__)
 
 GITHUB_API_DEFAULT = "https://api.github.com"
+
+RELINK = "scm.github_app.relink"
 
 # Prefix for the ``display_name`` we stamp on a fully-created GitHub-App
 # connection ("GitHub App: <slug>"). The App's URL slug is only persisted
@@ -688,6 +695,162 @@ def _finish_factory_gate_registration(
 
 
 # ---------------------------------------------------------------------------
+# Re-link (#2601): install a connection's App on that connection's account
+# again and keep the row. Its guid is in the App's webhook URL and in the
+# webhook installations and trigger tokens that point at it; replacing the
+# row, as Connect to GitHub does, loses them.
+# ---------------------------------------------------------------------------
+
+
+def _start_relink(request: HttpRequest, *, org_id: int, raw_guid: str, return_to: str) -> HttpResponseRedirect:
+    """Send the browser to GitHub's install page for the App of the active
+    organization's connection ``raw_guid``. The install state carries the
+    row's guid, so the return stores the installation on that row."""
+    try:
+        guid = uuid.UUID(raw_guid)
+    except ValueError:
+        return _redirect_with_error(return_to, "connection_missing")
+    connection = SourceConnection.objects.filter(
+        organization_id=org_id, guid=guid, kind="github_app_install", deleted_at__isnull=True
+    ).first()
+    if connection is None:
+        return _redirect_with_error(return_to, "connection_missing")
+    slug = _app_slug_from_connection(connection)
+    if not (
+        connection_status.can_relink(connection)
+        and bytes(connection.secret_ciphertext)
+        and _validate_gh_slug(slug)
+    ):
+        return _redirect_with_error(return_to, "relink_unavailable")
+
+    install_state = secrets.token_urlsafe(24)
+    request.session["scm_github_install_state"] = {
+        "state": install_state,
+        "connection_guid": str(connection.guid),
+        "return_to": return_to,
+        "relink": True,
+    }
+    request.session.save()
+    return HttpResponseRedirect(
+        f"https://github.com/apps/{urllib.parse.quote(slug)}/installations/new"
+        f"?state={urllib.parse.quote(install_state)}"
+    )
+
+
+def _relink_installation(
+    request: HttpRequest, connection: SourceConnection, installation_id: str, *, setup_action: str
+) -> str | None:
+    """Store ``installation_id`` on ``connection`` once GitHub, asked with the
+    App's own key, confirms it is this App's installation on the connection's
+    account, and no other organization's connection holds it. The id arrives
+    in the browser's redirect, so it is checked, not trusted. ``update`` is
+    what GitHub sends when the App was already installed on the account. A
+    refusal leaves the row as it was. Returns an error code for the redirect,
+    or None."""
+    from astrolift_scm.providers import github_app as gh_app
+
+    def audit(
+        decision: str = "ALLOW", error_code: str | None = None, error_message: str | None = None, **extra: Any
+    ) -> None:
+        emit_audit(
+            AuditEntry(
+                actor_user_id=request.user.pk,
+                organization_id=connection.organization_id,
+                action=RELINK,
+                decision=decision,
+                target_kind="source_connection",
+                target_id=str(connection.guid),
+                duration_ms=0,
+                permissions=(Permission.SCM_CONNECT,),
+                error_code=error_code,
+                error_message=error_message,
+                extra={
+                    "app_id": connection.oauth_client_id,
+                    "account_login": connection.account_login,
+                    "installation_id": installation_id,
+                    "setup_action": setup_action,
+                    **extra,
+                },
+            )
+        )
+
+    if setup_action not in ("install", "update") or not installation_id.isdigit():
+        return "install_incomplete"
+    try:
+        jwt_token = gh_app._mint_jwt(
+            connection.app_client_id or connection.oauth_client_id, gh_app._decrypt_pem(connection)
+        )
+    except Exception:  # noqa: BLE001 -- an unusable key is reported, never raised
+        audit(error_code="KEY_UNUSABLE", error_message="the stored key cannot sign for the App")
+        return "install_unconfirmed"
+    installation, err = gh_app.fetch_installation(gh_app._api_base(connection), jwt_token, installation_id)
+    if err is not None and err.http_status != 404:
+        audit(error_code="INSTALLATION_UNCONFIRMED", error_message=err.message)
+        return "install_unconfirmed"
+    # GitHub answers 404 for an installation of any other App.
+    installed_on = str((installation.get("account") or {}).get("login") or "")
+    if (
+        err is not None
+        or str(installation.get("app_id") or "") != connection.oauth_client_id
+        or installed_on.lower() != connection.account_login.lower()
+    ):
+        audit(
+            "DENY",
+            "WRONG_INSTALLATION",
+            f"installation {installation_id} is not this App's installation on {connection.account_login}",
+            installed_on=installed_on,
+        )
+        return "install_wrong_account"
+    if (
+        SourceConnection.objects.filter(
+            kind="github_app_install", installation_id=installation_id, deleted_at__isnull=True
+        )
+        .exclude(organization_id=connection.organization_id)
+        .exists()
+    ):
+        audit(
+            "DENY",
+            "INSTALLATION_IN_USE",
+            f"installation {installation_id} is held by another organization's connection",
+            installed_on=installed_on,
+        )
+        return "install_in_use"
+
+    previous = connection.installation_id
+    connection.installation_id = installation_id[:64]
+    connection.is_active = True
+    connection.is_orphaned = False
+    connection.orphaned_at = None
+    connection.orphaned_reason = ""
+    # save() moves the row version, and connection_status keys its 60 s
+    # verdict by version, so the next load checks GitHub again.
+    connection.save()
+    audit(installed_on=installed_on, previous_installation_id=previous)
+    return None
+
+
+def _finish_relink(
+    request: HttpRequest, pending: dict[str, Any], *, installation_id: str, setup_action: str
+) -> HttpResponseRedirect:
+    """GitHub's return from a re-link start, through the setup URL or, for an
+    App that asks for user authorization on install, the OAuth callback. Its
+    OAuth code is not redeemed: a re-link puts the installation back, and
+    Connect my GitHub stays the way to a user token."""
+    return_to = _safe_return_to(pending.get("return_to"))
+    connection = SourceConnection.objects.filter(
+        guid=pending.get("connection_guid", ""), kind="github_app_install", deleted_at__isnull=True
+    ).first()
+    if connection is None:
+        return _redirect_with_error(return_to, "connection_missing")
+    if _active_org_id(request) != connection.organization_id:
+        return _redirect_with_error(return_to, "org_mismatch")
+    err = _relink_installation(request, connection, installation_id, setup_action=setup_action)
+    if err is not None:
+        return _redirect_with_error(return_to, err)
+    return _redirect_with_ok(return_to, connection.display_name or "GitHub App")
+
+
+# ---------------------------------------------------------------------------
 # Views
 # ---------------------------------------------------------------------------
 
@@ -716,6 +879,10 @@ def github_app_manifest_start(request: HttpRequest) -> Any:
     org_id = _active_org_id(request)
     if org_id is None:
         return _redirect_with_error(return_to, "no_org")
+
+    relink_guid = (request.GET.get("connection") or "").strip()
+    if relink_guid:
+        return _start_relink(request, org_id=org_id, raw_guid=relink_guid, return_to=return_to)
 
     if request.GET.get("purpose") == factory_gate.PURPOSE:
         return _start_factory_gate(request, org_id=org_id, gh_org=gh_org, return_to=return_to)
@@ -997,6 +1164,8 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
     active so the repo-listing path picks it up. Any other value of
     ``setup_action`` (e.g. ``request`` from a private-App "request
     install" flow) leaves the row inactive and surfaces an info toast.
+    A re-link also takes ``update`` and confirms the id with GitHub
+    (``_relink_installation``).
     """
     require_scm_connect()
     state_in = request.GET.get("state", "")
@@ -1009,6 +1178,9 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
 
     if not state_in or not secrets.compare_digest(state_in, pending["state"]):
         return _redirect_with_error(return_to, "state_mismatch")
+
+    if pending.get("relink"):
+        return _finish_relink(request, pending, installation_id=installation_id, setup_action=setup_action)
 
     purpose = pending.get("purpose") or ""
     connection = SourceConnection.objects.filter(

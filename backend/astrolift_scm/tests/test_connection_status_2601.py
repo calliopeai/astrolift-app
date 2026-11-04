@@ -218,8 +218,8 @@ def test_an_app_with_no_installation_on_its_account_reads_installation_missing(o
     assert row["isActive"] is True
     assert row["status"] == "INSTALLATION_MISSING"
     assert row["statusDetail"] == (
-        "GitHub has no installation of this App on ConflictHQ. Install it under Providers → Source → "
-        "Connect to GitHub → Install Astrolift on a GitHub org, with ConflictHQ as the org."
+        "GitHub has no installation of this App on ConflictHQ. Use Install on GitHub in this row's actions, "
+        "and pick ConflictHQ on GitHub."
     )
     assert github.mints() == []
 

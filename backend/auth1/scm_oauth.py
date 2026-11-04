@@ -325,7 +325,7 @@ def github_callback(request: HttpRequest) -> Any:
     installation_id = (request.GET.get("installation_id") or "").strip()
     setup_action = (request.GET.get("setup_action") or "").strip()
 
-    if installation_id and setup_action == "install":
+    if installation_id and setup_action in ("install", "update"):
         return _github_install_time_callback(request)
 
     # ── Regular path ────────────────────────────────────────────────────
@@ -407,14 +407,25 @@ def _github_install_time_callback(request: HttpRequest) -> Any:
 
     This combines what previously required two separate operator actions
     (install App → then click 'Connect') into a single callback trip.
+
+    A re-link (#2601) goes to ``scm_app_manifest._finish_relink``, which also
+    takes ``setup_action=update``; any other install refuses ``update``.
     """
     code = request.GET.get("code", "")
     installation_id = (request.GET.get("installation_id") or "").strip()
+    setup_action = (request.GET.get("setup_action") or "").strip()
 
     pending = request.session.pop("scm_github_install_state", None)
     if not pending:
         return _redirect_with_error("/settings/source-providers", "no_pending_install_state")
     return_to = _safe_return_to(pending.get("return_to"))
+
+    if pending.get("relink"):
+        from auth1.scm_app_manifest import _finish_relink
+
+        return _finish_relink(request, pending, installation_id=installation_id, setup_action=setup_action)
+    if setup_action != "install":
+        return _redirect_with_error(return_to, "install_incomplete")
 
     if not code:
         return _redirect_with_error(return_to, "no_code")
