@@ -16,9 +16,9 @@ import pytest
 
 from astrolift_operations.models import AuditEvent
 from astrolift_registry.models import RegisteredApp
-from astrolift_registry.schema.mutations.source import _followed_source_url
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.services.secrets import PushSecretsResult, ValidateCiSecretsResult
+from astrolift_scm.services.source_change import _followed_source_url
 from astrolift_scm.services.webhooks import InstallSourceWebhookResult
 from astrolift_scm.services.workflow_sync import WorkflowSyncResult
 from core.permissions import Permission
@@ -284,7 +284,7 @@ def test_the_change_stands_when_autowire_fails_and_the_old_verdicts_are_gone(wor
     def fail(app, *, actor=None):
         raise RuntimeError("worker lost")
 
-    monkeypatch.setattr("astrolift_registry.schema.mutations.source.run_autowire", fail)
+    monkeypatch.setattr("astrolift_scm.services.source_change.run_autowire", fail)
     _grant(world)
 
     out = _set_source(world, world.medops_app, NEW)
@@ -302,7 +302,7 @@ def test_the_change_stands_when_autowire_fails_and_the_old_verdicts_are_gone(wor
 
 
 def test_a_registration_racing_the_change_is_a_conflict_not_an_internal_error(world, monkeypatch, wiring):
-    import astrolift_registry.schema.mutations.source as source
+    import astrolift_scm.services.source_change as source
 
     def raced(organization_id, repo):
         RegisteredApp.objects.filter(pk=world.platform_app.pk).update(source_repo=NEW)
