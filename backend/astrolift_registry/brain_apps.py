@@ -13,8 +13,9 @@ injected through ``envFrom`` like every other platform Secret:
 * ``BRAIN_TOKEN_HEADER`` and ``BRAIN_TOKEN``, a read token the cluster edge
   admits to that brain only (``brain_tokens``), whose subject is the app.
 
-The token is signed by a key of the binding's own, minted once per deploy,
-so a redeploy rotates it. The previous deploy's key stays published, since
+The token is signed by a key of the binding's own, taken off standby once per
+deploy (#2649), so a redeploy rotates it and the edge already holds the new
+one. The previous deploy's key stays published, since
 pods of the release being replaced still carry its token; the one before is
 deleted. Deleting the binding, the app or the brain unpublishes every key of
 the binding, and the edge stops admitting the app within its JWKS cache.
@@ -144,12 +145,13 @@ def deployment_brain_secret(deployment: Any) -> str | None:
 
 
 def _deployment_key(binding: BrainAppBinding, deployment: Any) -> BrainTokenKey:
-    """This deployment's key, minted on first use. Re-running a deploy step
-    reuses it, so only a new deploy rotates."""
+    """This deployment's key, taken from the standby keys on first use, so the
+    edge already holds it when the new pods start (#2649). Re-running a deploy
+    step reuses it, so only a new deploy rotates."""
     from django.db import transaction
 
     from astrolift_lifecycle.models import Deployment
-    from astrolift_registry.brain_tokens import _new_key
+    from astrolift_registry.brain_tokens import claim_key
 
     with transaction.atomic():
         BrainAppBinding.objects.select_for_update().filter(pk=binding.pk).first()
@@ -169,7 +171,7 @@ def _deployment_key(binding: BrainAppBinding, deployment: Any) -> BrainTokenKey:
         ]
         if stale:
             BrainTokenKey.objects.filter(pk__in=stale).delete()
-        return _new_key(binding=binding, deployment=deployment)
+        return claim_key(binding=binding, deployment=deployment)
 
 
 def issue_app_token(binding: BrainAppBinding, deployment: Any, *, now: dt.datetime | None = None) -> str:

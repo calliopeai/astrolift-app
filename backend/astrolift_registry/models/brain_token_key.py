@@ -15,6 +15,10 @@ binding and brain are live.
 
 ``typed_contract`` marks a hosted-app deployment key that signed a typed
 token (#2470): while one is published, the brain's consumer stays staged.
+
+A ``standby`` key is published but owned by nothing and has signed nothing
+(#2649). A run binding or a deploy takes one instead of minting a key, so the
+edge already holds it when the first token it signs arrives.
 """
 
 from __future__ import annotations
@@ -52,6 +56,7 @@ class BrainTokenKey(BaseCoreModel):
         on_delete=models.CASCADE,
     )
     typed_contract = models.CharField(max_length=8, blank=True, default="", db_default="")
+    standby = models.BooleanField(default=False, db_default=False)
 
     def __str__(self) -> str:
         return f"BrainTokenKey({self.kid})"

@@ -125,7 +125,7 @@ def test_the_jwks_is_public_and_never_empty():
     assert response.status_code == 200
     keys = response.json()["keys"]
     assert keys and keys[0]["alg"] == "ES256" and "d" not in keys[0]
-    assert BrainTokenKey.objects.count() == 1
+    assert BrainTokenKey.objects.filter(standby=False).count() == 1
 
 
 def test_mcp_connect_brain_returns_the_descriptor_or_not_found(world):

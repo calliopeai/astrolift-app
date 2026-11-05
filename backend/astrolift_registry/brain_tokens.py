@@ -51,6 +51,13 @@ TYPED_CLAIMS = frozenset({"contract", "sub_kind", "org", "teams", "agent", "app"
 #: shared contract guarantees. A token past either is refused, never trimmed.
 MAX_TYPED_TEAMS = 64
 MAX_TYPED_TOKEN_BYTES = 8192
+#: How long the cluster edge keeps the JWKS it fetched: Envoy Gateway's
+#: ``remoteJWKS.cacheDuration`` default, which ``brain_mcp_route`` leaves
+#: unset. Envoy never refetches for an unknown ``kid``, so it refuses a token
+#: whose key is younger than this until its next fetch (#2649).
+EDGE_JWKS_CACHE = dt.timedelta(minutes=5)
+#: Published keys kept on standby for runs and deploys to sign with (#2649).
+STANDBY_KEYS = 16
 
 
 class BrainTokenError(Exception):
@@ -228,7 +235,7 @@ def signing_key(*, now: dt.datetime | None = None) -> BrainTokenKey:
     with transaction.atomic():
         live = list(
             BrainTokenKey.objects.select_for_update()
-            .filter(retired_at__isnull=True, binding__isnull=True, run_binding__isnull=True)
+            .filter(retired_at__isnull=True, binding__isnull=True, run_binding__isnull=True, standby=False)
             .order_by("-created_at")
         )
         current = live[0] if live and live[0].created_at > now - KEY_SIGNING_LIFETIME else None
@@ -239,11 +246,52 @@ def signing_key(*, now: dt.datetime | None = None) -> BrainTokenKey:
         return current or _new_key()
 
 
+def ensure_standby() -> None:
+    """Keep ``STANDBY_KEYS`` keys on standby: published, owned by nothing,
+    never used to sign."""
+    for _ in range(STANDBY_KEYS - BrainTokenKey.objects.filter(standby=True).count()):
+        _new_key(standby=True)
+
+
+def claim_key(*, now: dt.datetime | None = None, **owner: Any) -> BrainTokenKey:
+    """A key of ``owner``'s own (``run_binding``, or a hosted app's ``binding``
+    and ``deployment``): the oldest standby key, which every edge holds once
+    it is ``EDGE_JWKS_CACHE`` old, so the first token it signs is admitted.
+    A new key only when none is on standby. ``SKIP LOCKED``: two spawns never
+    take the same key. Another key goes on standby in its place."""
+    import logging
+
+    now = now or timezone.now()
+    with transaction.atomic():
+        key = (
+            BrainTokenKey.objects.select_for_update(skip_locked=True)
+            .filter(standby=True)
+            .order_by("created_at", "pk")
+            .first()
+        )
+        if key is None:
+            key = _new_key(**owner)
+        else:
+            for name, value in owner.items():
+                setattr(key, name, value)
+            key.standby = False
+            key.save(update_fields=[*owner, "standby", "updated_at", "version"])
+        if key.created_at > now - EDGE_JWKS_CACHE:
+            logging.getLogger(__name__).warning(
+                "brain token key %s was published less than %ss ago; the edge may refuse its tokens "
+                "until its next JWKS fetch",
+                key.kid,
+                int(EDGE_JWKS_CACHE.total_seconds()),
+            )
+        ensure_standby()
+    return key
+
+
 def jwks(*, now: dt.datetime | None = None) -> dict[str, Any]:
     """The public keys the edge verifies against: the live ones and those
-    retired within ``KEY_PUBLISHED_AFTER_RETIREMENT``, the keys of every
-    live hosted-app binding (#2243), and those of every agent run's live
-    binding to a brain (#2432)."""
+    retired within ``KEY_PUBLISHED_AFTER_RETIREMENT``, the standby keys
+    (#2649), the keys of every live hosted-app binding (#2243), and those of
+    every agent run's live binding to a brain (#2432)."""
     from django.db.models import Q
 
     from astrolift_registry.brain_apps import live_binding_keys

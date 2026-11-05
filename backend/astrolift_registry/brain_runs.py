@@ -5,9 +5,10 @@ the agent's manifest) and the ones the launch asks for (``brainSlugs``), each
 as that person. Its tokens are the ones ``issueBrainReadToken`` issues
 (``brain_tokens.issue``: 15 minutes, subject the person, audience the brain)
 with the run's ``agent_task`` claim, signed by a key of the run's own binding
-to the brain (``BrainRunBinding``). That key is published only while the run
-is in flight, so revoking a binding stops the edge admitting the run's token
-within the JWKS cache rather than at its expiry.
+to the brain (``BrainRunBinding``). That key comes off standby (#2649), so the
+edge already holds it at spawn; from then on it is published only while the
+run is in flight, so revoking a binding stops the edge admitting the run's
+token within the JWKS cache rather than at its expiry.
 
 The run gets its first tokens in its environment at spawn and fresh ones
 from :func:`refresh`, over its callback key. The launch, the spawn, every
@@ -425,14 +426,15 @@ def recheck(task) -> list[BrainRunBinding]:
 
 
 def _binding_key(row: BrainRunBinding) -> BrainTokenKey:
-    """The key ``row``'s tokens are signed with, made on first use."""
-    from astrolift_registry.brain_tokens import _new_key
+    """The key ``row``'s tokens are signed with, taken from the standby keys on
+    first use, so the edge already holds it (#2649)."""
+    from astrolift_registry.brain_tokens import claim_key
 
     with transaction.atomic():
         locked = BrainRunBinding.objects.select_for_update().get(pk=row.pk)
         if locked.revoked_at is not None:
             raise BrainRunError("precondition", f"brain {row.slug!r}: {locked.revoked_reason}")
-        return BrainTokenKey.objects.filter(run_binding=locked).first() or _new_key(run_binding=locked)
+        return BrainTokenKey.objects.filter(run_binding=locked).first() or claim_key(run_binding=locked)
 
 
 def _subject(row: BrainRunBinding, task):
