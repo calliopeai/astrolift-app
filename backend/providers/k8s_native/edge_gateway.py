@@ -29,12 +29,21 @@ three that are easy to undo by accident:
   never set.
 * The raw ID token travels between those two filters on an internal
   header, which every route removes before the request reaches the app.
+
+Timeouts (#2651): with none of our own, Envoy's 15 s route timeout spans
+the whole response, so every stream and every slow answer was cut at 15 s,
+and the ALB in front idled out at 60 s. Every app route now names its
+request timeout (none by default), and silence is bounded instead: the
+listener's stream idle timeout and the ALB's idle timeout, both
+:data:`EDGE_IDLE_TIMEOUT_SECONDS`.
 """
 
 from __future__ import annotations
 
 import base64
 import hashlib
+import logging
+import os
 import re
 from typing import Any
 
@@ -96,6 +105,69 @@ CALLBACK_PATH = "/oauth2/callback"
 LOGOUT_PATH = "/oauth2/logout"
 
 _MANAGED_LABELS = {"astrolift.io/managed-by": "platform"}
+
+logger = logging.getLogger(__name__)
+
+# How long one response may take in all, on every app route (#2651). Unset,
+# Envoy Gateway leaves the route timeout to Envoy's default, 15 s, which also
+# spans a stream, so an SSE stream or an answer that waits on an AI model
+# was cut mid-response. The default, 0, is no cap (Gateway API: a zero
+# duration disables the timeout): a response may run as long as it keeps
+# sending, as behind nginx, and silence is bounded by the idle timeout
+# below. An operator who wants a cap sets whole seconds; set it on every
+# backend service (web and worker), since both render routes.
+REQUEST_TIMEOUT_ENV = "ASTROLIFT_EDGE_REQUEST_TIMEOUT_SECONDS"
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 0
+# Gateway API durations take at most five digits per unit.
+MAX_REQUEST_TIMEOUT_SECONDS = 99_999
+
+# How long a request may go without a byte either way before the edge ends
+# it, on the ALB in front and on Envoy's listener alike (#2651): a silent
+# answer gets five minutes, a stream that sends anything (an SSE ping) is
+# never cut. A constant, not a setting: the AWS Load Balancer Controller
+# refuses an ALB group whose Ingresses disagree on an attribute, and every
+# app's own rule joins its org's group, so a changed value would stop the
+# group reconciling until every app was deployed again.
+EDGE_IDLE_TIMEOUT_SECONDS = 300
+ALB_ATTRIBUTES_ANNOTATION = "alb.ingress.kubernetes.io/load-balancer-attributes"
+ALB_IDLE_TIMEOUT_ATTRIBUTE = "idle_timeout.timeout_seconds"
+
+
+def request_timeout(environ: dict[str, str] | None = None) -> str:
+    """The request timeout every app route carries, as a Gateway API duration.
+
+    From :data:`REQUEST_TIMEOUT_ENV` in whole seconds; anything that is not
+    one (empty, negative, fractional, past :data:`MAX_REQUEST_TIMEOUT_SECONDS`)
+    renders the default, with a warning, rather than a route the API server
+    would refuse on every deploy.
+    """
+    raw = str((os.environ if environ is None else environ).get(REQUEST_TIMEOUT_ENV) or "").strip()
+    seconds = DEFAULT_REQUEST_TIMEOUT_SECONDS
+    if raw:
+        if raw.isdigit() and int(raw) <= MAX_REQUEST_TIMEOUT_SECONDS:
+            seconds = int(raw)
+        else:
+            logger.warning(
+                "%s=%r is not whole seconds from 0 to %d; the edge uses %ds (0 is no cap)",
+                REQUEST_TIMEOUT_ENV,
+                raw,
+                MAX_REQUEST_TIMEOUT_SECONDS,
+                DEFAULT_REQUEST_TIMEOUT_SECONDS,
+            )
+    return f"{seconds}s"
+
+
+def alb_attributes(existing: str = "") -> str:
+    """The ALB's ``load-balancer-attributes``: whatever is set, with the edge's idle timeout.
+
+    Keeps every other attribute as written and replaces any idle timeout
+    with :data:`EDGE_IDLE_TIMEOUT_SECONDS`, so each Ingress the platform puts
+    in a group carries the same value (a group whose Ingresses disagree is
+    refused).
+    """
+    pairs = [p.strip() for p in existing.split(",") if p.strip()]
+    kept = [p for p in pairs if p.split("=", 1)[0].strip() != ALB_IDLE_TIMEOUT_ATTRIBUTE]
+    return ",".join([*kept, f"{ALB_IDLE_TIMEOUT_ATTRIBUTE}={EDGE_IDLE_TIMEOUT_SECONDS}"])
 
 
 def edge_configured(oidc_auth_config: dict[str, Any] | None) -> bool:
@@ -427,6 +499,11 @@ def edge_post_install_manifests(
                         "remove": [ID_TOKEN_HEADER, USER_HEADER, EMAIL_HEADER, DEFAULT_GATEWAY_SECRET_HEADER],
                     }
                 },
+                # Named on the listener, so Envoy Gateway keeps it for every
+                # route rather than deriving a route's idle timeout from its
+                # request timeout, which turns it off for a request timeout
+                # of 0 (#2651). Silence stays bounded, as on the ALB.
+                "timeout": {"http": {"streamIdleTimeout": f"{EDGE_IDLE_TIMEOUT_SECONDS}s"}},
             },
         ),
     ]
@@ -555,6 +632,9 @@ def alb_front(
     address, which Envoy answers 404: any status short of a 5xx means the
     proxy is up. A 500 is what a broken SecurityPolicy renders on every
     gated route, and that should fail the check.
+
+    Its idle timeout is the edge's (:func:`alb_attributes`, #2651), not the
+    ALB's 60 s default, so an answer that is silent for a minute is not cut.
     """
     zone = edge_zone(oidc_auth_config)
     if not zone:
@@ -591,6 +671,7 @@ def alb_front(
         "alb.ingress.kubernetes.io/ssl-redirect": "443",
         "alb.ingress.kubernetes.io/healthcheck-path": "/",
         "alb.ingress.kubernetes.io/success-codes": "200-499",
+        ALB_ATTRIBUTES_ANNOTATION: alb_attributes(),
     }
     if cluster_name:
         # Keep the deployment prefix required by the installer's IAM boundary.
@@ -975,6 +1056,7 @@ def brain_mcp_route(
     header_set: list[dict[str, str]],
     brain: dict[str, str],
     labels: dict[str, str],
+    timeout: str,
 ) -> list[dict[str, Any]]:
     """A brain's MCP path, admitted by its read token alone (#2320, #2526).
 
@@ -985,6 +1067,8 @@ def brain_mcp_route(
     never falls through to the app. The longer path wins over the app's
     route for the same hosts, so the rest of the brain stays behind the login.
     The token stays on the request for the container to verify again (#2441).
+    ``timeout`` is the app route's own (:func:`request_timeout`): an MCP
+    client's stream is cut no sooner than a browser's.
     """
     modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER]}
     if header_set:
@@ -998,6 +1082,7 @@ def brain_mcp_route(
                 "matches": [{"path": {"type": "PathPrefix", "value": BRAIN_MCP_PATH}}],
                 "backendRefs": [backend],
                 "filters": [{"type": "RequestHeaderModifier", "requestHeaderModifier": modifier}],
+                "timeouts": {"request": timeout},
             }
         ],
         labels=labels,
@@ -1091,7 +1176,11 @@ def render_app_routes(
     Routes live in the edge namespace, where only the platform writes; the
     ReferenceGrant in the app's namespace is what lets them reach its
     Services, and it names each Service rather than the whole namespace.
+    Every rule that reaches a Service carries the request timeout
+    (:func:`request_timeout`, none by default, #2651); a paused route
+    answers at once and needs none.
     """
+    timeout = request_timeout()
     labels = {
         "astrolift.dev/app": app_slug,
         ROUTE_NAMESPACE_LABEL: namespace,
@@ -1144,6 +1233,7 @@ def render_app_routes(
             rule = {
                 "backendRefs": [{"name": workload, "namespace": namespace, "port": port}],
                 "filters": [{"type": "RequestHeaderModifier", "requestHeaderModifier": modifier}],
+                "timeouts": {"request": timeout},
             }
             if token_route and brain:
                 out.extend(
@@ -1154,6 +1244,7 @@ def render_app_routes(
                         header_set=secret_set,
                         brain=brain,
                         labels=labels,
+                        timeout=timeout,
                     )
                 )
         out.append(_route(route_name(namespace, workload), hostnames, gated=gated, rules=[rule], labels=labels))
@@ -1189,7 +1280,9 @@ def alb_host_ingress(
     and this one keeps answering, so the host's DNS record never changes
     target and there is no window where the old ALB answers 404 for it.
 
-    Carries no authenticate-cognito annotation: the gate is Envoy's.
+    Carries no authenticate-cognito annotation: the gate is Envoy's. Carries
+    the edge's idle timeout (#2651), merged into any attributes the group
+    annotations bring: every Ingress in a group must agree on it.
     """
     ingress = _manifest(
         "networking.k8s.io/v1",
@@ -1227,6 +1320,7 @@ def alb_host_ingress(
         "alb.ingress.kubernetes.io/healthcheck-path": "/",
         "alb.ingress.kubernetes.io/success-codes": "200-499",
         **group_annotations,
+        ALB_ATTRIBUTES_ANNOTATION: alb_attributes(group_annotations.get(ALB_ATTRIBUTES_ANNOTATION, "")),
     }
     return ingress
 
@@ -1234,11 +1328,14 @@ def alb_host_ingress(
 __all__ = [
     "EDGE_COMPONENT_KEY",
     "EDGE_FRONT_LABEL",
+    "EDGE_IDLE_TIMEOUT_SECONDS",
     "EDGE_NAMESPACE",
     "EDGE_OIDC_SECRET_NAME",
     "EDGE_SERVICE_NAME",
     "GATE_LABEL",
+    "REQUEST_TIMEOUT_ENV",
     "ROUTE_NAMESPACE_LABEL",
+    "alb_attributes",
     "alb_front",
     "alb_host_ingress",
     "app_route_gated",
@@ -1248,5 +1345,6 @@ __all__ = [
     "edge_post_install_manifests",
     "edge_zone",
     "render_app_routes",
+    "request_timeout",
     "route_name",
 ]
