@@ -21297,6 +21297,20 @@ export type SetAppEdgePublicMutationVariables = Exact<{
 
 export type SetAppEdgePublicMutation = { setAppEdgePublic: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { appSlug: string, edgePublic: boolean, publicStates: Array<{ clusterSlug: string, state: string }> } | null } };
 
+export type AppCustomDomainsQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+}>;
+
+
+export type AppCustomDomainsQuery = { astroliftAppDomains: Array<{ id: string, hostname: string, isPaused: boolean, certState: string, certificateState: string }> };
+
+export type SetCustomDomainPausedMutationVariables = Exact<{
+  input: SetCustomDomainPausedInput;
+}>;
+
+
+export type SetCustomDomainPausedMutation = { setCustomDomainPaused: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, hostname: string, isPaused: boolean } | null } };
+
 export type EdgeAccessRowFieldsFragment = { id: string, appSlug: string, appName: string, teamSlug?: string | null, projectSlug?: string | null, environment: string, environmentId: string, clusterSlug: string, clusterName: string, hosts: Array<string>, restricted: boolean, groups: Array<string>, users: Array<string>, source: string, setBy?: string | null, setAt?: string | null, status: AstroliftEdgeAccessStatus, edgeChangedAt?: string | null, edgeAppliedAt?: string | null };
 
 export type EdgeAccessQueryVariables = Exact<{

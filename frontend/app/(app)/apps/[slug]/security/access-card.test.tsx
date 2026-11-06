@@ -19,10 +19,15 @@ const state = vi.hoisted(() => ({
   access: null as unknown,
   sent: [] as unknown[],
   publicReply: null as unknown,
+  domains: [] as unknown[],
+  pauseReply: null as unknown,
 }));
 
 vi.mock("@apollo/client/react", () => ({
-  useQuery: () => ({ data: { astroliftAppAccess: state.access }, loading: false }),
+  useQuery: (doc: { definitions: { name?: { value: string } }[] }) =>
+    doc.definitions[0]?.name?.value === "AppCustomDomains"
+      ? { data: { astroliftAppDomains: state.domains }, loading: false }
+      : { data: { astroliftAppAccess: state.access }, loading: false },
   useLazyQuery: () => [vi.fn(), { data: undefined }],
   useMutation: () => [
     vi.fn(async (opts: { variables: unknown }) => {
@@ -31,6 +36,7 @@ vi.mock("@apollo/client/react", () => ({
         data: {
           setAppAccess: { ok: true, errors: [] },
           setAppEdgePublic: state.publicReply,
+          setCustomDomainPaused: state.pauseReply,
         },
       };
     }),
@@ -56,6 +62,8 @@ const open = {
 beforeEach(() => {
   state.access = open;
   state.sent = [];
+  state.domains = [];
+  state.pauseReply = { ok: true, errors: [], data: null };
   state.publicReply = {
     ok: true,
     errors: [],
@@ -150,5 +158,61 @@ describe("the public switch (#2504)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("this action needs a person");
     expect(screen.queryByText("Make veruus-demo public?")).not.toBeInTheDocument();
+  });
+});
+
+describe("custom domains", () => {
+  const serving = { id: "d1", hostname: "www.example.com", isPaused: false };
+  const paused = { id: "d2", hostname: "shop.example.com", isPaused: true };
+
+  it("says so when the app has no custom domains", () => {
+    render(<AccessCard appSlug="veruus-demo" />);
+
+    expect(screen.getByText("This app has no custom domains.")).toBeInTheDocument();
+  });
+
+  it("shows each domain as serving or paused", () => {
+    state.domains = [serving, paused];
+    render(<AccessCard appSlug="veruus-demo" />);
+
+    expect(screen.getByText("www.example.com")).toBeInTheDocument();
+    expect(screen.getByText("Serving")).toBeInTheDocument();
+    expect(screen.getByText("Paused")).toBeInTheDocument();
+  });
+
+  it("asks before pausing, then sends the pause", async () => {
+    state.domains = [serving];
+    render(<AccessCard appSlug="veruus-demo" />);
+    fireEvent.click(screen.getByRole("button", { name: "Pause…" }));
+
+    expect(await screen.findByText("Pause www.example.com?")).toBeInTheDocument();
+    expect(screen.getByText(/will see a 503/)).toBeInTheDocument();
+    expect(state.sent).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Pause domain" }));
+
+    await waitFor(() => expect(state.sent).toHaveLength(1));
+    expect(state.sent[0]).toEqual({ input: { id: "d1", paused: true } });
+  });
+
+  it("resumes a paused domain without asking", async () => {
+    state.domains = [paused];
+    render(<AccessCard appSlug="veruus-demo" />);
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+
+    await waitFor(() => expect(state.sent).toHaveLength(1));
+    expect(state.sent[0]).toEqual({ input: { id: "d2", paused: false } });
+  });
+
+  it("shows the server's refusal under the list", async () => {
+    state.domains = [paused];
+    state.pauseReply = {
+      ok: false,
+      errors: [{ code: "PERMISSION_DENIED", message: "this action needs a person", field: "id" }],
+      data: null,
+    };
+    render(<AccessCard appSlug="veruus-demo" />);
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("this action needs a person");
   });
 });

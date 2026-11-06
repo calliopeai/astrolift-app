@@ -2927,6 +2927,23 @@
         "madePublic": "The app is public where its cluster allows it.",
         "madePrivate": "The app is behind the sign-in again.",
         "saveFailed": "Change failed."
+      },
+      "domains": {
+        "title": "Custom domains",
+        "description": "Each custom domain can be paused on its own. A paused domain answers visitors with a 503 until it is resumed; the app’s platform URL is not affected.",
+        "empty": "This app has no custom domains.",
+        "loadFailed": "Custom domains could not be loaded.",
+        "stateServing": "Serving",
+        "statePaused": "Paused",
+        "pause": "Pause…",
+        "resume": "Resume",
+        "saving": "Saving…",
+        "confirmTitle": "Pause {hostname}?",
+        "confirmDescription": "Visitors to this domain will see a 503 until it is resumed. You may be asked to verify it’s you.",
+        "confirm": "Pause domain",
+        "paused": "The domain is paused.",
+        "resumed": "The domain is serving again.",
+        "saveFailed": "Change failed."
       }
     },
     "members": {

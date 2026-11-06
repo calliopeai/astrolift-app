@@ -3144,6 +3144,23 @@
         "madePublic": "在集群允许的位置，应用已公开。",
         "madePrivate": "应用已恢复为需要登录。",
         "saveFailed": "更改失败。"
+      },
+      "domains": {
+        "title": "自定义域名",
+        "description": "每个自定义域名都可以单独暂停。已暂停的域名在恢复前会向访客返回 503；应用的平台 URL 不受影响。",
+        "empty": "此应用没有自定义域名。",
+        "loadFailed": "无法加载自定义域名。",
+        "stateServing": "服务中",
+        "statePaused": "已暂停",
+        "pause": "暂停…",
+        "resume": "恢复",
+        "saving": "正在保存…",
+        "confirmTitle": "暂停 {hostname}?",
+        "confirmDescription": "在恢复之前，此域名的访客将看到 503。系统可能会要求你验证身份。",
+        "confirm": "暂停域名",
+        "paused": "域名已暂停。",
+        "resumed": "域名已恢复服务。",
+        "saveFailed": "更改失败。"
       }
     },
     "members": {

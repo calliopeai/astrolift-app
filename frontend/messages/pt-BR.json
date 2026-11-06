@@ -3144,6 +3144,23 @@
         "madePublic": "O app está público onde o cluster permite.",
         "madePrivate": "O app voltou a ficar atrás do login.",
         "saveFailed": "Falha ao alterar."
+      },
+      "domains": {
+        "title": "Domínios personalizados",
+        "description": "Cada domínio personalizado pode ser pausado separadamente. Um domínio pausado responde aos visitantes com um 503 até ser retomado; a URL de plataforma do app não é afetada.",
+        "empty": "Este app não tem domínios personalizados.",
+        "loadFailed": "Não foi possível carregar os domínios personalizados.",
+        "stateServing": "Ativo",
+        "statePaused": "Pausado",
+        "pause": "Pausar…",
+        "resume": "Retomar",
+        "saving": "Salvando…",
+        "confirmTitle": "Pausar {hostname}?",
+        "confirmDescription": "Os visitantes deste domínio verão um 503 até que ele seja retomado. Pode ser solicitado que você confirme sua identidade.",
+        "confirm": "Pausar domínio",
+        "paused": "O domínio está pausado.",
+        "resumed": "O domínio voltou a ser servido.",
+        "saveFailed": "Falha na alteração."
       }
     },
     "members": {
