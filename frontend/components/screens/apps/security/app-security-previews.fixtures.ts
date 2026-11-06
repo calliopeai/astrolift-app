@@ -4,6 +4,7 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import type { AccessCardViewProps, AccessEditorViewProps } from "./AccessCard";
 import type { AppPreviewsScreenProps } from "./AppPreviewsScreen";
 import type { AppSecurityScreenProps } from "./AppSecurityScreen";
+import type { CustomDomainsViewProps } from "./CustomDomains";
 import type { PublicSwitchViewProps } from "./PublicSwitch";
 import type { AstroliftEvent } from "./use-app-security";
 
@@ -275,6 +276,29 @@ export const PUBLIC_ON: Required<PublicSwitchViewProps> = {
       { clusterSlug: "shared-eu", state: "cluster_disallows" },
     ],
   },
+};
+
+/** The custom domains: one serving, one paused, with the pause control. */
+export const DOMAINS_MIXED: Required<CustomDomainsViewProps> = {
+  domains: [
+    {
+      id: "d1",
+      hostname: "www.example.com",
+      isPaused: false,
+      certState: "active",
+      certificateState: "issued",
+    },
+    {
+      id: "d2",
+      hostname: "shop.example.com",
+      isPaused: true,
+      certState: "active",
+      certificateState: "issued",
+    },
+  ],
+  loading: false,
+  failed: false,
+  control: { pausing: null, setPausing: setter, refusal: null, saving: false, onSet: yes },
 };
 
 const PREVIEW_BASE: AstroliftPreviewEnvironment = {

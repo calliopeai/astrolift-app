@@ -757,6 +757,38 @@ export const SET_APP_EDGE_PUBLIC = gql`
   }
 `;
 
+/** The app's custom domains and whether each is serving, for the Access card. */
+export const GET_APP_CUSTOM_DOMAINS = gql`
+  query AppCustomDomains($appSlug: String!) {
+    astroliftAppDomains(appSlug: $appSlug) {
+      id
+      hostname
+      isPaused
+      certState
+      certificateState
+    }
+  }
+`;
+
+/** Pause or resume a custom domain: a paused one answers 503 until resumed. */
+export const SET_CUSTOM_DOMAIN_PAUSED = gql`
+  mutation SetCustomDomainPaused($input: SetCustomDomainPausedInput!) {
+    setCustomDomainPaused(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        hostname
+        isPaused
+      }
+    }
+  }
+`;
+
 const EDGE_ACCESS_ROW_FIELDS = gql`
   fragment EdgeAccessRowFields on AstroliftEdgeAccessRow {
     id
