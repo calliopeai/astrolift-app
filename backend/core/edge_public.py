@@ -1,4 +1,4 @@
-"""Per-app public access on the Envoy edge (#2504).
+"""Per-app public access on the Envoy and nginx edges (#2504).
 
 An app's platform hostname can answer without the edge login when both sides
 agree: the cluster allows public apps (``TenantCluster.allow_public_apps``,
@@ -10,10 +10,14 @@ A public app is public because its own HTTPRoute goes without the gate label
 ``edge-oidc`` SecurityPolicy is never loosened for it: on 2026-10-25 a change
 to that one policy opened every gated app on a cluster at once (#2526).
 
+On the nginx edge the same two-sided agreement drops the oauth2-proxy
+annotations from this app's managed-subdomain Ingress alone
+(:func:`nginx_gate_open`); every render path asks it, so they agree.
+
 A brain can be public too; its ``/mcp`` route keeps its own token policy
-whatever the app's state. Only the Envoy edge honours the switch. On any
-other edge, and wherever the cluster refuses, the app stays gated. Custom
-domains keep their own ``CustomDomain.edge_auth_enabled``.
+whatever the app's state. Only the Envoy and nginx edges honour the switch.
+On any other edge, and wherever the cluster refuses, the app stays gated.
+Custom domains keep their own ``CustomDomain.edge_auth_enabled``.
 """
 
 from __future__ import annotations
@@ -38,6 +42,27 @@ def _restricted(app: Any) -> bool:
     return is_restricted(app_access(app))
 
 
+#: Ingress classes that carry the oauth2-proxy annotations the switch removes.
+NGINX_CLASSES = ("nginx", "ingress-nginx")
+
+
+def nginx_gate_open(app: Any, cluster: Any) -> bool:
+    """Whether ``app``'s managed Ingress on ``cluster`` goes without the nginx gate.
+
+    The cluster has an edge login, is on nginx, allows public apps, and the
+    app asked and has no access list. One answer for every render path.
+    """
+    from core.app_deploy import oidc_auth_for_cluster
+
+    return (
+        getattr(cluster, "ingress_class", "") in NGINX_CLASSES
+        and oidc_auth_for_cluster(cluster) is not None
+        and bool(getattr(cluster, "allow_public_apps", True))
+        and bool(getattr(app, "edge_public", False))
+        and not _restricted(app)
+    )
+
+
 def route_gated(app: Any, cluster: Any) -> bool:
     """Whether ``app``'s platform route on ``cluster``'s Envoy edge carries the gate."""
     from core.app_deploy import oidc_auth_for_cluster
@@ -59,13 +84,15 @@ def public_state(app: Any, cluster: Any) -> str:
         return NO_GATE
     if not getattr(app, "edge_public", False):
         return GATED
-    if getattr(cluster, "ingress_class", "") != "envoy":
+    ingress_class = getattr(cluster, "ingress_class", "")
+    if ingress_class != "envoy" and ingress_class not in NGINX_CLASSES:
         return NOT_ENVOY
     if not getattr(cluster, "allow_public_apps", True):
         return CLUSTER_DISALLOWS
     if _restricted(app):
         return RESTRICTED
-    return PUBLIC if not route_gated(app, cluster) else GATED
+    gated = route_gated(app, cluster) if ingress_class == "envoy" else not nginx_gate_open(app, cluster)
+    return GATED if gated else PUBLIC
 
 
 def make_public_refusal(app: Any) -> str | None:
@@ -86,12 +113,52 @@ def app_clusters(app: Any) -> list[Any]:
     return list(TenantCluster.objects.filter(pk__in=list(ids), deleted_at__isnull=True).order_by("slug"))
 
 
-def set_edge_public(app: Any, public: bool) -> list[str]:
+def set_edge_public(app: Any, public: bool, actor: Any = None) -> list[str]:
     """Record the app's choice and move its live routes now. Returns errors."""
     if bool(app.edge_public) != public:
         app.edge_public = public
         app.save(update_fields=["edge_public", "updated_at", "version"])
-    return reapply_app_routes(app)
+    errors = reapply_app_routes(app)
+    reapply_nginx_environments(app, actor)
+    return errors
+
+
+def reapply_nginx_environments(app: Any, actor: Any = None) -> None:
+    """Re-apply ``app`` on its nginx clusters so the gate moves now, not on a deploy.
+
+    Same path as a custom-domain pause: one reprovision per non-preview
+    environment. Best effort: the flag is saved, and the next deploy applies
+    it if this cannot start. A paused environment keeps its 503 either way.
+    """
+    from astrolift_lifecycle.models import AppEnvironment, PreviewEnvironment
+    from astrolift_lifecycle.reprovision import reprovision
+    from astrolift_lifecycle.schema.mutations.helpers import _deploy_pipeline_disabled
+    from astrolift_lifecycle.visibility import live_lifecycle_rows
+    from astrolift_workflows.inputs import Actor
+
+    if _deploy_pipeline_disabled():
+        return
+    actor = actor or Actor(kind="system", display="system")
+    names = [
+        env.name
+        for env in live_lifecycle_rows(AppEnvironment.objects.all(), org_id=app.organization_id)
+        .filter(
+            registered_app=app,
+            previewed_environment__isnull=True,
+            tenant_cluster__ingress_class__in=NGINX_CLASSES,
+        )
+        .order_by("name")
+        if not PreviewEnvironment.all_objects.filter(app_environment=env).exists()
+    ]
+    for name in names:
+        try:
+            for result in reprovision(
+                app, environment_name=name, actor=actor, organization_id=app.organization_id
+            ):
+                if result.error:
+                    logger.warning("edge public: re-apply of %s/%s failed: %s", app.slug, name, result.error)
+        except Exception:  # noqa: BLE001 - the flag is saved; the next deploy applies it
+            logger.warning("edge public: could not re-apply %s/%s", app.slug, name, exc_info=True)
 
 
 def reapply_app_routes(app: Any, clusters: list[Any] | None = None) -> list[str]:
@@ -179,7 +246,7 @@ def reapply_cluster(cluster: Any) -> list[str]:
     from astrolift_registry.models import RegisteredApp
 
     if getattr(cluster, "ingress_class", "") != "envoy":
-        return []
+        return []  # nginx Ingresses are re-rendered on the apps' next deploy or reconcile.
     apps = RegisteredApp.objects.filter(
         edge_public=True,
         deleted_at__isnull=True,

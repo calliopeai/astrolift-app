@@ -2219,10 +2219,15 @@ def _render_managed_subdomain_ingress(
                     rendered["metadata"].setdefault("annotations", {}).update(group_annotations)
                 out.append(rendered)
     else:
+        from core.edge_public import nginx_gate_open
         from core.ingress_reconcile import _edge_config
         from providers.k8s_native.ingress import K8sIngressConfig, K8sIngressDriver
 
         oidc_auth = oidc_auth_for_cluster(cluster)
+        # An app made public (#2504) goes without the gate on its own
+        # Ingress; the workflow renderer asks the same function.
+        if oidc_auth is not None and nginx_gate_open(app, cluster):
+            oidc_auth = None
 
         ingress_class = getattr(cluster, "ingress_class", "nginx")
         # Map the cluster's ingress_class to the driver variant. "nginx" and

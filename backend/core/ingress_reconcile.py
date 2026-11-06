@@ -89,6 +89,7 @@ def _oidc_annotation_patch(
     cluster: TenantCluster,
     existing_snippet: str = "",
     edge: dict | None = None,
+    public: bool = False,
 ) -> dict[str, str | None]:
     """The nginx-family half of :func:`auth_annotation_patch`.
 
@@ -107,7 +108,9 @@ def _oidc_annotation_patch(
         nginx_auth_annotations,
     )
 
-    auth = oidc_auth_for_cluster(cluster)
+    # ``public``: the app asked to skip the login (#2504), so its Ingress
+    # is patched the way a cluster without auth is.
+    auth = None if public else oidc_auth_for_cluster(cluster)
     if auth is None:
         # Auth off: drop the keys the reconcile owns. The snippet is the
         # exception -- it is a shared annotation, so only the platform's
@@ -130,6 +133,7 @@ def auth_annotation_patch(
     cluster: TenantCluster,
     existing_snippet: str = "",
     edge: dict | None = None,
+    public: bool = False,
 ) -> dict[str, str | None]:
     """Annotation delta for ``cluster``, whichever gate its class uses.
 
@@ -147,7 +151,7 @@ def auth_annotation_patch(
     """
     if getattr(cluster, "ingress_class", "") == "alb":
         return _auth_annotation_patch(cluster.alb_auth_config)
-    return _oidc_annotation_patch(cluster, existing_snippet, edge)
+    return _oidc_annotation_patch(cluster, existing_snippet, edge, public)
 
 
 def _ingress_name(ingress: Any) -> str:
@@ -213,6 +217,7 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
     from astrolift_lifecycle.models import AppEnvironment
     from core.app_deploy import namespace_for_environment
     from core.cluster_management import _driver_for_cluster
+    from core.edge_public import nginx_gate_open
 
     reconciled = 0
     skipped = 0
@@ -305,6 +310,7 @@ def reconcile_cluster_ingresses(cluster: TenantCluster) -> dict[str, Any]:
                                 # content -- for declared content the
                                 # platform can just render it again.
                                 _edge_config(env.registered_app),
+                                nginx_gate_open(env.registered_app, cluster),
                             )
                         }
                     },

@@ -1212,6 +1212,7 @@ def _render_app_ingresses_and_tls(
                     # managed hostnames share one Ingress + one cert
                     # Secret (wildcard covers them all).
                     from core.app_deploy import oidc_auth_for_cluster
+                    from core.edge_public import nginx_gate_open
                     from providers.k8s_native.ingress import nginx_auth_annotations
 
                     all_hostnames = [wh.hostname for wh in computed]
@@ -1222,6 +1223,10 @@ def _render_app_ingresses_and_tls(
                     # parent zone, so the session cookie already covers
                     # them and no per-app registration is involved.
                     oidc_auth = oidc_auth_for_cluster(cluster)
+                    # An app made public (#2504) goes without the gate on its
+                    # own Ingress; core.app_deploy asks the same function.
+                    if oidc_auth is not None and nginx_gate_open(d.registered_app, cluster):
+                        oidc_auth = None
                     if oidc_auth is not None:
                         from core.ingress_reconcile import _edge_config
 
