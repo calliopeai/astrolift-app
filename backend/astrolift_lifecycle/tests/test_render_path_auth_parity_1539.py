@@ -341,3 +341,24 @@ def test_workflow_renderer_keeps_the_alb_ingress_when_load_balancers_are_withhel
     cluster.save()
 
     assert _managed_ingresses(deployment), "expected the managed-subdomain Ingress"
+
+
+def test_both_render_paths_produce_the_same_security_headers(deployment, cluster):
+    """The headers ride the same ``configuration-snippet`` on both producers."""
+    from core.app_deploy import _render_managed_subdomain_ingress
+    from core.edge_security_headers import SNIPPET_KEY
+
+    cluster.ingress_class = "nginx"
+    cluster.oidc_auth_config = OIDC_CONFIG
+    cluster.save()
+    app = deployment.registered_app
+    app.security_headers = True
+    app.save(update_fields=["security_headers"])
+
+    deploy_path = _render_managed_subdomain_ingress(
+        deployment, _make_manifest(), "ns", deployment.app_environment.managed_domain, cluster
+    )
+    deploy_snippet = deploy_path[0]["metadata"]["annotations"][SNIPPET_KEY]
+    workflow_snippet = _managed_ingresses(deployment)[0]["metadata"]["annotations"][SNIPPET_KEY]
+    assert "frame-ancestors 'none'" in deploy_snippet
+    assert workflow_snippet == deploy_snippet

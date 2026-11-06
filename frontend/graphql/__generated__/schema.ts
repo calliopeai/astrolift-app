@@ -1308,6 +1308,8 @@ export type AstroliftAppAccess = {
   /** What that means on each cluster the app runs on. */
   publicStates: Array<AstroliftAppPublicState>;
   restricted: Scalars['Boolean']['output'];
+  /** Fixed security response headers are added at the ingress-nginx edge for the app's hosts. */
+  securityHeaders: Scalars['Boolean']['output'];
   users: Array<Scalars['String']['output']>;
 };
 
@@ -1709,7 +1711,7 @@ export type AstroliftAppPodEvent = {
 
 export type AstroliftAppPublicState = {
   clusterSlug: Scalars['String']['output'];
-  /** public: answers without the edge login. gated: behind it. no_gate: the cluster has no edge login at all. not_envoy: only the Envoy edge honours the switch, so the app stays gated. cluster_disallows: the cluster does not allow public apps. restricted: the app has an access list. */
+  /** public: answers without the edge login. gated: behind it. no_gate: the cluster has no edge login at all. not_envoy: only the Envoy and nginx edges honour the switch, so the app stays gated. cluster_disallows: the cluster does not allow public apps. restricted: the app has an access list. */
   state: Scalars['String']['output'];
 };
 
@@ -6423,7 +6425,7 @@ export type AstroliftTemporaryAppPolicyMutationResult = {
 export type AstroliftTenantCluster = {
   agentProvisioned: Scalars['Boolean']['output'];
   albAuthConfig?: Maybe<Scalars['JSON']['output']>;
-  /** Whether an app on this cluster may answer without the edge login when it asks to (#2504). Off: every app is gated whatever its own setting. Only the Envoy edge honours an app's request. */
+  /** Whether an app on this cluster may answer without the edge login when it asks to (#2504). Off: every app is gated whatever its own setting. Only the Envoy and nginx edges honour an app's request. */
   allowPublicApps: Scalars['Boolean']['output'];
   authMethod: Scalars['String']['output'];
   bootstrapRuns: Array<AstroliftClusterBootstrapRun>;
@@ -10134,6 +10136,8 @@ export type Mutation = {
   setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
+  /** Add a fixed set of security headers to every response from the app's hosts at the ingress-nginx edge, or stop (off by default). Needs app.access. Takes effect on the app's live environments without a deploy; other ingress classes do not honour it. Audited as app.security_headers.enable or app.security_headers.disable. */
+  setAppSecurityHeaders: AstroliftAppAccessMutationResult;
   /** Point a GitHub app at another repository, or at its repository's new name after a rename on GitHub (#2478). The repository must be in the organization's GitHub App installation, and the name GitHub lists is stored; sourceUrl follows when it named the old repository. Autowire then runs against the repository: the CI workflow and the CI push role follow it, and the CI secrets are pushed to it, which rotates the deploy token. Audited as app.set_source. */
   setAppSource: AstroliftAppSourceChangeMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
@@ -12069,6 +12073,11 @@ export type MutationSetAppSecretArgs = {
 
 export type MutationSetAppSecretMetadataArgs = {
   input: SetAppSecretMetadataInput;
+};
+
+
+export type MutationSetAppSecurityHeadersArgs = {
+  input: SetAppSecurityHeadersInput;
 };
 
 
@@ -16857,6 +16866,11 @@ export type SetAppSecretMetadataInput = {
   key: Scalars['String']['input'];
   scope: InputMaybe<Scalars['String']['input']>;
   setVia: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SetAppSecurityHeadersInput = {
+  appSlug: Scalars['String']['input'];
+  enabled: Scalars['Boolean']['input'];
 };
 
 export type SetAppSourceInput = {

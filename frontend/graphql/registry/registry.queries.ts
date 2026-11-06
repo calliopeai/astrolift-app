@@ -695,6 +695,7 @@ export const GET_APP_ACCESS = gql`
         clusterSlug
         state
       }
+      securityHeaders
     }
   }
 `;
@@ -944,6 +945,24 @@ export const APP_VIEWER_PERMISSIONS = gql`
     astroliftApp(slug: $slug) {
       id
       viewerPermissions
+    }
+  }
+`;
+
+/** The security headers switch: fixed response headers added at the ingress-nginx edge. */
+export const SET_APP_SECURITY_HEADERS = gql`
+  mutation SetAppSecurityHeaders($input: SetAppSecurityHeadersInput!) {
+    setAppSecurityHeaders(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        appSlug
+        securityHeaders
+      }
     }
   }
 `;

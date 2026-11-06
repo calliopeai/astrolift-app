@@ -3155,6 +3155,17 @@
         "paused": "El dominio está en pausa.",
         "resumed": "El dominio vuelve a estar activo.",
         "saveFailed": "El cambio ha fallado."
+      },
+      "securityHeaders": {
+        "title": "Cabeceras de seguridad",
+        "on": "Activadas",
+        "off": "Desactivadas",
+        "description": "Si está activado, cada respuesta de los hosts de la app lleva Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin y X-Content-Type-Options: nosniff, añadidas en el borde aunque la app no defina ninguna. Se conserva cualquier política propia de la app. Déjelo desactivado en las apps que deban incrustarse en un marco. Solo los clústeres con ingress-nginx lo aplican.",
+        "enable": "Activar",
+        "disable": "Desactivar",
+        "enabled": "Las cabeceras de seguridad están activadas.",
+        "disabled": "Las cabeceras de seguridad están desactivadas.",
+        "saveFailed": "Error al guardar el cambio."
       }
     },
     "members": {

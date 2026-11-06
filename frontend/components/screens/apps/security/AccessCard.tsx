@@ -22,6 +22,7 @@ export type AccessCardViewProps = ReturnType<typeof useAppAccess> & {
   publicSwitch?: React.ReactNode;
   /** The custom domains and their pause toggles, below the public switch. */
   customDomains?: React.ReactNode;
+  securityHeadersSwitch?: React.ReactNode;
 };
 
 /**
@@ -36,6 +37,7 @@ export function AccessCardView({
   editor,
   publicSwitch,
   customDomains,
+  securityHeadersSwitch,
 }: AccessCardViewProps) {
   const t = useTranslations("apps.security.access");
   if (loading && !access) {
@@ -79,6 +81,7 @@ export function AccessCardView({
         )}
         {publicSwitch && <div className="mt-4 border-t pt-4">{publicSwitch}</div>}
         {customDomains && <div className="mt-4 border-t pt-4">{customDomains}</div>}
+        {securityHeadersSwitch && <div className="mt-4 border-t pt-4">{securityHeadersSwitch}</div>}
       </CardContent>
     </Card>
   );

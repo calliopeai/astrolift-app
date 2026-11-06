@@ -46,6 +46,9 @@ class AppAccessType:
     public_states: list[AppPublicStateType] = strawberry.field(
         description="What that means on each cluster the app runs on."
     )
+    security_headers: bool = strawberry.field(
+        description="Fixed security response headers are added at the ingress-nginx edge for the app's hosts."
+    )
 
 
 @strawberry.type(name="AstroliftAppPublicState")
@@ -213,6 +216,7 @@ def _to_type(app: RegisteredApp) -> AppAccessType:
         managed_by_manifest=(app.edge_access or {}).get("source") == "manifest",
         enforced_on=[c.slug for c in _edge_clusters(app)],
         edge_public=app.edge_public,
+        security_headers=app.security_headers,
         public_states=[
             AppPublicStateType(cluster_slug=c.slug, state=public_state(app, c)) for c in app_clusters(app)
         ],

@@ -3161,6 +3161,17 @@
         "paused": "ドメインを一時停止しました。",
         "resumed": "ドメインの提供を再開しました。",
         "saveFailed": "変更に失敗しました。"
+      },
+      "securityHeaders": {
+        "title": "セキュリティヘッダー",
+        "on": "オン",
+        "off": "オフ",
+        "description": "オンにすると、アプリのホストからの全レスポンスに、アプリ側で未設定でも Content-Security-Policy: frame-ancestors 'none'、X-Frame-Options: DENY、Referrer-Policy: same-origin、X-Content-Type-Options: nosniff がエッジで付与されます。アプリ独自のポリシーはそのまま維持されます。フレーム内での表示を想定したアプリではオフのままにしてください。適用されるのは ingress-nginx クラスターのみです。",
+        "enable": "有効にする",
+        "disable": "無効にする",
+        "enabled": "セキュリティヘッダーをオンにしました。",
+        "disabled": "セキュリティヘッダーをオフにしました。",
+        "saveFailed": "変更に失敗しました。"
       }
     },
     "members": {

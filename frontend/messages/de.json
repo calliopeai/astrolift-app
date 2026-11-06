@@ -3155,6 +3155,17 @@
         "paused": "Die Domain ist pausiert.",
         "resumed": "Die Domain wird wieder ausgeliefert.",
         "saveFailed": "Änderung fehlgeschlagen."
+      },
+      "securityHeaders": {
+        "title": "Sicherheits-Header",
+        "on": "Ein",
+        "off": "Aus",
+        "description": "Wenn aktiviert, tragen alle Antworten der Hosts der App Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin und X-Content-Type-Options: nosniff, am Edge hinzugefügt, auch wenn die App keine setzt. Eine eigene Richtlinie der App bleibt erhalten. Für Apps, die in Frames eingebettet werden sollen, deaktiviert lassen. Nur ingress-nginx-Cluster wenden das an.",
+        "enable": "Aktivieren",
+        "disable": "Deaktivieren",
+        "enabled": "Sicherheits-Header sind aktiviert.",
+        "disabled": "Sicherheits-Header sind deaktiviert.",
+        "saveFailed": "Änderung fehlgeschlagen."
       }
     },
     "members": {

@@ -185,6 +185,9 @@ class RegisteredApp(NamedBaseCoreModel):
     # where its cluster allows public apps (``core.edge_public``). Its own
     # authentication still applies; custom domains keep their own setting.
     edge_public = models.BooleanField(default=False, db_default=False)
+    # Fixed security response headers added at the ingress-nginx edge for
+    # the app's hosts (``core.edge_security_headers``). Off by default.
+    security_headers = models.BooleanField(default=False, db_default=False)
 
     # App-global webhook-deploy pause (#399). Independent of the
     # per-env ``deploys_paused`` (#378) and the per-env ``ingress_paused``

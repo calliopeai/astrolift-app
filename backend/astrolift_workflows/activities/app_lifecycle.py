@@ -942,6 +942,7 @@ def _render_app_ingresses_and_tls(
     # domain for real needs a first-party ``/oauth2/*`` endpoint on the
     # domain itself; see custom_domain_edge_auth_state.
     from core.app_deploy import custom_domain_edge_auth_state
+    from core.edge_security_headers import apply_security_headers
     from providers.k8s_native.ingress import nginx_body_annotations
 
     # The body handling core.app_deploy's render gives the app (#2423), on
@@ -1015,6 +1016,8 @@ def _render_app_ingresses_and_tls(
             annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                 'return 503 "Astrolift: app is paused";'
             )
+
+        apply_security_headers(annotations, d.registered_app, edge_cluster)
 
         if state == CustomDomain.CertificateState.BYO:
             # Split the stored bundle into cert chain + private key on
@@ -1241,6 +1244,7 @@ def _render_app_ingresses_and_tls(
                         managed_annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                             'return 503 "Astrolift: app is paused";'
                         )
+                    apply_security_headers(managed_annotations, d.registered_app, cluster)
                     if not cert_arn:
                         # No pre-provisioned cert — let cert-manager
                         # issue via the cluster's ACME issuer.

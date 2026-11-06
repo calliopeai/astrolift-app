@@ -3161,6 +3161,17 @@
         "paused": "O domínio está pausado.",
         "resumed": "O domínio voltou a ser servido.",
         "saveFailed": "Falha na alteração."
+      },
+      "securityHeaders": {
+        "title": "Cabeçalhos de segurança",
+        "on": "Ativados",
+        "off": "Desativados",
+        "description": "Quando ativado, toda resposta dos hosts do app leva Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin e X-Content-Type-Options: nosniff, adicionados na borda mesmo que o app não defina nenhum. Uma política própria do app é mantida. Deixe desativado em apps feitos para serem incorporados em frames. Somente clusters com ingress-nginx aplicam isso.",
+        "enable": "Ativar",
+        "disable": "Desativar",
+        "enabled": "Os cabeçalhos de segurança estão ativados.",
+        "disabled": "Os cabeçalhos de segurança estão desativados.",
+        "saveFailed": "Falha ao alterar."
       }
     },
     "members": {
