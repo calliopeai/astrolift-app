@@ -246,10 +246,11 @@ per-domain opt-in and the `no_gate | gated | ungated` values (they are label
 strings). Change the **meaning** on nginx: an opted-in domain is `gated` only
 when the cluster has the handoff enabled **and** `edge-session` is ready, else
 `ungated`, fixing the misreport in section 2. Add a derived, read-only
-`edgeAuthDetail` for the UI (`flag_off`, `cluster_not_enabled`,
+`edgeAuthDetail` for the UI, where the opt-in is a toggle on the access side of
+the domain panel with this status beside it (`flag_off`, `cluster_not_enabled`,
 `service_not_ready`, `domain_not_validated`, `certificate_not_ready`, `ready`).
-Add a mutation `setAppDomainEdgeAuth(domainId, enabled)`: enabling is the safe
-direction; **disabling opens the domain**, so it takes step-up permission and an
+Add a mutation `setAppDomainEdgeAuth(domainId, enabled)` behind that toggle:
+enabling is the safe direction; **disabling opens the domain**, so it takes step-up permission and an
 audit entry, as `app.edge.make_public` does. A cluster switch
 `oidc_auth_config.edge_handoff` (absent means off), as `proxy_extra_args` does.
 
@@ -332,9 +333,8 @@ objects).
 1. **Honesty first** (independent): `custom_domain_edge_auth_state` returns
    `ungated` for an opted-in domain whose endpoint is not served; add the missing
    response headers and gateway secret. No traffic change.
-2. Ship `edge-session` dark: component off, no Ingress points at it.
-3. One internal cluster and domain, full test plan.
-4. Customer domains by explicit opt-in, one at a time; no bulk enable.
+2. Ship `edge-session` dark; then one internal cluster and domain, full test plan.
+3. Customer domains by explicit opt-in, one at a time; no bulk enable.
 
 Off means today's ungated behaviour. A gated domain whose service fails is
 **down, not open**; rolling back to ungated is a deliberate step-up action
