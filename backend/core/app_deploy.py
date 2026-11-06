@@ -2267,6 +2267,9 @@ def _render_managed_subdomain_ingress(
                     rendered["metadata"].setdefault("annotations", {})[
                         "nginx.ingress.kubernetes.io/server-snippet"
                     ] = 'return 503 "Astrolift: app is paused";'
+                from core.edge_security_headers import apply_security_headers
+
+                apply_security_headers(rendered["metadata"].setdefault("annotations", {}), app, cluster)
                 out.append(rendered)
 
     # Return the rendered Ingress set. Without this the function fell through

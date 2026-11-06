@@ -1308,6 +1308,8 @@ export type AstroliftAppAccess = {
   /** What that means on each cluster the app runs on. */
   publicStates: Array<AstroliftAppPublicState>;
   restricted: Scalars['Boolean']['output'];
+  /** Fixed security response headers are added at the ingress-nginx edge for the app's hosts. */
+  securityHeaders: Scalars['Boolean']['output'];
   users: Array<Scalars['String']['output']>;
 };
 
@@ -10134,6 +10136,8 @@ export type Mutation = {
   setAppExpiry: AstroliftRegisteredAppMutationResult;
   setAppSecret: AppsecretwritepayloadMutationResult;
   setAppSecretMetadata: AppsecretmetadatapayloadMutationResult;
+  /** Add a fixed set of security headers to every response from the app's hosts at the ingress-nginx edge, or stop (off by default). Needs app.access. Takes effect on the app's live environments without a deploy; other ingress classes do not honour it. Audited as app.security_headers.enable or app.security_headers.disable. */
+  setAppSecurityHeaders: AstroliftAppAccessMutationResult;
   /** Point a GitHub app at another repository, or at its repository's new name after a rename on GitHub (#2478). The repository must be in the organization's GitHub App installation, and the name GitHub lists is stored; sourceUrl follows when it named the old repository. Autowire then runs against the repository: the CI workflow and the CI push role follow it, and the CI secrets are pushed to it, which rotates the deploy token. Audited as app.set_source. */
   setAppSource: AstroliftAppSourceChangeMutationResult;
   setAppSubdomain: AstroliftRegisteredAppMutationResult;
@@ -12069,6 +12073,11 @@ export type MutationSetAppSecretArgs = {
 
 export type MutationSetAppSecretMetadataArgs = {
   input: SetAppSecretMetadataInput;
+};
+
+
+export type MutationSetAppSecurityHeadersArgs = {
+  input: SetAppSecurityHeadersInput;
 };
 
 
@@ -16859,6 +16868,11 @@ export type SetAppSecretMetadataInput = {
   setVia: InputMaybe<Scalars['String']['input']>;
 };
 
+export type SetAppSecurityHeadersInput = {
+  appSlug: Scalars['String']['input'];
+  enabled: Scalars['Boolean']['input'];
+};
+
 export type SetAppSourceInput = {
   id: Scalars['GUID']['input'];
   ifMatchVersion: InputMaybe<Scalars['Int']['input']>;
@@ -21272,7 +21286,7 @@ export type GetAppAccessQueryVariables = Exact<{
 }>;
 
 
-export type GetAppAccessQuery = { astroliftAppAccess?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string>, edgePublic: boolean, publicStates: Array<{ clusterSlug: string, state: string }> } | null };
+export type GetAppAccessQuery = { astroliftAppAccess?: { appSlug: string, groups: Array<string>, users: Array<string>, restricted: boolean, managedByManifest: boolean, enforcedOn: Array<string>, edgePublic: boolean, securityHeaders: boolean, publicStates: Array<{ clusterSlug: string, state: string }> } | null };
 
 export type PreviewAppAccessQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -21296,6 +21310,13 @@ export type SetAppEdgePublicMutationVariables = Exact<{
 
 
 export type SetAppEdgePublicMutation = { setAppEdgePublic: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { appSlug: string, edgePublic: boolean, publicStates: Array<{ clusterSlug: string, state: string }> } | null } };
+
+export type SetAppSecurityHeadersMutationVariables = Exact<{
+  input: SetAppSecurityHeadersInput;
+}>;
+
+
+export type SetAppSecurityHeadersMutation = { setAppSecurityHeaders: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { appSlug: string, securityHeaders: boolean } | null } };
 
 export type EdgeAccessRowFieldsFragment = { id: string, appSlug: string, appName: string, teamSlug?: string | null, projectSlug?: string | null, environment: string, environmentId: string, clusterSlug: string, clusterName: string, hosts: Array<string>, restricted: boolean, groups: Array<string>, users: Array<string>, source: string, setBy?: string | null, setAt?: string | null, status: AstroliftEdgeAccessStatus, edgeChangedAt?: string | null, edgeAppliedAt?: string | null };
 

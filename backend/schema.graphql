@@ -1365,6 +1365,11 @@ type AstroliftAppAccess {
 
   """What that means on each cluster the app runs on."""
   publicStates: [AstroliftAppPublicState!]!
+
+  """
+  Fixed security response headers are added at the ingress-nginx edge for the app's hosts.
+  """
+  securityHeaders: Boolean!
 }
 
 type AstroliftAppAccessMutationResult {
@@ -10729,6 +10734,11 @@ type Mutation {
   Let the app's platform hostname answer without the edge login, or put it back behind it (#2504). Needs app.access. Making it public also needs the organization's rules for app.edge.make_public (a fresh verification by default), is refused for agents unless the organization allows them, and takes effect only on an Envoy edge whose cluster allows public apps. The app's own authentication still applies, and custom domains keep their own setting. The live routes move at once; audited as app.edge.public.set.
   """
   setAppEdgePublic(input: SetAppEdgePublicInput!): AstroliftAppAccessMutationResult!
+
+  """
+  Add a fixed set of security headers to every response from the app's hosts at the ingress-nginx edge, or stop (off by default). Needs app.access. Takes effect on the app's live environments without a deploy; other ingress classes do not honour it. Audited as app.security_headers.enable or app.security_headers.disable.
+  """
+  setAppSecurityHeaders(input: SetAppSecurityHeadersInput!): AstroliftAppAccessMutationResult!
   setNotificationQuietHours(input: SetNotificationQuietHoursInput!): AstroliftNotificationQuietHoursMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
@@ -12929,6 +12939,11 @@ input SetAppSecretMetadataInput {
   expiresAt: DateTime = null
   setVia: String = null
   scope: String = null
+}
+
+input SetAppSecurityHeadersInput {
+  appSlug: String!
+  enabled: Boolean!
 }
 
 input SetAppSourceInput {

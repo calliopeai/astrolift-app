@@ -4,11 +4,13 @@ import type { AstroliftAppAccess } from "@/graphql/__generated__/schema";
 import { Can } from "@/components/Can";
 import { AccessCardView, AccessEditorView } from "@/components/screens/apps/security/AccessCard";
 import { PublicSwitchView } from "@/components/screens/apps/security/PublicSwitch";
+import { SecurityHeadersSwitchView } from "@/components/screens/apps/security/SecurityHeadersSwitch";
 import {
   useAccessEditor,
   useAppAccess,
   usePublicSwitch,
 } from "@/components/screens/apps/security/use-app-access";
+import { useSecurityHeadersSwitch } from "@/components/screens/apps/security/use-security-headers-switch";
 
 /**
  * Who may enter this app behind central auth (#2132), and whether its
@@ -28,6 +30,16 @@ export function AccessCard({ appSlug }: { appSlug: string }) {
           </Can>
         ) : null
       }
+      securityHeadersSwitch={
+        state.access ? (
+          <Can
+            permission="app.access"
+            fallback={<SecurityHeadersSwitchView access={state.access} />}
+          >
+            <SecurityHeadersSwitch access={state.access} />
+          </Can>
+        ) : null
+      }
     />
   );
 }
@@ -38,4 +50,8 @@ function AccessEditor({ access }: { access: AstroliftAppAccess }) {
 
 function PublicSwitch({ access }: { access: AstroliftAppAccess }) {
   return <PublicSwitchView access={access} control={usePublicSwitch(access)} />;
+}
+
+function SecurityHeadersSwitch({ access }: { access: AstroliftAppAccess }) {
+  return <SecurityHeadersSwitchView access={access} control={useSecurityHeadersSwitch(access)} />;
 }

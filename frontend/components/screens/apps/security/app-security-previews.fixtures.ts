@@ -5,6 +5,7 @@ import type { AccessCardViewProps, AccessEditorViewProps } from "./AccessCard";
 import type { AppPreviewsScreenProps } from "./AppPreviewsScreen";
 import type { AppSecurityScreenProps } from "./AppSecurityScreen";
 import type { PublicSwitchViewProps } from "./PublicSwitch";
+import type { SecurityHeadersSwitchViewProps } from "./SecurityHeadersSwitch";
 import type { AstroliftEvent } from "./use-app-security";
 
 /**
@@ -185,6 +186,7 @@ export const ACCESS_OPEN: AccessCardViewProps = {
     enforcedOn: ["astrolift-conflict"],
     edgePublic: false,
     publicStates: [{ clusterSlug: "astrolift-conflict", state: "gated" }],
+    securityHeaders: false,
   },
 };
 
@@ -199,6 +201,7 @@ export const ACCESS_RESTRICTED: AccessCardViewProps = {
     enforcedOn: ["astrolift-conflict"],
     edgePublic: false,
     publicStates: [{ clusterSlug: "astrolift-conflict", state: "restricted" }],
+    securityHeaders: false,
   },
 };
 
@@ -275,6 +278,17 @@ export const PUBLIC_ON: Required<PublicSwitchViewProps> = {
       { clusterSlug: "shared-eu", state: "cluster_disallows" },
     ],
   },
+};
+
+/** The security headers switch: off by default, with the button to turn it on. */
+export const SECURITY_HEADERS_OFF: Required<SecurityHeadersSwitchViewProps> = {
+  access: { appSlug: "checkout", securityHeaders: false },
+  control: { error: null, saving: false, onSet: yes },
+};
+
+export const SECURITY_HEADERS_ON: Required<SecurityHeadersSwitchViewProps> = {
+  ...SECURITY_HEADERS_OFF,
+  access: { appSlug: "checkout", securityHeaders: true },
 };
 
 const PREVIEW_BASE: AstroliftPreviewEnvironment = {

@@ -2927,6 +2927,17 @@
         "madePublic": "The app is public where its cluster allows it.",
         "madePrivate": "The app is behind the sign-in again.",
         "saveFailed": "Change failed."
+      },
+      "securityHeaders": {
+        "title": "Security headers",
+        "on": "On",
+        "off": "Off",
+        "description": "When on, every response from the app’s hosts carries Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin and X-Content-Type-Options: nosniff, added at the edge even if the app sets none. An existing policy of the app’s own is kept. Leave it off for apps meant to be framed. Only ingress-nginx clusters apply it.",
+        "enable": "Enable",
+        "disable": "Disable",
+        "enabled": "Security headers are on.",
+        "disabled": "Security headers are off.",
+        "saveFailed": "Change failed."
       }
     },
     "members": {

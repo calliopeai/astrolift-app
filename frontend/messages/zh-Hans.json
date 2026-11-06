@@ -3144,6 +3144,17 @@
         "madePublic": "在集群允许的位置，应用已公开。",
         "madePrivate": "应用已恢复为需要登录。",
         "saveFailed": "更改失败。"
+      },
+      "securityHeaders": {
+        "title": "安全响应头",
+        "on": "已开启",
+        "off": "已关闭",
+        "description": "开启后，即使应用自身未设置，应用主机的每个响应都会在边缘附加 Content-Security-Policy: frame-ancestors 'none'、X-Frame-Options: DENY、Referrer-Policy: same-origin 和 X-Content-Type-Options: nosniff。应用自带的策略会保留。需要被嵌入框架的应用请保持关闭。仅 ingress-nginx 集群会应用此设置。",
+        "enable": "开启",
+        "disable": "关闭",
+        "enabled": "安全响应头已开启。",
+        "disabled": "安全响应头已关闭。",
+        "saveFailed": "更改失败。"
       }
     },
     "members": {
