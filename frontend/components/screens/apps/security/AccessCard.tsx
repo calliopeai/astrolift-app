@@ -20,6 +20,9 @@ export type AccessCardViewProps = ReturnType<typeof useAppAccess> & {
   editor?: React.ReactNode;
   /** The public switch (#2504), below the rule. */
   publicSwitch?: React.ReactNode;
+  /** The custom domains and their pause toggles, below the public switch. */
+  customDomains?: React.ReactNode;
+  securityHeadersSwitch?: React.ReactNode;
 };
 
 /**
@@ -28,7 +31,14 @@ export type AccessCardViewProps = ReturnType<typeof useAppAccess> & {
  * access, never the app. An app whose astrolift.toml declares
  * [ingress.access] is managed there, and this card only shows it.
  */
-export function AccessCardView({ access, loading, editor, publicSwitch }: AccessCardViewProps) {
+export function AccessCardView({
+  access,
+  loading,
+  editor,
+  publicSwitch,
+  customDomains,
+  securityHeadersSwitch,
+}: AccessCardViewProps) {
   const t = useTranslations("apps.security.access");
   if (loading && !access) {
     return (
@@ -70,6 +80,8 @@ export function AccessCardView({ access, loading, editor, publicSwitch }: Access
           </Can>
         )}
         {publicSwitch && <div className="mt-4 border-t pt-4">{publicSwitch}</div>}
+        {customDomains && <div className="mt-4 border-t pt-4">{customDomains}</div>}
+        {securityHeadersSwitch && <div className="mt-4 border-t pt-4">{securityHeadersSwitch}</div>}
       </CardContent>
     </Card>
   );

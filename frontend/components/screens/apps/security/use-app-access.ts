@@ -8,14 +8,20 @@ import { toast } from "sonner";
 import { gatedWrite } from "@/components/screens/brains/gated-write";
 import type { AstroliftAppAccess, AstroliftAppAccessPreview } from "@/graphql/__generated__/schema";
 import type {
+  AppCustomDomainsQuery,
+  AppCustomDomainsQueryVariables,
   SetAppEdgePublicMutation,
   SetAppEdgePublicMutationVariables,
+  SetCustomDomainPausedMutation,
+  SetCustomDomainPausedMutationVariables,
 } from "@/graphql/__generated__/operations";
 import {
   GET_APP_ACCESS,
+  GET_APP_CUSTOM_DOMAINS,
   PREVIEW_APP_ACCESS,
   SET_APP_ACCESS,
   SET_APP_EDGE_PUBLIC,
+  SET_CUSTOM_DOMAIN_PAUSED,
 } from "@/graphql/registry/registry.queries";
 
 /** The app's access rule (#2132). The data half of AccessCardView. */
@@ -111,4 +117,51 @@ export function usePublicSwitch(access: AstroliftAppAccess) {
   }
 
   return { confirming, setConfirming, refusal, saving, onSet };
+}
+
+/** The app's custom domains. The data half of CustomDomainsView. */
+export function useCustomDomains(appSlug: string) {
+  const { data, loading, error } = useQuery<AppCustomDomainsQuery, AppCustomDomainsQueryVariables>(
+    GET_APP_CUSTOM_DOMAINS,
+    { variables: { appSlug } }
+  );
+  return { domains: data?.astroliftAppDomains ?? [], loading, failed: !!error };
+}
+
+/**
+ * Pause or resume a custom domain: a paused domain answers 503 until it is
+ * resumed. Pausing asks first (`pausing` holds the domain being confirmed);
+ * resuming never does. The list is refetched so the badge is right. The
+ * data half of CustomDomainsView's control; mounted only for an operator
+ * holding `app.access`.
+ */
+export function useCustomDomainControl(appSlug: string) {
+  const t = useTranslations("apps.security.domains");
+  const [pausing, setPausing] = React.useState<{ id: string; hostname: string } | null>(null);
+  const [refusal, setRefusal] = React.useState<string | null>(null);
+  const [send, { loading: saving }] = useMutation<
+    SetCustomDomainPausedMutation,
+    SetCustomDomainPausedMutationVariables
+  >(SET_CUSTOM_DOMAIN_PAUSED, {
+    refetchQueries: [{ query: GET_APP_CUSTOM_DOMAINS, variables: { appSlug } }],
+    awaitRefetchQueries: true,
+  });
+
+  /** Resolves false on a refusal, which the view shows under the list. */
+  async function onSet(id: string, paused: boolean): Promise<boolean> {
+    const outcome = await gatedWrite(
+      async () =>
+        (await send({ variables: { input: { id, paused } } })).data?.setCustomDomainPaused,
+      t("saveFailed")
+    );
+    if (!outcome.ok) {
+      setRefusal(outcome.message);
+      return false;
+    }
+    setRefusal(null);
+    toast.success(paused ? t("paused") : t("resumed"));
+    return true;
+  }
+
+  return { pausing, setPausing, refusal, saving, onSet };
 }

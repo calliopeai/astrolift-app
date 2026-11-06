@@ -3144,6 +3144,34 @@
         "madePublic": "在集群允许的位置，应用已公开。",
         "madePrivate": "应用已恢复为需要登录。",
         "saveFailed": "更改失败。"
+      },
+      "domains": {
+        "title": "自定义域名",
+        "description": "每个自定义域名都可以单独暂停。已暂停的域名在恢复前会向访客返回 503；应用的平台 URL 不受影响。",
+        "empty": "此应用没有自定义域名。",
+        "loadFailed": "无法加载自定义域名。",
+        "stateServing": "服务中",
+        "statePaused": "已暂停",
+        "pause": "暂停…",
+        "resume": "恢复",
+        "saving": "正在保存…",
+        "confirmTitle": "暂停 {hostname}?",
+        "confirmDescription": "在恢复之前，此域名的访客将看到 503。系统可能会要求你验证身份。",
+        "confirm": "暂停域名",
+        "paused": "域名已暂停。",
+        "resumed": "域名已恢复服务。",
+        "saveFailed": "更改失败。"
+      },
+      "securityHeaders": {
+        "title": "安全响应头",
+        "on": "已开启",
+        "off": "已关闭",
+        "description": "开启后，即使应用自身未设置，应用主机的每个响应都会在边缘附加 Content-Security-Policy: frame-ancestors 'none'、X-Frame-Options: DENY、Referrer-Policy: same-origin 和 X-Content-Type-Options: nosniff。应用自带的策略会保留。需要被嵌入框架的应用请保持关闭。仅 ingress-nginx 集群会应用此设置。",
+        "enable": "开启",
+        "disable": "关闭",
+        "enabled": "安全响应头已开启。",
+        "disabled": "安全响应头已关闭。",
+        "saveFailed": "更改失败。"
       }
     },
     "members": {

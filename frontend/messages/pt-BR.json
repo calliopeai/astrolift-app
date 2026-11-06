@@ -3144,6 +3144,34 @@
         "madePublic": "O app está público onde o cluster permite.",
         "madePrivate": "O app voltou a ficar atrás do login.",
         "saveFailed": "Falha ao alterar."
+      },
+      "domains": {
+        "title": "Domínios personalizados",
+        "description": "Cada domínio personalizado pode ser pausado separadamente. Um domínio pausado responde aos visitantes com um 503 até ser retomado; a URL de plataforma do app não é afetada.",
+        "empty": "Este app não tem domínios personalizados.",
+        "loadFailed": "Não foi possível carregar os domínios personalizados.",
+        "stateServing": "Ativo",
+        "statePaused": "Pausado",
+        "pause": "Pausar…",
+        "resume": "Retomar",
+        "saving": "Salvando…",
+        "confirmTitle": "Pausar {hostname}?",
+        "confirmDescription": "Os visitantes deste domínio verão um 503 até que ele seja retomado. Pode ser solicitado que você confirme sua identidade.",
+        "confirm": "Pausar domínio",
+        "paused": "O domínio está pausado.",
+        "resumed": "O domínio voltou a ser servido.",
+        "saveFailed": "Falha na alteração."
+      },
+      "securityHeaders": {
+        "title": "Cabeçalhos de segurança",
+        "on": "Ativados",
+        "off": "Desativados",
+        "description": "Quando ativado, toda resposta dos hosts do app leva Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin e X-Content-Type-Options: nosniff, adicionados na borda mesmo que o app não defina nenhum. Uma política própria do app é mantida. Deixe desativado em apps feitos para serem incorporados em frames. Somente clusters com ingress-nginx aplicam isso.",
+        "enable": "Ativar",
+        "disable": "Desativar",
+        "enabled": "Os cabeçalhos de segurança estão ativados.",
+        "disabled": "Os cabeçalhos de segurança estão desativados.",
+        "saveFailed": "Falha ao alterar."
       }
     },
     "members": {

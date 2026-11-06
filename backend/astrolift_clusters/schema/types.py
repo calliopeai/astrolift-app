@@ -72,8 +72,8 @@ class TenantClusterType:
     allow_public_apps: bool = strawberry.field(
         description=(
             "Whether an app on this cluster may answer without the edge login when it asks to "
-            "(#2504). Off: every app is gated whatever its own setting. Only the Envoy edge "
-            "honours an app's request."
+            "(#2504). Off: every app is gated whatever its own setting. Only the Envoy and nginx edges "
+            "honour an app's request."
         )
     )
     is_active: bool

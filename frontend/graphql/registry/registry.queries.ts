@@ -695,6 +695,7 @@ export const GET_APP_ACCESS = gql`
         clusterSlug
         state
       }
+      securityHeaders
     }
   }
 `;
@@ -752,6 +753,38 @@ export const SET_APP_EDGE_PUBLIC = gql`
           clusterSlug
           state
         }
+      }
+    }
+  }
+`;
+
+/** The app's custom domains and whether each is serving, for the Access card. */
+export const GET_APP_CUSTOM_DOMAINS = gql`
+  query AppCustomDomains($appSlug: String!) {
+    astroliftAppDomains(appSlug: $appSlug) {
+      id
+      hostname
+      isPaused
+      certState
+      certificateState
+    }
+  }
+`;
+
+/** Pause or resume a custom domain: a paused one answers 503 until resumed. */
+export const SET_CUSTOM_DOMAIN_PAUSED = gql`
+  mutation SetCustomDomainPaused($input: SetCustomDomainPausedInput!) {
+    setCustomDomainPaused(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        hostname
+        isPaused
       }
     }
   }
@@ -912,6 +945,24 @@ export const APP_VIEWER_PERMISSIONS = gql`
     astroliftApp(slug: $slug) {
       id
       viewerPermissions
+    }
+  }
+`;
+
+/** The security headers switch: fixed response headers added at the ingress-nginx edge. */
+export const SET_APP_SECURITY_HEADERS = gql`
+  mutation SetAppSecurityHeaders($input: SetAppSecurityHeadersInput!) {
+    setAppSecurityHeaders(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        appSlug
+        securityHeaders
+      }
     }
   }
 `;

@@ -4,7 +4,9 @@ import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import type { AccessCardViewProps, AccessEditorViewProps } from "./AccessCard";
 import type { AppPreviewsScreenProps } from "./AppPreviewsScreen";
 import type { AppSecurityScreenProps } from "./AppSecurityScreen";
+import type { CustomDomainsViewProps } from "./CustomDomains";
 import type { PublicSwitchViewProps } from "./PublicSwitch";
+import type { SecurityHeadersSwitchViewProps } from "./SecurityHeadersSwitch";
 import type { AstroliftEvent } from "./use-app-security";
 
 /**
@@ -185,6 +187,7 @@ export const ACCESS_OPEN: AccessCardViewProps = {
     enforcedOn: ["astrolift-conflict"],
     edgePublic: false,
     publicStates: [{ clusterSlug: "astrolift-conflict", state: "gated" }],
+    securityHeaders: false,
   },
 };
 
@@ -199,6 +202,7 @@ export const ACCESS_RESTRICTED: AccessCardViewProps = {
     enforcedOn: ["astrolift-conflict"],
     edgePublic: false,
     publicStates: [{ clusterSlug: "astrolift-conflict", state: "restricted" }],
+    securityHeaders: false,
   },
 };
 
@@ -275,6 +279,40 @@ export const PUBLIC_ON: Required<PublicSwitchViewProps> = {
       { clusterSlug: "shared-eu", state: "cluster_disallows" },
     ],
   },
+};
+
+/** The custom domains: one serving, one paused, with the pause control. */
+export const DOMAINS_MIXED: Required<CustomDomainsViewProps> = {
+  domains: [
+    {
+      id: "d1",
+      hostname: "www.example.com",
+      isPaused: false,
+      certState: "active",
+      certificateState: "issued",
+    },
+    {
+      id: "d2",
+      hostname: "shop.example.com",
+      isPaused: true,
+      certState: "active",
+      certificateState: "issued",
+    },
+  ],
+  loading: false,
+  failed: false,
+  control: { pausing: null, setPausing: setter, refusal: null, saving: false, onSet: yes },
+};
+
+/** The security headers switch: off by default, with the button to turn it on. */
+export const SECURITY_HEADERS_OFF: Required<SecurityHeadersSwitchViewProps> = {
+  access: { appSlug: "checkout", securityHeaders: false },
+  control: { error: null, saving: false, onSet: yes },
+};
+
+export const SECURITY_HEADERS_ON: Required<SecurityHeadersSwitchViewProps> = {
+  ...SECURITY_HEADERS_OFF,
+  access: { appSlug: "checkout", securityHeaders: true },
 };
 
 const PREVIEW_BASE: AstroliftPreviewEnvironment = {

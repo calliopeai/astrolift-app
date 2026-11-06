@@ -3138,6 +3138,34 @@
         "madePublic": "L’app est publique là où son cluster l’autorise.",
         "madePrivate": "L’app est de nouveau derrière la connexion.",
         "saveFailed": "Échec de la modification."
+      },
+      "domains": {
+        "title": "Domaines personnalisés",
+        "description": "Chaque domaine personnalisé peut être mis en pause séparément. Un domaine en pause répond aux visiteurs par une erreur 503 jusqu’à sa reprise ; l’URL de plateforme de l’app n’est pas affectée.",
+        "empty": "Cette app n’a aucun domaine personnalisé.",
+        "loadFailed": "Impossible de charger les domaines personnalisés.",
+        "stateServing": "Actif",
+        "statePaused": "En pause",
+        "pause": "Mettre en pause…",
+        "resume": "Reprendre",
+        "saving": "Enregistrement…",
+        "confirmTitle": "Mettre {hostname} en pause ?",
+        "confirmDescription": "Les visiteurs de ce domaine verront une erreur 503 jusqu’à la reprise. Il peut vous être demandé de vérifier votre identité.",
+        "confirm": "Mettre le domaine en pause",
+        "paused": "Le domaine est en pause.",
+        "resumed": "Le domaine est de nouveau actif.",
+        "saveFailed": "La modification a échoué."
+      },
+      "securityHeaders": {
+        "title": "En-têtes de sécurité",
+        "on": "Activés",
+        "off": "Désactivés",
+        "description": "Lorsque cette option est activée, chaque réponse des hôtes de l’app porte Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin et X-Content-Type-Options: nosniff, ajoutés en périphérie même si l’app n’en définit aucun. Une politique propre à l’app est conservée. Laissez-la désactivée pour les apps destinées à être intégrées dans un cadre. Seuls les clusters ingress-nginx l’appliquent.",
+        "enable": "Activer",
+        "disable": "Désactiver",
+        "enabled": "Les en-têtes de sécurité sont activés.",
+        "disabled": "Les en-têtes de sécurité sont désactivés.",
+        "saveFailed": "Échec de la modification."
       }
     },
     "members": {

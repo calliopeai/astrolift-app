@@ -3144,6 +3144,34 @@
         "madePublic": "클러스터가 허용하는 곳에서 앱이 공개되었습니다.",
         "madePrivate": "앱이 다시 로그인 뒤에 있습니다.",
         "saveFailed": "변경하지 못했습니다."
+      },
+      "domains": {
+        "title": "사용자 지정 도메인",
+        "description": "사용자 지정 도메인은 각각 일시 중지할 수 있습니다. 일시 중지된 도메인은 재개할 때까지 방문자에게 503을 반환하며, 앱의 플랫폼 URL에는 영향이 없습니다.",
+        "empty": "이 앱에는 사용자 지정 도메인이 없습니다.",
+        "loadFailed": "사용자 지정 도메인을 불러오지 못했습니다.",
+        "stateServing": "서비스 중",
+        "statePaused": "일시 중지됨",
+        "pause": "일시 중지…",
+        "resume": "재개",
+        "saving": "저장 중…",
+        "confirmTitle": "{hostname} 도메인을 일시 중지할까요?",
+        "confirmDescription": "재개할 때까지 이 도메인 방문자에게 503이 표시됩니다. 본인 확인을 요청받을 수 있습니다.",
+        "confirm": "도메인 일시 중지",
+        "paused": "도메인이 일시 중지되었습니다.",
+        "resumed": "도메인이 다시 서비스 중입니다.",
+        "saveFailed": "변경에 실패했습니다."
+      },
+      "securityHeaders": {
+        "title": "보안 헤더",
+        "on": "켜짐",
+        "off": "꺼짐",
+        "description": "켜면 앱이 설정하지 않아도 앱 호스트의 모든 응답에 Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin, X-Content-Type-Options: nosniff가 엣지에서 추가됩니다. 앱 자체의 기존 정책은 유지됩니다. 프레임에 삽입되도록 만든 앱은 꺼 두세요. ingress-nginx 클러스터에서만 적용됩니다.",
+        "enable": "켜기",
+        "disable": "끄기",
+        "enabled": "보안 헤더를 켰습니다.",
+        "disabled": "보안 헤더를 껐습니다.",
+        "saveFailed": "변경하지 못했습니다."
       }
     },
     "members": {

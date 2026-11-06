@@ -3144,6 +3144,34 @@
         "madePublic": "クラスターが許可する場所でアプリは公開されました。",
         "madePrivate": "アプリは再びサインインが必要になりました。",
         "saveFailed": "変更に失敗しました。"
+      },
+      "domains": {
+        "title": "カスタムドメイン",
+        "description": "カスタムドメインは個別に一時停止できます。一時停止中のドメインは、再開するまで訪問者に 503 を返します。アプリのプラットフォーム URL には影響しません。",
+        "empty": "このアプリにはカスタムドメインがありません。",
+        "loadFailed": "カスタムドメインを読み込めませんでした。",
+        "stateServing": "提供中",
+        "statePaused": "一時停止中",
+        "pause": "一時停止…",
+        "resume": "再開",
+        "saving": "保存中…",
+        "confirmTitle": "{hostname} を一時停止しますか?",
+        "confirmDescription": "再開するまで、このドメインの訪問者には 503 が表示されます。本人確認を求められることがあります。",
+        "confirm": "ドメインを一時停止",
+        "paused": "ドメインを一時停止しました。",
+        "resumed": "ドメインの提供を再開しました。",
+        "saveFailed": "変更に失敗しました。"
+      },
+      "securityHeaders": {
+        "title": "セキュリティヘッダー",
+        "on": "オン",
+        "off": "オフ",
+        "description": "オンにすると、アプリのホストからの全レスポンスに、アプリ側で未設定でも Content-Security-Policy: frame-ancestors 'none'、X-Frame-Options: DENY、Referrer-Policy: same-origin、X-Content-Type-Options: nosniff がエッジで付与されます。アプリ独自のポリシーはそのまま維持されます。フレーム内での表示を想定したアプリではオフのままにしてください。適用されるのは ingress-nginx クラスターのみです。",
+        "enable": "有効にする",
+        "disable": "無効にする",
+        "enabled": "セキュリティヘッダーをオンにしました。",
+        "disabled": "セキュリティヘッダーをオフにしました。",
+        "saveFailed": "変更に失敗しました。"
       }
     },
     "members": {

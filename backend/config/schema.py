@@ -80,6 +80,7 @@ _mutation_bases = [
     AstroliftIdentitySchema.IdentityMutation,
     AstroliftRegistrySchema.RegistryMutation,
     AstroliftRegistrySchema.AppAccessMutation,
+    AstroliftRegistrySchema.AppSecurityHeadersMutation,
     AstroliftOperationsSchema.OperationsMutation,
     AstroliftClustersSchema.ClustersMutation,
     AstroliftClustersSchema.ClusterAgentInstallMutation,

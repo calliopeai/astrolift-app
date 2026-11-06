@@ -195,6 +195,114 @@ def test_both_render_paths_carry_the_apps_edge_mapping(deployment, cluster):
     assert workflow_snippets == deploy_snippets
 
 
+# ---- an app made public (#2504) --------------------------------------
+
+
+def _both_paths(deployment, cluster):
+    from core.app_deploy import _render_managed_subdomain_ingress
+
+    deploy_path = _render_managed_subdomain_ingress(
+        deployment,
+        _make_manifest(),
+        "ns",
+        deployment.app_environment.managed_domain,
+        cluster,
+    )
+    return deploy_path, _managed_ingresses(deployment)
+
+
+def _auth_keys(ingresses):
+    return {
+        k
+        for ingress in ingresses
+        for k in ingress["metadata"].get("annotations", {})
+        if k.startswith("nginx.ingress.kubernetes.io/auth-")
+        or k == "nginx.ingress.kubernetes.io/configuration-snippet"
+    }
+
+
+def _nginx_cluster(cluster, **extra):
+    cluster.ingress_class = "nginx"
+    cluster.oidc_auth_config = {**OIDC_CONFIG, "gateway_secret": "s" * 40}
+    for key, value in extra.items():
+        setattr(cluster, key, value)
+    cluster.save()
+
+
+def test_a_public_app_has_no_gate_on_either_path(deployment, cluster):
+    _nginx_cluster(cluster)
+    app = deployment.registered_app
+    app.edge_public = True
+    app.save()
+
+    deploy_path, workflow_path = _both_paths(deployment, cluster)
+
+    assert deploy_path and workflow_path
+    assert _auth_keys(deploy_path) == set()
+    assert _auth_keys(workflow_path) == set()
+
+
+def test_a_public_app_keeps_the_paused_503_on_either_path(deployment, cluster):
+    _nginx_cluster(cluster)
+    app = deployment.registered_app
+    app.edge_public = True
+    app.save()
+    env = deployment.app_environment
+    env.ingress_paused = True
+    env.save()
+
+    deploy_path, workflow_path = _both_paths(deployment, cluster)
+
+    for ingresses in (deploy_path, workflow_path):
+        for ingress in ingresses:
+            snippet = ingress["metadata"]["annotations"]["nginx.ingress.kubernetes.io/server-snippet"]
+            assert "app is paused" in snippet
+            assert AUTH_URL not in ingress["metadata"]["annotations"]
+
+
+def test_a_non_public_app_stays_gated_on_both_paths(deployment, cluster):
+    _nginx_cluster(cluster)
+
+    deploy_path, workflow_path = _both_paths(deployment, cluster)
+
+    assert AUTH_URL in _auth_keys(deploy_path)
+    assert _auth_keys(workflow_path) == _auth_keys(deploy_path)
+
+
+def test_a_cluster_that_disallows_public_apps_keeps_a_public_app_gated(deployment, cluster):
+    _nginx_cluster(cluster, allow_public_apps=False)
+    app = deployment.registered_app
+    app.edge_public = True
+    app.save()
+
+    deploy_path, workflow_path = _both_paths(deployment, cluster)
+
+    assert AUTH_URL in _auth_keys(deploy_path)
+    assert _auth_keys(workflow_path) == _auth_keys(deploy_path)
+
+
+def test_an_app_with_an_access_list_stays_gated_even_if_flagged_public(deployment, cluster):
+    _nginx_cluster(cluster)
+    app = deployment.registered_app
+    app.edge_public = True
+    app.edge_access = {"groups": ["ops"], "users": []}
+    app.save()
+
+    deploy_path, workflow_path = _both_paths(deployment, cluster)
+
+    assert AUTH_URL in _auth_keys(deploy_path)
+    assert _auth_keys(workflow_path) == _auth_keys(deploy_path)
+
+
+def test_the_reconcile_patch_drops_the_gate_for_a_public_app_only(cluster):
+    from core.ingress_reconcile import auth_annotation_patch
+
+    _nginx_cluster(cluster)
+
+    assert auth_annotation_patch(cluster)[AUTH_URL] is not None
+    assert auth_annotation_patch(cluster, public=True)[AUTH_URL] is None
+
+
 # ---- alb / Cognito ---------------------------------------------------
 
 
@@ -233,3 +341,24 @@ def test_workflow_renderer_keeps_the_alb_ingress_when_load_balancers_are_withhel
     cluster.save()
 
     assert _managed_ingresses(deployment), "expected the managed-subdomain Ingress"
+
+
+def test_both_render_paths_produce_the_same_security_headers(deployment, cluster):
+    """The headers ride the same ``configuration-snippet`` on both producers."""
+    from core.app_deploy import _render_managed_subdomain_ingress
+    from core.edge_security_headers import SNIPPET_KEY
+
+    cluster.ingress_class = "nginx"
+    cluster.oidc_auth_config = OIDC_CONFIG
+    cluster.save()
+    app = deployment.registered_app
+    app.security_headers = True
+    app.save(update_fields=["security_headers"])
+
+    deploy_path = _render_managed_subdomain_ingress(
+        deployment, _make_manifest(), "ns", deployment.app_environment.managed_domain, cluster
+    )
+    deploy_snippet = deploy_path[0]["metadata"]["annotations"][SNIPPET_KEY]
+    workflow_snippet = _managed_ingresses(deployment)[0]["metadata"]["annotations"][SNIPPET_KEY]
+    assert "frame-ancestors 'none'" in deploy_snippet
+    assert workflow_snippet == deploy_snippet

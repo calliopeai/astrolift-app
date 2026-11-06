@@ -942,6 +942,7 @@ def _render_app_ingresses_and_tls(
     # domain for real needs a first-party ``/oauth2/*`` endpoint on the
     # domain itself; see custom_domain_edge_auth_state.
     from core.app_deploy import custom_domain_edge_auth_state
+    from core.edge_security_headers import apply_security_headers
     from providers.k8s_native.ingress import nginx_body_annotations
 
     # The body handling core.app_deploy's render gives the app (#2423), on
@@ -1015,6 +1016,8 @@ def _render_app_ingresses_and_tls(
             annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                 'return 503 "Astrolift: app is paused";'
             )
+
+        apply_security_headers(annotations, d.registered_app, edge_cluster)
 
         if state == CustomDomain.CertificateState.BYO:
             # Split the stored bundle into cert chain + private key on
@@ -1212,6 +1215,7 @@ def _render_app_ingresses_and_tls(
                     # managed hostnames share one Ingress + one cert
                     # Secret (wildcard covers them all).
                     from core.app_deploy import oidc_auth_for_cluster
+                    from core.edge_public import nginx_gate_open
                     from providers.k8s_native.ingress import nginx_auth_annotations
 
                     all_hostnames = [wh.hostname for wh in computed]
@@ -1222,6 +1226,10 @@ def _render_app_ingresses_and_tls(
                     # parent zone, so the session cookie already covers
                     # them and no per-app registration is involved.
                     oidc_auth = oidc_auth_for_cluster(cluster)
+                    # An app made public (#2504) goes without the gate on its
+                    # own Ingress; core.app_deploy asks the same function.
+                    if oidc_auth is not None and nginx_gate_open(d.registered_app, cluster):
+                        oidc_auth = None
                     if oidc_auth is not None:
                         from core.ingress_reconcile import _edge_config
 
@@ -1236,6 +1244,7 @@ def _render_app_ingresses_and_tls(
                         managed_annotations["nginx.ingress.kubernetes.io/server-snippet"] = (
                             'return 503 "Astrolift: app is paused";'
                         )
+                    apply_security_headers(managed_annotations, d.registered_app, cluster)
                     if not cert_arn:
                         # No pre-provisioned cert — let cert-manager
                         # issue via the cluster's ACME issuer.

@@ -46,6 +46,9 @@ class AppAccessType:
     public_states: list[AppPublicStateType] = strawberry.field(
         description="What that means on each cluster the app runs on."
     )
+    security_headers: bool = strawberry.field(
+        description="Fixed security response headers are added at the ingress-nginx edge for the app's hosts."
+    )
 
 
 @strawberry.type(name="AstroliftAppPublicState")
@@ -54,8 +57,8 @@ class AppPublicStateType:
     state: str = strawberry.field(
         description=(
             "public: answers without the edge login. gated: behind it. no_gate: the cluster has "
-            "no edge login at all. not_envoy: only the Envoy edge honours the switch, so the app "
-            "stays gated. cluster_disallows: the cluster does not allow public apps. restricted: "
+            "no edge login at all. not_envoy: only the Envoy and nginx edges honour the switch, so "
+            "the app stays gated. cluster_disallows: the cluster does not allow public apps. restricted: "
             "the app has an access list."
         )
     )
@@ -213,6 +216,7 @@ def _to_type(app: RegisteredApp) -> AppAccessType:
         managed_by_manifest=(app.edge_access or {}).get("source") == "manifest",
         enforced_on=[c.slug for c in _edge_clusters(app)],
         edge_public=app.edge_public,
+        security_headers=app.security_headers,
         public_states=[
             AppPublicStateType(cluster_slug=c.slug, state=public_state(app, c)) for c in app_clusters(app)
         ],
@@ -588,6 +592,7 @@ class AppAccessMutation:
         self, info: Info, input: SetAppEdgePublicInput
     ) -> MutationResultType[AppAccessType]:
         from astrolift_identity.action_safety import agent_refusal, gate
+        from astrolift_lifecycle.schema.mutations.helpers import _actor_from_request
         from astrolift_registry.brain_manage import current_surface
         from core.edge_public import make_public_refusal, set_edge_public
 
@@ -603,7 +608,7 @@ class AppAccessMutation:
             deny = gate(info, "app.edge.make_public", app=app, resolver_name="set_app_edge_public")
             if deny is not None:
                 return deny
-        errors = set_edge_public(app, input.public)
+        errors = set_edge_public(app, input.public, _actor_from_request(info))
         app.refresh_from_db()
         if errors:
             return gql_failure(

@@ -204,14 +204,26 @@ def test_a_public_brain_keeps_its_token_route(monkeypatch):
     assert len(mcp) == 1
 
 
-def test_states_off_the_envoy_edge_and_without_a_gate():
-    nginx = _world(ingress_class="nginx")
-    nginx.app.edge_public = True
-    assert edge_public.public_state(nginx.app, nginx.cluster) == edge_public.NOT_ENVOY
+def test_states_off_the_honouring_edges_and_without_a_gate():
+    traefik = _world(ingress_class="traefik")
+    traefik.app.edge_public = True
+    assert edge_public.public_state(traefik.app, traefik.cluster) == edge_public.NOT_ENVOY
     open_cluster = _world(oidc={})
     assert edge_public.public_state(open_cluster.app, open_cluster.cluster) == edge_public.NO_GATE
     plain = _world(slug="plain")
     assert edge_public.public_state(plain.app, plain.cluster) == edge_public.GATED
+
+
+def test_nginx_states_follow_the_switch_the_cluster_and_the_access_list():
+    world = _world(ingress_class="nginx")
+    assert edge_public.public_state(world.app, world.cluster) == edge_public.GATED
+    world.app.edge_public = True
+    assert edge_public.public_state(world.app, world.cluster) == edge_public.PUBLIC
+    world.cluster.allow_public_apps = False
+    assert edge_public.public_state(world.app, world.cluster) == edge_public.CLUSTER_DISALLOWS
+    world.cluster.allow_public_apps = True
+    world.app.edge_access = {"groups": ["ops"], "users": []}
+    assert edge_public.public_state(world.app, world.cluster) == edge_public.RESTRICTED
 
 
 # ---- moving the live routes ----------------------------------------------------------
@@ -514,3 +526,56 @@ def test_the_access_query_reads_the_switch(permission_resolver):
     assert [(s.cluster_slug, s.state) for s in access.public_states] == [
         (world.cluster.slug, "cluster_disallows")
     ]
+
+
+# ---- the nginx edge re-applies through reprovision -----------------------------------
+
+
+@pytest.fixture
+def reprovisioned(monkeypatch):
+    calls = []
+
+    def fake(app, *, environment_name, actor, organization_id):
+        calls.append(environment_name)
+        return []
+
+    monkeypatch.setattr("astrolift_lifecycle.reprovision.reprovision", fake)
+    monkeypatch.setattr(
+        "astrolift_lifecycle.schema.mutations.helpers._deploy_pipeline_disabled", lambda: False
+    )
+    return calls
+
+
+def test_the_switch_reprovisions_nginx_environments_and_touches_no_envoy_route(api, reprovisioned):
+    world = _world(ingress_class="nginx")
+
+    assert edge_public.set_edge_public(world.app, True) == []
+
+    assert reprovisioned == ["prod"]
+    assert api.applied == []
+
+
+def test_the_switch_still_reapplies_envoy_routes_and_does_not_reprovision_them(api, reprovisioned):
+    world = _world()
+    api.routes = _live(world)
+
+    assert edge_public.set_edge_public(world.app, True) == []
+
+    assert len(api.applied) == 1
+    assert reprovisioned == []
+
+
+def test_a_failing_reprovision_never_fails_the_switch(api, monkeypatch):
+    world = _world(ingress_class="nginx")
+
+    def boom(app, **kwargs):
+        raise RuntimeError("engine down")
+
+    monkeypatch.setattr("astrolift_lifecycle.reprovision.reprovision", boom)
+    monkeypatch.setattr(
+        "astrolift_lifecycle.schema.mutations.helpers._deploy_pipeline_disabled", lambda: False
+    )
+
+    assert edge_public.set_edge_public(world.app, True) == []
+    world.app.refresh_from_db()
+    assert world.app.edge_public is True

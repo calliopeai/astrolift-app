@@ -3138,6 +3138,34 @@
         "madePublic": "Die App ist öffentlich, wo ihr Cluster es erlaubt.",
         "madePrivate": "Die App ist wieder hinter der Anmeldung.",
         "saveFailed": "Änderung fehlgeschlagen."
+      },
+      "domains": {
+        "title": "Eigene Domains",
+        "description": "Jede eigene Domain lässt sich einzeln pausieren. Eine pausierte Domain antwortet Besuchern mit einem 503, bis sie fortgesetzt wird; die Plattform-URL der App bleibt unberührt.",
+        "empty": "Diese App hat keine eigenen Domains.",
+        "loadFailed": "Die eigenen Domains konnten nicht geladen werden.",
+        "stateServing": "Aktiv",
+        "statePaused": "Pausiert",
+        "pause": "Pausieren…",
+        "resume": "Fortsetzen",
+        "saving": "Wird gespeichert…",
+        "confirmTitle": "{hostname} pausieren?",
+        "confirmDescription": "Besucher dieser Domain sehen einen 503, bis sie fortgesetzt wird. Möglicherweise musst du deine Identität bestätigen.",
+        "confirm": "Domain pausieren",
+        "paused": "Die Domain ist pausiert.",
+        "resumed": "Die Domain wird wieder ausgeliefert.",
+        "saveFailed": "Änderung fehlgeschlagen."
+      },
+      "securityHeaders": {
+        "title": "Sicherheits-Header",
+        "on": "Ein",
+        "off": "Aus",
+        "description": "Wenn aktiviert, tragen alle Antworten der Hosts der App Content-Security-Policy: frame-ancestors 'none', X-Frame-Options: DENY, Referrer-Policy: same-origin und X-Content-Type-Options: nosniff, am Edge hinzugefügt, auch wenn die App keine setzt. Eine eigene Richtlinie der App bleibt erhalten. Für Apps, die in Frames eingebettet werden sollen, deaktiviert lassen. Nur ingress-nginx-Cluster wenden das an.",
+        "enable": "Aktivieren",
+        "disable": "Deaktivieren",
+        "enabled": "Sicherheits-Header sind aktiviert.",
+        "disabled": "Sicherheits-Header sind deaktiviert.",
+        "saveFailed": "Änderung fehlgeschlagen."
       }
     },
     "members": {
