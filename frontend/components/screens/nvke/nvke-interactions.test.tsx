@@ -7,13 +7,52 @@ import messages from "@/messages/en.json";
 import { NvkeNativePanel } from "./NvkeNativePanel";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import { NvkeSitesScreen } from "./NvkeSitesScreen";
-import { ACTIONS, OPERATION_DETAIL, SITE_DETAIL, SITES } from "./fixtures";
+import { NvkeResourceScreen } from "./NvkeResourceScreen";
+import {
+  ACTIONS,
+  COLLECTION,
+  INVENTORY_ITEM,
+  OPERATION_DETAIL,
+  SITE_DETAIL,
+  SITE,
+  SITES,
+} from "./fixtures";
 
 const Context = ({ children }: { children: ReactNode }) => (
   <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
     {children}
   </NextIntlClientProvider>
 );
+
+it("shows exact metadata and requires confirmation before downloading a native resource document", async () => {
+  const onDownload = vi.fn().mockResolvedValue(undefined);
+  render(
+    <NvkeResourceScreen
+      siteId={SITE.id}
+      siteName={SITE.name}
+      operationId={OPERATION_DETAIL.operation!.id}
+      collection={COLLECTION}
+      item={INVENTORY_ITEM}
+      observedAt="2026-11-07T12:03:00Z"
+      loading={false}
+      pending={false}
+      error={null}
+      canRead
+      onRefresh={() => {}}
+      onDownload={onDownload}
+    />,
+    { wrapper: Context }
+  );
+  expect(screen.getByText("9007199254740993")).toBeInTheDocument();
+  expect(screen.getByText("Ready: True")).toBeInTheDocument();
+  expect(screen.getByRole("note")).toHaveTextContent(messages.nvke.historicalHelp);
+  fireEvent.click(screen.getByRole("button", { name: messages.nvke.nativeDocument }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent(messages.nvke.downloadHelp);
+  expect(onDownload).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: messages.nvke.nativeDocument }));
+  await waitFor(() => expect(onDownload).toHaveBeenCalledOnce());
+});
 
 it("keeps large native numbers as the original text and requires explicit mutation confirmation", async () => {
   const onRequest = vi.fn().mockResolvedValue(false);

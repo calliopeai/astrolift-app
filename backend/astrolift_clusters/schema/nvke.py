@@ -295,6 +295,26 @@ class NvkeInventoryPageType:
     native_page_count: int
 
 
+def inventory_item_type(item):
+    return NvkeInventoryItemType(
+        **{
+            **asdict(item),
+            "conditions": [
+                NvkeNativeConditionType(name=name, status=status) for name, status in item.conditions
+            ],
+        }
+    )
+
+
+@strawberry.type
+class NvkeInventoryResourceType:
+    item: NvkeInventoryItemType
+    collection: NvkeCollectionType
+    operation_id: GUID
+    site_id: GUID
+    observed_at: datetime | None
+
+
 @strawberry.type
 class NvkeContractType:
     revision: str
@@ -349,28 +369,17 @@ class NvkeQuery:
         expected_actor_id: int,
         after: str | None = None,
         limit: int = 50,
-        search: str = "",
+        search: str | None = None,
     ) -> NvkeInventoryPageType:
         row, selected, items, cursor, total, data = inventory.page(
             operation_id=str(operation_id),
             expected_actor_id=expected_actor_id,
             after=after,
             limit=limit,
-            search=search,
+            search=search or "",
         )
         return NvkeInventoryPageType(
-            items=[
-                NvkeInventoryItemType(
-                    **{
-                        **asdict(item),
-                        "conditions": [
-                            NvkeNativeConditionType(name=name, status=status)
-                            for name, status in item.conditions
-                        ],
-                    }
-                )
-                for item in items
-            ],
+            items=[inventory_item_type(item) for item in items],
             next_cursor=cursor,
             total_count=total,
             operation_id=GUID(str(row.guid)),
@@ -378,6 +387,23 @@ class NvkeQuery:
             collection=collection_type(selected),
             resource_version=data["resource_version"],
             native_page_count=data["native_page_count"],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_inventory_resource(
+        self, info: Info, operation_id: GUID, expected_actor_id: int, resource_key: str
+    ) -> NvkeInventoryResourceType:
+        row, selected, item, _data, _index = inventory.resource(
+            operation_id=str(operation_id), expected_actor_id=expected_actor_id, resource_key=resource_key
+        )
+        return NvkeInventoryResourceType(
+            item=inventory_item_type(item),
+            collection=collection_type(selected),
+            operation_id=GUID(str(row.guid)),
+            site_id=GUID(str(row.site.guid)),
+            observed_at=row.finished_at,
         )
 
     @strawberry.field

@@ -17682,6 +17682,25 @@
     "allSites": "すべてのサイト",
     "mutationTarget": "対象リソース：{target}",
     "targetFromParameters": "ネイティブパラメーターで定義",
-    "requestRejected": "要求は受け付け前に拒否されました。サイトを更新し、パラメーターを確認してから再試行してください。"
+    "requestRejected": "要求は受け付け前に拒否されました。サイトを更新し、パラメーターを確認してから再試行してください。",
+    "resourcesTitle": "リソース",
+    "resourcesHelp": "各NVKEインターフェースが公開するネイティブリソースのコレクションを参照します。",
+    "permission": "必要な権限",
+    "collectionUnavailable": "リソースコレクションを利用できません",
+    "desiredCount": "希望数",
+    "emptyInventory": "この観測にはリソースがありません",
+    "historicalHelp": "これは保存された観測です。読み取り後にリソースが変更されている可能性があります。ページの更新では新たなネイティブ読み取りは実行されません。",
+    "identity": "ネイティブ識別子",
+    "inventoryHelp": "インベントリ読み取りを実行すると、すべてのネイティブページを取得します。検索とページ分割は保存された観測全体を対象とします。",
+    "inventorySearch": "名前とネイティブ識別子を検索…",
+    "noInventory": "下でインベントリ読み取りを実行し、観測を作成してください。",
+    "observedAt": "観測日時",
+    "conditions": "ネイティブ条件",
+    "conditionsOmitted": "ネイティブドキュメントにさらに{count}件の条件があります。",
+    "downloadHelp": "ネイティブドキュメントには認証情報、非公開設定、その他の機密データが含まれる可能性があります。必要な場合のみダウンロードし、安全に保管してください。",
+    "nativeDocument": "ネイティブドキュメントをダウンロード",
+    "resourceUid": "リソースUID",
+    "resourceUnavailable": "リソースの観測を利用できません",
+    "resourceVersion": "リソースバージョン"
   }
 }

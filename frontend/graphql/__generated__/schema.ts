@@ -12982,6 +12982,14 @@ export type NvkeInventoryPageType = {
   totalCount: Scalars['Int']['output'];
 };
 
+export type NvkeInventoryResourceType = {
+  collection: NvkeCollectionType;
+  item: NvkeInventoryItemType;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationId: Scalars['GUID']['output'];
+  siteId: Scalars['GUID']['output'];
+};
+
 export type NvkeNativeConditionType = {
   name: Scalars['String']['output'];
   status: Scalars['String']['output'];
@@ -13654,6 +13662,7 @@ export type Query = {
   astroliftNvkeContract: NvkeContractType;
   astroliftNvkeInventoryDocumentText: StrMutationResult;
   astroliftNvkeInventoryPage: NvkeInventoryPageType;
+  astroliftNvkeInventoryResource: NvkeInventoryResourceType;
   astroliftNvkeOperation?: Maybe<NvkeOperationType>;
   astroliftNvkeOperationResult: JsonMutationResult;
   astroliftNvkeOperationResultText: StrMutationResult;
@@ -15235,7 +15244,14 @@ export type QueryAstroliftNvkeInventoryPageArgs = {
   expectedActorId: Scalars['Int']['input'];
   limit?: Scalars['Int']['input'];
   operationId: Scalars['GUID']['input'];
-  search?: Scalars['String']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftNvkeInventoryResourceArgs = {
+  expectedActorId: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  resourceKey: Scalars['String']['input'];
 };
 
 

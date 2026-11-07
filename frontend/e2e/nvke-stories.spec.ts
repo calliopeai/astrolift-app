@@ -8,6 +8,9 @@ const stories = [
   "screens-nvke-site--full",
   "screens-nvke-native-actions--full",
   "screens-nvke-operation--uncertain",
+  "screens-nvke-collections--full",
+  "screens-nvke-inventory--observed",
+  "screens-nvke-resource--full",
 ];
 for (const mode of ["light", "dark"]) {
   for (const id of stories) {

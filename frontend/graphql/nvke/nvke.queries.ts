@@ -253,3 +253,54 @@ export const GET_NVKE_INVENTORY_DOCUMENT_TEXT = gql`
     }
   }
 `;
+
+export const GET_NVKE_INVENTORY_RESOURCE = gql`
+  query GetNvkeInventoryResource(
+    $operationId: GUID!
+    $expectedActorId: Int!
+    $resourceKey: String!
+  ) {
+    astroliftNvkeInventoryResource(
+      operationId: $operationId
+      expectedActorId: $expectedActorId
+      resourceKey: $resourceKey
+    ) {
+      operationId
+      siteId
+      observedAt
+      collection {
+        key
+        surface
+        resourceKind
+        namespaced
+        permission
+        defaultParametersText
+        actions {
+          key
+          surface
+          verb
+          resourceKind
+          mutates
+          permission
+          path
+        }
+      }
+      item {
+        key
+        identity
+        name
+        uid
+        namespace
+        resourceVersion
+        generation
+        kubernetesVersion
+        desiredCount
+        conditions {
+          name
+          status
+        }
+        conditionsOmitted
+      }
+    }
+  }
+`;

@@ -17682,6 +17682,25 @@
     "allSites": "모든 사이트",
     "mutationTarget": "대상 리소스: {target}",
     "targetFromParameters": "네이티브 매개변수로 정의됨",
-    "requestRejected": "요청이 접수 전에 거부되었습니다. 사이트를 새로 고침하고 매개변수를 검토한 후 다시 시도하세요."
+    "requestRejected": "요청이 접수 전에 거부되었습니다. 사이트를 새로 고침하고 매개변수를 검토한 후 다시 시도하세요.",
+    "resourcesTitle": "리소스",
+    "resourcesHelp": "각 NVKE 인터페이스가 제공하는 기본 리소스 컬렉션을 살펴봅니다.",
+    "permission": "필요한 권한",
+    "collectionUnavailable": "리소스 컬렉션을 사용할 수 없습니다",
+    "desiredCount": "원하는 수",
+    "emptyInventory": "이 관측에 리소스가 없습니다",
+    "historicalHelp": "저장된 관측입니다. 읽기 이후 리소스가 변경되었을 수 있습니다. 페이지를 새로 고쳐도 새 네이티브 읽기를 실행하지 않습니다.",
+    "identity": "기본 식별자",
+    "inventoryHelp": "인벤토리 읽기를 실행하여 모든 기본 페이지를 수집합니다. 검색과 페이지 나누기는 저장된 전체 관측을 사용합니다.",
+    "inventorySearch": "이름 및 기본 식별자 검색…",
+    "noInventory": "아래에서 인벤토리 읽기를 실행하여 관측을 생성하세요.",
+    "observedAt": "관측 시각",
+    "conditions": "기본 조건",
+    "conditionsOmitted": "기본 문서에서 조건 {count}개를 더 볼 수 있습니다.",
+    "downloadHelp": "기본 문서에는 자격 증명, 비공개 구성 및 기타 민감한 데이터가 포함될 수 있습니다. 필요한 경우에만 다운로드하고 안전하게 보관하세요.",
+    "nativeDocument": "기본 문서 다운로드",
+    "resourceUid": "리소스 UID",
+    "resourceUnavailable": "리소스 관측을 사용할 수 없습니다",
+    "resourceVersion": "리소스 버전"
   }
 }

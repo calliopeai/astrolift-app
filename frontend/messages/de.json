@@ -17685,6 +17685,25 @@
     "allSites": "Alle Standorte",
     "mutationTarget": "Betroffene Ressource: {target}",
     "targetFromParameters": "Durch native Parameter festgelegt",
-    "requestRejected": "Die Anfrage wurde vor der Annahme abgelehnt. Aktualisieren Sie den Standort und prüfen Sie die Parameter, bevor Sie es erneut versuchen."
+    "requestRejected": "Die Anfrage wurde vor der Annahme abgelehnt. Aktualisieren Sie den Standort und prüfen Sie die Parameter, bevor Sie es erneut versuchen.",
+    "resourcesTitle": "Ressourcen",
+    "resourcesHelp": "Durchsuchen Sie die nativen Ressourcensammlungen der einzelnen NVKE-Schnittstellen.",
+    "permission": "Erforderliche Berechtigung",
+    "collectionUnavailable": "Ressourcensammlung nicht verfügbar",
+    "desiredCount": "Gewünschte Anzahl",
+    "emptyInventory": "Keine Ressourcen in dieser Beobachtung",
+    "historicalHelp": "Dies ist eine gespeicherte Beobachtung. Ressourcen können sich seit dem Lesen geändert haben. Das Aktualisieren der Seite startet keinen neuen nativen Lesevorgang.",
+    "identity": "Native Identität",
+    "inventoryHelp": "Starten Sie einen Inventar-Lesevorgang, um alle nativen Seiten abzurufen. Suche und Seitennavigation verwenden die vollständige gespeicherte Beobachtung.",
+    "inventorySearch": "Namen und native Identitäten suchen…",
+    "noInventory": "Starten Sie unten einen Inventar-Lesevorgang, um eine Beobachtung zu erstellen.",
+    "observedAt": "Beobachtet am",
+    "conditions": "Native Bedingungen",
+    "conditionsOmitted": "{count} weitere Bedingungen sind im nativen Dokument verfügbar.",
+    "downloadHelp": "Native Dokumente können Zugangsdaten, private Konfiguration und andere sensible Daten enthalten. Laden Sie sie nur bei Bedarf herunter und bewahren Sie sie sicher auf.",
+    "nativeDocument": "Natives Dokument herunterladen",
+    "resourceUid": "Ressourcen-UID",
+    "resourceUnavailable": "Ressourcenbeobachtung nicht verfügbar",
+    "resourceVersion": "Ressourcenversion"
   }
 }

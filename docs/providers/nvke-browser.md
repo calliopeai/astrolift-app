@@ -6,6 +6,21 @@ operation controls. `nvke.read` gates the routes; each action retains its own re
 admin permission. Site and credential configuration require admin access. The backend checks
 current authority again at admission and before remote I/O.
 
+`/nvke/{siteId}/resources` lists the pinned collection definitions (a fixed-cardinality
+catalog, not a capped resource inventory). Each collection opens an inventory editor and
+saved observation list. Running a read admits a complete inventory operation; the returned
+snapshot UUID is kept in the URL. Refresh checks operation status and saved metadata without
+starting another native read or discarding the same visit's native parameter draft. Admission
+stays disabled while source data refreshes or has errors. Caller/site changes clear the view.
+Successful inventory operations also link here from operation
+details. Failed/pending observations never present a partial resource list.
+
+Resource rows link to reloadable observation details using deterministic signed keys bound
+to the snapshot version and row index. Detail reads return only the metadata allowlist;
+the full native document remains an explicitly confirmed download. Collection, site,
+snapshot and caller identities are checked before displaying data. Search and page cursors
+remain server-side; native filters stay available as exact JSON text in the inventory editor.
+
 The native editor accepts JSON text without converting native integers through JavaScript's
 numeric representation. Use the displayed schema and template to construct parameters. Review
 the resource target before confirming a write. Operation admission does not prove readiness;
@@ -69,6 +84,6 @@ Results are fetched only after explicit confirmation and downloaded as JSON text
 native integer values. Treat these files as sensitive: native responses may contain credentials
 or kubeconfigs. No result is automatically fetched when opening an operation page.
 
-This route-wiring slice uses manual refresh. Resource-specific inventory/detail views, site
-bootstrap, workload access, telemetry and live hardware qualification remain separate delivery
-work. The native editor alone does not establish full integration qualification.
+This route-wiring slice uses manual refresh. Resource-specific mutation forms, site bootstrap,
+workload access, telemetry and live hardware qualification remain separate delivery work.
+Observation browsing and the native editor do not establish full integration qualification.

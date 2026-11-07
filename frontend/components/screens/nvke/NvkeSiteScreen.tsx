@@ -213,6 +213,9 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
       }
       actions={
         <>
+          <Button variant="outline" asChild>
+            <Link href={`/nvke/${site.id}/resources`}>{t("resourcesTitle")}</Link>
+          </Button>
           <Button variant="outline" disabled={pending} onClick={onRefresh}>
             <RefreshCwIcon className="size-4" />
             {t("refresh")}

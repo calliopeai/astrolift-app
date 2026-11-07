@@ -65,7 +65,7 @@ def _load(token):
     if not isinstance(token, str) or len(token) > 4096:
         raise NvkeError("INVALID_CURSOR", "Use a cursor from this NVKE inventory observation")
     try:
-        value = signing.loads(token, salt=_SALT)
+        value = signing.Signer(salt=_SALT).unsign_object(token)
     except (signing.BadSignature, ValueError, TypeError):
         raise NvkeError("INVALID_CURSOR", "Use a cursor from this NVKE inventory observation") from None
     if not isinstance(value, list):
@@ -107,7 +107,7 @@ def _item(row, selected, resource, index):
         and isinstance(value.get("status"), str)
         and value.get("status") in {"True", "False", "Unknown"}
     ]
-    key = signing.dumps(["resource", str(row.guid), row.version, index], salt=_SALT)
+    key = signing.Signer(salt=_SALT).sign_object(["resource", str(row.guid), row.version, index])
     return InventoryItem(
         key=key,
         identity=native_id,
@@ -162,11 +162,15 @@ def page(*, operation_id, expected_actor_id, after=None, limit=50, search=""):
     selected_indices = indices[offset : offset + limit]
     items = [_item(row, selected, data["items"][index], index) for index in selected_indices]
     next_offset = offset + len(items)
-    cursor = signing.dumps([*binding, next_offset], salt=_SALT) if next_offset < len(indices) else None
+    cursor = (
+        signing.Signer(salt=_SALT).sign_object([*binding, next_offset])
+        if next_offset < len(indices)
+        else None
+    )
     return row, selected, items, cursor, len(indices), data
 
 
-def document(*, operation_id, expected_actor_id, resource_key):
+def resource(*, operation_id, expected_actor_id, resource_key):
     row, selected, data, _org, _actor_value = _snapshot(operation_id, expected_actor_id)
     token = _load(resource_key)
     if (
@@ -176,4 +180,11 @@ def document(*, operation_id, expected_actor_id, resource_key):
         or not 0 <= token[3] < len(data["items"])
     ):
         raise NvkeError("INVALID_CURSOR", "Use a resource from this NVKE inventory observation")
-    return operations.canonical(data["items"][token[3]], limit=64 * 1024 * 1024).decode("utf-8")
+    return row, selected, _item(row, selected, data["items"][token[3]], token[3]), data, token[3]
+
+
+def document(*, operation_id, expected_actor_id, resource_key):
+    _row, _selected, _item_value, data, index = resource(
+        operation_id=operation_id, expected_actor_id=expected_actor_id, resource_key=resource_key
+    )
+    return operations.canonical(data["items"][index], limit=64 * 1024 * 1024).decode("utf-8")

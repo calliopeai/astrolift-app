@@ -1,4 +1,44 @@
 import type { CursorTableController } from "@/components/data-table";
+import type {
+  GetNvkeContractQuery,
+  ListNvkeInventoryPageQuery,
+} from "@/graphql/__generated__/operations";
+import type { NvkeNativePanelProps } from "./NvkeNativePanel";
+
+export type NvkeCollectionView =
+  GetNvkeContractQuery["astroliftNvkeContract"]["collections"][number];
+export type NvkeInventoryItemView =
+  ListNvkeInventoryPageQuery["astroliftNvkeInventoryPage"]["items"][number];
+export interface NvkeResourcesScreenProps {
+  site: NvkeSiteView | null;
+  collections: CursorTableController<NvkeCollectionView>;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}
+export interface NvkeInventoryScreenProps extends NvkeNativePanelProps {
+  collection: NvkeCollectionView | null;
+  table: CursorTableController<NvkeInventoryItemView>;
+  operation: NvkeOperationView | null;
+  observedAt: string | null;
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}
+export interface NvkeResourceScreenProps {
+  siteId: string;
+  operationId: string;
+  siteName: string;
+  collection: NvkeCollectionView | null;
+  item: NvkeInventoryItemView | null;
+  observedAt: string | null;
+  loading: boolean;
+  pending: boolean;
+  error: string | null;
+  canRead: boolean;
+  onRefresh: () => void;
+  onDownload: () => Promise<void>;
+}
 
 export type NvkeSurface = "CONTROLLER" | "TENANT" | "OPERATOR" | "DATASTORE";
 export type NvkeStatus =

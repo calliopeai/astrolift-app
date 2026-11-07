@@ -11372,6 +11372,14 @@ type NvkeInventoryPageType {
   nativePageCount: Int!
 }
 
+type NvkeInventoryResourceType {
+  item: NvkeInventoryItemType!
+  collection: NvkeCollectionType!
+  operationId: GUID!
+  siteId: GUID!
+  observedAt: DateTime
+}
+
 type NvkeNativeConditionType {
   name: String!
   status: String!
@@ -12157,7 +12165,8 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
-  astroliftNvkeInventoryPage(operationId: GUID!, expectedActorId: Int!, after: String = null, limit: Int! = 50, search: String! = ""): NvkeInventoryPageType!
+  astroliftNvkeInventoryPage(operationId: GUID!, expectedActorId: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeInventoryPageType!
+  astroliftNvkeInventoryResource(operationId: GUID!, expectedActorId: Int!, resourceKey: String!): NvkeInventoryResourceType!
   astroliftNvkeInventoryDocumentText(operationId: GUID!, expectedActorId: Int!, resourceKey: String!): StrMutationResult!
   astroliftNvkeRequest(siteId: GUID!, requestId: String!): NvkeOperationType
   astroliftNvkeContract: NvkeContractType!

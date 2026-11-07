@@ -8,10 +8,17 @@ import {
 import { ApolloProvider } from "@apollo/client/react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { ACTIONS, OPERATION, SITE } from "@/components/screens/nvke/fixtures";
+import {
+  ACTIONS,
+  COLLECTION,
+  INVENTORY_ITEM,
+  OPERATION,
+  SITE,
+} from "@/components/screens/nvke/fixtures";
 import { nvkeScopeKey, readRecovery } from "@/lib/nvke/recovery";
 import { useNvkeSite } from "./use-nvke-site";
 import { useNvkeOperation } from "./use-nvke-operation";
+import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 const caller = vi.hoisted(() => ({ actorId: 41 }));
@@ -84,6 +91,7 @@ function harness(
                   astroliftNvkeContract: {
                     revision: SITE.upstreamRevision,
                     actions: ACTIONS,
+                    collections: [COLLECTION],
                     controllerOpenapi: {},
                     resources: [],
                   },
@@ -105,6 +113,172 @@ function harness(
   );
   return { wrapper, calls, client, cache };
 }
+
+it("admits inventory through the durable inventory mutation without fetching hidden history", async () => {
+  const { wrapper, calls } = harness((request) => {
+    if (request.operationName === "RequestNvkeInventory") {
+      const input = request.variables.input;
+      return {
+        requestNvkeInventory: {
+          ok: true,
+          errors: [],
+          data: {
+            ...OPERATION,
+            isInventory: true,
+            operationKey: COLLECTION.key,
+            requestId: input.requestId,
+          },
+        },
+      };
+    }
+    throw new Error("Unexpected inventory request");
+  });
+  const { result } = renderHook(() => useNvkeInventory(SITE.id, COLLECTION.key, null), { wrapper });
+  await waitFor(() => expect(result.current.catalogLoading).toBe(false));
+  let admitted = false;
+  await act(async () => {
+    admitted = await result.current.onRequest({ ...values, operationKey: COLLECTION.key });
+  });
+  expect(admitted).toBe(true);
+  expect(calls.filter((c) => c.operationName === "RequestNvkeInventory")).toHaveLength(1);
+  expect(
+    calls.some((c) =>
+      ["ListNvkeOperations", "ListNvkeInventoryPage", "RequestNvkeOperationText"].includes(
+        c.operationName ?? ""
+      )
+    )
+  ).toBe(false);
+  expect(navigation.push).toHaveBeenCalledWith(
+    `/nvke/${SITE.id}/resources/${COLLECTION.key}?snapshot=${OPERATION.id}`
+  );
+  expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+});
+
+it("keeps same-visit inventory source mounted during refresh and clears it on caller change", async () => {
+  const { wrapper } = harness(() => {
+    throw new Error("Unexpected source request");
+  });
+  const { result, rerender } = renderHook(() => useNvkeInventory(SITE.id, COLLECTION.key, null), {
+    wrapper,
+  });
+  await waitFor(() => expect(result.current.catalogLoading).toBe(false));
+  expect(result.current.site?.id).toBe(SITE.id);
+  act(() => result.current.onRefresh());
+  expect(result.current.loading).toBe(true);
+  expect(result.current.site?.id).toBe(SITE.id);
+  expect(result.current.collection?.key).toBe(COLLECTION.key);
+  await waitFor(() => expect(result.current.catalogLoading).toBe(false));
+  caller.actorId = 42;
+  rerender();
+  expect(result.current.site).toBeNull();
+  expect(result.current.collection).toBeNull();
+  caller.actorId = 41;
+  rerender();
+  expect(result.current.site).toBeNull();
+  expect(result.current.collection).toBeNull();
+  await waitFor(() => expect(result.current.site?.id).toBe(SITE.id));
+});
+
+it.each(["RUNNING", "SUCCEEDED", "WRONG_SITE"])(
+  "only pages a successful matching inventory snapshot: %s",
+  async (state) => {
+    const { wrapper, calls, cache } = harness((request) => {
+      if (request.operationName === "GetNvkeOperation")
+        return {
+          astroliftNvkeOperation: {
+            ...OPERATION,
+            isInventory: true,
+            operationKey: COLLECTION.key,
+            siteId: state === "WRONG_SITE" ? "123e4567-e89b-12d3-a456-426614174099" : SITE.id,
+            status: state === "RUNNING" ? "RUNNING" : "SUCCEEDED",
+          },
+        };
+      if (request.operationName === "ListNvkeInventoryPage")
+        return {
+          astroliftNvkeInventoryPage: {
+            items: [INVENTORY_ITEM],
+            nextCursor: null,
+            totalCount: 501,
+            operationId: OPERATION.id,
+            observedAt: OPERATION.updatedAt,
+            resourceVersion: "snapshot-rv",
+            nativePageCount: 2,
+            collection: COLLECTION,
+          },
+        };
+      throw new Error("Unexpected snapshot request");
+    });
+    const { result } = renderHook(() => useNvkeInventory(SITE.id, COLLECTION.key, OPERATION.id), {
+      wrapper,
+    });
+    await waitFor(() => expect(result.current.catalogLoading).toBe(false));
+    if (state === "SUCCEEDED") {
+      await waitFor(() => expect(result.current.table.totalCount).toBe(501));
+      expect(result.current.table.rows[0].desiredCount).toBe("9007199254740993");
+      expect(result.current.table.searchEnabled).toBe(true);
+      const page = calls.find((c) => c.operationName === "ListNvkeInventoryPage")!;
+      expect(page.variables).toMatchObject({
+        expectedActorId: 41,
+        operationId: OPERATION.id,
+        search: null,
+      });
+    } else {
+      await waitFor(() =>
+        expect(calls.some((c) => c.operationName === "GetNvkeOperation")).toBe(true)
+      );
+      expect(calls.some((c) => c.operationName === "ListNvkeInventoryPage")).toBe(false);
+      expect(result.current.table.rows).toEqual([]);
+    }
+    expect(calls.some((c) => c.operationName === "RequestNvkeInventory")).toBe(false);
+    expect(cache.extract()).toEqual({});
+  }
+);
+
+it("loads only safe resource metadata and downloads exact text only on explicit request", async () => {
+  const raw = '{"desiredCount":9007199254740993,"token":"PRIVATE_NATIVE_DOCUMENT"}';
+  const create = vi.fn(() => "blob:local-test"),
+    revoke = vi.fn();
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = create;
+      static revokeObjectURL = revoke;
+    }
+  );
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  const { wrapper, calls, cache } = harness((request) => {
+    if (request.operationName === "GetNvkeInventoryResource")
+      return {
+        astroliftNvkeInventoryResource: {
+          siteId: SITE.id,
+          operationId: OPERATION.id,
+          observedAt: OPERATION.updatedAt,
+          collection: COLLECTION,
+          item: INVENTORY_ITEM,
+        },
+      };
+    if (request.operationName === "GetNvkeInventoryDocumentText")
+      return { astroliftNvkeInventoryDocumentText: { ok: true, errors: [], data: raw } };
+    throw new Error("Unexpected detail request");
+  });
+  const { result } = renderHook(
+    () => useNvkeResource(SITE.id, COLLECTION.key, OPERATION.id, INVENTORY_ITEM.key),
+    { wrapper }
+  );
+  await waitFor(() => expect(result.current.item?.key).toBe(INVENTORY_ITEM.key));
+  expect(calls.some((c) => c.operationName === "GetNvkeInventoryDocumentText")).toBe(false);
+  await act(async () => {
+    await result.current.onDownload();
+  });
+  expect(calls.filter((c) => c.operationName === "GetNvkeInventoryDocumentText")).toHaveLength(1);
+  expect(create).toHaveBeenCalledTimes(1);
+  const blob = create.mock.calls[0] as unknown as [Blob];
+  expect(await blob[0].text()).toBe(raw);
+  expect(click).toHaveBeenCalledTimes(1);
+  expect(cache.extract()).toEqual({});
+  await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:local-test"), { timeout: 2000 });
+  click.mockRestore();
+});
 it("recovers a lost admission reply by receipt without submitting the native request again", async () => {
   let accepted: typeof OPERATION | null = null;
   const h = harness((operation) => {

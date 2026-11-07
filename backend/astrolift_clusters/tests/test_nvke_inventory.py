@@ -84,6 +84,35 @@ def test_condition_summary_bounds_output_and_ignores_invalid_status_values(confi
     assert result[2][0].conditions_omitted == 6
 
 
+def test_resource_links_are_stable_and_metadata_query_never_reveals_native_document(configured, monkeypatch):
+    row = completed(configured)
+    with context(configured.world):
+        first = inventory.page(operation_id=str(row.guid), expected_actor_id=configured.world.user.pk)[2][0]
+        with monkeypatch.context() as patch:
+            patch.setattr("django.core.signing.time.time", lambda: 2000000000)
+            result = inventory.resource(
+                operation_id=str(row.guid), expected_actor_id=configured.world.user.pk, resource_key=first.key
+            )
+        assert result[2].key == first.key
+    response = execute(
+        configured.world,
+        """query($id: GUID!, $actor: Int!, $key: String!) {
+      astroliftNvkeInventoryResource(operationId: $id, expectedActorId: $actor, resourceKey: $key) {
+        operationId siteId observedAt collection { key }
+        item { key identity desiredCount conditions { name status } }
+      }
+      astroliftNvkeInventoryPage(operationId: $id, expectedActorId: $actor, search: null) { totalCount }
+    }""",
+        {"id": str(row.guid), "actor": configured.world.user.pk, "key": first.key},
+    )
+    assert not response.errors
+    data = response.data["astroliftNvkeInventoryResource"]
+    assert data["siteId"] == str(row.site.guid) and data["item"]["key"] == first.key
+    assert data["item"]["desiredCount"] == "9007199254740993"
+    assert "PRIVATE" not in str(data)
+    assert response.data["astroliftNvkeInventoryPage"]["totalCount"] == 205
+
+
 @pytest.mark.parametrize("change", ["cancellation", "deadline", "membership"])
 def test_inventory_checks_live_authority_before_each_native_page(datastore_site, monkeypatch, change):
     state = datastore_site

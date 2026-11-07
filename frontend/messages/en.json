@@ -17682,6 +17682,25 @@
     "allSites": "All sites",
     "mutationTarget": "Affected resource: {target}",
     "targetFromParameters": "Defined by native parameters",
-    "requestRejected": "The request was rejected before admission. Refresh the site and review the parameters before trying again."
+    "requestRejected": "The request was rejected before admission. Refresh the site and review the parameters before trying again.",
+    "resourcesTitle": "Resources",
+    "resourcesHelp": "Browse the native resource collections exposed by each NVKE interface.",
+    "permission": "Required permission",
+    "collectionUnavailable": "Resource collection unavailable",
+    "desiredCount": "Desired count",
+    "emptyInventory": "No resources in this observation",
+    "historicalHelp": "This is a saved observation. Resources may have changed since this read. Refreshing the page does not run a new native read.",
+    "identity": "Native identity",
+    "inventoryHelp": "Run an inventory read to collect every native page. Search and pagination use the complete saved observation.",
+    "inventorySearch": "Search names and native identities…",
+    "noInventory": "Run an inventory read below to create an observation.",
+    "observedAt": "Observed at",
+    "conditions": "Native conditions",
+    "conditionsOmitted": "{count} more conditions are available in the native document.",
+    "downloadHelp": "Native documents may contain credentials, private configuration and other sensitive data. Download only when needed and store securely.",
+    "nativeDocument": "Download native document",
+    "resourceUid": "Resource UID",
+    "resourceUnavailable": "Resource observation unavailable",
+    "resourceVersion": "Resource version"
   }
 }

@@ -17682,6 +17682,25 @@
     "allSites": "所有站点",
     "mutationTarget": "受影响的资源：{target}",
     "targetFromParameters": "由原生参数定义",
-    "requestRejected": "请求在受理前被拒绝。请刷新站点并检查参数，然后重试。"
+    "requestRejected": "请求在受理前被拒绝。请刷新站点并检查参数，然后重试。",
+    "resourcesTitle": "资源",
+    "resourcesHelp": "浏览各个 NVKE 接口提供的原生资源集合。",
+    "permission": "所需权限",
+    "collectionUnavailable": "资源集合不可用",
+    "desiredCount": "期望数量",
+    "emptyInventory": "此观测中没有资源",
+    "historicalHelp": "这是已保存的观测。资源可能在读取后发生变化。刷新页面不会执行新的原生读取。",
+    "identity": "原生标识",
+    "inventoryHelp": "执行清单读取以收集所有原生分页。搜索和分页基于完整的已保存观测。",
+    "inventorySearch": "搜索名称和原生标识…",
+    "noInventory": "请在下方执行清单读取以创建观测。",
+    "observedAt": "观测时间",
+    "conditions": "原生条件",
+    "conditionsOmitted": "原生文档中还有 {count} 个条件。",
+    "downloadHelp": "原生文档可能包含凭据、私有配置和其他敏感数据。请仅在需要时下载并安全保存。",
+    "nativeDocument": "下载原生文档",
+    "resourceUid": "资源 UID",
+    "resourceUnavailable": "资源观测不可用",
+    "resourceVersion": "资源版本"
   }
 }

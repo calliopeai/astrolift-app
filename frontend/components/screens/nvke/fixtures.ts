@@ -1,5 +1,7 @@
 import { fakeController } from "@/components/data-table/fixtures";
 import type {
+  NvkeCollectionView,
+  NvkeInventoryItemView,
   NvkeActionView,
   NvkeOperationScreenProps,
   NvkeOperationView,
@@ -7,6 +9,39 @@ import type {
   NvkeSitesScreenProps,
   NvkeSiteView,
 } from "./types";
+
+export const COLLECTION: NvkeCollectionView = {
+  key: "listClusters",
+  surface: "CONTROLLER",
+  resourceKind: "Cluster",
+  namespaced: false,
+  permission: "nvke.read",
+  defaultParametersText: "{}",
+  actions: [
+    {
+      key: "listClusters",
+      surface: "CONTROLLER",
+      resourceKind: "Cluster",
+      permission: "nvke.read",
+      verb: "GET",
+      mutates: false,
+      path: "/clusters",
+    },
+  ],
+};
+export const INVENTORY_ITEM: NvkeInventoryItemView = {
+  key: "signed-resource-key",
+  identity: "123e4567-e89b-12d3-a456-426614174010",
+  name: "research-cluster",
+  namespace: "",
+  uid: "",
+  resourceVersion: "",
+  generation: "1",
+  kubernetesVersion: "1.36.0",
+  desiredCount: "9007199254740993",
+  conditions: [{ name: "Ready", status: "True" }],
+  conditionsOmitted: 0,
+};
 
 export const SITE: NvkeSiteView = {
   id: "123e4567-e89b-12d3-a456-426614174001",

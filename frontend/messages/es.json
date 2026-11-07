@@ -17685,6 +17685,25 @@
     "allSites": "Todos los sitios",
     "mutationTarget": "Recurso afectado: {target}",
     "targetFromParameters": "Definido por los parámetros nativos",
-    "requestRejected": "La solicitud se rechazó antes de su admisión. Actualiza el sitio y revisa los parámetros antes de volver a intentarlo."
+    "requestRejected": "La solicitud se rechazó antes de su admisión. Actualiza el sitio y revisa los parámetros antes de volver a intentarlo.",
+    "resourcesTitle": "Recursos",
+    "resourcesHelp": "Explore las colecciones de recursos nativos que expone cada interfaz de NVKE.",
+    "permission": "Permiso requerido",
+    "collectionUnavailable": "Colección de recursos no disponible",
+    "desiredCount": "Cantidad deseada",
+    "emptyInventory": "No hay recursos en esta observación",
+    "historicalHelp": "Esta es una observación guardada. Los recursos pueden haber cambiado desde la lectura. Actualizar la página no ejecuta otra lectura nativa.",
+    "identity": "Identidad nativa",
+    "inventoryHelp": "Ejecute una lectura de inventario para recopilar todas las páginas nativas. La búsqueda y la paginación usan la observación guardada completa.",
+    "inventorySearch": "Buscar nombres e identidades nativas…",
+    "noInventory": "Ejecute una lectura de inventario abajo para crear una observación.",
+    "observedAt": "Observado el",
+    "conditions": "Condiciones nativas",
+    "conditionsOmitted": "Hay {count} condiciones más en el documento nativo.",
+    "downloadHelp": "Los documentos nativos pueden contener credenciales, configuración privada y otros datos sensibles. Descárguelos solo cuando sea necesario y guárdelos de forma segura.",
+    "nativeDocument": "Descargar documento nativo",
+    "resourceUid": "UID del recurso",
+    "resourceUnavailable": "Observación del recurso no disponible",
+    "resourceVersion": "Versión del recurso"
   }
 }

@@ -26,6 +26,17 @@ export const Uncertain: Story = {
 export const Succeeded: Story = {
   args: { operation: { ...OPERATION, status: "SUCCEEDED", stage: "ready" } },
 };
+export const InventorySucceeded: Story = {
+  args: {
+    operation: {
+      ...OPERATION,
+      operationKey: "listClusters",
+      isInventory: true,
+      status: "SUCCEEDED",
+      stage: "read_complete",
+    },
+  },
+};
 export const Failed: Story = {
   args: {
     operation: {

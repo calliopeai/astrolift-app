@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Skeleton } from "@/components/ui/skeleton";
+import { nvkeInventoryHref } from "@/lib/nvke/inventory";
 
 import { nvkeFinished, type NvkeOperationScreenProps } from "./types";
 
@@ -55,6 +56,15 @@ export function NvkeOperationScreen({
       }
       actions={
         <>
+          {operation.isInventory && operation.status === "SUCCEEDED" && (
+            <Button variant="outline" asChild>
+              <Link
+                href={nvkeInventoryHref(operation.siteId, operation.operationKey, operation.id)}
+              >
+                {t("resourcesTitle")}
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" disabled={pending} onClick={onRefresh}>
             <RefreshCwIcon className="size-4" />
             {t("refresh")}
