@@ -23,6 +23,7 @@ import {
   GET_NVKE_OPERATION_RESULT_TEXT,
   GET_NVKE_SITE,
 } from "./nvke.queries";
+import { useNvkeDiagnostics } from "./use-nvke-diagnostics";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
 
 export const useNvkeOperation = (
@@ -80,6 +81,13 @@ export const useNvkeOperation = (
     !!operation &&
     !!action &&
     mayExecute(context.access, action.permission);
+  const diagnostics = useNvkeDiagnostics({
+    context,
+    scopeKey: visitKey,
+    siteId,
+    operation,
+    enabled: canAct,
+  });
   const [mutation, setMutation] = useState<{
     key: string;
     pending: boolean;
@@ -137,6 +145,7 @@ export const useNvkeOperation = (
   return {
     scopeKey: visitKey,
     operation,
+    diagnostics,
     siteName: site.data?.astroliftNvkeSite?.name ?? "",
     loading,
     error: failed ? t("readFailed") : mutation?.key === visitKey ? mutation.error : null,

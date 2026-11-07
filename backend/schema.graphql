@@ -11348,6 +11348,60 @@ input NvkeCredentialsInput {
   clientKeyPem: String! = ""
 }
 
+type NvkeDiagnosticConditionType {
+  name: String!
+  value: String
+}
+
+type NvkeDiagnosticCountType {
+  name: String!
+  value: String
+}
+
+type NvkeDiagnosticFlagType {
+  name: String!
+  value: Boolean
+}
+
+type NvkeDiagnosticItemType {
+  key: String!
+  nativeId: String
+  name: String
+  createdAt: String
+  isCurrent: Boolean
+  reachable: Boolean
+  hasValidSvid: Boolean
+  serverAddress: String
+  serverPort: Int
+  svidExpiresAt: String
+  changedFields: [String!]!
+  changedFieldCount: String
+  fieldsOmitted: String
+}
+
+type NvkeDiagnosticPageType {
+  siteId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  observedAt: DateTime
+  summary: NvkeDiagnosticSummaryType!
+  items: [NvkeDiagnosticItemType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeDiagnosticSummaryType {
+  clusterId: GUID!
+  kind: String!
+  configurationId: String
+  kubernetesVersion: String
+  requestedAddress: String
+  requestedPort: Int
+  counts: [NvkeDiagnosticCountType!]!
+  flags: [NvkeDiagnosticFlagType!]!
+  conditions: [NvkeDiagnosticConditionType!]!
+}
+
 type NvkeInventoryItemType {
   key: String!
   identity: String!
@@ -12188,6 +12242,7 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeDiagnosticPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeDiagnosticPageType!
   astroliftNvkeResourceEditor(siteId: GUID!, expectedActorId: Int!, operationKey: String!, sourceOperationId: GUID!, expectedSourceVersion: Int!, sourceResourceKey: String = null): NvkeResourceEditorTypeMutationResult!
   astroliftNvkeInventoryPage(operationId: GUID!, expectedActorId: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeInventoryPageType!
   astroliftNvkeInventoryResource(operationId: GUID!, expectedActorId: Int!, resourceKey: String!): NvkeInventoryResourceType!

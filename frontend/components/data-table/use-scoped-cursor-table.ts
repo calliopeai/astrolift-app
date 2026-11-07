@@ -9,7 +9,8 @@ import { useCursorTable, type CursorTableOptions, type ScopedCursorRead } from "
 export function useScopedCursorTable<T, V extends OperationVariables = OperationVariables>(
   options: CursorTableOptions<T, V>,
   scopeKey: string,
-  requestContext?: Record<string, unknown>
+  requestContext?: Record<string, unknown>,
+  validateResponse?: (data: unknown, variables: Record<string, unknown>) => boolean
 ) {
   const [load] = useLazyQuery(options.query, { fetchPolicy: "no-cache" });
   const [snapshot, setSnapshot] = React.useState<Omit<ScopedCursorRead, "refresh"> | null>(null);
@@ -48,6 +49,15 @@ export function useScopedCursorTable<T, V extends OperationVariables = Operation
           context: { ...requestContext, queryDeduplication: false },
         });
         if (!active || latest.current !== captured) return;
+        if (validateResponse && !validateResponse(response.data, capturedVariables)) {
+          setSnapshot({
+            scopeKey,
+            variables: capturedVariables,
+            loading: false,
+            error: new Error("Response does not match the requested scope"),
+          });
+          return;
+        }
         setSnapshot({
           scopeKey,
           variables: capturedVariables,
@@ -71,6 +81,6 @@ export function useScopedCursorTable<T, V extends OperationVariables = Operation
     };
     // Variables are represented by their exact stable JSON in key.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, load]);
+  }, [key, load, validateResponse]);
   return { ...controller, retry: refresh, refetch: refresh };
 }

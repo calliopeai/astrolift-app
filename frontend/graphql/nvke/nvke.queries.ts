@@ -347,3 +347,87 @@ export const GET_NVKE_RESOURCE_EDITOR = gql`
     }
   }
 `;
+
+export const GET_NVKE_DIAGNOSTIC_SUMMARY = gql`
+  query GetNvkeDiagnosticSummary(
+    $siteId: GUID!
+    $operationId: GUID!
+    $expectedActorId: Int!
+    $expectedVersion: Int!
+  ) {
+    astroliftNvkeDiagnosticPage(
+      siteId: $siteId
+      operationId: $operationId
+      expectedActorId: $expectedActorId
+      expectedVersion: $expectedVersion
+      limit: 1
+    ) {
+      siteId
+      operationId
+      operationVersion
+      observedAt
+      summary {
+        clusterId
+        kind
+        configurationId
+        kubernetesVersion
+        requestedAddress
+        requestedPort
+        counts {
+          name
+          value
+        }
+        flags {
+          name
+          value
+        }
+        conditions {
+          name
+          value
+        }
+      }
+    }
+  }
+`;
+export const LIST_NVKE_DIAGNOSTIC_ROWS = gql`
+  query ListNvkeDiagnosticRows(
+    $siteId: GUID!
+    $operationId: GUID!
+    $expectedActorId: Int!
+    $expectedVersion: Int!
+    $after: String
+    $limit: Int = 25
+    $search: String
+  ) {
+    astroliftNvkeDiagnosticPage(
+      siteId: $siteId
+      operationId: $operationId
+      expectedActorId: $expectedActorId
+      expectedVersion: $expectedVersion
+      after: $after
+      limit: $limit
+      search: $search
+    ) {
+      siteId
+      operationId
+      operationVersion
+      totalCount
+      nextCursor
+      items {
+        key
+        nativeId
+        name
+        createdAt
+        isCurrent
+        reachable
+        hasValidSvid
+        serverAddress
+        serverPort
+        svidExpiresAt
+        changedFields
+        changedFieldCount
+        fieldsOmitted
+      }
+    }
+  }
+`;

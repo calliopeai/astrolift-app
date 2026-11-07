@@ -1,3 +1,4 @@
+import type { NvkeDiagnosticRow, NvkeDiagnosticSummary } from "./NvkeDiagnosticsPanel";
 import { fakeController } from "@/components/data-table/fixtures";
 import type {
   NvkeCollectionView,
@@ -233,4 +234,37 @@ export const OPERATION_DETAIL: NvkeOperationScreenProps = {
   onCancel: async () => true,
   onResume: async () => true,
   onDownload: async () => {},
+};
+
+export const DIAGNOSTIC_ROW: NvkeDiagnosticRow = {
+  key: "0",
+  nativeId: OPERATION.id,
+  name: "gpu-node-a",
+  createdAt: null,
+  isCurrent: null,
+  reachable: true,
+  hasValidSvid: true,
+  serverAddress: "spire.example.test",
+  serverPort: 30440,
+  svidExpiresAt: "2026-11-07T12:00:00Z",
+  changedFields: [],
+  changedFieldCount: null,
+  fieldsOmitted: null,
+};
+export const DIAGNOSTIC_OBSERVATION: NvkeDiagnosticSummary = {
+  siteId: SITE.id,
+  operationId: OPERATION.id,
+  operationVersion: OPERATION.version,
+  observedAt: OPERATION.updatedAt,
+  summary: {
+    clusterId: INVENTORY_ITEM.identity,
+    kind: "spire",
+    configurationId: null,
+    kubernetesVersion: null,
+    requestedAddress: "spire.example.test",
+    requestedPort: 30440,
+    counts: [],
+    flags: [],
+    conditions: [],
+  },
 };

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
-import { OPERATION, OPERATION_DETAIL } from "./fixtures";
+import { fakeController } from "@/components/data-table/fixtures";
+import { DIAGNOSTIC_OBSERVATION, DIAGNOSTIC_ROW, OPERATION, OPERATION_DETAIL } from "./fixtures";
 
 export default {
   title: "Screens/NVKE/Operation",
@@ -64,4 +65,17 @@ export const Width768: Story = {
       <NvkeOperationScreen {...args} />
     </div>
   ),
+};
+
+export const Diagnostics: Story = {
+  args: {
+    operation: { ...OPERATION, operationKey: "getClusterSpireServer", status: "SUCCEEDED" },
+    diagnostics: {
+      observation: DIAGNOSTIC_OBSERVATION,
+      table: fakeController({ rows: [DIAGNOSTIC_ROW] }),
+      loading: false,
+      error: null,
+      onRefresh: () => {},
+    },
+  },
 };

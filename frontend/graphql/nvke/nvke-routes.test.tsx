@@ -11,6 +11,8 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   ACTIONS,
   COLLECTION,
+  DIAGNOSTIC_OBSERVATION,
+  DIAGNOSTIC_ROW,
   INVENTORY_ITEM,
   OPERATION,
   SITE,
@@ -95,7 +97,11 @@ function harness(
                 return {
                   astroliftNvkeContract: {
                     revision: SITE.upstreamRevision,
-                    actions: ACTIONS,
+                    actions: Array.from(
+                      new Map(
+                        [...ACTIONS, ...collection.actions].map((action) => [action.key, action])
+                      ).values()
+                    ),
                     collections: [collection],
                     controllerOpenapi: {},
                     resources: [],
@@ -1112,4 +1118,133 @@ it("restores SPIRE preparation recovery after a reload without issuing another r
   expect(h.calls.filter((c) => c.operationName === "RequestNvkeResourceOperation")).toHaveLength(1);
   expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${preparedId}`);
   expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+});
+
+const diagnosticOperation = {
+  ...OPERATION,
+  operationKey: "getClusterSpireServer",
+  status: "SUCCEEDED",
+  resourceSource: {
+    operationId: "123e4567-e89b-12d3-a456-426614174095",
+    version: 7,
+    resourceKey: "signed-resource",
+  },
+};
+const diagnosticPage = {
+  ...DIAGNOSTIC_OBSERVATION,
+  items: [DIAGNOSTIC_ROW],
+  nextCursor: null,
+  totalCount: 1,
+};
+it("renders a successful bound diagnostic read through no-cache metadata queries", async () => {
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeOperation")
+      return { astroliftNvkeOperation: diagnosticOperation };
+    if (request.operationName === "GetNvkeDiagnosticSummary")
+      return { astroliftNvkeDiagnosticPage: DIAGNOSTIC_OBSERVATION };
+    if (request.operationName === "ListNvkeDiagnosticRows")
+      return { astroliftNvkeDiagnosticPage: diagnosticPage };
+    throw new Error("No native reads or private results on diagnostic view");
+  });
+  const { result } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() =>
+    expect(result.current.diagnostics?.table.rows[0]?.name).toBe(DIAGNOSTIC_ROW.name)
+  );
+  expect(
+    h.calls.find((c) => c.operationName === "ListNvkeDiagnosticRows")!.variables
+  ).toMatchObject({
+    expectedActorId: 41,
+    expectedVersion: OPERATION.version,
+    siteId: SITE.id,
+    operationId: OPERATION.id,
+    limit: 25,
+  });
+  expect(
+    h.calls.some(
+      (c) => c.operationName?.startsWith("Request") || c.operationName?.includes("ResultText")
+    )
+  ).toBe(false);
+  expect(h.cache.extract()).toEqual({});
+  expect(localStorage.length).toBe(0);
+});
+it.each(["RUNNING", "FAILED", "UNBOUND"])(
+  "does not project incomplete or unbound native reads: %s",
+  async (mode) => {
+    const h = harness((request) =>
+      request.operationName === "GetNvkeOperation"
+        ? {
+            astroliftNvkeOperation: {
+              ...diagnosticOperation,
+              status: mode === "UNBOUND" ? "SUCCEEDED" : mode,
+              resourceSource: mode === "UNBOUND" ? null : diagnosticOperation.resourceSource,
+            },
+          }
+        : (() => {
+            throw new Error("Must not query diagnostics");
+          })()
+    );
+    const { result } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+      wrapper: h.wrapper,
+    });
+    await waitFor(() => expect(result.current.canAct).toBe(true));
+    expect(result.current.diagnostics).toBeNull();
+    expect(h.calls.some((c) => c.operationName?.includes("Diagnostic"))).toBe(false);
+  }
+);
+it("rejects diagnostic pages belonging to another reviewed source version", async () => {
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeOperation")
+      return { astroliftNvkeOperation: diagnosticOperation };
+    return {
+      astroliftNvkeDiagnosticPage:
+        request.operationName === "GetNvkeDiagnosticSummary"
+          ? DIAGNOSTIC_OBSERVATION
+          : { ...diagnosticPage, operationVersion: OPERATION.version + 1 },
+    };
+  });
+  const { result } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.diagnostics?.error).toBe("readFailed"));
+  expect(result.current.diagnostics?.table.rows).toEqual([]);
+  expect(result.current.diagnostics?.table.state).toBe("error");
+});
+it("suppresses a late diagnostic summary across actor A to B to A", async () => {
+  let finish!: (value: Record<string, unknown>) => void;
+  let summaries = 0;
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeOperation")
+      return { astroliftNvkeOperation: diagnosticOperation };
+    if (request.operationName === "GetNvkeDiagnosticSummary") {
+      if (++summaries === 1)
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      return {
+        astroliftNvkeDiagnosticPage: {
+          ...DIAGNOSTIC_OBSERVATION,
+          summary: { ...DIAGNOSTIC_OBSERVATION.summary, requestedAddress: "new-visit.test" },
+        },
+      };
+    }
+    return { astroliftNvkeDiagnosticPage: diagnosticPage };
+  });
+  const { result, rerender } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(finish).toBeTypeOf("function"));
+  caller.actorId = 42;
+  rerender();
+  caller.actorId = 41;
+  rerender();
+  await waitFor(() =>
+    expect(result.current.diagnostics?.observation?.summary.requestedAddress).toBe("new-visit.test")
+  );
+  await act(async () => {
+    finish({ astroliftNvkeDiagnosticPage: DIAGNOSTIC_OBSERVATION });
+  });
+  expect(result.current.diagnostics?.observation?.summary.requestedAddress).toBe("new-visit.test");
+  expect(h.cache.extract()).toEqual({});
 });

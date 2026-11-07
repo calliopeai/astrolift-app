@@ -13,6 +13,7 @@ from nvke.operations import action, actions
 from strawberry.scalars import JSON
 from strawberry.types import Info
 
+from astrolift_clusters import nvke_diagnostics as diagnostics
 from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_resource_operations as resource_operations
@@ -399,7 +400,108 @@ class ResumeNvkeOperationInput:
 
 
 @strawberry.type
+class NvkeDiagnosticCountType:
+    name: str
+    value: str | None
+
+
+@strawberry.type
+class NvkeDiagnosticFlagType:
+    name: str
+    value: bool | None
+
+
+@strawberry.type
+class NvkeDiagnosticConditionType:
+    name: str
+    value: str | None
+
+
+@strawberry.type
+class NvkeDiagnosticSummaryType:
+    cluster_id: GUID
+    kind: str
+    configuration_id: str | None
+    kubernetes_version: str | None
+    requested_address: str | None
+    requested_port: int | None
+    counts: list[NvkeDiagnosticCountType]
+    flags: list[NvkeDiagnosticFlagType]
+    conditions: list[NvkeDiagnosticConditionType]
+
+
+@strawberry.type
+class NvkeDiagnosticItemType:
+    key: str
+    native_id: str | None
+    name: str | None
+    created_at: str | None
+    is_current: bool | None
+    reachable: bool | None
+    has_valid_svid: bool | None
+    server_address: str | None
+    server_port: int | None
+    svid_expires_at: str | None
+    changed_fields: list[str]
+    changed_field_count: str | None
+    fields_omitted: str | None
+
+
+@strawberry.type
+class NvkeDiagnosticPageType:
+    site_id: GUID
+    operation_id: GUID
+    operation_version: int
+    observed_at: datetime | None
+    summary: NvkeDiagnosticSummaryType
+    items: list[NvkeDiagnosticItemType]
+    next_cursor: str | None
+    total_count: int
+
+
+@strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_diagnostic_page(
+        self,
+        info: Info,
+        site_id: GUID,
+        operation_id: GUID,
+        expected_actor_id: int,
+        expected_version: int,
+        after: str | None = None,
+        limit: int = 50,
+        search: str | None = None,
+    ) -> NvkeDiagnosticPageType:
+        row, summary, items, cursor, total = diagnostics.page(
+            site_id=str(site_id),
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            expected_version=expected_version,
+            after=after,
+            limit=limit,
+            search=search or "",
+        )
+        return NvkeDiagnosticPageType(
+            site_id=GUID(str(row.site.guid)),
+            operation_id=GUID(str(row.guid)),
+            operation_version=row.version,
+            observed_at=row.finished_at,
+            summary=NvkeDiagnosticSummaryType(
+                **{
+                    **summary,
+                    "counts": [NvkeDiagnosticCountType(**value) for value in summary["counts"]],
+                    "flags": [NvkeDiagnosticFlagType(**value) for value in summary["flags"]],
+                    "conditions": [NvkeDiagnosticConditionType(**value) for value in summary["conditions"]],
+                }
+            ),
+            items=[NvkeDiagnosticItemType(**item) for item in items],
+            next_cursor=cursor,
+            total_count=total,
+        )
+
     @strawberry.field
     @nvke_errors
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))

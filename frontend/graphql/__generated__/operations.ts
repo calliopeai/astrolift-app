@@ -12963,6 +12963,60 @@ export type NvkeCredentialsInput = {
   token: Scalars['String']['input'];
 };
 
+export type NvkeDiagnosticConditionType = {
+  name: Scalars['String']['output'];
+  value?: Maybe<Scalars['String']['output']>;
+};
+
+export type NvkeDiagnosticCountType = {
+  name: Scalars['String']['output'];
+  value?: Maybe<Scalars['String']['output']>;
+};
+
+export type NvkeDiagnosticFlagType = {
+  name: Scalars['String']['output'];
+  value?: Maybe<Scalars['Boolean']['output']>;
+};
+
+export type NvkeDiagnosticItemType = {
+  changedFieldCount?: Maybe<Scalars['String']['output']>;
+  changedFields: Array<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  fieldsOmitted?: Maybe<Scalars['String']['output']>;
+  hasValidSvid?: Maybe<Scalars['Boolean']['output']>;
+  isCurrent?: Maybe<Scalars['Boolean']['output']>;
+  key: Scalars['String']['output'];
+  name?: Maybe<Scalars['String']['output']>;
+  nativeId?: Maybe<Scalars['String']['output']>;
+  reachable?: Maybe<Scalars['Boolean']['output']>;
+  serverAddress?: Maybe<Scalars['String']['output']>;
+  serverPort?: Maybe<Scalars['Int']['output']>;
+  svidExpiresAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type NvkeDiagnosticPageType = {
+  items: Array<NvkeDiagnosticItemType>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  siteId: Scalars['GUID']['output'];
+  summary: NvkeDiagnosticSummaryType;
+  totalCount: Scalars['Int']['output'];
+};
+
+export type NvkeDiagnosticSummaryType = {
+  clusterId: Scalars['GUID']['output'];
+  conditions: Array<NvkeDiagnosticConditionType>;
+  configurationId?: Maybe<Scalars['String']['output']>;
+  counts: Array<NvkeDiagnosticCountType>;
+  flags: Array<NvkeDiagnosticFlagType>;
+  kind: Scalars['String']['output'];
+  kubernetesVersion?: Maybe<Scalars['String']['output']>;
+  requestedAddress?: Maybe<Scalars['String']['output']>;
+  requestedPort?: Maybe<Scalars['Int']['output']>;
+};
+
 export type NvkeInventoryItemType = {
   conditions: Array<NvkeNativeConditionType>;
   conditionsOmitted: Scalars['Int']['output'];
@@ -13688,6 +13742,7 @@ export type Query = {
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
   astroliftNvkeContract: NvkeContractType;
+  astroliftNvkeDiagnosticPage: NvkeDiagnosticPageType;
   astroliftNvkeInventoryDocumentText: StrMutationResult;
   astroliftNvkeInventoryPage: NvkeInventoryPageType;
   astroliftNvkeInventoryResource: NvkeInventoryResourceType;
@@ -15258,6 +15313,17 @@ export type QueryAstroliftMyNotificationsArgs = {
 export type QueryAstroliftMyNotificationsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftNvkeDiagnosticPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  siteId: Scalars['GUID']['input'];
 };
 
 
@@ -21132,6 +21198,29 @@ export type GetNvkeResourceEditorQueryVariables = Exact<{
 
 
 export type GetNvkeResourceEditorQuery = { astroliftNvkeResourceEditor: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { operationKey: string, parametersText?: string | null, preparationActionKey?: string | null, concurrency: string, source: { operationId: string, version: number, resourceKey?: string | null } } | null } };
+
+export type GetNvkeDiagnosticSummaryQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  operationId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+}>;
+
+
+export type GetNvkeDiagnosticSummaryQuery = { astroliftNvkeDiagnosticPage: { siteId: string, operationId: string, operationVersion: number, observedAt?: string | null, summary: { clusterId: string, kind: string, configurationId?: string | null, kubernetesVersion?: string | null, requestedAddress?: string | null, requestedPort?: number | null, counts: Array<{ name: string, value?: string | null }>, flags: Array<{ name: string, value?: boolean | null }>, conditions: Array<{ name: string, value?: string | null }> } } };
+
+export type ListNvkeDiagnosticRowsQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  operationId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ListNvkeDiagnosticRowsQuery = { astroliftNvkeDiagnosticPage: { siteId: string, operationId: string, operationVersion: number, totalCount: number, nextCursor?: string | null, items: Array<{ key: string, nativeId?: string | null, name?: string | null, createdAt?: string | null, isCurrent?: boolean | null, reachable?: boolean | null, hasValidSvid?: boolean | null, serverAddress?: string | null, serverPort?: number | null, svidExpiresAt?: string | null, changedFields: Array<string>, changedFieldCount?: string | null, fieldsOmitted?: string | null }> } };
 
 export type TelemetryAppsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;

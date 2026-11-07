@@ -16,6 +16,10 @@ const stories = [
   "screens-nvke-resource-actions--spire",
   "screens-nvke-resource-actions--reads",
   "screens-nvke-resource-actions--read-only-resource",
+  "screens-nvke-diagnostics--spire",
+  "screens-nvke-diagnostics--control-plane",
+  "screens-nvke-diagnostics--history",
+  "screens-nvke-operation--diagnostics",
 ];
 for (const mode of ["light", "dark"]) {
   for (const id of stories) {
@@ -161,4 +165,24 @@ test("nvke SPIRE editing confirms both cluster and requested server", async ({ p
   await expect(page.getByLabel("SPIRE server address", { exact: true })).toHaveValue(
     "spire.new.test"
   );
+});
+
+test("nvke diagnostics show exact counters and unreported readiness as historical metadata", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-diagnostics--control-plane&viewMode=story");
+  await expect(page.getByText("9007199254740993")).toHaveCount(2);
+  await expect(page.getByText("Reported Ready nodes", { exact: true }).locator("..")).toContainText(
+    "Not reported"
+  );
+  await expect(page.getByRole("note")).toContainText("saved observation");
+});
+
+test("nvke read-only diagnostic tables scroll with the keyboard", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-diagnostics--spire&viewMode=story");
+  const region = page.getByRole("region", { name: "Diagnostics", exact: true });
+  await region.focus();
+  await expect(region).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
 });

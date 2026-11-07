@@ -1,3 +1,4 @@
+import type { NvkeDiagnosticsPanelProps } from "./NvkeDiagnosticsPanel";
 import type { CursorTableController } from "@/components/data-table";
 import type {
   GetNvkeContractQuery,
@@ -162,6 +163,7 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  diagnostics?: NvkeDiagnosticsPanelProps | null;
   operation: NvkeOperationView | null;
   siteName: string;
   loading: boolean;

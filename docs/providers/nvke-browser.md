@@ -110,3 +110,33 @@ Observation browsing uses manual refresh; a confirmed preparation GET polls its 
 for a bounded interval. Additional lifecycle controls, site bootstrap,
 additional workload access management, telemetry and live hardware qualification remain delivery work.
 Observation browsing and the native editor do not establish full integration qualification.
+
+
+## Typed diagnostic observations
+
+Successful resource-bound control-plane, configuration-history and SPIRE reads
+show typed metadata on their operation pages. Loading these views reads the saved
+encrypted observation; refresh and search do not start another native request.
+The header names the native cluster UUID from the verified immutable request binding.
+The diagnostic API requires the current numeric actor, reviewed operation version,
+site and native read permission. Failed, pending, unbound and foreign observations
+cannot supply these views. They remain historical after connection rotation;
+editing still requires the separate current interface-authority checks.
+
+Control-plane counts remain exact decimal strings, with absent or invalid values
+shown as not reported rather than zero. Conditions retain native True/False/Unknown
+without copying their messages. SPIRE rows show reported agent reachability,
+reported SVID validity/expiry and server identity; no browser-clock calculation
+turns an old report into current certificate validation. Configuration history
+retains native order and shows snapshot IDs/times, current-at-observation flags and
+known changed-field names. Encoded before/after values, author/reason text,
+annotations, credentials and diagnostic messages stay in the explicit native
+result download. Unknown or excess changed-field names are counted as omitted.
+
+SPIRE and history tables paginate and search the complete saved native arrays on
+the server. Cursors bind actor, organization, site, source operation/version, search
+and page size. A 100,000-row projection limit fails explicitly. Both metadata and
+row requests bypass normalized caches, and scope changes invalidate late replies.
+A page that fails its source/site/version validation becomes a table error before
+its data enters the scoped snapshot. These views report upstream data; they do not
+strengthen the pinned controller's missing readiness counters or atomic-write guarantees.
