@@ -235,5 +235,7 @@ ownership; revoking an imported grant is not a blanket deny for the cluster.
 Enrollment performs no native writes and does not download a credential. Every
 `datastore.getWorkloadKubeconfig` still verifies the live CAPI cluster UID and
 Secret owner reference, exact native cluster-ID label, admin mode, namespace,
-and cluster-name label. Unlabelled legacy Secrets remain refused. This enrollment
-API does not yet provide browser/CLI controls or certificate renewal automation.
+and cluster-name label. Unlabelled legacy Secrets remain refused. The paired CLI
+exposes `astro nvke access list`, `enroll`, and `revoke` with explicit reviewed
+site/source/binding versions. Browser controls and certificate renewal automation
+remain pending.
