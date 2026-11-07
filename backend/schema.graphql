@@ -8001,6 +8001,10 @@ input CancelDeregisterInput {
   reason: String = null
 }
 
+input CancelNvkeOperationInput {
+  operationId: GUID!
+}
+
 enum CatalogueState {
   AVAILABLE
   NO_DATA
@@ -9420,6 +9424,12 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
+type JSONMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: JSON
+}
+
 type LibraryMkdirResult {
   ok: Boolean!
   directory: SharedDirectoryType
@@ -10829,6 +10839,9 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  requestNvkeOperation(input: RequestNvkeOperationInput!): NvkeOperationTypeMutationResult!
+  cancelNvkeOperation(input: CancelNvkeOperationInput!): NvkeOperationTypeMutationResult!
+  resumeNvkeOperation(input: ResumeNvkeOperationInput!): NvkeOperationTypeMutationResult!
   createNvkeSite(input: CreateNvkeSiteInput!): NvkeSiteTypeMutationResult!
   configureNvkeConnection(input: ConfigureNvkeConnectionInput!): NvkeSiteTypeMutationResult!
   setNvkeSiteEnabled(input: SetNvkeSiteEnabledInput!): NvkeSiteTypeMutationResult!
@@ -11284,6 +11297,16 @@ type NoneTypeMutationResult {
   data: Void
 }
 
+type NvkeActionType {
+  key: String!
+  surface: NvkeSurface!
+  verb: String!
+  resourceKind: String!
+  mutates: Boolean!
+  permission: String!
+  path: String!
+}
+
 type NvkeConnectionType {
   id: GUID!
   version: Int!
@@ -11297,11 +11320,77 @@ type NvkeConnectionType {
   verificationCode: String!
 }
 
+type NvkeContractType {
+  revision: String!
+  actions: [NvkeActionType!]!
+  controllerOpenapi: JSON!
+  resources: [NvkeResourceSchemaType!]!
+}
+
 input NvkeCredentialsInput {
   token: String! = ""
   caPem: String! = ""
   clientCertificatePem: String! = ""
   clientKeyPem: String! = ""
+}
+
+enum NvkeOperationStatus {
+  QUEUED
+  RUNNING
+  RECONCILING
+  AWAITING_READY
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  UNCERTAIN
+}
+
+type NvkeOperationType {
+  id: GUID!
+  version: Int!
+  siteId: GUID!
+  requestId: String!
+  operationKey: String!
+  status: NvkeOperationStatus!
+  stage: String!
+  generation: Int!
+  errorCode: String!
+  errorMessage: String!
+  cancellationRequestedAt: DateTime
+  startedAt: DateTime
+  finishedAt: DateTime
+  deadline: DateTime!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type NvkeOperationTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperationType
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type NvkeOperationTypePage {
+  items: [NvkeOperationType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type NvkeResourceSchemaType {
+  kind: String!
+  namespaced: Boolean!
+  schema: JSON!
 }
 
 type NvkeSiteType {
@@ -12024,6 +12113,10 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeContract: NvkeContractType!
+  astroliftNvkeOperations(siteId: GUID!, after: String = null, limit: Int! = 50): NvkeOperationTypePage!
+  astroliftNvkeOperation(operationId: GUID!): NvkeOperationType
+  astroliftNvkeOperationResult(operationId: GUID!): JSONMutationResult!
   astroliftNvkeSites(after: String = null, limit: Int! = 50): NvkeSiteTypePage!
   astroliftNvkeSite(siteId: GUID!): NvkeSiteType
   astroliftQuotas: [AstroliftQuota!]!
@@ -12623,6 +12716,15 @@ input RequestModelConnectionInput {
   idempotencyKey: GUID!
 }
 
+input RequestNvkeOperationInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  requestId: String!
+  operationKey: String!
+  parameters: JSON!
+  timeoutSeconds: Int! = 7200
+}
+
 input RequestQuotaIncreaseInput {
   quotaId: GUID!
   factor: Float!
@@ -12653,6 +12755,12 @@ input RestoreAppInput {
 
 input ResumeAppWebhookDeploysInput {
   appSlug: String!
+}
+
+input ResumeNvkeOperationInput {
+  operationId: GUID!
+  expectedVersion: Int!
+  timeoutSeconds: Int! = 7200
 }
 
 input ResyncManifestFromRepoInput {

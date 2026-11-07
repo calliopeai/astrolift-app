@@ -233,3 +233,101 @@ def test_clearing_credentials_removes_the_metadata_presence_flag(world):
     assert cleared.errors is None
     assert cleared.data["configureNvkeConnection"]["ok"]
     assert not cleared.data["configureNvkeConnection"]["data"]["connections"][0]["hasCredentials"]
+
+
+REQUEST_OPERATION = """
+mutation($unrelated: RequestNvkeOperationInput!) {
+  requestNvkeOperation(input:$unrelated) {
+    ok errors { code message }
+    data { id version requestId operationKey status stage siteId }
+  }
+}
+"""
+
+
+def operation_request(world, *, operation_key="listClusters", parameters=None):
+    from astrolift_clusters.tests.test_nvke_sites import put
+
+    with context(world):
+        site = create()
+        put(site)
+        site.refresh_from_db()
+    return site, {
+        "siteId": str(site.guid),
+        "expectedSiteVersion": site.version,
+        "requestId": str(uuid4()),
+        "operationKey": operation_key,
+        "parameters": parameters or {},
+    }
+
+
+def test_complete_execution_catalog_is_available_through_real_schema(world):
+    from nvke.operations import actions
+
+    result = execute(
+        world,
+        "{ astroliftNvkeContract { revision actions { key surface verb mutates permission } resources { kind namespaced schema } } }",
+    )
+    assert result.errors is None
+    catalog = result.data["astroliftNvkeContract"]
+    assert {item["key"] for item in catalog["actions"]} == {item.key for item in actions()}
+    assert len(catalog["resources"]) == 6
+    assert len(catalog["revision"]) == 40
+
+
+def test_request_metadata_and_paginated_history_do_not_expose_private_parameters(world):
+    site, request = operation_request(world, parameters={"query": {"name": "PRIVATE_FILTER_IN_SCRIPT"}})
+    result = execute(world, REQUEST_OPERATION, {"unrelated": request})
+    assert result.errors is None
+    payload = result.data["requestNvkeOperation"]
+    assert payload["ok"], payload
+    assert payload["data"]["operationKey"] == "listClusters"
+    log = MutationAuditLog.objects.filter(operation="nvke.operation_request").latest("timestamp")
+    assert log.variables["unrelated"]["parameters"] == "***REDACTED***"
+    assert "PRIVATE_FILTER_IN_SCRIPT" not in json.dumps(log.variables)
+    repeated = execute(world, REQUEST_OPERATION, {"unrelated": request})
+    assert repeated.data["requestNvkeOperation"]["data"]["id"] == payload["data"]["id"]
+    history = execute(
+        world,
+        "query($id:GUID!) { astroliftNvkeOperations(siteId:$id, limit:1) { items { id status } totalCount } }",
+        {"id": str(site.guid)},
+    )
+    assert history.errors is None
+    assert history.data["astroliftNvkeOperations"]["totalCount"] == 1
+    assert history.data["astroliftNvkeOperations"]["items"][0]["id"] == payload["data"]["id"]
+
+
+def test_rejected_operation_payload_is_redacted_from_audit_even_when_variable_is_renamed(world):
+    _site, request = operation_request(world, parameters={"unknown": "PRIVATE_REJECTED_VALUE"})
+    result = execute(world, REQUEST_OPERATION, {"unrelated": request})
+    assert result.errors is None
+    payload = result.data["requestNvkeOperation"]
+    assert not payload["ok"]
+    assert payload["errors"][0]["code"] == "INVALID_INPUT"
+    assert "PRIVATE_REJECTED_VALUE" not in json.dumps(payload)
+    log = MutationAuditLog.objects.filter(operation="nvke.operation_request").latest("timestamp")
+    assert "PRIVATE_REJECTED_VALUE" not in json.dumps(log.variables)
+
+
+def test_manage_permission_cannot_dispatch_an_operator_operation(world):
+    _site, request = operation_request(world, operation_key="operator.listMachineImage")
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import Member
+    from core.permissions import Permission
+
+    user = get_user_model().objects.create(username="nvke-manager-" + uuid4().hex[:10], is_active=True)
+    Member.objects.create(user=user, scope_kind="ORG", scope_id=world.org.pk)
+    bind_role(
+        user,
+        permissions=[Permission.NVKE_READ, Permission.NVKE_MANAGE],
+        kind="ORG",
+        scope_id=world.org.pk,
+        slug="nvke-manager-" + uuid4().hex[:10],
+    )
+    limited = SimpleNamespace(user=user, org=world.org)
+    result = execute(limited, REQUEST_OPERATION, {"unrelated": request})
+    assert result.errors is None
+    payload = result.data["requestNvkeOperation"]
+    assert not payload["ok"]
+    assert payload["errors"][0]["code"] == "PERMISSION_DENIED"

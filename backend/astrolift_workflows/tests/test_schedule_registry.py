@@ -116,8 +116,9 @@ def test_default_schedules_complete():
     #1971 adds the moved-conversation admission expiry sweep.
     #2433 adds the temporary-app expiry timer sweep.
     #2465 adds the product-deployment scan.
+    #2660 adds recovery of durable NVKE operation dispatches.
     Lock the count so future additions stay visible in a diff."""
-    assert len(DEFAULT_SCHEDULES) == 30
+    assert len(DEFAULT_SCHEDULES) == 31
 
 
 def test_default_schedules_include_all_kinds():

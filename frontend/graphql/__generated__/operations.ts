@@ -7396,6 +7396,10 @@ export type CancelDeregisterInput = {
   workflowId: Scalars['String']['input'];
 };
 
+export type CancelNvkeOperationInput = {
+  operationId: Scalars['GUID']['input'];
+};
+
 export type CatalogueState =
   | 'AVAILABLE'
   | 'NO_DATA'
@@ -8758,6 +8762,12 @@ export type IssueClusterAgentKeyInput = {
   intervalSeconds: InputMaybe<Scalars['Int']['input']>;
 };
 
+export type JsonMutationResult = {
+  data?: Maybe<Scalars['JSON']['output']>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type LibraryMkdirResult = {
   directory?: Maybe<SharedDirectoryType>;
   ok: Scalars['Boolean']['output'];
@@ -9821,6 +9831,7 @@ export type Mutation = {
   cancelActionRequest: AstroliftActionApprovalRequestMutationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
   cancelModelConnectionRequest: ModelConnectionRequestMutationResult;
+  cancelNvkeOperation: NvkeOperationTypeMutationResult;
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
@@ -10090,6 +10101,7 @@ export type Mutation = {
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestModelConnection: ModelConnectionRequestMutationResult;
+  requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -10101,6 +10113,7 @@ export type Mutation = {
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
   resumeAstroliftAppWebhookDeploys: AstroliftRegisteredAppMutationResult;
   resumeEnvironment: AstroliftAppEnvironmentMutationResult;
+  resumeNvkeOperation: NvkeOperationTypeMutationResult;
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult;
   resyncAstroliftCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
@@ -10569,6 +10582,11 @@ export type MutationCancelAstroliftDeregisterArgs = {
 
 export type MutationCancelModelConnectionRequestArgs = {
   input: DecideModelConnectionRequestInput;
+};
+
+
+export type MutationCancelNvkeOperationArgs = {
+  input: CancelNvkeOperationInput;
 };
 
 
@@ -11787,6 +11805,11 @@ export type MutationRequestModelConnectionArgs = {
 };
 
 
+export type MutationRequestNvkeOperationArgs = {
+  input: RequestNvkeOperationInput;
+};
+
+
 export type MutationRequestQuotaIncreaseArgs = {
   input: RequestQuotaIncreaseInput;
 };
@@ -11836,6 +11859,11 @@ export type MutationResumeAstroliftAppWebhookDeploysArgs = {
 
 export type MutationResumeEnvironmentArgs = {
   input: EnvironmentByIdInput;
+};
+
+
+export type MutationResumeNvkeOperationArgs = {
+  input: ResumeNvkeOperationInput;
 };
 
 
@@ -12869,6 +12897,16 @@ export type NoneTypeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type NvkeActionType = {
+  key: Scalars['String']['output'];
+  mutates: Scalars['Boolean']['output'];
+  path: Scalars['String']['output'];
+  permission: Scalars['String']['output'];
+  resourceKind: Scalars['String']['output'];
+  surface: NvkeSurface;
+  verb: Scalars['String']['output'];
+};
+
 export type NvkeConnectionType = {
   allowHttp: Scalars['Boolean']['output'];
   endpoint: Scalars['String']['output'];
@@ -12882,11 +12920,72 @@ export type NvkeConnectionType = {
   version: Scalars['Int']['output'];
 };
 
+export type NvkeContractType = {
+  actions: Array<NvkeActionType>;
+  controllerOpenapi: Scalars['JSON']['output'];
+  resources: Array<NvkeResourceSchemaType>;
+  revision: Scalars['String']['output'];
+};
+
 export type NvkeCredentialsInput = {
   caPem: Scalars['String']['input'];
   clientCertificatePem: Scalars['String']['input'];
   clientKeyPem: Scalars['String']['input'];
   token: Scalars['String']['input'];
+};
+
+export type NvkeOperationStatus =
+  | 'AWAITING_READY'
+  | 'CANCELLED'
+  | 'FAILED'
+  | 'QUEUED'
+  | 'RECONCILING'
+  | 'RUNNING'
+  | 'SUCCEEDED'
+  | 'UNCERTAIN';
+
+export type NvkeOperationType = {
+  cancellationRequestedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deadline: Scalars['DateTime']['output'];
+  errorCode: Scalars['String']['output'];
+  errorMessage: Scalars['String']['output'];
+  finishedAt?: Maybe<Scalars['DateTime']['output']>;
+  generation: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  operationKey: Scalars['String']['output'];
+  requestId: Scalars['String']['output'];
+  siteId: Scalars['GUID']['output'];
+  stage: Scalars['String']['output'];
+  startedAt?: Maybe<Scalars['DateTime']['output']>;
+  status: NvkeOperationStatus;
+  updatedAt: Scalars['DateTime']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeOperationTypeMutationResult = {
+  data?: Maybe<NvkeOperationType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type NvkeOperationTypePage = {
+  items: Array<NvkeOperationType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type NvkeResourceSchemaType = {
+  kind: Scalars['String']['output'];
+  namespaced: Scalars['Boolean']['output'];
+  schema: Scalars['JSON']['output'];
 };
 
 export type NvkeSiteType = {
@@ -13498,6 +13597,10 @@ export type Query = {
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
+  astroliftNvkeContract: NvkeContractType;
+  astroliftNvkeOperation?: Maybe<NvkeOperationType>;
+  astroliftNvkeOperationResult: JsonMutationResult;
+  astroliftNvkeOperations: NvkeOperationTypePage;
   astroliftNvkeSite?: Maybe<NvkeSiteType>;
   astroliftNvkeSites: NvkeSiteTypePage;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
@@ -15062,6 +15165,23 @@ export type QueryAstroliftMyNotificationsPageArgs = {
 };
 
 
+export type QueryAstroliftNvkeOperationArgs = {
+  operationId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftNvkeOperationResultArgs = {
+  operationId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftNvkeOperationsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftNvkeSiteArgs = {
   siteId: Scalars['GUID']['input'];
 };
@@ -16587,6 +16707,15 @@ export type RequestModelConnectionInput = {
   policyVersion: Scalars['String']['input'];
 };
 
+export type RequestNvkeOperationInput = {
+  expectedSiteVersion: Scalars['Int']['input'];
+  operationKey: Scalars['String']['input'];
+  parameters: Scalars['JSON']['input'];
+  requestId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
 export type RequestQuotaIncreaseInput = {
   factor: Scalars['Float']['input'];
   quotaId: Scalars['GUID']['input'];
@@ -16617,6 +16746,12 @@ export type RestoreAppInput = {
 
 export type ResumeAppWebhookDeploysInput = {
   appSlug: Scalars['String']['input'];
+};
+
+export type ResumeNvkeOperationInput = {
+  expectedVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
 };
 
 export type ResyncManifestFromRepoInput = {
@@ -20679,6 +20814,27 @@ export type RemoveNvkeSiteMutationVariables = Exact<{
 
 export type RemoveNvkeSiteMutation = { removeNvkeSite: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null } };
 
+export type RequestNvkeOperationMutationVariables = Exact<{
+  input: RequestNvkeOperationInput;
+}>;
+
+
+export type RequestNvkeOperationMutation = { requestNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+
+export type CancelNvkeOperationMutationVariables = Exact<{
+  input: CancelNvkeOperationInput;
+}>;
+
+
+export type CancelNvkeOperationMutation = { cancelNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+
+export type ResumeNvkeOperationMutationVariables = Exact<{
+  input: ResumeNvkeOperationInput;
+}>;
+
+
+export type ResumeNvkeOperationMutation = { resumeNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+
 export type NvkeSiteFieldsFragment = { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> };
 
 export type ListNvkeSitesQueryVariables = Exact<{
@@ -20695,6 +20851,36 @@ export type GetNvkeSiteQueryVariables = Exact<{
 
 
 export type GetNvkeSiteQuery = { astroliftNvkeSite?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null };
+
+export type NvkeOperationFieldsFragment = { id: string, version: number, siteId: string, requestId: string, operationKey: string, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string };
+
+export type ListNvkeOperationsQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type ListNvkeOperationsQuery = { astroliftNvkeOperations: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, siteId: string, requestId: string, operationKey: string, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string }> } };
+
+export type GetNvkeOperationQueryVariables = Exact<{
+  operationId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetNvkeOperationQuery = { astroliftNvkeOperation?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null };
+
+export type GetNvkeOperationResultQueryVariables = Exact<{
+  operationId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetNvkeOperationResultQuery = { astroliftNvkeOperationResult: { ok: boolean, data?: unknown | null, errors: Array<{ code: string, message: string }> } };
+
+export type GetNvkeContractQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetNvkeContractQuery = { astroliftNvkeContract: { revision: string, controllerOpenapi: unknown, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }>, resources: Array<{ kind: string, namespaced: boolean, schema: unknown }> } };
 
 export type TelemetryAppsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;

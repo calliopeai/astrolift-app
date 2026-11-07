@@ -235,6 +235,7 @@ from astrolift_workflows.activities.native_endpoint_configuration import (
     configure_native_endpoint_deployment,
 )
 from astrolift_workflows.activities.native_endpoint_removal import remove_native_endpoint_identity
+from astrolift_workflows.activities.nvke import nvke_operation_attempt, nvke_outbox_tick
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
 from astrolift_workflows.activities.scheduled import (
     apply_observability_retention,
@@ -326,6 +327,7 @@ from astrolift_workflows.workflows.conversation_transfer import (
 from astrolift_workflows.workflows.domain_app_route import ManagedDomainAppRouteWorkflow
 from astrolift_workflows.workflows.install_cluster_agent import InstallClusterAgentWorkflow
 from astrolift_workflows.workflows.install_cluster_log_collector import InstallClusterLogCollectorWorkflow
+from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow, NvkeOutboxTickWorkflow
 
 WORKFLOWS = (
     BuilderBrainSourceBuildWorkflow,
@@ -333,6 +335,8 @@ WORKFLOWS = (
     ManagedDomainAppRouteWorkflow,
     InstallClusterAgentWorkflow,
     InstallClusterLogCollectorWorkflow,
+    NvkeOperationWorkflow,
+    NvkeOutboxTickWorkflow,
     AgentTaskCallbackReconcileWorkflow,
     DeliverAgentTaskCallbackWorkflow,
     ConversationTransferExpiryTickWorkflow,
@@ -419,6 +423,8 @@ ACTIVITIES = (
     reconcile_domain_app_route,
     install_cluster_agent_attempt,
     install_cluster_log_collector_attempt,
+    nvke_operation_attempt,
+    nvke_outbox_tick,
     deliver_agent_task_callback,
     reconcile_agent_task_callbacks,
     expire_conversation_transfers_tick,

@@ -102,6 +102,7 @@ class NvkeOperation(BaseCoreModel):
     request_digest = models.CharField(max_length=64)
     operation_key = models.CharField(max_length=128)
     expected_site_version = models.PositiveIntegerField()
+    authority = models.JSONField(default=dict)
     input_backend_kind = models.CharField(max_length=32)
     input_ciphertext = models.BinaryField()
     result_backend_kind = models.CharField(max_length=32, blank=True, default="")
@@ -136,6 +137,7 @@ class NvkeOperation(BaseCoreModel):
             "request_digest",
             "operation_key",
             "expected_site_version",
+            "authority",
             "input_backend_kind",
             "input_ciphertext",
         )

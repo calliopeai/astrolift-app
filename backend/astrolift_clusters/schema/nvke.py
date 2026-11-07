@@ -6,9 +6,15 @@ from enum import Enum
 from functools import wraps
 
 import strawberry
+from nvke.client import NvkeError
+from nvke.contract import controller_spec, resource_schema, resources, upstream_revision
+from nvke.operations import actions
+from strawberry.scalars import JSON
 from strawberry.types import Info
 
+from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_sites as service
+from astrolift_clusters.models import NvkeOperation
 from astrolift_clusters.scopes import cluster_catalog_org_scope
 from astrolift_graphql import GUID, MutationResultType, PageType, failure, keyset_page, success
 from core.decorators import tenant_scoped
@@ -23,12 +29,12 @@ def nvke_errors(fn):
             return fn(*args, **kwargs)
         except PermissionDenied:
             return failure("PERMISSION_DENIED", "NVKE authority is unavailable")
-        except service.NvkeSiteError as exc:
+        except (service.NvkeSiteError, NvkeError) as exc:
             return failure(exc.code, str(exc))
         except Exception:
             # Credential-bearing inputs and backend exception messages must not
             # escape into the audit decorator or GraphQL error diagnostics.
-            return failure("INTERNAL", "NVKE configuration could not be saved")
+            return failure("INTERNAL", "NVKE request could not be completed")
 
     return safe
 
@@ -139,8 +145,171 @@ class RemoveNvkeSiteInput:
     expected_site_version: int
 
 
+@strawberry.enum
+class NvkeOperationStatus(Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    RECONCILING = "reconciling"
+    AWAITING_READY = "awaiting_ready"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    UNCERTAIN = "uncertain"
+
+
+@strawberry.type
+class NvkeOperationType:
+    id: GUID
+    version: int
+    site_id: GUID
+    request_id: str
+    operation_key: str
+    status: NvkeOperationStatus
+    stage: str
+    generation: int
+    error_code: str
+    error_message: str
+    cancellation_requested_at: datetime | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    deadline: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+def operation_type(row):
+    return NvkeOperationType(
+        id=GUID(str(row.guid)),
+        version=row.version,
+        site_id=GUID(str(row.site.guid)),
+        request_id=str(row.request_id),
+        operation_key=row.operation_key,
+        status=NvkeOperationStatus(row.status),
+        stage=row.stage,
+        generation=row.generation,
+        error_code=row.error_code,
+        error_message=row.error_message,
+        cancellation_requested_at=row.cancellation_requested_at,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
+        deadline=row.deadline,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+@strawberry.type
+class NvkeActionType:
+    key: str
+    surface: NvkeSurface
+    verb: str
+    resource_kind: str
+    mutates: bool
+    permission: str
+    path: str
+
+
+@strawberry.type
+class NvkeResourceSchemaType:
+    kind: str
+    namespaced: bool
+    schema: JSON
+
+
+@strawberry.type
+class NvkeContractType:
+    revision: str
+    actions: list[NvkeActionType]
+    controller_openapi: JSON
+    resources: list[NvkeResourceSchemaType]
+
+
+@strawberry.input
+class RequestNvkeOperationInput:
+    site_id: GUID
+    expected_site_version: int
+    request_id: str
+    operation_key: str
+    parameters: JSON
+    timeout_seconds: int = 7200
+
+
+@strawberry.input
+class CancelNvkeOperationInput:
+    operation_id: GUID
+
+
+@strawberry.input
+class ResumeNvkeOperationInput:
+    operation_id: GUID
+    expected_version: int
+    timeout_seconds: int = 7200
+
+
 @strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_contract(self, info: Info) -> NvkeContractType:
+        service.authorized(Permission.NVKE_READ)
+        return NvkeContractType(
+            revision=upstream_revision(),
+            actions=[
+                NvkeActionType(
+                    key=item.key,
+                    surface=NvkeSurface(item.surface),
+                    verb=item.verb,
+                    resource_kind=item.kind or (item.http.resource if item.http else ""),
+                    mutates=item.mutates,
+                    permission=item.permission,
+                    path=item.http.path if item.http else "",
+                )
+                for item in actions()
+            ],
+            controller_openapi=controller_spec(),
+            resources=[
+                NvkeResourceSchemaType(
+                    kind=item.kind, namespaced=item.namespaced, schema=resource_schema(item.kind)
+                )
+                for item in resources()
+            ],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_operations(
+        self, info: Info, site_id: GUID, after: str | None = None, limit: int = 50
+    ) -> PageType[NvkeOperationType]:
+        site = service.read_site(str(site_id))
+        return keyset_page(
+            NvkeOperation.objects.select_related("site").filter(
+                site=site, organization_id=site.organization_id
+            ),
+            cursor=after,
+            limit=limit,
+            cursor_scope=f"nvke-operations:{site.guid}",
+        ).map(operation_type)
+
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_operation(self, info: Info, operation_id: GUID) -> NvkeOperationType | None:
+        try:
+            return operation_type(operations.read(str(operation_id)))
+        except NvkeError as exc:
+            if exc.code == "NOT_FOUND":
+                return None
+            raise
+
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_operation_result(self, info: Info, operation_id: GUID) -> MutationResultType[JSON]:
+        return success(operations.result(str(operation_id)))
+
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()
@@ -160,7 +329,7 @@ class NvkeQuery:
     def astrolift_nvke_site(self, info: Info, site_id: GUID) -> NvkeSiteType | None:
         try:
             return site_type(service.read_site(str(site_id)))
-        except service.NvkeSiteError as exc:
+        except (service.NvkeSiteError, NvkeError) as exc:
             if exc.code == "NOT_FOUND":
                 return None
             raise
@@ -168,6 +337,43 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.operation_request", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @tenant_scoped()
+    def request_nvke_operation(
+        self, info: Info, input: RequestNvkeOperationInput
+    ) -> MutationResultType[NvkeOperationType]:
+        # The catalog selects read/manage/admin for the exact operation. A
+        # blanket manage gate here would authorize operator writes incorrectly.
+        return success(operation_type(operations.reserve(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.operation_cancel",
+        target=lambda root, info, input: ("nvke_operation", str(input.operation_id)),
+    )
+    @nvke_errors
+    @tenant_scoped()
+    def cancel_nvke_operation(
+        self, info: Info, input: CancelNvkeOperationInput
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(operations.request_cancel(str(input.operation_id))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.operation_resume",
+        target=lambda root, info, input: ("nvke_operation", str(input.operation_id)),
+    )
+    @nvke_errors
+    @tenant_scoped()
+    def resume_nvke_operation(
+        self, info: Info, input: ResumeNvkeOperationInput
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(operations.resume(**asdict(input))))
+
     @strawberry.mutation
     @mutation_audit(action="nvke.site_create")
     @nvke_errors

@@ -40,6 +40,9 @@ MAX_INTERVAL_SECONDS = 24 * 60 * 60
 class ScheduleKind(StrEnum):
     """Spec 06 §5: locked vocabulary of recurring workflows."""
 
+    NVKE_OUTBOX = "nvke_outbox"
+    """Every minute recover a bounded batch of original NVKE operation executions."""
+
     PREVIEW_GC = "preview_gc"
     """Every 15 min — preview environment teardown by TTL +
     max-active eviction (#88)."""
@@ -329,6 +332,13 @@ def schedule_id_for(*, kind: ScheduleKind) -> str:
 
 # Spec 06 §5: the canonical schedule list. Locked.
 DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
+    ScheduleDefinition(
+        kind=ScheduleKind.NVKE_OUTBOX,
+        workflow_name="NvkeOutboxTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(kind=ScheduleKind.NVKE_OUTBOX),
+        description="Recover original NVKE dispatches without replaying writes (#2660)",
+    ),
     ScheduleDefinition(
         kind=ScheduleKind.PREVIEW_GC,
         workflow_name="PreviewGarbageCollectWorkflow",

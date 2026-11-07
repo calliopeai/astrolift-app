@@ -83,7 +83,7 @@ COPY . .
 # Every provider advertised by the runtime catalogue must be constructible in
 # the standard image; otherwise an Azure lifecycle request reaches the plugin
 # registry and fails only when the optional SDK import runs.
-RUN pip install --no-cache-dir ./providers[aws,gcp,azure,k8s]
+RUN pip install --no-cache-dir ./providers[aws,gcp,azure,k8s,nvke]
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

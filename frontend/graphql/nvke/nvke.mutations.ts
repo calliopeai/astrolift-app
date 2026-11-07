@@ -1,5 +1,5 @@
 import { gql } from "@apollo/client";
-import { NVKE_SITE_FIELDS } from "./nvke.queries";
+import { NVKE_OPERATION_FIELDS, NVKE_SITE_FIELDS } from "./nvke.queries";
 
 export const CREATE_NVKE_SITE = gql`
   mutation CreateNvkeSite($input: CreateNvkeSiteInput!) {
@@ -63,4 +63,52 @@ export const REMOVE_NVKE_SITE = gql`
     }
   }
   ${NVKE_SITE_FIELDS}
+`;
+
+export const REQUEST_NVKE_OPERATION = gql`
+  mutation RequestNvkeOperation($input: RequestNvkeOperationInput!) {
+    requestNvkeOperation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;
+
+export const CANCEL_NVKE_OPERATION = gql`
+  mutation CancelNvkeOperation($input: CancelNvkeOperationInput!) {
+    cancelNvkeOperation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;
+
+export const RESUME_NVKE_OPERATION = gql`
+  mutation ResumeNvkeOperation($input: ResumeNvkeOperationInput!) {
+    resumeNvkeOperation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
 `;

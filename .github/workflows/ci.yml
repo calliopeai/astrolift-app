@@ -663,7 +663,7 @@ jobs:
         # does this in its build step; CI mirrors it. The second install
         # replaces the copy a cached virtualenv carries from an older commit.
         run: |
-          pipenv run pip install './providers[aws,gcp,azure,k8s]'
+          pipenv run pip install './providers[aws,gcp,azure,k8s,nvke]'
           pipenv run pip install --no-deps --force-reinstall ./providers
       - name: Prepare verified native collector test artifacts
         if: ${{ matrix.shard == 'registration-clusters' }}
@@ -896,7 +896,7 @@ jobs:
         # core.cluster_observability which references _sdk.cluster
         # from the providers tree.
         run: |
-          pipenv run pip install './providers[aws,gcp,azure,k8s]'
+          pipenv run pip install './providers[aws,gcp,azure,k8s,nvke]'
           pipenv run pip install --no-deps --force-reinstall ./providers
       - name: Run mypy on the platform core
         run: pipenv run mypy core config || true
@@ -944,7 +944,7 @@ jobs:
         run: pipenv install --dev --deploy
       - name: Install in-tree provider plugins
         run: |
-          pipenv run pip install './providers[aws,gcp,azure,k8s]'
+          pipenv run pip install './providers[aws,gcp,azure,k8s,nvke]'
           pipenv run pip install --no-deps --force-reinstall ./providers
       - name: Verify generated GraphQL and MCP contracts
         run: |

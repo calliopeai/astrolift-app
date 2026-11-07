@@ -116,3 +116,71 @@ Use `astroliftNvkeSite(siteId: ...)` for one site,
 `setNvkeSiteEnabled(input: ...)` to disable/re-enable it, and
 `removeNvkeSite(input: ...)` to remove the local registration. Site configuration
 does not start remote cluster provisioning.
+
+## Durable operations
+
+`astroliftNvkeContract` exposes the pinned revision, complete controller OpenAPI,
+six management-resource schemas, and 88 allowed actions with their exact permission.
+It accepts no arbitrary URL, Kubernetes resource kind, namespace or HTTP method.
+Operator APIs and cluster-scoped datastore resources require `nvke.admin`, as do
+workload kubeconfig retrieval, controller config profiles and SPIRE updates.
+
+Submit `requestNvkeOperation(input: RequestNvkeOperationInput!)` with `siteId`,
+`expectedSiteVersion`, a caller-generated UUID `requestId`, `operationKey`, and
+JSON `parameters`. HTTP parameters use `path`, `query`, `body`, and conditional
+`resource_version`. Datastore parameters use `name`, `document`, `resource_version`,
+`uid`, and the action's declared options. The native schemas retain every field;
+invalid/unknown fields are rejected before admission. `timeoutSeconds` defaults
+to 7200 and must be 30–86400.
+
+The same request ID and identical input return the original operation, including
+after a response is lost. A different action, input, timeout or site version with
+that ID returns `CONFLICT`. Removed request identities cannot be reused. Inputs
+and observations/results are encrypted at rest; mutation audit logs mask the
+whole parameters field. Temporal history contains database IDs, generation numbers
+and safe status strings, never native scripts, kubeconfigs or connection keys.
+
+Use `astroliftNvkeOperations(siteId: ..., after: ..., limit: ...)` or
+`astroliftNvkeOperation(operationId: ...)` for metadata. Read the encrypted result
+through `astroliftNvkeOperationResult`, which also requires the action's permission.
+Result data may contain credentials or cloud-init scripts; callers must handle it
+as sensitive. Metadata and results are scoped to the active organization.
+
+The worker verifies active membership, original API token validity/scope, the
+original site version and namespace, contract revision, and exact connection
+configuration before every request. Changing or disabling a connection does not
+silently grant a queued request new authority. TLS material is temporary and
+private; no request falls back to another interface.
+
+`SUCCEEDED` means an observed result: reads completed, artifacts match accepted
+content, deleted resource identities disappeared, or lifecycle conditions and
+running node/control-plane counts satisfy readiness. Dry runs are labelled
+`dry_run_complete`. Accepted requests remain `AWAITING_READY`; transport acceptance
+alone is insufficient. Cancellation before sending produces `CANCELLED`.
+Cancellation after sending continues observation of the original effect; it does
+not undo provisioning or manufacture a successful upstream cancellation.
+
+A lost mutation response, changed authority after sending, or uncertain execution
+produces `UNCERTAIN`. Automatic recovery never replays such a write. An admin can
+request `resumeNvkeOperation` with `operationId`, `expectedVersion` and a bounded
+`timeoutSeconds`; it requires unchanged original authority and a known resource
+identity and resumes observation using the saved sending state. A controller
+create whose response and generated ID were both lost requires operator
+investigation; name matching alone cannot prove ownership.
+
+The minute `NvkeOutboxTickWorkflow` recovers a bounded batch of pending dispatches.
+For manual recovery run `python manage.py nvke_outbox --limit 10`. Recovery verifies
+the original Temporal workflow type and inputs; a stopped execution receives a
+new generation retaining encrypted progress. Missing/expired history is not proof
+that the old execution stopped. Uncertain rows are excluded from this sweep.
+
+### Current qualification limits
+
+These foundations do not yet constitute full application support; UI, CLI,
+bootstrap, workload access, telemetry and live controller qualification are
+tracked under #2656. In particular, the pinned controller does not expose a direct
+OIDC-enabled read-back field. That mutation cannot currently prove completion
+and will remain pending, then uncertain at its deadline. The pinned management
+engine declares pool readiness counters but does not populate all of them; the
+adapter requires positive evidence instead of treating reconciliation acceptance
+as readiness. These need further integration with workload/controller observations.
