@@ -10,6 +10,8 @@
 
 /** Brand, product and protocol names, acronyms, units, code and example values. */
 export const IDENTICAL_EVERYWHERE: readonly string[] = [
+  "NVKE",
+  "NVIDIA Kubernetes Engine",
   "(HTTP {status})",
   "{count, number} ms",
   "{count} d",
@@ -245,6 +247,7 @@ export const IDENTICAL_IN: Readonly<Record<string, readonly string[]>> = {
     "Zone",
   ],
   es: [
+    "Interfaces",
     "{count} {count, plural, one {driver} other {drivers}}",
     "{count} pods",
     "{prompt} + {completion} = {total} tokens",
@@ -310,6 +313,7 @@ export const IDENTICAL_IN: Readonly<Record<string, readonly string[]>> = {
     "Workers",
   ],
   fr: [
+    "Interfaces",
     "{count, plural, =0 {Secrets} other {Secrets (#)}}",
     "{count, plural, one {# agent} other {# agents}}",
     "{count, plural, one {# minute} other {# minutes}}",
@@ -492,6 +496,7 @@ export const IDENTICAL_IN: Readonly<Record<string, readonly string[]>> = {
   ],
   ko: ["App ID", "Cronjob", "Deployment", "Job"],
   "pt-BR": [
+    "Interfaces",
     "{count} {count, plural, one {cluster} other {clusters}}",
     "{count} {count, plural, one {driver} other {drivers}}",
     "{count} pods",

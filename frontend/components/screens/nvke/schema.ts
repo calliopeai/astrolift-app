@@ -1,0 +1,42 @@
+import { z } from "zod";
+
+export const createSiteSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9](?:[-a-z0-9]{0,198}[a-z0-9])?$/)
+    .max(200),
+  organizationNamespace: z.string().regex(/^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$/),
+});
+export const connectionSchema = z
+  .object({
+    surface: z.enum(["CONTROLLER", "TENANT", "OPERATOR", "DATASTORE"]),
+    endpoint: z.string().url().max(2048),
+    timeoutSeconds: z.number().int().min(1).max(300),
+    allowHttp: z.boolean(),
+    credentialMode: z.enum(["preserve", "replace", "clear"]),
+    token: z.string().max(16384),
+    caPem: z.string().max(262144),
+    clientCertificatePem: z.string().max(262144),
+    clientKeyPem: z.string().max(262144),
+  })
+  .refine(
+    (v) =>
+      v.credentialMode !== "replace" || Boolean(v.clientCertificatePem) === Boolean(v.clientKeyPem)
+  );
+export const nativeRequestSchema = z.object({
+  operationKey: z.string().min(1).max(128),
+  timeoutSeconds: z.number().int().min(30).max(86400),
+  parametersText: z
+    .string()
+    .min(2)
+    .max(16 * 1024 * 1024)
+    .refine((text) => {
+      try {
+        const value: unknown = JSON.parse(text);
+        return value !== null && typeof value === "object" && !Array.isArray(value);
+      } catch {
+        return false;
+      }
+    }),
+});
