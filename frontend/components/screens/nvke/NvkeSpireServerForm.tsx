@@ -2,17 +2,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useTranslations } from "next-intl";
-import { z } from "zod";
+import type { z } from "zod";
+import { spireServerSchema } from "./schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { NvkeRequestValues } from "./types";
 
-const schema = z.object({
-  address: z.string().min(1),
-  port: z.number().int().min(1).max(65535),
-  timeoutSeconds: z.number().int().min(30).max(86400),
-});
 export interface NvkeSpireServerFormProps {
   parametersText: string;
   timeoutSeconds: number;
@@ -29,8 +25,8 @@ export function NvkeSpireServerForm(props: NvkeSpireServerFormProps) {
   } catch {
     /* An unavailable draft starts empty. */
   }
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
+  const form = useForm<z.infer<typeof spireServerSchema>>({
+    resolver: zodResolver(spireServerSchema),
     defaultValues: {
       address: !props.recovery && typeof body.address === "string" ? body.address : "",
       port: !props.recovery && typeof body.port === "number" ? body.port : 30440,

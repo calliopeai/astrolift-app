@@ -49,7 +49,7 @@ export const WithEditor: Story = {
       siteName: SITE.name,
       siteVersion: SITE.version,
       target: INVENTORY_ITEM.name,
-      actions: COLLECTION.actions.filter((a) => a.mutates),
+      actions: COLLECTION.actions.filter((a) => a.mutates && !["POST", "create"].includes(a.verb)),
       selectedKey: "updateCluster",
       access: SITE_DETAIL.access,
       sourceReady: true,

@@ -40,3 +40,9 @@ export const nativeRequestSchema = z.object({
       }
     }),
 });
+
+export const spireServerSchema = z.object({
+  address: z.string().min(1),
+  port: z.number().int().min(1).max(65535),
+  timeoutSeconds: z.number().int().min(30).max(86400),
+});
