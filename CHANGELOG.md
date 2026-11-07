@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add explicit NVKE management-Kubernetes CRUDL adapters for all six resource kinds, conditional release deprecation, UID/resource-version deletion guards and secure kubeconfig retrieval. Local real Kubernetes admission tests cover CEL validation, immutability, pagination and namespace isolation (#2658).
+
 - Add the schema-validated transport for all pinned NVKE controller and tenant/operator HTTP operations, with distinct connections, conditional updates, credential rotation, bounded responses and ambiguous-mutation reporting (#2658). Application/API/UI wiring remains in progress under #2656.
 
 - Pin the full NVKE integration contract and coverage inventory, including controller, tenant/operator APIs, management resources and bootstrap tooling (#2656, #2657). This records pending integration scope; it does not advertise runtime support.

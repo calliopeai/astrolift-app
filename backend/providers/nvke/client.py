@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
-_NAME = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?\Z")
+_NAME = re.compile(r"^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*\Z")
 _VERSION = re.compile(r'[^"\s,*\x00-\x1f\x7f]+\Z')
 
 
@@ -69,7 +69,7 @@ class Endpoint:
             valid = False
         if not valid:
             raise ValueError("NVKE endpoint must be a valid HTTPS base URL without credentials, query or fragment")
-        if self.surface not in {"controller", "tenant", "operator"}:
+        if self.surface not in {"controller", "tenant", "operator", "datastore"}:
             raise ValueError("unknown NVKE endpoint surface")
 
 
@@ -207,7 +207,7 @@ class NvkeClient:
                 raise NvkeError("INVALID_INPUT", "NVKE path parameter is invalid")
             if value in {".", ".."} or any(ord(c) < 32 or ord(c) == 127 for c in value):
                 raise NvkeError("INVALID_INPUT", "NVKE path parameter is invalid")
-            if name == "name" and _NAME.fullmatch(value) is None:
+            if name == "name" and (len(value) > 253 or _NAME.fullmatch(value) is None):
                 raise NvkeError("INVALID_INPUT", "NVKE resource name is invalid")
 
         headers = {"Accept": "application/json"}
@@ -235,6 +235,19 @@ class NvkeClient:
                 headers["If-Match"] = f'"{resource_version}"'
             elif resource_version is not None:
                 raise NvkeError("INVALID_INPUT", "This NVKE operation accepts no resource version")
+        return self._call(op, endpoint, path=path, query=query, body=body, headers=headers)
+
+    def _call(
+        self,
+        op: Operation,
+        endpoint: Endpoint,
+        *,
+        path: Mapping[str, str],
+        query: Mapping[str, Any],
+        body: dict[str, Any] | None,
+        headers: dict[str, str] | None = None,
+    ) -> NvkeResponse:
+        headers = {"Accept": "application/json", **(headers or {})}
         if endpoint.token is not None:
             try:
                 token = endpoint.token()
@@ -311,6 +324,7 @@ class NvkeClient:
                         404: "NOT_FOUND",
                         409: "CONFLICT",
                         412: "CONFLICT",
+                        422: "INVALID_INPUT",
                         429: "RATE_LIMITED",
                     }.get(status, "UPSTREAM_ERROR")
                     raise NvkeError(

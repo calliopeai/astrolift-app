@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
-Surface = Literal["controller", "tenant", "operator"]
+Surface = Literal["controller", "tenant", "operator", "datastore"]
 CONTRACT_PATH = Path(__file__).parent / "upstream" / "contract.json"
 
 
@@ -74,7 +74,7 @@ def resource_schema(kind: str) -> dict[str, Any]:
         if crd["spec"]["names"]["kind"] == kind:
             for version in crd["spec"]["versions"]:
                 if version["storage"]:
-                    return version["schema"]["openAPIV3Schema"]  # type: ignore[no-any-return]
+                    return json.loads(json.dumps(version["schema"]["openAPIV3Schema"]))  # type: ignore[no-any-return]
     raise ValueError("unknown NVKE resource")
 
 

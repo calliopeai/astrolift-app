@@ -4,7 +4,15 @@ import re
 
 import pytest
 
-from nvke.contract import _contract, controller_spec, operation, operations, resources, upstream_revision
+from nvke.contract import (
+    _contract,
+    controller_spec,
+    operation,
+    operations,
+    resource_schema,
+    resources,
+    upstream_revision,
+)
 from scripts.nvke_coverage import OUTPUT, render
 
 
@@ -37,6 +45,25 @@ def test_controller_snapshot_is_not_mutable_shared_state() -> None:
     spec = controller_spec()
     spec["paths"].clear()
     assert controller_spec()["paths"]
+    schema = resource_schema("NVKECluster")
+    schema["properties"].clear()
+    assert resource_schema("NVKECluster")["properties"]
+
+
+def test_pinned_schema_references_cannot_fetch_external_documents() -> None:
+    def walk(value):
+        if isinstance(value, dict):
+            if "$ref" in value:
+                assert value["$ref"].startswith("#/")
+            for nested in value.values():
+                walk(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                walk(nested)
+
+    walk(controller_spec())
+    for resource in resources():
+        walk(resource_schema(resource.kind))
 
 
 def test_revision_and_source_evidence_are_pinned_and_cover_source_only_cli_commands() -> None:

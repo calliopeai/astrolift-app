@@ -2,136 +2,13 @@ from __future__ import annotations
 
 import copy
 import json
-import socket
-import ssl
-import threading
-from datetime import UTC, datetime, timedelta
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from ipaddress import ip_address
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.x509.oid import NameOID
 
 from nvke.client import Endpoint, NvkeClient, NvkeError
 from nvke.contract import Operation, controller_spec, operations
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from pathlib import Path
-
-UUID = "123e4567-e89b-12d3-a456-426614174000"
-TOKEN = "private-bearer-do-not-log"
-PUBLIC_SPECS = {
-    "MachineImage": {
-        "architecture": "amd64",
-        "buildDate": "2026-11-07",
-        "nico": {"ipxeScript": "https://boot.example.com/image.ipxe"},
-        "operatingSystem": {"family": "ubuntu", "version": "24.04"},
-    },
-    "ClusterRelease": {"machineImageRef": {"name": "image-a"}, "machineInit": {"userDataTemplate": "#cloud-config"}},
-    "NodePoolRelease": {"machineImageRef": {"name": "image-a"}, "machineInit": {"userDataTemplate": "#cloud-config"}},
-    "ClusterReleaseChannel": {"releases": {"1.36": [{"name": "release-a", "minimumUpgradeAge": "0s"}]}},
-    "ControlPlaneClass": {
-        "controlPlane": {"instanceTypePreferences": [UUID], "replicas": 3, "systemReservedMemory": "16Gi"},
-        "rollout": {"strategy": {"type": "RollingUpdate", "rollingUpdate": {"maxSurge": 1}}},
-    },
-    "NVKECluster": {
-        "apiServerAccess": {"publicAccessEnabled": False},
-        "clusterNetwork": {
-            "pods": {"cidrBlocks": ["192.168.0.0/16"]},
-            "services": {"cidrBlocks": ["10.96.0.0/12"]},
-            "serviceDomain": "cluster.local",
-        },
-        "controlPlaneClass": "standard",
-        "release": {"channel": {"name": "stable"}},
-    },
-}
-
-
-class Peer:
-    def __init__(self) -> None:
-        self.requests: list[dict[str, Any]] = []
-        self.status = 200
-        self.body = b'{"items":[],"futureField":{"kept":true}}'
-        self.headers: dict[str, str] = {"Content-Type": "application/json", "ETag": '"opaque-rv-17"'}
-        self.disconnect = False
-        self.url = ""
-        self.verify: Any = True
-
-
-@pytest.fixture
-def peer(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Peer]:
-    state = Peer()
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:
-            length = int(self.headers.get("Content-Length", 0))
-            raw = self.rfile.read(length) if length else None
-            state.requests.append(
-                {"method": self.command, "path": self.path, "headers": dict(self.headers), "body": raw}
-            )
-            if state.disconnect:
-                self.connection.shutdown(socket.SHUT_RDWR)
-                self.connection.close()
-                return
-            self.send_response(state.status)
-            for key, value in state.headers.items():
-                self.send_header(key, value)
-            self.send_header("Content-Length", str(len(state.body)))
-            self.end_headers()
-            self.wfile.write(state.body)
-
-        do_POST = do_GET  # noqa: N815
-        do_PUT = do_GET  # noqa: N815
-        do_PATCH = do_GET  # noqa: N815
-        do_DELETE = do_GET  # noqa: N815
-
-        def log_message(self, *_args: Any) -> None:
-            pass
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    scheme = "http"
-    if getattr(request, "param", False):
-        key = ec.generate_private_key(ec.SECP256R1())
-        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "NVKE local transport test")])
-        cert = (
-            x509.CertificateBuilder()
-            .subject_name(name)
-            .issuer_name(name)
-            .public_key(key.public_key())
-            .serial_number(x509.random_serial_number())
-            .not_valid_before(datetime.now(UTC) - timedelta(minutes=1))
-            .not_valid_after(datetime.now(UTC) + timedelta(days=1))
-            .add_extension(x509.SubjectAlternativeName([x509.IPAddress(ip_address("127.0.0.1"))]), critical=False)
-            .sign(key, hashes.SHA256())
-        )
-        cert_path = tmp_path / "cert.pem"
-        key_path = tmp_path / "key.pem"
-        cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-        key_path.write_bytes(
-            key.private_bytes(
-                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()
-            )
-        )
-        key_path.chmod(0o600)
-        tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        tls.load_cert_chain(cert_path, key_path)
-        server.socket = tls.wrap_socket(server.socket, server_side=True)
-        state.verify = ssl.create_default_context(cafile=str(cert_path))
-        scheme = "https"
-    state.url = f"{scheme}://127.0.0.1:{server.server_port}"
-    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
-    thread.start()
-    try:
-        yield state
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=2)
+from tests.nvke.support import PUBLIC_SPECS, TOKEN, UUID, Peer
 
 
 def arguments(op: Operation) -> dict[str, Any]:
