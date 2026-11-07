@@ -118,13 +118,19 @@ def validate_request(key: str, request: dict[str, Any], namespace: str) -> Actio
     return selected
 
 
-def execute_action(client: NvkeClient, selected: Action, request: dict[str, Any]) -> NvkeResponse:
+def execute_action(
+    client: NvkeClient,
+    selected: Action,
+    request: dict[str, Any],
+    *,
+    trusted_cluster_ids: frozenset[str] = frozenset(),
+) -> NvkeResponse:
     if selected.http:
         return client.execute(selected.key, **request)
     if not isinstance(client, NvkeDatastore):
         raise NvkeError("SURFACE_UNAVAILABLE", "NVKE datastore connection is required")
     if selected.verb == "kubeconfig":
-        value = client.workload_kubeconfig(**request)
+        value = client.workload_kubeconfig(**request, trusted_cluster_ids=trusted_cluster_ids)
         return NvkeResponse(200, {"kubeconfig": value.content.decode("utf-8")}, value.secret_resource_version)
     method = "set_deprecated" if selected.verb == "deprecate" else selected.verb
     result: NvkeResponse = getattr(client, method)(selected.kind, **request)

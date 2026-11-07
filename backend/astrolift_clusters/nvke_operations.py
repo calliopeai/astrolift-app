@@ -218,6 +218,70 @@ def decode_input(row):
         raise NvkeError("CREDENTIALS_UNAVAILABLE", "Original NVKE request could not be read") from None
 
 
+def _cluster_name_digest(row, name):
+    return hmac.new(
+        str(settings.SECRET_KEY).encode(),
+        canonical({"site": str(row.site.guid), "name": name}),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def created_cluster_reference(row, selected, request, response):
+    if (
+        selected.key != "createCluster"
+        or not 200 <= response.status_code < 300
+        or not isinstance(response.data, dict)
+    ):
+        return {}
+    data = response.data
+    try:
+        identity = UUID(data["id"])
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return {}
+    if (
+        not identity.int
+        or str(identity) != data["id"]
+        or not isinstance(data.get("name"), str)
+        or not data["name"]
+        or data.get("name") != request.get("body", {}).get("name")
+    ):
+        return {}
+    return {
+        "kind": "controller_cluster",
+        "id": str(identity),
+        "name_digest": _cluster_name_digest(row, data["name"]),
+    }
+
+
+def trusted_cluster_ids(row, cluster_name):
+    connection = NvkeConnection.objects.filter(site=row.site, surface="controller", is_enabled=True).first()
+    if connection is None:
+        return frozenset()
+    references = (
+        NvkeOperation.objects.filter(
+            site_id=row.site_id,
+            organization_id=row.organization_id,
+            operation_key="createCluster",
+            authority__connection_id=str(connection.guid),
+            authority__revision=row.authority.get("revision"),
+            authority__organization_namespace=row.authority.get("organization_namespace"),
+            remote_reference__kind="controller_cluster",
+            remote_reference__name_digest=_cluster_name_digest(row, cluster_name),
+        )
+        .values_list("remote_reference__id", flat=True)
+        .iterator()
+    )
+    result = set()
+    for value in references:
+        try:
+            identity = UUID(value)
+        except (ValueError, TypeError, AttributeError):
+            continue
+        if identity.int and str(identity) == value:
+            result.add(value)
+    return frozenset(result)
+
+
 def decode_result(row):
     if not row.result_ciphertext:
         return {}

@@ -285,7 +285,14 @@ def attempt(row_id, generation, *, execution):
                 response = (
                     collect_inventory(client, selected.key, request, row.site.organization_namespace)
                     if row.authority.get("inventory") is True
-                    else execute_action(client, selected, request)
+                    else execute_action(
+                        client,
+                        selected,
+                        request,
+                        trusted_cluster_ids=outbox.trusted_cluster_ids(row, request["cluster_name"])
+                        if selected.verb == "kubeconfig"
+                        else frozenset(),
+                    )
                 )
                 return _state(row, "succeeded", "read_complete", progress={"response": asdict(response)})
             if not progress.get("sending"):
@@ -300,7 +307,13 @@ def attempt(row_id, generation, *, execution):
                 applying = False
                 progress["response"] = asdict(response)
                 progress["target"] = _target(selected, request, response.data)
-                _state(row, "awaiting_ready", "accepted", progress=progress)
+                _state(
+                    row,
+                    "awaiting_ready",
+                    "accepted",
+                    progress=progress,
+                    reference=outbox.created_cluster_reference(row, selected, request, response),
+                )
                 if request.get("dry_run") is True:
                     return _state(row, "succeeded", "dry_run_complete", progress=progress)
             return _observe(row, client, selected, request, progress)

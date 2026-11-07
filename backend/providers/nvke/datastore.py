@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import base64
 import copy
 import re
 from dataclasses import dataclass, field
 from typing import Any
-
-import yaml
 
 from nvke.client import _NAME, _VERSION, Endpoint, NvkeClient, NvkeError, NvkeResponse, _strict_object, _validate
 from nvke.contract import Operation, Resource, resource_schema, resources
@@ -227,35 +224,15 @@ class NvkeDatastore(NvkeClient):
         }
         return self._request(kind, "DELETE", name=name, body=body)
 
-    def workload_kubeconfig(self, cluster_name: str, *, management_namespace: str) -> Kubeconfig:
-        cluster_name = _name(cluster_name)
-        if _NAMESPACE.fullmatch(management_namespace) is None:
-            raise NvkeError("INVALID_INPUT", "Use the configured NVKE management namespace")
-        secret_name = _name(f"{cluster_name}-admin-kubeconfig")
-        result = self._call(
-            Operation(
-                "datastore.getWorkloadKubeconfig",
-                "datastore",
-                "GET",
-                "/api/v1/namespaces/{namespace}/secrets/{name}",
-            ),
-            self._endpoint,
-            path={"namespace": management_namespace, "name": secret_name},
-            query={},
-            body=None,
+    def workload_kubeconfig(
+        self,
+        cluster_name: str,
+        *,
+        management_namespace: str,
+        trusted_cluster_ids: frozenset[str] = frozenset(),
+    ) -> Kubeconfig:
+        from nvke.access import workload_kubeconfig
+
+        return workload_kubeconfig(
+            self, cluster_name, management_namespace=management_namespace, trusted_cluster_ids=trusted_cluster_ids
         )
-        try:
-            content = base64.b64decode(result.data["data"]["value"], validate=True)
-            config = yaml.safe_load(content)
-            metadata = result.data["metadata"]
-            uid = _version(metadata["uid"])
-            version = _version(metadata["resourceVersion"])
-            if not isinstance(config, dict) or config.get("kind") != "Config" or config.get("apiVersion") != "v1":
-                raise ValueError("invalid kubeconfig")
-            if not config.get("clusters") or not config.get("users") or not config.get("contexts"):
-                raise ValueError("incomplete kubeconfig")
-        except (KeyError, TypeError, ValueError, yaml.YAMLError, NvkeError):
-            raise NvkeError(
-                "INVALID_RESPONSE", "NVKE admin kubeconfig Secret is missing valid kubeconfig data"
-            ) from None
-        return Kubeconfig(content, uid, version)

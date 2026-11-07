@@ -83,6 +83,8 @@ Observation timestamps describe historical reads and do not establish current re
 Results are fetched only after explicit confirmation and downloaded as JSON text, preserving
 native integer values. Treat these files as sensitive: native responses may contain credentials
 or kubeconfigs. No result is automatically fetched when opening an operation page.
+Workload kubeconfig operations additionally enforce [native ownership proofs](nvke-access.md)
+before reading the admin Secret; a supplied backing cluster name is not ownership evidence.
 
 This route-wiring slice uses manual refresh. Resource-specific mutation forms, site bootstrap,
 workload access, telemetry and live hardware qualification remain separate delivery work.

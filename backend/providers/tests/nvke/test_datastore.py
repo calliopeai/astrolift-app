@@ -124,38 +124,16 @@ def test_conflict_does_not_retry_as_an_unconditional_update(peer: Peer) -> None:
     assert len(peer.requests) == 1
 
 
-def test_secret_download_is_explicit_and_keeps_credentials_out_of_repr(peer: Peer) -> None:
-    config = b"apiVersion: v1\nkind: Config\nclusters: [{name: a}]\nusers: [{name: a}]\ncontexts: [{name: a}]\n"
+def test_bare_secret_does_not_bypass_native_organization_ownership(peer: Peer) -> None:
     peer.body = json.dumps(
         {
             "metadata": {"uid": "secret-uid", "resourceVersion": "rv-2"},
-            "data": {"value": base64.b64encode(config).decode()},
+            "data": {"value": base64.b64encode(TOKEN.encode()).decode()},
         }
     ).encode()
-    with datastore(peer) as client:
-        result = client.workload_kubeconfig("cluster-a", management_namespace="nvke-system")
-    assert result.content == config
-    assert "apiVersion" not in repr(result)
-    assert peer.requests[0]["path"] == "/api/v1/namespaces/nvke-system/secrets/cluster-a-admin-kubeconfig"
-    assert result.secret_uid == "secret-uid"
-
-
-@pytest.mark.parametrize(
-    "secret",
-    [
-        {},
-        {"data": {"value": TOKEN}},
-        {"data": {"value": "??bad-base64"}},
-        {"data": {"value": base64.b64encode(TOKEN.encode()).decode()}},
-        {
-            "data": {"value": base64.b64encode(b"kind: Config\napiVersion: v1").decode()},
-            "metadata": {"uid": "u", "resourceVersion": "1"},
-        },
-    ],
-)
-def test_malformed_kubeconfig_errors_do_not_include_secret_contents(peer: Peer, secret: dict[str, Any]) -> None:
-    peer.body = json.dumps(secret).encode()
-    with datastore(peer) as client, pytest.raises(NvkeError) as exc:
+    with datastore(peer) as client, pytest.raises(NvkeError) as error:
         client.workload_kubeconfig("cluster-a", management_namespace="nvke-system")
-    assert exc.value.code == "INVALID_RESPONSE"
-    assert TOKEN not in str(exc.value)
+    assert error.value.code == "OWNERSHIP_UNVERIFIED"
+    assert len(peer.requests) == 1
+    assert "/secrets/" not in peer.requests[0]["path"]
+    assert TOKEN not in str(error.value)

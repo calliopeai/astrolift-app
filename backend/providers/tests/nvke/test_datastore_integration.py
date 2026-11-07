@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import base64
 import copy
+import hashlib
 import os
 import ssl
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlsplit
@@ -15,6 +17,7 @@ import httpx
 import pytest
 import yaml
 
+from nvke.access import cluster_remote_name
 from nvke.client import Endpoint, NvkeError
 from nvke.contract import resources
 from nvke.datastore import NvkeDatastore
@@ -166,19 +169,107 @@ def test_namespace_binding_cannot_read_a_sibling_org_cluster(live: tuple[NvkeDat
     assert client.list("NVKECluster").data["items"] == []
 
 
-def test_kubeconfig_download_from_real_kubernetes_secret(live: tuple[NvkeDatastore, httpx.Client, str]) -> None:
+def seed_access(live, resource_name="cluster-a"):
     client, raw, namespace = live
+    path = Path(__file__).parent / "fixtures/cluster.x-k8s.io_clusters.yaml"
+    source = path.read_bytes()
+    assert hashlib.sha256(source).hexdigest() == "b72f04bb258d22fafd0c4fbba98feea08b103f1b854a98ebdb14e6a3ab8e9f24"
+    manifest = yaml.safe_load(source)
+    crd = "/apis/apiextensions.k8s.io/v1/customresourcedefinitions/clusters.cluster.x-k8s.io"
+    if raw.get(crd).status_code == 404:
+        response = raw.post(crd.rsplit("/", 1)[0], json=manifest)
+        assert response.status_code in {201, 409}
+    for _index in range(50):
+        installed = raw.get(crd)
+        installed.raise_for_status()
+        if any(
+            c["type"] == "Established" and c["status"] == "True"
+            for c in (installed.json().get("status", {}).get("conditions") or [])
+        ):
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("task-owned CAPI CRD did not become established")
+    native = client.create(
+        "NVKECluster", {"metadata": {"name": resource_name}, "spec": copy.deepcopy(PUBLIC_SPECS["NVKECluster"])}
+    ).data
+    cluster_id = str(uuid4())
+    native["status"] = {"id": cluster_id}
+    raw.put(
+        f"/apis/internal.nvke.nvidia.com/v1/namespaces/{namespace}/nvkeclusters/{resource_name}/status", json=native
+    ).raise_for_status()
+    name = cluster_remote_name(namespace, resource_name)
+    capi = raw.post(
+        f"/apis/cluster.x-k8s.io/v1beta2/namespaces/{namespace}/clusters",
+        json={
+            "apiVersion": "cluster.x-k8s.io/v1beta2",
+            "kind": "Cluster",
+            "metadata": {"name": name},
+            "spec": {"paused": True},
+        },
+    )
+    assert capi.status_code == 201, capi.json().get("message")
     content = b"apiVersion: v1\nkind: Config\nclusters: [{name: a}]\nusers: [{name: a}]\ncontexts: [{name: a}]\n"
     secret = {
         "apiVersion": "v1",
         "kind": "Secret",
-        "metadata": {"name": "cluster-a-admin-kubeconfig"},
+        "type": "Opaque",
+        "metadata": {
+            "name": name + "-admin-kubeconfig",
+            "labels": {
+                "nvke.nvidia.com/cluster-id": cluster_id,
+                "nvke.nvidia.com/kubeconfig-mode": "admin",
+                "cluster.x-k8s.io/cluster-name": name,
+            },
+            "ownerReferences": [
+                {
+                    "apiVersion": "cluster.x-k8s.io/v1beta2",
+                    "kind": "Cluster",
+                    "name": name,
+                    "uid": capi.json()["metadata"]["uid"],
+                    "controller": True,
+                }
+            ],
+        },
         "data": {"value": base64.b64encode(content).decode()},
     }
-    raw.post(f"/api/v1/namespaces/{namespace}/secrets", json=secret).raise_for_status()
-    result = client.workload_kubeconfig("cluster-a", management_namespace=namespace)
-    assert result.content == content
-    assert result.secret_uid
+    created = raw.post(f"/api/v1/namespaces/{namespace}/secrets", json=secret)
+    created.raise_for_status()
+    return name, cluster_id, content, created.json()
+
+
+def test_kubeconfig_download_from_real_kubernetes_secret(live: tuple[NvkeDatastore, httpx.Client, str]) -> None:
+    client, _raw, namespace = live
+    name, _cluster_id, content, secret = seed_access(live)
+    result = client.workload_kubeconfig(name, management_namespace=namespace)
+    assert result.content == content and result.secret_uid == secret["metadata"]["uid"]
+
+
+@pytest.mark.parametrize("failure", ["foreign-label", "stale-owner", "sibling-org"])
+def test_real_kubernetes_refuses_foreign_or_stale_kubeconfig_ownership(live, failure, tmp_path):
+    client, raw, namespace = live
+    name, _cluster_id, _content, secret = seed_access(live)
+    if failure == "foreign-label":
+        secret["metadata"]["labels"]["nvke.nvidia.com/cluster-id"] = str(uuid4())
+    elif failure == "stale-owner":
+        secret["metadata"]["ownerReferences"][0]["uid"] = str(uuid4())
+    if failure != "sibling-org":
+        raw.put(f"/api/v1/namespaces/{namespace}/secrets/{secret['metadata']['name']}", json=secret).raise_for_status()
+        with pytest.raises(NvkeError) as error:
+            client.workload_kubeconfig(name, management_namespace=namespace)
+        assert error.value.code == "OWNERSHIP_UNVERIFIED"
+    else:
+        sibling = "nvke-sibling-" + uuid4().hex[:12]
+        raw.post("/api/v1/namespaces", json={"metadata": {"name": sibling}}).raise_for_status()
+        # Identical privileged transport, but another org namespace cannot acquire these credentials.
+        tls = ssl.create_default_context(cafile=str(tmp_path / "ca.pem"))
+        tls.load_cert_chain(str(tmp_path / "cert.pem"), str(tmp_path / "key.pem"))
+        with (
+            NvkeDatastore(client._endpoint, organization_namespace=sibling, verify=tls) as other,
+            pytest.raises(NvkeError) as error,
+        ):
+            other.workload_kubeconfig(name, management_namespace=namespace)
+        assert error.value.code == "OWNERSHIP_UNVERIFIED"
 
 
 def test_foreground_deletion_is_accepted_but_not_reported_as_completed(

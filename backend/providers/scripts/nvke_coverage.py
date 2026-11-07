@@ -42,6 +42,8 @@ def render() -> str:
         "- Authentication/TLS, secrets and upstream failures must not leak through payload or transport logs.",
         "- Retry reads safely. A lost response to a create is ambiguous; reconcile by owned identity before retrying.",
         "- Unsupported upstream upgrade/backup/restore behavior remains explicitly unsupported.",
+        "- Workload kubeconfig downloads require native ownership or a durable Astro creation receipt,",
+        "  matching cluster UUID labels and a live CAPI owner; see [access proofs](nvke-access.md).",
         "",
         "## HTTP operations",
         "",
