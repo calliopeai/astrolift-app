@@ -17715,6 +17715,10 @@
     "observedConcurrencyHelp": "Le contrôleur ne propose pas de vérification atomique de version. La configuration modifiable est vérifiée avant l’envoi, mais une autre écriture peut encore intervenir ensuite.",
     "conditionalConcurrencyHelp": "L’écriture native utilise exactement la version et l’identité examinées ; tout conflit nécessite une nouvelle observation.",
     "collectionActions": "Lire ou créer des ressources",
-    "collectionActionsHelp": "Lisez la collection complète ou créez une ressource avec son schéma natif. La création est une écriture et nécessite une confirmation ; elle ne met pas à jour l’observation enregistrée."
+    "collectionActionsHelp": "Lisez la collection complète ou créez une ressource avec son schéma natif. La création est une écriture et nécessite une confirmation ; elle ne met pas à jour l’observation enregistrée.",
+    "resourceActions": "Actions de la ressource",
+    "spireAddress": "Adresse du serveur SPIRE",
+    "spirePort": "Port du serveur SPIRE",
+    "prepareSubresourceHelp": "Lisez cette sous-ressource du cluster pour examiner sa configuration actuelle avant de la modifier. Le contrôleur ne dispose toujours pas de vérification atomique de version."
   }
 }

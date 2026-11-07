@@ -55,8 +55,13 @@ export const useNvkeResourceActions = (args: {
     collection?.actions.filter(
       (action) => action.mutates && !["POST", "create"].includes(action.verb)
     ) ?? [];
+  const reads =
+    collection?.actions.filter(
+      (action) =>
+        !action.mutates && action.key !== collection.key && ["GET", "get"].includes(action.verb)
+    ) ?? [];
   const key =
-    context.scopeKey && site && source && actions.length
+    context.scopeKey && site && source && (actions.length || reads.length)
       ? JSON.stringify([context.scopeKey, site.id, source])
       : "";
   const { key: visitKey, isCurrent: current } = useNvkeEpoch(key);
@@ -67,10 +72,17 @@ export const useNvkeResourceActions = (args: {
     failed: boolean;
   } | null>(null);
   const pendingAction = journal?.key === visitKey ? journal.record?.operationKey : undefined;
+  const pendingRead = reads.find((action) => action.key === pendingAction);
+  const preparedAction = pendingRead
+    ? actions.find(
+        (action) => action.path === pendingRead.path && !["DELETE", "delete"].includes(action.verb)
+      )
+    : undefined;
   const selectedKey =
     choice?.key === visitKey
       ? choice.action
       : (actions.find((action) => action.key === pendingAction)?.key ??
+        preparedAction?.key ??
         actions.find((action) => !["DELETE", "delete"].includes(action.verb))?.key ??
         actions[0]?.key ??
         "");
@@ -228,12 +240,32 @@ export const useNvkeResourceActions = (args: {
       busy.current = false;
     }
   };
-  if (!site || !source || !actions.length) return null;
+  if (!site || !source || (!actions.length && !reads.length)) return null;
   return {
     siteName: site.name,
     siteVersion: site.version,
     target: args.target,
     actions,
+    reads,
+    readReady: !!key && args.sourceReady && journal?.key === visitKey && !journal.failed,
+    onRead: (actionKey) =>
+      perform(async () => {
+        const action = reads.find((value) => value.key === actionKey);
+        if (
+          !action ||
+          !context.scope ||
+          !args.sourceReady ||
+          !mayExecute(context.access, action.permission)
+        )
+          return false;
+        const operation = await submit(
+          { operationKey: action.key, parametersText: "{}", timeoutSeconds: 7200 },
+          source
+        );
+        if (!operation || !current()) return false;
+        router.push(`/nvke/${site.id}/operations/${operation.id}`);
+        return true;
+      }),
     selectedKey,
     access: context.access,
     sourceReady: allowed,

@@ -16,7 +16,7 @@ from nvke.operations import action, execute_action
 from astrolift_clusters import nvke_operations as outbox
 from astrolift_clusters.models import NvkeOperation
 from astrolift_clusters.nvke_connections import open_connection
-from astrolift_clusters.nvke_resource_operations import check_observation
+from astrolift_clusters.nvke_resource_operations import check_observation, check_subresource_configuration
 from astrolift_clusters.nvke_sites import NvkeSiteError
 from core.mutations import AuditEntry, emit_audit
 
@@ -86,6 +86,13 @@ def _get(client, target):
         raise
 
 
+def _check_bound_parent(client, guard, request):
+    parent = _get(client, {"key": guard["identity_action"], "request": {"path": request["path"]}})
+    if parent is None:
+        raise NvkeError("NOT_FOUND", "The reviewed native resource is no longer available")
+    check_observation(guard, parent.data, mutates=False)
+
+
 def _preflight(client, selected, request, resource_guard=None):
     creating = selected.verb == "create" or bool(selected.http and selected.http.method == "POST")
     target = _target(selected, request)
@@ -99,6 +106,8 @@ def _preflight(client, selected, request, resource_guard=None):
         if value.get("clusters" if key == "listClusters" else "nodePools"):
             raise NvkeError("CONFLICT", "The requested NVKE resource name is already in use")
         return {"baseline": None, "target": None}
+    if resource_guard and resource_guard.get("subresource"):
+        _check_bound_parent(client, resource_guard, request)
     previous = _get(client, target) if target else None
     if creating:
         if previous is not None:
@@ -107,7 +116,10 @@ def _preflight(client, selected, request, resource_guard=None):
         raise NvkeError("NOT_FOUND", "The requested NVKE resource does not exist")
     if previous is not None:
         if resource_guard is not None:
-            check_observation(resource_guard, previous.data, mutates=True)
+            if resource_guard.get("subresource"):
+                check_subresource_configuration(resource_guard, previous.data)
+            else:
+                check_observation(resource_guard, previous.data, mutates=True)
         version = request.get("resource_version")
         if version is not None and previous.resource_version != version:
             raise NvkeError("CONFLICT", "The NVKE resource changed before execution")
@@ -200,6 +212,8 @@ def _observe(row, client, selected, request, progress):
             progress=progress,
             error=NvkeError("MUTATION_UNCERTAIN", "NVKE mutation identity requires operator reconciliation"),
         )
+    if (guard := row.authority.get("resource")) and guard.get("subresource"):
+        _check_bound_parent(client, guard, request)
     current = _get(client, target)
     deleting = selected.verb in {"delete", "DELETE"}
     if current is None:
@@ -285,6 +299,9 @@ def attempt(row_id, generation, *, execution):
             connection, namespace=row.site.organization_namespace, checkpoint=fence
         ) as client:
             if not selected.mutates:
+                resource_guard = row.authority.get("resource")
+                if resource_guard and resource_guard.get("subresource"):
+                    _check_bound_parent(client, resource_guard, request)
                 response = (
                     collect_inventory(client, selected.key, request, row.site.organization_namespace)
                     if row.authority.get("inventory") is True
@@ -297,8 +314,11 @@ def attempt(row_id, generation, *, execution):
                         else frozenset(),
                     )
                 )
-                if resource_guard := row.authority.get("resource"):
-                    check_observation(resource_guard, response.data, mutates=False)
+                if resource_guard:
+                    if resource_guard.get("subresource"):
+                        _check_bound_parent(client, resource_guard, request)
+                    else:
+                        check_observation(resource_guard, response.data, mutates=False)
                 return _state(row, "succeeded", "read_complete", progress={"response": asdict(response)})
             if not progress.get("sending"):
                 progress = _preflight(client, selected, request, row.authority.get("resource"))

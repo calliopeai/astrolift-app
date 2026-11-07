@@ -66,7 +66,12 @@ def collection(key: str) -> Collection:
 def resource_actions(selected: Collection) -> tuple[Action, ...]:
     base = action(selected.key)
     if base.http:
-        path = re.compile(re.escape(base.http.path) + r"/\{[^}]+\}\Z")
+        path = re.compile(
+            re.escape(base.http.path)
+            + r"/\{[^}]+\}"
+            + (r"(?:/[^{}]+)*" if selected.surface == "controller" else "")
+            + r"\Z"
+        )
         return tuple(
             item
             for item in actions()

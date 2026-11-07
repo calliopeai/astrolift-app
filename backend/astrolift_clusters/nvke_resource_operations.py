@@ -6,18 +6,19 @@ import copy
 import hashlib
 import hmac
 import re
+from dataclasses import dataclass
 from uuid import UUID
 
 from django.conf import settings
 from nvke.client import NvkeError
 from nvke.contract import controller_spec
-from nvke.inventory import collections, identity, resource_actions
+from nvke.inventory import Collection, collections, identity, resource_actions
 from nvke.operations import action, validate_request
 
 from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_sites as sites
-from astrolift_clusters.models import NvkeConnection
+from astrolift_clusters.models import NvkeConnection, NvkeOperation
 from core.permissions import Permission
 
 
@@ -27,20 +28,38 @@ def digest(value):
     ).hexdigest()
 
 
+@dataclass(frozen=True)
+class ObservedResource:
+    operation: NvkeOperation
+    collection: Collection
+    document: dict
+    version: str | None
+    identity: dict
+    subresource: str | None = None
+
+
 def read_action(collection):
     original = action(collection.key)
+    path = re.compile(re.escape(original.http.path) + r"/\{[^}]+\}\Z") if original.http else None
     return next(
         (
             candidate
             for candidate in resource_actions(collection)
             if candidate.verb == "get"
-            or (
-                candidate.http
-                and candidate.http.method == "GET"
-                and candidate.http.path != original.http.path
-            )
+            or (candidate.http and candidate.http.method == "GET" and path.fullmatch(candidate.http.path))
         ),
         None,
+    )
+
+
+def is_subresource(selected, collection):
+    read = read_action(collection)
+    return bool(
+        collection.surface == "controller"
+        and selected.http
+        and read
+        and selected.http.path != read.http.path
+        and selected.key != collection.key
     )
 
 
@@ -67,7 +86,37 @@ def _source(site, actor, reference):
             raise NvkeError("INVALID_INPUT", "Use the resource read observation without an inventory row key")
         collection = next((value for value in collections() if read_action(value) == source_action), None)
         if collection is None:
-            raise NvkeError("INVALID_INPUT", "Choose a successful single-resource native read")
+            collection = next(
+                (
+                    value
+                    for value in collections()
+                    if source_action.verb == "GET"
+                    and source_action in resource_actions(value)
+                    and is_subresource(source_action, value)
+                ),
+                None,
+            )
+            guard = source.authority.get("resource", {})
+            if (
+                collection is None
+                or guard.get("subresource") != source_action.key
+                or guard.get("collection") != collection.key
+                or guard.get("mutates") is not False
+                or guard.get("identity_action") != read_action(collection).key
+            ):
+                raise NvkeError("INVALID_INPUT", "Choose a successful bound resource read")
+            original = operations.decode_input(source)
+            fields = re.findall(r"\{([^}]+)\}", source_action.http.path)
+            path = original.get("path")
+            if len(fields) != 1 or not isinstance(path, dict) or set(path) != set(fields):
+                raise NvkeError("SOURCE_CHANGED", "The native resource read lost its fixed target")
+            native_identity = _identity(collection, {"id": path[fields[0]]})
+            if not hmac.compare_digest(digest(native_identity), guard.get("identity_digest", "")):
+                raise NvkeError("SOURCE_CHANGED", "The native resource read binding changed")
+            raw = operations.decode_result(source).get("response", {}).get("data")
+            if not isinstance(raw, dict):
+                raise NvkeError("SOURCE_CHANGED", "The native resource observation is unavailable")
+            return ObservedResource(source, collection, raw, None, native_identity, source_action.key)
         response = operations.decode_result(source).get("response", {})
         raw, version = response.get("data"), response.get("resource_version")
     if not isinstance(raw, dict):
@@ -79,7 +128,7 @@ def _source(site, actor, reference):
             raise NvkeError(
                 "SOURCE_CHANGED", "The native read did not confirm its requested resource identity"
             )
-    return source, collection, raw, version
+    return ObservedResource(source, collection, raw, version, _identity(collection, raw))
 
 
 def _project(schema, value, schemas):
@@ -103,7 +152,8 @@ def controller_configuration(selected, raw):
     schema = spec["paths"][selected.http.path]["patch"]["requestBody"]["content"]["application/json"][
         "schema"
     ]
-    return _project(schema, raw, spec["components"]["schemas"])
+    value = raw.get("requested", {}) if selected.key == "updateClusterSpireServer" else raw
+    return _project(schema, value, spec["components"]["schemas"])
 
 
 def editor(*, site_id, expected_actor_id, operation_key, reference):
@@ -112,7 +162,8 @@ def editor(*, site_id, expected_actor_id, operation_key, reference):
     if type(expected_actor_id) is not int or actor.pk != expected_actor_id:
         raise NvkeError("SOURCE_CHANGED", "The reviewed NVKE caller changed")
     site = sites.site_row(site_id, org)
-    source, collection, raw, version = _source(site, actor, reference)
+    observed = _source(site, actor, reference)
+    source, collection, raw = observed.operation, observed.collection, observed.document
     connection = NvkeConnection.objects.filter(site=site, surface=selected.surface, is_enabled=True).first()
     if connection is None:
         raise NvkeError("SURFACE_UNAVAILABLE", "The requested NVKE interface is not configured")
@@ -144,11 +195,24 @@ def editor(*, site_id, expected_actor_id, operation_key, reference):
             reference=reference,
             connection=connection,
         )
-        validate_request(selected.key, parameters, site.organization_namespace)
+        if selected.key != "updateClusterSpireServer" or parameters.get("body"):
+            validate_request(selected.key, parameters, site.organization_namespace)
     except NvkeError as exc:
         if exc.code != "PREPARATION_REQUIRED":
             raise
-        return source, collection, selected, None, read_action(collection).key, "native_version"
+        preparation = (
+            "getClusterSpireServer"
+            if selected.key == "updateClusterSpireServer"
+            else read_action(collection).key
+        )
+        return (
+            source,
+            collection,
+            selected,
+            None,
+            preparation,
+            "observed_only" if collection.surface == "controller" else "native_version",
+        )
     return (
         source,
         collection,
@@ -183,7 +247,13 @@ def _fixed(parameters, field, expected):
 
 
 def bind(*, site, actor, selected, parameters, reference, connection):
-    source, collection, raw, version = _source(site, actor, reference)
+    observed = _source(site, actor, reference)
+    source, collection, raw, version = (
+        observed.operation,
+        observed.collection,
+        observed.document,
+        observed.version,
+    )
     if (
         source.authority.get("connection_id") != str(connection.guid)
         or source.authority.get("connection_digest") != operations.connection_digest(connection)
@@ -201,10 +271,17 @@ def bind(*, site, actor, selected, parameters, reference, connection):
         or selected.verb in {"POST", "create"}
     ):
         raise NvkeError("INVALID_INPUT", "Choose an action on the reviewed NVKE resource")
+    if observed.subresource and (
+        not is_subresource(selected, collection)
+        or selected.http.path != action(observed.subresource).http.path
+    ):
+        raise NvkeError("INVALID_INPUT", "Choose an action on the reviewed native subresource")
+    if selected.key == "updateClusterSpireServer" and observed.subresource != "getClusterSpireServer":
+        raise NvkeError("PREPARATION_REQUIRED", "Read the SPIRE server before editing its configuration")
     if not isinstance(parameters, dict):
         raise NvkeError("INVALID_INPUT", "Native resource parameters must be a JSON object")
     result = copy.deepcopy(parameters)
-    native_identity = _identity(collection, raw)
+    native_identity = observed.identity
     if selected.http:
         fields = re.findall(r"\{([^}]+)\}", selected.http.path)
         if len(fields) != 1:
@@ -230,6 +307,11 @@ def bind(*, site, actor, selected, parameters, reference, connection):
             raise NvkeError("INVALID_INPUT", "Use the native writable resource metadata")
         _fixed(metadata, "name", native_identity["identity"])
     guard = {
+        **(
+            {"subresource": selected.key, "identity_action": read.key}
+            if is_subresource(selected, collection)
+            else {}
+        ),
         "source": reference,
         "collection": collection.key,
         "identity_digest": digest(native_identity),
@@ -258,3 +340,11 @@ def check_observation(guard, data, *, mutates):
         )
     ):
         raise NvkeError("CONFLICT", "The native resource changed since the reviewed observation")
+
+
+def check_subresource_configuration(guard, data):
+    if not isinstance(data, dict) or not hmac.compare_digest(
+        digest(controller_configuration(action(guard["comparison_action"]), data)),
+        guard.get("baseline_digest", ""),
+    ):
+        raise NvkeError("CONFLICT", "The native subresource configuration changed since review")

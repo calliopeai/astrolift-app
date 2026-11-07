@@ -7,7 +7,7 @@ import {
   NvkeResourceActionPanel,
   type NvkeResourceActionPanelProps,
 } from "./NvkeResourceActionPanel";
-import { ACTIONS, OPERATION, SITE, SITE_DETAIL } from "./fixtures";
+import { COLLECTION, ACTIONS, OPERATION, SITE, SITE_DETAIL } from "./fixtures";
 
 const Context = ({ children }: { children: ReactNode }) => (
   <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
@@ -120,4 +120,75 @@ it("resets the draft and review if the resource source changes", async () => {
   expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   expect(screen.getByLabelText(messages.nvke.parameters)).toHaveValue(raw);
   expect(value.onRequest).not.toHaveBeenCalled();
+});
+
+it("reviews typed SPIRE configuration against the fixed resource before admission", async () => {
+  const spire = COLLECTION.actions.find((action) => action.key === "updateClusterSpireServer")!;
+  const base = props();
+  const value = {
+    ...base,
+    actions: [spire],
+    selectedKey: spire.key,
+    editor: {
+      ...base.editor!,
+      operationKey: spire.key,
+      parametersText: '{"body":{"address":"spire.old.test","port":30440}}',
+    },
+  };
+  render(<NvkeResourceActionPanel {...value} />, { wrapper: Context });
+  expect(screen.getByLabelText(messages.nvke.spireAddress)).toHaveValue("spire.old.test");
+  fireEvent.change(screen.getByLabelText(messages.nvke.spireAddress), {
+    target: { value: "spire.new.test" },
+  });
+  fireEvent.change(screen.getByLabelText(messages.nvke.spirePort), { target: { value: "65536" } });
+  fireEvent.click(screen.getByRole("button", { name: messages.nvke.reviewRequest }));
+  await waitFor(() =>
+    expect(screen.getByRole("alert")).toHaveTextContent(messages.nvke.invalidForm)
+  );
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText(messages.nvke.spirePort), { target: { value: "30441" } });
+  fireEvent.click(screen.getByRole("button", { name: messages.nvke.reviewRequest }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent("reviewed-cluster");
+  expect(dialog).toHaveTextContent("updateClusterSpireServer");
+  expect(value.onRequest).not.toHaveBeenCalled();
+  fireEvent.click(within(dialog).getByRole("button", { name: messages.nvke.submitRequest }));
+  await waitFor(() =>
+    expect(value.onRequest).toHaveBeenCalledWith({
+      operationKey: spire.key,
+      timeoutSeconds: 7200,
+      parametersText: '{"body":{"address":"spire.new.test","port":30441}}',
+    })
+  );
+});
+it("offers bound reads on a resource without mutable actions", async () => {
+  const read = COLLECTION.actions.find((action) => action.key === "getClusterControlPlane")!;
+  const onRead = vi.fn().mockResolvedValue(true);
+  render(
+    <NvkeResourceActionPanel
+      {...props()}
+      actions={[]}
+      selectedKey=""
+      editor={null}
+      reads={[read]}
+      readReady
+      onRead={onRead}
+      access={{ read: true, manage: false, admin: false, loading: false }}
+    />,
+    { wrapper: Context }
+  );
+  expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: read.key }));
+  expect(onRead).toHaveBeenCalledWith(read.key);
+});
+it("confirms leaving a loaded editor before admitting a diagnostic read", async () => {
+  const read = COLLECTION.actions.find((action) => action.key === "getClusterSpireServer")!;
+  const onRead = vi.fn().mockResolvedValue(true);
+  render(<NvkeResourceActionPanel {...props()} reads={[read]} readReady onRead={onRead} />, {
+    wrapper: Context,
+  });
+  fireEvent.click(screen.getByRole("button", { name: read.key }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent(messages.nvke.discardHelp);
+  expect(onRead).not.toHaveBeenCalled();
 });

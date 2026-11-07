@@ -17712,6 +17712,10 @@
     "observedConcurrencyHelp": "The controller has no atomic version check. Writable configuration is checked before dispatch, but another writer can still race afterward.",
     "conditionalConcurrencyHelp": "The native write uses the exact reviewed version and identity; conflicts require a new observation.",
     "collectionActions": "Read or create resources",
-    "collectionActionsHelp": "Read the complete collection or create a resource using its native schema. Creation is a write and requires confirmation; it does not refresh the saved observation."
+    "collectionActionsHelp": "Read the complete collection or create a resource using its native schema. Creation is a write and requires confirmation; it does not refresh the saved observation.",
+    "resourceActions": "Resource actions",
+    "spireAddress": "SPIRE server address",
+    "spirePort": "SPIRE server port",
+    "prepareSubresourceHelp": "Read this cluster subresource to review its current configuration before editing. The controller still has no atomic version check."
   }
 }

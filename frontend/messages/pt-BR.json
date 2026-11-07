@@ -17712,6 +17712,10 @@
     "observedConcurrencyHelp": "O controlador não oferece verificação atômica de versão. A configuração editável é verificada antes do envio, mas outra gravação ainda pode ocorrer depois.",
     "conditionalConcurrencyHelp": "A gravação nativa usa exatamente a versão e a identidade revisadas; conflitos exigem uma nova observação.",
     "collectionActions": "Ler ou criar recursos",
-    "collectionActionsHelp": "Leia a coleção completa ou crie um recurso usando seu esquema nativo. A criação é uma gravação e exige confirmação; ela não atualiza a observação salva."
+    "collectionActionsHelp": "Leia a coleção completa ou crie um recurso usando seu esquema nativo. A criação é uma gravação e exige confirmação; ela não atualiza a observação salva.",
+    "resourceActions": "Ações do recurso",
+    "spireAddress": "Endereço do servidor SPIRE",
+    "spirePort": "Porta do servidor SPIRE",
+    "prepareSubresourceHelp": "Leia este sub-recurso do cluster para revisar sua configuração atual antes de editar. O controlador continua sem uma verificação atômica de versão."
   }
 }

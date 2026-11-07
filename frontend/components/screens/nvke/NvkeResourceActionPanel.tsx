@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { NvkeResourceSource } from "@/lib/nvke/recovery";
+import { NvkeSpireServerForm } from "./NvkeSpireServerForm";
 import { nativeRequestSchema } from "./schema";
 import {
   mayExecute,
@@ -40,6 +41,9 @@ export interface NvkeResourceActionPanelProps {
   siteVersion: number;
   target: string;
   actions: NvkeActionView[];
+  reads?: NvkeActionView[];
+  readReady?: boolean;
+  onRead?: (key: string) => Promise<boolean>;
   selectedKey: string;
   access: NvkeAccess;
   sourceReady: boolean;
@@ -60,6 +64,7 @@ export function NvkeResourceActionPanel(props: NvkeResourceActionPanelProps) {
   const t = useTranslations("nvke");
   const [confirmLoad, setConfirmLoad] = useState(false);
   const [switchTo, setSwitchTo] = useState<string | null>(null);
+  const [readTo, setReadTo] = useState<string | null>(null);
   const selected = props.actions.find(
     (action) => action.key === props.selectedKey && action.mutates
   );
@@ -71,7 +76,7 @@ export function NvkeResourceActionPanel(props: NvkeResourceActionPanelProps) {
     !props.error;
   const editor = props.editor?.operationKey === props.selectedKey ? props.editor : null;
   return (
-    <Section title={t("editResource")} description={t("fixedTargetHelp")}>
+    <Section title={t("resourceActions")} description={t("fixedTargetHelp")}>
       <p className="min-w-0 font-mono text-sm [overflow-wrap:anywhere]">{props.target}</p>
       {props.error && (
         <div className="space-y-2">
@@ -83,35 +88,61 @@ export function NvkeResourceActionPanel(props: NvkeResourceActionPanelProps) {
           </Button>
         </div>
       )}
-      <div className="min-w-0 space-y-2">
-        <Label htmlFor="nvke-resource-action">{t("action")}</Label>
-        <Select
-          value={props.selectedKey}
-          disabled={props.pending || Boolean(props.recovery)}
-          onValueChange={(key) => {
-            if (!props.actions.some((action) => action.key === key && action.mutates)) return;
-            if (editor) setSwitchTo(key);
-            else props.onSelect(key);
-          }}
-        >
-          <SelectTrigger id="nvke-resource-action" className="w-full">
-            <SelectValue placeholder={t("chooseAction")} />
-          </SelectTrigger>
-          <SelectContent>
-            {props.actions
-              .filter((action) => action.mutates)
-              .map((action) => (
-                <SelectItem key={action.key} value={action.key}>
-                  {action.key}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {props.reads && props.reads.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {props.reads.map((action) => (
+            <Button
+              key={action.key}
+              variant="outline"
+              disabled={
+                !props.readReady ||
+                props.pending ||
+                !!props.error ||
+                !mayExecute(props.access, action.permission)
+              }
+              onClick={() => {
+                if (editor) setReadTo(action.key);
+                else void props.onRead?.(action.key);
+              }}
+            >
+              {action.key}
+            </Button>
+          ))}
+        </div>
+      )}
+      {props.actions.length > 0 && (
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="nvke-resource-action">{t("action")}</Label>
+          <Select
+            value={props.selectedKey}
+            disabled={props.pending || Boolean(props.recovery)}
+            onValueChange={(key) => {
+              if (!props.actions.some((action) => action.key === key && action.mutates)) return;
+              if (editor) setSwitchTo(key);
+              else props.onSelect(key);
+            }}
+          >
+            <SelectTrigger id="nvke-resource-action" className="w-full">
+              <SelectValue placeholder={t("chooseAction")} />
+            </SelectTrigger>
+            <SelectContent>
+              {props.actions
+                .filter((action) => action.mutates)
+                .map((action) => (
+                  <SelectItem key={action.key} value={action.key}>
+                    {action.key}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       <div className="flex flex-wrap gap-3">
-        <Button variant="outline" disabled={!allowed} onClick={() => setConfirmLoad(true)}>
-          {t("loadEdit")}
-        </Button>
+        {selected && (
+          <Button variant="outline" disabled={!allowed} onClick={() => setConfirmLoad(true)}>
+            {t("loadEdit")}
+          </Button>
+        )}
         {props.recovery && (
           <Button
             variant="outline"
@@ -134,7 +165,13 @@ export function NvkeResourceActionPanel(props: NvkeResourceActionPanelProps) {
       )}
       {editor?.preparationActionKey && (
         <div className="space-y-3">
-          <p className="text-muted-foreground text-sm">{t("prepareEditHelp")}</p>
+          <p className="text-muted-foreground text-sm">
+            {t(
+              editor.preparationActionKey === "getClusterSpireServer"
+                ? "prepareSubresourceHelp"
+                : "prepareEditHelp"
+            )}
+          </p>
           <Button
             disabled={!allowed}
             onClick={() => {
@@ -162,6 +199,28 @@ export function NvkeResourceActionPanel(props: NvkeResourceActionPanelProps) {
         confirmDisabled={!allowed}
         confirmLabel={t("loadEdit")}
         onConfirm={async () => (allowed ? props.onLoad() : false)}
+      />
+      <ConfirmDialog
+        open={readTo !== null}
+        onOpenChange={(open) => {
+          if (!open) setReadTo(null);
+        }}
+        title={t("discardTitle")}
+        description={t("discardHelp")}
+        confirmDisabled={props.pending || !props.readReady}
+        onConfirm={async () => {
+          const read = props.reads?.find((action) => action.key === readTo);
+          if (
+            !read ||
+            !mayExecute(props.access, read.permission) ||
+            !props.readReady ||
+            props.pending
+          )
+            return false;
+          const result = await props.onRead?.(read.key);
+          if (result) setReadTo(null);
+          return Boolean(result);
+        }}
       />
       <ConfirmDialog
         open={switchTo !== null}
@@ -196,6 +255,15 @@ function ResourceDraft(
     },
   });
   const [review, setReview] = useState<NvkeRequestValues | null>(null);
+  let spire: { address: string; port: number } | null = null;
+  if (review?.operationKey === "updateClusterSpireServer") {
+    try {
+      const body = JSON.parse(review.parametersText).body;
+      if (typeof body?.address === "string" && Number.isInteger(body?.port)) spire = body;
+    } catch {
+      /* Only validated configuration enters the confirmation. */
+    }
+  }
   return (
     <>
       <p role="note" className="text-warning-fg text-sm">
@@ -205,44 +273,57 @@ function ResourceDraft(
             : "conditionalConcurrencyHelp"
         )}
       </p>
-      <form
-        className="min-w-0 space-y-4"
-        onSubmit={form.handleSubmit((values) => {
-          if (props.allowed) setReview(values);
-        })}
-      >
-        <div className="space-y-2">
-          <Label htmlFor="nvke-resource-timeout">{t("timeout")}</Label>
-          <Input
-            id="nvke-resource-timeout"
-            type="number"
-            min={30}
-            max={86400}
-            disabled={props.pending || Boolean(props.recovery)}
-            {...form.register("timeoutSeconds", { valueAsNumber: true })}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="nvke-resource-parameters">{t("parameters")}</Label>
-          <Textarea
-            id="nvke-resource-parameters"
-            className="min-h-64 font-mono text-xs"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            disabled={props.pending}
-            {...form.register("parametersText")}
-          />
-        </div>
-        {Object.keys(form.formState.errors).length > 0 && (
-          <p role="alert" className="text-danger-fg text-sm">
-            {t("invalidForm")}
-          </p>
-        )}
-        <Button type="submit" disabled={!props.allowed}>
-          {t(props.pending ? "working" : "reviewRequest")}
-        </Button>
-      </form>
+      {props.action.key === "updateClusterSpireServer" ? (
+        <NvkeSpireServerForm
+          parametersText={props.editor.parametersText ?? "{}"}
+          timeoutSeconds={props.recovery?.timeoutSeconds ?? 7200}
+          recovery={Boolean(props.recovery)}
+          pending={props.pending}
+          disabled={!props.allowed}
+          onReview={(values) => {
+            if (props.allowed) setReview(values);
+          }}
+        />
+      ) : (
+        <form
+          className="min-w-0 space-y-4"
+          onSubmit={form.handleSubmit((values) => {
+            if (props.allowed) setReview(values);
+          })}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="nvke-resource-timeout">{t("timeout")}</Label>
+            <Input
+              id="nvke-resource-timeout"
+              type="number"
+              min={30}
+              max={86400}
+              disabled={props.pending || Boolean(props.recovery)}
+              {...form.register("timeoutSeconds", { valueAsNumber: true })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nvke-resource-parameters">{t("parameters")}</Label>
+            <Textarea
+              id="nvke-resource-parameters"
+              className="min-h-64 font-mono text-xs"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              disabled={props.pending}
+              {...form.register("parametersText")}
+            />
+          </div>
+          {Object.keys(form.formState.errors).length > 0 && (
+            <p role="alert" className="text-danger-fg text-sm">
+              {t("invalidForm")}
+            </p>
+          )}
+          <Button type="submit" disabled={!props.allowed}>
+            {t(props.pending ? "working" : "reviewRequest")}
+          </Button>
+        </form>
+      )}
       <details className="min-w-0 text-sm">
         <summary className="cursor-pointer font-medium">{t("schema")}</summary>
         <pre className="bg-muted mt-3 max-h-80 overflow-auto rounded-lg p-3 font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
@@ -263,6 +344,11 @@ function ResourceDraft(
               version: props.recovery?.expectedSiteVersion ?? props.editor.siteVersion,
             })}
             <span className="mt-2 block [overflow-wrap:anywhere]">{props.target}</span>
+            {spire && (
+              <span className="mt-2 block [overflow-wrap:anywhere]">
+                {t("spireAddress")}: {spire.address} · {t("spirePort")}: {spire.port}
+              </span>
+            )}
           </>
         }
         confirmLabel={t("submitRequest")}

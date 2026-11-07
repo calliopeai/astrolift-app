@@ -17712,6 +17712,10 @@
     "observedConcurrencyHelp": "控制器不支持原子版本检查。发送前会检查可写配置，但之后仍可能发生并发写入。",
     "conditionalConcurrencyHelp": "原生写入使用已审核的确切版本和标识；发生冲突时需要新的观测。",
     "collectionActions": "读取或创建资源",
-    "collectionActionsHelp": "读取完整集合，或使用原生架构创建资源。创建属于写入操作，需要确认；它不会刷新已保存的观测结果。"
+    "collectionActionsHelp": "读取完整集合，或使用原生架构创建资源。创建属于写入操作，需要确认；它不会刷新已保存的观测结果。",
+    "resourceActions": "资源操作",
+    "spireAddress": "SPIRE 服务器地址",
+    "spirePort": "SPIRE 服务器端口",
+    "prepareSubresourceHelp": "编辑前先读取此集群子资源，以检查其当前配置。控制器仍不提供原子版本检查。"
   }
 }

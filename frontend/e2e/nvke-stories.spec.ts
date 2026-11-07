@@ -13,6 +13,9 @@ const stories = [
   "screens-nvke-resource--full",
   "screens-nvke-resource-actions--editing",
   "screens-nvke-resource--with-editor",
+  "screens-nvke-resource-actions--spire",
+  "screens-nvke-resource-actions--reads",
+  "screens-nvke-resource-actions--read-only-resource",
 ];
 for (const mode of ["light", "dark"]) {
   for (const id of stories) {
@@ -142,4 +145,20 @@ test("nvke collection creation confirms its resource target without converting n
   await expect(dialog).toContainText("site version 7");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByLabel("Native parameters (JSON)")).toHaveValue(raw);
+});
+
+test("nvke SPIRE editing confirms both cluster and requested server", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-resource-actions--spire&viewMode=story");
+  await page.getByLabel("SPIRE server address", { exact: true }).fill("spire.new.test");
+  await page.getByLabel("SPIRE server port", { exact: true }).fill("30441");
+  await page.getByRole("button", { name: "Review change", exact: true }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("research-cluster");
+  await expect(dialog).toContainText("updateClusterSpireServer");
+  await expect(dialog).toContainText("spire.new.test");
+  await expect(dialog).toContainText("30441");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByLabel("SPIRE server address", { exact: true })).toHaveValue(
+    "spire.new.test"
+  );
 });

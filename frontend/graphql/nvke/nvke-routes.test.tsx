@@ -911,3 +911,205 @@ it.each([false, true])(
     expect(readRecovery(localStorage, scope, SITE.id)).toEqual(visible ? null : original);
   }
 );
+
+it.each(["getClusterControlPlane", "getClusterControlPlaneConfigHistory", "getClusterSpireServer"])(
+  "admits a fixed-source diagnostic read: %s",
+  async (actionKey) => {
+    const h = harness((request) => {
+      if (request.operationName === "RequestNvkeResourceOperation")
+        return {
+          requestNvkeResourceOperation: {
+            ok: true,
+            errors: [],
+            data: {
+              ...OPERATION,
+              operationKey: actionKey,
+              requestId: request.variables.input.requestId,
+              resourceSource: reviewedSource,
+            },
+          },
+        };
+      throw new Error("Unexpected diagnostic read");
+    });
+    const { result } = renderHook(() => useNvkeResourceActions(useResourceActionArgs()), {
+      wrapper: h.wrapper,
+    });
+    await waitFor(() => expect(result.current?.readReady).toBe(true));
+    await act(async () => {
+      expect(await result.current!.onRead!(actionKey)).toBe(true);
+    });
+    expect(
+      h.calls.find((c) => c.operationName === "RequestNvkeResourceOperation")!.variables.input
+    ).toMatchObject({
+      operationKey: actionKey,
+      parametersText: "{}",
+      sourceOperationId: reviewedSource.operationId,
+      expectedSourceVersion: reviewedSource.version,
+      sourceResourceKey: reviewedSource.resourceKey,
+    });
+    expect(h.calls.some((c) => c.operationName === "GetNvkeResourceEditor")).toBe(false);
+    expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+    expect(h.cache.extract()).toEqual({});
+  }
+);
+it("keeps bound reads available on a read-only native resource", async () => {
+  const read = COLLECTION.actions.find((a) => a.key === "getClusterControlPlane")!;
+  const h = harness(() => {
+    throw new Error("No automatic reads");
+  });
+  const { result } = renderHook(
+    () =>
+      useNvkeResourceActions({
+        ...useResourceActionArgs(),
+        collection: { ...COLLECTION, actions: [COLLECTION.actions[0], read] },
+      }),
+    { wrapper: h.wrapper }
+  );
+  await waitFor(() => expect(result.current?.readReady).toBe(true));
+  expect(result.current?.actions).toEqual([]);
+  expect(result.current?.reads).toEqual([read]);
+  expect(h.calls).toHaveLength(0);
+});
+it("prepares SPIRE and admits its edit against the successful bound SPIRE read", async () => {
+  const preparedId = "123e4567-e89b-12d3-a456-426614174091";
+  const prepared = { operationId: preparedId, version: 9, resourceKey: null };
+  const text = '{"body":{"address":"spire.old.test","port":30440}}';
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeResourceEditor")
+      return {
+        astroliftNvkeResourceEditor: {
+          ok: true,
+          errors: [],
+          data: {
+            operationKey: "updateClusterSpireServer",
+            source: request.variables.sourceOperationId === preparedId ? prepared : reviewedSource,
+            parametersText: request.variables.sourceOperationId === preparedId ? text : null,
+            preparationActionKey:
+              request.variables.sourceOperationId === preparedId ? null : "getClusterSpireServer",
+            concurrency: "observed_only",
+          },
+        },
+      };
+    if (request.operationName === "RequestNvkeResourceOperation")
+      return {
+        requestNvkeResourceOperation: {
+          ok: true,
+          errors: [],
+          data: {
+            ...OPERATION,
+            id:
+              request.variables.input.operationKey === "getClusterSpireServer"
+                ? preparedId
+                : OPERATION.id,
+            operationKey: request.variables.input.operationKey,
+            requestId: request.variables.input.requestId,
+            resourceSource:
+              request.variables.input.operationKey === "getClusterSpireServer"
+                ? reviewedSource
+                : prepared,
+          },
+        },
+      };
+    if (request.operationName === "GetNvkeOperation")
+      return {
+        astroliftNvkeOperation: {
+          ...OPERATION,
+          id: preparedId,
+          version: prepared.version,
+          status: "SUCCEEDED",
+          operationKey: "getClusterSpireServer",
+          resourceSource: reviewedSource,
+        },
+      };
+    throw new Error("Unexpected SPIRE request");
+  });
+  const { result } = renderHook(() => useNvkeResourceActions(useResourceActionArgs()), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current?.sourceReady).toBe(true));
+  act(() => result.current!.onSelect("updateClusterSpireServer"));
+  await act(async () => {
+    expect(await result.current!.onLoad()).toBe(true);
+  });
+  expect(result.current?.editor?.preparationActionKey).toBe("getClusterSpireServer");
+  await act(async () => {
+    expect(await result.current!.onPrepare()).toBe(true);
+  });
+  expect(result.current?.editor?.source).toEqual(prepared);
+  expect(result.current?.editor?.parametersText).toBe(text);
+  await act(async () => {
+    expect(
+      await result.current!.onRequest({
+        operationKey: "updateClusterSpireServer",
+        timeoutSeconds: 7200,
+        parametersText: '{"body":{"address":"spire.new.test","port":30441}}',
+      })
+    ).toBe(true);
+  });
+  const writes = h.calls.filter((c) => c.operationName === "RequestNvkeResourceOperation");
+  expect(writes).toHaveLength(2);
+  expect(writes[1].variables.input).toMatchObject({
+    sourceOperationId: prepared.operationId,
+    expectedSourceVersion: prepared.version,
+    sourceResourceKey: null,
+  });
+  expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+});
+
+it("restores SPIRE preparation recovery after a reload without issuing another request", async () => {
+  let accepted: Record<string, unknown> | null = null;
+  const preparedId = "123e4567-e89b-12d3-a456-426614174092";
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeResourceEditor")
+      return {
+        astroliftNvkeResourceEditor: {
+          ok: true,
+          errors: [],
+          data: {
+            operationKey: "updateClusterSpireServer",
+            source: reviewedSource,
+            parametersText: null,
+            preparationActionKey: "getClusterSpireServer",
+            concurrency: "observed_only",
+          },
+        },
+      };
+    if (request.operationName === "RequestNvkeResourceOperation") {
+      accepted = {
+        ...OPERATION,
+        id: preparedId,
+        operationKey: "getClusterSpireServer",
+        requestId: request.variables.input.requestId,
+        resourceSource: reviewedSource,
+      };
+      throw new Error("Lost preparation admission reply");
+    }
+    if (request.operationName === "GetNvkeRequest") return { astroliftNvkeRequest: accepted };
+    throw new Error("No implicit native preparation retry");
+  });
+  const first = renderHook(() => useNvkeResourceActions(useResourceActionArgs()), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(first.result.current?.sourceReady).toBe(true));
+  act(() => first.result.current!.onSelect("updateClusterSpireServer"));
+  await act(async () => {
+    await first.result.current!.onLoad();
+  });
+  await act(async () => {
+    expect(await first.result.current!.onPrepare()).toBe(false);
+  });
+  first.unmount();
+  const second = renderHook(() => useNvkeResourceActions(useResourceActionArgs()), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() =>
+    expect(second.result.current?.recovery?.operationKey).toBe("getClusterSpireServer")
+  );
+  expect(second.result.current?.selectedKey).toBe("updateClusterSpireServer");
+  await act(async () => {
+    expect(await second.result.current!.onRecover()).toBe(true);
+  });
+  expect(h.calls.filter((c) => c.operationName === "RequestNvkeResourceOperation")).toHaveLength(1);
+  expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${preparedId}`);
+  expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+});

@@ -100,7 +100,13 @@ Editors load sensitive writable configuration only after consent, retain opaque 
 and confirm the fixed target and reviewed site version. Public interfaces prepare a native GET
 when an ETag is absent; controller edits explicitly show their weaker concurrency guarantee.
 
+Resource details also offer bound native resource reads. Cluster details include
+control-plane status/configuration history and SPIRE status. SPIRE updates load
+their own reviewed read and use typed server address/port fields. All these paths
+retain the same journal, fixed cluster identity and explicit receipt recovery.
+A read requested while an editor is loaded confirms leaving the draft first.
+
 Observation browsing uses manual refresh; a confirmed preparation GET polls its own operation
-for a bounded interval. Native subresource/lifecycle controls, site bootstrap,
+for a bounded interval. Additional lifecycle controls, site bootstrap,
 additional workload access management, telemetry and live hardware qualification remain delivery work.
 Observation browsing and the native editor do not establish full integration qualification.

@@ -94,3 +94,34 @@ resource-mode recovery, preparation reads, actor changes and opaque integer text
 Collection creation uses the ordinary native admission path from the collection editor;
 it has no existing resource observation to bind. Native subresource/lifecycle controls
 and CLI source-binding flags remain delivery work.
+
+
+## Cluster subresources
+
+The cluster collection also exposes native control-plane status, control-plane
+configuration history, and SPIRE status/update operations. Their paths are bound
+to the reviewed controller cluster UUID; collection creation remains separate.
+A bound subresource read confirms the parent cluster identity before and after
+the native read. These response schemas do not contain a cluster ID, so the
+result's association comes from its immutable request target and successful
+parent checks, not a fabricated field in the native response.
+
+A successful bound SPIRE read can prepare a SPIRE update. Its saved identity
+binding survives removal of the original inventory observation, while current
+organization, source version, permission and connection authority remain
+mandatory. Ordinary unbound SPIRE reads cannot authorize this edit. A SPIRE read
+cannot substitute for the parent cluster observation or another subresource.
+The browser offers explicit bound read controls, including on resources with no
+write actions; admitting one opens its durable operation without automatically
+loading native response contents into the browser.
+
+SPIRE editing first requires its own read, then presents typed address/port
+fields and a confirmation naming both the fixed cluster and requested server.
+An absent prior requested server produces an empty draft requiring operator
+input. Admission still validates the native request. Worker preflight confirms
+the parent identity and compares only the reviewed requested server, ignoring
+volatile per-node reachability, certificate and diagnostic fields. Changing the
+requested server externally causes a conflict before PATCH. The controller
+still has no atomic write version, so another writer can race afterward.
+Readiness retains the native per-node checks; an accepted PATCH alone is not
+success. A parent lost after sending leaves an uncertain effect for reconciliation.

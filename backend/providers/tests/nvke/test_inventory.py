@@ -50,6 +50,10 @@ def test_every_native_resource_list_has_a_collection_and_its_original_actions():
         "getCluster",
         "updateCluster",
         "deleteCluster",
+        "getClusterControlPlane",
+        "getClusterControlPlaneConfigHistory",
+        "getClusterSpireServer",
+        "updateClusterSpireServer",
     }
     assert collection("operator.listMachineImage").permission == "nvke.admin"
 

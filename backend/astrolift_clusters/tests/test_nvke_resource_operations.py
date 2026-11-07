@@ -420,3 +420,218 @@ def test_real_kubernetes_replacement_between_preflight_and_put_cannot_be_overwri
         current = client.get("MachineImage", document["metadata"]["name"])
     assert current.data["metadata"]["uid"] == replacement[0].data["metadata"]["uid"]
     assert current.data["spec"]["buildDate"] == "2026-11-10"
+
+
+@pytest.fixture
+def cluster_subresources(configured):
+    from contextlib import ExitStack
+
+    identity = str(uuid4())
+    details = {
+        "spire": {
+            "requested": {"address": "spire.old.test", "port": 30440},
+            "nodes": [
+                {
+                    "nodeID": str(uuid4()),
+                    "name": "node-a",
+                    "reachable": True,
+                    "hasValidSVID": True,
+                    "serverAddress": "spire.old.test",
+                    "serverPort": 30440,
+                }
+            ],
+        },
+        "control_plane": {"nativeStatus": "observed"},
+        "history": {"items": []},
+    }
+    with ExitStack() as stack:
+        endpoint, _, calls = stack.enter_context(
+            controller({"body": {"name": "cluster-a"}}, identity, details)
+        )
+        with context(configured.world):
+            put(
+                configured.site,
+                expected_connection_version=configured.connection.version,
+                endpoint=endpoint,
+                allow_http=True,
+            )
+            configured.site.refresh_from_db()
+        source = completed(configured, items=[{"id": identity, "name": "cluster-a"}])
+        yield configured, source, source_for(configured, source), identity, details, calls
+
+
+def prepared_spire(state):
+    configured, source, reference, identity, details, calls = state
+    read = reserve(
+        configured, operation_key="getClusterSpireServer", parameters={}, resource_source=reference
+    )
+    assert run(read, "spire-read") == "succeeded"
+    read.refresh_from_db()
+    return read, {"operation_id": str(read.guid), "version": read.version, "resource_key": None}
+
+
+@pytest.mark.parametrize(
+    "key", ["getClusterControlPlane", "getClusterControlPlaneConfigHistory", "getClusterSpireServer"]
+)
+def test_bound_subresource_reads_confirm_parent_identity_around_the_native_read(cluster_subresources, key):
+    configured, source, reference, identity, details, calls = cluster_subresources
+    row = reserve(configured, operation_key=key, parameters={}, resource_source=reference)
+    assert operations.decode_input(row) == {"path": {"clusterID": identity}}
+    assert run(row, "bound-subresource") == "succeeded"
+    row.refresh_from_db()
+    assert calls[0] == calls[-1] == ("GET", f"/clusters/{identity}")
+    assert len(calls) == 3
+    assert row.authority["resource"]["subresource"] == key
+    assert row.authority["resource"]["identity_action"] == "getCluster"
+    assert (
+        operations.decode_result(row)["response"]["data"]
+        == details[
+            {
+                "getClusterControlPlane": "control_plane",
+                "getClusterControlPlaneConfigHistory": "history",
+                "getClusterSpireServer": "spire",
+            }[key]
+        ]
+    )
+
+
+def test_spire_editor_requires_its_bound_read_and_survives_parent_snapshot_removal(cluster_subresources):
+    configured, source, reference, identity, details, calls = cluster_subresources
+    with context(configured.world):
+        editor = resource_operations.editor(
+            site_id=str(configured.site.guid),
+            expected_actor_id=configured.world.user.pk,
+            operation_key="updateClusterSpireServer",
+            reference=reference,
+        )
+    assert editor[3] is None and editor[4:] == ("getClusterSpireServer", "observed_only")
+    assert calls == []
+    read, prepared = prepared_spire(cluster_subresources)
+    source.soft_delete()
+    with context(configured.world):
+        editor = resource_operations.editor(
+            site_id=str(configured.site.guid),
+            expected_actor_id=configured.world.user.pk,
+            operation_key="updateClusterSpireServer",
+            reference=prepared,
+        )
+    assert editor[3] == {"path": {"clusterID": identity}, "body": details["spire"]["requested"]}
+    assert editor[4:] == (None, "observed_only")
+    assert "nodes" not in str(editor[3])
+
+
+def test_unbound_spire_read_cannot_authorize_a_resource_edit(cluster_subresources):
+    configured, _, _, identity, _, _ = cluster_subresources
+    read = reserve(
+        configured, operation_key="getClusterSpireServer", parameters={"path": {"clusterID": identity}}
+    )
+    assert run(read, "unbound-spire-read") == "succeeded"
+    read.refresh_from_db()
+    with pytest.raises(NvkeError) as error:
+        reserve(
+            configured,
+            operation_key="updateClusterSpireServer",
+            parameters={"body": {"address": "spire.new.test", "port": 30440}},
+            resource_source={"operation_id": str(read.guid), "version": read.version, "resource_key": None},
+        )
+    assert error.value.code == "INVALID_INPUT"
+
+
+@pytest.mark.parametrize("key", ["updateCluster", "getClusterControlPlane"])
+def test_spire_read_cannot_be_reused_as_a_different_resource_observation(cluster_subresources, key):
+    configured, _, _, _, _, _ = cluster_subresources
+    _, prepared = prepared_spire(cluster_subresources)
+    with pytest.raises(NvkeError) as error:
+        reserve(
+            configured,
+            operation_key=key,
+            parameters={"body": {}} if key == "updateCluster" else {},
+            resource_source=prepared,
+        )
+    assert error.value.code == "INVALID_INPUT"
+
+
+@pytest.mark.parametrize("configuration_changed", [True, False])
+def test_spire_patch_checks_requested_configuration_but_ignores_live_node_status(
+    cluster_subresources, configuration_changed
+):
+    configured, _, _, _, details, calls = cluster_subresources
+    _, prepared = prepared_spire(cluster_subresources)
+    row = reserve(
+        configured,
+        operation_key="updateClusterSpireServer",
+        parameters={"body": {"address": "spire.new.test", "port": 30440}},
+        resource_source=prepared,
+    )
+    if configuration_changed:
+        details["spire"]["requested"]["address"] = "another-writer.test"
+    else:
+        details["spire"]["nodes"][0]["message"] = "Volatile diagnostic state changed"
+    result = run(row, "spire-patch")
+    row.refresh_from_db()
+    if configuration_changed:
+        assert result == "failed" and row.error_code == "CONFLICT"
+        assert not any(method == "PATCH" for method, _ in calls)
+    else:
+        assert result == "succeeded"
+        assert sum(method == "PATCH" for method, _ in calls) == 1
+
+
+def test_initial_spire_configuration_has_an_explicit_empty_draft(cluster_subresources):
+    configured, _, _, _, details, _ = cluster_subresources
+    details["spire"].pop("requested")
+    _, prepared = prepared_spire(cluster_subresources)
+    with context(configured.world):
+        editor = resource_operations.editor(
+            site_id=str(configured.site.guid),
+            expected_actor_id=configured.world.user.pk,
+            operation_key="updateClusterSpireServer",
+            reference=prepared,
+        )
+    assert editor[3]["body"] == {} and editor[4] is None
+    with pytest.raises(NvkeError) as error:
+        reserve(
+            configured,
+            operation_key="updateClusterSpireServer",
+            parameters={"body": {}},
+            resource_source=prepared,
+        )
+    assert error.value.code == "INVALID_INPUT"
+
+
+@pytest.mark.parametrize("change", ["missing", "identity", "during-read"])
+def test_bound_spire_read_does_not_promote_an_unconfirmed_parent(cluster_subresources, change):
+    configured, _, reference, _, details, calls = cluster_subresources
+    row = reserve(configured, operation_key="getClusterSpireServer", parameters={}, resource_source=reference)
+    if change == "missing":
+        details["parent_missing"] = True
+    elif change == "identity":
+        details["parent_override"] = {"id": str(uuid4())}
+    else:
+        details["remove_parent_during_read"] = True
+    assert run(row, "parent-unconfirmed") == "failed"
+    row.refresh_from_db()
+    assert row.error_code in {"NOT_FOUND", "CONFLICT"}
+    assert "response" not in operations.decode_result(row)
+    assert len(calls) == (3 if change == "during-read" else 1)
+
+
+def test_prepared_spire_read_does_not_survive_connection_authority_rotation(cluster_subresources):
+    configured, _, _, _, _, _ = cluster_subresources
+    _, prepared = prepared_spire(cluster_subresources)
+    with context(configured.world):
+        configured.connection.refresh_from_db()
+        put(
+            configured.site,
+            expected_connection_version=configured.connection.version,
+            credentials={"token": "ROTATED_PRIVATE"},
+        )
+    configured.site.refresh_from_db()
+    with pytest.raises(NvkeError) as error:
+        reserve(
+            configured,
+            operation_key="updateClusterSpireServer",
+            parameters={"body": {"address": "spire.new.test", "port": 30440}},
+            resource_source=prepared,
+        )
+    assert error.value.code == "SOURCE_CHANGED"

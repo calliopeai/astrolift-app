@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NvkeResourceActionPanel } from "./NvkeResourceActionPanel";
-import { ACTIONS, SITE_DETAIL, SITE, OPERATION } from "./fixtures";
+import { COLLECTION, ACTIONS, SITE_DETAIL, SITE, OPERATION } from "./fixtures";
 const update = {
   ...ACTIONS[1],
   key: "updateCluster",
@@ -80,4 +80,25 @@ export const Width768: Story = {
       <NvkeResourceActionPanel {...args} editor={editor} />
     </div>
   ),
+};
+
+export const Reads: Story = {
+  args: {
+    reads: COLLECTION.actions.filter((action) => !action.mutates && action.key !== COLLECTION.key),
+    readReady: true,
+    onRead: async () => true,
+  },
+};
+export const ReadOnlyResource: Story = { args: { ...Reads.args, actions: [], selectedKey: "" } };
+const spire = COLLECTION.actions.find((action) => action.key === "updateClusterSpireServer")!;
+export const Spire: Story = {
+  args: {
+    actions: [spire],
+    selectedKey: spire.key,
+    editor: {
+      ...editor,
+      operationKey: spire.key,
+      parametersText: '{"body":{"address":"spire.example.test","port":30440}}',
+    },
+  },
 };

@@ -36,6 +36,22 @@ export const COLLECTION: NvkeCollectionView = {
       mutates: true,
       path: "/clusters",
     },
+    ...[
+      "getCluster",
+      "getClusterControlPlane",
+      "getClusterControlPlaneConfigHistory",
+      "getClusterSpireServer",
+    ].map((key, index) => ({
+      key,
+      surface: "CONTROLLER" as const,
+      resourceKind: "Cluster",
+      permission: "nvke.read",
+      verb: "GET",
+      mutates: false,
+      path:
+        "/clusters/{clusterID}" +
+        ["", "/control-plane", "/control-plane/configHistory", "/spire-server"][index],
+    })),
     {
       key: "updateCluster",
       surface: "CONTROLLER",
@@ -44,6 +60,15 @@ export const COLLECTION: NvkeCollectionView = {
       verb: "PATCH",
       mutates: true,
       path: "/clusters/{clusterID}",
+    },
+    {
+      key: "updateClusterSpireServer",
+      surface: "CONTROLLER",
+      resourceKind: "Cluster",
+      permission: "nvke.admin",
+      verb: "PATCH",
+      mutates: true,
+      path: "/clusters/{clusterID}/spire-server",
     },
     {
       key: "deleteCluster",

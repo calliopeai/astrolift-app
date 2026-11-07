@@ -109,9 +109,10 @@ def test_unconfirmed_or_mismatched_native_identity_never_becomes_a_binding(confi
 
 
 @contextmanager
-def controller(request, identity=None):
+def controller(request, identity=None, subresources=None):
     identity = identity or str(uuid4())
     calls = []
+    subresources = subresources if subresources is not None else {}
     response = {"id": identity, "name": request["body"]["name"], "conditions": {}}
 
     class Handler(BaseHTTPRequestHandler):
@@ -123,10 +124,18 @@ def controller(request, identity=None):
                 self.reply({"nodePools": []})
             elif self.path.startswith("/nodes?"):
                 self.reply({"nodes": []})
+            elif self.path.endswith("/control-plane/configHistory"):
+                self.reply(subresources.get("history", {}))
             elif self.path.endswith("/control-plane"):
-                self.reply({})
+                self.reply(subresources.get("control_plane", {}))
+            elif self.path.endswith("/spire-server"):
+                self.reply(subresources.get("spire", {"nodes": []}))
+                if subresources.get("remove_parent_during_read"):
+                    subresources["parent_missing"] = True
+            elif subresources.get("parent_missing"):
+                self.reply({}, 404)
             else:
-                self.reply(response)
+                self.reply({**response, **subresources.get("parent_override", {})})
 
         def do_POST(self):
             calls.append((self.command, self.path))
@@ -143,8 +152,15 @@ def controller(request, identity=None):
 
         def do_PATCH(self):
             calls.append((self.command, self.path))
-            response.update(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
-            self.reply(response)
+            body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if self.path.endswith("/spire-server"):
+                subresources.setdefault("spire", {"nodes": []})["requested"] = body
+                for node in subresources["spire"].get("nodes", []):
+                    node.update(serverAddress=body["address"], serverPort=body["port"])
+                self.reply({}, 202)
+            else:
+                response.update(body)
+                self.reply(response)
 
         def log_message(self, *_args):
             pass
