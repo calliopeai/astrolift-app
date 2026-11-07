@@ -2,6 +2,7 @@ import { ApolloClient, gql, HttpLink, InMemoryCache } from "@apollo/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildClientLinks } from "./links";
+import { clearActiveOrgGuid, setActiveOrgGuid } from "@/lib/identity/active-org";
 
 vi.mock("@/lib/auth/token-store", () => ({
   getClientToken: async () => null,
@@ -60,4 +61,51 @@ describe("an expired session reaches the sign-in prompt", () => {
     expect(await expired(403, { errors: [{ message: "Send the X-Platform header." }] })).toBe(0);
     expect(await expired(500, {})).toBe(0);
   });
+});
+
+it("omits response bodies from sensitive network diagnostics", async () => {
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const api = client(500, { private: "native-kubeconfig-private-key" });
+    await api
+      .query({ query: QUERY, fetchPolicy: "no-cache", context: { redactDiagnostics: true } })
+      .catch(() => {});
+    expect(log).toHaveBeenCalledWith("[Apollo] Sensitive request failed");
+    expect(JSON.stringify(log.mock.calls)).not.toContain("native-kubeconfig-private-key");
+    api.stop();
+  } finally {
+    log.mockRestore();
+  }
+});
+
+it("does not send a request after its reviewed organization has changed", async () => {
+  const fetch = vi.fn(
+    async () =>
+      new Response(JSON.stringify({ data: { me: { id: "id" } } }), {
+        headers: { "content-type": "application/json" },
+      })
+  );
+  const log = vi.spyOn(console, "error").mockImplementation(() => {});
+  const api = new ApolloClient({
+    cache: new InMemoryCache(),
+    link: buildClientLinks(new HttpLink({ uri: "http://test/app/gql/config/", fetch })),
+  });
+  setActiveOrgGuid("new-organization");
+  try {
+    await expect(
+      api.query({
+        query: QUERY,
+        fetchPolicy: "no-cache",
+        context: {
+          expectedNvkeOrganization: "reviewed-organization",
+          redactDiagnostics: true,
+        },
+      })
+    ).rejects.toThrow("NVKE_SOURCE_CHANGED");
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    clearActiveOrgGuid();
+    log.mockRestore();
+    api.stop();
+  }
 });

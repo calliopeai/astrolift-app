@@ -17165,7 +17165,8 @@
       "logs": "Logs",
       "traces": "Traces",
       "operations": "Operations",
-      "app-access": "App access"
+      "app-access": "App access",
+      "nvke": "NVKE"
     }
   },
   "relativeAge": {
@@ -17664,7 +17665,7 @@
     "requestFailed": "NVKE request could not be confirmed. Preserve its recovery identity and original input.",
     "readFailed": "NVKE data could not be read. Refresh to recheck your current access.",
     "configurationFailed": "NVKE configuration was refused or could not be confirmed. Refresh the current versions before retrying.",
-    "storageRequired": "A recovery identity could not be saved in this browser. Enable site storage before submitting a native operation.",
+    "storageRequired": "A recovery identity could not be saved or locked in this browser. Enable site storage and use a browser with Web Locks before submitting a native operation.",
     "recoveryMismatch": "The parameters differ from the saved request. Restore the original input to recover it.",
     "downloadFailed": "The sensitive result could not be downloaded. Recheck access and try again.",
     "status": {
@@ -17680,6 +17681,7 @@
     "sitesTitle": "NVKE sites",
     "allSites": "All sites",
     "mutationTarget": "Affected resource: {target}",
-    "targetFromParameters": "Defined by native parameters"
+    "targetFromParameters": "Defined by native parameters",
+    "requestRejected": "The request was rejected before admission. Refresh the site and review the parameters before trying again."
   }
 }

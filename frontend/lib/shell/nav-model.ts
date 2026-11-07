@@ -302,6 +302,7 @@ export const NAV: NavArea[] = [
             tourTarget: "clusters-nav",
           },
           { key: "domains", label: "Domains", href: "/domains", icon: GlobeIcon, module: "admin" },
+          { key: "nvke", label: "NVKE", href: "/nvke", icon: ServerIcon, module: "admin" },
           {
             key: "providers",
             label: "Providers",

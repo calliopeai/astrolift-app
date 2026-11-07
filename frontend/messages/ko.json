@@ -16354,7 +16354,8 @@
       "environments": "환경",
       "previews": "미리보기",
       "zentinelle": "Zentinelle",
-      "app-access": "앱 접근"
+      "app-access": "앱 접근",
+      "nvke": "NVKE"
     },
     "areas": {
       "home": "홈",
@@ -17664,7 +17665,7 @@
     "requestFailed": "NVKE 요청을 확인하지 못했습니다. 복구 ID와 원래 입력을 보존하세요.",
     "readFailed": "NVKE 데이터를 읽지 못했습니다. 새로 고쳐 현재 접근 권한을 확인하세요.",
     "configurationFailed": "설정이 거부되었거나 확인되지 않았습니다. 재시도 전에 현재 버전을 확인하세요.",
-    "storageRequired": "복구 ID를 저장하지 못했습니다. 작업 제출 전에 사이트 저장소를 활성화하세요.",
+    "storageRequired": "이 브라우저에서 복구 식별 정보를 저장하거나 잠글 수 없습니다. 기본 작업을 제출하기 전에 사이트 저장소를 활성화하고 Web Locks를 지원하는 브라우저를 사용하세요.",
     "recoveryMismatch": "저장된 요청과 매개변수가 다릅니다. 복구하려면 원래 입력을 복원하세요.",
     "downloadFailed": "민감한 결과를 다운로드하지 못했습니다. 접근 권한을 확인한 후 재시도하세요.",
     "status": {
@@ -17680,6 +17681,7 @@
     "sitesTitle": "NVKE 사이트",
     "allSites": "모든 사이트",
     "mutationTarget": "대상 리소스: {target}",
-    "targetFromParameters": "네이티브 매개변수로 정의됨"
+    "targetFromParameters": "네이티브 매개변수로 정의됨",
+    "requestRejected": "요청이 접수 전에 거부되었습니다. 사이트를 새로 고침하고 매개변수를 검토한 후 다시 시도하세요."
   }
 }

@@ -16357,7 +16357,8 @@
       "environments": "Umgebungen",
       "previews": "Vorschauen",
       "zentinelle": "Zentinelle",
-      "app-access": "App-Zugriff"
+      "app-access": "App-Zugriff",
+      "nvke": "NVKE"
     },
     "areas": {
       "home": "Startseite",
@@ -17667,7 +17668,7 @@
     "requestFailed": "NVKE-Anfrage nicht bestätigt. Wiederherstellungsidentität und Originaleingabe behalten.",
     "readFailed": "NVKE-Daten konnten nicht gelesen werden. Aktuellen Zugriff durch Aktualisieren prüfen.",
     "configurationFailed": "NVKE-Konfiguration abgelehnt oder nicht bestätigt. Vor Wiederholung aktuelle Versionen laden.",
-    "storageRequired": "Wiederherstellungsidentität konnte nicht gespeichert werden. Vor dem Senden Website-Speicher aktivieren.",
+    "storageRequired": "Die Wiederherstellungskennung konnte in diesem Browser nicht gespeichert oder gesperrt werden. Aktivieren Sie den Website-Speicher und verwenden Sie einen Browser mit Web Locks, bevor Sie einen nativen Vorgang senden.",
     "recoveryMismatch": "Parameter unterscheiden sich von der gespeicherten Anfrage. Originaleingabe zur Wiederherstellung verwenden.",
     "downloadFailed": "Vertrauliches Ergebnis konnte nicht geladen werden. Zugriff prüfen und erneut versuchen.",
     "status": {
@@ -17683,6 +17684,7 @@
     "sitesTitle": "NVKE-Standorte",
     "allSites": "Alle Standorte",
     "mutationTarget": "Betroffene Ressource: {target}",
-    "targetFromParameters": "Durch native Parameter festgelegt"
+    "targetFromParameters": "Durch native Parameter festgelegt",
+    "requestRejected": "Die Anfrage wurde vor der Annahme abgelehnt. Aktualisieren Sie den Standort und prüfen Sie die Parameter, bevor Sie es erneut versuchen."
   }
 }

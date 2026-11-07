@@ -16354,7 +16354,8 @@
       "environments": "环境",
       "previews": "预览",
       "zentinelle": "Zentinelle",
-      "app-access": "应用访问权限"
+      "app-access": "应用访问权限",
+      "nvke": "NVKE"
     },
     "areas": {
       "home": "首页",
@@ -17664,7 +17665,7 @@
     "requestFailed": "无法确认 NVKE 请求。请保留恢复标识和原始输入。",
     "readFailed": "无法读取 NVKE 数据。请刷新以检查当前访问权限。",
     "configurationFailed": "配置被拒绝或无法确认。重试前请刷新当前版本。",
-    "storageRequired": "无法保存恢复标识。提交操作前请启用站点存储。",
+    "storageRequired": "无法在此浏览器中保存或锁定恢复标识。提交原生操作前，请启用站点存储并使用支持 Web Locks 的浏览器。",
     "recoveryMismatch": "参数与保存的请求不同。请恢复原始输入以恢复请求。",
     "downloadFailed": "无法下载敏感结果。请检查访问权限后重试。",
     "status": {
@@ -17680,6 +17681,7 @@
     "sitesTitle": "NVKE 站点",
     "allSites": "所有站点",
     "mutationTarget": "受影响的资源：{target}",
-    "targetFromParameters": "由原生参数定义"
+    "targetFromParameters": "由原生参数定义",
+    "requestRejected": "请求在受理前被拒绝。请刷新站点并检查参数，然后重试。"
   }
 }

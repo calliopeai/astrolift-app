@@ -8,7 +8,8 @@ import { useCursorTable, type CursorTableOptions, type ScopedCursorRead } from "
 /** Observe each actor-bound server page separately, including identical queries after a scope switch. */
 export function useScopedCursorTable<T, V extends OperationVariables = OperationVariables>(
   options: CursorTableOptions<T, V>,
-  scopeKey: string
+  scopeKey: string,
+  requestContext?: Record<string, unknown>
 ) {
   const [load] = useLazyQuery(options.query, { fetchPolicy: "no-cache" });
   const [snapshot, setSnapshot] = React.useState<Omit<ScopedCursorRead, "refresh"> | null>(null);
@@ -20,17 +21,21 @@ export function useScopedCursorTable<T, V extends OperationVariables = Operation
     externalRead: snapshot ? { ...snapshot, refresh } : undefined,
   });
   const variables = controller.requestVariables ?? {};
-  const key = JSON.stringify([scopeKey, variables, refreshEpoch, options.skip]);
+  const binding = JSON.stringify([scopeKey, variables, refreshEpoch, options.skip, requestContext]);
+  const [visit, setVisit] = React.useState({ binding, generation: 0 });
+  if (visit.binding !== binding) setVisit({ binding, generation: visit.generation + 1 });
+  const key = JSON.stringify([binding, visit.generation]);
   const latest = React.useRef(key);
   React.useLayoutEffect(() => {
     latest.current = key;
   }, [key]);
   React.useEffect(() => {
     if (!scopeKey || options.skip) return;
+    let active = true;
     const captured = key;
     const capturedVariables = JSON.parse(JSON.stringify(variables)) as Record<string, unknown>;
     Promise.resolve().then(async () => {
-      if (latest.current !== captured) return;
+      if (!active || latest.current !== captured) return;
       setSnapshot((current) => ({
         scopeKey,
         variables: capturedVariables,
@@ -40,9 +45,9 @@ export function useScopedCursorTable<T, V extends OperationVariables = Operation
       try {
         const response = await load({
           variables: capturedVariables,
-          context: { queryDeduplication: false },
+          context: { ...requestContext, queryDeduplication: false },
         });
-        if (latest.current !== captured) return;
+        if (!active || latest.current !== captured) return;
         setSnapshot({
           scopeKey,
           variables: capturedVariables,
@@ -51,7 +56,7 @@ export function useScopedCursorTable<T, V extends OperationVariables = Operation
           loading: false,
         });
       } catch (error) {
-        if (latest.current !== captured) return;
+        if (!active || latest.current !== captured) return;
         setSnapshot({
           scopeKey,
           variables: capturedVariables,
@@ -61,6 +66,7 @@ export function useScopedCursorTable<T, V extends OperationVariables = Operation
       }
     });
     return () => {
+      active = false;
       if (latest.current === captured) latest.current = "";
     };
     // Variables are represented by their exact stable JSON in key.

@@ -1,0 +1,199 @@
+/** Browser recovery metadata only. Native parameters and credentials never enter storage. */
+export interface NvkeBrowserScope {
+  server: string;
+  organizationId: string;
+  actorId: number;
+}
+export interface NvkeRecoveryRecord extends NvkeBrowserScope {
+  format: 1;
+  siteId: string;
+  expectedSiteVersion: number;
+  operationKey: string;
+  revision: string;
+  timeoutSeconds: number;
+  requestId: string;
+  parametersDigest: string;
+  operationId: string | null;
+}
+export interface RecoveryStorage {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
+}
+const PREFIX = "astrolift.nvke.recovery.v1:";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const emptyUUID = "00000000-0000-0000-0000-000000000000";
+export const validNvkeGuid = (value: unknown): value is string =>
+  typeof value === "string" && UUID.test(value) && value !== emptyUUID;
+export const nvkeScopeKey = (scope: NvkeBrowserScope) =>
+  JSON.stringify([scope.server, scope.organizationId, scope.actorId]);
+export const recoveryKey = (scope: NvkeBrowserScope, siteId: string) =>
+  PREFIX + JSON.stringify([scope.server, scope.organizationId, scope.actorId, siteId]);
+export class NvkeRecoveryError extends Error {
+  constructor(readonly code: "STORAGE_UNAVAILABLE" | "INVALID_RECOVERY" | "RECOVERY_MISMATCH") {
+    super(code);
+  }
+}
+const fields = [
+  "format",
+  "server",
+  "organizationId",
+  "actorId",
+  "siteId",
+  "expectedSiteVersion",
+  "operationKey",
+  "revision",
+  "timeoutSeconds",
+  "requestId",
+  "parametersDigest",
+  "operationId",
+];
+export function validateRecovery(
+  value: unknown,
+  scope: NvkeBrowserScope,
+  siteId: string
+): NvkeRecoveryRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new NvkeRecoveryError("INVALID_RECOVERY");
+  const row = value as Record<string, unknown>;
+  if (
+    Object.keys(row).length !== fields.length ||
+    Object.keys(row).some((key) => !fields.includes(key)) ||
+    row.format !== 1 ||
+    row.server !== scope.server ||
+    row.organizationId !== scope.organizationId ||
+    row.actorId !== scope.actorId ||
+    row.siteId !== siteId ||
+    !validNvkeGuid(row.siteId) ||
+    !validNvkeGuid(row.organizationId) ||
+    !validNvkeGuid(row.requestId) ||
+    (row.operationId !== null && !validNvkeGuid(row.operationId)) ||
+    !Number.isSafeInteger(row.actorId) ||
+    (row.actorId as number) < 1 ||
+    !Number.isSafeInteger(row.expectedSiteVersion) ||
+    (row.expectedSiteVersion as number) < 1 ||
+    !Number.isSafeInteger(row.timeoutSeconds) ||
+    (row.timeoutSeconds as number) < 30 ||
+    (row.timeoutSeconds as number) > 86400 ||
+    typeof row.revision !== "string" ||
+    !/^[0-9a-f]{40}$/.test(row.revision) ||
+    typeof row.parametersDigest !== "string" ||
+    !/^[0-9a-f]{64}$/.test(row.parametersDigest) ||
+    typeof row.operationKey !== "string" ||
+    !/^[A-Za-z][A-Za-z0-9.]{0,127}$/.test(row.operationKey)
+  )
+    throw new NvkeRecoveryError("INVALID_RECOVERY");
+  return row as unknown as NvkeRecoveryRecord;
+}
+export function readRecovery(
+  storage: RecoveryStorage,
+  scope: NvkeBrowserScope,
+  siteId: string
+): NvkeRecoveryRecord | null {
+  try {
+    const raw = storage.getItem(recoveryKey(scope, siteId));
+    if (raw === null) return null;
+    if (raw.length > 16384) throw new NvkeRecoveryError("INVALID_RECOVERY");
+    return validateRecovery(JSON.parse(raw), scope, siteId);
+  } catch (error) {
+    if (error instanceof NvkeRecoveryError) throw error;
+    throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+  }
+}
+export async function nativeTextDigest(text: string): Promise<string> {
+  const result = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(result), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+export function saveRecovery(storage: RecoveryStorage, record: NvkeRecoveryRecord): void {
+  validateRecovery(record, record, record.siteId);
+  try {
+    const key = recoveryKey(record, record.siteId),
+      text = JSON.stringify(record);
+    const current = storage.getItem(key);
+    if (current !== null && current !== text) throw new NvkeRecoveryError("RECOVERY_MISMATCH");
+    storage.setItem(key, text);
+    if (storage.getItem(key) !== text) throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+  } catch (error) {
+    if (error instanceof NvkeRecoveryError) throw error;
+    throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+  }
+}
+export function assertOriginalRequest(
+  record: NvkeRecoveryRecord,
+  values: { operationKey: string; timeoutSeconds: number },
+  digest: string
+) {
+  if (
+    record.operationKey !== values.operationKey ||
+    record.timeoutSeconds !== values.timeoutSeconds ||
+    record.parametersDigest !== digest
+  )
+    throw new NvkeRecoveryError("RECOVERY_MISMATCH");
+}
+export function archiveRecovery(
+  storage: RecoveryStorage,
+  record: NvkeRecoveryRecord,
+  operation: { id: string; siteId: string; requestId: string; operationKey: string }
+) {
+  if (
+    !validNvkeGuid(operation.id) ||
+    record.siteId !== operation.siteId ||
+    record.requestId !== operation.requestId ||
+    record.operationKey !== operation.operationKey
+  )
+    throw new NvkeRecoveryError("RECOVERY_MISMATCH");
+  try {
+    const key = recoveryKey(record, record.siteId),
+      receipt = { ...record, operationId: operation.id },
+      text = JSON.stringify(receipt);
+    const current = readRecovery(storage, record, record.siteId);
+    if (JSON.stringify(current) !== JSON.stringify(record))
+      throw new NvkeRecoveryError("RECOVERY_MISMATCH");
+    const archive = key + ":receipt:" + record.requestId;
+    const previous = storage.getItem(archive);
+    if (previous !== null && previous !== text) throw new NvkeRecoveryError("RECOVERY_MISMATCH");
+    storage.setItem(archive, text);
+    if (storage.getItem(archive) !== text) throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+    storage.removeItem(key);
+    if (storage.getItem(key) !== null) throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+  } catch (error) {
+    if (error instanceof NvkeRecoveryError) throw error;
+    throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+  }
+}
+export async function withRecoveryLock<T>(
+  scope: NvkeBrowserScope,
+  siteId: string,
+  run: () => Promise<T>
+): Promise<T> {
+  if (typeof navigator === "undefined" || !navigator.locks?.request)
+    throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+  return navigator.locks.request(recoveryKey(scope, siteId), { mode: "exclusive" }, run);
+}
+
+/** These admission failures occur before insertion, after any existing receipt is returned.
+ * Authorization, source changes, conflicts and internal failures do not prove rejection. */
+export function archiveRejectedRecovery(
+  storage: RecoveryStorage,
+  record: NvkeRecoveryRecord,
+  code: string
+): boolean {
+  if (!["INVALID_INPUT", "VERSION_MISMATCH", "SURFACE_UNAVAILABLE"].includes(code)) return false;
+  try {
+    const key = recoveryKey(record, record.siteId);
+    if (JSON.stringify(readRecovery(storage, record, record.siteId)) !== JSON.stringify(record))
+      throw new NvkeRecoveryError("RECOVERY_MISMATCH");
+    const archive = key + ":rejected:" + record.requestId;
+    const text = JSON.stringify({ ...record, rejectionCode: code });
+    const previous = storage.getItem(archive);
+    if (previous !== null && previous !== text) throw new NvkeRecoveryError("RECOVERY_MISMATCH");
+    storage.setItem(archive, text);
+    if (storage.getItem(archive) !== text) throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+    storage.removeItem(key);
+    if (storage.getItem(key) !== null) throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+    return true;
+  } catch (error) {
+    if (error instanceof NvkeRecoveryError) throw error;
+    throw new NvkeRecoveryError("STORAGE_UNAVAILABLE");
+  }
+}

@@ -13,6 +13,7 @@ from nvke.client import NvkeError
 
 from astrolift_clusters import nvke_operations as service
 from astrolift_clusters import nvke_runtime as runtime
+from astrolift_clusters import nvke_sites as sites
 from astrolift_clusters.models import NvkeOperation
 from astrolift_clusters.nvke_connections import open_connection
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
@@ -80,6 +81,29 @@ def test_invalid_input_is_refused_before_outbox_or_workflow_creation(configured,
     assert error.value.code == "INVALID_INPUT"
     assert "PRIVATE" not in str(error.value)
     assert not NvkeOperation.objects.exists()
+
+
+@pytest.mark.parametrize("change", ["version", "surface"])
+def test_browser_rejection_codes_cannot_hide_an_existing_original_receipt(configured, change):
+    request_id = uuid4()
+    original = reserve(configured, request_id=request_id)
+    if change == "version":
+        configured.site.save()
+        expected_code = "VERSION_MISMATCH"
+    else:
+        configured.connection.is_enabled = False
+        configured.connection.save()
+        expected_code = "SURFACE_UNAVAILABLE"
+    # The browser retries its original reviewed version, not the new source version.
+    assert (
+        reserve(configured, request_id=request_id, expected_site_version=original.expected_site_version).pk
+        == original.pk
+    )
+    rejected_id = uuid4()
+    with pytest.raises((NvkeError, sites.NvkeSiteError)) as error:
+        reserve(configured, request_id=rejected_id, expected_site_version=original.expected_site_version)
+    assert error.value.code == expected_code
+    assert not NvkeOperation.all_objects.filter(request_id=rejected_id).exists()
 
 
 def test_original_membership_and_exact_connection_are_checked_again_at_execution(configured):

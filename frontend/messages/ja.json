@@ -16354,7 +16354,8 @@
       "environments": "環境",
       "previews": "プレビュー",
       "zentinelle": "Zentinelle",
-      "app-access": "アプリへのアクセス"
+      "app-access": "アプリへのアクセス",
+      "nvke": "NVKE"
     },
     "areas": {
       "home": "ホーム",
@@ -17664,7 +17665,7 @@
     "requestFailed": "NVKEリクエストを確認できませんでした。復旧用IDと元の入力を保持してください。",
     "readFailed": "NVKEデータを読み取れませんでした。更新して現在のアクセスを確認してください。",
     "configurationFailed": "設定が拒否されたか確認できませんでした。再試行前にバージョンを更新してください。",
-    "storageRequired": "復旧用IDを保存できませんでした。操作の送信前にサイトのストレージを有効にしてください。",
+    "storageRequired": "このブラウザーでは復旧用の識別情報を保存またはロックできませんでした。サイトのストレージを有効にし、Web Locks に対応したブラウザーでネイティブ操作を送信してください。",
     "recoveryMismatch": "保存済みリクエストとパラメーターが異なります。元の入力を復元してください。",
     "downloadFailed": "機密結果をダウンロードできませんでした。アクセスを確認し、再試行してください。",
     "status": {
@@ -17680,6 +17681,7 @@
     "sitesTitle": "NVKEサイト",
     "allSites": "すべてのサイト",
     "mutationTarget": "対象リソース：{target}",
-    "targetFromParameters": "ネイティブパラメーターで定義"
+    "targetFromParameters": "ネイティブパラメーターで定義",
+    "requestRejected": "要求は受け付け前に拒否されました。サイトを更新し、パラメーターを確認してから再試行してください。"
   }
 }

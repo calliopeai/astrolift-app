@@ -18,6 +18,7 @@ export const routeLabels: Record<string, string> = {
   events: "Events",
   audit: "Audit",
   clusters: "Clusters",
+  nvke: "NVKE",
   domains: "Domains",
   providers: "Providers",
   models: "Models",

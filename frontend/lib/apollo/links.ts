@@ -7,20 +7,19 @@ import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
 import { getClientToken, clearToken } from "@/lib/auth/token-store";
 import { getActiveOrgGuid } from "@/lib/identity/active-org";
-import {
-  STEP_UP_EVENT,
-  type StepUpEventDetail,
-} from "@/lib/auth/step-up-events";
+import { STEP_UP_EVENT, type StepUpEventDetail } from "@/lib/auth/step-up-events";
 import { toast } from "sonner";
 
 const ACTION_SAFETY_PATH = "/administration/permissions/safety";
 
-const authLink = setContext(async (_, { headers }) => {
+const authLink = setContext(async (_, { headers, expectedNvkeOrganization }) => {
   const token = await getClientToken();
   // The OrgSwitcher writes the active org's guid to a cookie; we
   // mirror it on every GraphQL request as X-Astrolift-Organization
   // so the backend's TenantContextMiddleware scopes the resolver.
   const orgGuid = getActiveOrgGuid();
+  if (expectedNvkeOrganization && expectedNvkeOrganization !== orgGuid)
+    throw new Error("NVKE_SOURCE_CHANGED");
   return {
     headers: {
       ...headers,
@@ -48,7 +47,7 @@ function sessionExpired() {
   }
 }
 
-const errorLink = onError(({ error }) => {
+const errorLink = onError(({ error, operation }) => {
   if (CombinedGraphQLErrors.is(error)) {
     for (const { extensions } of error.errors) {
       if (extensions?.code === "UNAUTHENTICATED") {
@@ -61,6 +60,10 @@ const errorLink = onError(({ error }) => {
   // An expired session is refused before GraphQL runs, as an HTTP 401.
   if (ServerError.is(error) && error.statusCode === 401) {
     sessionExpired();
+    return;
+  }
+  if (operation.getContext().redactDiagnostics) {
+    console.error("[Apollo] Sensitive request failed");
     return;
   }
   console.error("[Apollo] Network error:", error);
@@ -89,7 +92,7 @@ function buildWsLink(): GraphQLWsLink | null {
       retryAttempts: Infinity,
       shouldRetry: () => true,
       lazy: true,
-    }),
+    })
   );
 }
 
@@ -108,8 +111,7 @@ export const stepUpLink = new ApolloLink((operation, forward) => {
       next: (result) => {
         try {
           const op = operation.query.definitions.find(
-            (d) =>
-              d.kind === "OperationDefinition" && d.operation === "mutation",
+            (d) => d.kind === "OperationDefinition" && d.operation === "mutation"
           );
           if (op && result.data && typeof result.data === "object") {
             for (const value of Object.values(result.data)) {
@@ -138,22 +140,16 @@ export const stepUpLink = new ApolloLink((operation, forward) => {
                   const raw = stepUp.supportedMethods;
                   const known = ["password", "sso", "webauthn", "magic_link", "pin"];
                   const supported = Array.isArray(raw)
-                    ? (raw.filter((m): m is string => typeof m === "string" && known.includes(m)) as (
-                        | "password"
-                        | "sso"
-                        | "webauthn"
-                        | "magic_link"
-                        | "pin"
-                      )[])
+                    ? (raw.filter(
+                        (m): m is string => typeof m === "string" && known.includes(m)
+                      ) as ("password" | "sso" | "webauthn" | "magic_link" | "pin")[])
                     : undefined;
                   const detail: StepUpEventDetail = {
                     operationName: operation.operationName ?? "",
                     message: stepUp.message ?? "",
                     supportedMethods: supported,
                   };
-                  window.dispatchEvent(
-                    new CustomEvent(STEP_UP_EVENT, { detail }),
-                  );
+                  window.dispatchEvent(new CustomEvent(STEP_UP_EVENT, { detail }));
                 }
                 // #2202 — an action-safety rule asked for approval: the
                 // server recorded a request and did nothing else. Say so
@@ -185,11 +181,7 @@ export const stepUpLink = new ApolloLink((operation, forward) => {
 
 export function buildClientLinks(httpLink: HttpLink): ApolloLink {
   const wsLink = buildWsLink();
-  const httpStack = ApolloLink.from([
-    errorLink,
-    stepUpLink,
-    authLink.concat(httpLink),
-  ]);
+  const httpStack = ApolloLink.from([errorLink, stepUpLink, authLink.concat(httpLink)]);
   if (!wsLink) return httpStack;
   // Subscription operations get the WS link; everything else
   // (queries, mutations) goes through the HTTP stack so the
@@ -197,12 +189,9 @@ export function buildClientLinks(httpLink: HttpLink): ApolloLink {
   return split(
     ({ query }) => {
       const def = getMainDefinition(query);
-      return (
-        def.kind === "OperationDefinition" &&
-        def.operation === "subscription"
-      );
+      return def.kind === "OperationDefinition" && def.operation === "subscription";
     },
     wsLink,
-    httpStack,
+    httpStack
   );
 }

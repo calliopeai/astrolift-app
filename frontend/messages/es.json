@@ -16357,7 +16357,8 @@
       "environments": "Entornos",
       "previews": "Vistas previas",
       "zentinelle": "Zentinelle",
-      "app-access": "Acceso a aplicaciones"
+      "app-access": "Acceso a aplicaciones",
+      "nvke": "NVKE"
     },
     "areas": {
       "home": "Inicio",
@@ -17667,7 +17668,7 @@
     "requestFailed": "No se pudo confirmar la solicitud NVKE. Conserva su identidad de recuperación y la entrada original.",
     "readFailed": "No se pudieron leer los datos NVKE. Actualiza para comprobar tu acceso.",
     "configurationFailed": "La configuración se rechazó o no pudo confirmarse. Actualiza las versiones antes de reintentar.",
-    "storageRequired": "No se pudo guardar la identidad de recuperación. Habilita el almacenamiento del sitio antes de enviar una operación.",
+    "storageRequired": "No se pudo guardar o bloquear la identidad de recuperación en este navegador. Habilita el almacenamiento del sitio y usa un navegador compatible con Web Locks antes de enviar una operación nativa.",
     "recoveryMismatch": "Los parámetros difieren de la solicitud guardada. Restaura la entrada original para recuperarla.",
     "downloadFailed": "No se pudo descargar el resultado confidencial. Comprueba el acceso e inténtalo otra vez.",
     "status": {
@@ -17683,6 +17684,7 @@
     "sitesTitle": "Sitios NVKE",
     "allSites": "Todos los sitios",
     "mutationTarget": "Recurso afectado: {target}",
-    "targetFromParameters": "Definido por los parámetros nativos"
+    "targetFromParameters": "Definido por los parámetros nativos",
+    "requestRejected": "La solicitud se rechazó antes de su admisión. Actualiza el sitio y revisa los parámetros antes de volver a intentarlo."
   }
 }
