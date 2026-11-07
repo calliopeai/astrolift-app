@@ -11320,6 +11320,19 @@ type NvkeActionType {
   path: String!
 }
 
+type NvkeCertificateRenewalObservationType {
+  workflowId: String
+  state: String
+  outcome: String
+  forced: Boolean
+  scheduledFor: String
+  startedAt: String
+  completedAt: String
+  failedNodeId: GUID
+  phase: String
+  retainedMutationLock: Boolean
+}
+
 type NvkeCollectionType {
   key: String!
   surface: NvkeSurface!
@@ -11412,6 +11425,17 @@ type NvkeDiagnosticSummaryType {
   conditions: [NvkeDiagnosticConditionType!]!
 }
 
+type NvkeEtcdKeyRotationObservationType {
+  workflowId: String
+  state: String
+  phase: String
+  startedAt: String
+  lastProgressAt: String
+  completedAt: String
+  failureReason: String
+  retainedMutationLock: Boolean
+}
+
 type NvkeInventoryItemType {
   key: String!
   identity: String!
@@ -11444,6 +11468,21 @@ type NvkeInventoryResourceType {
   operationVersion: Int!
   siteId: GUID!
   observedAt: DateTime
+}
+
+type NvkeMaintenanceObservationType {
+  siteId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  observedAt: DateTime
+  clusterId: GUID!
+  nextCertificateRenewalDue: String
+  renewalScheduleOverdueAtObservation: Boolean
+  mutationLockReported: Boolean
+  mutationLockOwner: String
+  mutationLockStartedAt: String
+  renewal: NvkeCertificateRenewalObservationType
+  etcdKeyRotation: NvkeEtcdKeyRotationObservationType
 }
 
 type NvkeNativeConditionType {
@@ -12287,6 +12326,7 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeMaintenanceObservation(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!): NvkeMaintenanceObservationType!
   astroliftNvkeWorkloadAccessBindings(siteId: GUID!, after: String = null, limit: Int! = 50): NvkeWorkloadAccessBindingTypePage!
   astroliftNvkeDiagnosticPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeDiagnosticPageType!
   astroliftNvkeResourceEditor(siteId: GUID!, expectedActorId: Int!, operationKey: String!, sourceOperationId: GUID!, expectedSourceVersion: Int!, sourceResourceKey: String = null): NvkeResourceEditorTypeMutationResult!

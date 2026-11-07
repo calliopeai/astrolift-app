@@ -1,4 +1,5 @@
 import type { NvkeDiagnosticRow, NvkeDiagnosticSummary } from "./NvkeDiagnosticsPanel";
+import type { NvkeMaintenanceObservation } from "./NvkeMaintenancePanel";
 import { fakeController } from "@/components/data-table/fixtures";
 import type {
   NvkeCollectionView,
@@ -130,6 +131,32 @@ export const SITE: NvkeSiteView = {
       verificationCode: "",
     },
   ],
+};
+
+export const MAINTENANCE_OBSERVATION: NvkeMaintenanceObservation = {
+  siteId: SITE.id,
+  operationId: "123e4567-e89b-12d3-a456-426614174003",
+  operationVersion: 9,
+  observedAt: "2026-11-07T12:00:00Z",
+  clusterId: "123e4567-e89b-12d3-a456-426614174088",
+  nextCertificateRenewalDue: "2026-11-07T10:00:00Z",
+  renewalScheduleOverdueAtObservation: true,
+  mutationLockReported: true,
+  mutationLockOwner: "certificate_renewal",
+  mutationLockStartedAt: "2026-11-07T10:00:00Z",
+  renewal: {
+    workflowId: "operator-k8s-cert-renewal-123e4567-e89b-12d3-a456-426614174088",
+    state: "failed",
+    outcome: null,
+    forced: false,
+    scheduledFor: "2026-11-07T10:00:00Z",
+    startedAt: "2026-11-07T10:00:01Z",
+    completedAt: "2026-11-07T11:00:00Z",
+    failedNodeId: "123e4567-e89b-12d3-a456-426614174077",
+    phase: "renew-node",
+    retainedMutationLock: true,
+  },
+  etcdKeyRotation: null,
 };
 export const ACTIONS: NvkeActionView[] = [
   {

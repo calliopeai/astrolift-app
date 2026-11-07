@@ -24,6 +24,7 @@ import {
   GET_NVKE_SITE,
 } from "./nvke.queries";
 import { useNvkeDiagnostics } from "./use-nvke-diagnostics";
+import { useNvkeMaintenance } from "./use-nvke-maintenance";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
 
@@ -83,6 +84,13 @@ export const useNvkeOperation = (
     !!action &&
     mayExecute(context.access, action.permission);
   const diagnostics = useNvkeDiagnostics({
+    context,
+    scopeKey: visitKey,
+    siteId,
+    operation,
+    enabled: canAct,
+  });
+  const maintenance = useNvkeMaintenance({
     context,
     scopeKey: visitKey,
     siteId,
@@ -154,6 +162,7 @@ export const useNvkeOperation = (
     scopeKey: visitKey,
     operation,
     diagnostics,
+    maintenance,
     workloadAccess,
     siteName: site.data?.astroliftNvkeSite?.name ?? "",
     loading,

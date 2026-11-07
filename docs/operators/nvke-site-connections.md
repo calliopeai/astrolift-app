@@ -246,3 +246,38 @@ and source operation/version. A changed source or caller invalidates the review;
 an unconfirmed write requires refreshing the grant list before reviewing a retry.
 No grant command downloads credentials. Certificate renewal automation remains
 pending.
+
+## Historical credential maintenance observations
+
+Open a successful controller `getCluster` operation to inspect its Credential
+maintenance panel, or query `astroliftNvkeMaintenanceObservation` with `siteId`,
+`operationId`, `expectedActorId`, and `expectedVersion`. Current organization
+membership and `nvke.read` are checked before decrypting the saved response.
+The requested UUID and returned native cluster UUID must match. Reads perform
+no native I/O and do not download the raw result. A changed connection does not
+erase historical evidence; the page identifies the saved observation time.
+
+The projection reports the next scheduled renewal check, mutation-lock owner,
+renewal cycle/workflow identity, accepted/succeeded/failed state, successful
+`renewed` versus `unchanged` outcome, forced flag, timestamps, failed node and
+known phase. It also reports etcd key-rotation workflow, phase, state, progress,
+bounded failure reason and retained-lock evidence. Free-text messages, key
+material, unknown fields and unsupported status values are excluded. Missing
+observations remain unknown. Printable native workflow IDs, including Unicode,
+are preserved within the native identifier size budget.
+
+`renewalScheduleOverdueAtObservation` compares the next scheduled check with the
+saved observation time, and is false while a recorded cycle is accepted. It is
+unknown when scheduling or cycle evidence is incomplete. It is not an X.509
+expiry date. A successful no-op cycle means `unchanged`, not that all credentials
+were renewed. Provisioning success does not override failed maintenance or a
+retained mutation lock. A failed cycle/rotation with its matching lock is shown
+as retained ownership; absence of trustworthy lock evidence remains unknown.
+
+Refreshing this panel rereads the saved observation. Run a new controller
+`getCluster` operation to collect current status. This panel neither starts a
+renewal nor resets workflows or clears locks. The pinned upstream operator paths
+use native Temporal `RenewK8sCertsV2`, `RotateEtcdEncryptionKey`, and
+`RetireLostEtcdRotationNode`; explicit native Temporal authority and reviewed
+controls are tracked in #2665. Node certificate expiry/inspection metrics and
+workload credential expiry remain separate qualification work under #2661.

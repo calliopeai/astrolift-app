@@ -26,7 +26,42 @@ const stories = [
   "screens-nvke-workload-access--failure",
   "screens-nvke-operation--imported-access",
   "screens-nvke-site--imported-access",
+  "screens-nvke-maintenance--retained-failure",
+  "screens-nvke-maintenance--accepted",
+  "screens-nvke-maintenance--no-op",
+  "screens-nvke-maintenance--missing",
+  "screens-nvke-maintenance--retained-rotation",
+  "screens-nvke-operation--maintenance",
 ];
+
+test("nvke renewal failures expose retained ownership and distinguish schedule from expiry", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-maintenance--retained-failure&viewMode=story");
+  await expect(page.getByText("Recorded state", { exact: true }).locator("..")).toContainText(
+    "Failed"
+  );
+  await expect(
+    page.getByText("Mutation lock retained after failure", { exact: true }).locator("..")
+  ).toContainText("Yes");
+  await expect(
+    page.getByText("Scheduled check overdue at observation", { exact: true }).locator("..")
+  ).toContainText("Yes");
+  await expect(page.getByRole("note")).toContainText("2026-11-07T12:00:00Z");
+  await expect(
+    page.getByText(/Certificate expiry requires separate inspection data/)
+  ).toBeVisible();
+  await expect(page.getByRole("button")).toHaveCount(1);
+});
+test("nvke long maintenance workflow identifiers stay within a narrow viewport", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-maintenance--long-strings&viewMode=story");
+  await page.getByRole("heading", { name: "Credential maintenance", exact: true }).waitFor();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+});
 
 test("nvke imported enrollment names the exact cluster and reviewed source", async ({ page }) => {
   await page.goto("/iframe.html?id=screens-nvke-workload-access--full&viewMode=story");

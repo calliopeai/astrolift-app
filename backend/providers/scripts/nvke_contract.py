@@ -108,6 +108,13 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
         surface_path,
         route_path,
         "management-engine/pkg/publicapi/server.go",
+        "controller/internal/db/clusters.go",
+        "controller/internal/db/etcd_key_rotation.go",
+        "controller/internal/temporal/workflows/renew_k8s_certs.go",
+        "controller/internal/controllers/certrenewal/controller.go",
+        "controller/internal/controllers/tenantaccess/breakglass.go",
+        "controller/docs/certificate-renewal.md",
+        "controller/docs/credential-monitoring.md",
         "LICENSE",
         "NOTICE",
     }

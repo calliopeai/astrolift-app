@@ -15,6 +15,7 @@ from strawberry.types import Info
 
 from astrolift_clusters import nvke_diagnostics as diagnostics
 from astrolift_clusters import nvke_inventory as inventory
+from astrolift_clusters import nvke_maintenance as maintenance
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_resource_operations as resource_operations
 from astrolift_clusters import nvke_sites as service
@@ -506,7 +507,77 @@ class NvkeDiagnosticPageType:
 
 
 @strawberry.type
+class NvkeCertificateRenewalObservationType:
+    workflow_id: str | None
+    state: str | None
+    outcome: str | None
+    forced: bool | None
+    scheduled_for: str | None
+    started_at: str | None
+    completed_at: str | None
+    failed_node_id: GUID | None
+    phase: str | None
+    retained_mutation_lock: bool | None
+
+
+@strawberry.type
+class NvkeEtcdKeyRotationObservationType:
+    workflow_id: str | None
+    state: str | None
+    phase: str | None
+    started_at: str | None
+    last_progress_at: str | None
+    completed_at: str | None
+    failure_reason: str | None
+    retained_mutation_lock: bool | None
+
+
+@strawberry.type
+class NvkeMaintenanceObservationType:
+    site_id: GUID
+    operation_id: GUID
+    operation_version: int
+    observed_at: datetime | None
+    cluster_id: GUID
+    next_certificate_renewal_due: str | None
+    renewal_schedule_overdue_at_observation: bool | None
+    mutation_lock_reported: bool | None
+    mutation_lock_owner: str | None
+    mutation_lock_started_at: str | None
+    renewal: NvkeCertificateRenewalObservationType | None
+    etcd_key_rotation: NvkeEtcdKeyRotationObservationType | None
+
+
+@strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_maintenance_observation(
+        self, info: Info, site_id: GUID, operation_id: GUID, expected_actor_id: int, expected_version: int
+    ) -> NvkeMaintenanceObservationType:
+        row, data = maintenance.read(
+            site_id=str(site_id),
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            expected_version=expected_version,
+        )
+        return NvkeMaintenanceObservationType(
+            site_id=GUID(str(row.site.guid)),
+            operation_id=GUID(str(row.guid)),
+            operation_version=row.version,
+            observed_at=row.finished_at,
+            **{
+                **data,
+                "renewal": NvkeCertificateRenewalObservationType(**data["renewal"])
+                if data["renewal"] is not None
+                else None,
+                "etcd_key_rotation": NvkeEtcdKeyRotationObservationType(**data["etcd_key_rotation"])
+                if data["etcd_key_rotation"] is not None
+                else None,
+            },
+        )
+
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()

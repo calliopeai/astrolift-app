@@ -1,4 +1,5 @@
 import type { NvkeDiagnosticsPanelProps } from "./NvkeDiagnosticsPanel";
+import type { NvkeMaintenancePanelProps } from "./NvkeMaintenancePanel";
 import type { NvkeWorkloadAccessPanelProps } from "./NvkeWorkloadAccessPanel";
 import type { CursorTableController } from "@/components/data-table";
 import type {
@@ -165,6 +166,7 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  maintenance?: NvkeMaintenancePanelProps | null;
   workloadAccess?: NvkeWorkloadAccessPanelProps | null;
   diagnostics?: NvkeDiagnosticsPanelProps | null;
   operation: NvkeOperationView | null;

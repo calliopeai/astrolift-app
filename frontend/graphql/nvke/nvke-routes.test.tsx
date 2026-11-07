@@ -16,6 +16,7 @@ import {
   INVENTORY_ITEM,
   OPERATION,
   SITE,
+  MAINTENANCE_OBSERVATION,
 } from "@/components/screens/nvke/fixtures";
 import { nvkeScopeKey, readRecovery } from "@/lib/nvke/recovery";
 import { useNvkeContext } from "./nvke.hooks";
@@ -109,6 +110,15 @@ function harness(
                 };
               if (operation.operationName === "ListNvkeOperations")
                 return { astroliftNvkeOperations: { items: [], nextCursor: null, totalCount: 0 } };
+              if (operation.operationName === "GetNvkeMaintenance")
+                return {
+                  astroliftNvkeMaintenanceObservation: {
+                    ...MAINTENANCE_OBSERVATION,
+                    siteId: operation.variables.siteId,
+                    operationId: operation.variables.operationId,
+                    operationVersion: operation.variables.expectedVersion,
+                  },
+                };
               if (operation.operationName === "ListNvkeAccess")
                 return {
                   astroliftNvkeWorkloadAccessBindings: {

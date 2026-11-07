@@ -12945,6 +12945,19 @@ export type NvkeActionType = {
   verb: Scalars['String']['output'];
 };
 
+export type NvkeCertificateRenewalObservationType = {
+  completedAt?: Maybe<Scalars['String']['output']>;
+  failedNodeId?: Maybe<Scalars['GUID']['output']>;
+  forced?: Maybe<Scalars['Boolean']['output']>;
+  outcome?: Maybe<Scalars['String']['output']>;
+  phase?: Maybe<Scalars['String']['output']>;
+  retainedMutationLock?: Maybe<Scalars['Boolean']['output']>;
+  scheduledFor?: Maybe<Scalars['String']['output']>;
+  startedAt?: Maybe<Scalars['String']['output']>;
+  state?: Maybe<Scalars['String']['output']>;
+  workflowId?: Maybe<Scalars['String']['output']>;
+};
+
 export type NvkeCollectionType = {
   actions: Array<NvkeActionType>;
   defaultParametersText: Scalars['String']['output'];
@@ -13037,6 +13050,17 @@ export type NvkeDiagnosticSummaryType = {
   requestedPort?: Maybe<Scalars['Int']['output']>;
 };
 
+export type NvkeEtcdKeyRotationObservationType = {
+  completedAt?: Maybe<Scalars['String']['output']>;
+  failureReason?: Maybe<Scalars['String']['output']>;
+  lastProgressAt?: Maybe<Scalars['String']['output']>;
+  phase?: Maybe<Scalars['String']['output']>;
+  retainedMutationLock?: Maybe<Scalars['Boolean']['output']>;
+  startedAt?: Maybe<Scalars['String']['output']>;
+  state?: Maybe<Scalars['String']['output']>;
+  workflowId?: Maybe<Scalars['String']['output']>;
+};
+
 export type NvkeInventoryItemType = {
   conditions: Array<NvkeNativeConditionType>;
   conditionsOmitted: Scalars['Int']['output'];
@@ -13068,6 +13092,21 @@ export type NvkeInventoryResourceType = {
   observedAt?: Maybe<Scalars['DateTime']['output']>;
   operationId: Scalars['GUID']['output'];
   operationVersion: Scalars['Int']['output'];
+  siteId: Scalars['GUID']['output'];
+};
+
+export type NvkeMaintenanceObservationType = {
+  clusterId: Scalars['GUID']['output'];
+  etcdKeyRotation?: Maybe<NvkeEtcdKeyRotationObservationType>;
+  mutationLockOwner?: Maybe<Scalars['String']['output']>;
+  mutationLockReported?: Maybe<Scalars['Boolean']['output']>;
+  mutationLockStartedAt?: Maybe<Scalars['String']['output']>;
+  nextCertificateRenewalDue?: Maybe<Scalars['String']['output']>;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  renewal?: Maybe<NvkeCertificateRenewalObservationType>;
+  renewalScheduleOverdueAtObservation?: Maybe<Scalars['Boolean']['output']>;
   siteId: Scalars['GUID']['output'];
 };
 
@@ -13797,6 +13836,7 @@ export type Query = {
   astroliftNvkeInventoryDocumentText: StrMutationResult;
   astroliftNvkeInventoryPage: NvkeInventoryPageType;
   astroliftNvkeInventoryResource: NvkeInventoryResourceType;
+  astroliftNvkeMaintenanceObservation: NvkeMaintenanceObservationType;
   astroliftNvkeOperation?: Maybe<NvkeOperationType>;
   astroliftNvkeOperationResult: JsonMutationResult;
   astroliftNvkeOperationResultText: StrMutationResult;
@@ -15399,6 +15439,14 @@ export type QueryAstroliftNvkeInventoryResourceArgs = {
   expectedActorId: Scalars['Int']['input'];
   operationId: Scalars['GUID']['input'];
   resourceKey: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftNvkeMaintenanceObservationArgs = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  siteId: Scalars['GUID']['input'];
 };
 
 
@@ -21171,6 +21219,16 @@ export type RequestNvkeResourceOperationMutationVariables = Exact<{
 
 
 export type RequestNvkeResourceOperationMutation = { requestNvkeResourceOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
+export type GetNvkeMaintenanceQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  operationId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+}>;
+
+
+export type GetNvkeMaintenanceQuery = { astroliftNvkeMaintenanceObservation: { siteId: string, operationId: string, operationVersion: number, observedAt?: string | null, clusterId: string, nextCertificateRenewalDue?: string | null, renewalScheduleOverdueAtObservation?: boolean | null, mutationLockReported?: boolean | null, mutationLockOwner?: string | null, mutationLockStartedAt?: string | null, renewal?: { workflowId?: string | null, state?: string | null, outcome?: string | null, forced?: boolean | null, scheduledFor?: string | null, startedAt?: string | null, completedAt?: string | null, failedNodeId?: string | null, phase?: string | null, retainedMutationLock?: boolean | null } | null, etcdKeyRotation?: { workflowId?: string | null, state?: string | null, phase?: string | null, startedAt?: string | null, lastProgressAt?: string | null, completedAt?: string | null, failureReason?: string | null, retainedMutationLock?: boolean | null } | null } };
 
 export type NvkeAccessFieldsFragment = { id: string, version: number, siteId: string, controllerConnectionId: string, sourceOperationId: string, clusterId: string, upstreamRevision: string, createdAt: string, deletedAt?: string | null };
 

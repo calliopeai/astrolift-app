@@ -1,5 +1,54 @@
 import { gql } from "@apollo/client";
 
+export const GET_NVKE_MAINTENANCE = gql`
+  query GetNvkeMaintenance(
+    $siteId: GUID!
+    $operationId: GUID!
+    $expectedActorId: Int!
+    $expectedVersion: Int!
+  ) {
+    astroliftNvkeMaintenanceObservation(
+      siteId: $siteId
+      operationId: $operationId
+      expectedActorId: $expectedActorId
+      expectedVersion: $expectedVersion
+    ) {
+      siteId
+      operationId
+      operationVersion
+      observedAt
+      clusterId
+      nextCertificateRenewalDue
+      renewalScheduleOverdueAtObservation
+      mutationLockReported
+      mutationLockOwner
+      mutationLockStartedAt
+      renewal {
+        workflowId
+        state
+        outcome
+        forced
+        scheduledFor
+        startedAt
+        completedAt
+        failedNodeId
+        phase
+        retainedMutationLock
+      }
+      etcdKeyRotation {
+        workflowId
+        state
+        phase
+        startedAt
+        lastProgressAt
+        completedAt
+        failureReason
+        retainedMutationLock
+      }
+    }
+  }
+`;
+
 export const NVKE_ACCESS_FIELDS = gql`
   fragment NvkeAccessFields on NvkeWorkloadAccessBindingType {
     id

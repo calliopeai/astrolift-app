@@ -2,7 +2,13 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
 import { fakeController } from "@/components/data-table/fixtures";
-import { DIAGNOSTIC_OBSERVATION, DIAGNOSTIC_ROW, OPERATION, OPERATION_DETAIL } from "./fixtures";
+import {
+  DIAGNOSTIC_OBSERVATION,
+  DIAGNOSTIC_ROW,
+  OPERATION,
+  OPERATION_DETAIL,
+  MAINTENANCE_OBSERVATION,
+} from "./fixtures";
 
 export default {
   title: "Screens/NVKE/Operation",
@@ -10,6 +16,17 @@ export default {
   args: OPERATION_DETAIL,
 } satisfies Meta<typeof NvkeOperationScreen>;
 type Story = StoryObj<typeof NvkeOperationScreen>;
+export const Maintenance: Story = {
+  args: {
+    operation: { ...OPERATION, operationKey: "getCluster", status: "SUCCEEDED" },
+    maintenance: {
+      observation: MAINTENANCE_OBSERVATION,
+      loading: false,
+      error: null,
+      onRefresh: () => {},
+    },
+  },
+};
 export const ImportedAccess: Story = {
   args: {
     operation: { ...OPERATION, operationKey: "getCluster", status: "SUCCEEDED" },
