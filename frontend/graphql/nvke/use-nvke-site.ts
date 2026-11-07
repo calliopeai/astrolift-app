@@ -24,17 +24,13 @@ import type {
 } from "@/graphql/__generated__/operations";
 import { nativeSchemaText, nativeTemplateText } from "@/lib/nvke/contract";
 import {
-  archiveRecovery,
-  archiveRejectedRecovery,
-  assertOriginalRequest,
-  nativeTextDigest,
   NvkeRecoveryError,
   readRecovery,
-  saveRecovery,
   validNvkeGuid,
   withRecoveryLock,
   type NvkeRecoveryRecord,
 } from "@/lib/nvke/recovery";
+import { admitNvkeRequest, NvkeAdmissionError } from "@/lib/nvke/admission";
 import { useNvkeContext, useNvkeEpoch } from "./nvke.hooks";
 import { NVKE_REQUEST_CONTEXT, useNvkeRead } from "./use-scoped-read";
 import {
@@ -257,99 +253,58 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
         return false;
       const scope = context.scope;
       busy.current = true;
-      let rejected = false;
       setMutation({ key: visitKey, pending: true, error: null });
       try {
-        return await withRecoveryLock(scope, siteId, async () => {
-          if (!current()) return false;
-          let original = readRecovery(window.localStorage, scope, siteId);
-          if (original) {
-            const receipt = await client.query<GetNvkeRequestQuery>({
+        const operation = await admitNvkeRequest({
+          scope,
+          siteId,
+          expectedSiteVersion: site.version,
+          revision: contract.revision,
+          mode: "native",
+          values,
+          storage: window.localStorage,
+          current,
+          sourceAvailable: () =>
+            site.isActive &&
+            site.upstreamRevision === contract.revision &&
+            site.connections.some((row) => row.surface === action.surface && row.isEnabled),
+          onRecord: (record) => setJournal({ key, record, failed: false }),
+          receipt: async (requestId) => {
+            const response = await client.query<GetNvkeRequestQuery>({
               query: GET_NVKE_REQUEST,
-              variables: { siteId, requestId: original.requestId },
+              variables: { siteId, requestId },
               fetchPolicy: "no-cache",
               context: requestContext,
             });
-            if (!current()) return false;
-            const operation = receipt.data?.astroliftNvkeRequest;
-            if (operation) {
-              archiveRecovery(window.localStorage, original, operation);
-              setJournal({ key, record: null, failed: false });
-              setMutation({ key: visitKey, pending: false, error: null });
-              router.push(`/nvke/${siteId}/operations/${operation.id}`);
-              return true;
-            }
-          }
-          const digest = await nativeTextDigest(values.parametersText);
-          if (!current()) return false;
-          if (original) assertOriginalRequest(original, values, digest);
-          else {
-            if (
-              !site.isActive ||
-              site.upstreamRevision !== contract.revision ||
-              !site.connections.some((row) => row.surface === action.surface && row.isEnabled)
-            )
-              throw new Error("SOURCE_CHANGED");
-            original = {
-              ...scope,
-              format: 1,
-              siteId,
-              expectedSiteVersion: site.version,
-              revision: contract.revision,
-              operationKey: values.operationKey,
-              timeoutSeconds: values.timeoutSeconds,
-              requestId: crypto.randomUUID(),
-              parametersDigest: digest,
-              operationId: null,
-            };
-            saveRecovery(window.localStorage, original);
-          }
-          setJournal({ key, record: original, failed: false });
-          const reply = await client.mutate<
-            RequestNvkeOperationTextMutation,
-            RequestNvkeOperationTextMutationVariables
-          >({
-            mutation: REQUEST_NVKE_OPERATION_TEXT,
-            variables: {
-              input: {
-                siteId,
-                expectedSiteVersion: original.expectedSiteVersion,
-                expectedActorId: scope.actorId,
-                requestId: original.requestId,
-                operationKey: original.operationKey,
-                timeoutSeconds: original.timeoutSeconds,
-                parametersText: values.parametersText,
-              },
-            },
-            fetchPolicy: "no-cache",
-            context: requestContext,
-          });
-          if (!current()) return false;
-          const operation = reply.data?.requestNvkeOperationText;
-          if (!operation?.ok || !operation.data) {
-            if (
-              operation?.ok === false &&
-              !operation.data &&
-              operation.errors.length === 1 &&
-              archiveRejectedRecovery(window.localStorage, original, operation.errors[0].code)
-            ) {
-              rejected = true;
-              setJournal({ key, record: null, failed: false });
-            }
-            throw new Error("REQUEST_FAILED");
-          }
-          archiveRecovery(window.localStorage, original, operation.data);
-          setJournal({ key, record: null, failed: false });
-          setMutation({ key: visitKey, pending: false, error: null });
-          router.push(`/nvke/${siteId}/operations/${operation.data.id}`);
-          return true;
+            return response.data?.astroliftNvkeRequest ?? null;
+          },
+          admit: async (input) => {
+            const response = await client.mutate<
+              RequestNvkeOperationTextMutation,
+              RequestNvkeOperationTextMutationVariables
+            >({
+              mutation: REQUEST_NVKE_OPERATION_TEXT,
+              variables: { input },
+              fetchPolicy: "no-cache",
+              context: requestContext,
+            });
+            return response.data?.requestNvkeOperationText;
+          },
         });
+        if (!operation || !current()) return false;
+        setMutation({ key: visitKey, pending: false, error: null });
+        router.push(`/nvke/${siteId}/operations/${operation.id}`);
+        return true;
       } catch (failure) {
         if (current()) {
           const message =
             failure instanceof NvkeRecoveryError
               ? t(failure.code === "RECOVERY_MISMATCH" ? "recoveryMismatch" : "storageRequired")
-              : t(rejected ? "requestRejected" : "requestFailed");
+              : t(
+                  failure instanceof NvkeAdmissionError && failure.code === "REQUEST_REJECTED"
+                    ? "requestRejected"
+                    : "requestFailed"
+                );
           setMutation({ key: visitKey, pending: false, error: message });
         }
         return false;

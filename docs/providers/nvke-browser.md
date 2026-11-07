@@ -16,7 +16,11 @@ refresh operation details to observe status. An uncertain operation needs explic
 Native submission requires working site storage and the browser Web Locks API. Before sending,
 the browser saves metadata scoped to the API server, organization, numeric actor and site:
 request UUID, action, reviewed site version and upstream revision, timeout and SHA-256 of the
-original parameter text. Native parameters, credentials and result contents are never stored
+original parameter text. New format-2 records also bind native versus inventory mode. Existing
+format-1 records remain native requests in the same journal and must be resolved before an
+inventory request can take their place. The two editors share the same cross-tab lock. Receipt
+recovery checks the server's explicit `isInventory` value against the original mode.
+Native parameters, credentials and result contents are never stored
 there or put in Apollo's normalized cache. Concurrent tabs serialize admission for the same scope.
 
 A lost response retains this original identity. Retrying first checks the exact actor-bound

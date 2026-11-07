@@ -4,8 +4,7 @@ export interface NvkeBrowserScope {
   organizationId: string;
   actorId: number;
 }
-export interface NvkeRecoveryRecord extends NvkeBrowserScope {
-  format: 1;
+interface RecoveryMetadata extends NvkeBrowserScope {
   siteId: string;
   expectedSiteVersion: number;
   operationKey: string;
@@ -14,6 +13,17 @@ export interface NvkeRecoveryRecord extends NvkeBrowserScope {
   requestId: string;
   parametersDigest: string;
   operationId: string | null;
+}
+export type NvkeRecoveryRecord = RecoveryMetadata &
+  ({ format: 1 } | { format: 2; mode: "native" | "inventory" });
+export const recoveryMode = (record: NvkeRecoveryRecord) =>
+  record.format === 1 ? "native" : record.mode;
+export interface NvkeRecoveryOperation {
+  id: string;
+  siteId: string;
+  requestId: string;
+  operationKey: string;
+  isInventory: boolean;
 }
 export interface RecoveryStorage {
   getItem: (key: string) => string | null;
@@ -56,10 +66,12 @@ export function validateRecovery(
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   const row = value as Record<string, unknown>;
+  const expectedFields = row.format === 2 ? [...fields, "mode"] : fields;
   if (
-    Object.keys(row).length !== fields.length ||
-    Object.keys(row).some((key) => !fields.includes(key)) ||
-    row.format !== 1 ||
+    Object.keys(row).length !== expectedFields.length ||
+    Object.keys(row).some((key) => !expectedFields.includes(key)) ||
+    (row.format !== 1 && row.format !== 2) ||
+    (row.format === 2 && row.mode !== "native" && row.mode !== "inventory") ||
     row.server !== scope.server ||
     row.organizationId !== scope.organizationId ||
     row.actorId !== scope.actorId ||
@@ -120,11 +132,12 @@ export function saveRecovery(storage: RecoveryStorage, record: NvkeRecoveryRecor
 }
 export function assertOriginalRequest(
   record: NvkeRecoveryRecord,
-  values: { operationKey: string; timeoutSeconds: number },
+  values: { operationKey: string; timeoutSeconds: number; mode?: "native" | "inventory" },
   digest: string
 ) {
   if (
     record.operationKey !== values.operationKey ||
+    recoveryMode(record) !== (values.mode ?? "native") ||
     record.timeoutSeconds !== values.timeoutSeconds ||
     record.parametersDigest !== digest
   )
@@ -133,12 +146,14 @@ export function assertOriginalRequest(
 export function archiveRecovery(
   storage: RecoveryStorage,
   record: NvkeRecoveryRecord,
-  operation: { id: string; siteId: string; requestId: string; operationKey: string }
+  operation: NvkeRecoveryOperation
 ) {
   if (
     !validNvkeGuid(operation.id) ||
     record.siteId !== operation.siteId ||
     record.requestId !== operation.requestId ||
+    typeof operation.isInventory !== "boolean" ||
+    (recoveryMode(record) === "inventory") !== operation.isInventory ||
     record.operationKey !== operation.operationKey
   )
     throw new NvkeRecoveryError("RECOVERY_MISMATCH");

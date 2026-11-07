@@ -33,6 +33,7 @@ export interface NvkeSiteView {
   connections: NvkeConnectionView[];
 }
 export interface NvkeOperationView {
+  isInventory: boolean;
   id: string;
   version: number;
   siteId: string;

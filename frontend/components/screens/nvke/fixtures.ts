@@ -82,6 +82,7 @@ export const ACTIONS: NvkeActionView[] = [
   },
 ];
 export const OPERATION: NvkeOperationView = {
+  isInventory: false,
   id: "123e4567-e89b-12d3-a456-426614174003",
   siteId: SITE.id,
   version: 4,
