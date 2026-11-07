@@ -10102,6 +10102,7 @@ export type Mutation = {
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestModelConnection: ModelConnectionRequestMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
+  requestNvkeOperationText: NvkeOperationTypeMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -11807,6 +11808,11 @@ export type MutationRequestModelConnectionArgs = {
 
 export type MutationRequestNvkeOperationArgs = {
   input: RequestNvkeOperationInput;
+};
+
+
+export type MutationRequestNvkeOperationTextArgs = {
+  input: RequestNvkeOperationTextInput;
 };
 
 
@@ -13600,7 +13606,9 @@ export type Query = {
   astroliftNvkeContract: NvkeContractType;
   astroliftNvkeOperation?: Maybe<NvkeOperationType>;
   astroliftNvkeOperationResult: JsonMutationResult;
+  astroliftNvkeOperationResultText: StrMutationResult;
   astroliftNvkeOperations: NvkeOperationTypePage;
+  astroliftNvkeRequest?: Maybe<NvkeOperationType>;
   astroliftNvkeSite?: Maybe<NvkeSiteType>;
   astroliftNvkeSites: NvkeSiteTypePage;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
@@ -15175,9 +15183,20 @@ export type QueryAstroliftNvkeOperationResultArgs = {
 };
 
 
+export type QueryAstroliftNvkeOperationResultTextArgs = {
+  operationId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftNvkeOperationsArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftNvkeRequestArgs = {
+  requestId: Scalars['String']['input'];
   siteId: Scalars['GUID']['input'];
 };
 
@@ -16716,6 +16735,16 @@ export type RequestNvkeOperationInput = {
   timeoutSeconds: Scalars['Int']['input'];
 };
 
+export type RequestNvkeOperationTextInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  operationKey: Scalars['String']['input'];
+  parametersText: Scalars['String']['input'];
+  requestId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
 export type RequestQuotaIncreaseInput = {
   factor: Scalars['Float']['input'];
   quotaId: Scalars['GUID']['input'];
@@ -17356,6 +17385,12 @@ export type StartWorkflowDefinitionInput = {
 export type StartWorkflowResult = {
   errors: Array<ValidationError>;
   instanceId?: Maybe<Scalars['ID']['output']>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type StrMutationResult = {
+  data?: Maybe<Scalars['String']['output']>;
+  errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
 

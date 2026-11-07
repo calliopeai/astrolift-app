@@ -235,6 +235,17 @@ class RequestNvkeOperationInput:
 
 
 @strawberry.input
+class RequestNvkeOperationTextInput:
+    expected_actor_id: int
+    site_id: GUID
+    expected_site_version: int
+    request_id: str
+    operation_key: str
+    parameters_text: str
+    timeout_seconds: int = 7200
+
+
+@strawberry.input
 class CancelNvkeOperationInput:
     operation_id: GUID
 
@@ -248,6 +259,18 @@ class ResumeNvkeOperationInput:
 
 @strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_request(self, info: Info, site_id: GUID, request_id: str) -> NvkeOperationType | None:
+        try:
+            row = operations.read_request(site_id=str(site_id), request_id=request_id)
+            return operation_type(row) if row is not None else None
+        except service.NvkeSiteError as exc:
+            if exc.code == "NOT_FOUND":
+                return None
+            raise
+
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()
@@ -311,6 +334,15 @@ class NvkeQuery:
         return success(operations.result(str(operation_id)))
 
     @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_operation_result_text(self, info: Info, operation_id: GUID) -> MutationResultType[str]:
+        return success(
+            operations.canonical(operations.result(str(operation_id)), limit=64 * 1024 * 1024).decode("utf-8")
+        )
+
+    @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()
     def astrolift_nvke_sites(
@@ -337,6 +369,18 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.operation_request_text",
+        target=lambda root, info, input: ("nvke_site", str(input.site_id)),
+    )
+    @nvke_errors
+    @tenant_scoped()
+    def request_nvke_operation_text(
+        self, info: Info, input: RequestNvkeOperationTextInput
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(operations.reserve_text(**asdict(input))))
+
     @strawberry.mutation
     @mutation_audit(
         action="nvke.operation_request", target=lambda root, info, input: ("nvke_site", str(input.site_id))

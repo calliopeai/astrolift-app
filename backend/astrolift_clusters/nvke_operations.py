@@ -42,6 +42,23 @@ def canonical(value, *, limit=MAX_REQUEST_BYTES):
     return data
 
 
+def reserve_text(*, parameters_text, expected_actor_id, **kwargs):
+    # Browser editors must not parse native int64 values through JavaScript's
+    # floating-point JSON representation before admission.
+    _org, actor = sites.authorized(Permission(action(kwargs["operation_key"]).permission))
+    if type(expected_actor_id) is not int or actor.pk != expected_actor_id:
+        raise NvkeError("SOURCE_CHANGED", "The reviewed NVKE caller changed before admission")
+    if not isinstance(parameters_text, str):
+        raise NvkeError("INVALID_INPUT", "NVKE parameters must contain a JSON object")
+    try:
+        if len(parameters_text.encode("utf-8")) > MAX_REQUEST_BYTES:
+            raise ValueError
+        parameters = json.loads(parameters_text)
+    except (ValueError, UnicodeError, TypeError):
+        raise NvkeError("INVALID_INPUT", "NVKE parameters must contain one bounded JSON object") from None
+    return reserve(parameters=parameters, **kwargs)
+
+
 def connection_digest(row):
     return hashlib.sha256(
         canonical(
@@ -344,3 +361,17 @@ def resume(operation_id, *, expected_version, timeout_seconds=7200):
         transaction.on_commit(lambda: dispatch(row.pk))
     row.refresh_from_db()
     return row
+
+
+def read_request(*, site_id, request_id):
+    org, actor = sites.authorized(Permission.NVKE_READ)
+    site = sites.site_row(site_id, org)
+    try:
+        request_id = UUID(str(request_id))
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return (
+        NvkeOperation.objects.select_related("site")
+        .filter(site=site, organization=org, actor=actor, request_id=request_id)
+        .first()
+    )

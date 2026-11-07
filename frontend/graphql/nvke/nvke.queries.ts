@@ -126,3 +126,33 @@ export const GET_NVKE_CONTRACT = gql`
     }
   }
 `;
+
+export const GET_NVKE_IDENTITY = gql`
+  query GetNvkeIdentity {
+    astroliftMyProfile {
+      userId
+    }
+  }
+`;
+
+export const GET_NVKE_REQUEST = gql`
+  query GetNvkeRequest($siteId: GUID!, $requestId: String!) {
+    astroliftNvkeRequest(siteId: $siteId, requestId: $requestId) {
+      ...NvkeOperationFields
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;
+
+export const GET_NVKE_OPERATION_RESULT_TEXT = gql`
+  query GetNvkeOperationResultText($operationId: GUID!) {
+    astroliftNvkeOperationResultText(operationId: $operationId) {
+      ok
+      errors {
+        code
+        message
+      }
+      data
+    }
+  }
+`;

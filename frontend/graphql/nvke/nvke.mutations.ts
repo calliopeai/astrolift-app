@@ -112,3 +112,19 @@ export const RESUME_NVKE_OPERATION = gql`
   }
   ${NVKE_OPERATION_FIELDS}
 `;
+
+export const REQUEST_NVKE_OPERATION_TEXT = gql`
+  mutation RequestNvkeOperationText($input: RequestNvkeOperationTextInput!) {
+    requestNvkeOperationText(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;

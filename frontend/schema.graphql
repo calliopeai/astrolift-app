@@ -10839,6 +10839,7 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  requestNvkeOperationText(input: RequestNvkeOperationTextInput!): NvkeOperationTypeMutationResult!
   requestNvkeOperation(input: RequestNvkeOperationInput!): NvkeOperationTypeMutationResult!
   cancelNvkeOperation(input: CancelNvkeOperationInput!): NvkeOperationTypeMutationResult!
   resumeNvkeOperation(input: ResumeNvkeOperationInput!): NvkeOperationTypeMutationResult!
@@ -12113,10 +12114,12 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeRequest(siteId: GUID!, requestId: String!): NvkeOperationType
   astroliftNvkeContract: NvkeContractType!
   astroliftNvkeOperations(siteId: GUID!, after: String = null, limit: Int! = 50): NvkeOperationTypePage!
   astroliftNvkeOperation(operationId: GUID!): NvkeOperationType
   astroliftNvkeOperationResult(operationId: GUID!): JSONMutationResult!
+  astroliftNvkeOperationResultText(operationId: GUID!): StrMutationResult!
   astroliftNvkeSites(after: String = null, limit: Int! = 50): NvkeSiteTypePage!
   astroliftNvkeSite(siteId: GUID!): NvkeSiteType
   astroliftQuotas: [AstroliftQuota!]!
@@ -12722,6 +12725,16 @@ input RequestNvkeOperationInput {
   requestId: String!
   operationKey: String!
   parameters: JSON!
+  timeoutSeconds: Int! = 7200
+}
+
+input RequestNvkeOperationTextInput {
+  expectedActorId: Int!
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  requestId: String!
+  operationKey: String!
+  parametersText: String!
   timeoutSeconds: Int! = 7200
 }
 
@@ -13378,6 +13391,12 @@ type StartWorkflowResult {
   ok: Boolean!
   errors: [ValidationError!]!
   instanceId: ID
+}
+
+type StrMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: String
 }
 
 input SubscribeClusterModelInput {

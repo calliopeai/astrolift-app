@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add lossless NVKE JSON text admission/results for browser native editors, with the reviewed actor bound at admission and original UUID receipt lookup scoped to that actor and organization. Sensitive text inputs use schema-position audit redaction; structured API clients remain compatible (#2659, #2662).
+
 - Add the NVKE encrypted operation outbox, 88-action execution catalog and permission-gated operation API. Temporal carries IDs only; original caller/site/connection authority is rechecked before I/O, accepted writes are never blindly replayed, readiness is observed separately, and uncertain outcomes require explicit reconciliation. Add bounded dispatch recovery and real Postgres/Kubernetes/Temporal qualification, including lost replies and workflow-history secret checks. UI/CLI/bootstrap and live management-plane validation remain under #2656 (#2660).
 
 - Add organization-owned NVKE sites and separately configured controller, tenant, operator and management-Kubernetes connections. The API provides paginated metadata and audited configuration with write-only encrypted credentials, explicit preserve/rotate/clear behavior, tenant and membership checks, optimistic concurrency, and separate NVKE permissions. Durable operation records preserve encrypted original inputs; provisioning/workflow/UI/CLI integration remains under #2656 (#2659).

@@ -184,3 +184,21 @@ and will remain pending, then uncertain at its deadline. The pinned management
 engine declares pool readiness counters but does not populate all of them; the
 adapter requires positive evidence instead of treating reconciliation acceptance
 as readiness. These need further integration with workload/controller observations.
+
+## Browser native editors
+
+`requestNvkeOperationText` accepts `RequestNvkeOperationTextInput` with the same
+site/version/action/UUID/timeout tuple, `expectedActorId`, and `parametersText`.
+`expectedActorId` is the current `astroliftMyProfile.userId` reviewed by the editor;
+an identity change before admission is refused. The text must contain one bounded
+JSON object. Parsing happens on the server, retaining native int64 values that a
+JavaScript JSON round trip could change. Both admission paths share one encrypted
+outbox and idempotency identity. Audit logs mask the complete text field.
+
+`astroliftNvkeOperationResultText` returns the authorized result as JSON text, so
+browser downloads preserve native numbers and fields. Results still require the
+original action's permission. Fetch them explicitly without browser cache/storage.
+`astroliftNvkeRequest(siteId: ..., requestId: ...)` recovers metadata for the current
+actor's exact UUID, including after a lost admission reply. Another actor's UUID or
+another organization's site does not disclose a receipt. A missing receipt alone
+does not prove an in-flight admission had no effect; retry the original identity.

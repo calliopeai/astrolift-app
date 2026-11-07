@@ -331,3 +331,133 @@ def test_manage_permission_cannot_dispatch_an_operator_operation(world):
     payload = result.data["requestNvkeOperation"]
     assert not payload["ok"]
     assert payload["errors"][0]["code"] == "PERMISSION_DENIED"
+
+
+REQUEST_TEXT = """
+mutation($unrelated: RequestNvkeOperationTextInput!) {
+  requestNvkeOperationText(input:$unrelated) {
+    ok errors { code message } data { id operationKey requestId status }
+  }
+}
+"""
+
+
+def test_browser_text_path_retains_int64_native_values_and_masks_all_input(world):
+    from astrolift_clusters import nvke_operations
+    from astrolift_clusters.models import NvkeOperation
+    from astrolift_clusters.tests.test_nvke_sites import put
+
+    with context(world):
+        site = create()
+        put(site, surface="controller")
+        site.refresh_from_db()
+    request_id = str(uuid4())
+    raw = '{"path":{"nodePoolID":"123e4567-e89b-12d3-a456-426614174000"},"body":{"desiredNodeCount":9007199254740993,"description":"PRIVATE_BROWSER_INPUT"}}'
+    request = {
+        "siteId": str(site.guid),
+        "expectedSiteVersion": site.version,
+        "requestId": request_id,
+        "operationKey": "updateNodePool",
+        "parametersText": raw,
+        "expectedActorId": world.user.pk,
+    }
+    result = execute(world, REQUEST_TEXT, {"unrelated": request})
+    assert result.errors is None
+    payload = result.data["requestNvkeOperationText"]
+    assert payload["ok"], payload
+    row = NvkeOperation.objects.get(guid=payload["data"]["id"])
+    assert nvke_operations.decode_input(row)["body"]["desiredNodeCount"] == 9007199254740993
+    log = MutationAuditLog.objects.filter(operation="nvke.operation_request_text").latest("timestamp")
+    assert log.variables["unrelated"]["parametersText"] == "***REDACTED***"
+    assert "PRIVATE_BROWSER_INPUT" not in json.dumps(log.variables)
+    nvke_operations.save_result(row, {"counter": 9007199254740993, "futureField": {"kept": True}})
+    row.save(update_fields=["result_backend_kind", "result_ciphertext", "updated_at", "version"])
+    observed = execute(
+        world,
+        "query($id:GUID!) { astroliftNvkeOperationResultText(operationId:$id) { ok data errors { code } } }",
+        {"id": str(row.guid)},
+    )
+    assert observed.errors is None
+    assert "9007199254740993" in observed.data["astroliftNvkeOperationResultText"]["data"]
+    assert (
+        json.loads(observed.data["astroliftNvkeOperationResultText"]["data"])["counter"] == 9007199254740993
+    )
+    # Existing JSON clients and the text editor share one durable identity.
+    del request["expectedActorId"]
+    del request["parametersText"]
+    request["parameters"] = json.loads(raw)
+    duplicate = execute(world, REQUEST_OPERATION, {"unrelated": request})
+    assert duplicate.errors is None
+    assert duplicate.data["requestNvkeOperation"]["data"]["id"] == str(row.guid)
+
+
+@pytest.mark.parametrize("raw", ['{"private":"PRIVATE_REJECTED_TEXT"', '{"x":NaN}', "[]", "null"])
+def test_browser_text_rejects_invalid_native_objects_without_leaking_them(world, raw):
+    _site, request = operation_request(world)
+    request.pop("parameters")
+    request["parametersText"] = raw
+    request["expectedActorId"] = world.user.pk
+    result = execute(world, REQUEST_TEXT, {"unrelated": request})
+    assert result.errors is None
+    payload = result.data["requestNvkeOperationText"]
+    assert not payload["ok"]
+    assert "PRIVATE_REJECTED_TEXT" not in json.dumps(payload)
+    log = MutationAuditLog.objects.filter(operation="nvke.operation_request_text").latest("timestamp")
+    assert "PRIVATE_REJECTED_TEXT" not in json.dumps(log.variables)
+
+
+def test_browser_reviewed_actor_change_cannot_admit_under_another_identity(world):
+    from astrolift_clusters.models import NvkeOperation
+
+    _site, request = operation_request(world)
+    request.pop("parameters")
+    request.update(parametersText="{}", expectedActorId=world.user.pk + 1)
+    response = execute(world, REQUEST_TEXT, {"unrelated": request})
+    assert response.errors is None
+    assert response.data["requestNvkeOperationText"]["errors"][0]["code"] == "SOURCE_CHANGED"
+    assert not NvkeOperation.objects.exists()
+
+
+def test_exact_browser_receipt_recovery_is_bound_to_original_actor_and_org(world):
+    site, request = operation_request(world)
+    response = execute(world, REQUEST_OPERATION, {"unrelated": request})
+    assert response.errors is None
+    query = "query($site:GUID!, $request:String!) { astroliftNvkeRequest(siteId:$site, requestId:$request) { id requestId } }"
+    variables = {"site": str(site.guid), "request": request["requestId"]}
+    recovered = execute(world, query, variables)
+    assert recovered.errors is None
+    assert recovered.data["astroliftNvkeRequest"]["id"] == response.data["requestNvkeOperation"]["data"]["id"]
+    from astrolift_clusters.tests.test_nvke_sites import world as factory
+
+    foreign = factory.__wrapped__()
+    missing = execute(foreign, query, variables)
+    assert missing.errors is None
+    assert missing.data["astroliftNvkeRequest"] is None
+
+
+def test_browser_receipt_is_not_shared_with_another_authorized_actor_in_the_same_org(world):
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import Member
+    from core.permissions import Permission
+
+    site, request = operation_request(world)
+    response = execute(world, REQUEST_OPERATION, {"unrelated": request})
+    assert response.data["requestNvkeOperation"]["ok"]
+    user = get_user_model().objects.create(username="other-nvke-caller-" + uuid4().hex[:10], is_active=True)
+    Member.objects.create(user=user, scope_kind="ORG", scope_id=world.org.pk)
+    bind_role(
+        user,
+        permissions=[Permission.NVKE_READ],
+        kind="ORG",
+        scope_id=world.org.pk,
+        slug="other-nvke-reader-" + uuid4().hex[:10],
+    )
+    other = SimpleNamespace(user=user, org=world.org)
+    result = execute(
+        other,
+        "query($site:GUID!, $request:String!) { astroliftNvkeRequest(siteId:$site, requestId:$request) { id } }",
+        {"site": str(site.guid), "request": request["requestId"]},
+    )
+    assert result.errors is None
+    assert result.data["astroliftNvkeRequest"] is None

@@ -97,6 +97,7 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         # Rejected endpoint URLs can still contain embedded credentials.
         "ConfigureNvkeConnectionInput.endpoint",
         "RequestNvkeOperationInput.parameters",
+        "RequestNvkeOperationTextInput.parametersText",
         "NvkeCredentialsInput.clientKeyPem",
     }
 )
