@@ -14,6 +14,12 @@ license = { text = "MIT" }
 dependencies = []
 
 [project.optional-dependencies]
+nvke = [
+    "httpx>=0.27,<1",
+    "jsonschema>=4.23,<5",
+    "kubernetes>=29.0,<36",
+    "PyYAML>=6.0",
+]
 aws = [
     "boto3>=1.43.71",
     "botocore>=1.43.71",
@@ -111,9 +117,10 @@ dev = [
     # Gateway privacy tests exercise real client header/error instrumentation.
     "opentelemetry-instrumentation-httpx>=0.62b0,<0.64",
     # Driver config_schema() output is asserted to be a well-formed JSON
-    # Schema, and sample configs are validated against it. Test-only: no
-    # driver imports jsonschema at runtime.
+    # Schema, and sample configs are validated against it. NVKE also uses
+    # JSON Schema at runtime to preserve the full pinned upstream surface.
     "jsonschema>=4.23",
+    "types-jsonschema>=4.23",
     "moto[s3,iam,sts,ec2,eks,route53,acm,ecr,secretsmanager,ssm,sqs,sns,dynamodb,elasticache,rds,efs]>=5.0",
     # Bounded like the backend lint job's ruff pin — ruff moves rules and
     # formatter output across minors, so an open pin re-breaks CI on every
@@ -127,7 +134,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["_sdk", "aws", "gcp", "azure", "k8s_native"]
+packages = ["_sdk", "aws", "gcp", "azure", "k8s_native", "nvke"]
 
 [project.entry-points."astrolift.providers"]
 aws = "aws.plugin:PLUGIN"
