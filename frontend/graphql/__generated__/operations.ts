@@ -10104,6 +10104,7 @@ export type Mutation = {
   requestNvkeInventory: NvkeOperationTypeMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestNvkeOperationText: NvkeOperationTypeMutationResult;
+  requestNvkeResourceOperation: NvkeOperationTypeMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -11822,6 +11823,11 @@ export type MutationRequestNvkeOperationTextArgs = {
 };
 
 
+export type MutationRequestNvkeResourceOperationArgs = {
+  input: RequestNvkeResourceOperationInput;
+};
+
+
 export type MutationRequestQuotaIncreaseArgs = {
   input: RequestQuotaIncreaseInput;
 };
@@ -13017,6 +13023,7 @@ export type NvkeOperationType = {
   isInventory: Scalars['Boolean']['output'];
   operationKey: Scalars['String']['output'];
   requestId: Scalars['String']['output'];
+  resourceSource?: Maybe<NvkeResourceSourceType>;
   siteId: Scalars['GUID']['output'];
   stage: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -13044,10 +13051,30 @@ export type NvkeOperationTypePage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type NvkeResourceEditorType = {
+  concurrency: Scalars['String']['output'];
+  operationKey: Scalars['String']['output'];
+  parametersText?: Maybe<Scalars['String']['output']>;
+  preparationActionKey?: Maybe<Scalars['String']['output']>;
+  source: NvkeResourceSourceType;
+};
+
+export type NvkeResourceEditorTypeMutationResult = {
+  data?: Maybe<NvkeResourceEditorType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeResourceSchemaType = {
   kind: Scalars['String']['output'];
   namespaced: Scalars['Boolean']['output'];
   schema: Scalars['JSON']['output'];
+};
+
+export type NvkeResourceSourceType = {
+  operationId: Scalars['GUID']['output'];
+  resourceKey?: Maybe<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
 };
 
 export type NvkeSiteType = {
@@ -13668,6 +13695,7 @@ export type Query = {
   astroliftNvkeOperationResultText: StrMutationResult;
   astroliftNvkeOperations: NvkeOperationTypePage;
   astroliftNvkeRequest?: Maybe<NvkeOperationType>;
+  astroliftNvkeResourceEditor: NvkeResourceEditorTypeMutationResult;
   astroliftNvkeSite?: Maybe<NvkeSiteType>;
   astroliftNvkeSites: NvkeSiteTypePage;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
@@ -15283,6 +15311,16 @@ export type QueryAstroliftNvkeRequestArgs = {
 };
 
 
+export type QueryAstroliftNvkeResourceEditorArgs = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  operationKey: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  sourceResourceKey?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftNvkeSiteArgs = {
   siteId: Scalars['GUID']['input'];
 };
@@ -16824,6 +16862,19 @@ export type RequestNvkeOperationTextInput = {
   parametersText: Scalars['String']['input'];
   requestId: Scalars['String']['input'];
   siteId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
+export type RequestNvkeResourceOperationInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  operationKey: Scalars['String']['input'];
+  parametersText: Scalars['String']['input'];
+  requestId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  sourceResourceKey: InputMaybe<Scalars['String']['input']>;
   timeoutSeconds: Scalars['Int']['input'];
 };
 
@@ -20936,35 +20987,42 @@ export type RequestNvkeOperationMutationVariables = Exact<{
 }>;
 
 
-export type RequestNvkeOperationMutation = { requestNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+export type RequestNvkeOperationMutation = { requestNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type CancelNvkeOperationMutationVariables = Exact<{
   input: CancelNvkeOperationInput;
 }>;
 
 
-export type CancelNvkeOperationMutation = { cancelNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+export type CancelNvkeOperationMutation = { cancelNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type ResumeNvkeOperationMutationVariables = Exact<{
   input: ResumeNvkeOperationInput;
 }>;
 
 
-export type ResumeNvkeOperationMutation = { resumeNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+export type ResumeNvkeOperationMutation = { resumeNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type RequestNvkeOperationTextMutationVariables = Exact<{
   input: RequestNvkeOperationTextInput;
 }>;
 
 
-export type RequestNvkeOperationTextMutation = { requestNvkeOperationText: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+export type RequestNvkeOperationTextMutation = { requestNvkeOperationText: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type RequestNvkeInventoryMutationVariables = Exact<{
   input: RequestNvkeOperationTextInput;
 }>;
 
 
-export type RequestNvkeInventoryMutation = { requestNvkeInventory: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null } };
+export type RequestNvkeInventoryMutation = { requestNvkeInventory: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
+export type RequestNvkeResourceOperationMutationVariables = Exact<{
+  input: RequestNvkeResourceOperationInput;
+}>;
+
+
+export type RequestNvkeResourceOperationMutation = { requestNvkeResourceOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type NvkeSiteFieldsFragment = { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> };
 
@@ -20983,7 +21041,7 @@ export type GetNvkeSiteQueryVariables = Exact<{
 
 export type GetNvkeSiteQuery = { astroliftNvkeSite?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null };
 
-export type NvkeOperationFieldsFragment = { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string };
+export type NvkeOperationFieldsFragment = { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null };
 
 export type ListNvkeOperationsQueryVariables = Exact<{
   siteId: Scalars['GUID']['input'];
@@ -20992,14 +21050,14 @@ export type ListNvkeOperationsQueryVariables = Exact<{
 }>;
 
 
-export type ListNvkeOperationsQuery = { astroliftNvkeOperations: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string }> } };
+export type ListNvkeOperationsQuery = { astroliftNvkeOperations: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null }> } };
 
 export type GetNvkeOperationQueryVariables = Exact<{
   operationId: Scalars['GUID']['input'];
 }>;
 
 
-export type GetNvkeOperationQuery = { astroliftNvkeOperation?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null };
+export type GetNvkeOperationQuery = { astroliftNvkeOperation?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null };
 
 export type GetNvkeOperationResultQueryVariables = Exact<{
   operationId: Scalars['GUID']['input'];
@@ -21024,7 +21082,7 @@ export type GetNvkeRequestQueryVariables = Exact<{
 }>;
 
 
-export type GetNvkeRequestQuery = { astroliftNvkeRequest?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string } | null };
+export type GetNvkeRequestQuery = { astroliftNvkeRequest?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null };
 
 export type GetNvkeOperationResultTextQueryVariables = Exact<{
   operationId: Scalars['GUID']['input'];
@@ -21061,6 +21119,18 @@ export type GetNvkeInventoryResourceQueryVariables = Exact<{
 
 
 export type GetNvkeInventoryResourceQuery = { astroliftNvkeInventoryResource: { operationId: string, siteId: string, observedAt?: string | null, collection: { key: string, surface: NvkeSurface, resourceKind: string, namespaced: boolean, permission: string, defaultParametersText: string, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }> }, item: { key: string, identity: string, name: string, uid: string, namespace: string, resourceVersion: string, generation: string, kubernetesVersion: string, desiredCount: string, conditionsOmitted: number, conditions: Array<{ name: string, status: string }> } } };
+
+export type GetNvkeResourceEditorQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  operationKey: Scalars['String']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  sourceResourceKey?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetNvkeResourceEditorQuery = { astroliftNvkeResourceEditor: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { operationKey: string, parametersText?: string | null, preparationActionKey?: string | null, concurrency: string, source: { operationId: string, version: number, resourceKey?: string | null } } | null } };
 
 export type TelemetryAppsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;

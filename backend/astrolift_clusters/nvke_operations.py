@@ -87,6 +87,7 @@ def reserve(
     parameters,
     timeout_seconds=7200,
     inventory=False,
+    resource_source=None,
 ):
     selected = action(operation_key)
     org, actor = sites.authorized(Permission(selected.permission))
@@ -109,6 +110,8 @@ def reserve(
         }
         if inventory:
             reviewed["inventory"] = True
+        if resource_source is not None:
+            reviewed["resource_source"] = resource_source
         digest = hmac.new(
             str(settings.SECRET_KEY).encode(),
             canonical(reviewed),
@@ -128,7 +131,10 @@ def reserve(
         sites._version(site, expected_site_version)
         if not site.is_active or site.upstream_revision != upstream_revision():
             raise NvkeError("SOURCE_CHANGED", "NVKE site is disabled or requires contract review")
-        validate_request(operation_key, parameters, site.organization_namespace)
+        if inventory and resource_source is not None:
+            raise NvkeError("INVALID_INPUT", "Choose inventory or resource admission")
+        if resource_source is None:
+            validate_request(operation_key, parameters, site.organization_namespace)
         if inventory:
             validate_inventory_request(operation_key, parameters)
         connection = NvkeConnection.objects.filter(
@@ -136,6 +142,49 @@ def reserve(
         ).first()
         if connection is None:
             raise NvkeError("SURFACE_UNAVAILABLE", "The requested NVKE interface is not configured")
+        resource_guard = None
+        if resource_source is not None:
+            from astrolift_clusters.nvke_resource_operations import bind
+
+            parameters, resource_guard = bind(
+                site=site,
+                actor=actor,
+                selected=selected,
+                parameters=parameters,
+                reference=resource_source,
+                connection=connection,
+            )
+            source_row = (
+                NvkeOperation.all_objects.select_for_update()
+                .filter(guid=resource_source["operation_id"], site=site, organization=org)
+                .first()
+            )
+            if (
+                source_row is None
+                or source_row.deleted_at is not None
+                or source_row.version != resource_source["version"]
+                or source_row.status != "succeeded"
+            ):
+                raise NvkeError(
+                    "SOURCE_CHANGED", "The reviewed NVKE resource observation changed during admission"
+                )
+            if (
+                selected.mutates
+                and NvkeOperation.objects.filter(
+                    site=site,
+                    organization=org,
+                    authority__resource__identity_digest=resource_guard["identity_digest"],
+                    authority__resource__mutates=True,
+                )
+                .exclude(status__in=["succeeded", "failed", "cancelled"])
+                .exists()
+            ):
+                raise NvkeError(
+                    "RESOURCE_BUSY",
+                    "Observe or explicitly reconcile the existing NVKE mutation for this resource",
+                )
+            payload = canonical(parameters)
+            validate_request(operation_key, parameters, site.organization_namespace)
         token = get_current_api_token()
         sealed = encrypt_at_rest(payload)
         row = NvkeOperation.objects.create(
@@ -153,6 +202,7 @@ def reserve(
                 "revision": upstream_revision(),
                 "organization_namespace": site.organization_namespace,
                 **({"inventory": True} if inventory else {}),
+                **({"resource": resource_guard} if resource_guard is not None else {}),
             },
             input_backend_kind=sealed.backend_kind,
             input_ciphertext=sealed.backend_ref,

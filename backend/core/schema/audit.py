@@ -98,6 +98,7 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "ConfigureNvkeConnectionInput.endpoint",
         "RequestNvkeOperationInput.parameters",
         "RequestNvkeOperationTextInput.parametersText",
+        "RequestNvkeResourceOperationInput.parametersText",
         "NvkeCredentialsInput.clientKeyPem",
     }
 )

@@ -85,6 +85,9 @@ native integer values. Treat these files as sensitive: native responses may cont
 or kubeconfigs. No result is automatically fetched when opening an operation page.
 Workload kubeconfig operations additionally enforce [native ownership proofs](nvke-access.md)
 before reading the admin Secret; a supplied backing cluster name is not ownership evidence.
+The [resource editor/admission API](nvke-resource-operations.md) supplies server-bound targets
+and native preconditions for the upcoming mutation forms; it is separate from the current
+observation browsing flow.
 
 This route-wiring slice uses manual refresh. Resource-specific mutation forms, site bootstrap,
 workload access, telemetry and live hardware qualification remain separate delivery work.

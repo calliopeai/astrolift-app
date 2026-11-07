@@ -10839,6 +10839,7 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  requestNvkeResourceOperation(input: RequestNvkeResourceOperationInput!): NvkeOperationTypeMutationResult!
   requestNvkeInventory(input: RequestNvkeOperationTextInput!): NvkeOperationTypeMutationResult!
   requestNvkeOperationText(input: RequestNvkeOperationTextInput!): NvkeOperationTypeMutationResult!
   requestNvkeOperation(input: RequestNvkeOperationInput!): NvkeOperationTypeMutationResult!
@@ -11403,6 +11404,7 @@ type NvkeOperationType {
   requestId: String!
   operationKey: String!
   isInventory: Boolean!
+  resourceSource: NvkeResourceSourceType
   status: NvkeOperationStatus!
   stage: String!
   generation: Int!
@@ -11439,10 +11441,30 @@ type NvkeOperationTypePage {
   pageSize: Int
 }
 
+type NvkeResourceEditorType {
+  operationKey: String!
+  parametersText: String
+  preparationActionKey: String
+  concurrency: String!
+  source: NvkeResourceSourceType!
+}
+
+type NvkeResourceEditorTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeResourceEditorType
+}
+
 type NvkeResourceSchemaType {
   kind: String!
   namespaced: Boolean!
   schema: JSON!
+}
+
+type NvkeResourceSourceType {
+  operationId: GUID!
+  version: Int!
+  resourceKey: String
 }
 
 type NvkeSiteType {
@@ -12165,6 +12187,7 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeResourceEditor(siteId: GUID!, expectedActorId: Int!, operationKey: String!, sourceOperationId: GUID!, expectedSourceVersion: Int!, sourceResourceKey: String = null): NvkeResourceEditorTypeMutationResult!
   astroliftNvkeInventoryPage(operationId: GUID!, expectedActorId: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeInventoryPageType!
   astroliftNvkeInventoryResource(operationId: GUID!, expectedActorId: Int!, resourceKey: String!): NvkeInventoryResourceType!
   astroliftNvkeInventoryDocumentText(operationId: GUID!, expectedActorId: Int!, resourceKey: String!): StrMutationResult!
@@ -12789,6 +12812,19 @@ input RequestNvkeOperationTextInput {
   requestId: String!
   operationKey: String!
   parametersText: String!
+  timeoutSeconds: Int! = 7200
+}
+
+input RequestNvkeResourceOperationInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  expectedActorId: Int!
+  requestId: String!
+  operationKey: String!
+  parametersText: String!
+  sourceOperationId: GUID!
+  expectedSourceVersion: Int!
+  sourceResourceKey: String = null
   timeoutSeconds: Int! = 7200
 }
 

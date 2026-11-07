@@ -24,6 +24,7 @@ export interface NvkeRecoveryOperation {
   requestId: string;
   operationKey: string;
   isInventory: boolean;
+  resourceSource?: unknown;
 }
 export interface RecoveryStorage {
   getItem: (key: string) => string | null;
@@ -153,6 +154,7 @@ export function archiveRecovery(
     record.siteId !== operation.siteId ||
     record.requestId !== operation.requestId ||
     typeof operation.isInventory !== "boolean" ||
+    operation.resourceSource != null ||
     (recoveryMode(record) === "inventory") !== operation.isInventory ||
     record.operationKey !== operation.operationKey
   )

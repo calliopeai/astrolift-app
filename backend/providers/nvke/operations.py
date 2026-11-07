@@ -79,6 +79,8 @@ def validate_request(key: str, request: dict[str, Any], namespace: str) -> Actio
     if selected.verb in {"delete", "deprecate"}:
         properties["uid"] = {"type": "string"}
         required.append("uid")
+    if selected.verb == "replace":
+        properties["uid"] = {"type": "string"}
     if selected.verb in {"create", "replace"}:
         properties.update(document={"type": "object"}, dry_run={"type": "boolean"})
         required.append("document")

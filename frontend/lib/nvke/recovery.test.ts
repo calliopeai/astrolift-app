@@ -119,6 +119,14 @@ describe("NVKE browser request identity", () => {
       { ...record, operationId: operation.id },
     ]);
   });
+  it("does not recover a resource-bound receipt as an ordinary native request", () => {
+    const { api } = storage();
+    saveRecovery(api, record);
+    expect(() =>
+      archiveRecovery(api, record, { ...operation, resourceSource: { operationId: operation.id } })
+    ).toThrow("RECOVERY_MISMATCH");
+    expect(readRecovery(api, record, record.siteId)).toEqual(record);
+  });
   it("preserves the pending identity when receipt storage fails", () => {
     const { api } = storage();
     saveRecovery(api, record);

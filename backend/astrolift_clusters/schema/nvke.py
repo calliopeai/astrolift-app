@@ -9,12 +9,13 @@ import strawberry
 from nvke.client import NvkeError
 from nvke.contract import controller_spec, resource_schema, resources, upstream_revision
 from nvke.inventory import collections, resource_actions
-from nvke.operations import actions
+from nvke.operations import action, actions
 from strawberry.scalars import JSON
 from strawberry.types import Info
 
 from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_operations as operations
+from astrolift_clusters import nvke_resource_operations as resource_operations
 from astrolift_clusters import nvke_sites as service
 from astrolift_clusters.models import NvkeOperation
 from astrolift_clusters.scopes import cluster_catalog_org_scope
@@ -160,6 +161,22 @@ class NvkeOperationStatus(Enum):
 
 
 @strawberry.type
+class NvkeResourceSourceType:
+    operation_id: GUID
+    version: int
+    resource_key: str | None
+
+
+@strawberry.type
+class NvkeResourceEditorType:
+    operation_key: str
+    parameters_text: str | None
+    preparation_action_key: str | None
+    concurrency: str
+    source: NvkeResourceSourceType
+
+
+@strawberry.type
 class NvkeOperationType:
     id: GUID
     version: int
@@ -167,6 +184,7 @@ class NvkeOperationType:
     request_id: str
     operation_key: str
     is_inventory: bool
+    resource_source: NvkeResourceSourceType | None
     status: NvkeOperationStatus
     stage: str
     generation: int
@@ -181,6 +199,7 @@ class NvkeOperationType:
 
 
 def operation_type(row):
+    resource_source = row.authority.get("resource", {}).get("source")
     return NvkeOperationType(
         id=GUID(str(row.guid)),
         version=row.version,
@@ -188,6 +207,13 @@ def operation_type(row):
         request_id=str(row.request_id),
         operation_key=row.operation_key,
         is_inventory=row.authority.get("inventory") is True,
+        resource_source=NvkeResourceSourceType(
+            operation_id=GUID(resource_source["operation_id"]),
+            version=resource_source["version"],
+            resource_key=resource_source["resource_key"],
+        )
+        if resource_source
+        else None,
         status=NvkeOperationStatus(row.status),
         stage=row.stage,
         generation=row.generation,
@@ -346,6 +372,20 @@ class RequestNvkeOperationTextInput:
 
 
 @strawberry.input
+class RequestNvkeResourceOperationInput:
+    site_id: GUID
+    expected_site_version: int
+    expected_actor_id: int
+    request_id: str
+    operation_key: str
+    parameters_text: str
+    source_operation_id: GUID
+    expected_source_version: int
+    source_resource_key: str | None = None
+    timeout_seconds: int = 7200
+
+
+@strawberry.input
 class CancelNvkeOperationInput:
     operation_id: GUID
 
@@ -359,6 +399,45 @@ class ResumeNvkeOperationInput:
 
 @strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_resource_editor(
+        self,
+        info: Info,
+        site_id: GUID,
+        expected_actor_id: int,
+        operation_key: str,
+        source_operation_id: GUID,
+        expected_source_version: int,
+        source_resource_key: str | None = None,
+    ) -> MutationResultType[NvkeResourceEditorType]:
+        reference = {
+            "operation_id": str(source_operation_id),
+            "version": expected_source_version,
+            "resource_key": source_resource_key,
+        }
+        _source, _collection, selected, parameters, preparation, concurrency = resource_operations.editor(
+            site_id=str(site_id),
+            expected_actor_id=expected_actor_id,
+            operation_key=operation_key,
+            reference=reference,
+        )
+        return success(
+            NvkeResourceEditorType(
+                operation_key=selected.key,
+                parameters_text=operations.canonical(parameters).decode() if parameters is not None else None,
+                preparation_action_key=preparation,
+                concurrency=concurrency,
+                source=NvkeResourceSourceType(
+                    operation_id=source_operation_id,
+                    version=expected_source_version,
+                    resource_key=source_resource_key,
+                ),
+            )
+        )
+
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()
@@ -530,6 +609,24 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.resource_request", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @tenant_scoped()
+    def request_nvke_resource_operation(
+        self, info: Info, input: RequestNvkeResourceOperationInput
+    ) -> MutationResultType[NvkeOperationType]:
+        service.authorized(Permission(action(input.operation_key).permission))
+        values = asdict(input)
+        source = {
+            "operation_id": str(values.pop("source_operation_id")),
+            "version": values.pop("expected_source_version"),
+            "resource_key": values.pop("source_resource_key"),
+        }
+        return success(operation_type(operations.reserve_text(**values, resource_source=source)))
+
     @strawberry.mutation
     @mutation_audit(
         action="nvke.inventory_request", target=lambda root, info, input: ("nvke_site", str(input.site_id))

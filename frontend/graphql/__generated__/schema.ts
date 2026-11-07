@@ -10104,6 +10104,7 @@ export type Mutation = {
   requestNvkeInventory: NvkeOperationTypeMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestNvkeOperationText: NvkeOperationTypeMutationResult;
+  requestNvkeResourceOperation: NvkeOperationTypeMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -11822,6 +11823,11 @@ export type MutationRequestNvkeOperationTextArgs = {
 };
 
 
+export type MutationRequestNvkeResourceOperationArgs = {
+  input: RequestNvkeResourceOperationInput;
+};
+
+
 export type MutationRequestQuotaIncreaseArgs = {
   input: RequestQuotaIncreaseInput;
 };
@@ -13017,6 +13023,7 @@ export type NvkeOperationType = {
   isInventory: Scalars['Boolean']['output'];
   operationKey: Scalars['String']['output'];
   requestId: Scalars['String']['output'];
+  resourceSource?: Maybe<NvkeResourceSourceType>;
   siteId: Scalars['GUID']['output'];
   stage: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -13044,10 +13051,30 @@ export type NvkeOperationTypePage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type NvkeResourceEditorType = {
+  concurrency: Scalars['String']['output'];
+  operationKey: Scalars['String']['output'];
+  parametersText?: Maybe<Scalars['String']['output']>;
+  preparationActionKey?: Maybe<Scalars['String']['output']>;
+  source: NvkeResourceSourceType;
+};
+
+export type NvkeResourceEditorTypeMutationResult = {
+  data?: Maybe<NvkeResourceEditorType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeResourceSchemaType = {
   kind: Scalars['String']['output'];
   namespaced: Scalars['Boolean']['output'];
   schema: Scalars['JSON']['output'];
+};
+
+export type NvkeResourceSourceType = {
+  operationId: Scalars['GUID']['output'];
+  resourceKey?: Maybe<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
 };
 
 export type NvkeSiteType = {
@@ -13668,6 +13695,7 @@ export type Query = {
   astroliftNvkeOperationResultText: StrMutationResult;
   astroliftNvkeOperations: NvkeOperationTypePage;
   astroliftNvkeRequest?: Maybe<NvkeOperationType>;
+  astroliftNvkeResourceEditor: NvkeResourceEditorTypeMutationResult;
   astroliftNvkeSite?: Maybe<NvkeSiteType>;
   astroliftNvkeSites: NvkeSiteTypePage;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
@@ -15283,6 +15311,16 @@ export type QueryAstroliftNvkeRequestArgs = {
 };
 
 
+export type QueryAstroliftNvkeResourceEditorArgs = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  operationKey: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  sourceResourceKey?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftNvkeSiteArgs = {
   siteId: Scalars['GUID']['input'];
 };
@@ -16824,6 +16862,19 @@ export type RequestNvkeOperationTextInput = {
   parametersText: Scalars['String']['input'];
   requestId: Scalars['String']['input'];
   siteId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
+export type RequestNvkeResourceOperationInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  operationKey: Scalars['String']['input'];
+  parametersText: Scalars['String']['input'];
+  requestId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  sourceResourceKey: InputMaybe<Scalars['String']['input']>;
   timeoutSeconds: Scalars['Int']['input'];
 };
 

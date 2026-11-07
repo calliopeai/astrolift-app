@@ -16,6 +16,7 @@ from nvke.operations import action, execute_action
 from astrolift_clusters import nvke_operations as outbox
 from astrolift_clusters.models import NvkeOperation
 from astrolift_clusters.nvke_connections import open_connection
+from astrolift_clusters.nvke_resource_operations import check_observation
 from astrolift_clusters.nvke_sites import NvkeSiteError
 from core.mutations import AuditEntry, emit_audit
 
@@ -85,7 +86,7 @@ def _get(client, target):
         raise
 
 
-def _preflight(client, selected, request):
+def _preflight(client, selected, request, resource_guard=None):
     creating = selected.verb == "create" or bool(selected.http and selected.http.method == "POST")
     target = _target(selected, request)
     if creating and selected.surface == "controller":
@@ -105,6 +106,8 @@ def _preflight(client, selected, request):
     elif previous is None and selected.verb not in {"delete", "DELETE"}:
         raise NvkeError("NOT_FOUND", "The requested NVKE resource does not exist")
     if previous is not None:
+        if resource_guard is not None:
+            check_observation(resource_guard, previous.data, mutates=True)
         version = request.get("resource_version")
         if version is not None and previous.resource_version != version:
             raise NvkeError("CONFLICT", "The NVKE resource changed before execution")
@@ -294,9 +297,11 @@ def attempt(row_id, generation, *, execution):
                         else frozenset(),
                     )
                 )
+                if resource_guard := row.authority.get("resource"):
+                    check_observation(resource_guard, response.data, mutates=False)
                 return _state(row, "succeeded", "read_complete", progress={"response": asdict(response)})
             if not progress.get("sending"):
-                progress = _preflight(client, selected, request)
+                progress = _preflight(client, selected, request, row.authority.get("resource"))
                 if progress.get("already_absent"):
                     return _state(row, "succeeded", "already_absent", progress=progress)
                 outbox.checkpoint(row)

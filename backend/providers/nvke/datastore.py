@@ -182,12 +182,21 @@ class NvkeDatastore(NvkeClient):
         return self._request(kind, "POST", body=body, query=query)
 
     def replace(
-        self, kind: str, name: str, document: dict[str, Any], *, resource_version: str, dry_run: bool = False
+        self,
+        kind: str,
+        name: str,
+        document: dict[str, Any],
+        *,
+        resource_version: str,
+        dry_run: bool = False,
+        uid: str | None = None,
     ) -> NvkeResponse:
         body = self._document(kind, document)
         if body["metadata"]["name"] != _name(name):
             raise NvkeError("INVALID_INPUT", "NVKE document name must match the resource path")
         body["metadata"]["resourceVersion"] = _version(resource_version)
+        if uid is not None:
+            body["metadata"]["uid"] = _version(uid)
         query = {"fieldValidation": "Strict"}
         if dry_run:
             query["dryRun"] = "All"

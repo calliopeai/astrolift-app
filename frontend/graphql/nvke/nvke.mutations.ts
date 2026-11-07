@@ -144,3 +144,19 @@ export const REQUEST_NVKE_INVENTORY = gql`
   }
   ${NVKE_OPERATION_FIELDS}
 `;
+
+export const REQUEST_NVKE_RESOURCE_OPERATION = gql`
+  mutation RequestNvkeResourceOperation($input: RequestNvkeResourceOperationInput!) {
+    requestNvkeResourceOperation(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;

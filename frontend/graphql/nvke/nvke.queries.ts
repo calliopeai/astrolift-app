@@ -56,6 +56,11 @@ export const NVKE_OPERATION_FIELDS = gql`
     requestId
     operationKey
     isInventory
+    resourceSource {
+      operationId
+      version
+      resourceKey
+    }
     status
     stage
     generation
@@ -300,6 +305,43 @@ export const GET_NVKE_INVENTORY_RESOURCE = gql`
           status
         }
         conditionsOmitted
+      }
+    }
+  }
+`;
+
+export const GET_NVKE_RESOURCE_EDITOR = gql`
+  query GetNvkeResourceEditor(
+    $siteId: GUID!
+    $expectedActorId: Int!
+    $operationKey: String!
+    $sourceOperationId: GUID!
+    $expectedSourceVersion: Int!
+    $sourceResourceKey: String
+  ) {
+    astroliftNvkeResourceEditor(
+      siteId: $siteId
+      expectedActorId: $expectedActorId
+      operationKey: $operationKey
+      sourceOperationId: $sourceOperationId
+      expectedSourceVersion: $expectedSourceVersion
+      sourceResourceKey: $sourceResourceKey
+    ) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        operationKey
+        parametersText
+        preparationActionKey
+        concurrency
+        source {
+          operationId
+          version
+          resourceKey
+        }
       }
     }
   }

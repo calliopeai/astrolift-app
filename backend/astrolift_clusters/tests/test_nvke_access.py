@@ -117,7 +117,16 @@ def controller(request, identity=None):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             calls.append((self.command, self.path))
-            self.reply({"clusters": []} if self.path.startswith("/clusters?") else response)
+            if self.path.startswith("/clusters?"):
+                self.reply({"clusters": []})
+            elif self.path.startswith("/nodePools?"):
+                self.reply({"nodePools": []})
+            elif self.path.startswith("/nodes?"):
+                self.reply({"nodes": []})
+            elif self.path.endswith("/control-plane"):
+                self.reply({})
+            else:
+                self.reply(response)
 
         def do_POST(self):
             calls.append((self.command, self.path))
@@ -131,6 +140,11 @@ def controller(request, identity=None):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+
+        def do_PATCH(self):
+            calls.append((self.command, self.path))
+            response.update(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            self.reply(response)
 
         def log_message(self, *_args):
             pass
