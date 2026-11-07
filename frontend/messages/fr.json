@@ -17758,6 +17758,28 @@
       "empty": "Aucune ligne de diagnostic",
       "search": "Rechercher les métadonnées de diagnostic",
       "clusterId": "ID du cluster"
+    },
+    "workloadAccess": {
+      "title": "Imported workload access",
+      "help": "Manage imported ownership grants. Every credential download still verifies live Kubernetes ownership.",
+      "cluster": "Native cluster UUID",
+      "source": "Original controller read",
+      "connection": "Controller binding",
+      "currentConnection": "Current connection",
+      "inactiveConnection": "Connection or revision changed",
+      "enroll": "Enroll workload access",
+      "enrolled": "Workload access enrolled",
+      "revoke": "Revoke imported grant",
+      "preparing": "Checking the saved controller read…",
+      "sourceUnavailable": "This read cannot currently prove an enrollment target. Refresh the site and perform a new controller getCluster read.",
+      "empty": "No imported access grants",
+      "emptyHelp": "Open a successful controller getCluster operation to enroll a cluster created outside Astro.",
+      "enrollHelp": "Enroll this exact observed cluster for workload credential ownership checks. This does not download credentials or change native infrastructure.",
+      "revokeHelp": "Withdraw this imported grant. Independent native CRD or Astro create-receipt ownership can still authorize access. Re-enrollment requires a successful controller read completed after revocation.",
+      "review": "Site {site}, site version {siteVersion}. Native cluster UUID: {cluster}.",
+      "sourceReview": "Controller read {source}, observation version {version}.",
+      "bindingReview": "Imported binding {binding}, binding version {version}.",
+      "writeFailed": "The grant outcome could not be confirmed. Refresh the grant list before reviewing a retry."
     }
   }
 }

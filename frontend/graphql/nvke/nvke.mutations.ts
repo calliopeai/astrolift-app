@@ -1,5 +1,34 @@
 import { gql } from "@apollo/client";
-import { NVKE_OPERATION_FIELDS, NVKE_SITE_FIELDS } from "./nvke.queries";
+import { NVKE_ACCESS_FIELDS, NVKE_OPERATION_FIELDS, NVKE_SITE_FIELDS } from "./nvke.queries";
+
+export const ENROLL_NVKE_ACCESS = gql`
+  mutation EnrollNvkeAccess($input: EnrollNvkeWorkloadAccessInput!) {
+    enrollNvkeWorkloadAccess(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeAccessFields
+      }
+    }
+  }
+  ${NVKE_ACCESS_FIELDS}
+`;
+export const REVOKE_NVKE_ACCESS = gql`
+  mutation RevokeNvkeAccess($input: RevokeNvkeWorkloadAccessInput!) {
+    revokeNvkeWorkloadAccess(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeAccessFields
+      }
+    }
+  }
+  ${NVKE_ACCESS_FIELDS}
+`;
 
 export const CREATE_NVKE_SITE = gql`
   mutation CreateNvkeSite($input: CreateNvkeSiteInput!) {

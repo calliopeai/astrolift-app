@@ -237,5 +237,12 @@ Enrollment performs no native writes and does not download a credential. Every
 Secret owner reference, exact native cluster-ID label, admin mode, namespace,
 and cluster-name label. Unlabelled legacy Secrets remain refused. The paired CLI
 exposes `astro nvke access list`, `enroll`, and `revoke` with explicit reviewed
-site/source/binding versions. Browser controls and certificate renewal automation
-remain pending.
+site/source/binding versions. The site's Imported workload access panel pages
+binding metadata and supports reviewed revocation. To enroll, open a successful
+controller `getCluster` operation and select Enroll workload access. The browser
+prepares the exact UUID from the saved resource observation without downloading
+the native result. Its confirmation names the site/version, native cluster UUID,
+and source operation/version. A changed source or caller invalidates the review;
+an unconfirmed write requires refreshing the grant list before reviewing a retry.
+No grant command downloads credentials. Certificate renewal automation remains
+pending.

@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { nvkeInventoryHref } from "@/lib/nvke/inventory";
 
 import { NvkeDiagnosticsPanel } from "./NvkeDiagnosticsPanel";
+import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { nvkeFinished, type NvkeOperationScreenProps } from "./types";
 
 export function NvkeOperationScreen({
@@ -29,6 +30,7 @@ export function NvkeOperationScreen({
   onResume,
   onDownload,
   diagnostics,
+  workloadAccess,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
   const [confirm, setConfirm] = useState<"cancel" | "resume" | "download" | null>(null);
@@ -148,6 +150,7 @@ export function NvkeOperationScreen({
         ]}
       />
       {diagnostics && <NvkeDiagnosticsPanel {...diagnostics} />}
+      {workloadAccess && <NvkeWorkloadAccessPanel {...workloadAccess} />}
       <p className="text-muted-foreground text-sm">{t("resultHelp")}</p>
       <ConfirmDialog
         open={Boolean(confirm)}

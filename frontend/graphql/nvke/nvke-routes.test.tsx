@@ -109,6 +109,14 @@ function harness(
                 };
               if (operation.operationName === "ListNvkeOperations")
                 return { astroliftNvkeOperations: { items: [], nextCursor: null, totalCount: 0 } };
+              if (operation.operationName === "ListNvkeAccess")
+                return {
+                  astroliftNvkeWorkloadAccessBindings: {
+                    items: [],
+                    nextCursor: null,
+                    totalCount: 0,
+                  },
+                };
               return respond(operation);
             })
             .then((data) => {

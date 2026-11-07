@@ -20,7 +20,38 @@ const stories = [
   "screens-nvke-diagnostics--control-plane",
   "screens-nvke-diagnostics--history",
   "screens-nvke-operation--diagnostics",
+  "screens-nvke-workload-access--full",
+  "screens-nvke-workload-access--read-only",
+  "screens-nvke-workload-access--empty",
+  "screens-nvke-workload-access--failure",
+  "screens-nvke-operation--imported-access",
+  "screens-nvke-site--imported-access",
 ];
+
+test("nvke imported enrollment names the exact cluster and reviewed source", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-workload-access--full&viewMode=story");
+  await page.getByRole("button", { name: "Enroll workload access", exact: true }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("123e4567-e89b-12d3-a456-426614174088");
+  await expect(dialog).toContainText("NICo research fleet, site version 7");
+  await expect(dialog).toContainText("observation version 9");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+});
+test("nvke imported revocation explains independent ownership sources", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-workload-access--full&viewMode=story");
+  await page
+    .getByRole("row")
+    .filter({ has: page.locator("code", { hasText: "123e4567-e89b-12d3-a456-426614174088" }) })
+    .getByRole("button")
+    .click();
+  await page.getByRole("menuitem", { name: "Revoke imported grant" }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("Independent native CRD or Astro create-receipt");
+  await expect(dialog).toContainText("binding version 1");
+  await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+});
 for (const mode of ["light", "dark"]) {
   for (const id of stories) {
     test(`nvke accessibility ${id} in ${mode}`, async ({ page }) => {

@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 import { NvkeNativePanel } from "./NvkeNativePanel";
+import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { connectionSchema } from "./schema";
 import {
   fixedNvkeTable,
@@ -291,6 +292,7 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
         {...props}
         access={{ ...access, loading: access.loading || Boolean(error) }}
       />
+      {props.workloadAccess && <NvkeWorkloadAccessPanel {...props.workloadAccess} />}
       <Section title={t("operations")} description={t("operationsHelp")}>
         <ListPage
           embedded

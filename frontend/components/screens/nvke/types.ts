@@ -1,4 +1,5 @@
 import type { NvkeDiagnosticsPanelProps } from "./NvkeDiagnosticsPanel";
+import type { NvkeWorkloadAccessPanelProps } from "./NvkeWorkloadAccessPanel";
 import type { CursorTableController } from "@/components/data-table";
 import type {
   GetNvkeContractQuery,
@@ -144,6 +145,7 @@ export interface NvkeSitesScreenProps {
   onCreate: (values: NvkeCreateValues) => Promise<boolean>;
 }
 export interface NvkeSiteScreenProps {
+  workloadAccess?: NvkeWorkloadAccessPanelProps | null;
   site: NvkeSiteView | null;
   loading: boolean;
   error: string | null;
@@ -163,6 +165,7 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  workloadAccess?: NvkeWorkloadAccessPanelProps | null;
   diagnostics?: NvkeDiagnosticsPanelProps | null;
   operation: NvkeOperationView | null;
   siteName: string;

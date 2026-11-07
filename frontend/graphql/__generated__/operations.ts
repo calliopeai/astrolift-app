@@ -21088,6 +21088,20 @@ export type GetModelSubscriptionMetricsQueryVariables = Exact<{
 
 export type GetModelSubscriptionMetricsQuery = { astroliftModelSubscriptionMetrics?: { serviceId: string, clusterId: string, subscriptionId: string, start: string, end: string, retrievedAt: string, stepSeconds: number, scope: string, metrics: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> } | null };
 
+export type EnrollNvkeAccessMutationVariables = Exact<{
+  input: EnrollNvkeWorkloadAccessInput;
+}>;
+
+
+export type EnrollNvkeAccessMutation = { enrollNvkeWorkloadAccess: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, controllerConnectionId: string, sourceOperationId: string, clusterId: string, upstreamRevision: string, createdAt: string, deletedAt?: string | null } | null } };
+
+export type RevokeNvkeAccessMutationVariables = Exact<{
+  input: RevokeNvkeWorkloadAccessInput;
+}>;
+
+
+export type RevokeNvkeAccessMutation = { revokeNvkeWorkloadAccess: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, controllerConnectionId: string, sourceOperationId: string, clusterId: string, upstreamRevision: string, createdAt: string, deletedAt?: string | null } | null } };
+
 export type CreateNvkeSiteMutationVariables = Exact<{
   input: CreateNvkeSiteInput;
 }>;
@@ -21157,6 +21171,17 @@ export type RequestNvkeResourceOperationMutationVariables = Exact<{
 
 
 export type RequestNvkeResourceOperationMutation = { requestNvkeResourceOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
+export type NvkeAccessFieldsFragment = { id: string, version: number, siteId: string, controllerConnectionId: string, sourceOperationId: string, clusterId: string, upstreamRevision: string, createdAt: string, deletedAt?: string | null };
+
+export type ListNvkeAccessQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type ListNvkeAccessQuery = { astroliftNvkeWorkloadAccessBindings: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, siteId: string, controllerConnectionId: string, sourceOperationId: string, clusterId: string, upstreamRevision: string, createdAt: string, deletedAt?: string | null }> } };
 
 export type NvkeSiteFieldsFragment = { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> };
 

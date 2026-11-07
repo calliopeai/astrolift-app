@@ -366,6 +366,15 @@ def test_enrollment_is_explicit_durable_private_and_revocable(configured):
     source, name, identity = observed(configured)
     assert operations.trusted_cluster_ids(source, name) == frozenset()
     with context(configured.world):
+        from astrolift_clusters import nvke_resource_operations
+
+        preview = nvke_resource_operations.editor(
+            site_id=configured.site.guid,
+            expected_actor_id=configured.world.user.pk,
+            operation_key="getCluster",
+            reference={"operation_id": str(source.guid), "version": source.version, "resource_key": None},
+        )
+        assert preview[3] == {"path": {"clusterID": identity}}
         binding = access.enroll(**enrollment(configured, source))
         assert access.enroll(**enrollment(configured, source)).pk == binding.pk
         assert access.list_bindings(configured.site.guid).count() == 1

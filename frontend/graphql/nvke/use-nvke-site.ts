@@ -32,6 +32,7 @@ import {
 } from "@/lib/nvke/recovery";
 import { admitNvkeRequest, NvkeAdmissionError } from "@/lib/nvke/admission";
 import { useNvkeContext, useNvkeEpoch } from "./nvke.hooks";
+import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { NVKE_REQUEST_CONTEXT, useNvkeRead } from "./use-scoped-read";
 import {
   GET_NVKE_SITE,
@@ -126,6 +127,12 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
       : mutation?.key === visitKey
         ? mutation.error
         : null;
+  const workloadAccess = useNvkeWorkloadAccess({
+    context,
+    scopeKey: visitKey,
+    site,
+    enabled: !loadFailed && !siteQuery.loading,
+  });
   const refresh = () => {
     setMutation(null);
     setJournalEpoch((value) => value + 1);
@@ -177,6 +184,7 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     }
   };
   return {
+    workloadAccess,
     scopeKey: visitKey,
     site,
     loading: context.loading || siteQuery.loading,

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fakeController } from "@/components/data-table/fixtures";
 import { NvkeSiteScreen } from "./NvkeSiteScreen";
+import accessStory from "./NvkeWorkloadAccessPanel.stories";
 import { SITE, SITE_DETAIL } from "./fixtures";
 
 export default {
@@ -9,6 +10,9 @@ export default {
   args: SITE_DETAIL,
 } satisfies Meta<typeof NvkeSiteScreen>;
 type Story = StoryObj<typeof NvkeSiteScreen>;
+export const ImportedAccess: Story = {
+  args: { workloadAccess: { ...accessStory.args, candidate: null } },
+};
 export const Full: Story = {};
 export const Loading: Story = { args: { site: null, loading: true } };
 export const Empty: Story = {

@@ -1,5 +1,31 @@
 import { gql } from "@apollo/client";
 
+export const NVKE_ACCESS_FIELDS = gql`
+  fragment NvkeAccessFields on NvkeWorkloadAccessBindingType {
+    id
+    version
+    siteId
+    controllerConnectionId
+    sourceOperationId
+    clusterId
+    upstreamRevision
+    createdAt
+    deletedAt
+  }
+`;
+export const LIST_NVKE_ACCESS = gql`
+  query ListNvkeAccess($siteId: GUID!, $after: String, $limit: Int = 25) {
+    astroliftNvkeWorkloadAccessBindings(siteId: $siteId, after: $after, limit: $limit) {
+      items {
+        ...NvkeAccessFields
+      }
+      nextCursor
+      totalCount
+    }
+  }
+  ${NVKE_ACCESS_FIELDS}
+`;
+
 export const NVKE_SITE_FIELDS = gql`
   fragment NvkeSiteFields on NvkeSiteType {
     id

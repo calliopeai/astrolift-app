@@ -24,6 +24,7 @@ import {
   GET_NVKE_SITE,
 } from "./nvke.queries";
 import { useNvkeDiagnostics } from "./use-nvke-diagnostics";
+import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
 
 export const useNvkeOperation = (
@@ -88,6 +89,13 @@ export const useNvkeOperation = (
     operation,
     enabled: canAct,
   });
+  const workloadAccess = useNvkeWorkloadAccess({
+    context,
+    scopeKey: visitKey,
+    site: site.data?.astroliftNvkeSite?.id === siteId ? site.data.astroliftNvkeSite : null,
+    operation,
+    enabled: canAct,
+  });
   const [mutation, setMutation] = useState<{
     key: string;
     pending: boolean;
@@ -146,6 +154,7 @@ export const useNvkeOperation = (
     scopeKey: visitKey,
     operation,
     diagnostics,
+    workloadAccess,
     siteName: site.data?.astroliftNvkeSite?.name ?? "",
     loading,
     error: failed ? t("readFailed") : mutation?.key === visitKey ? mutation.error : null,
