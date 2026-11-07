@@ -10839,6 +10839,7 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  requestNvkeInventory(input: RequestNvkeOperationTextInput!): NvkeOperationTypeMutationResult!
   requestNvkeOperationText(input: RequestNvkeOperationTextInput!): NvkeOperationTypeMutationResult!
   requestNvkeOperation(input: RequestNvkeOperationInput!): NvkeOperationTypeMutationResult!
   cancelNvkeOperation(input: CancelNvkeOperationInput!): NvkeOperationTypeMutationResult!
@@ -11308,6 +11309,16 @@ type NvkeActionType {
   path: String!
 }
 
+type NvkeCollectionType {
+  key: String!
+  surface: NvkeSurface!
+  resourceKind: String!
+  namespaced: Boolean!
+  permission: String!
+  defaultParametersText: String!
+  actions: [NvkeActionType!]!
+}
+
 type NvkeConnectionType {
   id: GUID!
   version: Int!
@@ -11326,6 +11337,7 @@ type NvkeContractType {
   actions: [NvkeActionType!]!
   controllerOpenapi: JSON!
   resources: [NvkeResourceSchemaType!]!
+  collections: [NvkeCollectionType!]!
 }
 
 input NvkeCredentialsInput {
@@ -11333,6 +11345,36 @@ input NvkeCredentialsInput {
   caPem: String! = ""
   clientCertificatePem: String! = ""
   clientKeyPem: String! = ""
+}
+
+type NvkeInventoryItemType {
+  key: String!
+  identity: String!
+  name: String!
+  uid: String!
+  namespace: String!
+  resourceVersion: String!
+  generation: String!
+  kubernetesVersion: String!
+  desiredCount: String!
+  conditions: [NvkeNativeConditionType!]!
+  conditionsOmitted: Int!
+}
+
+type NvkeInventoryPageType {
+  items: [NvkeInventoryItemType!]!
+  nextCursor: String
+  totalCount: Int!
+  operationId: GUID!
+  observedAt: DateTime
+  collection: NvkeCollectionType!
+  resourceVersion: String!
+  nativePageCount: Int!
+}
+
+type NvkeNativeConditionType {
+  name: String!
+  status: String!
 }
 
 enum NvkeOperationStatus {
@@ -11352,6 +11394,7 @@ type NvkeOperationType {
   siteId: GUID!
   requestId: String!
   operationKey: String!
+  isInventory: Boolean!
   status: NvkeOperationStatus!
   stage: String!
   generation: Int!
@@ -12114,6 +12157,8 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeInventoryPage(operationId: GUID!, expectedActorId: Int!, after: String = null, limit: Int! = 50, search: String! = ""): NvkeInventoryPageType!
+  astroliftNvkeInventoryDocumentText(operationId: GUID!, expectedActorId: Int!, resourceKey: String!): StrMutationResult!
   astroliftNvkeRequest(siteId: GUID!, requestId: String!): NvkeOperationType
   astroliftNvkeContract: NvkeContractType!
   astroliftNvkeOperations(siteId: GUID!, after: String = null, limit: Int! = 50): NvkeOperationTypePage!

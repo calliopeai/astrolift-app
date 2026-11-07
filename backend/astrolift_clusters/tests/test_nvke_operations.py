@@ -298,8 +298,20 @@ def datastore_site(world):
     with open_connection(
         connection, namespace=site.organization_namespace, checkpoint=lambda: None
     ) as client:
-        page = client.list("MachineImage", label_selector=f"astrolift.test/run={site.guid}")
-        for item in page.data["items"]:
+        items = []
+        token = ""
+        while True:
+            page = client.list(
+                "MachineImage",
+                page_size=500,
+                continue_token=token,
+                label_selector=f"astrolift.test/run={site.guid}",
+            )
+            items.extend(page.data["items"])
+            token = page.data["metadata"].get("continue", "")
+            if not token:
+                break
+        for item in items:
             client.delete(
                 "MachineImage",
                 item["metadata"]["name"],

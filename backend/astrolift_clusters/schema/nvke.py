@@ -8,10 +8,12 @@ from functools import wraps
 import strawberry
 from nvke.client import NvkeError
 from nvke.contract import controller_spec, resource_schema, resources, upstream_revision
+from nvke.inventory import collections, resource_actions
 from nvke.operations import actions
 from strawberry.scalars import JSON
 from strawberry.types import Info
 
+from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_sites as service
 from astrolift_clusters.models import NvkeOperation
@@ -164,6 +166,7 @@ class NvkeOperationType:
     site_id: GUID
     request_id: str
     operation_key: str
+    is_inventory: bool
     status: NvkeOperationStatus
     stage: str
     generation: int
@@ -184,6 +187,7 @@ def operation_type(row):
         site_id=GUID(str(row.site.guid)),
         request_id=str(row.request_id),
         operation_key=row.operation_key,
+        is_inventory=row.authority.get("inventory") is True,
         status=NvkeOperationStatus(row.status),
         stage=row.stage,
         generation=row.generation,
@@ -216,12 +220,88 @@ class NvkeResourceSchemaType:
     schema: JSON
 
 
+def action_type(item):
+    return NvkeActionType(
+        key=item.key,
+        surface=NvkeSurface(item.surface),
+        verb=item.verb,
+        resource_kind=item.kind or (item.http.resource if item.http else ""),
+        mutates=item.mutates,
+        permission=item.permission,
+        path=item.http.path if item.http else "",
+    )
+
+
+@strawberry.type
+class NvkeCollectionType:
+    key: str
+    surface: NvkeSurface
+    resource_kind: str
+    namespaced: bool
+    permission: str
+    default_parameters_text: str
+    actions: list[NvkeActionType]
+
+
+def collection_type(item):
+    parameters = (
+        {"page_size": 500}
+        if item.surface == "datastore"
+        else {"query": {"pageSize": 500}}
+        if item.surface != "controller"
+        else {}
+    )
+    return NvkeCollectionType(
+        key=item.key,
+        surface=NvkeSurface(item.surface),
+        resource_kind=item.kind,
+        namespaced=item.namespaced,
+        permission=item.permission,
+        default_parameters_text=operations.canonical(parameters).decode(),
+        actions=[action_type(selected) for selected in resource_actions(item)],
+    )
+
+
+@strawberry.type
+class NvkeNativeConditionType:
+    name: str
+    status: str
+
+
+@strawberry.type
+class NvkeInventoryItemType:
+    key: str
+    identity: str
+    name: str
+    uid: str
+    namespace: str
+    resource_version: str
+    generation: str
+    kubernetes_version: str
+    desired_count: str
+    conditions: list[NvkeNativeConditionType]
+    conditions_omitted: int
+
+
+@strawberry.type
+class NvkeInventoryPageType:
+    items: list[NvkeInventoryItemType]
+    next_cursor: str | None
+    total_count: int
+    operation_id: GUID
+    observed_at: datetime | None
+    collection: NvkeCollectionType
+    resource_version: str
+    native_page_count: int
+
+
 @strawberry.type
 class NvkeContractType:
     revision: str
     actions: list[NvkeActionType]
     controller_openapi: JSON
     resources: list[NvkeResourceSchemaType]
+    collections: list[NvkeCollectionType]
 
 
 @strawberry.input
@@ -262,6 +342,60 @@ class NvkeQuery:
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()
+    def astrolift_nvke_inventory_page(
+        self,
+        info: Info,
+        operation_id: GUID,
+        expected_actor_id: int,
+        after: str | None = None,
+        limit: int = 50,
+        search: str = "",
+    ) -> NvkeInventoryPageType:
+        row, selected, items, cursor, total, data = inventory.page(
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            after=after,
+            limit=limit,
+            search=search,
+        )
+        return NvkeInventoryPageType(
+            items=[
+                NvkeInventoryItemType(
+                    **{
+                        **asdict(item),
+                        "conditions": [
+                            NvkeNativeConditionType(name=name, status=status)
+                            for name, status in item.conditions
+                        ],
+                    }
+                )
+                for item in items
+            ],
+            next_cursor=cursor,
+            total_count=total,
+            operation_id=GUID(str(row.guid)),
+            observed_at=row.finished_at,
+            collection=collection_type(selected),
+            resource_version=data["resource_version"],
+            native_page_count=data["native_page_count"],
+        )
+
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_inventory_document_text(
+        self, info: Info, operation_id: GUID, expected_actor_id: int, resource_key: str
+    ) -> MutationResultType[str]:
+        return success(
+            inventory.document(
+                operation_id=str(operation_id), expected_actor_id=expected_actor_id, resource_key=resource_key
+            )
+        )
+
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
     def astrolift_nvke_request(self, info: Info, site_id: GUID, request_id: str) -> NvkeOperationType | None:
         try:
             row = operations.read_request(site_id=str(site_id), request_id=request_id)
@@ -297,6 +431,7 @@ class NvkeQuery:
                 )
                 for item in resources()
             ],
+            collections=[collection_type(item) for item in collections()],
         )
 
     @strawberry.field
@@ -369,6 +504,17 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.inventory_request", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @tenant_scoped()
+    def request_nvke_inventory(
+        self, info: Info, input: RequestNvkeOperationTextInput
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(operations.reserve_text(**asdict(input), inventory=True)))
+
     @strawberry.mutation
     @mutation_audit(
         action="nvke.operation_request_text",

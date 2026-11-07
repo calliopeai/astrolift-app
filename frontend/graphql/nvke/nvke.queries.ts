@@ -55,6 +55,7 @@ export const NVKE_OPERATION_FIELDS = gql`
     siteId
     requestId
     operationKey
+    isInventory
     status
     stage
     generation
@@ -108,6 +109,23 @@ export const GET_NVKE_CONTRACT = gql`
   query GetNvkeContract {
     astroliftNvkeContract {
       revision
+      collections {
+        key
+        surface
+        resourceKind
+        namespaced
+        permission
+        defaultParametersText
+        actions {
+          key
+          surface
+          verb
+          resourceKind
+          mutates
+          permission
+          path
+        }
+      }
       actions {
         key
         surface
@@ -147,6 +165,85 @@ export const GET_NVKE_REQUEST = gql`
 export const GET_NVKE_OPERATION_RESULT_TEXT = gql`
   query GetNvkeOperationResultText($operationId: GUID!) {
     astroliftNvkeOperationResultText(operationId: $operationId) {
+      ok
+      errors {
+        code
+        message
+      }
+      data
+    }
+  }
+`;
+
+export const LIST_NVKE_INVENTORY_PAGE = gql`
+  query ListNvkeInventoryPage(
+    $operationId: GUID!
+    $expectedActorId: Int!
+    $after: String
+    $limit: Int = 50
+    $search: String = ""
+  ) {
+    astroliftNvkeInventoryPage(
+      operationId: $operationId
+      expectedActorId: $expectedActorId
+      after: $after
+      limit: $limit
+      search: $search
+    ) {
+      items {
+        key
+        identity
+        name
+        uid
+        namespace
+        resourceVersion
+        generation
+        kubernetesVersion
+        desiredCount
+        conditions {
+          name
+          status
+        }
+        conditionsOmitted
+      }
+      nextCursor
+      totalCount
+      operationId
+      observedAt
+      resourceVersion
+      nativePageCount
+      collection {
+        key
+        surface
+        resourceKind
+        namespaced
+        permission
+        defaultParametersText
+        actions {
+          key
+          surface
+          verb
+          resourceKind
+          mutates
+          permission
+          path
+        }
+      }
+    }
+  }
+`;
+
+export const GET_NVKE_INVENTORY_DOCUMENT_TEXT = gql`
+  query GetNvkeInventoryDocumentText(
+    $operationId: GUID!
+    $expectedActorId: Int!
+    $resourceKey: String!
+  ) {
+    astroliftNvkeInventoryDocumentText(
+      operationId: $operationId
+      expectedActorId: $expectedActorId
+      resourceKey: $resourceKey
+    ) {
       ok
       errors {
         code

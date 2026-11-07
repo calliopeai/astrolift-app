@@ -128,3 +128,19 @@ export const REQUEST_NVKE_OPERATION_TEXT = gql`
   }
   ${NVKE_OPERATION_FIELDS}
 `;
+
+export const REQUEST_NVKE_INVENTORY = gql`
+  mutation RequestNvkeInventory($input: RequestNvkeOperationTextInput!) {
+    requestNvkeInventory(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;

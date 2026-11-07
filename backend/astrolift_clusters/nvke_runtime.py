@@ -9,6 +9,7 @@ from django.db import connection as database
 from django.db.models import F
 from django.utils import timezone
 from nvke.client import NvkeError
+from nvke.inventory import collect as collect_inventory
 from nvke.lifecycle import cluster_ready, contains, declarative_ready, pool_ready
 from nvke.operations import action, execute_action
 
@@ -270,6 +271,10 @@ def attempt(row_id, generation, *, execution):
                 or current.terminal
             ):
                 raise NvkeError("EXECUTION_REFUSED", "NVKE execution authority changed")
+            if timezone.now() >= current.deadline:
+                raise NvkeError("DEADLINE_EXCEEDED", "NVKE operation deadline was reached")
+            if not selected.mutates and current.cancellation_requested_at:
+                raise NvkeError("OPERATION_CANCELLED", "NVKE read cancellation was requested")
             return outbox.checkpoint(row)
 
         connection = fence()
@@ -277,7 +282,11 @@ def attempt(row_id, generation, *, execution):
             connection, namespace=row.site.organization_namespace, checkpoint=fence
         ) as client:
             if not selected.mutates:
-                response = execute_action(client, selected, request)
+                response = (
+                    collect_inventory(client, selected.key, request, row.site.organization_namespace)
+                    if row.authority.get("inventory") is True
+                    else execute_action(client, selected, request)
+                )
                 return _state(row, "succeeded", "read_complete", progress={"response": asdict(response)})
             if not progress.get("sending"):
                 progress = _preflight(client, selected, request)
@@ -298,6 +307,8 @@ def attempt(row_id, generation, *, execution):
     except (NvkeError, NvkeSiteError) as exc:
         if not isinstance(exc, NvkeError):
             exc = NvkeError(exc.code, str(exc))
+        if exc.code == "OPERATION_CANCELLED" and not progress.get("sending"):
+            return _state(row, "cancelled", "cancelled_between_reads")
         if applying and not exc.ambiguous:
             return _state(row, "failed", "request_refused", error=exc)
         if progress.get("sending") or exc.ambiguous:

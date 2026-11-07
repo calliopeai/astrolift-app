@@ -10101,6 +10101,7 @@ export type Mutation = {
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestModelConnection: ModelConnectionRequestMutationResult;
+  requestNvkeInventory: NvkeOperationTypeMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestNvkeOperationText: NvkeOperationTypeMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
@@ -11806,6 +11807,11 @@ export type MutationRequestModelConnectionArgs = {
 };
 
 
+export type MutationRequestNvkeInventoryArgs = {
+  input: RequestNvkeOperationTextInput;
+};
+
+
 export type MutationRequestNvkeOperationArgs = {
   input: RequestNvkeOperationInput;
 };
@@ -12913,6 +12919,16 @@ export type NvkeActionType = {
   verb: Scalars['String']['output'];
 };
 
+export type NvkeCollectionType = {
+  actions: Array<NvkeActionType>;
+  defaultParametersText: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  namespaced: Scalars['Boolean']['output'];
+  permission: Scalars['String']['output'];
+  resourceKind: Scalars['String']['output'];
+  surface: NvkeSurface;
+};
+
 export type NvkeConnectionType = {
   allowHttp: Scalars['Boolean']['output'];
   endpoint: Scalars['String']['output'];
@@ -12928,6 +12944,7 @@ export type NvkeConnectionType = {
 
 export type NvkeContractType = {
   actions: Array<NvkeActionType>;
+  collections: Array<NvkeCollectionType>;
   controllerOpenapi: Scalars['JSON']['output'];
   resources: Array<NvkeResourceSchemaType>;
   revision: Scalars['String']['output'];
@@ -12938,6 +12955,36 @@ export type NvkeCredentialsInput = {
   clientCertificatePem: Scalars['String']['input'];
   clientKeyPem: Scalars['String']['input'];
   token: Scalars['String']['input'];
+};
+
+export type NvkeInventoryItemType = {
+  conditions: Array<NvkeNativeConditionType>;
+  conditionsOmitted: Scalars['Int']['output'];
+  desiredCount: Scalars['String']['output'];
+  generation: Scalars['String']['output'];
+  identity: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  kubernetesVersion: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+  resourceVersion: Scalars['String']['output'];
+  uid: Scalars['String']['output'];
+};
+
+export type NvkeInventoryPageType = {
+  collection: NvkeCollectionType;
+  items: Array<NvkeInventoryItemType>;
+  nativePageCount: Scalars['Int']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationId: Scalars['GUID']['output'];
+  resourceVersion: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type NvkeNativeConditionType = {
+  name: Scalars['String']['output'];
+  status: Scalars['String']['output'];
 };
 
 export type NvkeOperationStatus =
@@ -12959,6 +13006,7 @@ export type NvkeOperationType = {
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   generation: Scalars['Int']['output'];
   id: Scalars['GUID']['output'];
+  isInventory: Scalars['Boolean']['output'];
   operationKey: Scalars['String']['output'];
   requestId: Scalars['String']['output'];
   siteId: Scalars['GUID']['output'];
@@ -13604,6 +13652,8 @@ export type Query = {
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
   astroliftNvkeContract: NvkeContractType;
+  astroliftNvkeInventoryDocumentText: StrMutationResult;
+  astroliftNvkeInventoryPage: NvkeInventoryPageType;
   astroliftNvkeOperation?: Maybe<NvkeOperationType>;
   astroliftNvkeOperationResult: JsonMutationResult;
   astroliftNvkeOperationResultText: StrMutationResult;
@@ -15170,6 +15220,22 @@ export type QueryAstroliftMyNotificationsArgs = {
 export type QueryAstroliftMyNotificationsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftNvkeInventoryDocumentTextArgs = {
+  expectedActorId: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  resourceKey: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftNvkeInventoryPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  expectedActorId: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  search?: Scalars['String']['input'];
 };
 
 

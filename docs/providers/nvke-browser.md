@@ -39,6 +39,28 @@ retrieval is pending blocks transmission; native admission additionally checks t
 
 ## Results and current limits
 
+The inventory API provides 18 resource collections derived from the pinned native contract.
+`requestNvkeInventory` admits a read through the existing encrypted operation outbox; its
+`isInventory` receipt distinguishes a complete collection from an ordinary native list call.
+Inventory mode participates in idempotency without changing existing native request digests
+or the 88-action registry. Callers must retain that mode when recovering a submission.
+
+The worker follows native continuation tokens while preserving filters and checking current
+authority, cancellation and deadline before each request. Duplicate identities, token cycles,
+changed Kubernetes snapshot versions and malformed continuation metadata fail the observation.
+Budgets of 100,000 resources, 2,000 pages and 48 MiB of encoded resource data fail explicitly;
+no truncated collection is reported complete. Kubernetes collections carry a native resource
+version; public/controller collections have no cross-page snapshot guarantee from upstream.
+
+After success, `astroliftNvkeInventoryPage` searches the entire encrypted observation and
+returns a server-paged metadata allowlist. Its cursors bind the organization, current actor,
+operation version, collection, search and page size. Native numeric counts remain strings.
+Condition summaries include at most 64 names/statuses and report `conditionsOmitted`; native
+condition messages, specs, annotations and credentials require an explicit document request.
+`astroliftNvkeInventoryDocumentText` returns exact JSON text for a signed resource key only
+after rechecking current organization membership and the collection's native permission.
+Observation timestamps describe historical reads and do not establish current readiness.
+
 Results are fetched only after explicit confirmation and downloaded as JSON text, preserving
 native integer values. Treat these files as sensitive: native responses may contain credentials
 or kubeconfigs. No result is automatically fetched when opening an operation page.

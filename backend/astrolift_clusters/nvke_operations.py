@@ -15,6 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 from nvke.client import MAX_REQUEST_BYTES, NvkeError
 from nvke.contract import upstream_revision
+from nvke.inventory import validate_inventory_request
 from nvke.operations import action, validate_request
 
 from astrolift_clusters import nvke_sites as sites
@@ -77,7 +78,16 @@ def connection_digest(row):
     ).hexdigest()
 
 
-def reserve(*, site_id, expected_site_version, request_id, operation_key, parameters, timeout_seconds=7200):
+def reserve(
+    *,
+    site_id,
+    expected_site_version,
+    request_id,
+    operation_key,
+    parameters,
+    timeout_seconds=7200,
+    inventory=False,
+):
     selected = action(operation_key)
     org, actor = sites.authorized(Permission(selected.permission))
     try:
@@ -90,17 +100,18 @@ def reserve(*, site_id, expected_site_version, request_id, operation_key, parame
     parameters = json.loads(payload)
     with transaction.atomic():
         site = sites.site_row(site_id, org, locked=True)
+        reviewed = {
+            "site": str(site.guid),
+            "version": expected_site_version,
+            "key": operation_key,
+            "parameters": parameters,
+            "timeout": timeout_seconds,
+        }
+        if inventory:
+            reviewed["inventory"] = True
         digest = hmac.new(
             str(settings.SECRET_KEY).encode(),
-            canonical(
-                {
-                    "site": str(site.guid),
-                    "version": expected_site_version,
-                    "key": operation_key,
-                    "parameters": parameters,
-                    "timeout": timeout_seconds,
-                }
-            ),
+            canonical(reviewed),
             hashlib.sha256,
         ).hexdigest()
         existing = (
@@ -118,6 +129,8 @@ def reserve(*, site_id, expected_site_version, request_id, operation_key, parame
         if not site.is_active or site.upstream_revision != upstream_revision():
             raise NvkeError("SOURCE_CHANGED", "NVKE site is disabled or requires contract review")
         validate_request(operation_key, parameters, site.organization_namespace)
+        if inventory:
+            validate_inventory_request(operation_key, parameters)
         connection = NvkeConnection.objects.filter(
             site=site, surface=selected.surface, is_enabled=True
         ).first()
@@ -139,6 +152,7 @@ def reserve(*, site_id, expected_site_version, request_id, operation_key, parame
                 "token_id": str(token.guid) if token is not None else None,
                 "revision": upstream_revision(),
                 "organization_namespace": site.organization_namespace,
+                **({"inventory": True} if inventory else {}),
             },
             input_backend_kind=sealed.backend_kind,
             input_ciphertext=sealed.backend_ref,
