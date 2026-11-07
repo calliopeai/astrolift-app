@@ -82,6 +82,36 @@ class NvkeConnection(BaseCoreModel):
         ]
 
 
+class NvkeTemporalAuthority(BaseCoreModel):
+    site = models.ForeignKey(NvkeSite, on_delete=models.PROTECT, related_name="temporal_authorities")
+    address = models.CharField(max_length=512)
+    namespace = models.CharField(max_length=255)
+    task_queue = models.CharField(max_length=255)
+    server_name = models.CharField(max_length=253, blank=True, default="")
+    use_tls = models.BooleanField(default=True)
+    is_enabled = models.BooleanField(default=True)
+    timeout_seconds = models.PositiveIntegerField(default=30)
+    credential_backend_kind = models.CharField(max_length=32, blank=True, default="")
+    credential_ciphertext = models.BinaryField(default=bytes)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verification_code = models.CharField(max_length=64, blank=True, default="")
+
+    def save(self, *args, **kwargs):
+        _immutable(self, "site_id")
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["site"], condition=models.Q(deleted_at__isnull=True), name="nvke_temporal_site_live"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(timeout_seconds__gte=1, timeout_seconds__lte=300),
+                name="nvke_temporal_timeout",
+            ),
+        ]
+
+
 class NvkeWorkloadAccessBinding(BaseCoreModel):
     site = models.ForeignKey(NvkeSite, on_delete=models.PROTECT, related_name="workload_access_bindings")
     controller_connection = models.ForeignKey(NvkeConnection, on_delete=models.PROTECT, related_name="+")

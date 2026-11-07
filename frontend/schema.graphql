@@ -8281,6 +8281,20 @@ input ConfigureNvkeConnectionInput {
   timeoutSeconds: Int! = 30
 }
 
+input ConfigureNvkeTemporalAuthorityInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+  address: String!
+  namespace: String!
+  taskQueue: String!
+  serverName: String! = ""
+  useTls: Boolean! = true
+  timeoutSeconds: Int! = 30
+  credentials: NvkeTemporalCredentialsInput = null
+}
+
 input ConfigureProviderPluginInput {
   pluginSlug: String!
   config: JSON!
@@ -10847,6 +10861,10 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  configureNvkeTemporalAuthority(input: ConfigureNvkeTemporalAuthorityInput!): NvkeTemporalAuthorityTypeMutationResult!
+  setNvkeTemporalAuthorityEnabled(input: SetNvkeTemporalAuthorityEnabledInput!): NvkeTemporalAuthorityTypeMutationResult!
+  removeNvkeTemporalAuthority(input: NvkeTemporalAuthorityReviewInput!): NvkeTemporalAuthorityTypeMutationResult!
+  verifyNvkeTemporalAuthority(input: NvkeTemporalAuthorityReviewInput!): NvkeTemporalAuthorityTypeMutationResult!
   enrollNvkeWorkloadAccess(input: EnrollNvkeWorkloadAccessInput!): NvkeWorkloadAccessBindingTypeMutationResult!
   revokeNvkeWorkloadAccess(input: RevokeNvkeWorkloadAccessInput!): NvkeWorkloadAccessBindingTypeMutationResult!
   requestNvkeResourceOperation(input: RequestNvkeResourceOperationInput!): NvkeOperationTypeMutationResult!
@@ -11362,6 +11380,7 @@ type NvkeContractType {
   controllerOpenapi: JSON!
   resources: [NvkeResourceSchemaType!]!
   collections: [NvkeCollectionType!]!
+  nativeWorkflows: [NvkeNativeWorkflowType!]!
 }
 
 input NvkeCredentialsInput {
@@ -11490,6 +11509,14 @@ type NvkeNativeConditionType {
   status: String!
 }
 
+type NvkeNativeWorkflowType {
+  name: String!
+  inputType: String!
+  source: String!
+  permission: String!
+  inputSchema: JSON!
+}
+
 enum NvkeOperationStatus {
   QUEUED
   RUNNING
@@ -11612,6 +11639,44 @@ enum NvkeSurface {
   TENANT
   OPERATOR
   DATASTORE
+}
+
+input NvkeTemporalAuthorityReviewInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+}
+
+type NvkeTemporalAuthorityType {
+  id: GUID!
+  version: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  address: String!
+  namespace: String!
+  taskQueue: String!
+  serverName: String!
+  useTls: Boolean!
+  isEnabled: Boolean!
+  timeoutSeconds: Int!
+  hasCredentials: Boolean!
+  verifiedAt: DateTime
+  verificationCode: String!
+  deletedAt: DateTime
+}
+
+type NvkeTemporalAuthorityTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeTemporalAuthorityType
+}
+
+input NvkeTemporalCredentialsInput {
+  apiKey: String! = ""
+  caPem: String! = ""
+  clientCertificatePem: String! = ""
+  clientKeyPem: String! = ""
 }
 
 type NvkeWorkloadAccessBindingType {
@@ -12326,6 +12391,7 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeTemporalAuthority(siteId: GUID!): NvkeTemporalAuthorityType
   astroliftNvkeMaintenanceObservation(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!): NvkeMaintenanceObservationType!
   astroliftNvkeWorkloadAccessBindings(siteId: GUID!, after: String = null, limit: Int! = 50): NvkeWorkloadAccessBindingTypePage!
   astroliftNvkeDiagnosticPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeDiagnosticPageType!
@@ -13498,6 +13564,14 @@ input SetNotificationQuietHoursInput {
 input SetNvkeSiteEnabledInput {
   siteId: GUID!
   expectedSiteVersion: Int!
+  enabled: Boolean!
+}
+
+input SetNvkeTemporalAuthorityEnabledInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
   enabled: Boolean!
 }
 

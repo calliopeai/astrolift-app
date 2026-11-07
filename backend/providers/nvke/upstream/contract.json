@@ -158,11 +158,15 @@
     "controller/api/openapi.yaml": "eef81b49bfcaae31c8008f2c305d838d81b5d053a39650d8a470d3cdbbe1fc3c",
     "controller/docs/certificate-renewal.md": "1953d29f34eeecd9bd19b33896d34c80898c375164bb16c66ff898475832fb2a",
     "controller/docs/credential-monitoring.md": "94f589c8d4bce2050f3ef32ad3fdad334e4849da6de8df54b13af50ec64f697d",
+    "controller/docs/etcd-encryption-key-rotation.md": "9359a1123fc8a6d8b6d88b671b6163da56bdcdef3bb36a64ebc7f7dc15a7c331",
     "controller/internal/controllers/certrenewal/controller.go": "c8c4a8d781202e5e19343080c8dd45da9ce1dd30bb50de1a46047e4da13ef29b",
     "controller/internal/controllers/tenantaccess/breakglass.go": "5d661540a718952e0850485287d6fd3585e01c035c6530761ba0a0201cbf6a2d",
     "controller/internal/db/clusters.go": "f912a316a1f8ed61b6c70bb185f708f692e1511fe2fa7c594e55eae666cf8a10",
     "controller/internal/db/etcd_key_rotation.go": "2dfd3d41e8274e7f2492f5b7ca10a39665449239abd15a33bafcecf1005c3da5",
+    "controller/internal/temporal/register.go": "4fe82aba21fc1e1c0e1ecc761596ca45bfba046794ccb390404270e057b2c7f8",
     "controller/internal/temporal/workflows/renew_k8s_certs.go": "a0f444039848f0c5bd29bbf18d8ed0d21b2baa8f1d6ca8284bd50ca840539fe4",
+    "controller/internal/temporal/workflows/retire_lost_etcd_rotation_node.go": "619c243b35ea43d4799303d78b92ebecde8ef59b8d3b550fed1aab581a2acc84",
+    "controller/internal/temporal/workflows/rotate_etcd_encryption_key.go": "8ff32e3fc1fc8a6f0d4fc5f28d60df940dc70fc47b5b665111dfacb3ad247b12",
     "docs/nktp/architecture/backpressure.md": "790438f3d6ca6dbdefa98198a7a6a3c241d649a7268d5f6d956e232347a2d448",
     "docs/nktp/architecture/self-telemetry.md": "2222a59cfd11ddc89d73c4e7e54f063a3ddb188d4501c2937f5754109c0141fe",
     "docs/nktp/architecture/topology.md": "e8263cc9d0dc03e785c4a11c09be6e89db08491c68283a3de43567568b864154",
@@ -9452,6 +9456,109 @@
           "shorthand": "v"
         }
       ]
+    }
+  ],
+  "native_workflows": [
+    {
+      "name": "RenewK8sCertsV2",
+      "input_type": "RenewK8sCertsInput",
+      "source": "controller/internal/temporal/workflows/renew_k8s_certs.go",
+      "permission": "nvke.admin",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "clusterID",
+          "thresholdDays"
+        ],
+        "properties": {
+          "clusterID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "thresholdDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "force": {
+            "type": "boolean",
+            "default": false
+          },
+          "scheduledFor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "not": {
+          "required": [
+            "force",
+            "scheduledFor"
+          ],
+          "properties": {
+            "force": {
+              "enum": [
+                true
+              ]
+            },
+            "scheduledFor": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "RotateEtcdEncryptionKey",
+      "input_type": "RotateEtcdEncryptionKeyInput",
+      "source": "controller/internal/temporal/workflows/rotate_etcd_encryption_key.go",
+      "permission": "nvke.admin",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "clusterID"
+        ],
+        "properties": {
+          "clusterID": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    },
+    {
+      "name": "RetireLostEtcdRotationNode",
+      "input_type": "RetireLostEtcdRotationNodeInput",
+      "source": "controller/internal/temporal/workflows/retire_lost_etcd_rotation_node.go",
+      "permission": "nvke.admin",
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "clusterID",
+          "rotationWorkflowID",
+          "nodeID"
+        ],
+        "properties": {
+          "clusterID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rotationWorkflowID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "nodeID": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
     }
   ]
 }

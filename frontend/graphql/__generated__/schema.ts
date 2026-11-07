@@ -7669,6 +7669,20 @@ export type ConfigureNvkeConnectionInput = {
   timeoutSeconds: Scalars['Int']['input'];
 };
 
+export type ConfigureNvkeTemporalAuthorityInput = {
+  address: Scalars['String']['input'];
+  credentials: InputMaybe<NvkeTemporalCredentialsInput>;
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  namespace: Scalars['String']['input'];
+  serverName: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  taskQueue: Scalars['String']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+  useTls: Scalars['Boolean']['input'];
+};
+
 export type ConfigureProviderPluginInput = {
   config: Scalars['JSON']['input'];
   organizationScoped: Scalars['Boolean']['input'];
@@ -9854,6 +9868,7 @@ export type Mutation = {
   commitConversationTransfer: AstroliftConversationTransferMutationResult;
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
   configureNvkeConnection: NvkeSiteTypeMutationResult;
+  configureNvkeTemporalAuthority: NvkeTemporalAuthorityTypeMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -10098,6 +10113,7 @@ export type Mutation = {
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
   removeNvkeSite: NvkeSiteTypeMutationResult;
+  removeNvkeTemporalAuthority: NvkeTemporalAuthorityTypeMutationResult;
   removeOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
   /** Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order. */
@@ -10202,6 +10218,7 @@ export type Mutation = {
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   setNotificationQuietHours: AstroliftNotificationQuietHoursMutationResult;
   setNvkeSiteEnabled: NvkeSiteTypeMutationResult;
+  setNvkeTemporalAuthorityEnabled: NvkeTemporalAuthorityTypeMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
@@ -10322,6 +10339,7 @@ export type Mutation = {
   validateAstroliftCiSecrets: AstroliftValidateCiSecretsPayloadMutationResult;
   verifyConversationTransfer: AstroliftConversationTransferMutationResult;
   verifyManagedDomain: VerifyManagedDomainPayloadMutationResult;
+  verifyNvkeTemporalAuthority: NvkeTemporalAuthorityTypeMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
 };
 
@@ -10666,6 +10684,11 @@ export type MutationConfigureAgentTaskCallbacksArgs = {
 
 export type MutationConfigureNvkeConnectionArgs = {
   input: ConfigureNvkeConnectionInput;
+};
+
+
+export type MutationConfigureNvkeTemporalAuthorityArgs = {
+  input: ConfigureNvkeTemporalAuthorityInput;
 };
 
 
@@ -11770,6 +11793,11 @@ export type MutationRemoveNvkeSiteArgs = {
 };
 
 
+export type MutationRemoveNvkeTemporalAuthorityArgs = {
+  input: NvkeTemporalAuthorityReviewInput;
+};
+
+
 export type MutationRemoveOrgSkillRepoArgs = {
   input: RemoveOrgSkillRepoInput;
 };
@@ -12261,6 +12289,11 @@ export type MutationSetNotificationQuietHoursArgs = {
 
 export type MutationSetNvkeSiteEnabledArgs = {
   input: SetNvkeSiteEnabledInput;
+};
+
+
+export type MutationSetNvkeTemporalAuthorityEnabledArgs = {
+  input: SetNvkeTemporalAuthorityEnabledInput;
 };
 
 
@@ -12832,6 +12865,11 @@ export type MutationVerifyManagedDomainArgs = {
 };
 
 
+export type MutationVerifyNvkeTemporalAuthorityArgs = {
+  input: NvkeTemporalAuthorityReviewInput;
+};
+
+
 export type MutationWithdrawSecretChangeArgs = {
   input: WithdrawSecretChangeInput;
 };
@@ -12985,6 +13023,7 @@ export type NvkeContractType = {
   actions: Array<NvkeActionType>;
   collections: Array<NvkeCollectionType>;
   controllerOpenapi: Scalars['JSON']['output'];
+  nativeWorkflows: Array<NvkeNativeWorkflowType>;
   resources: Array<NvkeResourceSchemaType>;
   revision: Scalars['String']['output'];
 };
@@ -13115,6 +13154,14 @@ export type NvkeNativeConditionType = {
   status: Scalars['String']['output'];
 };
 
+export type NvkeNativeWorkflowType = {
+  inputSchema: Scalars['JSON']['output'];
+  inputType: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  permission: Scalars['String']['output'];
+  source: Scalars['String']['output'];
+};
+
 export type NvkeOperationStatus =
   | 'AWAITING_READY'
   | 'CANCELLED'
@@ -13228,6 +13275,44 @@ export type NvkeSurface =
   | 'DATASTORE'
   | 'OPERATOR'
   | 'TENANT';
+
+export type NvkeTemporalAuthorityReviewInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+export type NvkeTemporalAuthorityType = {
+  address: Scalars['String']['output'];
+  deletedAt?: Maybe<Scalars['DateTime']['output']>;
+  hasCredentials: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  isEnabled: Scalars['Boolean']['output'];
+  namespace: Scalars['String']['output'];
+  serverName: Scalars['String']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  taskQueue: Scalars['String']['output'];
+  timeoutSeconds: Scalars['Int']['output'];
+  useTls: Scalars['Boolean']['output'];
+  verificationCode: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeTemporalAuthorityTypeMutationResult = {
+  data?: Maybe<NvkeTemporalAuthorityType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeTemporalCredentialsInput = {
+  apiKey: Scalars['String']['input'];
+  caPem: Scalars['String']['input'];
+  clientCertificatePem: Scalars['String']['input'];
+  clientKeyPem: Scalars['String']['input'];
+};
 
 export type NvkeWorkloadAccessBindingType = {
   clusterId: Scalars['GUID']['output'];
@@ -13845,6 +13930,7 @@ export type Query = {
   astroliftNvkeResourceEditor: NvkeResourceEditorTypeMutationResult;
   astroliftNvkeSite?: Maybe<NvkeSiteType>;
   astroliftNvkeSites: NvkeSiteTypePage;
+  astroliftNvkeTemporalAuthority?: Maybe<NvkeTemporalAuthorityType>;
   astroliftNvkeWorkloadAccessBindings: NvkeWorkloadAccessBindingTypePage;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
   astroliftOrgMembersForApprovalPicker: Array<AstroliftApproverUser>;
@@ -15496,6 +15582,11 @@ export type QueryAstroliftNvkeSiteArgs = {
 export type QueryAstroliftNvkeSitesArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftNvkeTemporalAuthorityArgs = {
+  siteId: Scalars['GUID']['input'];
 };
 
 
@@ -17568,6 +17659,14 @@ export type SetNotificationQuietHoursInput = {
 export type SetNvkeSiteEnabledInput = {
   enabled: Scalars['Boolean']['input'];
   expectedSiteVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+export type SetNvkeTemporalAuthorityEnabledInput = {
+  enabled: Scalars['Boolean']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
   siteId: Scalars['GUID']['input'];
 };
 

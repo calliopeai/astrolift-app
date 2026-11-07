@@ -12,6 +12,11 @@ from typing import Any
 
 import yaml
 
+if __package__:
+    from .nvke_native_workflows import inventory as native_workflows
+else:
+    from nvke_native_workflows import inventory as native_workflows
+
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "nvke" / "upstream" / "contract.json"
 METHODS = frozenset({"get", "post", "put", "patch", "delete", "head", "options"})
@@ -110,11 +115,15 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
         "management-engine/pkg/publicapi/server.go",
         "controller/internal/db/clusters.go",
         "controller/internal/db/etcd_key_rotation.go",
+        "controller/internal/temporal/register.go",
         "controller/internal/temporal/workflows/renew_k8s_certs.go",
+        "controller/internal/temporal/workflows/rotate_etcd_encryption_key.go",
+        "controller/internal/temporal/workflows/retire_lost_etcd_rotation_node.go",
         "controller/internal/controllers/certrenewal/controller.go",
         "controller/internal/controllers/tenantaccess/breakglass.go",
         "controller/docs/certificate-renewal.md",
         "controller/docs/credential-monitoring.md",
+        "controller/docs/etcd-encryption-key-rotation.md",
         "LICENSE",
         "NOTICE",
     }
@@ -144,6 +153,7 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
         "cli_reference": command_docs,
         "cli_source_declarations": declarations,
         "cli_runtime": runtime_commands,
+        "native_workflows": native_workflows(checkout),
     }
 
 

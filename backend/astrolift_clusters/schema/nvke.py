@@ -9,6 +9,7 @@ import strawberry
 from nvke.client import NvkeError
 from nvke.contract import controller_spec, resource_schema, resources, upstream_revision
 from nvke.inventory import collections, resource_actions
+from nvke.native_workflows import workflows as native_workflows
 from nvke.operations import action, actions
 from strawberry.scalars import JSON
 from strawberry.types import Info
@@ -19,6 +20,7 @@ from astrolift_clusters import nvke_maintenance as maintenance
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_resource_operations as resource_operations
 from astrolift_clusters import nvke_sites as service
+from astrolift_clusters import nvke_temporal as native_temporal
 from astrolift_clusters import nvke_workload_access as workload_access
 from astrolift_clusters.models import NvkeOperation
 from astrolift_clusters.scopes import cluster_catalog_org_scope
@@ -149,6 +151,81 @@ class SetNvkeSiteEnabledInput:
 class RemoveNvkeSiteInput:
     site_id: GUID
     expected_site_version: int
+
+
+@strawberry.type
+class NvkeTemporalAuthorityType:
+    id: GUID
+    version: int
+    site_id: GUID
+    site_version: int
+    address: str
+    namespace: str
+    task_queue: str
+    server_name: str
+    use_tls: bool
+    is_enabled: bool
+    timeout_seconds: int
+    has_credentials: bool
+    verified_at: datetime | None
+    verification_code: str
+    deleted_at: datetime | None
+
+
+def temporal_authority_type(row):
+    return NvkeTemporalAuthorityType(
+        id=GUID(str(row.guid)),
+        version=row.version,
+        site_id=GUID(str(row.site.guid)),
+        site_version=row.site.version,
+        address=row.address,
+        namespace=row.namespace,
+        task_queue=row.task_queue,
+        server_name=row.server_name,
+        use_tls=row.use_tls,
+        is_enabled=row.is_enabled,
+        timeout_seconds=row.timeout_seconds,
+        has_credentials=bool(row.credential_ciphertext),
+        verified_at=row.verified_at,
+        verification_code=row.verification_code,
+        deleted_at=row.deleted_at,
+    )
+
+
+@strawberry.input
+class NvkeTemporalCredentialsInput:
+    api_key: str = ""
+    ca_pem: str = ""
+    client_certificate_pem: str = ""
+    client_key_pem: str = ""
+
+
+@strawberry.input
+class ConfigureNvkeTemporalAuthorityInput:
+    site_id: GUID
+    expected_actor_id: int
+    expected_site_version: int
+    expected_version: int
+    address: str
+    namespace: str
+    task_queue: str
+    server_name: str = ""
+    use_tls: bool = True
+    timeout_seconds: int = 30
+    credentials: NvkeTemporalCredentialsInput | None = None
+
+
+@strawberry.input
+class NvkeTemporalAuthorityReviewInput:
+    site_id: GUID
+    expected_actor_id: int
+    expected_site_version: int
+    expected_version: int
+
+
+@strawberry.input
+class SetNvkeTemporalAuthorityEnabledInput(NvkeTemporalAuthorityReviewInput):
+    enabled: bool
 
 
 @strawberry.type
@@ -391,12 +468,22 @@ class NvkeInventoryResourceType:
 
 
 @strawberry.type
+class NvkeNativeWorkflowType:
+    name: str
+    input_type: str
+    source: str
+    permission: str
+    input_schema: JSON
+
+
+@strawberry.type
 class NvkeContractType:
     revision: str
     actions: list[NvkeActionType]
     controller_openapi: JSON
     resources: list[NvkeResourceSchemaType]
     collections: list[NvkeCollectionType]
+    native_workflows: list[NvkeNativeWorkflowType]
 
 
 @strawberry.input
@@ -550,6 +637,15 @@ class NvkeMaintenanceObservationType:
 
 @strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_temporal_authority(
+        self, info: Info, site_id: GUID
+    ) -> NvkeTemporalAuthorityType | None:
+        row = native_temporal.read(str(site_id))
+        return temporal_authority_type(row) if row is not None else None
+
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()
@@ -773,6 +869,7 @@ class NvkeQuery:
                 for item in resources()
             ],
             collections=[collection_type(item) for item in collections()],
+            native_workflows=[NvkeNativeWorkflowType(**item) for item in native_workflows()],
         )
 
     @strawberry.field
@@ -845,6 +942,55 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.temporal_configure", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def configure_nvke_temporal_authority(
+        self, info: Info, input: ConfigureNvkeTemporalAuthorityInput
+    ) -> MutationResultType[NvkeTemporalAuthorityType]:
+        values = asdict(input)
+        return success(temporal_authority_type(native_temporal.configure(**values)))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.temporal_enable", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def set_nvke_temporal_authority_enabled(
+        self, info: Info, input: SetNvkeTemporalAuthorityEnabledInput
+    ) -> MutationResultType[NvkeTemporalAuthorityType]:
+        return success(temporal_authority_type(native_temporal.set_enabled(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.temporal_remove", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def remove_nvke_temporal_authority(
+        self, info: Info, input: NvkeTemporalAuthorityReviewInput
+    ) -> MutationResultType[NvkeTemporalAuthorityType]:
+        return success(temporal_authority_type(native_temporal.set_enabled(**asdict(input), remove=True)))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.temporal_verify", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def verify_nvke_temporal_authority(
+        self, info: Info, input: NvkeTemporalAuthorityReviewInput
+    ) -> MutationResultType[NvkeTemporalAuthorityType]:
+        return success(temporal_authority_type(native_temporal.verify(**asdict(input))))
+
     @strawberry.mutation
     @mutation_audit(
         action="nvke.workload_access_enroll",

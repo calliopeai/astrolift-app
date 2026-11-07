@@ -281,3 +281,37 @@ use native Temporal `RenewK8sCertsV2`, `RotateEtcdEncryptionKey`, and
 `RetireLostEtcdRotationNode`; explicit native Temporal authority and reviewed
 controls are tracked in #2665. Node certificate expiry/inspection metrics and
 workload credential expiry remain separate qualification work under #2661.
+
+## Native Temporal connection authority
+
+Administrators can configure a separate native Temporal authority with
+`configureNvkeTemporalAuthority`. Review `siteId`, `expectedActorId`,
+`expectedSiteVersion`, and `expectedVersion` (zero for a new authority), then
+provide an explicit `address` (`host:port`), `namespace`, and `taskQueue`.
+`useTls` defaults to true; `serverName` optionally overrides the TLS server name.
+`timeoutSeconds` bounds connection and namespace inspection, not a native
+workflow's execution duration. This connection never inherits Astro's Temporal
+endpoint, namespace, queue, or the site's HTTP credentials.
+
+The optional write-only `credentials` object accepts `apiKey`, `caPem`,
+`clientCertificatePem`, and `clientKeyPem`; client certificate and key must be
+paired. Credentials are encrypted at rest. Omitting credentials preserves the
+existing ciphertext without decrypting it; an empty object clears it. Plaintext
+connections require explicit credential clearing and no TLS server name.
+Configuration advances both authority and site versions and clears previous
+verification. Audit records mask credentials and rejected connection addresses.
+
+`astroliftNvkeTemporalAuthority(siteId)` returns scoped metadata and
+`hasCredentials`, never credential values. `setNvkeTemporalAuthorityEnabled` and
+`removeNvkeTemporalAuthority` require the same reviewed actor/site/authority
+versions; removal soft-deletes the authority. Replacing it creates a new identity.
+`verifyNvkeTemporalAuthority` checks the configured namespace using the native
+connection and rechecks current permissions and unchanged authority around I/O.
+`NAMESPACE_VERIFIED` proves namespace access only; it does not prove a worker is
+polling the configured queue or that a workflow type is registered there.
+
+The contract query's `nativeWorkflows` catalog separately exposes the three
+pinned operator workflow input schemas, with upstream declaration and
+registration checks. These are additional to the 88 HTTP/datastore actions.
+This foundation does not start, reset, or retire native workflows. Reviewed
+execution, recovery, and browser/CLI controls remain in #2665.
