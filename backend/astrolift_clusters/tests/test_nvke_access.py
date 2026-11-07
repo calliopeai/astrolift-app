@@ -6,23 +6,27 @@ import threading
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
-from nvke.client import NvkeResponse
+from nvke.client import NvkeError, NvkeResponse
 from nvke.contract import controller_spec
 from nvke.operations import action
 from tests.nvke.test_datastore_integration import seed_access
 
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_runtime as runtime
+from astrolift_clusters import nvke_workload_access as access
+from astrolift_clusters.models import NvkeWorkloadAccessBinding
 from astrolift_clusters.nvke_connections import open_connection
+from astrolift_clusters.nvke_sites import NvkeSiteError
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
 from astrolift_clusters.tests.test_nvke_operations import configured as _configured
 from astrolift_clusters.tests.test_nvke_operations import datastore_site as _datastore_site
 from astrolift_clusters.tests.test_nvke_operations import reserve
 from astrolift_clusters.tests.test_nvke_operations import world as _world
 from astrolift_clusters.tests.test_nvke_sites import context, put
+from core.permissions import PermissionDenied
 
 pytestmark = pytest.mark.django_db
 
@@ -199,7 +203,10 @@ def test_real_native_controller_response_persists_an_owned_receipt_before_readin
     assert sum(method == "POST" for method, _path in calls) == 1
 
 
-def test_real_postgres_controller_receipt_and_kubernetes_download_without_a_native_crd(datastore_site):
+@pytest.mark.parametrize("ownership", ["create_receipt", "enrolled_read"])
+def test_real_postgres_controller_receipt_and_kubernetes_download_without_a_native_crd(
+    datastore_site, ownership
+):
     state = datastore_site
     with open_connection(
         state.connection, namespace=state.site.organization_namespace, checkpoint=lambda: None
@@ -243,15 +250,21 @@ def test_real_postgres_controller_receipt_and_kubernetes_download_without_a_nati
                 with context(state.world):
                     put(state.site, surface="controller", endpoint=endpoint, allow_http=True)
                     state.site.refresh_from_db()
-                creation = reserve(state, operation_key="createCluster", parameters=request)
-                assert (
-                    runtime.attempt(
-                        creation.pk,
-                        0,
-                        execution=(creation.workflow_id, "receipt-create", "NvkeOperationWorkflow"),
-                    )
-                    == "awaiting_ready"
+                creation = reserve(
+                    state,
+                    operation_key="getCluster" if ownership == "enrolled_read" else "createCluster",
+                    parameters={"path": {"clusterID": identity}} if ownership == "enrolled_read" else request,
                 )
+                assert runtime.attempt(
+                    creation.pk,
+                    0,
+                    execution=(creation.workflow_id, "receipt-create", "NvkeOperationWorkflow"),
+                ) == ("succeeded" if ownership == "enrolled_read" else "awaiting_ready")
+                creation.refresh_from_db()
+                if ownership == "enrolled_read":
+                    with context(state.world):
+                        binding = access.enroll(**enrollment(state, creation))
+                    creation.soft_delete()
             row = reserve(
                 state,
                 operation_key="datastore.getWorkloadKubeconfig",
@@ -267,6 +280,29 @@ def test_real_postgres_controller_receipt_and_kubernetes_download_without_a_nati
             result = operations.decode_result(row)
             assert result["response"]["data"]["kubeconfig"] == content.decode()
             assert content not in bytes(row.result_ciphertext)
+            if ownership == "enrolled_read":
+                with context(state.world):
+                    access.revoke(
+                        site_id=state.site.guid,
+                        expected_site_version=state.site.version,
+                        expected_actor_id=state.world.user.pk,
+                        binding_id=binding.guid,
+                        expected_version=binding.version,
+                    )
+                retry = reserve(
+                    state, operation_key=row.operation_key, parameters=operations.decode_input(row)
+                )
+                assert (
+                    runtime.attempt(
+                        retry.pk,
+                        0,
+                        execution=(retry.workflow_id, "revoked-download", "NvkeOperationWorkflow"),
+                    )
+                    == "failed"
+                )
+                retry.refresh_from_db()
+                assert retry.error_code == "OWNERSHIP_UNVERIFIED"
+                assert "kubeconfig" not in operations.decode_result(retry).get("response", {}).get("data", {})
         finally:
             paths = [
                 f"/api/v1/namespaces/{state.site.organization_namespace}/secrets/{secret['metadata']['name']}",
@@ -287,3 +323,236 @@ def test_real_postgres_controller_receipt_and_kubernetes_download_without_a_nati
                         "preconditions": {"uid": meta["uid"], "resourceVersion": meta["resourceVersion"]},
                     },
                 ).raise_for_status()
+
+
+def enrollment(state, source):
+    return {
+        "site_id": state.site.guid,
+        "expected_site_version": state.site.version,
+        "expected_actor_id": state.world.user.pk,
+        "source_operation_id": source.guid,
+        "expected_source_version": source.version,
+    }
+
+
+def observed(state, *, overrides=None):
+    request = create_request()
+    with controller(request, subresources={"parent_override": overrides or {}}) as (
+        endpoint,
+        identity,
+        calls,
+    ):
+        with context(state.world):
+            state.connection = put(
+                state.site,
+                expected_connection_version=state.connection.version,
+                endpoint=endpoint,
+                allow_http=True,
+            )
+            state.site.refresh_from_db()
+        row = reserve(state, operation_key="getCluster", parameters={"path": {"clusterID": identity}})
+        assert (
+            runtime.attempt(
+                row.pk, 0, execution=(row.workflow_id, "enrollment-read", "NvkeOperationWorkflow")
+            )
+            == "succeeded"
+        )
+        row.refresh_from_db()
+    assert calls == [("GET", f"/clusters/{identity}")]
+    return row, request["body"]["name"], identity
+
+
+def test_enrollment_is_explicit_durable_private_and_revocable(configured):
+    source, name, identity = observed(configured)
+    assert operations.trusted_cluster_ids(source, name) == frozenset()
+    with context(configured.world):
+        binding = access.enroll(**enrollment(configured, source))
+        assert access.enroll(**enrollment(configured, source)).pk == binding.pk
+        assert access.list_bindings(configured.site.guid).count() == 1
+    assert binding.cluster_id == UUID(identity)
+    assert name not in str(binding.__dict__)
+    assert operations.trusted_cluster_ids(source, name) == frozenset([identity])
+    assert operations.trusted_cluster_ids(source, "foreign") == frozenset()
+    source.soft_delete()
+    assert operations.trusted_cluster_ids(source, name) == frozenset([identity])
+    with context(configured.world):
+        with pytest.raises(NvkeSiteError) as stale:
+            access.revoke(
+                site_id=configured.site.guid,
+                expected_site_version=configured.site.version,
+                expected_actor_id=configured.world.user.pk,
+                binding_id=binding.guid,
+                expected_version=binding.version + 1,
+            )
+        assert stale.value.code == "VERSION_MISMATCH"
+        access.revoke(
+            site_id=configured.site.guid,
+            expected_site_version=configured.site.version,
+            expected_actor_id=configured.world.user.pk,
+            binding_id=binding.guid,
+            expected_version=binding.version,
+        )
+    assert operations.trusted_cluster_ids(source, name) == frozenset()
+    assert NvkeWorkloadAccessBinding.all_objects.get(pk=binding.pk).deleted_at is not None
+
+
+def test_imported_binding_survives_credential_renewal_but_not_controller_replacement(configured):
+    source, name, identity = observed(configured)
+    with context(configured.world):
+        binding = access.enroll(**enrollment(configured, source))
+        put(
+            configured.site,
+            expected_connection_version=configured.connection.version,
+            credentials={"token": "RENEWED_PRIVATE_TOKEN"},
+        )
+        configured.site.refresh_from_db()
+    assert operations.trusted_cluster_ids(source, name) == frozenset([identity])
+    configured.connection.soft_delete()
+    with context(configured.world):
+        put(configured.site, credentials={"token": "NEW_INTERFACE"})
+    assert operations.trusted_cluster_ids(source, name) == frozenset()
+    binding.refresh_from_db()
+    assert binding.deleted_at is None
+    binding.cluster_id = uuid4()
+    with pytest.raises(ValueError, match="cannot change"):
+        binding.save()
+
+
+def test_retrying_an_old_enrollment_cannot_resurrect_a_revoked_grant(configured):
+    source, name, _identity = observed(configured)
+    with context(configured.world):
+        args = enrollment(configured, source)
+        binding = access.enroll(**args)
+        access.revoke(
+            site_id=configured.site.guid,
+            expected_site_version=configured.site.version,
+            expected_actor_id=configured.world.user.pk,
+            binding_id=binding.guid,
+            expected_version=binding.version,
+        )
+        with pytest.raises(NvkeError) as replay:
+            access.enroll(**args)
+        assert replay.value.code == "SOURCE_CHANGED"
+    assert operations.trusted_cluster_ids(source, name) == frozenset()
+
+
+def test_imported_enrollment_and_revocation_use_audited_graphql_envelopes(configured):
+    from astrolift_clusters.tests.test_nvke_schema import execute
+    from core.schema.audit import MutationAuditLog
+
+    source, name, identity = observed(configured)
+    args = enrollment(configured, source)
+    mutation = """
+    mutation($input: EnrollNvkeWorkloadAccessInput!) {
+      enrollNvkeWorkloadAccess(input:$input) {
+        ok errors { code } data { id version siteId clusterId sourceOperationId }
+      }
+    }
+    """
+    result = execute(
+        configured.world,
+        mutation,
+        {
+            "input": {
+                "siteId": str(args["site_id"]),
+                "expectedSiteVersion": args["expected_site_version"],
+                "expectedActorId": args["expected_actor_id"],
+                "sourceOperationId": str(args["source_operation_id"]),
+                "expectedSourceVersion": args["expected_source_version"],
+            }
+        },
+    )
+    assert result.errors is None
+    payload = result.data["enrollNvkeWorkloadAccess"]
+    assert payload["ok"], payload
+    assert payload["data"]["clusterId"] == identity
+    query = "query($site:GUID!) { astroliftNvkeWorkloadAccessBindings(siteId:$site,limit:1) { items { id clusterId } totalCount } }"
+    page = execute(configured.world, query, {"site": str(configured.site.guid)})
+    assert page.errors is None
+    assert page.data["astroliftNvkeWorkloadAccessBindings"]["totalCount"] == 1
+    foreign = _world.__wrapped__()
+    hidden = execute(foreign, query, {"site": str(configured.site.guid)})
+    assert hidden.errors
+    assert hidden.data is None
+    result = execute(
+        configured.world,
+        """
+    mutation($input:RevokeNvkeWorkloadAccessInput!) {
+      revokeNvkeWorkloadAccess(input:$input) { ok errors { code } data { deletedAt } }
+    }
+    """,
+        {
+            "input": {
+                "siteId": str(configured.site.guid),
+                "expectedSiteVersion": configured.site.version,
+                "expectedActorId": configured.world.user.pk,
+                "bindingId": payload["data"]["id"],
+                "expectedVersion": payload["data"]["version"],
+            }
+        },
+    )
+    assert result.errors is None
+    assert result.data["revokeNvkeWorkloadAccess"]["ok"]
+    assert result.data["revokeNvkeWorkloadAccess"]["data"]["deletedAt"]
+    logs = MutationAuditLog.objects.filter(
+        operation__in=["nvke.workload_access_enroll", "nvke.workload_access_revoke"]
+    )
+    assert logs.count() == 2
+    assert name not in str(list(logs.values("variables", "errors")))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "actor",
+        "source_version",
+        "site_version",
+        "connection",
+        "foreign",
+        "permission",
+        "pending",
+        "identity",
+        "invalid_name",
+    ],
+)
+def test_enrollment_refuses_stale_foreign_unreviewed_and_unproven_sources(configured, change):
+    from django.utils import timezone
+
+    from astrolift_identity.models import RoleBinding
+
+    source, _name, _identity = observed(
+        configured,
+        overrides={"id": str(uuid4())}
+        if change == "identity"
+        else {"name": "invalid/name"}
+        if change == "invalid_name"
+        else None,
+    )
+    args = enrollment(configured, source)
+    if change == "actor":
+        args["expected_actor_id"] += 1
+    elif change == "source_version":
+        args["expected_source_version"] -= 1
+    elif change == "site_version":
+        args["expected_site_version"] -= 1
+    elif change == "foreign":
+        other = _configured.__wrapped__(_world.__wrapped__())
+        args["site_id"] = other.site.guid
+    elif change == "permission":
+        RoleBinding.objects.filter(user=configured.world.user).update(deleted_at=timezone.now())
+    elif change == "pending":
+        source.status = "queued"
+        source.save(update_fields=["status", "updated_at", "version"])
+        args["expected_source_version"] = source.version
+    elif change == "connection":
+        with context(configured.world):
+            put(
+                configured.site,
+                expected_connection_version=configured.connection.version,
+                credentials={"token": "ROTATED"},
+            )
+            configured.site.refresh_from_db()
+            args["expected_site_version"] = configured.site.version
+    with context(configured.world), pytest.raises((NvkeError, NvkeSiteError, PermissionDenied)):
+        access.enroll(**args)
+    assert not NvkeWorkloadAccessBinding.objects.exists()

@@ -18,6 +18,7 @@ from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_resource_operations as resource_operations
 from astrolift_clusters import nvke_sites as service
+from astrolift_clusters import nvke_workload_access as workload_access
 from astrolift_clusters.models import NvkeOperation
 from astrolift_clusters.scopes import cluster_catalog_org_scope
 from astrolift_graphql import GUID, MutationResultType, PageType, failure, keyset_page, success
@@ -147,6 +148,51 @@ class SetNvkeSiteEnabledInput:
 class RemoveNvkeSiteInput:
     site_id: GUID
     expected_site_version: int
+
+
+@strawberry.type
+class NvkeWorkloadAccessBindingType:
+    id: GUID
+    version: int
+    site_id: GUID
+    controller_connection_id: GUID
+    source_operation_id: GUID
+    cluster_id: GUID
+    upstream_revision: str
+    created_at: datetime
+    deleted_at: datetime | None
+
+
+def workload_access_type(row):
+    return NvkeWorkloadAccessBindingType(
+        id=GUID(str(row.guid)),
+        version=row.version,
+        site_id=GUID(str(row.site.guid)),
+        controller_connection_id=GUID(str(row.controller_connection.guid)),
+        source_operation_id=GUID(str(row.source_operation.guid)),
+        cluster_id=GUID(str(row.cluster_id)),
+        upstream_revision=row.upstream_revision,
+        created_at=row.created_at,
+        deleted_at=row.deleted_at,
+    )
+
+
+@strawberry.input
+class EnrollNvkeWorkloadAccessInput:
+    site_id: GUID
+    expected_site_version: int
+    expected_actor_id: int
+    source_operation_id: GUID
+    expected_source_version: int
+
+
+@strawberry.input
+class RevokeNvkeWorkloadAccessInput:
+    site_id: GUID
+    expected_site_version: int
+    expected_actor_id: int
+    binding_id: GUID
+    expected_version: int
 
 
 @strawberry.enum
@@ -464,6 +510,21 @@ class NvkeQuery:
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()
+    def astrolift_nvke_workload_access_bindings(
+        self, info: Info, site_id: GUID, after: str | None = None, limit: int = 50
+    ) -> PageType[NvkeWorkloadAccessBindingType]:
+        return keyset_page(
+            workload_access.list_bindings(str(site_id)).select_related(
+                "site", "controller_connection", "source_operation"
+            ),
+            cursor=after,
+            limit=limit,
+            cursor_scope=f"nvke-access:{service.authorized(Permission.NVKE_READ)[0].guid}:{site_id}",
+        ).map(workload_access_type)
+
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
     def astrolift_nvke_diagnostic_page(
         self,
         info: Info,
@@ -713,6 +774,32 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.workload_access_enroll",
+        target=lambda root, info, input: ("nvke_site", str(input.site_id)),
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def enroll_nvke_workload_access(
+        self, info: Info, input: EnrollNvkeWorkloadAccessInput
+    ) -> MutationResultType[NvkeWorkloadAccessBindingType]:
+        return success(workload_access_type(workload_access.enroll(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.workload_access_revoke",
+        target=lambda root, info, input: ("nvke_site", str(input.site_id)),
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def revoke_nvke_workload_access(
+        self, info: Info, input: RevokeNvkeWorkloadAccessInput
+    ) -> MutationResultType[NvkeWorkloadAccessBindingType]:
+        return success(workload_access_type(workload_access.revoke(**asdict(input))))
+
     @strawberry.mutation
     @mutation_audit(
         action="nvke.resource_request", target=lambda root, info, input: ("nvke_site", str(input.site_id))

@@ -8320,6 +8320,14 @@ export type EmailtemplatedeletedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type EnrollNvkeWorkloadAccessInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+};
+
 export type EnsureAgentBoxInput = {
   agentSlug: Scalars['String']['input'];
   environmentSpecSlug: Scalars['String']['input'];
@@ -9951,6 +9959,7 @@ export type Mutation = {
   disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
   disconnectZentinelleInstall: AstroliftZentinelleDisconnectMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
+  enrollNvkeWorkloadAccess: NvkeWorkloadAccessBindingTypeMutationResult;
   ensureAgentBox: AstroliftAgentBoxMutationResult;
   exportAstroliftAppLogs: AstroliftAppLogExportMutationResult;
   exportAuditEvents: AstroliftAuditExportMutationResult;
@@ -10136,6 +10145,7 @@ export type Mutation = {
   revokeInvitation: AstroliftInvitationMutationResult;
   revokeMobileDevice: RevokemobiledevicepayloadMutationResult;
   revokeModelSubscription: ModelSubscriptionOperationMutationResult;
+  revokeNvkeWorkloadAccess: NvkeWorkloadAccessBindingTypeMutationResult;
   revokeRoleBinding: SoftdeletepayloadMutationResult;
   revokeTeamAccessFromApp: SoftdeletepayloadMutationResult;
   rollbackDeployment: AstroliftDeploymentMutationResult;
@@ -11178,6 +11188,11 @@ export type MutationElevateAdminSessionArgs = {
 };
 
 
+export type MutationEnrollNvkeWorkloadAccessArgs = {
+  input: EnrollNvkeWorkloadAccessInput;
+};
+
+
 export type MutationEnsureAgentBoxArgs = {
   input: EnsureAgentBoxInput;
   orgId: Scalars['ID']['input'];
@@ -11976,6 +11991,11 @@ export type MutationRevokeMobileDeviceArgs = {
 
 export type MutationRevokeModelSubscriptionArgs = {
   input: RevokeModelSubscriptionInput;
+};
+
+
+export type MutationRevokeNvkeWorkloadAccessArgs = {
+  input: RevokeNvkeWorkloadAccessInput;
 };
 
 
@@ -13170,6 +13190,37 @@ export type NvkeSurface =
   | 'OPERATOR'
   | 'TENANT';
 
+export type NvkeWorkloadAccessBindingType = {
+  clusterId: Scalars['GUID']['output'];
+  controllerConnectionId: Scalars['GUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deletedAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  siteId: Scalars['GUID']['output'];
+  sourceOperationId: Scalars['GUID']['output'];
+  upstreamRevision: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeWorkloadAccessBindingTypeMutationResult = {
+  data?: Maybe<NvkeWorkloadAccessBindingType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type NvkeWorkloadAccessBindingTypePage = {
+  items: Array<NvkeWorkloadAccessBindingType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ObservabilityRetentionHoldType = {
   endsAt: Scalars['DateTime']['output'];
   id: Scalars['GUID']['output'];
@@ -13754,6 +13805,7 @@ export type Query = {
   astroliftNvkeResourceEditor: NvkeResourceEditorTypeMutationResult;
   astroliftNvkeSite?: Maybe<NvkeSiteType>;
   astroliftNvkeSites: NvkeSiteTypePage;
+  astroliftNvkeWorkloadAccessBindings: NvkeWorkloadAccessBindingTypePage;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
   astroliftOrgMembersForApprovalPicker: Array<AstroliftApproverUser>;
   astroliftOrganization?: Maybe<AstroliftOrganization>;
@@ -15396,6 +15448,13 @@ export type QueryAstroliftNvkeSiteArgs = {
 export type QueryAstroliftNvkeSitesArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftNvkeWorkloadAccessBindingsArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
 };
 
 
@@ -17093,6 +17152,14 @@ export type RevokeModelSubscriptionInput = {
   ifMatchDeploymentVersion: Scalars['Int']['input'];
   ifMatchVersion: Scalars['Int']['input'];
   organizationId: Scalars['GUID']['input'];
+};
+
+export type RevokeNvkeWorkloadAccessInput = {
+  bindingId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
 };
 
 export type RevokeRoleBindingInput = {

@@ -8954,6 +8954,14 @@ type EmailtemplatedeletedpayloadMutationResult {
   data: Emailtemplatedeletedpayload
 }
 
+input EnrollNvkeWorkloadAccessInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  expectedActorId: Int!
+  sourceOperationId: GUID!
+  expectedSourceVersion: Int!
+}
+
 input EnsureAgentBoxInput {
   environmentSpecSlug: String! = ""
   agentSlug: String! = ""
@@ -10839,6 +10847,8 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  enrollNvkeWorkloadAccess(input: EnrollNvkeWorkloadAccessInput!): NvkeWorkloadAccessBindingTypeMutationResult!
+  revokeNvkeWorkloadAccess(input: RevokeNvkeWorkloadAccessInput!): NvkeWorkloadAccessBindingTypeMutationResult!
   requestNvkeResourceOperation(input: RequestNvkeResourceOperationInput!): NvkeOperationTypeMutationResult!
   requestNvkeInventory(input: RequestNvkeOperationTextInput!): NvkeOperationTypeMutationResult!
   requestNvkeOperationText(input: RequestNvkeOperationTextInput!): NvkeOperationTypeMutationResult!
@@ -11565,6 +11575,41 @@ enum NvkeSurface {
   DATASTORE
 }
 
+type NvkeWorkloadAccessBindingType {
+  id: GUID!
+  version: Int!
+  siteId: GUID!
+  controllerConnectionId: GUID!
+  sourceOperationId: GUID!
+  clusterId: GUID!
+  upstreamRevision: String!
+  createdAt: DateTime!
+  deletedAt: DateTime
+}
+
+type NvkeWorkloadAccessBindingTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeWorkloadAccessBindingType
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type NvkeWorkloadAccessBindingTypePage {
+  items: [NvkeWorkloadAccessBindingType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type ObservabilityRetentionHoldType {
   id: GUID!
   stream: String!
@@ -12242,6 +12287,7 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeWorkloadAccessBindings(siteId: GUID!, after: String = null, limit: Int! = 50): NvkeWorkloadAccessBindingTypePage!
   astroliftNvkeDiagnosticPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeDiagnosticPageType!
   astroliftNvkeResourceEditor(siteId: GUID!, expectedActorId: Int!, operationKey: String!, sourceOperationId: GUID!, expectedSourceVersion: Int!, sourceResourceKey: String = null): NvkeResourceEditorTypeMutationResult!
   astroliftNvkeInventoryPage(operationId: GUID!, expectedActorId: Int!, after: String = null, limit: Int! = 50, search: String = null): NvkeInventoryPageType!
@@ -13032,6 +13078,14 @@ input RevokeModelSubscriptionInput {
   expectedProviderId: GUID!
   ifMatchVersion: Int!
   ifMatchDeploymentVersion: Int!
+}
+
+input RevokeNvkeWorkloadAccessInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  expectedActorId: Int!
+  bindingId: GUID!
+  expectedVersion: Int!
 }
 
 input RevokeRoleBindingInput {

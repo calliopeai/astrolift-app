@@ -19,7 +19,7 @@ from nvke.inventory import validate_inventory_request
 from nvke.operations import action, validate_request
 
 from astrolift_clusters import nvke_sites as sites
-from astrolift_clusters.models import NvkeConnection, NvkeOperation
+from astrolift_clusters.models import NvkeConnection, NvkeOperation, NvkeWorkloadAccessBinding
 from astrolift_identity import abac
 from astrolift_identity.api_tokens import (
     get_current_api_token,
@@ -321,7 +321,16 @@ def trusted_cluster_ids(row, cluster_name):
         .values_list("remote_reference__id", flat=True)
         .iterator()
     )
-    result = set()
+    result = {
+        str(value)
+        for value in NvkeWorkloadAccessBinding.objects.filter(
+            site_id=row.site_id,
+            site__organization_id=row.organization_id,
+            controller_connection=connection,
+            upstream_revision=row.authority.get("revision"),
+            name_digest=_cluster_name_digest(row, cluster_name),
+        ).values_list("cluster_id", flat=True)
+    }
     for value in references:
         try:
             identity = UUID(value)

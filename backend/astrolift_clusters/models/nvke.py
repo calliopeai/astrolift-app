@@ -82,6 +82,44 @@ class NvkeConnection(BaseCoreModel):
         ]
 
 
+class NvkeWorkloadAccessBinding(BaseCoreModel):
+    site = models.ForeignKey(NvkeSite, on_delete=models.PROTECT, related_name="workload_access_bindings")
+    controller_connection = models.ForeignKey(NvkeConnection, on_delete=models.PROTECT, related_name="+")
+    source_operation = models.ForeignKey("NvkeOperation", on_delete=models.PROTECT, related_name="+")
+    cluster_id = models.UUIDField()
+    name_digest = models.CharField(max_length=64)
+    upstream_revision = models.CharField(max_length=40)
+
+    def save(self, *args, **kwargs):
+        _immutable(
+            self,
+            "site_id",
+            "controller_connection_id",
+            "source_operation_id",
+            "cluster_id",
+            "name_digest",
+            "upstream_revision",
+        )
+        if not NvkeConnection.all_objects.filter(
+            pk=self.controller_connection_id, site_id=self.site_id, surface="controller"
+        ).exists():
+            raise ValueError("NVKE access binding must use its site's controller")
+        if not NvkeOperation.all_objects.filter(
+            pk=self.source_operation_id, site_id=self.site_id, operation_key="getCluster"
+        ).exists():
+            raise ValueError("NVKE access binding must use its site's cluster read")
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["site", "controller_connection", "cluster_id", "name_digest", "upstream_revision"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="nvke_access_binding_live",
+            ),
+        ]
+
+
 class NvkeOperation(BaseCoreModel):
     class Status(models.TextChoices):
         QUEUED = "queued"

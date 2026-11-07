@@ -202,3 +202,38 @@ original action's permission. Fetch them explicitly without browser cache/storag
 actor's exact UUID, including after a lost admission reply. Another actor's UUID or
 another organization's site does not disclose a receipt. A missing receipt alone
 does not prove an in-flight admission had no effect; retry the original identity.
+
+## Imported workload access enrollment
+
+For a controller-managed cluster created outside Astro, first execute `getCluster`
+with the exact native `clusterID` through the site's controller connection. After
+the operation succeeds, an administrator with both `nvke.admin` and `nvke.read`
+can call `enrollNvkeWorkloadAccess` with `siteId`, `expectedSiteVersion`,
+`expectedActorId`, `sourceOperationId`, and `expectedSourceVersion`. Enrollment
+checks the encrypted successful response ID against the requested UUID and uses
+its native name, without accepting a caller-supplied name or cluster ID. The read
+must belong to the same organization/site and current controller authority.
+Listing a cluster does not enroll it. An uncertain create is not enrollment proof;
+this procedure does not reconcile or replay that create.
+
+The durable binding stores the native UUID and a keyed name digest, without
+credentials or a plaintext cluster name. Retrying the same enrollment returns
+the existing live binding. Soft-deleting the source observation does not remove
+the binding. Renewing credentials on the same logical controller connection
+retains it; deleting/replacing that connection stops it from authorizing access.
+Bindings also require the pinned upstream revision.
+
+`astroliftNvkeWorkloadAccessBindings(siteId, after, limit)` pages metadata within
+the active organization. `revokeNvkeWorkloadAccess` requires `siteId`,
+`expectedSiteVersion`, `expectedActorId`, `bindingId`, and `expectedVersion`, and
+soft-deletes the imported grant. Re-enrollment requires a new successful read
+completed after revocation; retrying an old enrollment cannot restore the grant.
+Revocation stops subsequent downloads that rely
+on this grant. An independent native CRD or Astro create receipt can still prove
+ownership; revoking an imported grant is not a blanket deny for the cluster.
+
+Enrollment performs no native writes and does not download a credential. Every
+`datastore.getWorkloadKubeconfig` still verifies the live CAPI cluster UID and
+Secret owner reference, exact native cluster-ID label, admin mode, namespace,
+and cluster-name label. Unlabelled legacy Secrets remain refused. This enrollment
+API does not yet provide browser/CLI controls or certificate renewal automation.
