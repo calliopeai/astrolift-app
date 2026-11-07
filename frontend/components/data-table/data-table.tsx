@@ -312,7 +312,14 @@ export function DataTable<TRow>({
         className={cn("rounded-md border transition-opacity", controller.isStale && "opacity-60")}
         aria-busy={state === "loading" || controller.isStale || undefined}
       >
-        <Table>
+        <Table
+          containerProps={{
+            tabIndex: 0,
+            role: "region",
+            "aria-label": label,
+            className: "focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none",
+          }}
+        >
           <caption className="sr-only">{label}</caption>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
