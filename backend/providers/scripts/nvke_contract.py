@@ -21,13 +21,18 @@ def _json(value: Any) -> str:
     return json.dumps(value, indent=2, ensure_ascii=False) + "\n"
 
 
-def inventory(checkout: Path) -> dict[str, Any]:
+def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
     revision = subprocess.check_output(["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True).strip()
     dirty = subprocess.check_output(
         ["git", "-C", str(checkout), "status", "--porcelain", "--untracked-files=no"], text=True
     )
     if dirty:
         raise ValueError("upstream tracked files must be clean before pinning")
+    runtime_commands = json.loads(cli_inventory.read_text())
+    if not runtime_commands or not all(
+        isinstance(item.get("path"), str) and isinstance(item.get("flags"), list) for item in runtime_commands
+    ):
+        raise ValueError("a compiled NVKE command-tree inventory is required")
     spec_path = "controller/api/openapi.yaml"
     openapi = yaml.safe_load((checkout / spec_path).read_text())
     operations = []
@@ -131,15 +136,17 @@ def inventory(checkout: Path) -> dict[str, Any]:
         "custom_resources": crds,
         "cli_reference": command_docs,
         "cli_source_declarations": declarations,
+        "cli_runtime": runtime_commands,
     }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--upstream", type=Path, required=True)
+    parser.add_argument("--cli-inventory", type=Path, required=True)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    content = _json(inventory(args.upstream.resolve()))
+    content = _json(inventory(args.upstream.resolve(), args.cli_inventory.resolve()))
     if args.check:
         if not OUTPUT.exists() or OUTPUT.read_text() != content:
             raise SystemExit("NVKE upstream contract drifted; review every changed interface before regenerating")

@@ -21,7 +21,7 @@ def render() -> str:
         "",
         f"Pinned upstream: [`{upstream_revision()}`](https://github.com/dsx-ai-factory/nvke/tree/{upstream_revision()}).",
         "The contract snapshot preserves full OpenAPI request/response definitions, all six CRD schemas,",
-        "CLI reference content, source command declarations and SHA-256 hashes of relevant upstream files.",
+        "CLI reference content, compiled command paths/flags, source declarations and source SHA-256 hashes.",
         "Upstream content is Apache-2.0; its license and notice accompany the snapshot.",
         "",
         "## Delivery and ownership",
@@ -135,17 +135,21 @@ def render() -> str:
                 "backup/restore without a verified implementation |"
             ),
             "",
-            "## Upstream CLI reference inventory",
+            "## Executable upstream CLI inventory",
             "",
-            "The checked-in upstream docs lag some source commands. Both are pinned: this reference inventory",
-            "and `cli_source_declarations` in the contract. Source-only inspect/render commands are covered",
-            "by the operator families above. Help, completion and version map to Astro's existing utilities.",
+            "The upstream docs lag the binary. This list comes from constructing the pinned Cobra command",
+            "tree in Go; every local/inherited flag, default, type and alias is preserved in `cli_runtime`",
+            "in the contract. It contacts no site and reads no credentials. Historical reference docs and",
+            "source declarations are also preserved. Help/completion/version use Astro's existing utilities.",
             "",
             "| Upstream command | Astro mapping | Delivery evidence |",
             "|---|---|---|",
         ]
     )
-    for command in sorted(_contract()["cli_reference"]):
+    for item in _contract()["cli_runtime"]:
+        if not item["executable"]:
+            continue
+        command = item["path"]
         mapping = (
             "Existing CLI utility"
             if any(x in command for x in ("completion", "help", "version"))
@@ -159,7 +163,10 @@ def render() -> str:
             "",
             "```sh",
             "cd backend/providers",
-            "python -m scripts.nvke_contract --upstream /path/to/pinned/nvke --check",
+            "# Copy scripts/nvke_cli_inventory.go into the pinned checkout's cli/cmd/astro-inventory/main.go",
+            "# then, from that checkout: go run ./cli/cmd/astro-inventory > /tmp/nvke-cli.json",
+            "python -m scripts.nvke_contract --upstream /path/to/pinned/nvke "
+            "--cli-inventory /tmp/nvke-cli.json --check",
             "python -m scripts.nvke_coverage --check",
             "python -m pytest tests/nvke",
             "```",

@@ -54,6 +54,17 @@ def test_namespaced_resources_are_not_misclassified_as_site_wide() -> None:
     assert all(r.group == "internal.nvke.nvidia.com" and r.version == "v1" for r in resources())
 
 
+def test_compiled_cli_inventory_covers_commands_missing_from_upstream_reference() -> None:
+    commands = {item["path"]: item for item in _contract()["cli_runtime"]}
+    for path in ("nvkectl render deploy-path", "nvkectl inspect values", "nvkectl inspect nvkr-release"):
+        assert commands[path]["executable"]
+        assert f"`{path}`" in render()
+    flags = {flag["name"]: flag for flag in commands["nvkectl bootstrap site"]["flags"]}
+    assert {"sitespec", "disable-mtls", "timeout", "release", "otlp-endpoint", "site"} <= flags.keys()
+    assert flags["sitespec"]["type"] == "string"
+    assert flags["timeout"]["default"] == "30m0s"
+
+
 def test_unknown_operation_is_rejected() -> None:
     with pytest.raises(ValueError, match="unknown NVKE operation"):
         operation("operator.rawProxy")

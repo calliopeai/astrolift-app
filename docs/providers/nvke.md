@@ -7,7 +7,7 @@ Tracking: [full integration #2656](https://github.com/calliopeai/astrolift-app/i
 
 Pinned upstream: [`92c39b8ad563ebe5ef705f781b3038b901aba10f`](https://github.com/dsx-ai-factory/nvke/tree/92c39b8ad563ebe5ef705f781b3038b901aba10f).
 The contract snapshot preserves full OpenAPI request/response definitions, all six CRD schemas,
-CLI reference content, source command declarations and SHA-256 hashes of relevant upstream files.
+CLI reference content, compiled command paths/flags, source declarations and source SHA-256 hashes.
 Upstream content is Apache-2.0; its license and notice accompany the snapshot.
 
 ## Delivery and ownership
@@ -130,33 +130,24 @@ These require dedicated workflows and verification beyond the HTTP client. All a
 | Telemetry | NKTP/OTLP deployment and collection; health/events/logs/metrics, config and connectivity diagnostics |
 | Unsupported upstream | No claimed self-management, management-plane upgrade or backup/restore without a verified implementation |
 
-## Upstream CLI reference inventory
+## Executable upstream CLI inventory
 
-The checked-in upstream docs lag some source commands. Both are pinned: this reference inventory
-and `cli_source_declarations` in the contract. Source-only inspect/render commands are covered
-by the operator families above. Help, completion and version map to Astro's existing utilities.
+The upstream docs lag the binary. This list comes from constructing the pinned Cobra command
+tree in Go; every local/inherited flag, default, type and alias is preserved in `cli_runtime`
+in the contract. It contacts no site and reads no credentials. Historical reference docs and
+source declarations are also preserved. Help/completion/version use Astro's existing utilities.
 
 | Upstream command | Astro mapping | Delivery evidence |
 |---|---|---|
-| `nvkectl` | NVKE domain operation | Pending |
-| `nvkectl bootstrap` | NVKE domain operation | Pending |
 | `nvkectl bootstrap site` | NVKE domain operation | Pending |
-| `nvkectl completion` | Existing CLI utility | Pending |
-| `nvkectl completion bash` | Existing CLI utility | Pending |
-| `nvkectl completion fish` | Existing CLI utility | Pending |
-| `nvkectl completion powershell` | Existing CLI utility | Pending |
-| `nvkectl completion zsh` | Existing CLI utility | Pending |
-| `nvkectl config` | NVKE domain operation | Pending |
 | `nvkectl config set-site` | NVKE domain operation | Pending |
 | `nvkectl config use-site` | NVKE domain operation | Pending |
 | `nvkectl config view` | NVKE domain operation | Pending |
-| `nvkectl create` | NVKE domain operation | Pending |
 | `nvkectl create cluster` | NVKE domain operation | Pending |
 | `nvkectl create clusterrelease` | NVKE domain operation | Pending |
 | `nvkectl create machineimage` | NVKE domain operation | Pending |
 | `nvkectl create nodepool` | NVKE domain operation | Pending |
 | `nvkectl create nodepoolrelease` | NVKE domain operation | Pending |
-| `nvkectl delete` | NVKE domain operation | Pending |
 | `nvkectl delete cluster` | NVKE domain operation | Pending |
 | `nvkectl delete clusterrelease` | NVKE domain operation | Pending |
 | `nvkectl delete machineimage` | NVKE domain operation | Pending |
@@ -165,10 +156,8 @@ by the operator families above. Help, completion and version map to Astro's exis
 | `nvkectl deprecate` | NVKE domain operation | Pending |
 | `nvkectl deprecate clusterrelease` | NVKE domain operation | Pending |
 | `nvkectl deprecate nodepoolrelease` | NVKE domain operation | Pending |
-| `nvkectl generate` | NVKE domain operation | Pending |
 | `nvkectl generate oidc-kubeconfig` | NVKE domain operation | Pending |
 | `nvkectl generate sitespec` | NVKE domain operation | Pending |
-| `nvkectl get` | NVKE domain operation | Pending |
 | `nvkectl get bootstrap-manifest` | NVKE domain operation | Pending |
 | `nvkectl get clusterreleases` | NVKE domain operation | Pending |
 | `nvkectl get clusters` | NVKE domain operation | Pending |
@@ -177,11 +166,13 @@ by the operator families above. Help, completion and version map to Astro's exis
 | `nvkectl get nodepoolreleases` | NVKE domain operation | Pending |
 | `nvkectl get nodepools` | NVKE domain operation | Pending |
 | `nvkectl get providers` | NVKE domain operation | Pending |
-| `nvkectl help` | Existing CLI utility | Pending |
-| `nvkectl patch` | NVKE domain operation | Pending |
+| `nvkectl inspect nvkr-release` | NVKE domain operation | Pending |
+| `nvkectl inspect sitespec` | NVKE domain operation | Pending |
+| `nvkectl inspect stack-config` | NVKE domain operation | Pending |
+| `nvkectl inspect values` | NVKE domain operation | Pending |
 | `nvkectl patch cluster` | NVKE domain operation | Pending |
 | `nvkectl patch nodepool` | NVKE domain operation | Pending |
-| `nvkectl validate` | NVKE domain operation | Pending |
+| `nvkectl render deploy-path` | NVKE domain operation | Pending |
 | `nvkectl validate sitespec` | NVKE domain operation | Pending |
 | `nvkectl version` | Existing CLI utility | Pending |
 
@@ -189,7 +180,9 @@ by the operator families above. Help, completion and version map to Astro's exis
 
 ```sh
 cd backend/providers
-python -m scripts.nvke_contract --upstream /path/to/pinned/nvke --check
+# Copy scripts/nvke_cli_inventory.go into the pinned checkout's cli/cmd/astro-inventory/main.go
+# then, from that checkout: go run ./cli/cmd/astro-inventory > /tmp/nvke-cli.json
+python -m scripts.nvke_contract --upstream /path/to/pinned/nvke --cli-inventory /tmp/nvke-cli.json --check
 python -m scripts.nvke_coverage --check
 python -m pytest tests/nvke
 ```

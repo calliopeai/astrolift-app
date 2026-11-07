@@ -7233,5 +7233,2218 @@
       "use": "providers",
       "source": "cli/internal/providers/command/get.go"
     }
+  ],
+  "cli_runtime": [
+    {
+      "path": "nvkectl",
+      "use": "nvkectl",
+      "short": "NVKE control-plane CLI",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nvkectl",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl bootstrap",
+      "use": "bootstrap",
+      "short": "Bootstrap NVKE clusters from a declarative site spec",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for bootstrap",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl bootstrap site",
+      "use": "site",
+      "short": "Bootstrap a new NVKE management cluster from a site spec file",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "allow-control-plane-without-vip",
+          "type": "bool",
+          "default": "false",
+          "usage": "Permit a multi-node control plane without a VIP and enable the override in the temporary NVKE controller. Development only; replacing the initializing node can break API access."
+        },
+        {
+          "name": "arch",
+          "type": "string",
+          "default": "",
+          "usage": "Architecture of the release artifact to use, linux/amd64 or linux/arm64; default: the bootstrap host's, since the bootstrap CAPNICo runs in its Kind cluster. Only with --release."
+        },
+        {
+          "name": "diagnostics-dir",
+          "type": "string",
+          "default": "cluster-diagnostics",
+          "usage": "Directory a failed bootstrap writes cluster diagnostics to before tearing the cluster down. With --verbose a successful bootstrap writes them too. Overrides NVKECTL_BOOTSTRAP_DIAGNOSTICS_DIR."
+        },
+        {
+          "name": "disable-mtls",
+          "type": "bool",
+          "default": "false",
+          "usage": "Stand the site up without SPIFFE: no SPIRE, and the controller dials node agents in plaintext. The agents must be running with --disable-mtls too. Development only."
+        },
+        {
+          "name": "dry-run",
+          "type": "bool",
+          "default": "false",
+          "usage": "Load and validate the site spec and print it, but do not dispatch any workflow"
+        },
+        {
+          "name": "encryption-key-out",
+          "type": "string",
+          "default": "",
+          "usage": "Where to write the finished cluster's etcd encryption key, as a Secret manifest (default: <clusterName>-etcd-encryption-key.json in the working directory)"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for site",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "keep-bootstrap-cluster",
+          "type": "bool",
+          "default": "false",
+          "usage": "Leave the ephemeral bootstrap Kind cluster running after the command exits, for debugging"
+        },
+        {
+          "name": "kubeconfig-out",
+          "type": "string",
+          "default": "",
+          "usage": "Where to write the finished cluster's admin breakglass kubeconfig (default: <clusterName>.kubeconfig in the working directory)"
+        },
+        {
+          "name": "nvke-controller-image",
+          "type": "string",
+          "default": "",
+          "usage": "NVKE controller image to deploy (overrides NVKECTL_NVKE_CONTROLLER_IMAGE and the manifest default)"
+        },
+        {
+          "name": "otlp-endpoint",
+          "type": "string",
+          "default": "",
+          "usage": "OTLP/gRPC endpoint, a host:port or an http(s):// URL (http implies --otlp-insecure), that receives this run's spans and log records. The temporary controller in the bootstrap cluster exports there too, so a loopback address is rejected"
+        },
+        {
+          "name": "otlp-insecure",
+          "type": "bool",
+          "default": "false",
+          "usage": "Send to --otlp-endpoint without TLS; requires --otlp-endpoint"
+        },
+        {
+          "name": "provisioned-provider-image",
+          "type": "string",
+          "default": "",
+          "usage": "Provisioned-provider image to deploy (overrides NVKECTL_CAPI_PROVISIONED_IMAGE and the manifest default)"
+        },
+        {
+          "name": "release",
+          "type": "string",
+          "default": "",
+          "usage": "NVKR release description whose capnico-controller artifact replaces the bootstrap CAPNICo image with its pinned digest, as \"render deploy-path --release\" does for the management cluster's CAPNICo. The release description is not verified: run \"nvkr release verify\" on the same reference first. Only with infra.provider nico."
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "sitespec",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the site spec YAML file (required)",
+          "shorthand": "f"
+        },
+        {
+          "name": "timeout",
+          "type": "duration",
+          "default": "30m0s",
+          "usage": "How long to wait for the cluster to finish provisioning, which includes every control plane node joining. Overrides NVKECTL_BOOTSTRAP_CLUSTER_TIMEOUT."
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl config",
+      "use": "config",
+      "short": "Manage nvkectl configuration",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for config",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl config set-site",
+      "use": "set-site",
+      "short": "Configure the management plane the CLI connects to",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for set-site",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "kubeconfig",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the management cluster kubeconfig (required)"
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "default": "default",
+          "usage": "Name for this site entry. Must not be empty"
+        },
+        {
+          "name": "otlp-endpoint",
+          "type": "string",
+          "default": "",
+          "usage": "OTLP/gRPC endpoint (host:port or an http(s):// URL; http implies --otlp-insecure) that receives the spans and log records of commands that use this site (optional)"
+        },
+        {
+          "name": "otlp-insecure",
+          "type": "bool",
+          "default": "false",
+          "usage": "Send to --otlp-endpoint without TLS. An http:// endpoint is always insecure"
+        },
+        {
+          "name": "proxy-client-cert",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the proxy TLS client certificate"
+        },
+        {
+          "name": "proxy-client-key",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the private key matching --proxy-client-cert"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "url",
+          "type": "string",
+          "default": "",
+          "usage": "Controller API base URL, e.g. http://localhost:8080 (required)"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl config use-site",
+      "use": "use-site <name>",
+      "short": "Switch the active site to a previously configured entry",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for use-site",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl config view",
+      "use": "view",
+      "short": "Print the current nvkectl configuration",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for view",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl create",
+      "use": "create",
+      "short": "Create a resource",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for create",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl create cluster",
+      "use": "cluster",
+      "short": "Create a tenant cluster",
+      "aliases": [
+        "clusters"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "filename",
+          "type": "string",
+          "default": "",
+          "usage": "Path to YAML spec file, or '-' to read from stdin",
+          "shorthand": "f"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for cluster",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl create clusterrelease",
+      "use": "clusterrelease",
+      "short": "Create a cluster release: a control-plane release",
+      "aliases": [
+        "clusterreleases"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "dry-run",
+          "type": "string",
+          "default": "none",
+          "usage": "Use \"client\" to print the complete manifest without contacting the management cluster"
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the YAML or JSON request, or '-' to read from stdin",
+          "shorthand": "f"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for clusterrelease",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: a one-line message, or yaml with --dry-run)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl create machineimage",
+      "use": "machineimage",
+      "short": "Create a machine image: an immutable node image and its NICo boot script",
+      "aliases": [
+        "machineimages"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "dry-run",
+          "type": "string",
+          "default": "none",
+          "usage": "Use \"client\" to print the complete manifest without contacting the management cluster"
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the YAML or JSON request, or '-' to read from stdin",
+          "shorthand": "f"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for machineimage",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: a one-line message, or yaml with --dry-run)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl create nodepool",
+      "use": "nodepool",
+      "short": "Create a node pool",
+      "aliases": [
+        "nodepools"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "filename",
+          "type": "string",
+          "default": "",
+          "usage": "Path to YAML spec file, or '-' to read from stdin",
+          "shorthand": "f"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepool",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl create nodepoolrelease",
+      "use": "nodepoolrelease",
+      "short": "Create a node pool release: a worker release",
+      "aliases": [
+        "nodepoolreleases"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "dry-run",
+          "type": "string",
+          "default": "none",
+          "usage": "Use \"client\" to print the complete manifest without contacting the management cluster"
+        },
+        {
+          "name": "filename",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the YAML or JSON request, or '-' to read from stdin",
+          "shorthand": "f"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepoolrelease",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: a one-line message, or yaml with --dry-run)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl delete",
+      "use": "delete",
+      "short": "Delete a resource",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for delete",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl delete cluster",
+      "use": "cluster <name>",
+      "short": "Delete a tenant cluster",
+      "aliases": [
+        "clusters"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for cluster",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl delete clusterrelease",
+      "use": "clusterrelease <name>",
+      "short": "Delete a cluster release: a control-plane release",
+      "aliases": [
+        "clusterreleases"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for clusterrelease",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl delete machineimage",
+      "use": "machineimage <name>",
+      "short": "Delete a machine image: an immutable node image and its NICo boot script",
+      "aliases": [
+        "machineimages"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for machineimage",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl delete nodepool",
+      "use": "nodepool <name> --cluster <cluster>",
+      "short": "Delete a node pool",
+      "aliases": [
+        "nodepools"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "cluster",
+          "type": "string",
+          "default": "",
+          "usage": "Name of the cluster that owns the node pool",
+          "shorthand": "c"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepool",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl delete nodepoolrelease",
+      "use": "nodepoolrelease <name>",
+      "short": "Delete a node pool release: a worker release",
+      "aliases": [
+        "nodepoolreleases"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepoolrelease",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl deprecate",
+      "use": "deprecate",
+      "short": "Deprecate a release",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for deprecate",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl deprecate clusterrelease",
+      "use": "clusterrelease <name>",
+      "short": "Deprecate a cluster release",
+      "aliases": [
+        "clusterreleases"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for clusterrelease",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl deprecate nodepoolrelease",
+      "use": "nodepoolrelease <name>",
+      "short": "Deprecate a node pool release",
+      "aliases": [
+        "nodepoolreleases"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepoolrelease",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl generate",
+      "use": "generate",
+      "short": "Generate NVKE configuration files",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for generate",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl generate oidc-kubeconfig",
+      "use": "oidc-kubeconfig",
+      "short": "Generate an oidc-login kubeconfig from an input kubeconfig",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "headless",
+          "type": "bool",
+          "default": "false",
+          "usage": "Use the device authorization grant so login works without a local browser"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for oidc-kubeconfig",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "kubeconfig",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the input kubeconfig (required)"
+        },
+        {
+          "name": "oidc-client-id",
+          "type": "string",
+          "default": "",
+          "usage": "OIDC client ID (required)"
+        },
+        {
+          "name": "oidc-extra-scope",
+          "type": "stringArray",
+          "default": "[]",
+          "usage": "Extra OIDC scope. Repeatable."
+        },
+        {
+          "name": "oidc-issuer-url",
+          "type": "string",
+          "default": "",
+          "usage": "OIDC issuer URL (required)"
+        },
+        {
+          "name": "output-file",
+          "type": "string",
+          "default": "",
+          "usage": "Write kubeconfig to file instead of stdout"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl generate sitespec",
+      "use": "sitespec <cluster-name>",
+      "short": "Generate a site spec file for a tier-0 cluster",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for sitespec",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "nodes",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the node CSV, or '-' to read standard input (required)"
+        },
+        {
+          "name": "set",
+          "type": "stringArray",
+          "default": "[]",
+          "usage": "Set a field, as path=value. Repeatable. Accepts: cluster.cniName, cluster.cniVersion, cluster.controlPlaneVIP, cluster.etcdEncryption, cluster.k8sVersion, cluster.kubeletConfig.systemReservedMemory, cluster.nodeAgentPort, cluster.podCidr, cluster.serviceCidr, clusterName, spire.trustDomain, spire.upstreamCA"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get",
+      "use": "get",
+      "short": "Display one or more resources",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for get",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get bootstrap-manifest",
+      "use": "bootstrap-manifest",
+      "short": "Print the charts and images the bootstrap fetches, with version and digest",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for bootstrap-manifest",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get clusterreleases",
+      "use": "clusterreleases [name ...]",
+      "short": "List cluster releases on the active site's management cluster",
+      "aliases": [
+        "clusterrelease"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for clusterreleases",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: table)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get clusters",
+      "use": "clusters [name ...]",
+      "short": "List tenant clusters on the management plane",
+      "aliases": [
+        "cluster"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for clusters",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: table)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get kubeconfig",
+      "use": "kubeconfig <cluster-name>",
+      "short": "Get the admin kubeconfig for a tenant cluster",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for kubeconfig",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "namespace",
+          "type": "string",
+          "default": "",
+          "usage": "Management namespace holding the kubeconfig Secret (default: nvke-system, then nke-system)"
+        },
+        {
+          "name": "output-file",
+          "type": "string",
+          "default": "",
+          "usage": "Write kubeconfig to file instead of stdout"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get machineimages",
+      "use": "machineimages [name ...]",
+      "short": "List machine images on the active site's management cluster",
+      "aliases": [
+        "machineimage"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for machineimages",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: table)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get nodepoolreleases",
+      "use": "nodepoolreleases [name ...]",
+      "short": "List node pool releases on the active site's management cluster",
+      "aliases": [
+        "nodepoolrelease"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepoolreleases",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: table)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get nodepools",
+      "use": "nodepools [name ...]",
+      "short": "List node pools on the management plane",
+      "aliases": [
+        "nodepool"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "cluster",
+          "type": "string",
+          "default": "",
+          "usage": "Filter output to node pools of the named cluster",
+          "shorthand": "c"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepools",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: table)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl get providers",
+      "use": "providers",
+      "short": "List infrastructure providers installed on the management cluster",
+      "aliases": [
+        "provider"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for providers",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format: json or yaml (default: table)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl inspect",
+      "use": "inspect",
+      "short": "Internal diagnostics: print one view of a file nvkectl reads",
+      "aliases": null,
+      "executable": false,
+      "hidden": true,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for inspect",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl inspect nvkr-release",
+      "use": "nvkr-release FILE (--artifacts [--kind KIND] | --meta | --select NAME --arch OS/ARCH)",
+      "short": "Print one view of the release description nvkr release export writes",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "arch",
+          "type": "string",
+          "default": "",
+          "usage": "With --select: the architecture to select for, linux/amd64 or linux/arm64"
+        },
+        {
+          "name": "artifacts",
+          "type": "bool",
+          "default": "false",
+          "usage": "Print one tab-separated line per output"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nvkr-release",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "kind",
+          "type": "string",
+          "default": "",
+          "usage": "With --artifacts: print only outputs of this kind (oci, helm-oci, executable, disk-image, ...)"
+        },
+        {
+          "name": "meta",
+          "type": "bool",
+          "default": "false",
+          "usage": "Print the metadata as shell assignments"
+        },
+        {
+          "name": "select",
+          "type": "string",
+          "default": "",
+          "usage": "Print the output of this name for --arch"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl inspect sitespec",
+      "use": "sitespec FILE",
+      "short": "Print the site facts the install stages read, as shell assignments",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for sitespec",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl inspect stack-config",
+      "use": "stack-config FILE",
+      "short": "Validate a stack config file and the install's credentials, and print the facts the install scripts read, as shell assignments",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for stack-config",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl inspect values",
+      "use": "values FILE",
+      "short": "Print the top-level keys of a Helm values file, one per line",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for values",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl patch",
+      "use": "patch",
+      "short": "Patch a resource",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for patch",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl patch cluster",
+      "use": "cluster <name>",
+      "short": "Patch a tenant cluster",
+      "aliases": [
+        "clusters"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for cluster",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "patch",
+          "type": "string",
+          "default": "",
+          "usage": "Inline patch document. Accepts YAML or JSON",
+          "shorthand": "p"
+        },
+        {
+          "name": "patch-file",
+          "type": "string",
+          "default": "",
+          "usage": "Path to a YAML or JSON patch file, or '-' to read from stdin"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl patch nodepool",
+      "use": "nodepool <name> --cluster <cluster>",
+      "short": "Patch a node pool",
+      "aliases": [
+        "nodepools"
+      ],
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "cluster",
+          "type": "string",
+          "default": "",
+          "usage": "Name of the cluster that owns the node pool",
+          "shorthand": "c"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for nodepool",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "patch",
+          "type": "string",
+          "default": "",
+          "usage": "Inline patch document. Accepts YAML or JSON",
+          "shorthand": "p"
+        },
+        {
+          "name": "patch-file",
+          "type": "string",
+          "default": "",
+          "usage": "Path to a YAML or JSON patch file, or '-' to read from stdin"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl render",
+      "use": "render",
+      "short": "Write a resolved copy of an input, ready to apply",
+      "aliases": null,
+      "executable": false,
+      "hidden": true,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for render",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl render deploy-path",
+      "use": "deploy-path --deploy-path DIR (--sitespec FILE --stack-config FILE | --release FILE | both) --out DIR",
+      "short": "Resolve a deploy path for a site and against an NVKR release, and write the result",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "arch",
+          "type": "string",
+          "default": "linux/arm64",
+          "usage": "The nodes' architecture, linux/amd64 or linux/arm64; default: this machine's"
+        },
+        {
+          "name": "credentials",
+          "type": "string",
+          "default": "rendered",
+          "usage": "Where the site's credentials go: rendered (Secret manifests in the site-credentials item) or external (none written; the Secrets the cluster must hold are listed)"
+        },
+        {
+          "name": "deploy-path",
+          "type": "string",
+          "default": "",
+          "usage": "The committed deploy path (required)"
+        },
+        {
+          "name": "ephemeral",
+          "type": "bool",
+          "default": "false",
+          "usage": "The caller removes --out when it is done; the summary does not ask the operator to"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for deploy-path",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "nvkr-run-dir",
+          "type": "string",
+          "default": "",
+          "usage": "A completed NVKR Run or a directory of OCI layouts to read artifacts from instead of a registry"
+        },
+        {
+          "name": "out",
+          "type": "string",
+          "default": "",
+          "usage": "Directory to write; must not exist and must not be under a shared temp directory (required)"
+        },
+        {
+          "name": "plain-http-registries",
+          "type": "stringSlice",
+          "default": "[]",
+          "usage": "Registry hosts served over plain HTTP; nothing is probed"
+        },
+        {
+          "name": "release",
+          "type": "string",
+          "default": "",
+          "usage": "The NVKR release description, JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "sitespec",
+          "type": "string",
+          "default": "",
+          "usage": "The site spec: the site name, VIP and trust domain (with --stack-config)",
+          "shorthand": "f"
+        },
+        {
+          "name": "stack-config",
+          "type": "string",
+          "default": "",
+          "usage": "The stack config file: the stack's input for this site (with --sitespec)"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl validate",
+      "use": "validate",
+      "short": "Validate a file before acting on it",
+      "aliases": null,
+      "executable": false,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for validate",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl validate sitespec",
+      "use": "sitespec",
+      "short": "Check a site spec the way nvkectl bootstrap site reads it",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "allow-control-plane-without-vip",
+          "type": "bool",
+          "default": "false",
+          "usage": "Permit a multi-node control plane without a VIP. Development only; bootstrap site needs the same flag."
+        },
+        {
+          "name": "bootstrap-only",
+          "type": "bool",
+          "default": "false",
+          "usage": "Also fail on what only the bootstrap host holds, as \"bootstrap site\" does"
+        },
+        {
+          "name": "disable-mtls",
+          "type": "bool",
+          "default": "false",
+          "usage": "Check the file as \"bootstrap site --disable-mtls\" would: with infra.provider nico, spire.externalAddress is not required"
+        },
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for sitespec",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "sitespec",
+          "type": "string",
+          "default": "",
+          "usage": "Path to the site spec (required)",
+          "shorthand": "f"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    },
+    {
+      "path": "nvkectl version",
+      "use": "version",
+      "short": "Print version information",
+      "aliases": null,
+      "executable": true,
+      "hidden": false,
+      "flags": [
+        {
+          "name": "help",
+          "type": "bool",
+          "default": "false",
+          "usage": "help for version",
+          "shorthand": "h"
+        },
+        {
+          "name": "json-logs",
+          "type": "bool",
+          "default": "false",
+          "usage": "Emit logs as JSON"
+        },
+        {
+          "name": "output",
+          "type": "string",
+          "default": "",
+          "usage": "Output format (short|yaml|json)",
+          "shorthand": "o"
+        },
+        {
+          "name": "site",
+          "type": "string",
+          "default": "",
+          "usage": "Override the active site for this invocation"
+        },
+        {
+          "name": "verbose",
+          "type": "bool",
+          "default": "false",
+          "usage": "Enable debug logging",
+          "shorthand": "v"
+        }
+      ]
+    }
   ]
 }
