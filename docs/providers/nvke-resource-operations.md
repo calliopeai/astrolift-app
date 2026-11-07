@@ -91,5 +91,6 @@ journal. Editor and mutation queries use no-cache and redacted request contexts.
 Local proof covers real PostgreSQL/GraphQL admission and real Kubernetes
 replacement, stale snapshots, replacement between preflight and PUT, browser
 resource-mode recovery, preparation reads, actor changes and opaque integer text.
-Collection creation flows, native subresource/lifecycle controls and CLI
-source-binding flags remain delivery work.
+Collection creation uses the ordinary native admission path from the collection editor;
+it has no existing resource observation to bind. Native subresource/lifecycle controls
+and CLI source-binding flags remain delivery work.

@@ -8,7 +8,14 @@ current authority again at admission and before remote I/O.
 
 `/nvke/{siteId}/resources` lists the pinned collection definitions (a fixed-cardinality
 catalog, not a capped resource inventory). Each collection opens an inventory editor and
-saved observation list. Running a read admits a complete inventory operation; the returned
+saved observation list. Its editor offers the collection read and native creation action,
+when upstream defines one. The 18 pinned collections include 14 creation actions; config
+profiles, node sets, nodes and releases in the controller remain read-only collections.
+Creation uses ordinary native admission, the selected action's own permission, native schema
+and parameter template, and an explicit target/site-version confirmation. It opens the durable
+operation without silently re-reading or changing the saved observation. A lost creation reply
+must resolve the same site journal before another inventory read or write can replace it.
+Running a read admits a complete inventory operation; the returned
 snapshot UUID is kept in the URL. Refresh checks operation status and saved metadata without
 starting another native read or discarding the same visit's native parameter draft. Admission
 stays disabled while source data refreshes or has errors. Caller/site changes clear the view.
@@ -94,6 +101,6 @@ and confirm the fixed target and reviewed site version. Public interfaces prepar
 when an ETag is absent; controller edits explicitly show their weaker concurrency guarantee.
 
 Observation browsing uses manual refresh; a confirmed preparation GET polls its own operation
-for a bounded interval. Collection creation, native subresource/lifecycle controls, site bootstrap,
+for a bounded interval. Native subresource/lifecycle controls, site bootstrap,
 additional workload access management, telemetry and live hardware qualification remain delivery work.
 Observation browsing and the native editor do not establish full integration qualification.

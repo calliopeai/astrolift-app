@@ -126,3 +126,20 @@ test("nvke resource edit confirms its fixed target and retains opaque integer te
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByLabel("Native parameters (JSON)")).toHaveValue(text);
 });
+
+test("nvke collection creation confirms its resource target without converting native integers", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-inventory--observed&viewMode=story");
+  await page.locator("#nvke-action").click();
+  await page.getByRole("option", { name: "controller · createCluster", exact: true }).click();
+  const raw = '{"body":{"name":"new-collection-cluster","count":9007199254740993}}';
+  await page.getByLabel("Native parameters (JSON)").fill(raw);
+  await page.getByRole("button", { name: "Review change", exact: true }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("new-collection-cluster");
+  await expect(dialog).toContainText("createCluster");
+  await expect(dialog).toContainText("site version 7");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByLabel("Native parameters (JSON)")).toHaveValue(raw);
+});

@@ -17713,6 +17713,8 @@
     "prepareEdit": "Leer recurso para editar",
     "recoverReceipt": "Recuperar recibo original",
     "observedConcurrencyHelp": "El controlador no ofrece una comprobación atómica de versión. Se comprueba la configuración editable antes del envío, pero otra escritura aún puede competir después.",
-    "conditionalConcurrencyHelp": "La escritura nativa usa la versión e identidad revisadas exactas; los conflictos requieren otra observación."
+    "conditionalConcurrencyHelp": "La escritura nativa usa la versión e identidad revisadas exactas; los conflictos requieren otra observación.",
+    "collectionActions": "Leer o crear recursos",
+    "collectionActionsHelp": "Lee la colección completa o crea un recurso con su esquema nativo. La creación es una escritura y requiere confirmación; no actualiza la observación guardada."
   }
 }

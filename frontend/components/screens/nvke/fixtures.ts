@@ -28,6 +28,15 @@ export const COLLECTION: NvkeCollectionView = {
       path: "/clusters",
     },
     {
+      key: "createCluster",
+      surface: "CONTROLLER",
+      resourceKind: "Cluster",
+      permission: "nvke.manage",
+      verb: "POST",
+      mutates: true,
+      path: "/clusters",
+    },
+    {
       key: "updateCluster",
       surface: "CONTROLLER",
       resourceKind: "Cluster",

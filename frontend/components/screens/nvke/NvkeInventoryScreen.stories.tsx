@@ -1,13 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fakeController } from "@/components/data-table/fixtures";
 import { NvkeInventoryScreen } from "./NvkeInventoryScreen";
+import { nativeTemplateText } from "@/lib/nvke/contract";
+import { nvkeCollectionActions } from "@/lib/nvke/inventory";
 import { COLLECTION, INVENTORY_ITEM, OPERATION, SITE_DETAIL } from "./fixtures";
 export default {
   title: "Screens/NVKE/Inventory",
   component: NvkeInventoryScreen,
   args: {
     ...SITE_DETAIL,
-    actions: [COLLECTION.actions[0]],
+    actions: nvkeCollectionActions(COLLECTION),
     collection: COLLECTION,
     table: fakeController({ rows: [INVENTORY_ITEM] }),
     operation: {
@@ -17,7 +19,7 @@ export default {
       status: "SUCCEEDED",
     },
     observedAt: "2026-11-07T12:03:00Z",
-    templateText: () => "{}",
+    templateText: (action) => (action.key === COLLECTION.key ? "{}" : nativeTemplateText(action)),
   },
 } satisfies Meta<typeof NvkeInventoryScreen>;
 type Story = StoryObj<typeof NvkeInventoryScreen>;
@@ -62,4 +64,15 @@ export const Width768: Story = {
       <NvkeInventoryScreen {...args} />
     </div>
   ),
+};
+
+export const CreateRecovery: Story = {
+  args: {
+    recovery: {
+      operationKey: "createCluster",
+      requestId: OPERATION.requestId,
+      expectedSiteVersion: 7,
+      timeoutSeconds: 7200,
+    },
+  },
 };

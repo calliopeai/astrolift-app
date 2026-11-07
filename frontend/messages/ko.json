@@ -17710,6 +17710,8 @@
     "prepareEdit": "편집할 리소스 읽기",
     "recoverReceipt": "원래 접수 기록 복구",
     "observedConcurrencyHelp": "컨트롤러에는 원자적 버전 검사가 없습니다. 전송 전에 편집 가능한 구성을 확인하지만 이후 다른 쓰기와의 경합은 막을 수 없습니다.",
-    "conditionalConcurrencyHelp": "기본 쓰기는 검토한 버전과 식별자를 그대로 사용합니다. 충돌이 발생하면 새 관측이 필요합니다."
+    "conditionalConcurrencyHelp": "기본 쓰기는 검토한 버전과 식별자를 그대로 사용합니다. 충돌이 발생하면 새 관측이 필요합니다.",
+    "collectionActions": "리소스 읽기 또는 생성",
+    "collectionActionsHelp": "전체 컬렉션을 읽거나 기본 스키마를 사용하여 리소스를 생성합니다. 생성은 쓰기 작업이므로 확인이 필요하며 저장된 관측 결과를 갱신하지 않습니다."
   }
 }

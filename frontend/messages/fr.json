@@ -17713,6 +17713,8 @@
     "prepareEdit": "Lire la ressource à modifier",
     "recoverReceipt": "Récupérer le reçu initial",
     "observedConcurrencyHelp": "Le contrôleur ne propose pas de vérification atomique de version. La configuration modifiable est vérifiée avant l’envoi, mais une autre écriture peut encore intervenir ensuite.",
-    "conditionalConcurrencyHelp": "L’écriture native utilise exactement la version et l’identité examinées ; tout conflit nécessite une nouvelle observation."
+    "conditionalConcurrencyHelp": "L’écriture native utilise exactement la version et l’identité examinées ; tout conflit nécessite une nouvelle observation.",
+    "collectionActions": "Lire ou créer des ressources",
+    "collectionActionsHelp": "Lisez la collection complète ou créez une ressource avec son schéma natif. La création est une écriture et nécessite une confirmation ; elle ne met pas à jour l’observation enregistrée."
   }
 }

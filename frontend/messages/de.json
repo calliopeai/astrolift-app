@@ -17713,6 +17713,8 @@
     "prepareEdit": "Ressource zum Bearbeiten lesen",
     "recoverReceipt": "Ursprünglichen Beleg abrufen",
     "observedConcurrencyHelp": "Der Controller bietet keine atomare Versionsprüfung. Die bearbeitbare Konfiguration wird vor dem Senden geprüft; danach kann weiterhin ein konkurrierender Schreibvorgang auftreten.",
-    "conditionalConcurrencyHelp": "Der native Schreibvorgang verwendet genau die geprüfte Version und Identität; Konflikte erfordern eine neue Beobachtung."
+    "conditionalConcurrencyHelp": "Der native Schreibvorgang verwendet genau die geprüfte Version und Identität; Konflikte erfordern eine neue Beobachtung.",
+    "collectionActions": "Ressourcen lesen oder erstellen",
+    "collectionActionsHelp": "Lesen Sie die vollständige Sammlung oder erstellen Sie eine Ressource mit ihrem nativen Schema. Die Erstellung ist ein Schreibvorgang und erfordert eine Bestätigung; die gespeicherte Beobachtung wird nicht aktualisiert."
   }
 }

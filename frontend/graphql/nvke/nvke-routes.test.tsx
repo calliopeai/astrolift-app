@@ -23,7 +23,7 @@ import { useNvkeOperation } from "./use-nvke-operation";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
-const caller = vi.hoisted(() => ({ actorId: 41 }));
+const caller = vi.hoisted(() => ({ actorId: 41, manage: true }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("./nvke.hooks", async (original) => {
@@ -39,7 +39,7 @@ vi.mock("./nvke.hooks", async (original) => {
       return {
         scope,
         scopeKey: JSON.stringify([scope.server, scope.organizationId, scope.actorId]),
-        access: { read: true, manage: true, admin: true, loading: false },
+        access: { read: true, manage: caller.manage, admin: true, loading: false },
         loading: false,
         failed: false,
       };
@@ -59,6 +59,7 @@ const values = {
 beforeEach(() => {
   localStorage.clear();
   caller.actorId = 41;
+  caller.manage = true;
   navigation.push.mockReset();
   vi.stubGlobal("navigator", {
     locks: {
@@ -68,7 +69,9 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 function harness(
-  respond: (operation: Operation) => Record<string, unknown> | Promise<Record<string, unknown>>
+  respond: (operation: Operation) => Record<string, unknown> | Promise<Record<string, unknown>>,
+  collection = COLLECTION,
+  site = SITE
 ) {
   const calls: Operation[] = [];
   const cache = new InMemoryCache();
@@ -83,7 +86,7 @@ function harness(
               if (operation.operationName === "GetNvkeSite")
                 return {
                   astroliftNvkeSite: {
-                    ...SITE,
+                    ...site,
                     createdAt: OPERATION.createdAt,
                     updatedAt: OPERATION.updatedAt,
                   },
@@ -93,7 +96,7 @@ function harness(
                   astroliftNvkeContract: {
                     revision: SITE.upstreamRevision,
                     actions: ACTIONS,
-                    collections: [COLLECTION],
+                    collections: [collection],
                     controllerOpenapi: {},
                     resources: [],
                   },
@@ -781,3 +784,130 @@ it("discards a late resource editor across an actor A to B to A change", async (
   expect(result.current?.editor).toBeNull();
   expect(navigation.push).not.toHaveBeenCalled();
 });
+
+it.each(["CONTROLLER", "TENANT", "OPERATOR", "DATASTORE"] as const)(
+  "creates a %s collection resource through native admission while retaining exact text",
+  async (surface) => {
+    const action = {
+      ...COLLECTION.actions.find((a) => a.key === "createCluster")!,
+      key: surface === "DATASTORE" ? "datastore.createNVKECluster" : "createCluster",
+      surface,
+      verb: surface === "DATASTORE" ? "create" : "POST",
+    };
+    const collection = {
+      ...COLLECTION,
+      surface,
+      actions: [{ ...COLLECTION.actions[0], surface }, action],
+    };
+    const h = harness(
+      (request) => {
+        if (request.operationName === "RequestNvkeOperationText") {
+          const pending = readRecovery(localStorage, scope, SITE.id);
+          expect(pending).toMatchObject({ format: 2, mode: "native", operationKey: action.key });
+          return {
+            requestNvkeOperationText: {
+              ok: true,
+              errors: [],
+              data: {
+                ...OPERATION,
+                isInventory: false,
+                operationKey: action.key,
+                requestId: request.variables.input.requestId,
+              },
+            },
+          };
+        }
+        throw new Error("Creation must use native admission only");
+      },
+      collection,
+      { ...SITE, connections: [{ ...SITE.connections[0], surface }] }
+    );
+    const { result } = renderHook(() => useNvkeInventory(SITE.id, collection.key, null), {
+      wrapper: h.wrapper,
+    });
+    await waitFor(() => expect(result.current.catalogLoading).toBe(false));
+    expect(result.current.actions.map((a) => a.key)).toEqual([collection.key, action.key]);
+    const text =
+      surface === "DATASTORE"
+        ? '{"document":{"metadata":{"name":"new-cluster"},"spec":{"count":9007199254740993}}}'
+        : '{"body":{"name":"new-cluster","count":9007199254740993}}';
+    await act(async () => {
+      expect(
+        await result.current.onRequest({
+          operationKey: action.key,
+          parametersText: text,
+          timeoutSeconds: 7200,
+        })
+      ).toBe(true);
+    });
+    const mutation = h.calls.find((c) => c.operationName === "RequestNvkeOperationText")!;
+    expect(mutation.variables.input).toMatchObject({
+      parametersText: text,
+      expectedActorId: 41,
+      expectedSiteVersion: SITE.version,
+    });
+    expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${OPERATION.id}`);
+    expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+    expect(h.cache.extract()).toEqual({});
+  }
+);
+it("refuses collection edits and unpermitted creation before transmitting a mutation", async () => {
+  const h = harness(() => {
+    throw new Error("Must not transmit");
+  });
+  const { result, rerender } = renderHook(() => useNvkeInventory(SITE.id, COLLECTION.key, null), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.catalogLoading).toBe(false));
+  await act(async () => {
+    expect(await result.current.onRequest({ ...values, operationKey: "updateCluster" })).toBe(
+      false
+    );
+  });
+  caller.manage = false;
+  rerender();
+  await act(async () => {
+    expect(await result.current.onRequest(values)).toBe(false);
+  });
+  expect(h.calls.some((c) => c.operationName?.startsWith("Request"))).toBe(false);
+  expect(localStorage.length).toBe(0);
+});
+it.each([false, true])(
+  "recovers an original creation before changing to inventory mode, receipt visible: %s",
+  async (visible) => {
+    let accepted: Record<string, unknown> | null = null;
+    const h = harness((request) => {
+      if (request.operationName === "GetNvkeRequest")
+        return { astroliftNvkeRequest: visible ? accepted : null };
+      if (request.operationName === "RequestNvkeOperationText") {
+        accepted = {
+          ...OPERATION,
+          operationKey: values.operationKey,
+          requestId: request.variables.input.requestId,
+        };
+        throw new Error("Lost creation reply");
+      }
+      throw new Error("Must retain original creation");
+    });
+    const { result } = renderHook(() => useNvkeInventory(SITE.id, COLLECTION.key, null), {
+      wrapper: h.wrapper,
+    });
+    await waitFor(() => expect(result.current.catalogLoading).toBe(false));
+    await act(async () => {
+      expect(await result.current.onRequest(values)).toBe(false);
+    });
+    const original = readRecovery(localStorage, scope, SITE.id);
+    await act(async () => {
+      expect(
+        await result.current.onRequest({
+          ...values,
+          operationKey: COLLECTION.key,
+          parametersText: "{}",
+        })
+      ).toBe(visible);
+    });
+    expect(h.calls.filter((c) => c.operationName === "RequestNvkeOperationText")).toHaveLength(1);
+    expect(h.calls.some((c) => c.operationName === "RequestNvkeInventory")).toBe(false);
+    expect(readRecovery(localStorage, scope, SITE.id)).toEqual(visible ? null : original);
+  }
+);

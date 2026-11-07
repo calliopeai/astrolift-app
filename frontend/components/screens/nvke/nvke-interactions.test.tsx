@@ -201,3 +201,26 @@ it("site creation remains unavailable until admin authority is established", () 
   expect(screen.queryByRole("button", { name: messages.nvke.createSite })).not.toBeInTheDocument();
   expect(onCreate).not.toHaveBeenCalled();
 });
+
+it("blocks a creation confirmation after its reviewed site version changes", async () => {
+  const onRequest = vi.fn().mockResolvedValue(true);
+  const view = render(
+    <NvkeNativePanel {...SITE_DETAIL} actions={[ACTIONS[1]]} onRequest={onRequest} />,
+    { wrapper: Context }
+  );
+  fireEvent.click(screen.getByRole("button", { name: messages.nvke.reviewRequest }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent("site version 7");
+  view.rerender(
+    <NvkeNativePanel
+      {...SITE_DETAIL}
+      site={{ ...SITE, version: 8 }}
+      actions={[ACTIONS[1]]}
+      onRequest={onRequest}
+    />
+  );
+  expect(within(dialog).getByRole("button", { name: messages.nvke.submitRequest })).toBeDisabled();
+  expect(dialog).toHaveTextContent("site version 7");
+  fireEvent.click(within(dialog).getByRole("button", { name: messages.nvke.submitRequest }));
+  expect(onRequest).not.toHaveBeenCalled();
+});

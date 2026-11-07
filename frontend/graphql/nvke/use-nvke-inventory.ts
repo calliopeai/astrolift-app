@@ -20,12 +20,18 @@ import type {
   ListNvkeInventoryPageQuery,
   RequestNvkeInventoryMutation,
   RequestNvkeInventoryMutationVariables,
+  RequestNvkeOperationTextMutation,
+  RequestNvkeOperationTextMutationVariables,
   GetNvkeInventoryResourceQuery,
   GetNvkeInventoryDocumentTextQuery,
 } from "@/graphql/__generated__/operations";
-import { nativeSchemaText } from "@/lib/nvke/contract";
+import { nativeSchemaText, nativeTemplateText } from "@/lib/nvke/contract";
 import { admitNvkeRequest, NvkeAdmissionError } from "@/lib/nvke/admission";
-import { nvkeInventoryHref, validNvkeCollectionKey } from "@/lib/nvke/inventory";
+import {
+  nvkeCollectionActions,
+  nvkeInventoryHref,
+  validNvkeCollectionKey,
+} from "@/lib/nvke/inventory";
 import {
   validNvkeGuid,
   NvkeRecoveryError,
@@ -44,7 +50,7 @@ import {
   GET_NVKE_INVENTORY_RESOURCE,
   GET_NVKE_INVENTORY_DOCUMENT_TEXT,
 } from "./nvke.queries";
-import { REQUEST_NVKE_INVENTORY } from "./nvke.mutations";
+import { REQUEST_NVKE_INVENTORY, REQUEST_NVKE_OPERATION_TEXT } from "./nvke.mutations";
 import { useNvkeResourceActions } from "./use-nvke-resource-actions";
 
 const useInventorySource = (siteId: string) => {
@@ -140,6 +146,7 @@ export const useNvkeInventory = (
     expectedNvkeOrganization: context.scope?.organizationId,
   };
   const allowed = !!collection && mayExecute(context.access, collection.permission);
+  const collectionActions = collection ? nvkeCollectionActions(collection) : [];
   const observation = useNvkeRead<GetNvkeOperationQuery>(
     GET_NVKE_OPERATION,
     { operationId: snapshotId },
@@ -221,11 +228,15 @@ export const useNvkeInventory = (
     observedAt: operation?.finishedAt ?? null,
     loading: context.loading || siteQuery.loading || catalog.loading,
     access: context.access,
-    actions: collection?.actions.filter((row) => row.key === collection.key) ?? [],
+    actions: collectionActions,
     contractRevision: contract?.revision ?? null,
-    catalogLoading: catalog.loading || journal?.key !== binding || !!journal?.failed,
+    catalogLoading:
+      siteQuery.loading || catalog.loading || journal?.key !== binding || !!journal?.failed,
     schemaText: (action) => (contract ? nativeSchemaText(contract, action) : ""),
-    templateText: () => collection?.defaultParametersText ?? "{}",
+    templateText: (action) =>
+      action.key === collectionKey
+        ? (collection?.defaultParametersText ?? "{}")
+        : nativeTemplateText(action),
     recovery: journal?.key === binding ? journal.record : null,
     pending: mutation?.key === visitKey && mutation.pending,
     error: failed
@@ -237,6 +248,7 @@ export const useNvkeInventory = (
           : null,
     onRefresh: refresh,
     onRequest: async (values) => {
+      const action = collectionActions.find((row) => row.key === values.operationKey);
       if (
         !current() ||
         !binding ||
@@ -246,7 +258,8 @@ export const useNvkeInventory = (
         !contract ||
         !allowed ||
         failed ||
-        values.operationKey !== collection.key ||
+        !action ||
+        !mayExecute(context.access, action.permission) ||
         siteQuery.loading ||
         catalog.loading ||
         journal?.key !== binding ||
@@ -262,14 +275,14 @@ export const useNvkeInventory = (
           siteId,
           expectedSiteVersion: site.version,
           revision: contract.revision,
-          mode: "inventory",
+          mode: action.key === collection.key ? "inventory" : "native",
           values,
           storage: window.localStorage,
           current,
           sourceAvailable: () =>
             site.isActive &&
             site.upstreamRevision === contract.revision &&
-            site.connections.some((row) => row.surface === collection.surface && row.isEnabled),
+            site.connections.some((row) => row.surface === action.surface && row.isEnabled),
           onRecord: (record) => setJournal({ key: binding, record, failed: false }),
           receipt: async (requestId) => {
             const result = await client.query<GetNvkeRequestQuery>({
@@ -281,6 +294,18 @@ export const useNvkeInventory = (
             return result.data?.astroliftNvkeRequest ?? null;
           },
           admit: async (input) => {
+            if (action.key !== collection.key) {
+              const result = await client.mutate<
+                RequestNvkeOperationTextMutation,
+                RequestNvkeOperationTextMutationVariables
+              >({
+                mutation: REQUEST_NVKE_OPERATION_TEXT,
+                variables: { input },
+                fetchPolicy: "no-cache",
+                context: requestContext,
+              });
+              return result.data?.requestNvkeOperationText;
+            }
             const result = await client.mutate<
               RequestNvkeInventoryMutation,
               RequestNvkeInventoryMutationVariables

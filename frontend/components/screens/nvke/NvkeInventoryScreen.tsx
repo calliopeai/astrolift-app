@@ -125,7 +125,7 @@ export function NvkeInventoryScreen(props: NvkeInventoryScreenProps) {
           {operation ? t("acceptedHelp") : t("noInventory")}
         </p>
       )}
-      <NvkeNativePanel {...props} />
+      <NvkeNativePanel {...props} presentation="collection" disabled={Boolean(error)} />
     </PageShell>
   );
 }

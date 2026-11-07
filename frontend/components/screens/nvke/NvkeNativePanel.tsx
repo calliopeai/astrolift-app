@@ -30,7 +30,7 @@ import {
   type NvkeSiteScreenProps,
 } from "./types";
 
-export type NvkeNativePanelProps = Pick<
+export type NvkeNativePanelProps = { presentation?: "collection"; disabled?: boolean } & Pick<
   NvkeSiteScreenProps,
   | "site"
   | "actions"
@@ -55,6 +55,8 @@ export function NvkeNativePanel({
   templateText,
   recovery,
   onRequest,
+  presentation,
+  disabled,
 }: NvkeNativePanelProps) {
   const t = useTranslations("nvke");
   const first =
@@ -71,7 +73,12 @@ export function NvkeNativePanel({
   });
   const operationKey = useWatch({ control: form.control, name: "operationKey" });
   const selected = actions.find((action) => action.key === operationKey);
-  const [review, setReview] = useState<NvkeRequestValues | null>(null);
+  const [review, setReview] = useState<{
+    values: NvkeRequestValues;
+    siteId: string;
+    siteVersion: number;
+    revision: string | null;
+  } | null>(null);
   const [switchTo, setSwitchTo] = useState<NvkeActionView | null>(null);
   const ready = Boolean(
     site?.isActive &&
@@ -80,8 +87,15 @@ export function NvkeNativePanel({
     site.connections.some((c) => c.surface === selected.surface && c.isEnabled) &&
     contractRevision === site.upstreamRevision &&
     !catalogLoading &&
+    !disabled &&
     !pending
   );
+  const reviewedSourceCurrent =
+    !!review &&
+    review.siteId === site?.id &&
+    (review.siteVersion === site.version || review.siteVersion === recovery?.expectedSiteVersion) &&
+    review.revision === contractRevision &&
+    review.values.operationKey === selected?.key;
   const choose = (action: NvkeActionView) => {
     form.reset({
       operationKey: action.key,
@@ -95,12 +109,21 @@ export function NvkeNativePanel({
     return onRequest(values);
   };
   return (
-    <Section title={t("nativeTitle")} description={t("nativeHelp")}>
+    <Section
+      title={t(presentation === "collection" ? "collectionActions" : "nativeTitle")}
+      description={t(presentation === "collection" ? "collectionActionsHelp" : "nativeHelp")}
+    >
       <form
         className="flex min-w-0 flex-col gap-4"
         onSubmit={form.handleSubmit(async (values) => {
           if (!ready || !selected) return;
-          if (selected.mutates) setReview(values);
+          if (selected.mutates && site)
+            setReview({
+              values: { ...values },
+              siteId: site.id,
+              siteVersion: recovery?.expectedSiteVersion ?? site.version,
+              revision: contractRevision,
+            });
           else await request(values);
         })}
       >
@@ -219,19 +242,20 @@ export function NvkeNativePanel({
             {t("mutationContext", {
               site: site?.name ?? "",
               action: selected?.key ?? "",
-              version: recovery?.expectedSiteVersion ?? site?.version ?? 0,
+              version: review?.siteVersion ?? recovery?.expectedSiteVersion ?? site?.version ?? 0,
             })}
             <span className="mt-2 block font-mono text-xs [overflow-wrap:anywhere]">
               {t("mutationTarget", {
-                target: nativeTarget(review?.parametersText ?? "") ?? t("targetFromParameters"),
+                target:
+                  nativeTarget(review?.values.parametersText ?? "") ?? t("targetFromParameters"),
               })}
             </span>
           </>
         }
         confirmLabel={t("submitRequest")}
         destructive={selected?.verb === "DELETE" || selected?.verb === "delete"}
-        confirmDisabled={!ready}
-        onConfirm={async () => (review ? request(review) : false)}
+        confirmDisabled={!ready || !reviewedSourceCurrent}
+        onConfirm={async () => (reviewedSourceCurrent && review ? request(review.values) : false)}
       />
       <ConfirmDialog
         open={Boolean(switchTo)}
