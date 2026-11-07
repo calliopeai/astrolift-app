@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 
 from nvke.contract import _contract, operations, resources, upstream_revision
+from nvke.operations import action
 
 OUTPUT = Path(__file__).resolve().parents[3] / "docs" / "providers" / "nvke.md"
 
@@ -46,14 +47,14 @@ def render() -> str:
         "",
         "Each operation maps to the site's API adapter, the matching domain page in the NVKE operator UI,",
         "and `astro nvke` commands. Reads require `nvke.read`; mutations require `nvke.manage`;",
-        "site configuration, credentials and bootstrap require `nvke.admin`. These are planned catalog",
-        "permissions, not assertions that the permission catalog already implements them.",
+        "operator/artifact APIs, credential access and site administration require `nvke.admin`.",
+        "The catalog derives permissions from the executable allowlist; delivery still needs UI/CLI/live evidence.",
         "",
         "| Operation | Surface | Upstream route | Planned permission | Delivery evidence |",
         "|---|---|---|---|---|",
     ]
     for op in operations():
-        permission = "nvke.manage" if op.mutates else "nvke.read"
+        permission = action(op.id).permission
         lines.append(f"| `{op.id}` | {op.surface} | `{op.method} {op.path}` | `{permission}` | Pending |")
     lines.extend(
         [

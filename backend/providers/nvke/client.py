@@ -7,7 +7,7 @@ import json
 import math
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import quote, urlsplit
 
 import httpx
@@ -78,6 +78,15 @@ class NvkeResponse:
     status_code: int
     data: Any
     resource_version: str | None = None
+
+
+@dataclass(frozen=True)
+class PreparedRequest:
+    operation: Operation
+    path: dict[str, str]
+    query: dict[str, Any]
+    body: dict[str, Any] | None
+    headers: dict[str, str]
 
 
 def _schema(value: Any) -> Any:
@@ -159,6 +168,7 @@ class NvkeClient:
         verify: Any = True,
         transport: httpx.BaseTransport | None = None,
         max_response_bytes: int = MAX_RESPONSE_BYTES,
+        before_request: Callable[[], None] | None = None,
     ) -> None:
         if not math.isfinite(timeout) or timeout <= 0 or max_response_bytes <= 0:
             raise ValueError("NVKE timeout and response limit must be positive and finite")
@@ -174,8 +184,9 @@ class NvkeClient:
         )
         self._max_response_bytes = max_response_bytes
         self._spec = controller_spec()
+        self._before_request = before_request
 
-    def __enter__(self) -> NvkeClient:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_args: Any) -> None:
@@ -193,10 +204,30 @@ class NvkeClient:
         body: dict[str, Any] | None = None,
         resource_version: str | None = None,
     ) -> NvkeResponse:
-        op = operation(operation_id)
-        endpoint = self._endpoints.get(op.surface)
+        prepared = self.prepare(operation_id, path=path, query=query, body=body, resource_version=resource_version)
+        endpoint = self._endpoints.get(prepared.operation.surface)
         if endpoint is None:
             raise NvkeError("SURFACE_UNAVAILABLE", "The requested NVKE interface is not configured")
+        return self._call(
+            prepared.operation,
+            endpoint,
+            path=prepared.path,
+            query=prepared.query,
+            body=prepared.body,
+            headers=prepared.headers,
+        )
+
+    def prepare(
+        self,
+        operation_id: str,
+        *,
+        path: Mapping[str, str] | None = None,
+        query: Mapping[str, Any] | None = None,
+        body: dict[str, Any] | None = None,
+        resource_version: str | None = None,
+    ) -> PreparedRequest:
+        """Validate without reading credentials or contacting an endpoint."""
+        op = operation(operation_id)
         path = dict(path or {})
         query = dict(query or {})
         names = set(re.findall(r"\{([^}]+)\}", op.path))
@@ -235,7 +266,7 @@ class NvkeClient:
                 headers["If-Match"] = f'"{resource_version}"'
             elif resource_version is not None:
                 raise NvkeError("INVALID_INPUT", "This NVKE operation accepts no resource version")
-        return self._call(op, endpoint, path=path, query=query, body=body, headers=headers)
+        return PreparedRequest(op, path, query, copy.deepcopy(body), headers)
 
     def _call(
         self,
@@ -248,6 +279,8 @@ class NvkeClient:
         headers: dict[str, str] | None = None,
     ) -> NvkeResponse:
         headers = {"Accept": "application/json", **(headers or {})}
+        if self._before_request is not None:
+            self._before_request()
         if endpoint.token is not None:
             try:
                 token = endpoint.token()
@@ -341,7 +374,17 @@ class NvkeClient:
                             "RESPONSE_TOO_LARGE", "NVKE response exceeds the size limit", ambiguous=op.mutates
                         )
                     chunks.extend(chunk)
-                if response.status_code == 204 or (not chunks and op.path in {"/healthz", "/readyz"}):
+                declaration = (
+                    self._spec["paths"][op.path][op.method.lower()]
+                    .get("responses", {})
+                    .get(str(response.status_code), {})
+                    if op.surface == "controller"
+                    else {}
+                )
+                declared_empty = bool(declaration) and not declaration.get("content")
+                if response.status_code == 204 or (
+                    not chunks and (declared_empty or op.path in {"/healthz", "/readyz"})
+                ):
                     data = None
                 else:
                     try:

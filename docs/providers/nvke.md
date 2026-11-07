@@ -32,8 +32,8 @@ Provider transport tests alone do not prove the application integration or live 
 
 Each operation maps to the site's API adapter, the matching domain page in the NVKE operator UI,
 and `astro nvke` commands. Reads require `nvke.read`; mutations require `nvke.manage`;
-site configuration, credentials and bootstrap require `nvke.admin`. These are planned catalog
-permissions, not assertions that the permission catalog already implements them.
+operator/artifact APIs, credential access and site administration require `nvke.admin`.
+The catalog derives permissions from the executable allowlist; delivery still needs UI/CLI/live evidence.
 
 | Operation | Surface | Upstream route | Planned permission | Delivery evidence |
 |---|---|---|---|---|
@@ -50,38 +50,38 @@ permissions, not assertions that the permission catalog already implements them.
 | `getNodePool` | controller | `GET /nodePools/{nodePoolID}` | `nvke.read` | Pending |
 | `getNodeSet` | controller | `GET /nodeSets/{nodeSetID}` | `nvke.read` | Pending |
 | `listClusters` | controller | `GET /clusters` | `nvke.read` | Pending |
-| `listConfigProfiles` | controller | `GET /configProfiles` | `nvke.read` | Pending |
+| `listConfigProfiles` | controller | `GET /configProfiles` | `nvke.admin` | Pending |
 | `listNodePools` | controller | `GET /nodePools` | `nvke.read` | Pending |
 | `listNodeSets` | controller | `GET /nodeSets` | `nvke.read` | Pending |
 | `listNodes` | controller | `GET /nodes` | `nvke.read` | Pending |
 | `listReleases` | controller | `GET /releases` | `nvke.read` | Pending |
-| `operator.createClusterRelease` | operator | `POST /v1/cluster-releases` | `nvke.manage` | Pending |
-| `operator.createClusterReleaseChannel` | operator | `POST /v1/cluster-release-channels` | `nvke.manage` | Pending |
-| `operator.createControlPlaneClass` | operator | `POST /v1/control-plane-classes` | `nvke.manage` | Pending |
-| `operator.createMachineImage` | operator | `POST /v1/machine-images` | `nvke.manage` | Pending |
-| `operator.createNodePoolRelease` | operator | `POST /v1/node-profiles` | `nvke.manage` | Pending |
-| `operator.deleteClusterRelease` | operator | `DELETE /v1/cluster-releases/{name}` | `nvke.manage` | Pending |
-| `operator.deleteClusterReleaseChannel` | operator | `DELETE /v1/cluster-release-channels/{name}` | `nvke.manage` | Pending |
-| `operator.deleteControlPlaneClass` | operator | `DELETE /v1/control-plane-classes/{name}` | `nvke.manage` | Pending |
-| `operator.deleteMachineImage` | operator | `DELETE /v1/machine-images/{name}` | `nvke.manage` | Pending |
-| `operator.deleteNodePoolRelease` | operator | `DELETE /v1/node-profiles/{name}` | `nvke.manage` | Pending |
-| `operator.getClusterRelease` | operator | `GET /v1/cluster-releases/{name}` | `nvke.read` | Pending |
-| `operator.getClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels/{name}` | `nvke.read` | Pending |
-| `operator.getControlPlaneClass` | operator | `GET /v1/control-plane-classes/{name}` | `nvke.read` | Pending |
-| `operator.getMachineImage` | operator | `GET /v1/machine-images/{name}` | `nvke.read` | Pending |
-| `operator.getNodePoolRelease` | operator | `GET /v1/node-profiles/{name}` | `nvke.read` | Pending |
-| `operator.healthz` | operator | `GET /healthz` | `nvke.read` | Pending |
-| `operator.listClusterRelease` | operator | `GET /v1/cluster-releases` | `nvke.read` | Pending |
-| `operator.listClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels` | `nvke.read` | Pending |
-| `operator.listControlPlaneClass` | operator | `GET /v1/control-plane-classes` | `nvke.read` | Pending |
-| `operator.listMachineImage` | operator | `GET /v1/machine-images` | `nvke.read` | Pending |
-| `operator.listNodePoolRelease` | operator | `GET /v1/node-profiles` | `nvke.read` | Pending |
-| `operator.readyz` | operator | `GET /readyz` | `nvke.read` | Pending |
-| `operator.updateClusterRelease` | operator | `PUT /v1/cluster-releases/{name}` | `nvke.manage` | Pending |
-| `operator.updateClusterReleaseChannel` | operator | `PUT /v1/cluster-release-channels/{name}` | `nvke.manage` | Pending |
-| `operator.updateControlPlaneClass` | operator | `PUT /v1/control-plane-classes/{name}` | `nvke.manage` | Pending |
-| `operator.updateMachineImage` | operator | `PUT /v1/machine-images/{name}` | `nvke.manage` | Pending |
-| `operator.updateNodePoolRelease` | operator | `PUT /v1/node-profiles/{name}` | `nvke.manage` | Pending |
+| `operator.createClusterRelease` | operator | `POST /v1/cluster-releases` | `nvke.admin` | Pending |
+| `operator.createClusterReleaseChannel` | operator | `POST /v1/cluster-release-channels` | `nvke.admin` | Pending |
+| `operator.createControlPlaneClass` | operator | `POST /v1/control-plane-classes` | `nvke.admin` | Pending |
+| `operator.createMachineImage` | operator | `POST /v1/machine-images` | `nvke.admin` | Pending |
+| `operator.createNodePoolRelease` | operator | `POST /v1/node-profiles` | `nvke.admin` | Pending |
+| `operator.deleteClusterRelease` | operator | `DELETE /v1/cluster-releases/{name}` | `nvke.admin` | Pending |
+| `operator.deleteClusterReleaseChannel` | operator | `DELETE /v1/cluster-release-channels/{name}` | `nvke.admin` | Pending |
+| `operator.deleteControlPlaneClass` | operator | `DELETE /v1/control-plane-classes/{name}` | `nvke.admin` | Pending |
+| `operator.deleteMachineImage` | operator | `DELETE /v1/machine-images/{name}` | `nvke.admin` | Pending |
+| `operator.deleteNodePoolRelease` | operator | `DELETE /v1/node-profiles/{name}` | `nvke.admin` | Pending |
+| `operator.getClusterRelease` | operator | `GET /v1/cluster-releases/{name}` | `nvke.admin` | Pending |
+| `operator.getClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels/{name}` | `nvke.admin` | Pending |
+| `operator.getControlPlaneClass` | operator | `GET /v1/control-plane-classes/{name}` | `nvke.admin` | Pending |
+| `operator.getMachineImage` | operator | `GET /v1/machine-images/{name}` | `nvke.admin` | Pending |
+| `operator.getNodePoolRelease` | operator | `GET /v1/node-profiles/{name}` | `nvke.admin` | Pending |
+| `operator.healthz` | operator | `GET /healthz` | `nvke.admin` | Pending |
+| `operator.listClusterRelease` | operator | `GET /v1/cluster-releases` | `nvke.admin` | Pending |
+| `operator.listClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels` | `nvke.admin` | Pending |
+| `operator.listControlPlaneClass` | operator | `GET /v1/control-plane-classes` | `nvke.admin` | Pending |
+| `operator.listMachineImage` | operator | `GET /v1/machine-images` | `nvke.admin` | Pending |
+| `operator.listNodePoolRelease` | operator | `GET /v1/node-profiles` | `nvke.admin` | Pending |
+| `operator.readyz` | operator | `GET /readyz` | `nvke.admin` | Pending |
+| `operator.updateClusterRelease` | operator | `PUT /v1/cluster-releases/{name}` | `nvke.admin` | Pending |
+| `operator.updateClusterReleaseChannel` | operator | `PUT /v1/cluster-release-channels/{name}` | `nvke.admin` | Pending |
+| `operator.updateControlPlaneClass` | operator | `PUT /v1/control-plane-classes/{name}` | `nvke.admin` | Pending |
+| `operator.updateMachineImage` | operator | `PUT /v1/machine-images/{name}` | `nvke.admin` | Pending |
+| `operator.updateNodePoolRelease` | operator | `PUT /v1/node-profiles/{name}` | `nvke.admin` | Pending |
 | `tenant.createNVKECluster` | tenant | `POST /v1/clusters` | `nvke.manage` | Pending |
 | `tenant.deleteNVKECluster` | tenant | `DELETE /v1/clusters/{name}` | `nvke.manage` | Pending |
 | `tenant.getNVKECluster` | tenant | `GET /v1/clusters/{name}` | `nvke.read` | Pending |
@@ -90,7 +90,7 @@ permissions, not assertions that the permission catalog already implements them.
 | `tenant.readyz` | tenant | `GET /readyz` | `nvke.read` | Pending |
 | `tenant.updateNVKECluster` | tenant | `PUT /v1/clusters/{name}` | `nvke.manage` | Pending |
 | `updateCluster` | controller | `PATCH /clusters/{clusterID}` | `nvke.manage` | Pending |
-| `updateClusterSpireServer` | controller | `PATCH /clusters/{clusterID}/spire-server` | `nvke.manage` | Pending |
+| `updateClusterSpireServer` | controller | `PATCH /clusters/{clusterID}/spire-server` | `nvke.admin` | Pending |
 | `updateNodePool` | controller | `PATCH /nodePools/{nodePoolID}` | `nvke.manage` | Pending |
 
 ## Management Kubernetes resources
