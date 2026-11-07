@@ -10127,6 +10127,7 @@ export type Mutation = {
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestModelConnection: ModelConnectionRequestMutationResult;
   requestNvkeInventory: NvkeOperationTypeMutationResult;
+  requestNvkeNativeWorkflow: NvkeOperationTypeMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestNvkeOperationText: NvkeOperationTypeMutationResult;
   requestNvkeResourceOperation: NvkeOperationTypeMutationResult;
@@ -11853,6 +11854,11 @@ export type MutationRequestModelConnectionArgs = {
 
 export type MutationRequestNvkeInventoryArgs = {
   input: RequestNvkeOperationTextInput;
+};
+
+
+export type MutationRequestNvkeNativeWorkflowArgs = {
+  input: RequestNvkeNativeWorkflowInput;
 };
 
 
@@ -17109,6 +17115,20 @@ export type RequestModelConnectionInput = {
   modelDeploymentId: Scalars['GUID']['input'];
   organizationId: Scalars['GUID']['input'];
   policyVersion: Scalars['String']['input'];
+};
+
+export type RequestNvkeNativeWorkflowInput = {
+  acknowledgeLostNodeTeardown: Scalars['Boolean']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  parametersText: Scalars['String']['input'];
+  requestId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+  workflow: Scalars['String']['input'];
 };
 
 export type RequestNvkeOperationInput = {

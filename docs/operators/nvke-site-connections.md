@@ -313,5 +313,55 @@ polling the configured queue or that a workflow type is registered there.
 The contract query's `nativeWorkflows` catalog separately exposes the three
 pinned operator workflow input schemas, with upstream declaration and
 registration checks. These are additional to the 88 HTTP/datastore actions.
-This foundation does not start, reset, or retire native workflows. Reviewed
-execution, recovery, and browser/CLI controls remain in #2665.
+Reviewed execution is available through the API below. Native history reset and
+dedicated browser/CLI controls remain in #2665.
+
+## Reviewed native workflow requests
+
+`requestNvkeNativeWorkflow` accepts `RequestNvkeNativeWorkflowInput`. Review the
+current `siteId`, `expectedSiteVersion`, `expectedActorId`, and
+`expectedAuthorityVersion`, choose a new UUID `requestId`, and provide `workflow`
+from the native catalog and `parametersText` containing its exact JSON input.
+`sourceOperationId` and `expectedSourceVersion` must identify a successful
+controller `getCluster` observation for the same cluster UUID, collected using
+the current site/controller authority. Current `nvke.admin` and `nvke.read` are
+required. The complete input text is masked in the mutation audit and encrypted
+in the outbox. Astro's own Temporal history carries operation IDs only; the
+native Temporal service necessarily receives the native workflow input.
+
+Use the same request UUID and reviewed inputs to recover a lost admission reply,
+or query `astroliftNvkeRequest`. Changing any reviewed input under that UUID is
+refused. One unresolved native maintenance request per cluster blocks another.
+The native ID is `astro-nvke-<operation GUID>`; retain it for operator recovery.
+Dispatch uses RejectDuplicate reuse and Fail conflict policies, with a stable
+Temporal start request ID. Sending state is durable before dispatch. A lost
+start acknowledgement is recovered only from matching native history: type,
+queue, exact input, original run, and request proof must agree. Missing history
+does not permit another start. An automatic retry never replaces a succeeded
+rotation or starts a new rotation under its old owner.
+
+`timeoutSeconds` (30–86400; default 7200) limits Astro observation. It does not set
+a native workflow run/execution timeout, cancel a native owner, or constrain the
+six-hour etcd rewrite. An observation timeout after dispatch becomes uncertain;
+`resumeNvkeOperation` with the reviewed operation version extends observation of
+the original identity. A reset/continued/retried native run is not silently
+adopted. A cancellation requested before sending prevents dispatch; requesting
+cancellation after sending continues observation and does not cancel or terminate
+the native workflow. Retain the native owner's lock and follow its recovery
+procedure. Authority changes require investigation rather than endpoint fallback.
+
+Lost-node retirement additionally requires `acknowledgeLostNodeTeardown: true`,
+the exact `nodeID`, and the retained `rotationWorkflowID`. The reviewed cluster
+observation must report that owner's failed rotation, retained mutation lock,
+and one of `add_secondary`, `promote_primary`, `rewrite`, or `remove_old_keys`.
+Before dispatch Astro verifies a matching closed, unsuccessful native rotation
+with the exact cluster input and configured queue. The native retirement workflow
+then performs its live node/quorum/ownership checks and can permanently remove
+that control-plane node. Backups, survivor rewrite checks, and a reviewed owner
+reset remain operator recovery requirements; Astro does not clear the lock.
+
+`native_workflow_completed` records successful native workflow completion only.
+Collect fresh controller observations and site qualification evidence to prove
+certificate outcomes, cleared rotation ownership, all-node convergence, and
+preexisting Secret rewrite/readability. The local Temporal transport tests use
+fixture workflows; they do not qualify native hardware or encryption changes.

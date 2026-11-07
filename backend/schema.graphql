@@ -10861,6 +10861,7 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  requestNvkeNativeWorkflow(input: RequestNvkeNativeWorkflowInput!): NvkeOperationTypeMutationResult!
   configureNvkeTemporalAuthority(input: ConfigureNvkeTemporalAuthorityInput!): NvkeTemporalAuthorityTypeMutationResult!
   setNvkeTemporalAuthorityEnabled(input: SetNvkeTemporalAuthorityEnabledInput!): NvkeTemporalAuthorityTypeMutationResult!
   removeNvkeTemporalAuthority(input: NvkeTemporalAuthorityReviewInput!): NvkeTemporalAuthorityTypeMutationResult!
@@ -13002,6 +13003,20 @@ input RequestModelConnectionInput {
   ifMatchAppVersion: Int!
   policyVersion: String!
   idempotencyKey: GUID!
+}
+
+input RequestNvkeNativeWorkflowInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  expectedActorId: Int!
+  expectedAuthorityVersion: Int!
+  requestId: String!
+  workflow: String!
+  parametersText: String!
+  sourceOperationId: GUID!
+  expectedSourceVersion: Int!
+  acknowledgeLostNodeTeardown: Boolean! = false
+  timeoutSeconds: Int! = 7200
 }
 
 input RequestNvkeOperationInput {

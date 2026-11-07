@@ -17,6 +17,7 @@ from strawberry.types import Info
 from astrolift_clusters import nvke_diagnostics as diagnostics
 from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_maintenance as maintenance
+from astrolift_clusters import nvke_native_operations as native_operations
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_resource_operations as resource_operations
 from astrolift_clusters import nvke_sites as service
@@ -299,6 +300,21 @@ class NvkeResourceEditorType:
     preparation_action_key: str | None
     concurrency: str
     source: NvkeResourceSourceType
+
+
+@strawberry.input
+class RequestNvkeNativeWorkflowInput:
+    site_id: GUID
+    expected_site_version: int
+    expected_actor_id: int
+    expected_authority_version: int
+    request_id: str
+    workflow: str
+    parameters_text: str
+    source_operation_id: GUID
+    expected_source_version: int
+    acknowledge_lost_node_teardown: bool = False
+    timeout_seconds: int = 7200
 
 
 @strawberry.type
@@ -942,6 +958,19 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.native_workflow_request",
+        target=lambda root, info, input: ("nvke_site", str(input.site_id)),
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def request_nvke_native_workflow(
+        self, info: Info, input: RequestNvkeNativeWorkflowInput
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(native_operations.reserve_text(**asdict(input))))
+
     @strawberry.mutation
     @mutation_audit(
         action="nvke.temporal_configure", target=lambda root, info, input: ("nvke_site", str(input.site_id))

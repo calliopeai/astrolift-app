@@ -137,7 +137,7 @@ def credentials_for(row):
         ) from None
 
 
-def _actor(expected):
+def _actor(expected, *, require_read=False):
     org, actor = sites.authorized(Permission.NVKE_ADMIN)
     if type(expected) is not int or actor.pk != expected:
         raise sites.NvkeSiteError("SOURCE_CHANGED", "The reviewed native Temporal caller changed")
@@ -156,6 +156,8 @@ def _actor(expected):
     try:
         with abac.request_attributes(replace(abac.attributes_for(actor.pk), cache={})):
             org, actor = sites.authorized(Permission.NVKE_ADMIN)
+            if require_read:
+                sites.authorized(Permission.NVKE_READ)
     finally:
         reset_current_api_token(mark)
     return org, actor

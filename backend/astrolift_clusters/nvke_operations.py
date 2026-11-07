@@ -78,6 +78,15 @@ def connection_digest(row):
     ).hexdigest()
 
 
+def operation_permission(key):
+    if key.startswith("temporal."):
+        from astrolift_clusters.nvke_native_operations import workflow_name
+
+        workflow_name(key)
+        return Permission.NVKE_ADMIN
+    return Permission(action(key).permission)
+
+
 def reserve(
     *,
     site_id,
@@ -236,6 +245,10 @@ def original_actor(row):
 
 
 def checkpoint(row):
+    if row.operation_key.startswith("temporal."):
+        from astrolift_clusters.nvke_native_operations import checkpoint as native_checkpoint
+
+        return native_checkpoint(row)
     selected = action(row.operation_key)
     with original_actor(row), abac.request_attributes(replace(abac.attributes_for(row.actor_id), cache={})):
         try:
@@ -374,7 +387,7 @@ def read(operation_id):
 
 def result(operation_id):
     row = read(operation_id)
-    sites.authorized(Permission(action(row.operation_key).permission))
+    sites.authorized(operation_permission(row.operation_key))
     return decode_result(row)
 
 
@@ -461,7 +474,7 @@ def sweep_outbox(*, limit=40):
 
 def request_cancel(operation_id):
     row = read(operation_id)
-    sites.authorized(Permission(action(row.operation_key).permission))
+    sites.authorized(operation_permission(row.operation_key))
     with transaction.atomic():
         row = NvkeOperation.objects.select_for_update().get(pk=row.pk)
         if not row.terminal:
@@ -473,7 +486,7 @@ def request_cancel(operation_id):
 def resume(operation_id, *, expected_version, timeout_seconds=7200):
     row = read(operation_id)
     sites.authorized(Permission.NVKE_ADMIN)
-    sites.authorized(Permission(action(row.operation_key).permission))
+    sites.authorized(operation_permission(row.operation_key))
     if type(timeout_seconds) is not int or not 30 <= timeout_seconds <= 86400:
         raise NvkeError("INVALID_INPUT", "NVKE operation timeout must be between 30 and 86400 seconds")
     with transaction.atomic():

@@ -46,7 +46,7 @@ def _state(row, status, stage, *, progress=None, error=None, reference=None):
             actor_user_id=row.actor_id,
             organization_id=row.organization_id,
             action="nvke.operation_state",
-            permissions=(action(row.operation_key).permission,),
+            permissions=(outbox.operation_permission(row.operation_key).value,),
             decision="ALLOW",
             target_kind="nvke_operation",
             target_id=str(row.guid),
@@ -266,6 +266,10 @@ def attempt(row_id, generation, *, execution):
             return "execution_refused"
         NvkeOperation.objects.filter(pk=row.pk, workflow_run_id="").update(workflow_run_id=execution[1])
         NvkeOperation.objects.filter(pk=row.pk, started_at__isnull=True).update(started_at=timezone.now())
+        if row.operation_key.startswith("temporal."):
+            from astrolift_clusters.nvke_native_runtime import attempt as native_attempt
+
+            return native_attempt(row, execution=execution)
         selected = action(row.operation_key)
         request = outbox.decode_input(row)
         progress = outbox.decode_result(row)
