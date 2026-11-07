@@ -12993,6 +12993,7 @@ export type NvkeInventoryResourceType = {
   item: NvkeInventoryItemType;
   observedAt?: Maybe<Scalars['DateTime']['output']>;
   operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
   siteId: Scalars['GUID']['output'];
 };
 

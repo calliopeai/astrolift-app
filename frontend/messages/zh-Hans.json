@@ -17701,6 +17701,15 @@
     "nativeDocument": "下载原生文档",
     "resourceUid": "资源 UID",
     "resourceUnavailable": "资源观测不可用",
-    "resourceVersion": "资源版本"
+    "resourceVersion": "资源版本",
+    "editResource": "编辑资源",
+    "fixedTargetHelp": "已审核的观测固定目标和原生前置条件。更改这些值将被拒绝。",
+    "loadEdit": "加载编辑文档",
+    "loadEditHelp": "可编辑的原生配置可能包含凭据或其他敏感数据。请仅在需要时加载；数据保留在此编辑器中。",
+    "prepareEditHelp": "准备编辑前，请读取当前资源以获取其原生版本。",
+    "prepareEdit": "读取资源以编辑",
+    "recoverReceipt": "恢复原始回执",
+    "observedConcurrencyHelp": "控制器不支持原子版本检查。发送前会检查可写配置，但之后仍可能发生并发写入。",
+    "conditionalConcurrencyHelp": "原生写入使用已审核的确切版本和标识；发生冲突时需要新的观测。"
   }
 }

@@ -4,6 +4,7 @@ import type {
   ListNvkeInventoryPageQuery,
 } from "@/graphql/__generated__/operations";
 import type { NvkeNativePanelProps } from "./NvkeNativePanel";
+import type { NvkeResourceActionPanelProps } from "./NvkeResourceActionPanel";
 
 export type NvkeCollectionView =
   GetNvkeContractQuery["astroliftNvkeContract"]["collections"][number];
@@ -26,6 +27,7 @@ export interface NvkeInventoryScreenProps extends NvkeNativePanelProps {
   onRefresh: () => void;
 }
 export interface NvkeResourceScreenProps {
+  resourceActions?: NvkeResourceActionPanelProps | null;
   siteId: string;
   operationId: string;
   siteName: string;

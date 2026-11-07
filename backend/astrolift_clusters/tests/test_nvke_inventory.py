@@ -98,7 +98,7 @@ def test_resource_links_are_stable_and_metadata_query_never_reveals_native_docum
         configured.world,
         """query($id: GUID!, $actor: Int!, $key: String!) {
       astroliftNvkeInventoryResource(operationId: $id, expectedActorId: $actor, resourceKey: $key) {
-        operationId siteId observedAt collection { key }
+        operationId operationVersion siteId observedAt collection { key }
         item { key identity desiredCount conditions { name status } }
       }
       astroliftNvkeInventoryPage(operationId: $id, expectedActorId: $actor, search: null) { totalCount }
@@ -108,6 +108,7 @@ def test_resource_links_are_stable_and_metadata_query_never_reveals_native_docum
     assert not response.errors
     data = response.data["astroliftNvkeInventoryResource"]
     assert data["siteId"] == str(row.site.guid) and data["item"]["key"] == first.key
+    assert data["operationVersion"] == row.version
     assert data["item"]["desiredCount"] == "9007199254740993"
     assert "PRIVATE" not in str(data)
     assert response.data["astroliftNvkeInventoryPage"]["totalCount"] == 205

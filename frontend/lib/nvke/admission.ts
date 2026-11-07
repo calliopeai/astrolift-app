@@ -6,10 +6,13 @@ import {
   readRecovery,
   saveRecovery,
   withRecoveryLock,
+  resourceSourceMetadata,
+  NvkeRecoveryError,
   type NvkeBrowserScope,
   type NvkeRecoveryOperation,
   type NvkeRecoveryRecord,
   type RecoveryStorage,
+  type NvkeResourceSource,
 } from "./recovery";
 
 export class NvkeAdmissionError extends Error {
@@ -19,6 +22,7 @@ export class NvkeAdmissionError extends Error {
 }
 
 export interface NvkeAdmissionInput {
+  source?: NvkeResourceSource;
   siteId: string;
   expectedSiteVersion: number;
   expectedActorId: number;
@@ -34,7 +38,8 @@ export async function admitNvkeRequest<T extends NvkeRecoveryOperation>(options:
   siteId: string;
   expectedSiteVersion: number;
   revision: string;
-  mode: "native" | "inventory";
+  mode: "native" | "inventory" | "resource";
+  source?: NvkeResourceSource;
   values: { operationKey: string; timeoutSeconds: number; parametersText: string };
   storage: RecoveryStorage;
   current: () => boolean;
@@ -51,7 +56,11 @@ export async function admitNvkeRequest<T extends NvkeRecoveryOperation>(options:
     | undefined
   >;
 }): Promise<T | null> {
-  const { scope, siteId, values, storage, current } = options;
+  const { siteId, storage, current } = options;
+  const scope = { ...options.scope },
+    values = { ...options.values };
+  const requestedSource =
+    options.mode === "resource" ? resourceSourceMetadata(options.source) : null;
   return withRecoveryLock(scope, siteId, async () => {
     if (!current()) return null;
     let original = readRecovery(storage, scope, siteId);
@@ -66,13 +75,22 @@ export async function admitNvkeRequest<T extends NvkeRecoveryOperation>(options:
     }
     const digest = await nativeTextDigest(values.parametersText);
     if (!current()) return null;
-    if (original) assertOriginalRequest(original, { ...values, mode: options.mode }, digest);
+    const source = requestedSource;
+    if (options.mode === "resource" && source === null)
+      throw new NvkeRecoveryError("INVALID_RECOVERY");
+    if (original)
+      assertOriginalRequest(
+        original,
+        { ...values, mode: options.mode, source: source ?? undefined },
+        digest
+      );
     else {
       if (!options.sourceAvailable()) throw new NvkeAdmissionError("SOURCE_CHANGED");
       original = {
         ...scope,
-        format: 2,
-        mode: options.mode,
+        ...(options.mode === "resource"
+          ? { format: 3 as const, mode: "resource" as const, source: source! }
+          : { format: 2 as const, mode: options.mode }),
         siteId,
         expectedSiteVersion: options.expectedSiteVersion,
         revision: options.revision,
@@ -93,6 +111,7 @@ export async function admitNvkeRequest<T extends NvkeRecoveryOperation>(options:
       operationKey: original.operationKey,
       timeoutSeconds: original.timeoutSeconds,
       parametersText: values.parametersText,
+      ...(original.format === 3 ? { source: original.source } : {}),
     });
     if (!current()) return null;
     if (!reply?.ok || !reply.data) {

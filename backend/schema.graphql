@@ -11377,6 +11377,7 @@ type NvkeInventoryResourceType {
   item: NvkeInventoryItemType!
   collection: NvkeCollectionType!
   operationId: GUID!
+  operationVersion: Int!
   siteId: GUID!
   observedAt: DateTime
 }

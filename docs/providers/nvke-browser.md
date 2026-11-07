@@ -31,10 +31,12 @@ refresh operation details to observe status. An uncertain operation needs explic
 Native submission requires working site storage and the browser Web Locks API. Before sending,
 the browser saves metadata scoped to the API server, organization, numeric actor and site:
 request UUID, action, reviewed site version and upstream revision, timeout and SHA-256 of the
-original parameter text. New format-2 records also bind native versus inventory mode. Existing
-format-1 records remain native requests in the same journal and must be resolved before an
-inventory request can take their place. The two editors share the same cross-tab lock. Receipt
-recovery checks the server's explicit `isInventory` value against the original mode.
+original parameter text. Format-2 records bind native versus inventory mode; format-3
+resource edits additionally bind the reviewed source operation, version and signed resource key.
+Existing format-1 records remain native requests. All editors share the same journal and
+cross-tab lock, and must resolve an outstanding request before changing its mode or source.
+Receipt recovery checks both the explicit `isInventory` value and the resource source against
+the original mode/binding.
 Native parameters, credentials and result contents are never stored
 there or put in Apollo's normalized cache. Concurrent tabs serialize admission for the same scope.
 
@@ -86,9 +88,12 @@ or kubeconfigs. No result is automatically fetched when opening an operation pag
 Workload kubeconfig operations additionally enforce [native ownership proofs](nvke-access.md)
 before reading the admin Secret; a supplied backing cluster name is not ownership evidence.
 The [resource editor/admission API](nvke-resource-operations.md) supplies server-bound targets
-and native preconditions for the upcoming mutation forms; it is separate from the current
-observation browsing flow.
+and native preconditions for the existing-resource mutation forms on resource details.
+Editors load sensitive writable configuration only after consent, retain opaque native JSON,
+and confirm the fixed target and reviewed site version. Public interfaces prepare a native GET
+when an ETag is absent; controller edits explicitly show their weaker concurrency guarantee.
 
-This route-wiring slice uses manual refresh. Resource-specific mutation forms, site bootstrap,
-workload access, telemetry and live hardware qualification remain separate delivery work.
+Observation browsing uses manual refresh; a confirmed preparation GET polls its own operation
+for a bounded interval. Collection creation, native subresource/lifecycle controls, site bootstrap,
+additional workload access management, telemetry and live hardware qualification remain delivery work.
 Observation browsing and the native editor do not establish full integration qualification.

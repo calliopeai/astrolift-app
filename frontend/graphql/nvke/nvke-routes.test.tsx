@@ -16,6 +16,8 @@ import {
   SITE,
 } from "@/components/screens/nvke/fixtures";
 import { nvkeScopeKey, readRecovery } from "@/lib/nvke/recovery";
+import { useNvkeContext } from "./nvke.hooks";
+import { useNvkeResourceActions } from "./use-nvke-resource-actions";
 import { useNvkeSite } from "./use-nvke-site";
 import { useNvkeOperation } from "./use-nvke-operation";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
@@ -252,6 +254,7 @@ it("loads only safe resource metadata and downloads exact text only on explicit 
         astroliftNvkeInventoryResource: {
           siteId: SITE.id,
           operationId: OPERATION.id,
+          operationVersion: OPERATION.version,
           observedAt: OPERATION.updatedAt,
           collection: COLLECTION,
           item: INVENTORY_ITEM,
@@ -278,6 +281,93 @@ it("loads only safe resource metadata and downloads exact text only on explicit 
   expect(cache.extract()).toEqual({});
   await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:local-test"), { timeout: 2000 });
   click.mockRestore();
+});
+
+it("loads an explicit resource edit and admits its exact reviewed source through the shared journal", async () => {
+  const source = {
+    operationId: OPERATION.id,
+    version: OPERATION.version,
+    resourceKey: INVENTORY_ITEM.key,
+  };
+  const text = '{"body":{"controlPlaneConfig":{"desiredCount":3}}}';
+  const issuedId = "123e4567-e89b-12d3-a456-426614174088";
+  const { wrapper, calls, cache } = harness((request) => {
+    if (request.operationName === "GetNvkeInventoryResource")
+      return {
+        astroliftNvkeInventoryResource: {
+          siteId: SITE.id,
+          operationId: OPERATION.id,
+          operationVersion: OPERATION.version,
+          observedAt: OPERATION.updatedAt,
+          collection: COLLECTION,
+          item: INVENTORY_ITEM,
+        },
+      };
+    if (request.operationName === "GetNvkeResourceEditor")
+      return {
+        astroliftNvkeResourceEditor: {
+          ok: true,
+          errors: [],
+          data: {
+            operationKey: "updateCluster",
+            parametersText: text,
+            preparationActionKey: null,
+            concurrency: "observed_only",
+            source: { ...source, __typename: "NvkeResourceSourceType" },
+          },
+        },
+      };
+    if (request.operationName === "RequestNvkeResourceOperation")
+      return {
+        requestNvkeResourceOperation: {
+          ok: true,
+          errors: [],
+          data: {
+            ...OPERATION,
+            id: issuedId,
+            operationKey: "updateCluster",
+            requestId: request.variables.input.requestId,
+            resourceSource: { ...source, __typename: "NvkeResourceSourceType" },
+          },
+        },
+      };
+    throw new Error("Unexpected resource edit request");
+  });
+  const { result } = renderHook(
+    () => useNvkeResource(SITE.id, COLLECTION.key, OPERATION.id, INVENTORY_ITEM.key),
+    { wrapper }
+  );
+  await waitFor(() => expect(result.current.resourceActions?.sourceReady).toBe(true));
+  expect(calls.some((call) => call.operationName === "GetNvkeResourceEditor")).toBe(false);
+  await act(async () => {
+    await result.current.resourceActions!.onLoad();
+  });
+  expect(result.current.resourceActions?.editor?.parametersText).toBe(text);
+  const loadedEditor = result.current.resourceActions?.editor;
+  act(() => result.current.onRefresh());
+  expect(result.current.resourceActions?.editor).toEqual(loadedEditor);
+  expect(result.current.resourceActions?.sourceReady).toBe(false);
+  await waitFor(() => expect(result.current.resourceActions?.sourceReady).toBe(true));
+  expect(result.current.resourceActions?.editor).toEqual(loadedEditor);
+  await act(async () => {
+    await result.current.resourceActions!.onRequest({
+      operationKey: "updateCluster",
+      parametersText: text,
+      timeoutSeconds: 7200,
+    });
+  });
+  const submitted = calls.find((call) => call.operationName === "RequestNvkeResourceOperation")!;
+  expect(submitted.variables.input).toMatchObject({
+    sourceOperationId: source.operationId,
+    expectedSourceVersion: source.version,
+    sourceResourceKey: source.resourceKey,
+    parametersText: text,
+    expectedActorId: 41,
+  });
+  expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${issuedId}`);
+  expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+  expect(Object.values(localStorage).join()).not.toContain("desiredCount");
+  expect(cache.extract()).toEqual({});
 });
 it("recovers a lost admission reply by receipt without submitting the native request again", async () => {
   let accepted: typeof OPERATION | null = null;
@@ -507,4 +597,187 @@ it("downloads explicit result text losslessly without putting it in the Apollo c
     delete (URL as unknown as Record<string, unknown>).createObjectURL;
     delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
   }
+});
+
+const reviewedSource = {
+  operationId: OPERATION.id,
+  version: OPERATION.version,
+  resourceKey: INVENTORY_ITEM.key,
+};
+const resourceText = '{"body":{"desiredCount":9007199254740993}}';
+const useResourceActionArgs = () => ({
+  context: useNvkeContext(),
+  site: SITE,
+  contract: {
+    revision: SITE.upstreamRevision,
+    actions: ACTIONS,
+    collections: [COLLECTION],
+    controllerOpenapi: {},
+    resources: [],
+  },
+  collection: COLLECTION,
+  source: reviewedSource,
+  target: INVENTORY_ITEM.name,
+  sourceReady: true,
+});
+const editorReply = (
+  source: typeof reviewedSource | { operationId: string; version: number; resourceKey: null },
+  preparationActionKey: string | null = null
+) => ({
+  astroliftNvkeResourceEditor: {
+    ok: true,
+    errors: [],
+    data: {
+      operationKey: "updateCluster",
+      parametersText: preparationActionKey ? null : resourceText,
+      preparationActionKey,
+      concurrency: "native_version",
+      source,
+    },
+  },
+});
+it("prepares a versioned edit from the confirmed native GET without resubmitting preparation", async () => {
+  const preparedId = "123e4567-e89b-12d3-a456-426614174089";
+  const preparedSource = { operationId: preparedId, version: 8, resourceKey: null };
+  let interrupted = false;
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeResourceEditor")
+      return editorReply(
+        request.variables.sourceOperationId === preparedId ? preparedSource : reviewedSource,
+        request.variables.sourceOperationId === preparedId ? null : "getCluster"
+      );
+    if (request.operationName === "RequestNvkeResourceOperation")
+      return {
+        requestNvkeResourceOperation: {
+          ok: true,
+          errors: [],
+          data: {
+            ...OPERATION,
+            id: preparedId,
+            operationKey: "getCluster",
+            requestId: request.variables.input.requestId,
+            resourceSource: reviewedSource,
+          },
+        },
+      };
+    if (request.operationName === "GetNvkeOperation" && !interrupted) {
+      interrupted = true;
+      throw new Error("Preparation status temporarily unavailable");
+    }
+    if (request.operationName === "GetNvkeOperation")
+      return {
+        astroliftNvkeOperation: {
+          ...OPERATION,
+          id: preparedId,
+          version: preparedSource.version,
+          operationKey: "getCluster",
+          status: "SUCCEEDED",
+          resourceSource: reviewedSource,
+        },
+      };
+    throw new Error("Unexpected preparation request");
+  });
+  const { result } = renderHook(() => useNvkeResourceActions(useResourceActionArgs()), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current?.sourceReady).toBe(true));
+  await act(async () => {
+    expect(await result.current!.onLoad()).toBe(true);
+  });
+  expect(result.current?.editor?.parametersText).toBeNull();
+  await act(async () => {
+    expect(await result.current!.onPrepare()).toBe(false);
+  });
+  expect(result.current?.error).toBe("requestFailed");
+  act(() => result.current!.onRefresh());
+  await waitFor(() => expect(result.current?.sourceReady).toBe(true));
+  await act(async () => {
+    expect(await result.current!.onPrepare()).toBe(true);
+  });
+  expect(result.current?.editor?.parametersText).toBe(resourceText);
+  expect(result.current?.editor?.source).toEqual(preparedSource);
+  expect(h.calls.filter((c) => c.operationName === "RequestNvkeResourceOperation")).toHaveLength(1);
+  expect(
+    h.calls.find((c) => c.operationName === "RequestNvkeResourceOperation")!.variables.input
+  ).toMatchObject({
+    operationKey: "getCluster",
+    sourceOperationId: reviewedSource.operationId,
+    expectedSourceVersion: reviewedSource.version,
+    sourceResourceKey: reviewedSource.resourceKey,
+  });
+  expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+  expect(h.cache.extract()).toEqual({});
+});
+it("recovers a resource admission lost reply by receipt without issuing a second request", async () => {
+  let accepted: Record<string, unknown> | null = null;
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeResourceEditor") return editorReply(reviewedSource);
+    if (request.operationName === "GetNvkeRequest") return { astroliftNvkeRequest: accepted };
+    if (request.operationName === "RequestNvkeResourceOperation") {
+      accepted = {
+        ...OPERATION,
+        operationKey: "updateCluster",
+        requestId: request.variables.input.requestId,
+        resourceSource: reviewedSource,
+      };
+      throw new Error("Lost reply with private native fields");
+    }
+    throw new Error("Unexpected recovery request");
+  });
+  const { result } = renderHook(() => useNvkeResourceActions(useResourceActionArgs()), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current?.sourceReady).toBe(true));
+  await act(async () => {
+    await result.current!.onLoad();
+  });
+  await act(async () => {
+    expect(
+      await result.current!.onRequest({
+        operationKey: "updateCluster",
+        parametersText: resourceText,
+        timeoutSeconds: 7200,
+      })
+    ).toBe(false);
+  });
+  expect(result.current?.recovery).toMatchObject({
+    format: 3,
+    mode: "resource",
+    source: reviewedSource,
+  });
+  expect(JSON.stringify(localStorage)).not.toContain("desiredCount");
+  await act(async () => {
+    expect(await result.current!.onRecover()).toBe(true);
+  });
+  expect(h.calls.filter((c) => c.operationName === "RequestNvkeResourceOperation")).toHaveLength(1);
+  expect(readRecovery(localStorage, scope, SITE.id)).toBeNull();
+  expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${OPERATION.id}`);
+});
+it("discards a late resource editor across an actor A to B to A change", async () => {
+  let finish!: (value: Record<string, unknown>) => void;
+  const h = harness(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const { result, rerender } = renderHook(() => useNvkeResourceActions(useResourceActionArgs()), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current?.sourceReady).toBe(true));
+  let loading!: Promise<boolean>;
+  act(() => {
+    loading = result.current!.onLoad();
+  });
+  await waitFor(() => expect(finish).toBeTypeOf("function"));
+  caller.actorId = 42;
+  rerender();
+  caller.actorId = 41;
+  rerender();
+  await act(async () => {
+    finish(editorReply(reviewedSource));
+    expect(await loading).toBe(false);
+  });
+  expect(result.current?.editor).toBeNull();
+  expect(navigation.push).not.toHaveBeenCalled();
 });

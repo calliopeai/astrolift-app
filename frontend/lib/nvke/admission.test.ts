@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { admitNvkeRequest } from "./admission";
+import { admitNvkeRequest, type NvkeAdmissionInput } from "./admission";
 import {
   nativeTextDigest,
   readRecovery,
@@ -87,6 +87,88 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("shared NVKE durable admission", () => {
+  it("sends the reviewed parameter text even if caller state changes after journaling", async () => {
+    const { options } = setup("native");
+    options.values = { ...values };
+    options.onRecord.mockImplementation(() => {
+      options.values.parametersText = '{"body":{"changed":true}}';
+    });
+    await admitNvkeRequest(options);
+    expect(options.admit).toHaveBeenCalledWith(expect.objectContaining({ parametersText: "{}" }));
+  });
+  it("persists and replays the exact resource source after a lost reply", async () => {
+    const { options } = setup("native");
+    const source = { operationId, version: 7, resourceKey: "signed-key" };
+    const resourceOptions = {
+      ...options,
+      mode: "resource" as const,
+      source: { ...source, __typename: "NvkeResourceSourceType" },
+      admit: vi.fn(async (input: NvkeAdmissionInput) => ({
+        ok: true,
+        errors: [],
+        data: {
+          id: operationId,
+          siteId,
+          requestId: input.requestId,
+          operationKey: values.operationKey,
+          isInventory: false,
+          resourceSource: { ...source, __typename: "NvkeResourceSourceType" },
+        },
+      })),
+    };
+    resourceOptions.admit.mockRejectedValueOnce(new Error("lost reply"));
+    await expect(admitNvkeRequest(resourceOptions)).rejects.toThrow("lost reply");
+    const pending = readRecovery(options.storage, scope, siteId)!;
+    expect(pending).toMatchObject({ format: 3, mode: "resource", source });
+    await expect(
+      admitNvkeRequest({ ...resourceOptions, source: { ...source, version: 8 } })
+    ).rejects.toThrow("RECOVERY_MISMATCH");
+    expect(resourceOptions.admit).toHaveBeenCalledTimes(1);
+    await admitNvkeRequest(resourceOptions);
+    expect(resourceOptions.admit.mock.calls[1][0]).toMatchObject({
+      source,
+      requestId: pending.requestId,
+    });
+    expect(readRecovery(options.storage, scope, siteId)).toBeNull();
+  });
+
+  it.each(["missing", "version", "resourceKey", "inventory"])(
+    "retains resource recovery when a receipt has a mismatched %s binding",
+    async (change) => {
+      const { options } = setup("native");
+      const source = { operationId, version: 7, resourceKey: "signed-key" };
+      const resourceOptions = { ...options, mode: "resource" as const, source };
+      options.admit.mockRejectedValueOnce(new Error("lost reply"));
+      await expect(admitNvkeRequest(resourceOptions)).rejects.toThrow("lost reply");
+      const pending = readRecovery(options.storage, scope, siteId)!;
+      options.receipt.mockResolvedValueOnce({
+        id: operationId,
+        siteId,
+        requestId: pending.requestId,
+        operationKey: values.operationKey,
+        isInventory: change === "inventory",
+        resourceSource:
+          change === "missing"
+            ? null
+            : {
+                ...source,
+                ...(change === "version" ? { version: 8 } : {}),
+                ...(change === "resourceKey" ? { resourceKey: "another-resource" } : {}),
+              },
+      });
+      await expect(admitNvkeRequest(resourceOptions)).rejects.toThrow("RECOVERY_MISMATCH");
+      expect(readRecovery(options.storage, scope, siteId)).toEqual(pending);
+      expect(options.admit).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it("refuses resource admission without valid source metadata before transmission", async () => {
+    const { options } = setup("native");
+    await expect(admitNvkeRequest({ ...options, mode: "resource" })).rejects.toThrow(
+      "INVALID_RECOVERY"
+    );
+    expect(options.admit).not.toHaveBeenCalled();
+  });
   it.each(["native", "inventory"] as const)(
     "persists %s mode before transmitting and archives its receipt",
     async (mode) => {

@@ -17704,6 +17704,15 @@
     "nativeDocument": "Télécharger le document natif",
     "resourceUid": "UID de la ressource",
     "resourceUnavailable": "Observation de ressource indisponible",
-    "resourceVersion": "Version de la ressource"
+    "resourceVersion": "Version de la ressource",
+    "editResource": "Modifier la ressource",
+    "fixedTargetHelp": "L’observation examinée fixe la cible et les préconditions natives. Leur modification est refusée.",
+    "loadEdit": "Charger le document à modifier",
+    "loadEditHelp": "La configuration native modifiable peut contenir des identifiants ou d’autres données sensibles. Chargez-la uniquement si nécessaire ; elle reste dans cet éditeur.",
+    "prepareEditHelp": "Lisez la ressource actuelle pour obtenir sa version native avant de préparer la modification.",
+    "prepareEdit": "Lire la ressource à modifier",
+    "recoverReceipt": "Récupérer le reçu initial",
+    "observedConcurrencyHelp": "Le contrôleur ne propose pas de vérification atomique de version. La configuration modifiable est vérifiée avant l’envoi, mais une autre écriture peut encore intervenir ensuite.",
+    "conditionalConcurrencyHelp": "L’écriture native utilise exactement la version et l’identité examinées ; tout conflit nécessite une nouvelle observation."
   }
 }

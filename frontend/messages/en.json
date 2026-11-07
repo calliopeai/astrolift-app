@@ -17701,6 +17701,15 @@
     "nativeDocument": "Download native document",
     "resourceUid": "Resource UID",
     "resourceUnavailable": "Resource observation unavailable",
-    "resourceVersion": "Resource version"
+    "resourceVersion": "Resource version",
+    "editResource": "Edit resource",
+    "fixedTargetHelp": "The reviewed observation fixes the target and native preconditions. Changing them is rejected.",
+    "loadEdit": "Load edit document",
+    "loadEditHelp": "The editable native configuration may contain credentials or other sensitive data. Load it only when needed; it stays in this editor.",
+    "prepareEditHelp": "Read the current resource to obtain its native version before preparing this edit.",
+    "prepareEdit": "Read resource for editing",
+    "recoverReceipt": "Recover original receipt",
+    "observedConcurrencyHelp": "The controller has no atomic version check. Writable configuration is checked before dispatch, but another writer can still race afterward.",
+    "conditionalConcurrencyHelp": "The native write uses the exact reviewed version and identity; conflicts require a new observation."
   }
 }

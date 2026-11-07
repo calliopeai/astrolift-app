@@ -10,6 +10,7 @@ import { DefinitionList } from "@/components/ui/definition-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { nvkeInventoryHref } from "@/lib/nvke/inventory";
 import type { NvkeResourceScreenProps } from "./types";
+import { NvkeResourceActionPanel } from "./NvkeResourceActionPanel";
 
 export function NvkeResourceScreen({
   siteId,
@@ -24,6 +25,7 @@ export function NvkeResourceScreen({
   canRead,
   onRefresh,
   onDownload,
+  resourceActions,
 }: NvkeResourceScreenProps) {
   const t = useTranslations("nvke");
   const [confirm, setConfirm] = useState(false);
@@ -93,6 +95,7 @@ export function NvkeResourceScreen({
           {t("conditionsOmitted", { count: item.conditionsOmitted })}
         </p>
       )}
+      {resourceActions && <NvkeResourceActionPanel {...resourceActions} />}
       <ConfirmDialog
         open={confirm}
         onOpenChange={setConfirm}

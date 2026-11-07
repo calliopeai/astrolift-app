@@ -45,6 +45,7 @@ import {
   GET_NVKE_INVENTORY_DOCUMENT_TEXT,
 } from "./nvke.queries";
 import { REQUEST_NVKE_INVENTORY } from "./nvke.mutations";
+import { useNvkeResourceActions } from "./use-nvke-resource-actions";
 
 const useInventorySource = (siteId: string) => {
   const context = useNvkeContext();
@@ -350,7 +351,22 @@ export const useNvkeResource = (
     0,
     context.scope?.organizationId
   );
-  const data = observation.data?.astroliftNvkeInventoryResource;
+  const liveData = observation.data?.astroliftNvkeInventoryResource;
+  const [saved, setSaved] = useState<{
+    key: string;
+    data: GetNvkeInventoryResourceQuery["astroliftNvkeInventoryResource"];
+  } | null>(null);
+  if (
+    liveData?.siteId === siteId &&
+    liveData.operationId === operationId &&
+    liveData.collection.key === collectionKey &&
+    liveData.item.key === resourceKey &&
+    (saved?.key !== visitKey || saved.data !== liveData)
+  )
+    setSaved({ key: visitKey, data: liveData });
+  const data =
+    liveData ??
+    (binding && !observation.failed && saved?.key === visitKey ? saved.data : undefined);
   const matched =
     data?.siteId === siteId &&
     data.operationId === operationId &&
@@ -370,16 +386,35 @@ export const useNvkeResource = (
     failed: boolean;
   } | null>(null);
   const busy = useRef(false);
+  const resourceActions = useNvkeResourceActions({
+    context,
+    site,
+    contract,
+    collection: matched ? data.collection : null,
+    source:
+      matched && Number.isSafeInteger(data.operationVersion) && data.operationVersion > 0
+        ? { operationId, version: data.operationVersion, resourceKey }
+        : null,
+    target: matched ? data.item.name || data.item.identity : "",
+    sourceReady:
+      !!binding &&
+      allowed &&
+      !failed &&
+      !siteQuery.loading &&
+      !catalog.loading &&
+      !observation.loading,
+  });
   return {
     scopeKey: visitKey,
     siteId,
     operationId,
     siteName: site?.name ?? "",
+    resourceActions,
     collection: matched ? data.collection : null,
     item: matched ? data.item : null,
     observedAt: matched ? (data.observedAt ?? null) : null,
     loading: context.loading || siteQuery.loading || catalog.loading || observation.loading,
-    pending: download?.key === visitKey && download.pending,
+    pending: (download?.key === visitKey && download.pending) || !!resourceActions?.pending,
     error: failed
       ? t("readFailed")
       : download?.key === visitKey && download.failed
@@ -391,6 +426,7 @@ export const useNvkeResource = (
       catalog.refresh();
       observation.refresh();
       setDownload(null);
+      resourceActions?.onRefresh();
     },
     onDownload: async () => {
       if (!current() || !binding || !allowed || !matched || failed || busy.current) return;

@@ -27,6 +27,24 @@ export const COLLECTION: NvkeCollectionView = {
       mutates: false,
       path: "/clusters",
     },
+    {
+      key: "updateCluster",
+      surface: "CONTROLLER",
+      resourceKind: "Cluster",
+      permission: "nvke.manage",
+      verb: "PATCH",
+      mutates: true,
+      path: "/clusters/{clusterID}",
+    },
+    {
+      key: "deleteCluster",
+      surface: "CONTROLLER",
+      resourceKind: "Cluster",
+      permission: "nvke.manage",
+      verb: "DELETE",
+      mutates: true,
+      path: "/clusters/{clusterID}",
+    },
   ],
 };
 export const INVENTORY_ITEM: NvkeInventoryItemView = {

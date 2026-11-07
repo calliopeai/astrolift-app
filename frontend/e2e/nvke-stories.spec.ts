@@ -11,6 +11,8 @@ const stories = [
   "screens-nvke-collections--full",
   "screens-nvke-inventory--observed",
   "screens-nvke-resource--full",
+  "screens-nvke-resource-actions--editing",
+  "screens-nvke-resource--with-editor",
 ];
 for (const mode of ["light", "dark"]) {
   for (const id of stories) {
@@ -109,3 +111,18 @@ for (const mode of ["light", "dark"]) {
     await expect(dialog).not.toBeVisible();
   });
 }
+
+test("nvke resource edit confirms its fixed target and retains opaque integer text", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-resource-actions--editing&viewMode=story");
+  const text = '{"body":{"desiredCount":9007199254740993}}';
+  await expect(page.getByLabel("Native parameters (JSON)")).toHaveValue(text);
+  await page.getByRole("button", { name: "Review change", exact: true }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toContainText("research-cluster");
+  await expect(dialog).toContainText("updateCluster");
+  await expect(dialog).toContainText("site version 7");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByLabel("Native parameters (JSON)")).toHaveValue(text);
+});

@@ -17704,6 +17704,15 @@
     "nativeDocument": "Natives Dokument herunterladen",
     "resourceUid": "Ressourcen-UID",
     "resourceUnavailable": "Ressourcenbeobachtung nicht verfügbar",
-    "resourceVersion": "Ressourcenversion"
+    "resourceVersion": "Ressourcenversion",
+    "editResource": "Ressource bearbeiten",
+    "fixedTargetHelp": "Die geprüfte Beobachtung legt Ziel und native Vorbedingungen fest. Änderungen daran werden abgelehnt.",
+    "loadEdit": "Bearbeitungsdokument laden",
+    "loadEditHelp": "Die bearbeitbare native Konfiguration kann Zugangsdaten oder andere sensible Daten enthalten. Laden Sie sie nur bei Bedarf; sie bleibt in diesem Editor.",
+    "prepareEditHelp": "Lesen Sie die aktuelle Ressource, um vor der Bearbeitung ihre native Version zu erhalten.",
+    "prepareEdit": "Ressource zum Bearbeiten lesen",
+    "recoverReceipt": "Ursprünglichen Beleg abrufen",
+    "observedConcurrencyHelp": "Der Controller bietet keine atomare Versionsprüfung. Die bearbeitbare Konfiguration wird vor dem Senden geprüft; danach kann weiterhin ein konkurrierender Schreibvorgang auftreten.",
+    "conditionalConcurrencyHelp": "Der native Schreibvorgang verwendet genau die geprüfte Version und Identität; Konflikte erfordern eine neue Beobachtung."
   }
 }

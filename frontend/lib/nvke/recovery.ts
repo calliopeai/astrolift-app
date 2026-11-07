@@ -15,7 +15,58 @@ interface RecoveryMetadata extends NvkeBrowserScope {
   operationId: string | null;
 }
 export type NvkeRecoveryRecord = RecoveryMetadata &
-  ({ format: 1 } | { format: 2; mode: "native" | "inventory" });
+  (
+    | { format: 1 }
+    | { format: 2; mode: "native" | "inventory" }
+    | { format: 3; mode: "resource"; source: NvkeResourceSource }
+  );
+export interface NvkeResourceSource {
+  operationId: string;
+  version: number;
+  resourceKey: string | null;
+}
+export const validResourceSource = (value: unknown): value is NvkeResourceSource => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    Object.keys(row).length === 3 &&
+    validNvkeGuid(row.operationId) &&
+    Number.isSafeInteger(row.version) &&
+    (row.version as number) > 0 &&
+    (row.resourceKey === null ||
+      (typeof row.resourceKey === "string" &&
+        row.resourceKey.length > 0 &&
+        row.resourceKey.length <= 4096))
+  );
+};
+export const resourceSourceMetadata = (value: unknown): NvkeResourceSource | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  if (
+    Object.keys(row).some(
+      (key) => !["operationId", "version", "resourceKey", "__typename"].includes(key)
+    ) ||
+    (row.__typename !== undefined && row.__typename !== "NvkeResourceSourceType")
+  )
+    return null;
+  const source = {
+    operationId: row.operationId,
+    version: row.version,
+    resourceKey: row.resourceKey,
+  };
+  return validResourceSource(source) ? source : null;
+};
+export const sameResourceSource = (left: unknown, right: unknown) => {
+  const first = resourceSourceMetadata(left),
+    second = resourceSourceMetadata(right);
+  return (
+    !!first &&
+    !!second &&
+    first.operationId === second.operationId &&
+    first.version === second.version &&
+    first.resourceKey === second.resourceKey
+  );
+};
 export const recoveryMode = (record: NvkeRecoveryRecord) =>
   record.format === 1 ? "native" : record.mode;
 export interface NvkeRecoveryOperation {
@@ -67,11 +118,17 @@ export function validateRecovery(
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   const row = value as Record<string, unknown>;
-  const expectedFields = row.format === 2 ? [...fields, "mode"] : fields;
+  const expectedFields =
+    row.format === 3
+      ? [...fields, "mode", "source"]
+      : row.format === 2
+        ? [...fields, "mode"]
+        : fields;
   if (
     Object.keys(row).length !== expectedFields.length ||
     Object.keys(row).some((key) => !expectedFields.includes(key)) ||
-    (row.format !== 1 && row.format !== 2) ||
+    (row.format !== 1 && row.format !== 2 && row.format !== 3) ||
+    (row.format === 3 && (row.mode !== "resource" || !validResourceSource(row.source))) ||
     (row.format === 2 && row.mode !== "native" && row.mode !== "inventory") ||
     row.server !== scope.server ||
     row.organizationId !== scope.organizationId ||
@@ -133,12 +190,18 @@ export function saveRecovery(storage: RecoveryStorage, record: NvkeRecoveryRecor
 }
 export function assertOriginalRequest(
   record: NvkeRecoveryRecord,
-  values: { operationKey: string; timeoutSeconds: number; mode?: "native" | "inventory" },
+  values: {
+    operationKey: string;
+    timeoutSeconds: number;
+    mode?: "native" | "inventory" | "resource";
+    source?: NvkeResourceSource;
+  },
   digest: string
 ) {
   if (
     record.operationKey !== values.operationKey ||
     recoveryMode(record) !== (values.mode ?? "native") ||
+    (record.format === 3 && !sameResourceSource(record.source, values.source)) ||
     record.timeoutSeconds !== values.timeoutSeconds ||
     record.parametersDigest !== digest
   )
@@ -154,7 +217,9 @@ export function archiveRecovery(
     record.siteId !== operation.siteId ||
     record.requestId !== operation.requestId ||
     typeof operation.isInventory !== "boolean" ||
-    operation.resourceSource != null ||
+    (record.format === 3
+      ? !sameResourceSource(record.source, operation.resourceSource)
+      : operation.resourceSource != null) ||
     (recoveryMode(record) === "inventory") !== operation.isInventory ||
     record.operationKey !== operation.operationKey
   )

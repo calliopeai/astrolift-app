@@ -17701,6 +17701,15 @@
     "nativeDocument": "Baixar documento nativo",
     "resourceUid": "UID do recurso",
     "resourceUnavailable": "Observação do recurso indisponível",
-    "resourceVersion": "Versão do recurso"
+    "resourceVersion": "Versão do recurso",
+    "editResource": "Editar recurso",
+    "fixedTargetHelp": "A observação revisada fixa o destino e as precondições nativas. Alterações nesses campos são rejeitadas.",
+    "loadEdit": "Carregar documento de edição",
+    "loadEditHelp": "A configuração nativa editável pode conter credenciais ou outros dados sensíveis. Carregue apenas quando necessário; ela permanece neste editor.",
+    "prepareEditHelp": "Leia o recurso atual para obter sua versão nativa antes de preparar a edição.",
+    "prepareEdit": "Ler recurso para editar",
+    "recoverReceipt": "Recuperar recibo original",
+    "observedConcurrencyHelp": "O controlador não oferece verificação atômica de versão. A configuração editável é verificada antes do envio, mas outra gravação ainda pode ocorrer depois.",
+    "conditionalConcurrencyHelp": "A gravação nativa usa exatamente a versão e a identidade revisadas; conflitos exigem uma nova observação."
   }
 }

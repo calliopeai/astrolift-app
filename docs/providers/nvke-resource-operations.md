@@ -65,12 +65,31 @@ Versioned interfaces expose `native_version` concurrency instead.
 
 Receipts expose `resourceSource` separately from `isInventory`. The existing
 native/inventory browser recovery path refuses to adopt a resource-bound receipt
-as an ordinary request. Resource forms must extend that shared journal with the
-source binding before submitting these operations; they must not create a second
-nonce over an unresolved request. Existing confirmed receipts are returned before
+as an ordinary request. Resource forms use format 3 of that same site/actor journal, with the reviewed
+source operation/version/resource key bound to the original request. Only
+metadata and the request digest enter storage; parameter text, editor documents
+and native credentials remain in memory. A lost reply checks the original receipt
+before retrying the same nonce and exact input. Switching views or changing the
+reviewed source cannot create a second nonce over an unresolved request. Existing confirmed receipts are returned before
 rechecking changed/deleted source observations, preserving request recovery.
 
+Resource detail pages expose the collection's existing-resource mutation actions.
+Loading the editor requires explicit consent because native configuration can
+contain secrets. The form keeps JSON as opaque text, confirms the fixed target
+and site version, and shows the interface's concurrency limitation. An actor or
+resource visit change discards late editor replies; refreshing the same visit
+keeps the draft mounted while disabling submission until observations refresh.
+A changed site version requires loading a new editor before submission.
+
+When public editing needs an ETag, the preparation button admits a resource-bound
+GET through the same journal. It polls only the confirmed operation ID, then
+loads the editor from its successful version. A delayed read retains its ID in
+memory for another explicit check; it never launches another read merely because
+polling timed out. A lost admission reply remains recoverable through the durable
+journal. Editor and mutation queries use no-cache and redacted request contexts.
+
 Local proof covers real PostgreSQL/GraphQL admission and real Kubernetes
-replacement, stale snapshots, and replacement between preflight and PUT. Resource
-form wiring, resource-mode browser recovery, collection creation flows, native
-subresource/lifecycle controls and CLI source-binding flags remain delivery work.
+replacement, stale snapshots, replacement between preflight and PUT, browser
+resource-mode recovery, preparation reads, actor changes and opaque integer text.
+Collection creation flows, native subresource/lifecycle controls and CLI
+source-binding flags remain delivery work.

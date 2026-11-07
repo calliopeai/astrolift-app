@@ -271,6 +271,7 @@ export const GET_NVKE_INVENTORY_RESOURCE = gql`
       resourceKey: $resourceKey
     ) {
       operationId
+      operationVersion
       siteId
       observedAt
       collection {

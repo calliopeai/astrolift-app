@@ -12993,6 +12993,7 @@ export type NvkeInventoryResourceType = {
   item: NvkeInventoryItemType;
   observedAt?: Maybe<Scalars['DateTime']['output']>;
   operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
   siteId: Scalars['GUID']['output'];
 };
 
@@ -21118,7 +21119,7 @@ export type GetNvkeInventoryResourceQueryVariables = Exact<{
 }>;
 
 
-export type GetNvkeInventoryResourceQuery = { astroliftNvkeInventoryResource: { operationId: string, siteId: string, observedAt?: string | null, collection: { key: string, surface: NvkeSurface, resourceKind: string, namespaced: boolean, permission: string, defaultParametersText: string, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }> }, item: { key: string, identity: string, name: string, uid: string, namespace: string, resourceVersion: string, generation: string, kubernetesVersion: string, desiredCount: string, conditionsOmitted: number, conditions: Array<{ name: string, status: string }> } } };
+export type GetNvkeInventoryResourceQuery = { astroliftNvkeInventoryResource: { operationId: string, operationVersion: number, siteId: string, observedAt?: string | null, collection: { key: string, surface: NvkeSurface, resourceKind: string, namespaced: boolean, permission: string, defaultParametersText: string, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }> }, item: { key: string, identity: string, name: string, uid: string, namespace: string, resourceVersion: string, generation: string, kubernetesVersion: string, desiredCount: string, conditionsOmitted: number, conditions: Array<{ name: string, status: string }> } } };
 
 export type GetNvkeResourceEditorQueryVariables = Exact<{
   siteId: Scalars['GUID']['input'];

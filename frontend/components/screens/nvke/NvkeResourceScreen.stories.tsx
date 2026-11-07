@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NvkeResourceScreen } from "./NvkeResourceScreen";
-import { COLLECTION, INVENTORY_ITEM, OPERATION, SITE } from "./fixtures";
+import { COLLECTION, INVENTORY_ITEM, OPERATION, SITE, SITE_DETAIL } from "./fixtures";
 export default {
   title: "Screens/NVKE/Resource",
   component: NvkeResourceScreen,
@@ -41,4 +41,41 @@ export const Width768: Story = {
       <NvkeResourceScreen {...args} />
     </div>
   ),
+};
+
+export const WithEditor: Story = {
+  args: {
+    resourceActions: {
+      siteName: SITE.name,
+      siteVersion: SITE.version,
+      target: INVENTORY_ITEM.name,
+      actions: COLLECTION.actions.filter((a) => a.mutates),
+      selectedKey: "updateCluster",
+      access: SITE_DETAIL.access,
+      sourceReady: true,
+      pending: false,
+      error: null,
+      recovery: null,
+      editor: {
+        id: "reviewed-resource",
+        siteVersion: SITE.version,
+        operationKey: "updateCluster",
+        parametersText: '{"body":{"controlPlaneConfig":{"desiredCount":3}}}',
+        preparationActionKey: null,
+        concurrency: "observed_only",
+        source: {
+          operationId: OPERATION.id,
+          version: OPERATION.version,
+          resourceKey: INVENTORY_ITEM.key,
+        },
+      },
+      schemaText: "{}",
+      onSelect: () => {},
+      onLoad: async () => true,
+      onRefresh: () => {},
+      onPrepare: async () => true,
+      onRecover: async () => true,
+      onRequest: async () => true,
+    },
+  },
 };

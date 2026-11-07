@@ -337,6 +337,7 @@ class NvkeInventoryResourceType:
     item: NvkeInventoryItemType
     collection: NvkeCollectionType
     operation_id: GUID
+    operation_version: int
     site_id: GUID
     observed_at: datetime | None
 
@@ -482,6 +483,7 @@ class NvkeQuery:
             collection=collection_type(selected),
             operation_id=GUID(str(row.guid)),
             site_id=GUID(str(row.site.guid)),
+            operation_version=row.version,
             observed_at=row.finished_at,
         )
 
