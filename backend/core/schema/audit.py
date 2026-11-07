@@ -94,6 +94,9 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         # refuses it (#2256).
         "SetNotificationProfileInput.config",
         "StartWorkflowDefinitionInput.inputs",
+        # Rejected endpoint URLs can still contain embedded credentials.
+        "ConfigureNvkeConnectionInput.endpoint",
+        "NvkeCredentialsInput.clientKeyPem",
     }
 )
 

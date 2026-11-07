@@ -8266,6 +8266,17 @@ type ClusteragentkeyissuedpayloadMutationResult {
   data: Clusteragentkeyissuedpayload
 }
 
+input ConfigureNvkeConnectionInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  surface: NvkeSurface!
+  expectedConnectionVersion: Int!
+  endpoint: String!
+  credentials: NvkeCredentialsInput = null
+  allowHttp: Boolean! = false
+  timeoutSeconds: Int! = 30
+}
+
 input ConfigureProviderPluginInput {
   pluginSlug: String!
   config: JSON!
@@ -8495,6 +8506,12 @@ input CreateManagedDomainInput {
   isWildcardManaged: Boolean! = false
   dnsConfig: JSON = null
   organizationScoped: Boolean! = true
+}
+
+input CreateNvkeSiteInput {
+  name: String!
+  slug: String!
+  organizationNamespace: String!
 }
 
 input CreateOrganizationInput {
@@ -10812,6 +10829,10 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  createNvkeSite(input: CreateNvkeSiteInput!): NvkeSiteTypeMutationResult!
+  configureNvkeConnection(input: ConfigureNvkeConnectionInput!): NvkeSiteTypeMutationResult!
+  setNvkeSiteEnabled(input: SetNvkeSiteEnabledInput!): NvkeSiteTypeMutationResult!
+  removeNvkeSite(input: RemoveNvkeSiteInput!): NvkeSiteTypeMutationResult!
   prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
@@ -11261,6 +11282,69 @@ type NoneTypeMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: Void
+}
+
+type NvkeConnectionType {
+  id: GUID!
+  version: Int!
+  surface: NvkeSurface!
+  endpoint: String!
+  isEnabled: Boolean!
+  allowHttp: Boolean!
+  timeoutSeconds: Int!
+  hasCredentials: Boolean!
+  verifiedAt: DateTime
+  verificationCode: String!
+}
+
+input NvkeCredentialsInput {
+  token: String! = ""
+  caPem: String! = ""
+  clientCertificatePem: String! = ""
+  clientKeyPem: String! = ""
+}
+
+type NvkeSiteType {
+  id: GUID!
+  version: Int!
+  name: String!
+  slug: String!
+  organizationNamespace: String!
+  isActive: Boolean!
+  upstreamRevision: String!
+  connections: [NvkeConnectionType!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type NvkeSiteTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeSiteType
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type NvkeSiteTypePage {
+  items: [NvkeSiteType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+enum NvkeSurface {
+  CONTROLLER
+  TENANT
+  OPERATOR
+  DATASTORE
 }
 
 type ObservabilityRetentionHoldType {
@@ -11940,6 +12024,8 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeSites(after: String = null, limit: Int! = 50): NvkeSiteTypePage!
+  astroliftNvkeSite(siteId: GUID!): NvkeSiteType
   astroliftQuotas: [AstroliftQuota!]!
   astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!
   astroliftSourceConnections: [AstroliftSourceConnection!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage.")
@@ -12450,6 +12536,11 @@ input RemoveAppDomainInput {
 input RemoveEmailSuppressionEntryInput {
   managedServiceId: GUID!
   address: String!
+}
+
+input RemoveNvkeSiteInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
 }
 
 input RemoveOrgSkillRepoInput {
@@ -13041,6 +13132,12 @@ input SetNotificationQuietHoursInput {
   timezone: String!
   startMinute: Int!
   endMinute: Int!
+}
+
+input SetNvkeSiteEnabledInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  enabled: Boolean!
 }
 
 input SetOrganizationModuleInput {

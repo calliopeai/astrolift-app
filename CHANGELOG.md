@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add organization-owned NVKE sites and separately configured controller, tenant, operator and management-Kubernetes connections. The API provides paginated metadata and audited configuration with write-only encrypted credentials, explicit preserve/rotate/clear behavior, tenant and membership checks, optimistic concurrency, and separate NVKE permissions. Durable operation records preserve encrypted original inputs; provisioning/workflow/UI/CLI integration remains under #2656 (#2659).
+
 - Add explicit NVKE management-Kubernetes CRUDL adapters for all six resource kinds, conditional release deprecation, UID/resource-version deletion guards and secure kubeconfig retrieval. Local real Kubernetes admission tests cover CEL validation, immutability, pagination and namespace isolation (#2658).
 
 - Add the schema-validated transport for all pinned NVKE controller and tenant/operator HTTP operations, with distinct connections, conditional updates, credential rotation, bounded responses and ambiguous-mutation reporting (#2658). Application/API/UI wiring remains in progress under #2656.

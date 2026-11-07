@@ -7654,6 +7654,17 @@ export type ClusteragentkeyissuedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ConfigureNvkeConnectionInput = {
+  allowHttp: Scalars['Boolean']['input'];
+  credentials: InputMaybe<NvkeCredentialsInput>;
+  endpoint: Scalars['String']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+  surface: NvkeSurface;
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
 export type ConfigureProviderPluginInput = {
   config: Scalars['JSON']['input'];
   organizationScoped: Scalars['Boolean']['input'];
@@ -7876,6 +7887,12 @@ export type CreateManagedDomainInput = {
   isWildcardManaged: Scalars['Boolean']['input'];
   organizationScoped: Scalars['Boolean']['input'];
   zone: Scalars['String']['input'];
+};
+
+export type CreateNvkeSiteInput = {
+  name: Scalars['String']['input'];
+  organizationNamespace: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
 };
 
 export type CreateOrganizationInput = {
@@ -9817,6 +9834,7 @@ export type Mutation = {
   cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
   commitConversationTransfer: AstroliftConversationTransferMutationResult;
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
+  configureNvkeConnection: NvkeSiteTypeMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -9846,6 +9864,7 @@ export type Mutation = {
   createIdentityProvider: AstroliftIdentityProviderMutationResult;
   createInvitation: AstroliftInvitationCreatedMutationResult;
   createManagedDomain: AstroliftManagedDomainMutationResult;
+  createNvkeSite: NvkeSiteTypeMutationResult;
   createOrganization: AstroliftOrganizationMutationResult;
   createPipeline: AstroliftPipelineMutationResult;
   createPolicy: AstroliftPolicyMutationResult;
@@ -10058,6 +10077,7 @@ export type Mutation = {
   removeAgentSecretRef: AstroliftAgentSecretStatusMutationResult;
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
+  removeNvkeSite: NvkeSiteTypeMutationResult;
   removeOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   removeOrganizationAllowlistDomain: SoftdeletepayloadMutationResult;
   /** Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order. */
@@ -10155,6 +10175,7 @@ export type Mutation = {
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   setNotificationQuietHours: AstroliftNotificationQuietHoursMutationResult;
+  setNvkeSiteEnabled: NvkeSiteTypeMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
@@ -10612,6 +10633,11 @@ export type MutationConfigureAgentTaskCallbacksArgs = {
 };
 
 
+export type MutationConfigureNvkeConnectionArgs = {
+  input: ConfigureNvkeConnectionInput;
+};
+
+
 export type MutationConfigureProviderPluginArgs = {
   input: ConfigureProviderPluginInput;
 };
@@ -10754,6 +10780,11 @@ export type MutationCreateInvitationArgs = {
 
 export type MutationCreateManagedDomainArgs = {
   input: CreateManagedDomainInput;
+};
+
+
+export type MutationCreateNvkeSiteArgs = {
+  input: CreateNvkeSiteInput;
 };
 
 
@@ -11698,6 +11729,11 @@ export type MutationRemoveEmailSuppressionEntryArgs = {
 };
 
 
+export type MutationRemoveNvkeSiteArgs = {
+  input: RemoveNvkeSiteInput;
+};
+
+
 export type MutationRemoveOrgSkillRepoArgs = {
   input: RemoveOrgSkillRepoInput;
 };
@@ -12154,6 +12190,11 @@ export type MutationSetNotificationProfileArgs = {
 
 export type MutationSetNotificationQuietHoursArgs = {
   input: SetNotificationQuietHoursInput;
+};
+
+
+export type MutationSetNvkeSiteEnabledArgs = {
+  input: SetNvkeSiteEnabledInput;
 };
 
 
@@ -12828,6 +12869,64 @@ export type NoneTypeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type NvkeConnectionType = {
+  allowHttp: Scalars['Boolean']['output'];
+  endpoint: Scalars['String']['output'];
+  hasCredentials: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  isEnabled: Scalars['Boolean']['output'];
+  surface: NvkeSurface;
+  timeoutSeconds: Scalars['Int']['output'];
+  verificationCode: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeCredentialsInput = {
+  caPem: Scalars['String']['input'];
+  clientCertificatePem: Scalars['String']['input'];
+  clientKeyPem: Scalars['String']['input'];
+  token: Scalars['String']['input'];
+};
+
+export type NvkeSiteType = {
+  connections: Array<NvkeConnectionType>;
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  isActive: Scalars['Boolean']['output'];
+  name: Scalars['String']['output'];
+  organizationNamespace: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  updatedAt: Scalars['DateTime']['output'];
+  upstreamRevision: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeSiteTypeMutationResult = {
+  data?: Maybe<NvkeSiteType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type NvkeSiteTypePage = {
+  items: Array<NvkeSiteType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type NvkeSurface =
+  | 'CONTROLLER'
+  | 'DATASTORE'
+  | 'OPERATOR'
+  | 'TENANT';
+
 export type ObservabilityRetentionHoldType = {
   endsAt: Scalars['DateTime']['output'];
   id: Scalars['GUID']['output'];
@@ -13399,6 +13498,8 @@ export type Query = {
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
+  astroliftNvkeSite?: Maybe<NvkeSiteType>;
+  astroliftNvkeSites: NvkeSiteTypePage;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
   astroliftOrgMembersForApprovalPicker: Array<AstroliftApproverUser>;
   astroliftOrganization?: Maybe<AstroliftOrganization>;
@@ -14961,6 +15062,17 @@ export type QueryAstroliftMyNotificationsPageArgs = {
 };
 
 
+export type QueryAstroliftNvkeSiteArgs = {
+  siteId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftNvkeSitesArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+};
+
+
 export type QueryAstroliftOrgMembersForApprovalPickerArgs = {
   orgSlug: Scalars['String']['input'];
 };
@@ -16404,6 +16516,11 @@ export type RemoveEmailSuppressionEntryInput = {
   managedServiceId: Scalars['GUID']['input'];
 };
 
+export type RemoveNvkeSiteInput = {
+  expectedSiteVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
 export type RemoveOrgSkillRepoInput = {
   id: Scalars['GUID']['input'];
 };
@@ -16967,6 +17084,12 @@ export type SetNotificationQuietHoursInput = {
   endMinute: Scalars['Int']['input'];
   startMinute: Scalars['Int']['input'];
   timezone: Scalars['String']['input'];
+};
+
+export type SetNvkeSiteEnabledInput = {
+  enabled: Scalars['Boolean']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
 };
 
 export type SetOrganizationModuleInput = {
@@ -20527,6 +20650,51 @@ export type GetModelSubscriptionMetricsQueryVariables = Exact<{
 
 
 export type GetModelSubscriptionMetricsQuery = { astroliftModelSubscriptionMetrics?: { serviceId: string, clusterId: string, subscriptionId: string, start: string, end: string, retrievedAt: string, stepSeconds: number, scope: string, metrics: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> } | null };
+
+export type CreateNvkeSiteMutationVariables = Exact<{
+  input: CreateNvkeSiteInput;
+}>;
+
+
+export type CreateNvkeSiteMutation = { createNvkeSite: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null } };
+
+export type ConfigureNvkeConnectionMutationVariables = Exact<{
+  input: ConfigureNvkeConnectionInput;
+}>;
+
+
+export type ConfigureNvkeConnectionMutation = { configureNvkeConnection: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null } };
+
+export type SetNvkeSiteEnabledMutationVariables = Exact<{
+  input: SetNvkeSiteEnabledInput;
+}>;
+
+
+export type SetNvkeSiteEnabledMutation = { setNvkeSiteEnabled: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null } };
+
+export type RemoveNvkeSiteMutationVariables = Exact<{
+  input: RemoveNvkeSiteInput;
+}>;
+
+
+export type RemoveNvkeSiteMutation = { removeNvkeSite: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null } };
+
+export type NvkeSiteFieldsFragment = { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> };
+
+export type ListNvkeSitesQueryVariables = Exact<{
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type ListNvkeSitesQuery = { astroliftNvkeSites: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> }> } };
+
+export type GetNvkeSiteQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetNvkeSiteQuery = { astroliftNvkeSite?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null };
 
 export type TelemetryAppsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;

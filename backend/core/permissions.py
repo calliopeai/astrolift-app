@@ -125,6 +125,11 @@ class Permission(enum.StrEnum):
     PROVIDER_PLUGIN_READ = "provider_plugin.read"
     PROVIDER_PLUGIN_CONFIGURE = "provider_plugin.configure"
 
+    # NVKE authority is separate from workload deployment and cluster adoption.
+    NVKE_READ = "nvke.read"
+    NVKE_MANAGE = "nvke.manage"
+    NVKE_ADMIN = "nvke.admin"
+
     # --- SCM integration ------------------------------------------
     SCM_READ = "scm.read"
     # Create repositories through a stored connection (#2605); file writes
