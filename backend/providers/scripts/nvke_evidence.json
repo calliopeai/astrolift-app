@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "563fdbd23a57fb94bdb11190564de682dd228461"
+      "revision": "4cf7e8b1ade1427bc42b1aba8d366e88b0c16131"
     }
   },
   "evidence": {
@@ -480,6 +480,34 @@
       "kind": "observation",
       "scope": "One actual native UID/version-bound NVKECluster deletion completed naturally after isolated VM/SPIFFE recovery. Native resource/controller/CAPI/NICo/simulator objects absent; original tenant healthy with two Ready nodes and native TLS. No forced finalizer removal, repeated delete, hosted admission, latency/production or physical-provider claim.",
       "sha256": "0d819a125e7db746c6e033a97c0000e332709ec935d17b4e9e4b86d5ef7c84e9"
+    },
+    "operator-agent-contract": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/operator_contract.py",
+      "kind": "implementation",
+      "scope": "Typed source-pinned descriptors for 17 existing runner commands; finite bounded JSON, explicit file references, fixed choices and no ambient site, host paths, shell or arbitrary Helm passthrough. Strict mypy-clean reusable contract; not yet consumed by Astro.",
+      "sha256": "96a0e1b932890bd094e9fa0ad32b081761b57aa8d099e7fbc13001dd2ab72f5f"
+    },
+    "operator-agent": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/operator_agent.py",
+      "kind": "implementation",
+      "scope": "Standalone one-site mTLS/leaf-pinned agent with persistent instance/bundle fencing, private durable/HMAC-bound job receipts, original-job recovery, native finished-receipt reconciliation, guarded artifact export/snapshot copies and owned process-group termination. No shared-backend execution or GraphQL/outbox integration yet.",
+      "sha256": "df6b9a62eb38729695aba03bcb81e34e95c244d0ef3f281aea639903c78376e2"
+    },
+    "operator-agent-tests": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_operator_agent.py",
+      "kind": "test",
+      "scope": "Twenty-one focused tests use real TLS/native utilities and private filesystem receipts; lost reply yields one native run, finished journal reconciles without replay, unresolved effects block new mutation, cross-site/instance/bundle and input authority are refused. Deadline uses a synthetic owned process; no infrastructure mutation. A journal-write fault after launch stops the owned process group and retains the uncertain fence.",
+      "sha256": "4b2706dae0a2c57d7c8f640ee3d9d9b029b2ce5c567e3e3ddf73134a7cd7ac09"
+    },
+    "operator-agent-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-agent-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Standalone foundation: 63 tooling tests run, 60 passed/3 opt-in skipped; strict shared-contract mypy, ruff/format and isolated entrypoint passed. Actual agent-driven Linux bootstrap/install, Astro API/UI, standalone NKTP deployment/health and production qualification remain open.",
+      "sha256": "e4878101e1222989c1699bbd2d924ee2c7921ed89805d235717f8169ca806eff"
     }
   },
   "rows": {
@@ -2487,9 +2515,13 @@
         "evidence": [
           "native-tooling",
           "cli-tooling",
-          "native-linux-utilities"
+          "native-linux-utilities",
+          "operator-agent-contract",
+          "operator-agent",
+          "operator-agent-tests",
+          "operator-agent-local"
         ],
-        "remaining": "Dedicated API/UI preparation controls and live bootstrap qualification remain pending."
+        "remaining": "Generation/validation and native dry-run also execute through the standalone mTLS agent. Dedicated Astro API/outbox/UI controls and agent-driven live bootstrap qualification remain pending."
       },
       "deployment-rendering": {
         "mapping": "Pinned native deploy-path, stack/values inspection and management install planning",
@@ -2508,21 +2540,29 @@
           "management-controller-profile-tests",
           "cli-management-controller-profile",
           "cli-management-controller-test",
-          "cli-management-controller-qualified"
+          "cli-management-controller-qualified",
+          "operator-agent-contract",
+          "operator-agent",
+          "operator-agent-tests",
+          "operator-agent-local"
         ],
         "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
       },
       "bootstrap": {
-        "mapping": "Pinned local bootstrap, private outputs and durable attempt guard",
+        "mapping": "Pinned bootstrap/attempt guard plus standalone site-bound mTLS execution agent",
         "qualification": "partial",
         "evidence": [
           "native-tooling",
           "cli-tooling",
           "native-bootstrap-local",
           "native-bootstrap-checker",
-          "native-bootstrap-checker-tests"
+          "native-bootstrap-checker-tests",
+          "operator-agent-contract",
+          "operator-agent",
+          "operator-agent-tests",
+          "operator-agent-local"
         ],
-        "remaining": "One local seed/node bootstrap is qualified; API/UI admission/observation controls, production artifact supply-chain verification and live deployment remain pending."
+        "remaining": "A local seed/node bootstrap is qualified separately; the standalone agent has real TLS/native-utility and dry-run proof. Astro API/outbox/UI admission/observation and actual agent-driven bootstrap/install, production artifact verification and deployed acceptance remain pending."
       },
       "installation": {
         "mapping": "Pinned management install/check/access with guarded actual local default-stack installation",
@@ -2536,7 +2576,11 @@
           "management-controller-startup-native",
           "management-engine-declarative-native",
           "management-engine-worker-lifecycle-native",
-          "management-engine-cluster-deletion-native"
+          "management-engine-cluster-deletion-native",
+          "operator-agent-contract",
+          "operator-agent",
+          "operator-agent-tests",
+          "operator-agent-local"
         ],
         "remaining": "Default stack, private APIs, native controller, declarative create/access, worker growth/explicit surplus deletion and native cluster cleanup are locally qualified. Hosted bootstrap/install/delete API/UI controls, new tenant provisioning, cluster upgrades, verified production supply chain, physical providers and live deployment remain pending."
       },
