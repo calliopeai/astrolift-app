@@ -314,7 +314,8 @@ The contract query's `nativeWorkflows` catalog separately exposes the three
 pinned operator workflow input schemas, with upstream declaration and
 registration checks. These are additional to the 88 HTTP/datastore actions.
 Reviewed execution, owner history and rotation reset are available through the
-APIs below. Dedicated browser/CLI reset controls remain in #2665.
+APIs below and the paired CLI commands described in this guide. Dedicated browser
+workflow/history/reset controls remain in #2665.
 
 ## Reviewed native workflow requests
 
@@ -493,5 +494,20 @@ The observation deadline never cancels the native workflow or releases its lock.
 A successful operation means that the proved reset workflow completed; it does
 not independently certify encryption health. Local qualification uses real
 PostgreSQL, controller HTTP reads and Temporal with fixture workflows. Full native
-controller, agent and topology qualification, plus browser/CLI reset controls,
-remain release requirements tracked in #2665.
+controller, agent and topology qualification, plus browser workflow/history/reset
+controls, remain release requirements tracked in #2665.
+
+
+The paired CLI exposes `astro nvke temporal workflow history WORKFLOW` with the
+same site/authority/source versions and explicit `--after`/`--limit` pagination.
+`temporal workflow reset --file private-review.json --request-file recovery.json`
+submits the typed rotation reset review, with explicit site/authority/source
+versions. `temporal workflow reset recover --request-file recovery.json` performs
+receipt lookup only. Review input uses protected private files or stdin. The CLI
+flushes a separate reset recovery identity containing metadata and digests before
+admission, preserves the exact original UTF-8 review on pending retries, and
+checks an existing receipt before opening the review file. Its recovery file
+cannot substitute for a native workflow-start or HTTP/resource recovery record.
+Compiled CLI qualification also exercises paginated renewal/rotation history,
+lost native reset replies, recovery after review-file removal and old-cursor
+refusal after a native run changes.
