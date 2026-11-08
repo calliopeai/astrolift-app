@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { WORKFLOW_PROPS, WORKFLOW_HISTORY } from "./NvkeWorkflowPanel.stories";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
+import { PROVIDER_PROPS } from "./NvkeProvidersPanel.stories";
 import { CREDENTIAL_PROPS } from "./NvkeCredentialPanel.stories";
 import { COLLECTION_PROPS } from "./NvkeCredentialRequestPanel.stories";
 import { fakeController } from "@/components/data-table/fixtures";
@@ -173,5 +174,17 @@ export const NativeMaintenanceControls: Story = {
       error: null,
       onRefresh: () => {},
     },
+  },
+};
+
+export const Providers: Story = {
+  args: {
+    operation: {
+      ...OPERATION,
+      operationKey: "infrastructure.providers",
+      status: "SUCCEEDED",
+      version: 12,
+    },
+    providers: PROVIDER_PROPS,
   },
 };

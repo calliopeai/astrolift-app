@@ -160,6 +160,12 @@ export const NVKE_OPERATION_FIELDS = gql`
     requestId
     operationKey
     isInventory
+    providerSource {
+      connectionId
+      connectionVersion
+      siteVersion
+      upstreamRevision
+    }
     resourceSource {
       operationId
       version

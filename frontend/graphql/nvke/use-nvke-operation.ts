@@ -27,6 +27,7 @@ import {
 import { useNvkeDiagnostics } from "./use-nvke-diagnostics";
 import { useNvkeWorkflows } from "./use-nvke-workflows";
 import { useNvkeMaintenance } from "./use-nvke-maintenance";
+import { useNvkeProviders } from "./use-nvke-providers";
 import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
@@ -88,10 +89,11 @@ export const useNvkeOperation = (
   const loading = context.loading || detail.loading || site.loading || catalog.loading;
   const failed =
     context.failed || detail.failed || site.failed || catalog.failed || (!context.loading && !key);
-  const permission =
-    operation?.operationKey === "metrics.credentials"
-      ? "nvke.admin"
-      : (nativeMaintenancePermission(operation?.operationKey) ?? action?.permission);
+  const permission = ["metrics.credentials", "infrastructure.providers"].includes(
+    operation?.operationKey ?? ""
+  )
+    ? "nvke.admin"
+    : (nativeMaintenancePermission(operation?.operationKey) ?? action?.permission);
   const canAct =
     !!key &&
     !loading &&
@@ -112,6 +114,13 @@ export const useNvkeOperation = (
     siteId,
     operation,
     enabled: canAct,
+  });
+  const providers = useNvkeProviders({
+    context,
+    scopeKey: visitKey,
+    siteId,
+    operation,
+    enabled: !loading && !failed,
   });
   const credentials = useNvkeCredentials({
     context,
@@ -206,6 +215,7 @@ export const useNvkeOperation = (
     diagnostics,
     maintenance,
     credentials,
+    providers,
     credentialRequest,
     workflows,
     workloadAccess,

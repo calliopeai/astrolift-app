@@ -21699,7 +21699,7 @@ export type RequestNvkeCredentialObservationMutationVariables = Exact<{
 }>;
 
 
-export type RequestNvkeCredentialObservationMutation = { requestNvkeCredentialObservation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type RequestNvkeCredentialObservationMutation = { requestNvkeCredentialObservation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type NvkeMetricsAuthorityFieldsFragment = { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, allowHttp: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null };
 
@@ -21745,6 +21745,30 @@ export type GetNvkeCredentialCertificatesQueryVariables = Exact<{
 
 
 export type GetNvkeCredentialCertificatesQuery = { astroliftNvkeCredentialCertificatesPage: { ok: boolean, errors: Array<{ code: string }>, data?: { siteId: string, operationId: string, operationVersion: number, scrapedAt: string, totalCount: number, nextCursor?: string | null, items: Array<{ key: string, node: string, credential: string, required?: boolean | null, observationAvailable?: boolean | null, latestInspectionAvailable?: boolean | null, observationAgeSeconds?: string | null, reportedNotAfter?: string | null, reportedExpiredAtScrape?: boolean | null }> } | null } };
+
+export type GetNvkeProviderObservationQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  operationId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+}>;
+
+
+export type GetNvkeProviderObservationQuery = { astroliftNvkeProviderObservation: { ok: boolean, errors: Array<{ code: string }>, data?: { siteId: string, operationId: string, operationVersion: number, sourceSiteVersion: number, connectionId: string, connectionVersion: number, upstreamRevision: string, observedAt: string, complete: boolean, providers: Array<{ provider: string, state: string, reason: string, complete: boolean, crdsEstablished?: boolean | null, controllerAvailable?: boolean | null, managerNamespace?: string | null, managerName?: string | null, readyReplicas?: string | null, desiredReplicas?: string | null, secretNamespace?: string | null, secretName?: string | null, secretPresent?: boolean | null, endpointConfigured?: boolean | null, unconfiguredIsValid: boolean, credentials?: { health: string, reason: string, identityNamespace?: string | null, identityName?: string | null, identityGeneration?: string | null, readyStatus?: string | null, observedGeneration?: string | null, lastCheckedTime?: string | null, nextCheckTime?: string | null, additionalIdentityCount: number } | null }> } | null } };
+
+export type GetNvkeProviderIdentitiesQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  operationId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  provider: Scalars['String']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  after?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetNvkeProviderIdentitiesQuery = { astroliftNvkeProviderIdentitiesPage: { ok: boolean, errors: Array<{ code: string }>, data?: { siteId: string, operationId: string, operationVersion: number, observedAt: string, provider: string, totalCount: number, nextCursor?: string | null, items: Array<{ key: string, namespace: string, name: string }> } | null } };
 
 export type ConfigureNvkeTemporalMutationVariables = Exact<{
   input: ConfigureNvkeTemporalAuthorityInput;
@@ -21821,56 +21845,56 @@ export type RequestNvkeOperationMutationVariables = Exact<{
 }>;
 
 
-export type RequestNvkeOperationMutation = { requestNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type RequestNvkeOperationMutation = { requestNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type CancelNvkeOperationMutationVariables = Exact<{
   input: CancelNvkeOperationInput;
 }>;
 
 
-export type CancelNvkeOperationMutation = { cancelNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type CancelNvkeOperationMutation = { cancelNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type ResumeNvkeOperationMutationVariables = Exact<{
   input: ResumeNvkeOperationInput;
 }>;
 
 
-export type ResumeNvkeOperationMutation = { resumeNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type ResumeNvkeOperationMutation = { resumeNvkeOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type RequestNvkeOperationTextMutationVariables = Exact<{
   input: RequestNvkeOperationTextInput;
 }>;
 
 
-export type RequestNvkeOperationTextMutation = { requestNvkeOperationText: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type RequestNvkeOperationTextMutation = { requestNvkeOperationText: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type RequestNvkeInventoryMutationVariables = Exact<{
   input: RequestNvkeOperationTextInput;
 }>;
 
 
-export type RequestNvkeInventoryMutation = { requestNvkeInventory: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type RequestNvkeInventoryMutation = { requestNvkeInventory: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type RequestNvkeResourceOperationMutationVariables = Exact<{
   input: RequestNvkeResourceOperationInput;
 }>;
 
 
-export type RequestNvkeResourceOperationMutation = { requestNvkeResourceOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type RequestNvkeResourceOperationMutation = { requestNvkeResourceOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type RequestNvkeNativeWorkflowMutationVariables = Exact<{
   input: RequestNvkeNativeWorkflowInput;
 }>;
 
 
-export type RequestNvkeNativeWorkflowMutation = { requestNvkeNativeWorkflow: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type RequestNvkeNativeWorkflowMutation = { requestNvkeNativeWorkflow: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type RequestNvkeNativeResetMutationVariables = Exact<{
   input: RequestNvkeNativeResetInput;
 }>;
 
 
-export type RequestNvkeNativeResetMutation = { requestNvkeNativeReset: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+export type RequestNvkeNativeResetMutation = { requestNvkeNativeReset: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
 export type NvkeTemporalFieldsFragment = { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null };
 
@@ -21919,7 +21943,7 @@ export type GetNvkeSiteQueryVariables = Exact<{
 
 export type GetNvkeSiteQuery = { astroliftNvkeSite?: { id: string, version: number, name: string, slug: string, organizationNamespace: string, isActive: boolean, upstreamRevision: string, createdAt: string, updatedAt: string, connections: Array<{ id: string, version: number, surface: NvkeSurface, endpoint: string, isEnabled: boolean, allowHttp: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string }> } | null };
 
-export type NvkeOperationFieldsFragment = { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null };
+export type NvkeOperationFieldsFragment = { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null };
 
 export type ListNvkeOperationsQueryVariables = Exact<{
   siteId: Scalars['GUID']['input'];
@@ -21928,14 +21952,14 @@ export type ListNvkeOperationsQueryVariables = Exact<{
 }>;
 
 
-export type ListNvkeOperationsQuery = { astroliftNvkeOperations: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null }> } };
+export type ListNvkeOperationsQuery = { astroliftNvkeOperations: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null }> } };
 
 export type GetNvkeOperationQueryVariables = Exact<{
   operationId: Scalars['GUID']['input'];
 }>;
 
 
-export type GetNvkeOperationQuery = { astroliftNvkeOperation?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null };
+export type GetNvkeOperationQuery = { astroliftNvkeOperation?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null };
 
 export type GetNvkeOperationResultQueryVariables = Exact<{
   operationId: Scalars['GUID']['input'];
@@ -21960,7 +21984,7 @@ export type GetNvkeRequestQueryVariables = Exact<{
 }>;
 
 
-export type GetNvkeRequestQuery = { astroliftNvkeRequest?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null };
+export type GetNvkeRequestQuery = { astroliftNvkeRequest?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null };
 
 export type GetNvkeOperationResultTextQueryVariables = Exact<{
   operationId: Scalars['GUID']['input'];

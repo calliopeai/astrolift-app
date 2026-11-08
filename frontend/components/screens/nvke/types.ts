@@ -79,6 +79,12 @@ export interface NvkeSiteView {
   connections: NvkeConnectionView[];
 }
 export interface NvkeOperationView {
+  providerSource?: {
+    connectionId: string;
+    connectionVersion: number;
+    siteVersion: number;
+    upstreamRevision: string;
+  } | null;
   isInventory: boolean;
   id: string;
   version: number;
@@ -169,6 +175,7 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  providers?: import("./NvkeProvidersPanel").NvkeProvidersPanelProps | null;
   credentialRequest?: import("./NvkeCredentialRequestPanel").NvkeCredentialRequestPanelProps | null;
   credentials?: import("./NvkeCredentialPanel").NvkeCredentialPanelProps | null;
   workflows?: NvkeWorkflowPanelProps | null;

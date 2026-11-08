@@ -17,6 +17,7 @@ import { nvkeInventoryHref } from "@/lib/nvke/inventory";
 import { NvkeDiagnosticsPanel } from "./NvkeDiagnosticsPanel";
 import { NvkeWorkflowPanel } from "./NvkeWorkflowPanel";
 import { NvkeMaintenancePanel } from "./NvkeMaintenancePanel";
+import { NvkeProvidersPanel } from "./NvkeProvidersPanel";
 import { NvkeCredentialPanel } from "./NvkeCredentialPanel";
 import { NvkeCredentialRequestPanel } from "./NvkeCredentialRequestPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
@@ -37,6 +38,7 @@ export function NvkeOperationScreen({
   diagnostics,
   maintenance,
   credentials,
+  providers,
   credentialRequest,
   workflows,
   workloadAccess,
@@ -115,19 +117,21 @@ export function NvkeOperationScreen({
       >
         <Badge variant="outline">{t(`status.${operation.status}`)}</Badge>
         <p className="mt-2">
-          {native
-            ? t("workflow.reviewHelp")
-            : t(
-                operation.status === "SUCCEEDED"
-                  ? "observedHelp"
-                  : operation.status === "UNCERTAIN"
-                    ? "uncertainHelp"
-                    : operation.status === "CANCELLED"
-                      ? "cancelledHelp"
-                      : operation.status === "FAILED"
-                        ? "failedHelp"
-                        : "acceptedHelp"
-              )}
+          {operation.operationKey === "infrastructure.providers" && operation.status === "SUCCEEDED"
+            ? t("providers.collectedHelp")
+            : native
+              ? t("workflow.reviewHelp")
+              : t(
+                  operation.status === "SUCCEEDED"
+                    ? "observedHelp"
+                    : operation.status === "UNCERTAIN"
+                      ? "uncertainHelp"
+                      : operation.status === "CANCELLED"
+                        ? "cancelledHelp"
+                        : operation.status === "FAILED"
+                          ? "failedHelp"
+                          : "acceptedHelp"
+                )}
         </p>
       </div>
       <DefinitionList
@@ -164,6 +168,7 @@ export function NvkeOperationScreen({
       {diagnostics && <NvkeDiagnosticsPanel {...diagnostics} />}
       {maintenance && <NvkeMaintenancePanel {...maintenance} />}
       {credentials && <NvkeCredentialPanel {...credentials} />}
+      {providers && <NvkeProvidersPanel {...providers} />}
       {credentialRequest && <NvkeCredentialRequestPanel {...credentialRequest} />}
       {workflows && <NvkeWorkflowPanel {...workflows} />}
       {workloadAccess && <NvkeWorkloadAccessPanel {...workloadAccess} />}

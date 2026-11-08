@@ -23,6 +23,7 @@ import { useNvkeContext } from "./nvke.hooks";
 import { useNvkeResourceActions } from "./use-nvke-resource-actions";
 import { useNvkeSite } from "./use-nvke-site";
 import { useNvkeOperation } from "./use-nvke-operation";
+import { PROVIDER_PROPS } from "@/components/screens/nvke/NvkeProvidersPanel.stories";
 import { CREDENTIAL_PROPS } from "@/components/screens/nvke/NvkeCredentialPanel.stories";
 import { METRICS_AUTHORITY } from "@/components/screens/nvke/NvkeMetricsPanel.stories";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
@@ -1462,4 +1463,61 @@ it("does not download a native result whose administrator authority was revoked 
     if (previous) Object.defineProperty(URL, "createObjectURL", previous);
     else delete (URL as unknown as Record<string, unknown>).createObjectURL;
   }
+});
+
+it("opens provider history without a live connection and clears it on administrator loss", async () => {
+  const observation = PROVIDER_PROPS.observation!;
+  const h = harness(
+    (request) => {
+      if (request.operationName === "GetNvkeProviderObservation")
+        return { astroliftNvkeProviderObservation: { ok: true, errors: [], data: observation } };
+      if (request.operationName === "GetNvkeProviderIdentities")
+        return {
+          astroliftNvkeProviderIdentitiesPage: {
+            ok: true,
+            errors: [],
+            data: {
+              siteId: SITE.id,
+              operationId: OPERATION.id,
+              operationVersion: 12,
+              observedAt: observation.observedAt,
+              provider: "nico",
+              items: [],
+              totalCount: 31,
+              nextCursor: "opaque",
+            },
+          },
+        };
+      return {
+        astroliftNvkeOperation: {
+          ...OPERATION,
+          status: "SUCCEEDED",
+          operationKey: "infrastructure.providers",
+          version: 12,
+          providerSource: {
+            connectionId: observation.connectionId,
+            connectionVersion: observation.connectionVersion,
+            siteVersion: observation.sourceSiteVersion,
+            upstreamRevision: observation.upstreamRevision,
+          },
+        },
+      };
+    },
+    COLLECTION,
+    { ...SITE, version: 99, connections: [] }
+  );
+  const { result, rerender } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() =>
+    expect(result.current.providers?.observation?.observedAt).toBe(observation.observedAt)
+  );
+  expect(result.current.canAct).toBe(true);
+  expect(h.calls.some((call) => call.operationName === "GetNvkeProviderObservation")).toBe(true);
+  caller.admin = false;
+  rerender();
+  await waitFor(() => expect(result.current.providers).toBeNull());
+  expect(result.current.canAct).toBe(false);
+  expect(h.cache.extract()).toEqual({});
+  h.client.stop();
 });

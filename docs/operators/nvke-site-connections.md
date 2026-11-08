@@ -777,5 +777,15 @@ provider's state separately; a partial observation can succeed while provider
 facts remain unknown. A fresh successful credential check does not certify the
 manager's current availability. LaunchLayer may legitimately be unconfigured.
 The source-pinned classifier and bounded reader have local database, Kubernetes
-and Temporal tests. Provider UI/CLI wiring and native NICo/LaunchLayer controller,
-credential and physical infrastructure qualification remain pending in #2667.
+and Temporal tests. Successful provider operations now have a dedicated historical
+UI: both permissions are required, the admitted source metadata binds the saved
+header, and the identity table searches and pages the full saved list on the
+server. The UI preserves nanoseconds and decimal strings, distinguishes partial
+collection from provider readiness, and clears retained facts on caller or
+capability changes. It does not require the original connection to remain live.
+
+The historical panel has all eight locale catalogs, Storybook states and browser
+accessibility/layout checks. Hook tests use controlled Apollo replies; these do
+not establish connected native execution. Provider collection/recovery UI, CLI
+wiring and native NICo/LaunchLayer controller, credential and physical
+infrastructure qualification remain pending in #2667.
