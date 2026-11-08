@@ -10876,6 +10876,7 @@ type Mutation {
   setNvkeMetricsAuthorityEnabled(input: SetNvkeMetricsAuthorityEnabledInput!): NvkeMetricsAuthorityTypeMutationResult!
   removeNvkeMetricsAuthority(input: NvkeMetricsAuthorityReviewInput!): NvkeMetricsAuthorityTypeMutationResult!
   verifyNvkeMetricsAuthority(input: NvkeMetricsAuthorityReviewInput!): NvkeMetricsAuthorityTypeMutationResult!
+  requestNvkeProviderObservation(input: RequestNvkeProviderObservationInput!): NvkeOperationTypeMutationResult!
   requestNvkeCredentialObservation(input: RequestNvkeCredentialObservationInput!): NvkeOperationTypeMutationResult!
   requestNvkeNativeReset(input: RequestNvkeNativeResetInput!): NvkeOperationTypeMutationResult!
   requestNvkeNativeWorkflow(input: RequestNvkeNativeWorkflowInput!): NvkeOperationTypeMutationResult!
@@ -11400,6 +11401,7 @@ type NvkeContractType {
   collections: [NvkeCollectionType!]!
   nativeWorkflows: [NvkeNativeWorkflowType!]!
   credentialMetrics: JSON!
+  infrastructureProviders: JSON!
 }
 
 type NvkeCredentialCertificateType {
@@ -11551,6 +11553,25 @@ type NvkeEtcdKeyRotationObservationType {
   retainedMutationLock: Boolean
 }
 
+type NvkeInfrastructureProviderType {
+  provider: String!
+  state: String!
+  reason: String!
+  complete: Boolean!
+  crdsEstablished: Boolean
+  controllerAvailable: Boolean
+  managerNamespace: String
+  managerName: String
+  readyReplicas: String
+  desiredReplicas: String
+  secretNamespace: String
+  secretName: String
+  secretPresent: Boolean
+  endpointConfigured: Boolean
+  unconfiguredIsValid: Boolean!
+  credentials: NvkeProviderCredentialHealthType
+}
+
 type NvkeInventoryItemType {
   key: String!
   identity: String!
@@ -11697,6 +11718,7 @@ type NvkeOperationType {
   operationKey: String!
   isInventory: Boolean!
   resourceSource: NvkeResourceSourceType
+  providerSource: NvkeProviderSourceType
   status: NvkeOperationStatus!
   stage: String!
   generation: Int!
@@ -11731,6 +11753,68 @@ type NvkeOperationTypePage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type NvkeProviderCredentialHealthType {
+  health: String!
+  reason: String!
+  identityNamespace: String
+  identityName: String
+  identityGeneration: String
+  readyStatus: String
+  observedGeneration: String
+  lastCheckedTime: String
+  nextCheckTime: String
+  additionalIdentityCount: Int!
+}
+
+type NvkeProviderIdentitiesPageType {
+  siteId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  observedAt: String!
+  provider: String!
+  items: [NvkeProviderIdentityType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeProviderIdentitiesPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeProviderIdentitiesPageType
+}
+
+type NvkeProviderIdentityType {
+  key: String!
+  namespace: String!
+  name: String!
+}
+
+type NvkeProviderObservationType {
+  siteId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  sourceSiteVersion: Int!
+  connectionId: GUID!
+  connectionVersion: Int!
+  upstreamRevision: String!
+  observedAt: String!
+  complete: Boolean!
+  providers: [NvkeInfrastructureProviderType!]!
+}
+
+type NvkeProviderObservationTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeProviderObservationType
+}
+
+type NvkeProviderSourceType {
+  connectionId: GUID!
+  connectionVersion: Int!
+  siteVersion: Int!
+  upstreamRevision: String!
 }
 
 type NvkeResourceEditorType {
@@ -12553,6 +12637,8 @@ type Query {
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
   astroliftNvkeMetricsAuthority(siteId: GUID!): NvkeMetricsAuthorityType
+  astroliftNvkeProviderObservation(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!): NvkeProviderObservationTypeMutationResult!
+  astroliftNvkeProviderIdentitiesPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, provider: String!, search: String! = "", limit: Int! = 25, after: String = null): NvkeProviderIdentitiesPageTypeMutationResult!
   astroliftNvkeCredentialObservation(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!): NvkeCredentialObservationTypeMutationResult!
   astroliftNvkeCredentialMetricsPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 25, search: String = null): NvkeCredentialMetricsPageTypeMutationResult!
   astroliftNvkeCredentialCertificatesPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 25, search: String = null): NvkeCredentialCertificatesPageTypeMutationResult!
@@ -13248,6 +13334,16 @@ input RequestNvkeOperationTextInput {
   operationKey: String!
   parametersText: String!
   timeoutSeconds: Int! = 7200
+}
+
+input RequestNvkeProviderObservationInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  connectionId: GUID!
+  expectedConnectionVersion: Int!
+  requestId: String!
+  timeoutSeconds: Int! = 600
 }
 
 input RequestNvkeResourceOperationInput {

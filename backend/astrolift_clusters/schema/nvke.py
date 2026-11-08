@@ -10,6 +10,7 @@ import strawberry
 from nvke.client import NvkeError
 from nvke.contract import controller_spec, resource_schema, resources, upstream_revision
 from nvke.credential_metrics import catalog as credential_metrics_catalog
+from nvke.infrastructure import catalog as infrastructure_providers_catalog
 from nvke.inventory import collections, resource_actions
 from nvke.native_workflows import workflows as native_workflows
 from nvke.operations import action, actions
@@ -25,6 +26,7 @@ from astrolift_clusters import nvke_native_history as native_history
 from astrolift_clusters import nvke_native_operations as native_operations
 from astrolift_clusters import nvke_native_reset as native_reset
 from astrolift_clusters import nvke_operations as operations
+from astrolift_clusters import nvke_provider_observations as provider_observations
 from astrolift_clusters import nvke_resource_operations as resource_operations
 from astrolift_clusters import nvke_sites as service
 from astrolift_clusters import nvke_temporal as native_temporal
@@ -231,6 +233,92 @@ class ConfigureNvkeMetricsAuthorityInput(NvkeMetricsAuthorityReviewInput):
 @strawberry.input
 class SetNvkeMetricsAuthorityEnabledInput(NvkeMetricsAuthorityReviewInput):
     enabled: bool
+
+
+@strawberry.input
+class RequestNvkeProviderObservationInput:
+    site_id: GUID
+    expected_actor_id: int
+    expected_site_version: int
+    connection_id: GUID
+    expected_connection_version: int
+    request_id: str
+    timeout_seconds: int = 600
+
+
+@strawberry.type
+class NvkeProviderCredentialHealthType:
+    health: str
+    reason: str
+    identity_namespace: str | None
+    identity_name: str | None
+    identity_generation: str | None
+    ready_status: str | None
+    observed_generation: str | None
+    last_checked_time: str | None
+    next_check_time: str | None
+    additional_identity_count: int
+
+
+@strawberry.type
+class NvkeInfrastructureProviderType:
+    provider: str
+    state: str
+    reason: str
+    complete: bool
+    crds_established: bool | None
+    controller_available: bool | None
+    manager_namespace: str | None
+    manager_name: str | None
+    ready_replicas: str | None
+    desired_replicas: str | None
+    secret_namespace: str | None
+    secret_name: str | None
+    secret_present: bool | None
+    endpoint_configured: bool | None
+    unconfigured_is_valid: bool
+    credentials: NvkeProviderCredentialHealthType | None
+
+
+@strawberry.type
+class NvkeProviderSourceType:
+    connection_id: GUID
+    connection_version: int
+    site_version: int
+    upstream_revision: str
+
+
+@strawberry.type
+class NvkeProviderObservationType:
+    site_id: GUID
+    operation_id: GUID
+    operation_version: int
+    source_site_version: int
+    connection_id: GUID
+    connection_version: int
+    upstream_revision: str
+    observed_at: str
+    complete: bool
+    providers: list[NvkeInfrastructureProviderType]
+
+
+@strawberry.type
+class NvkeProviderIdentityType:
+    key: str
+    namespace: str
+    name: str
+
+
+@strawberry.type
+class NvkeProviderIdentitiesPageType:
+    site_id: GUID
+    operation_id: GUID
+    operation_version: int
+    observed_at: str
+    provider: str
+    items: list[NvkeProviderIdentityType]
+    next_cursor: str | None
+    total_count: int
 
 
 @strawberry.input
@@ -487,6 +575,7 @@ class NvkeOperationType:
     operation_key: str
     is_inventory: bool
     resource_source: NvkeResourceSourceType | None
+    provider_source: NvkeProviderSourceType | None
     status: NvkeOperationStatus
     stage: str
     generation: int
@@ -501,6 +590,9 @@ class NvkeOperationType:
 
 
 def operation_type(row):
+    provider_source = provider_observations.receipt_source(row)
+    if provider_source is not None:
+        provider_source["connection_id"] = GUID(provider_source["connection_id"])
     resource_source = row.authority.get("resource", {}).get("source")
     return NvkeOperationType(
         id=GUID(str(row.guid)),
@@ -516,6 +608,7 @@ def operation_type(row):
         )
         if resource_source
         else None,
+        provider_source=NvkeProviderSourceType(**provider_source) if provider_source is not None else None,
         status=NvkeOperationStatus(row.status),
         stage=row.stage,
         generation=row.generation,
@@ -666,6 +759,7 @@ class NvkeContractType:
     collections: list[NvkeCollectionType]
     native_workflows: list[NvkeNativeWorkflowType]
     credential_metrics: JSON
+    infrastructure_providers: JSON
 
 
 @strawberry.input
@@ -870,6 +964,84 @@ class NvkeQuery:
     def astrolift_nvke_metrics_authority(self, info: Info, site_id: GUID) -> NvkeMetricsAuthorityType | None:
         row = native_metrics.read(str(site_id))
         return metrics_authority_type(row) if row is not None else None
+
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def astrolift_nvke_provider_observation(
+        self,
+        info: Info,
+        site_id: GUID,
+        operation_id: GUID,
+        expected_actor_id: int,
+        expected_version: int,
+    ) -> MutationResultType[NvkeProviderObservationType]:
+        row, data = provider_observations.observation(
+            site_id=str(site_id),
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            expected_version=expected_version,
+        )
+        values = []
+        for provider in data.pop("providers"):
+            health = provider.pop("credentials")
+            values.append(
+                NvkeInfrastructureProviderType(
+                    **provider,
+                    credentials=NvkeProviderCredentialHealthType(**health) if health else None,
+                )
+            )
+        data["connection_id"] = GUID(data["connection_id"])
+        return success(
+            NvkeProviderObservationType(
+                site_id=GUID(str(row.site.guid)),
+                operation_id=GUID(str(row.guid)),
+                operation_version=row.version,
+                source_site_version=row.expected_site_version,
+                providers=values,
+                **data,
+            )
+        )
+
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def astrolift_nvke_provider_identities_page(
+        self,
+        info: Info,
+        site_id: GUID,
+        operation_id: GUID,
+        expected_actor_id: int,
+        expected_version: int,
+        provider: str,
+        search: str = "",
+        limit: int = 25,
+        after: str | None = None,
+    ) -> MutationResultType[NvkeProviderIdentitiesPageType]:
+        row, observed, items, cursor, total = provider_observations.identities_page(
+            site_id=str(site_id),
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            expected_version=expected_version,
+            provider=provider,
+            search=search,
+            limit=limit,
+            after=after,
+        )
+        return success(
+            NvkeProviderIdentitiesPageType(
+                site_id=GUID(str(row.site.guid)),
+                operation_id=GUID(str(row.guid)),
+                operation_version=row.version,
+                observed_at=observed,
+                provider=provider,
+                items=[NvkeProviderIdentityType(**item) for item in items],
+                next_cursor=cursor,
+                total_count=total,
+            )
+        )
 
     @strawberry.field
     @nvke_errors
@@ -1199,6 +1371,7 @@ class NvkeQuery:
         return NvkeContractType(
             revision=upstream_revision(),
             credential_metrics=credential_metrics_catalog(),
+            infrastructure_providers=infrastructure_providers_catalog(),
             actions=[
                 NvkeActionType(
                     key=item.key,
@@ -1339,6 +1512,21 @@ class NvkeMutation:
         self, info: Info, input: NvkeMetricsAuthorityReviewInput
     ) -> MutationResultType[NvkeMetricsAuthorityType]:
         return success(metrics_authority_type(native_metrics.verify(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.provider_observation_request",
+        target=lambda root, info, input: ("nvke_site", str(input.site_id)),
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def request_nvke_provider_observation(
+        self,
+        info: Info,
+        input: RequestNvkeProviderObservationInput,
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(provider_observations.reserve(**asdict(input))))
 
     @strawberry.mutation
     @mutation_audit(

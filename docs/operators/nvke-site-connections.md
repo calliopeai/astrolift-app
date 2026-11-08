@@ -733,3 +733,49 @@ The test skips unless a static build is explicitly selected; a selected build
 with missing Node/Chromium or unavailable services fails. This qualifies the
 connected local reset/recovery flow. It does not qualify deployed login, live
 native controller/agent/hardware changes, or every browser workflow procedure.
+
+
+## Infrastructure provider observations
+
+The provider observation API uses the site's explicitly reviewed enabled
+`datastore` connection. It never falls back to another surface or ambient
+Kubernetes credentials. Both `nvke.read` and `nvke.admin` are required for
+collection and historical payload reads, including API tokens with both scopes.
+
+`requestNvkeProviderObservation` takes the site ID/version, current caller ID,
+connection ID/version, request UUID and timeout (30–86400 seconds). Persist the
+request UUID before admission. A retry with the same tuple recovers the original
+receipt even after connection removal or a site version change; it never admits
+another read. `NvkeOperation.providerSource` retains the admitted connection
+ID/version, site version and upstream pin for receipt recovery. This is metadata,
+not a grant to read the private result.
+
+Collection runs through the original caller's durable outbox. Before each native
+request and publication it rechecks current membership, permissions, API token,
+site/connection versions, connection digest, cancellation, deadline and owning
+workflow run. Temporal history carries operation IDs, not provider inventory.
+Secret presence is read only through Kubernetes PartialObjectMetadata negotiation;
+there is no full-Secret fallback. Raw native messages and manager arguments are
+excluded from the encrypted projection.
+
+Use `astroliftNvkeProviderObservation` with the receipt's site ID, operation ID,
+current caller ID and operation version to read the saved projection. It contains
+the two pinned providers, independent installation/configuration/controller facts,
+and NICo credential health. Timestamps preserve nanoseconds, and replica counts
+and identity generations are decimal strings. Connection removal does not prevent
+a currently authorized administrator from reading history. The generic operation
+result paths use this same validated bounded projection.
+
+Additional identity names are available only through
+`astroliftNvkeProviderIdentitiesPage`, with the same receipt review plus provider,
+search, limit (1–100) and cursor. Search runs across the full saved list. Signed
+cursors bind the caller, organization, site, operation/version, provider, search
+and page size and expire after one hour. Historical reads perform no native I/O.
+
+Successful collection means an observation was saved. Inspect `complete` and each
+provider's state separately; a partial observation can succeed while provider
+facts remain unknown. A fresh successful credential check does not certify the
+manager's current availability. LaunchLayer may legitimately be unconfigured.
+The source-pinned classifier and bounded reader have local database, Kubernetes
+and Temporal tests. Provider UI/CLI wiring and native NICo/LaunchLayer controller,
+credential and physical infrastructure qualification remain pending in #2667.

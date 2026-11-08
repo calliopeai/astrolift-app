@@ -10145,6 +10145,7 @@ export type Mutation = {
   requestNvkeNativeWorkflow: NvkeOperationTypeMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestNvkeOperationText: NvkeOperationTypeMutationResult;
+  requestNvkeProviderObservation: NvkeOperationTypeMutationResult;
   requestNvkeResourceOperation: NvkeOperationTypeMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
@@ -11909,6 +11910,11 @@ export type MutationRequestNvkeOperationTextArgs = {
 };
 
 
+export type MutationRequestNvkeProviderObservationArgs = {
+  input: RequestNvkeProviderObservationInput;
+};
+
+
 export type MutationRequestNvkeResourceOperationArgs = {
   input: RequestNvkeResourceOperationInput;
 };
@@ -13077,6 +13083,7 @@ export type NvkeContractType = {
   collections: Array<NvkeCollectionType>;
   controllerOpenapi: Scalars['JSON']['output'];
   credentialMetrics: Scalars['JSON']['output'];
+  infrastructureProviders: Scalars['JSON']['output'];
   nativeWorkflows: Array<NvkeNativeWorkflowType>;
   resources: Array<NvkeResourceSchemaType>;
   revision: Scalars['String']['output'];
@@ -13231,6 +13238,25 @@ export type NvkeEtcdKeyRotationObservationType = {
   workflowId?: Maybe<Scalars['String']['output']>;
 };
 
+export type NvkeInfrastructureProviderType = {
+  complete: Scalars['Boolean']['output'];
+  controllerAvailable?: Maybe<Scalars['Boolean']['output']>;
+  crdsEstablished?: Maybe<Scalars['Boolean']['output']>;
+  credentials?: Maybe<NvkeProviderCredentialHealthType>;
+  desiredReplicas?: Maybe<Scalars['String']['output']>;
+  endpointConfigured?: Maybe<Scalars['Boolean']['output']>;
+  managerName?: Maybe<Scalars['String']['output']>;
+  managerNamespace?: Maybe<Scalars['String']['output']>;
+  provider: Scalars['String']['output'];
+  readyReplicas?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  secretName?: Maybe<Scalars['String']['output']>;
+  secretNamespace?: Maybe<Scalars['String']['output']>;
+  secretPresent?: Maybe<Scalars['Boolean']['output']>;
+  state: Scalars['String']['output'];
+  unconfiguredIsValid: Scalars['Boolean']['output'];
+};
+
 export type NvkeInventoryItemType = {
   conditions: Array<NvkeNativeConditionType>;
   conditionsOmitted: Scalars['Int']['output'];
@@ -13379,6 +13405,7 @@ export type NvkeOperationType = {
   id: Scalars['GUID']['output'];
   isInventory: Scalars['Boolean']['output'];
   operationKey: Scalars['String']['output'];
+  providerSource?: Maybe<NvkeProviderSourceType>;
   requestId: Scalars['String']['output'];
   resourceSource?: Maybe<NvkeResourceSourceType>;
   siteId: Scalars['GUID']['output'];
@@ -13406,6 +13433,68 @@ export type NvkeOperationTypePage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type NvkeProviderCredentialHealthType = {
+  additionalIdentityCount: Scalars['Int']['output'];
+  health: Scalars['String']['output'];
+  identityGeneration?: Maybe<Scalars['String']['output']>;
+  identityName?: Maybe<Scalars['String']['output']>;
+  identityNamespace?: Maybe<Scalars['String']['output']>;
+  lastCheckedTime?: Maybe<Scalars['String']['output']>;
+  nextCheckTime?: Maybe<Scalars['String']['output']>;
+  observedGeneration?: Maybe<Scalars['String']['output']>;
+  readyStatus?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+};
+
+export type NvkeProviderIdentitiesPageType = {
+  items: Array<NvkeProviderIdentityType>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  observedAt: Scalars['String']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  provider: Scalars['String']['output'];
+  siteId: Scalars['GUID']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type NvkeProviderIdentitiesPageTypeMutationResult = {
+  data?: Maybe<NvkeProviderIdentitiesPageType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeProviderIdentityType = {
+  key: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+};
+
+export type NvkeProviderObservationType = {
+  complete: Scalars['Boolean']['output'];
+  connectionId: Scalars['GUID']['output'];
+  connectionVersion: Scalars['Int']['output'];
+  observedAt: Scalars['String']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  providers: Array<NvkeInfrastructureProviderType>;
+  siteId: Scalars['GUID']['output'];
+  sourceSiteVersion: Scalars['Int']['output'];
+  upstreamRevision: Scalars['String']['output'];
+};
+
+export type NvkeProviderObservationTypeMutationResult = {
+  data?: Maybe<NvkeProviderObservationType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeProviderSourceType = {
+  connectionId: Scalars['GUID']['output'];
+  connectionVersion: Scalars['Int']['output'];
+  siteVersion: Scalars['Int']['output'];
+  upstreamRevision: Scalars['String']['output'];
 };
 
 export type NvkeResourceEditorType = {
@@ -14127,6 +14216,8 @@ export type Query = {
   astroliftNvkeOperationResult: JsonMutationResult;
   astroliftNvkeOperationResultText: StrMutationResult;
   astroliftNvkeOperations: NvkeOperationTypePage;
+  astroliftNvkeProviderIdentitiesPage: NvkeProviderIdentitiesPageTypeMutationResult;
+  astroliftNvkeProviderObservation: NvkeProviderObservationTypeMutationResult;
   astroliftNvkeRequest?: Maybe<NvkeOperationType>;
   astroliftNvkeResourceEditor: NvkeResourceEditorTypeMutationResult;
   astroliftNvkeSite?: Maybe<NvkeSiteType>;
@@ -15799,6 +15890,26 @@ export type QueryAstroliftNvkeOperationsArgs = {
 };
 
 
+export type QueryAstroliftNvkeProviderIdentitiesPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  limit?: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  provider: Scalars['String']['input'];
+  search?: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftNvkeProviderObservationArgs = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftNvkeRequestArgs = {
   requestId: Scalars['String']['input'];
   siteId: Scalars['GUID']['input'];
@@ -17427,6 +17538,16 @@ export type RequestNvkeOperationTextInput = {
   expectedSiteVersion: Scalars['Int']['input'];
   operationKey: Scalars['String']['input'];
   parametersText: Scalars['String']['input'];
+  requestId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
+export type RequestNvkeProviderObservationInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
   requestId: Scalars['String']['input'];
   siteId: Scalars['GUID']['input'];
   timeoutSeconds: Scalars['Int']['input'];

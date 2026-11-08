@@ -79,6 +79,8 @@ def connection_digest(row):
 
 
 def operation_permission(key):
+    if key == "infrastructure.providers":
+        return Permission.NVKE_ADMIN
     if key == "metrics.credentials":
         return Permission.NVKE_ADMIN
     if key == "temporal.reset.RotateEtcdEncryptionKey":
@@ -249,6 +251,10 @@ def original_actor(row):
 
 
 def checkpoint(row):
+    if row.operation_key == "infrastructure.providers":
+        from astrolift_clusters.nvke_provider_observations import checkpoint as provider_checkpoint
+
+        return provider_checkpoint(row)
     if row.operation_key == "metrics.credentials":
         from astrolift_clusters.nvke_credential_observations import checkpoint as metrics_checkpoint
 
@@ -395,6 +401,17 @@ def read(operation_id):
 
 def result(operation_id):
     row = read(operation_id)
+    if row.operation_key == "infrastructure.providers":
+        from astrolift_clusters.nvke_provider_observations import observation
+
+        _org, caller = sites.authorized(Permission.NVKE_READ)
+        _row, data = observation(
+            site_id=str(row.site.guid),
+            operation_id=str(row.guid),
+            expected_actor_id=caller.pk,
+            expected_version=row.version,
+        )
+        return {"provider_observation_format": 1, **data}
     sites.authorized(operation_permission(row.operation_key))
     return decode_result(row)
 

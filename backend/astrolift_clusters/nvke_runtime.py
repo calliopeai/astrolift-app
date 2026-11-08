@@ -21,7 +21,7 @@ from astrolift_clusters.nvke_sites import NvkeSiteError
 from core.mutations import AuditEntry, emit_audit
 
 
-def _state(row, status, stage, *, progress=None, error=None, reference=None):
+def _state(row, status, stage, *, progress=None, error=None, reference=None, expected_run_id=None):
     fields = {
         "status": status,
         "stage": stage,
@@ -37,7 +37,10 @@ def _state(row, status, stage, *, progress=None, error=None, reference=None):
         fields.update(result_backend_kind=row.result_backend_kind, result_ciphertext=row.result_ciphertext)
     if reference is not None:
         fields["remote_reference"] = reference
-    updated = NvkeOperation.objects.filter(pk=row.pk, generation=row.generation).update(**fields)
+    query = NvkeOperation.objects.filter(pk=row.pk, generation=row.generation)
+    if expected_run_id is not None:
+        query = query.filter(workflow_run_id=expected_run_id)
+    updated = query.update(**fields)
     row.refresh_from_db()
     if not updated:
         return "execution_refused"
@@ -266,6 +269,10 @@ def attempt(row_id, generation, *, execution):
             return "execution_refused"
         NvkeOperation.objects.filter(pk=row.pk, workflow_run_id="").update(workflow_run_id=execution[1])
         NvkeOperation.objects.filter(pk=row.pk, started_at__isnull=True).update(started_at=timezone.now())
+        if row.operation_key == "infrastructure.providers":
+            from astrolift_clusters.nvke_provider_observations import attempt as provider_attempt
+
+            return provider_attempt(row, execution=execution)
         if row.operation_key == "metrics.credentials":
             from astrolift_clusters.nvke_credential_observations import attempt as metrics_attempt
 

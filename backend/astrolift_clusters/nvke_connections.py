@@ -8,6 +8,7 @@ from pathlib import Path
 
 from nvke.client import Endpoint, NvkeClient
 from nvke.datastore import NvkeDatastore
+from nvke.infrastructure_client import InfrastructureClient
 
 from astrolift_clusters.nvke_sites import NvkeSiteError, credentials_for
 
@@ -53,4 +54,23 @@ def open_connection(connection, *, namespace, checkpoint):
             else NvkeClient([endpoint], **options)
         )
         with client:
+            yield client
+
+
+@contextmanager
+def open_infrastructure(connection, *, checkpoint):
+    checkpoint()
+    if connection.surface != "datastore":
+        raise NvkeSiteError("SURFACE_UNAVAILABLE", "Use explicit management-Kubernetes authority")
+    credentials = credentials_for(connection)
+    with connection_tls(credentials) as tls:
+        endpoint = Endpoint(
+            "datastore",
+            connection.endpoint,
+            allow_http=connection.allow_http,
+            token=(lambda: credentials_for(connection)["token"]) if credentials.get("token") else None,
+        )
+        with InfrastructureClient(
+            endpoint, verify=tls, timeout=connection.timeout_seconds, before_request=checkpoint
+        ) as client:
             yield client

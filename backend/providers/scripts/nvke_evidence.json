@@ -223,6 +223,19 @@
       "kind": "test",
       "scope": "Real TLS Kubernetes API with synthetic NICo CRDs/manager/identity status: actual metadata-only Secret responses, GET-only reader requests, independent provider state and current-generation health checks. No native provider controller or hardware effects.",
       "symbol": "test_real_management_api_observes_provider_metadata_without_secret_values"
+    },
+    "provider-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_provider_observations.py",
+      "kind": "test",
+      "scope": "Durable original-actor collection, encrypted history, revocation/run fences and typed GraphQL with exact numeric/timestamp strings; controlled native Kubernetes responses, not native controller execution."
+    },
+    "provider-api-kube": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_provider_observations.py",
+      "kind": "test",
+      "scope": "Real Astro PostgreSQL and TLS Kubernetes collection for absent provider CRDs; no native provider controllers or hardware.",
+      "symbol": "test_real_database_and_tls_kubernetes_observation"
     }
   },
   "rows": {
@@ -2056,14 +2069,16 @@
         "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
       },
       "nvkectl get providers": {
-        "mapping": "No equivalent Astro API/UI/CLI observation yet; tracked in #2667",
-        "qualification": "missing",
+        "mapping": "Pinned provider registry, metadata-only Kubernetes reader and durable actor/site/authority-bound provider observation API",
+        "qualification": "partial",
         "evidence": [
           "provider-classifier",
           "provider-reader",
-          "provider-reader-kube"
+          "provider-reader-kube",
+          "provider-api",
+          "provider-api-kube"
         ],
-        "remaining": "The reader exists internally; implement durable actor/site/authority-bound API/UI/CLI management paths, then qualify native provider controllers and hardware."
+        "remaining": "Provider UI and CLI collection/history/recovery remain pending; qualify native NICo and enabled LaunchLayer credentials/controllers/hardware separately."
       },
       "nvkectl inspect nvkr-release": {
         "mapping": "astro nvke tooling run -- inspect nvkr-release",
@@ -2220,16 +2235,18 @@
         "remaining": "NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending."
       },
       "infrastructure-providers": {
-        "mapping": "Pinned provider registry, bounded metadata-only Kubernetes reader and credential-health classifier; management control still pending",
+        "mapping": "Pinned provider registry, metadata-only Kubernetes reader and durable actor/site/authority-bound provider observation API",
         "qualification": "partial",
         "evidence": [
           "action-validation",
           "limits",
           "provider-classifier",
           "provider-reader",
-          "provider-reader-kube"
+          "provider-reader-kube",
+          "provider-api",
+          "provider-api-kube"
         ],
-        "remaining": "#2667: wire actor/site/authority-bound observations into API/UI/CLI, then qualify NICo and enabled LaunchLayer credentials/controllers/hardware."
+        "remaining": "Provider UI and CLI collection/history/recovery remain pending; qualify native NICo and enabled LaunchLayer credentials/controllers/hardware separately."
       },
       "artifacts": {
         "mapping": "All six management CRDs plus public operator APIs",

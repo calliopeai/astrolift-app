@@ -10,7 +10,7 @@ hashes bind this projection to the bundled snapshot; native messages stay privat
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
@@ -274,3 +274,19 @@ def assess_credentials(
         pick.next_check.text if pick.next_check else None,
         tuple((i.namespace, i.name) for i in candidates[1:]),
     )
+
+
+def catalog() -> dict[str, Any]:
+    return {
+        "format": 1,
+        "operationKey": "infrastructure.providers",
+        "surface": "datastore",
+        "permission": "nvke.admin",
+        "requiredPermissions": ["nvke.read", "nvke.admin"],
+        "historicalPermission": "nvke.admin",
+        "providers": [asdict(provider) for provider in providers()],
+        "staleAfterNanoseconds": str(STALE_AFTER_NS),
+        "nextCheckGraceNanoseconds": str(NEXT_CHECK_GRACE_NS),
+        "futureToleranceNanoseconds": str(FUTURE_TOLERANCE_NS),
+        "sourceHashes": dict(SOURCE_HASHES),
+    }
