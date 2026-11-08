@@ -21450,6 +21450,20 @@ export type RequestNvkeResourceOperationMutationVariables = Exact<{
 
 export type RequestNvkeResourceOperationMutation = { requestNvkeResourceOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
+export type RequestNvkeNativeWorkflowMutationVariables = Exact<{
+  input: RequestNvkeNativeWorkflowInput;
+}>;
+
+
+export type RequestNvkeNativeWorkflowMutation = { requestNvkeNativeWorkflow: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
+export type RequestNvkeNativeResetMutationVariables = Exact<{
+  input: RequestNvkeNativeResetInput;
+}>;
+
+
+export type RequestNvkeNativeResetMutation = { requestNvkeNativeReset: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
 export type NvkeTemporalFieldsFragment = { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null };
 
 export type GetNvkeTemporalQueryVariables = Exact<{
@@ -21525,7 +21539,7 @@ export type GetNvkeOperationResultQuery = { astroliftNvkeOperationResult: { ok: 
 export type GetNvkeContractQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetNvkeContractQuery = { astroliftNvkeContract: { revision: string, controllerOpenapi: unknown, collections: Array<{ key: string, surface: NvkeSurface, resourceKind: string, namespaced: boolean, permission: string, defaultParametersText: string, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }> }>, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }>, resources: Array<{ kind: string, namespaced: boolean, schema: unknown }> } };
+export type GetNvkeContractQuery = { astroliftNvkeContract: { revision: string, controllerOpenapi: unknown, nativeWorkflows: Array<{ name: string, inputType: string, source: string, permission: string, inputSchema: unknown }>, collections: Array<{ key: string, surface: NvkeSurface, resourceKind: string, namespaced: boolean, permission: string, defaultParametersText: string, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }> }>, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }>, resources: Array<{ kind: string, namespaced: boolean, schema: unknown }> } };
 
 export type GetNvkeIdentityQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -21610,6 +21624,21 @@ export type ListNvkeDiagnosticRowsQueryVariables = Exact<{
 
 
 export type ListNvkeDiagnosticRowsQuery = { astroliftNvkeDiagnosticPage: { siteId: string, operationId: string, operationVersion: number, totalCount: number, nextCursor?: string | null, items: Array<{ key: string, nativeId?: string | null, name?: string | null, createdAt?: string | null, isCurrent?: boolean | null, reachable?: boolean | null, hasValidSvid?: boolean | null, serverAddress?: string | null, serverPort?: number | null, svidExpiresAt?: string | null, changedFields: Array<string>, changedFieldCount?: string | null, fieldsOmitted?: string | null }> } };
+
+export type GetNvkeNativeHistoryQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  workflow: Scalars['String']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+}>;
+
+
+export type GetNvkeNativeHistoryQuery = { astroliftNvkeNativeHistory: { ok: boolean, errors: Array<{ code: string }>, data?: { siteId: string, siteVersion: number, authorityVersion: number, sourceOperationId: string, sourceVersion: number, sourceObservedAt?: string | null, clusterId: string, workflow: string, workflowId: string, runId: string, status: string, recordedState?: string | null, recordedPhase?: string | null, retainedMutationLock?: boolean | null, observedAt: string, nextCursor?: string | null, items: Array<{ eventId: string, eventType: string, occurredAt?: string | null, activityType?: string | null, scheduledEventId?: string | null, workflowTaskCompletedEventId?: string | null }> } | null } };
 
 export type TelemetryAppsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;

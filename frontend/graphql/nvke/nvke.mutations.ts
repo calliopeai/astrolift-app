@@ -251,3 +251,32 @@ export const REQUEST_NVKE_RESOURCE_OPERATION = gql`
   }
   ${NVKE_OPERATION_FIELDS}
 `;
+
+export const REQUEST_NVKE_NATIVE_WORKFLOW = gql`
+  mutation RequestNvkeNativeWorkflow($input: RequestNvkeNativeWorkflowInput!) {
+    requestNvkeNativeWorkflow(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;
+export const REQUEST_NVKE_NATIVE_RESET = gql`
+  mutation RequestNvkeNativeReset($input: RequestNvkeNativeResetInput!) {
+    requestNvkeNativeReset(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;

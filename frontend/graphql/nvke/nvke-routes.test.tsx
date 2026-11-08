@@ -105,6 +105,7 @@ function harness(
                     ),
                     collections: [collection],
                     controllerOpenapi: {},
+                    nativeWorkflows: [],
                     resources: [],
                   },
                 };
@@ -640,6 +641,7 @@ const useResourceActionArgs = () => ({
     actions: ACTIONS,
     collections: [COLLECTION],
     controllerOpenapi: {},
+    nativeWorkflows: [],
     resources: [],
   },
   collection: COLLECTION,

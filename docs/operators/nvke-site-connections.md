@@ -511,3 +511,41 @@ cannot substitute for a native workflow-start or HTTP/resource recovery record.
 Compiled CLI qualification also exercises paginated renewal/rotation history,
 lost native reset replies, recovery after review-file removal and old-cursor
 refusal after a native run changes.
+
+
+### Browser native admission foundation
+
+The shared browser recovery journal recognizes native workflow-start and reset
+records with explicit authority and source versions. It shares the same site key
+and Web Lock as HTTP/resource admission, so an unresolved request cannot be
+replaced by switching editors. Only metadata and a digest persist; native JSON,
+reset rationale/evidence and credentials remain out of storage. Native JSON text
+is sent verbatim. Typed reset field ordering does not change its digest, and
+native event IDs remain decimal strings through the GraphQL boundary.
+
+Recovery checks the original receipt before private input or a new admission.
+Lookup-only recovery requires no private review. Actor visits and the stored
+identity are checked immediately before submission, and a late response cannot
+archive a request from an old visit. A first structured admission rejection can
+be archived for the declared pre-insertion failure codes. `INVALID_INPUT` for an
+already unconfirmed native request retains the journal because native input
+validation can precede receipt lookup.
+
+The history response guard binds site/authority/source versions, cluster, owner
+and native run before publishing a page. It rejects inexact IDs, out-of-order
+events, invalid scheduling references and mismatched pages. Native status and
+controller-recorded state remain separate. These are browser protocol foundations;
+Storybook workflow/history/reset forms and application wiring are still pending.
+
+The real browser journal qualification runs without a live NVKE site:
+
+```sh
+cd frontend
+npx vitest run lib/nvke graphql/nvke components/screens/nvke
+npx playwright test --config playwright.journal.config.ts
+```
+
+The Playwright fixture serves the application protocol modules in an owned
+loopback origin and exercises actual Web Locks/localStorage across two tabs.
+Its admission/receipt callbacks are fixtures; it does not qualify native node
+work, deployed UI or backend workflow execution.

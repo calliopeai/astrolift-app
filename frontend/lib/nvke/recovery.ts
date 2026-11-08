@@ -19,6 +19,12 @@ export type NvkeRecoveryRecord = RecoveryMetadata &
     | { format: 1 }
     | { format: 2; mode: "native" | "inventory" }
     | { format: 3; mode: "resource"; source: NvkeResourceSource }
+    | {
+        format: 4;
+        mode: "workflow" | "reset";
+        source: NvkeResourceSource;
+        authorityVersion: number;
+      }
   );
 export interface NvkeResourceSource {
   operationId: string;
@@ -119,15 +125,30 @@ export function validateRecovery(
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   const row = value as Record<string, unknown>;
   const expectedFields =
-    row.format === 3
-      ? [...fields, "mode", "source"]
-      : row.format === 2
-        ? [...fields, "mode"]
-        : fields;
+    row.format === 4
+      ? [...fields, "mode", "source", "authorityVersion"]
+      : row.format === 3
+        ? [...fields, "mode", "source"]
+        : row.format === 2
+          ? [...fields, "mode"]
+          : fields;
   if (
     Object.keys(row).length !== expectedFields.length ||
     Object.keys(row).some((key) => !expectedFields.includes(key)) ||
-    (row.format !== 1 && row.format !== 2 && row.format !== 3) ||
+    (row.format !== 1 && row.format !== 2 && row.format !== 3 && row.format !== 4) ||
+    (row.format === 4 &&
+      ((row.mode !== "workflow" && row.mode !== "reset") ||
+        !validResourceSource(row.source) ||
+        row.source.resourceKey !== null ||
+        !Number.isSafeInteger(row.authorityVersion) ||
+        (row.authorityVersion as number) < 1 ||
+        (row.mode === "reset"
+          ? row.operationKey !== "temporal.reset.RotateEtcdEncryptionKey"
+          : ![
+              "temporal.RenewK8sCertsV2",
+              "temporal.RotateEtcdEncryptionKey",
+              "temporal.RetireLostEtcdRotationNode",
+            ].includes(row.operationKey as string)))) ||
     (row.format === 3 && (row.mode !== "resource" || !validResourceSource(row.source))) ||
     (row.format === 2 && row.mode !== "native" && row.mode !== "inventory") ||
     row.server !== scope.server ||

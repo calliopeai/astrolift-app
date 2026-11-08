@@ -217,6 +217,13 @@ export const GET_NVKE_CONTRACT = gql`
   query GetNvkeContract {
     astroliftNvkeContract {
       revision
+      nativeWorkflows {
+        name
+        inputType
+        source
+        permission
+        inputSchema
+      }
       collections {
         key
         surface
@@ -530,6 +537,65 @@ export const LIST_NVKE_DIAGNOSTIC_ROWS = gql`
         changedFields
         changedFieldCount
         fieldsOmitted
+      }
+    }
+  }
+`;
+
+export const GET_NVKE_NATIVE_HISTORY = gql`
+  query GetNvkeNativeHistory(
+    $siteId: GUID!
+    $expectedSiteVersion: Int!
+    $expectedActorId: Int!
+    $expectedAuthorityVersion: Int!
+    $sourceOperationId: GUID!
+    $expectedSourceVersion: Int!
+    $workflow: String!
+    $after: String
+    $limit: Int = 50
+  ) {
+    astroliftNvkeNativeHistory(
+      input: {
+        siteId: $siteId
+        expectedSiteVersion: $expectedSiteVersion
+        expectedActorId: $expectedActorId
+        expectedAuthorityVersion: $expectedAuthorityVersion
+        sourceOperationId: $sourceOperationId
+        expectedSourceVersion: $expectedSourceVersion
+        workflow: $workflow
+        after: $after
+        limit: $limit
+      }
+    ) {
+      ok
+      errors {
+        code
+      }
+      data {
+        siteId
+        siteVersion
+        authorityVersion
+        sourceOperationId
+        sourceVersion
+        sourceObservedAt
+        clusterId
+        workflow
+        workflowId
+        runId
+        status
+        recordedState
+        recordedPhase
+        retainedMutationLock
+        observedAt
+        items {
+          eventId
+          eventType
+          occurredAt
+          activityType
+          scheduledEventId
+          workflowTaskCompletedEventId
+        }
+        nextCursor
       }
     }
   }
