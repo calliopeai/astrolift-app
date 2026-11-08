@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "472b155764e8118326257dc4049697fe6afc4f6b"
+      "revision": "2c7f0b25385404ba4d6a4fdc6abf6bc002f0e3c6"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "93619bca993b501c4b34b04a0460d483a53c5146"
+      "revision": "67449de1ae88f3c88562a71796dbf11e441bb5a0"
     }
   },
   "evidence": {
@@ -176,7 +176,7 @@
       "path": "scripts/integration/test_nvke_tooling.py",
       "kind": "test",
       "scope": "Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.",
-      "sha256": "2289c3d9e93cb80ceb849c9c3611f90c7a7d31c516fe0cf1bb667ad301f52fd6"
+      "sha256": "05bbf4380026484e53c228f7d2de51a810473d1bf2abfce0323867371e2bfe8b"
     },
     "tooling-source": {
       "repository": "opscode",
@@ -345,6 +345,28 @@
       "kind": "observation",
       "scope": "SDK-driven local legacy-controller NICo simulator: MachineImage public create/read, complete ClusterRelease/NodePoolRelease datastore publication with native annotations, controller create request, two Ready workload nodes and ownership-checked private kubeconfig export. Not hosted Astro API/UI/CLI admission/recovery/access enrollment, physical hardware or declarative NVKECluster reconciliation.",
       "sha256": "80718a3fa4b3800e89eb85c82b31669bd59349bf60435ae7b32b96aa5b799ca1"
+    },
+    "cli-management-api-profile": {
+      "repository": "cli",
+      "path": "internal/nvketooling/tooling.go",
+      "kind": "implementation",
+      "scope": "CLI bridge verifies embedded renderer provenance, selects Python 3.12+ with PyYAML, retains process/privacy boundaries and validates source-revision/digest metadata. Rendering only, no hosted/effectful installation.",
+      "sha256": "110bbdc5c1b7e00477ab887732fa390ec5a10e23772f68ae5e067ceeeab47a02"
+    },
+    "cli-management-api-profile-test": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_tooling.py",
+      "kind": "test",
+      "scope": "Compiled CLI with actual pinned source: private digest-matched output, tenant RBAC/ClusterIP/default ingress, overwrite refusal, empty pod-selector rejection and inline-credential redaction. No native provisioning in this case.",
+      "sha256": "05bbf4380026484e53c228f7d2de51a810473d1bf2abfce0323867371e2bfe8b",
+      "symbol": "test_compiled_management_apis_keep_scope_private_and_output_exclusive"
+    },
+    "cli-management-api-qualified": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/cli-management-apis-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Committed CLI build and binary digest reproduced the already-qualified native deployment manifest byte for byte. Full local Go tests/vet/lint and immutable-vendor checks passed. Pure profile rendering, not hosted admission or effectful CLI installation.",
+      "sha256": "0b150a5df9e6f5d150d98adf54bf6fd1ab2d0ab5f8240484228f5180acc2e797"
     }
   },
   "rows": {
@@ -2337,7 +2359,10 @@
           "cli-tooling",
           "native-management-base",
           "management-api-profile",
-          "management-api-profile-tests"
+          "management-api-profile-tests",
+          "cli-management-api-profile",
+          "cli-management-api-profile-test",
+          "cli-management-api-qualified"
         ],
         "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
       },
@@ -2363,7 +2388,7 @@
           "native-management-base",
           "management-apis-native"
         ],
-        "remaining": "Default stack and private operator/tenant APIs are locally qualified. Management-engine controller reconciliation, hosted API/UI installation controls, profile CLI exposure, verified production supply chain and live deployment remain pending."
+        "remaining": "Default stack and private operator/tenant APIs are locally qualified, including profile CLI rendering. Management-engine controller reconciliation, hosted API/UI installation controls, verified production supply chain and live deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
