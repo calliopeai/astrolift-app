@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "2e60bd669d7fb5530ede24afa3c84ca5181323a9"
+      "revision": "2d2054a090ce877da84153cb26f0106037529315"
     }
   },
   "evidence": {
@@ -789,6 +789,27 @@
       "kind": "test",
       "scope": "HTTP/GraphQL refusal, invisible and mismatched receipts stop initial/subsequent watches after one read; recovery preserves the original operation and never re-admits work.",
       "sha256": "90744212b02cf237ee9621c47edd685110181208b53583c5ddea40a749d14714"
+    },
+    "operator-partial-install-review": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/management_recovery.py",
+      "kind": "implementation",
+      "scope": "Read-only partial-install review verifies the exact failed native guard/start/finish, current pinned bundle, private TLS kubeconfig and free native lock. Reports current generations/replicas; never clears a guard or authorizes continuation.",
+      "sha256": "31cb3e382afa0c2c63211ec451b47e9b8af1eb889fa4c07777c690f4eab2c509"
+    },
+    "operator-partial-install-tests": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_management_recovery.py",
+      "kind": "test",
+      "scope": "Nine cases cover original failure/privacy, missing/mismatched/successful receipts, symlinks, stale/deleting/scaled-down workloads, active locks, read-only behavior, receipt/bundle drift and output overwrite refusal.",
+      "sha256": "cf39d98c62c6881a5721fdce7c60934f6d68f46d6983111a60a923b503fdca6c"
+    },
+    "operator-partial-install-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-agent-partial-install-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "One actual agent install failed its LGTM readiness deadline with native exit 1; original UNCERTAIN effects/fence/guard retained without replay. Live source-bound review and 83 tooling tests (80 passed/3 opt-in skipped). Inotify prerequisite corrected. Reviewed agent/API/UI/CLI continuation remains open in #97.",
+      "sha256": "fbad1dcc08c2d9fad724c7238f4cec0e56ca3068a49cf56328ba099591f0c369"
     }
   },
   "rows": {
@@ -3023,9 +3044,12 @@
           "operator-stop-browser",
           "operator-stop-ui-local",
           "operator-watch-recovery",
-          "operator-watch-tests"
+          "operator-watch-tests",
+          "operator-partial-install-review",
+          "operator-partial-install-tests",
+          "operator-partial-install-local"
         ],
-        "remaining": "Default stack, private APIs/controller, native declarative create/access, worker growth/deletion and native cleanup are locally qualified. Reviewed Astro API/CLI/UI admission and original stop/fencing exist; actual agent-driven install, hosted new tenant/delete, upgrades, verified supply chain, physical providers and deployment remain pending."
+        "remaining": "Direct-runner default stack and native tenant lifecycle are locally qualified. The first agent-driven install ended with exit 1 at LGTM readiness; original UNCERTAIN effects/fence/guard remain intact, with a source-bound read-only review. Reviewed partial-install continuation (#97), successful agent install/access (#96), hosted new tenant/delete, upgrades, verified supply chain, physical providers and deployment remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
