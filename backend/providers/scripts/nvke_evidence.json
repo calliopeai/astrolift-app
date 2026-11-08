@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "385b1563be777f23a5c9319da58c385206bdc584"
+      "revision": "fe42191aa48791e3550c4713068f11253421dbc5"
     }
   },
   "evidence": {
@@ -911,15 +911,36 @@
       "repository": "opscode",
       "path": "kubernetes/nvke/management_plan.py",
       "kind": "implementation",
-      "scope": "Pure source/input/review-bound remaining-install proposal compiler. Strict native inventory/observed-prefix validation preserves order and includes the final observed item. Native log order is unattested observation; the public digest is not administrator authority or admission. Source collection, sealed persistence and linked execution remain pending.",
-      "sha256": "8685c3b17474bde9ac7e21e744745d9406d7e75734e862552849cf5fd60006b2"
+      "scope": "Pure input/execution/review-bound remaining-install proposal compiler. It distinguishes exact native starts from Helm progress, preserves original prepared and proposed item types/content, and declares retained versus reconstructed provenance. Log order remains unattested; no administrator authority or native admission.",
+      "sha256": "c9c05a4ac95a079bba8c147cfb6bac050efec3df9afd1b37784317288a5e8f40"
     },
     "operator-install-plan-core-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_management_plan.py",
       "kind": "test",
-      "scope": "Eight unit cases cover original prefix/remaining order, malformed or ambiguous inventories/traces, private-diagnostic exclusion, successful/unknown source refusal, changed bindings/tampering, custom inventories and 10,000-item proposals beyond the smaller command request limit. No native execution or API/UI/CLI continuation claim.",
-      "sha256": "e1323c728c8dc6a1224dfdac9a701521117577c4478d4e418e841e56c08e4e28"
+      "scope": "Ten unit cases cover native Helm progress, original/rendered type differences, inventory/prefix ambiguity, source/tamper/privacy refusal, custom inventories and 10,000-item proposals. No native execution or hosted continuation claim.",
+      "sha256": "38aad13a3a6f7c951c03963cb7e379431e11d75fb20d6a719b7b38ed7e202366"
+    },
+    "operator-install-plan-store": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/management_plan_store.py",
+      "kind": "implementation",
+      "scope": "Private bounded snapshots and fsynced non-overwriting HMAC-sealed proposals/linkage. Actual original/proposed frozen inventories, item content and private execution payload must match reviewed digests. One original-job reservation across replanning, same-link recovery after lost reply and different child/intent refusal. Storage/reservation only; fresh source/current-admin checks and dispatch remain external.",
+      "sha256": "44070b7e32c9e5b6bbcc5240064a8f2af0a339c5f005b8be7b9235d153828967"
+    },
+    "operator-install-plan-store-tests": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_management_plan_store.py",
+      "kind": "test",
+      "scope": "Seventeen real-filesystem cases cover source changes, frozen content/flags/tampering, symlinks/hardlinks/budgets, incomplete or overwritten publication, site/instance/key separation, original/rendered inventory pairing, cold same-link recovery and concurrent one-winner reservation.",
+      "sha256": "3c86015383d567adf6342647bbe41bfdab22e991acc567a9353839d5c9b48206"
+    },
+    "operator-install-plan-storage-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-plan-storage-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Direct Linux read-only preparation against authenticated retained job/native receipts produced a sealed 12-item reconstructed plan with seven observed starts and six remaining items; cold authentication, wrong-key/tamper refusal, and unchanged eight original files/five jobs/runs/application UNCERTAIN version 23. 27 compiler/store cases pass; management discovery 50 run/8 opt-in skips. No reservation, hosted preparation or continuation admitted; historical environment/content identity unproven.",
+      "sha256": "1a7b32dd9fb51a50a8ede3723299b6d53720f661673a6f701f37b1019f4f1205"
     }
   },
   "rows": {
@@ -3174,9 +3195,12 @@
           "operator-install-review-ui-browser",
           "operator-install-review-ui-local",
           "operator-install-plan-core",
-          "operator-install-plan-core-tests"
+          "operator-install-plan-core-tests",
+          "operator-install-plan-store",
+          "operator-install-plan-store-tests",
+          "operator-install-plan-storage-local"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin/version-gated API/compiled CLI and connected operation-screen review with encrypted snapshot pagination are locally qualified against that original job, with unchanged effect fences and later LGTM recovery. A pure bound proposal compiler exists; private source collection, sealed durable plans and reviewed linked continuation (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen review is locally qualified with unchanged fences. Bound proposal/storage and a separate read-only Linux preparation prototype are qualified; authenticated agent preparation/source collection, current-admin plan review and linked once-only execution/recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
