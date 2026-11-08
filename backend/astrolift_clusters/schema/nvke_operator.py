@@ -311,3 +311,16 @@ class NvkeOperatorMutation:
         self, info: Info, input: NvkeOperatorJobReviewInput
     ) -> MutationResultType[NvkeOperationType]:
         return success(operation_type(jobs.reconcile(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.operator_stop",
+        target=lambda root, info, input: ("nvke_operation", str(input.operation_id)),
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def stop_nvke_operator_job(
+        self, info: Info, input: NvkeOperatorJobReviewInput
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(jobs.stop(**asdict(input))))

@@ -596,3 +596,156 @@ def test_missing_agent_receipt_keeps_unknown_infrastructure_intent_fenced(config
         reserve(state, request_text=effect, acknowledge_infrastructure_change=True)
     assert fenced.value.code == "RESOURCE_BUSY"
     assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+def test_reviewed_stop_fences_absent_original_and_releases_infrastructure_intent(configured):
+    state = configured
+    effect = request(
+        state,
+        command="bootstrap.site",
+        positionals=[],
+        options={"sitespec": "input:site.yaml"},
+        files={"site.yaml": "not executed"},
+    )
+    row = reserve(state, request_text=effect, acknowledge_infrastructure_change=True)
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    with context(state.world):
+        stopped = jobs.stop(**source_review(state, row))
+    assert stopped.status == "cancelled"
+    assert outbox.decode_result(stopped)["operator_job"]["errorCode"] == "ORIGINAL_JOB_FENCED"
+    with pytest.raises(NvkeError) as delayed:
+        state.agent.client.submit(str(row.guid), json.loads(effect), intent=row.request_digest)
+    assert delayed.value.code == "OPERATOR_JOB_FENCED"
+    replacement = reserve(state, request_text=effect, acknowledge_infrastructure_change=True)
+    assert replacement.guid != row.guid
+    assert not list((state.agent.root / "state/jobs").iterdir())
+    assert not (state.agent.root / "state/workspace/runs").exists()
+
+
+def test_unconfirmed_stop_recovers_original_fence_through_read_only_reconciliation(configured, monkeypatch):
+    state = configured
+    row = reserve(state)
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    original_version = row.version
+    original = OperatorAgentClient.stop_or_fence
+
+    def lose_reply(client, *args, **kwargs):
+        original(client, *args, **kwargs)
+        raise NvkeError("OPERATOR_UNCONFIRMED", "synthetic lost stop reply", ambiguous=True)
+
+    monkeypatch.setattr(OperatorAgentClient, "stop_or_fence", lose_reply)
+    with context(state.world), pytest.raises(NvkeError) as unknown:
+        jobs.stop(**source_review(state, row))
+    assert unknown.value.ambiguous
+    row.refresh_from_db()
+    assert row.status == "uncertain" and row.version == original_version
+    with context(state.world):
+        recovered = jobs.reconcile(**source_review(state, row))
+    assert recovered.status == "cancelled" and recovered.version > original_version
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "expected_actor_id",
+        "expected_site_version",
+        "expected_authority_version",
+        "expected_operation_version",
+    ],
+)
+def test_stale_stop_review_never_closes_the_original_agent_intent(configured, key):
+    state = configured
+    row = reserve(state)
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    reviewed = source_review(state, row)
+    reviewed[key] += 1
+    with context(state.world), pytest.raises((NvkeError, sites.NvkeSiteError, PermissionDenied)):
+        jobs.stop(**reviewed)
+    journal = json.loads((state.agent.root / "state/admissions.json").read_bytes())
+    assert journal["payload"]["entries"] == {}
+
+
+def test_schema_stop_is_reviewed_audited_and_refuses_revoked_admin(configured):
+    from astrolift_clusters.tests.test_nvke_schema import execute
+    from core.schema.audit import MutationAuditLog
+
+    state = configured
+    row = reserve(state)
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    variables = {
+        "input": {
+            "operationId": str(row.guid),
+            "expectedActorId": state.world.user.pk,
+            "expectedSiteVersion": state.site.version,
+            "expectedAuthorityVersion": state.authority.version,
+            "expectedOperationVersion": row.version,
+        }
+    }
+    query = """mutation($input:NvkeOperatorJobReviewInput!){stopNvkeOperatorJob(input:$input){ok errors{code} data{id status}}}"""
+    response = execute(state.world, query, variables)
+    assert response.errors is None and response.data["stopNvkeOperatorJob"]["ok"]
+    assert response.data["stopNvkeOperatorJob"]["data"] == {"id": str(row.guid), "status": "CANCELLED"}
+    audit = MutationAuditLog.objects.filter(operation="nvke.operator_stop").latest("timestamp")
+    assert row.request_digest not in str(audit.variables)
+    RoleBinding.objects.filter(user=state.world.user).update(deleted_at=timezone.now())
+    revoked = execute(state.world, query, variables)
+    assert revoked.errors is None and not revoked.data["stopNvkeOperatorJob"]["ok"]
+
+
+def test_stop_refuses_an_active_original_observer_lease(configured):
+    from django.db import connection
+
+    state = configured
+    row = reserve(state)
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    other = connection.copy()
+    try:
+        other.ensure_connection()
+        with other.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_lock(%s)", [runtime.operation_lease_key(row.guid)])
+        with context(state.world), pytest.raises(NvkeError) as busy:
+            jobs.stop(**source_review(state, row))
+        assert busy.value.code == "RESOURCE_BUSY"
+        assert (
+            json.loads((state.agent.root / "state/admissions.json").read_bytes())["payload"]["entries"] == {}
+        )
+    finally:
+        other.close()
+
+
+def test_current_admin_can_fence_original_intent_after_original_caller_revocation(configured):
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import Member
+    from core.permissions import Permission
+    from core.tests.utils.scope_world import bind_role
+
+    state = configured
+    row = reserve(state)
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    caller = get_user_model().objects.create(username="stop-review-" + uuid4().hex, is_active=True)
+    Member.objects.create(user=caller, scope_kind="ORG", scope_id=state.world.org.pk)
+    bind_role(
+        caller,
+        permissions=[Permission.NVKE_ADMIN, Permission.NVKE_READ],
+        kind="ORG",
+        scope_id=state.world.org.pk,
+        slug="stop-review-" + uuid4().hex,
+    )
+    RoleBinding.objects.filter(user=state.world.user).update(deleted_at=timezone.now())
+    reviewed = source_review(state, row)
+    reviewed["expected_actor_id"] = caller.pk
+    with context(SimpleNamespace(org=state.world.org, user=caller)):
+        stopped = jobs.stop(**reviewed)
+    assert stopped.status == "cancelled" and stopped.updated_by_id == caller.pk
+    receipt = state.agent.client.observe(
+        str(row.guid), command="generate.sitespec", intent=row.request_digest
+    )
+    assert receipt["errorCode"] == "ORIGINAL_JOB_FENCED"

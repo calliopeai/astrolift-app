@@ -320,12 +320,20 @@ def artifact_page(*, after=None, limit=50, search="", **review):
 
 
 def reconcile(**review):
+    return _reviewed_job_action(review, stop=False)
+
+
+def stop(**review):
+    return _reviewed_job_action(review, stop=True)
+
+
+def _reviewed_job_action(review, *, stop):
     from astrolift_clusters.nvke_operator_runtime import record_peer
     from astrolift_clusters.nvke_runtime import _state, operation_lease_key
 
     caller, row, selected, checkpoint = reviewed_source(**review)
     if row.status != "uncertain":
-        raise NvkeError("PRECONDITION", "Only an uncertain operator intent needs reviewed reconciliation")
+        raise NvkeError("PRECONDITION", "Only an uncertain operator intent needs reviewed recovery")
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute("SELECT pg_try_advisory_xact_lock(%s)", [operation_lease_key(row.guid)])
@@ -336,11 +344,19 @@ def reconcile(**review):
         progress = outbox.decode_result(row)
         with authority.open_agent(selected, checkpoint=checkpoint) as client:
             try:
-                peer = client.observe(
-                    str(row.guid), command=command_key(row.operation_key), intent=row.request_digest
-                )
+                if stop:
+                    peer = client.stop_or_fence(
+                        str(row.guid),
+                        command=command_key(row.operation_key),
+                        intent=row.request_digest,
+                        effectful=row.authority["tooling_effectful"],
+                    )
+                else:
+                    peer = client.observe(
+                        str(row.guid), command=command_key(row.operation_key), intent=row.request_digest
+                    )
             except NvkeError as error:
-                if error.code != "OPERATOR_JOB_NOT_FOUND":
+                if stop or error.code != "OPERATOR_JOB_NOT_FOUND":
                     raise
                 # Absence cannot fence a delayed original PUT still in flight.
                 _state(

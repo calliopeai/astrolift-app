@@ -10295,6 +10295,7 @@ export type Mutation = {
   startWorkflow: StartWorkflowResult;
   /** Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response. */
   startWorkflowDefinition: WorkflowDefinitionStartMutationResult;
+  stopNvkeOperatorJob: NvkeOperationTypeMutationResult;
   submitForm: AstroliftFormSubmissionMutationResult;
   subscribeClusterModel: ModelSubscriptionOperationMutationResult;
   /** Switch the active user (impersonation). */
@@ -12552,6 +12553,11 @@ export type MutationStartWorkflowArgs = {
 
 export type MutationStartWorkflowDefinitionArgs = {
   input: StartWorkflowDefinitionInput;
+};
+
+
+export type MutationStopNvkeOperatorJobArgs = {
+  input: NvkeOperatorJobReviewInput;
 };
 
 

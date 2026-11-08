@@ -10,9 +10,10 @@ wired into the site screen and locally qualified in Storybook and Chromium
 against real GraphQL/Postgres/mTLS. The native command workbench and original-receipt recovery are also wired into
 the site screen and locally browser-qualified for one actual native utility.
 Original-job receipt inspection, private browser artifact downloads and reviewed
-read-only reconciliation are implemented locally. Reviewed native stop/fencing,
-agent-driven Linux bootstrap/install, production supply-chain checks and deployed
-acceptance remain separate qualification work.
+read-only reconciliation are implemented locally. Original-job stop/fencing is
+implemented in the agent, SDK and reviewed GraphQL recovery API; browser and CLI
+controls remain pending. Agent-driven Linux bootstrap/install, production
+supply-chain checks and deployed acceptance remain separate qualification work.
 
 ## Native tooling in the site screen
 
@@ -64,10 +65,10 @@ process. A completed native receipt can update the recorded outcome; completion
 of the native process alone does not establish infrastructure readiness.
 A `not_found` receipt is only an observation of absence: a delayed original PUT
 can still arrive. Reconciliation therefore keeps the operation uncertain and
-preserves its infrastructure intent fence. A durable native-agent stop/fence
-capability is still required to settle such an absent admission safely.
+preserves its infrastructure intent fence. Only a confirmed durable native-agent
+fence can settle such an absent admission safely.
 The existing generic cancellation request is consumed by an active observer;
-reviewed stop/fencing after that observer has closed remains open.
+the reviewed recovery API below can stop/fence after that observer has closed.
 
 The local browser qualification generates a native site spec, deliberately loses
 its admission response, recovers the original request receipt, downloads and
@@ -164,10 +165,25 @@ An authorized current administrator can call `reconcileNvkeOperatorJob` with
 reviewed current site/authority/operation versions after the original caller loses
 access. This acquires the same operation lease as normal execution and reads the
 original site, persistent instance, bundle and intent. It never submits a new job.
-A matching finished receipt can settle the operation; authoritative absence on
-that exact agent records `OPERATOR_NOT_ADMITTED`. A running or conflicting receipt
-remains unresolved. Credential rotation is permitted for this explicitly reviewed
+A matching finished receipt can settle the operation; absence on that exact
+agent records `OPERATOR_RECEIPT_NOT_FOUND` and retains uncertainty. A running or
+conflicting receipt remains unresolved. Credential rotation is permitted for this explicitly reviewed
 read path; changing the original agent identity is refused.
+
+`stopNvkeOperatorJob` uses the same reviewed input, current-admin permission and
+original operation lease for an uncertain job. The SDK first checks the agent's
+explicit version-1 stop/fence capability. A complete admission journal can certify
+that an absent original intent never ran and durably reject its delayed PUT;
+only that confirmed `ORIGINAL_JOB_FENCED` receipt settles absence as cancelled.
+Legacy or incomplete history remains unresolved. For admitted jobs the agent
+records cancellation and terminates only a currently owned process group;
+infrastructure effects remain uncertain where completion is unproven. A lost or
+unconfirmed stop reply leaves the Astro row uncertain. Refresh and reconcile the
+same original receipt before further action; never submit a replacement intent to
+resolve uncertainty. Caller/source versions and authority are rechecked around
+the capability handshake and stop exchange. Agent state backups must preserve
+identity, admission journal, digest key and private receipts together; pruning or
+rolling back admission history is unsupported.
 
 `astroliftNvkeOperatorArtifactText` returns a bounded, base64-encoded chunk from a
 retained private artifact. Review the operation and current authority versions for

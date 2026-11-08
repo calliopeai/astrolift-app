@@ -10914,6 +10914,7 @@ type Mutation {
   removeNvkeOperatorAuthority(input: NvkeOperatorAuthorityReviewInput!): NvkeOperatorAuthorityTypeMutationResult!
   requestNvkeOperatorJob(input: RequestNvkeOperatorJobInput!): NvkeOperationTypeMutationResult!
   reconcileNvkeOperatorJob(input: NvkeOperatorJobReviewInput!): NvkeOperationTypeMutationResult!
+  stopNvkeOperatorJob(input: NvkeOperatorJobReviewInput!): NvkeOperationTypeMutationResult!
   prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
