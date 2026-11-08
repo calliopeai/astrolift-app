@@ -49,22 +49,49 @@ with the minimum NVKE scopes through the existing token-management screen.
 
 ## Interfaces
 
-The provider package also contains a pinned controller credential-metrics reader.
-It is transport groundwork; site metrics authority, durable observations and
-their API/browser/CLI controls are still pending under #2661. It does not reuse
-the REST endpoint or infer a metrics address from a management kubeconfig.
-The controller serves these gauges on its separate metrics listener.
+Credential observations use an explicit site metrics authority with its own full
+scrape URL, encrypted bearer/TLS credentials, timeout and version. Configure,
+verify, disable and remove it through the GraphQL metrics-authority mutations.
+Verification records `METRICS_READ`, which proves readable pinned metrics rather
+than successful collection or cluster health. The controller serves these gauges
+on its separate metrics listener; Astrolift does not infer its address or reuse
+REST or management kubeconfig credentials. Browser and CLI controls remain open
+under #2666, a child of #2661.
 
 The reader pins all 18 credential gauges and 16 kubeadm credential names from the
 upstream collector and agent catalog. It selects only an exact cluster name's
-series and global subsystem flags. Binding that selector to the UUID in a reviewed
-controller observation remains application work; a supplied name alone is not
-ownership evidence. It preserves exact reported numeric values as
+series and global subsystem flags. Admission requires a successful `getCluster`
+receipt under the current site/controller authority and its exact version. The
+selector comes from that encrypted receipt, never a caller-supplied cluster name.
+Live controller reads before and after the scrape must still prove the same UUID
+and name, a provisioned cluster and no deletion. It preserves exact reported numeric values as
 decimal strings. Prometheus upstream gauges use float64, so this does not recover
 precision already lost by the exporter. Stored certificate NotAfter, fresh
 successful inventory, latest inspection availability, and monitoring enablement
 remain independent facts. Missing series and a failed collection are not healthy
 credential evidence. Renewal schedule timestamps never become expiry dates.
+The exporter labels clusters by name rather than UUID. The controller checks
+bind that selector, but cannot prove which cluster incarnation produced a retained
+gauge after name reuse. These are exporter-reported observations; inspection
+availability and reported observation age remain relevant.
+
+`requestNvkeCredentialObservation` reserves the actor-owned `metrics.credentials`
+outbox operation. It requires both `admin:nvke` and `read:nvke` access, checks the
+original caller and all source/authority versions throughout execution, and keeps
+the selected samples encrypted outside Temporal history. The request UUID recovers
+the original receipt before changed-authority admission checks. Cancellation or an
+observation deadline stops this read without changing the native cluster.
+
+READ-authorized `astroliftNvkeCredentialObservation`,
+`astroliftNvkeCredentialMetricsPage` and `astroliftNvkeCredentialCertificatesPage`
+expose version-bound historical views with signed, caller-bound pagination and
+server-side search. They retain the scrape time and distinguish a retained expiry
+from latest inspection availability. Expiry comparison is explicitly **at scrape
+time**. Missing observations remain unknown. Historical reads do not contact the
+native listener and survive later authority rotation; raw result access still
+requires administrator permission. Local HTTP/TLS, PostgreSQL, GraphQL and real
+Temporal tests qualify this flow; live collector/node inspection remains to be
+qualified on an NVKE installation.
 
 Reads have response/sample budgets, socket and elapsed scrape deadlines, explicit
 TLS/bearer configuration, no redirects, no ambient proxy credentials and no

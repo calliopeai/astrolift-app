@@ -12,6 +12,7 @@ from astrolift_clusters.models.managed_domain import (
 )
 from astrolift_clusters.models.nvke import (
     NvkeConnection,
+    NvkeMetricsAuthority,
     NvkeOperation,
     NvkeSite,
     NvkeTemporalAuthority,
@@ -31,6 +32,7 @@ __all__ = [
     "ManagedDomain",
     "ManagedServiceCatalogEntry",
     "NvkeConnection",
+    "NvkeMetricsAuthority",
     "NvkeOperation",
     "NvkeSite",
     "NvkeTemporalAuthority",

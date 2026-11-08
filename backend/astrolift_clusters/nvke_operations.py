@@ -79,6 +79,8 @@ def connection_digest(row):
 
 
 def operation_permission(key):
+    if key == "metrics.credentials":
+        return Permission.NVKE_ADMIN
     if key == "temporal.reset.RotateEtcdEncryptionKey":
         return Permission.NVKE_ADMIN
     if key.startswith("temporal."):
@@ -247,6 +249,10 @@ def original_actor(row):
 
 
 def checkpoint(row):
+    if row.operation_key == "metrics.credentials":
+        from astrolift_clusters.nvke_credential_observations import checkpoint as metrics_checkpoint
+
+        return metrics_checkpoint(row)
     if row.operation_key.startswith("temporal."):
         from astrolift_clusters.nvke_native_operations import checkpoint as native_checkpoint
 

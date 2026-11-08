@@ -8281,6 +8281,17 @@ input ConfigureNvkeConnectionInput {
   timeoutSeconds: Int! = 30
 }
 
+input ConfigureNvkeMetricsAuthorityInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+  endpoint: String!
+  credentials: NvkeCredentialsInput = null
+  allowHttp: Boolean! = false
+  timeoutSeconds: Int! = 30
+}
+
 input ConfigureNvkeTemporalAuthorityInput {
   siteId: GUID!
   expectedActorId: Int!
@@ -10861,6 +10872,11 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  configureNvkeMetricsAuthority(input: ConfigureNvkeMetricsAuthorityInput!): NvkeMetricsAuthorityTypeMutationResult!
+  setNvkeMetricsAuthorityEnabled(input: SetNvkeMetricsAuthorityEnabledInput!): NvkeMetricsAuthorityTypeMutationResult!
+  removeNvkeMetricsAuthority(input: NvkeMetricsAuthorityReviewInput!): NvkeMetricsAuthorityTypeMutationResult!
+  verifyNvkeMetricsAuthority(input: NvkeMetricsAuthorityReviewInput!): NvkeMetricsAuthorityTypeMutationResult!
+  requestNvkeCredentialObservation(input: RequestNvkeCredentialObservationInput!): NvkeOperationTypeMutationResult!
   requestNvkeNativeReset(input: RequestNvkeNativeResetInput!): NvkeOperationTypeMutationResult!
   requestNvkeNativeWorkflow(input: RequestNvkeNativeWorkflowInput!): NvkeOperationTypeMutationResult!
   configureNvkeTemporalAuthority(input: ConfigureNvkeTemporalAuthorityInput!): NvkeTemporalAuthorityTypeMutationResult!
@@ -11383,6 +11399,84 @@ type NvkeContractType {
   resources: [NvkeResourceSchemaType!]!
   collections: [NvkeCollectionType!]!
   nativeWorkflows: [NvkeNativeWorkflowType!]!
+  credentialMetrics: JSON!
+}
+
+type NvkeCredentialCertificateType {
+  key: String!
+  node: String!
+  credential: String!
+  required: Boolean
+  observationAvailable: Boolean
+  latestInspectionAvailable: Boolean
+  observationAgeSeconds: String
+  reportedNotAfter: DateTime
+  reportedExpiredAtScrape: Boolean
+}
+
+type NvkeCredentialCertificatesPageType {
+  siteId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  scrapedAt: DateTime!
+  items: [NvkeCredentialCertificateType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeCredentialCertificatesPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeCredentialCertificatesPageType
+}
+
+type NvkeCredentialMetricType {
+  key: String!
+  metric: String!
+  node: String
+  credential: String
+  state: String
+  value: String!
+}
+
+type NvkeCredentialMetricsPageType {
+  siteId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  scrapedAt: DateTime!
+  items: [NvkeCredentialMetricType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeCredentialMetricsPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeCredentialMetricsPageType
+}
+
+type NvkeCredentialObservationType {
+  siteId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  sourceSiteVersion: Int!
+  clusterId: GUID!
+  sourceOperationId: GUID!
+  sourceVersion: Int!
+  authorityId: GUID!
+  authorityVersion: Int!
+  scrapedAt: DateTime!
+  clusterReported: Boolean!
+  collectionSucceeded: Boolean
+  monitoringEnabled: Boolean
+  renewalAutomationEnabled: Boolean
+  warningWindowSeconds: String
+}
+
+type NvkeCredentialObservationTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeCredentialObservationType
 }
 
 input NvkeCredentialsInput {
@@ -11505,6 +11599,34 @@ type NvkeMaintenanceObservationType {
   mutationLockStartedAt: String
   renewal: NvkeCertificateRenewalObservationType
   etcdKeyRotation: NvkeEtcdKeyRotationObservationType
+}
+
+input NvkeMetricsAuthorityReviewInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+}
+
+type NvkeMetricsAuthorityType {
+  id: GUID!
+  version: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  endpoint: String!
+  allowHttp: Boolean!
+  isEnabled: Boolean!
+  timeoutSeconds: Int!
+  hasCredentials: Boolean!
+  verifiedAt: DateTime
+  verificationCode: String!
+  deletedAt: DateTime
+}
+
+type NvkeMetricsAuthorityTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeMetricsAuthorityType
 }
 
 type NvkeNativeConditionType {
@@ -12430,6 +12552,10 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeMetricsAuthority(siteId: GUID!): NvkeMetricsAuthorityType
+  astroliftNvkeCredentialObservation(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!): NvkeCredentialObservationTypeMutationResult!
+  astroliftNvkeCredentialMetricsPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 25, search: String = null): NvkeCredentialMetricsPageTypeMutationResult!
+  astroliftNvkeCredentialCertificatesPage(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!, after: String = null, limit: Int! = 25, search: String = null): NvkeCredentialCertificatesPageTypeMutationResult!
   astroliftNvkeNativeHistory(input: ReadNvkeNativeHistoryInput!): NvkeNativeHistoryPageTypeMutationResult!
   astroliftNvkeTemporalAuthority(siteId: GUID!): NvkeTemporalAuthorityType
   astroliftNvkeMaintenanceObservation(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!): NvkeMaintenanceObservationType!
@@ -13056,6 +13182,17 @@ input RequestModelConnectionInput {
   idempotencyKey: GUID!
 }
 
+input RequestNvkeCredentialObservationInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  sourceOperationId: GUID!
+  expectedSourceVersion: Int!
+  requestId: String!
+  timeoutSeconds: Int! = 600
+}
+
 input RequestNvkeNativeResetInput {
   siteId: GUID!
   expectedSiteVersion: Int!
@@ -13649,6 +13786,14 @@ input SetNotificationQuietHoursInput {
   timezone: String!
   startMinute: Int!
   endMinute: Int!
+}
+
+input SetNvkeMetricsAuthorityEnabledInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+  enabled: Boolean!
 }
 
 input SetNvkeSiteEnabledInput {

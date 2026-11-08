@@ -9,15 +9,18 @@ from functools import wraps
 import strawberry
 from nvke.client import NvkeError
 from nvke.contract import controller_spec, resource_schema, resources, upstream_revision
+from nvke.credential_metrics import catalog as credential_metrics_catalog
 from nvke.inventory import collections, resource_actions
 from nvke.native_workflows import workflows as native_workflows
 from nvke.operations import action, actions
 from strawberry.scalars import JSON
 from strawberry.types import Info
 
+from astrolift_clusters import nvke_credential_observations as credential_observations
 from astrolift_clusters import nvke_diagnostics as diagnostics
 from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_maintenance as maintenance
+from astrolift_clusters import nvke_metrics as native_metrics
 from astrolift_clusters import nvke_native_history as native_history
 from astrolift_clusters import nvke_native_operations as native_operations
 from astrolift_clusters import nvke_native_reset as native_reset
@@ -174,6 +177,136 @@ class NvkeTemporalAuthorityType:
     verified_at: datetime | None
     verification_code: str
     deleted_at: datetime | None
+
+
+@strawberry.type
+class NvkeMetricsAuthorityType:
+    id: GUID
+    version: int
+    site_id: GUID
+    site_version: int
+    endpoint: str
+    allow_http: bool
+    is_enabled: bool
+    timeout_seconds: int
+    has_credentials: bool
+    verified_at: datetime | None
+    verification_code: str
+    deleted_at: datetime | None
+
+
+def metrics_authority_type(row):
+    return NvkeMetricsAuthorityType(
+        id=GUID(str(row.guid)),
+        version=row.version,
+        site_id=GUID(str(row.site.guid)),
+        site_version=row.site.version,
+        endpoint=row.endpoint,
+        allow_http=row.allow_http,
+        is_enabled=row.is_enabled,
+        timeout_seconds=row.timeout_seconds,
+        has_credentials=bool(row.credential_ciphertext),
+        verified_at=row.verified_at,
+        verification_code=row.verification_code,
+        deleted_at=row.deleted_at,
+    )
+
+
+@strawberry.input
+class NvkeMetricsAuthorityReviewInput:
+    site_id: GUID
+    expected_actor_id: int
+    expected_site_version: int
+    expected_version: int
+
+
+@strawberry.input
+class ConfigureNvkeMetricsAuthorityInput(NvkeMetricsAuthorityReviewInput):
+    endpoint: str
+    credentials: NvkeCredentialsInput | None = None
+    allow_http: bool = False
+    timeout_seconds: int = 30
+
+
+@strawberry.input
+class SetNvkeMetricsAuthorityEnabledInput(NvkeMetricsAuthorityReviewInput):
+    enabled: bool
+
+
+@strawberry.input
+class RequestNvkeCredentialObservationInput:
+    site_id: GUID
+    expected_actor_id: int
+    expected_site_version: int
+    expected_authority_version: int
+    source_operation_id: GUID
+    expected_source_version: int
+    request_id: str
+    timeout_seconds: int = 600
+
+
+@strawberry.type
+class NvkeCredentialObservationType:
+    site_id: GUID
+    operation_id: GUID
+    operation_version: int
+    source_site_version: int
+    cluster_id: GUID
+    source_operation_id: GUID
+    source_version: int
+    authority_id: GUID
+    authority_version: int
+    scraped_at: datetime
+    cluster_reported: bool
+    collection_succeeded: bool | None
+    monitoring_enabled: bool | None
+    renewal_automation_enabled: bool | None
+    warning_window_seconds: str | None
+
+
+@strawberry.type
+class NvkeCredentialMetricType:
+    key: str
+    metric: str
+    node: str | None
+    credential: str | None
+    state: str | None
+    value: str
+
+
+@strawberry.type
+class NvkeCredentialCertificateType:
+    key: str
+    node: str
+    credential: str
+    required: bool | None
+    observation_available: bool | None
+    latest_inspection_available: bool | None
+    observation_age_seconds: str | None
+    reported_not_after: datetime | None
+    reported_expired_at_scrape: bool | None
+
+
+@strawberry.type
+class NvkeCredentialMetricsPageType:
+    site_id: GUID
+    operation_id: GUID
+    operation_version: int
+    scraped_at: datetime
+    items: list[NvkeCredentialMetricType]
+    next_cursor: str | None
+    total_count: int
+
+
+@strawberry.type
+class NvkeCredentialCertificatesPageType:
+    site_id: GUID
+    operation_id: GUID
+    operation_version: int
+    scraped_at: datetime
+    items: list[NvkeCredentialCertificateType]
+    next_cursor: str | None
+    total_count: int
 
 
 def temporal_authority_type(row):
@@ -532,6 +665,7 @@ class NvkeContractType:
     resources: list[NvkeResourceSchemaType]
     collections: list[NvkeCollectionType]
     native_workflows: list[NvkeNativeWorkflowType]
+    credential_metrics: JSON
 
 
 @strawberry.input
@@ -730,6 +864,116 @@ class ReadNvkeNativeHistoryInput:
 
 @strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_metrics_authority(self, info: Info, site_id: GUID) -> NvkeMetricsAuthorityType | None:
+        row = native_metrics.read(str(site_id))
+        return metrics_authority_type(row) if row is not None else None
+
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_credential_observation(
+        self,
+        info: Info,
+        site_id: GUID,
+        operation_id: GUID,
+        expected_actor_id: int,
+        expected_version: int,
+    ) -> MutationResultType[NvkeCredentialObservationType]:
+        row, data = credential_observations.observation(
+            site_id=str(site_id),
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            expected_version=expected_version,
+        )
+        for field in ("cluster_id", "source_operation_id", "authority_id"):
+            data[field] = GUID(data[field])
+        return success(
+            NvkeCredentialObservationType(
+                site_id=GUID(str(row.site.guid)),
+                operation_id=GUID(str(row.guid)),
+                operation_version=row.version,
+                source_site_version=row.expected_site_version,
+                **data,
+            )
+        )
+
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_credential_metrics_page(
+        self,
+        info: Info,
+        site_id: GUID,
+        operation_id: GUID,
+        expected_actor_id: int,
+        expected_version: int,
+        after: str | None = None,
+        limit: int = 25,
+        search: str | None = None,
+    ) -> MutationResultType[NvkeCredentialMetricsPageType]:
+        row, items, cursor, total, observed_at = credential_observations.page(
+            site_id=str(site_id),
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            expected_version=expected_version,
+            after=after,
+            limit=limit,
+            search=search or "",
+        )
+        return success(
+            NvkeCredentialMetricsPageType(
+                site_id=GUID(str(row.site.guid)),
+                operation_id=GUID(str(row.guid)),
+                operation_version=row.version,
+                scraped_at=observed_at,
+                items=[NvkeCredentialMetricType(**item) for item in items],
+                next_cursor=cursor,
+                total_count=total,
+            )
+        )
+
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
+    @tenant_scoped()
+    def astrolift_nvke_credential_certificates_page(
+        self,
+        info: Info,
+        site_id: GUID,
+        operation_id: GUID,
+        expected_actor_id: int,
+        expected_version: int,
+        after: str | None = None,
+        limit: int = 25,
+        search: str | None = None,
+    ) -> MutationResultType[NvkeCredentialCertificatesPageType]:
+        row, items, cursor, total, observed_at = credential_observations.page(
+            site_id=str(site_id),
+            operation_id=str(operation_id),
+            expected_actor_id=expected_actor_id,
+            expected_version=expected_version,
+            after=after,
+            limit=limit,
+            search=search or "",
+            kind="certificates",
+        )
+        return success(
+            NvkeCredentialCertificatesPageType(
+                site_id=GUID(str(row.site.guid)),
+                operation_id=GUID(str(row.guid)),
+                operation_version=row.version,
+                scraped_at=observed_at,
+                items=[NvkeCredentialCertificateType(**item) for item in items],
+                next_cursor=cursor,
+                total_count=total,
+            )
+        )
+
     @strawberry.field
     @nvke_errors
     @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
@@ -954,6 +1198,7 @@ class NvkeQuery:
         service.authorized(Permission.NVKE_READ)
         return NvkeContractType(
             revision=upstream_revision(),
+            credential_metrics=credential_metrics_catalog(),
             actions=[
                 NvkeActionType(
                     key=item.key,
@@ -1047,6 +1292,67 @@ class NvkeQuery:
 
 @strawberry.type
 class NvkeMutation:
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.metrics_configure", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def configure_nvke_metrics_authority(
+        self, info: Info, input: ConfigureNvkeMetricsAuthorityInput
+    ) -> MutationResultType[NvkeMetricsAuthorityType]:
+        return success(metrics_authority_type(native_metrics.configure(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.metrics_enable", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def set_nvke_metrics_authority_enabled(
+        self, info: Info, input: SetNvkeMetricsAuthorityEnabledInput
+    ) -> MutationResultType[NvkeMetricsAuthorityType]:
+        return success(metrics_authority_type(native_metrics.set_enabled(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.metrics_remove", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def remove_nvke_metrics_authority(
+        self, info: Info, input: NvkeMetricsAuthorityReviewInput
+    ) -> MutationResultType[NvkeMetricsAuthorityType]:
+        return success(metrics_authority_type(native_metrics.set_enabled(**asdict(input), remove=True)))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.metrics_verify", target=lambda root, info, input: ("nvke_site", str(input.site_id))
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def verify_nvke_metrics_authority(
+        self, info: Info, input: NvkeMetricsAuthorityReviewInput
+    ) -> MutationResultType[NvkeMetricsAuthorityType]:
+        return success(metrics_authority_type(native_metrics.verify(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.credential_observation_request",
+        target=lambda root, info, input: ("nvke_site", str(input.site_id)),
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def request_nvke_credential_observation(
+        self, info: Info, input: RequestNvkeCredentialObservationInput
+    ) -> MutationResultType[NvkeOperationType]:
+        return success(operation_type(credential_observations.reserve(**asdict(input))))
+
     @strawberry.mutation
     @mutation_audit(
         action="nvke.native_reset_request", target=lambda root, info, input: ("nvke_site", str(input.site_id))

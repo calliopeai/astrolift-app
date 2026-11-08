@@ -266,6 +266,10 @@ def attempt(row_id, generation, *, execution):
             return "execution_refused"
         NvkeOperation.objects.filter(pk=row.pk, workflow_run_id="").update(workflow_run_id=execution[1])
         NvkeOperation.objects.filter(pk=row.pk, started_at__isnull=True).update(started_at=timezone.now())
+        if row.operation_key == "metrics.credentials":
+            from astrolift_clusters.nvke_credential_observations import attempt as metrics_attempt
+
+            return metrics_attempt(row, execution=execution)
         if row.operation_key == "temporal.reset.RotateEtcdEncryptionKey":
             from astrolift_clusters.nvke_native_reset import attempt as reset_attempt
 

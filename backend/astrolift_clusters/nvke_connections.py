@@ -13,9 +13,7 @@ from astrolift_clusters.nvke_sites import NvkeSiteError, credentials_for
 
 
 @contextmanager
-def open_connection(connection, *, namespace, checkpoint):
-    checkpoint()
-    credentials = credentials_for(connection)
+def connection_tls(credentials):
     try:
         tls = ssl.create_default_context(cadata=credentials.get("ca_pem") or None)
     except (ValueError, ssl.SSLError):
@@ -34,6 +32,14 @@ def open_connection(connection, *, namespace, checkpoint):
                 raise NvkeSiteError(
                     "CREDENTIALS_UNAVAILABLE", "NVKE client certificate or key is invalid"
                 ) from None
+        yield tls
+
+
+@contextmanager
+def open_connection(connection, *, namespace, checkpoint):
+    checkpoint()
+    credentials = credentials_for(connection)
+    with connection_tls(credentials) as tls:
         endpoint = Endpoint(
             connection.surface,
             connection.endpoint,
