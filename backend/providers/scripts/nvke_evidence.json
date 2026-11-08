@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "2c7f0b25385404ba4d6a4fdc6abf6bc002f0e3c6"
+      "revision": "6d6f1c09d400b0921fd20ec91bd4d75725a61e15"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "4c13c8191e98084ed69318f828f8260f698725ee"
+      "revision": "dda15afe89e7219b54a78351bae70274f79ae2fa"
     }
   },
   "evidence": {
@@ -176,7 +176,7 @@
       "path": "scripts/integration/test_nvke_tooling.py",
       "kind": "test",
       "scope": "Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.",
-      "sha256": "05bbf4380026484e53c228f7d2de51a810473d1bf2abfce0323867371e2bfe8b"
+      "sha256": "c5672cc90aed317d3efab69c0ed50a687e859660659d4e0dc809e52f8b6e8f78"
     },
     "tooling-source": {
       "repository": "opscode",
@@ -351,14 +351,14 @@
       "path": "internal/nvketooling/tooling.go",
       "kind": "implementation",
       "scope": "CLI bridge verifies embedded renderer provenance, selects Python 3.12+ with PyYAML, retains process/privacy boundaries and validates source-revision/digest metadata. Rendering only, no hosted/effectful installation.",
-      "sha256": "110bbdc5c1b7e00477ab887732fa390ec5a10e23772f68ae5e067ceeeab47a02"
+      "sha256": "fd541ed8dd637fbb91b6c27a2ebef66840f27df3e9e875d87f858d8cb2f4c0d6"
     },
     "cli-management-api-profile-test": {
       "repository": "cli",
       "path": "scripts/integration/test_nvke_tooling.py",
       "kind": "test",
       "scope": "Compiled CLI with actual pinned source: private digest-matched output, tenant RBAC/ClusterIP/default ingress, overwrite refusal, empty pod-selector rejection and inline-credential redaction. No native provisioning in this case.",
-      "sha256": "05bbf4380026484e53c228f7d2de51a810473d1bf2abfce0323867371e2bfe8b",
+      "sha256": "c5672cc90aed317d3efab69c0ed50a687e859660659d4e0dc809e52f8b6e8f78",
       "symbol": "test_compiled_management_apis_keep_scope_private_and_output_exclusive"
     },
     "cli-management-api-qualified": {
@@ -415,6 +415,35 @@
       "kind": "test",
       "scope": "Real Kubernetes changes metadata after the preservation read and before PUT; server returns conflict, keeps the intervening annotation and does not apply the submitted spec.",
       "symbol": "test_replace_keeps_the_server_version_fence_after_metadata_read"
+    },
+    "management-engine-declarative-native": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-engine-declarative-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Actual isolated native manager: one admitted NVKECluster resolves release channel/control-plane class and worker pool, reaches two Ready workload nodes, and exports mode-0600 admin access through native ownership checks without externally trusted ID override. Explicit server/kubelet version scope, native transient retries and upstream nodeProfile limitation retained. No hosted admission or production/physical-provider claim.",
+      "sha256": "343ca5ea4452613d3822553a286d276bd78f19ca028bc8f32dd03cb17876fd82"
+    },
+    "cli-management-controller-profile": {
+      "repository": "cli",
+      "path": "internal/nvketooling/tooling.go",
+      "kind": "implementation",
+      "scope": "Pinned native controller and API helper run in a private directory with isolated Python and provenance validation; source-bound tenant permissions and explicit private controller access, digest-only metadata. Pure rendering, no effectful hosted installation.",
+      "sha256": "fd541ed8dd637fbb91b6c27a2ebef66840f27df3e9e875d87f858d8cb2f4c0d6"
+    },
+    "cli-management-controller-test": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_tooling.py",
+      "kind": "test",
+      "scope": "Compiled native controller rendering: both authentication modes, native private RBAC/security, output digest/privacy/exclusivity, external endpoint and credential refusal; malicious ambient helper in CWD/PYTHONPATH cannot run.",
+      "sha256": "c5672cc90aed317d3efab69c0ed50a687e859660659d4e0dc809e52f8b6e8f78",
+      "symbol": "test_compiled_controller_profile_keeps_native_scope_and_isolates_imports"
+    },
+    "cli-management-controller-qualified": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/cli-management-controller-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Committed CLI rebuild reproduced the already-qualified native manager manifest byte for byte. Full Go tests/fmt/vet/lint, nine vendor tests and six compiled tests passed; two opt-in cases skipped. Pure rendering only.",
+      "sha256": "8d4e586a909cbcae8320468e221123381406a2f80d09aca30ecca3cc79c49808"
     }
   },
   "rows": {
@@ -1615,7 +1644,8 @@
           "resource-admission",
           "ui-resource",
           "cli-wiring",
-          "datastore-metadata-preservation"
+          "datastore-metadata-preservation",
+          "management-engine-declarative-native"
         ],
         "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
       },
@@ -1640,7 +1670,8 @@
           "resource-admission",
           "ui-resource",
           "cli-wiring",
-          "datastore-metadata-preservation"
+          "datastore-metadata-preservation",
+          "management-engine-declarative-native"
         ],
         "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
       },
@@ -1680,9 +1711,10 @@
           "cli-wiring",
           "datastore-metadata-preservation",
           "datastore-metadata-regression",
-          "datastore-metadata-race"
+          "datastore-metadata-race",
+          "management-engine-declarative-native"
         ],
-        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+        "remaining": "One isolated native declarative create/release/class/worker reconciliation and ownership-checked workload access are qualified. Hosted flows, scaling/upgrades/deletion completion and physical providers remain separate."
       }
     },
     "workflows": {
@@ -2422,7 +2454,10 @@
           "cli-management-api-profile-test",
           "cli-management-api-qualified",
           "management-controller-profile",
-          "management-controller-profile-tests"
+          "management-controller-profile-tests",
+          "cli-management-controller-profile",
+          "cli-management-controller-test",
+          "cli-management-controller-qualified"
         ],
         "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
       },
@@ -2447,9 +2482,10 @@
           "nktp-kind",
           "native-management-base",
           "management-apis-native",
-          "management-controller-startup-native"
+          "management-controller-startup-native",
+          "management-engine-declarative-native"
         ],
-        "remaining": "Default stack, private operator/tenant APIs and tenant-scoped native controller startup/RBAC are locally qualified. Declarative NVKECluster reconciliation, controller profile CLI exposure, hosted API/UI installation controls, verified production supply chain and live deployment remain pending."
+        "remaining": "Default stack, private APIs, native controller and one declarative tenant create/release/class/worker reconciliation with SDK ownership-checked access are locally qualified. Controller profile CLI is qualified. Hosted API/UI installation/admission/recovery, verified production supply chain, physical providers and live deployment remain pending; local create proof does not establish scaling, upgrades or deletion completion."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
