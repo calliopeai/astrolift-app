@@ -6,12 +6,14 @@ import argparse
 from pathlib import Path
 
 from nvke.contract import _contract, operations, resources, upstream_revision
-from nvke.operations import action
+from nvke.operations import action, actions
+from scripts.nvke_evidence import OPERATOR_FAMILIES, cell, load, sources
 
 OUTPUT = Path(__file__).resolve().parents[3] / "docs" / "providers" / "nvke.md"
 
 
 def render() -> str:
+    evidence = load()
     lines = [
         "# NVIDIA Kubernetes Engine integration contract",
         "",
@@ -34,7 +36,8 @@ def render() -> str:
         "| Workflow | Input | Permission | Source | Qualification |",
         "|---|---|---|---|---|",
         *[
-            f"| `{row['name']}` | `{row['input_type']}` | `{row['permission']}` | `{row['source']}` | pending |"
+            f"| `{row['name']}` | `{row['input_type']}` | `{row['permission']}` | `{row['source']}` | "
+            f"{cell(evidence, 'workflows', row['name'])} |"
             for row in _contract()["native_workflows"]
         ],
         "",
@@ -47,20 +50,31 @@ def render() -> str:
         "These gauges come from the separate controller metrics listener, not the REST API.",
         "The snapshot pins the collector, label definitions and all 16 supported kubeadm credential names.",
         "Stored NotAfter, observation freshness and latest inspection availability have distinct meanings.",
-        "An absent series never proves healthy credentials. Application/UI/CLI/live qualification remains required.",
+        "An absent series never proves healthy credentials. "
+        "Each row separates local evidence from native qualification.",
         "",
         "| Gauge suffix (`nvke_controller_`) | Exact labels | Qualification |",
         "|---|---|---|",
         *[
-            f"| `{row['name']}` | {', '.join(f'`{label}`' for label in row['labels']) or 'none'} | pending |"
+            f"| `{row['name']}` | {', '.join(f'`{label}`' for label in row['labels']) or 'none'} | "
+            f"{cell(evidence, 'metrics', row['name'])} |"
             for row in _contract()["credential_metrics"]["metrics"]
         ],
         "",
         "## Delivery and ownership",
         "",
-        "This is a coverage inventory, not a support claim. Every row starts pending. Completion requires",
+        "This is a coverage inventory, not a support claim. Every row is reconciled in `scripts/nvke_evidence.json`.",
+        "Completion requires",
         "a working tenant-scoped API, permission/audit mapping, UI and CLI behavior and execution evidence.",
         "Provider transport tests alone do not prove the application integration or live NVKE behavior.",
+        "",
+        "Ledger labels describe evidence scope, not completion:",
+        "",
+        "- **fixture**: protocol/schema/shared wiring evidence; no native controller effect proven.",
+        "- **local**: named local execution/observation with explicit limits; no broad live support claim.",
+        "- **partial**: only some required surfaces/scenarios exist; gaps remain listed.",
+        "- **missing**: no equivalent Astro delivery found; implementation is still required.",
+        "- **unsupported**: no verified upstream implementation is exposed as supported.",
         "",
         "- Sites belong to an Astro organization. Cross-organization site IDs answer as missing.",
         "- Site-wide controller/operator actions require an operator permission; the controller API has",
@@ -83,12 +97,15 @@ def render() -> str:
         "operator/artifact APIs, credential access and site administration require `nvke.admin`.",
         "The catalog derives permissions from the executable allowlist; delivery still needs UI/CLI/live evidence.",
         "",
-        "| Operation | Surface | Upstream route | Planned permission | Delivery evidence |",
+        "| Operation | Surface | Upstream route | Permission | Delivery evidence |",
         "|---|---|---|---|---|",
     ]
     for op in operations():
         permission = action(op.id).permission
-        lines.append(f"| `{op.id}` | {op.surface} | `{op.method} {op.path}` | `{permission}` | Pending |")
+        lines.append(
+            f"| `{op.id}` | {op.surface} | `{op.method} {op.path}` | `{permission}` | "
+            f"{cell(evidence, 'actions', op.id)} |"
+        )
     lines.extend(
         [
             "",
@@ -105,69 +122,45 @@ def render() -> str:
     )
     for res in resources():
         scope = "Organization namespace" if res.namespaced else "Site"
-        lines.append(f"| `{res.kind}` | `{res.group}/{res.version}` | `{res.plural}` | {scope} | Pending |")
+        lines.append(
+            f"| `{res.kind}` | `{res.group}/{res.version}` | `{res.plural}` | {scope} | "
+            f"{cell(evidence, 'resources', res.kind)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Executable management Kubernetes actions",
+            "",
+            "Every datastore action is separate from its resource kind; "
+            "admission does not prove native reconciliation.",
+            "",
+            "| Action | Kind/verb | Permission | Delivery evidence |",
+            "|---|---|---|---|",
+        ]
+    )
+    for selected in actions():
+        if selected.surface == "datastore":
+            lines.append(
+                f"| `{selected.key}` | `{selected.kind or selected.verb}` / `{selected.verb}` | "
+                f"`{selected.permission}` | {cell(evidence, 'actions', selected.key)} |"
+            )
     lines.extend(
         [
             "",
             "## Operator and bootstrap operations",
             "",
-            "These require dedicated workflows and verification beyond the HTTP client. All are pending.",
+            "Each family retains the complete required behavior. "
+            "Local tooling is distinct from API/UI and physical-site qualification.",
             "",
-            "| Operation family | Required behavior |",
-            "|---|---|",
-            (
-                "| Site configuration | Register/select/edit/probe/remove sites, secret references, "
-                "supported interface discovery |"
-            ),
-            (
-                "| Node preparation | Images, registry/boot artifacts, SPIRE CA/TPM or admitted "
-                "alternative, pre-provisioned nodes |"
-            ),
-            (
-                "| Site specs | Generate, inspect, validate and dry-run the complete spec; report field "
-                "errors without secrets |"
-            ),
-            (
-                "| Deployment rendering | Inspect Helm values and stack config; render pinned deploy "
-                "path and release inputs |"
-            ),
-            (
-                "| Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, "
-                "kubeconfig and encryption-key outputs |"
-            ),
-            (
-                "| Installation | Ordered CAPI/provider/management-plane install; validate pinned "
-                "images, versions, storage and network |"
-            ),
-            (
-                "| Infrastructure providers | NICo and enabled LaunchLayer; CRDs, credentials and "
-                "manager state; credential-health freshness |"
-            ),
-            (
-                "| Artifacts | Machine images, cluster releases, node-pool releases, release channels "
-                "and control-plane classes |"
-            ),
-            (
-                "| Access | Kubeconfig retrieval and OIDC config generation, narrow automation "
-                "identity, private route validation |"
-            ),
-            (
-                "| Credentials | Certificate expiry/renewal, SPIRE settings, bootstrap outputs and "
-                "secure output/download |"
-            ),
-            (
-                "| Maintenance | Control-plane and worker version changes, node replacement, "
-                "drain/rollout conditions and partial failure |"
-            ),
-            "| Networking | CNI, VIP and API access/CIDRs; separate immutable creation fields from day-2 updates |",
-            (
-                "| Telemetry | NKTP/OTLP deployment and collection; health/events/logs/metrics, config "
-                "and connectivity diagnostics |"
-            ),
-            (
-                "| Unsupported upstream | No claimed self-management, management-plane upgrade or "
-                "backup/restore without a verified implementation |"
-            ),
+            "| Operation family | Required behavior | Existing mapping | Delivery evidence |",
+            "|---|---|---|---|",
+        ]
+    )
+    for key, (label, behavior) in OPERATOR_FAMILIES.items():
+        row = evidence["rows"]["operators"][key]
+        lines.append(f"| {label} | {behavior} | {row['mapping']} | {cell(evidence, 'operators', key)} |")
+    lines.extend(
+        [
             "",
             "## Executable upstream CLI inventory",
             "",
@@ -184,12 +177,9 @@ def render() -> str:
         if not item["executable"]:
             continue
         command = item["path"]
-        mapping = (
-            "Existing CLI utility"
-            if any(x in command for x in ("completion", "help", "version"))
-            else "NVKE domain operation"
-        )
-        lines.append(f"| `{command}` | {mapping} | Pending |")
+        mapping = evidence["rows"]["commands"][command]["mapping"]
+        lines.append(f"| `{command}` | {mapping} | {cell(evidence, 'commands', command)} |")
+    lines.extend(["", *sources(evidence)])
     lines.extend(
         [
             "",
@@ -202,11 +192,16 @@ def render() -> str:
             "python -m scripts.nvke_contract --upstream /path/to/pinned/nvke "
             "--cli-inventory /tmp/nvke-cli.json --check",
             "python -m scripts.nvke_coverage --check",
+            "# Also verify paired immutable evidence when the local checkouts are available:",
+            "python -m scripts.nvke_coverage --check --cli /path/to/cli --opscode /path/to/opscode",
             "python -m pytest tests/nvke",
             "```",
             "",
             "Changing the upstream revision requires regenerating the snapshot and reviewing source hashes,",
             "schemas, CLI source declarations and every coverage row. Do not fetch or accept latest at runtime.",
+            "Update `scripts/nvke_evidence.json` only after inspecting the linked implementations and tests.",
+            "The validator requires every native row, explicit remaining work and scoped sources; "
+            "it does not prove tests passed.",
             "",
         ]
     )
@@ -216,7 +211,11 @@ def render() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--cli", type=Path, help="Verify pinned evidence in a local CLI checkout")
+    parser.add_argument("--opscode", type=Path, help="Verify pinned evidence in a local opscode checkout")
     args = parser.parse_args()
+    related = {name: path for name, path in (("cli", args.cli), ("opscode", args.opscode)) if path is not None}
+    load(related=related)
     content = render()
     if args.check:
         if not OUTPUT.exists() or OUTPUT.read_text() != content:

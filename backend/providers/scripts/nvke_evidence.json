@@ -1,0 +1,2286 @@
+{
+  "format": 1,
+  "upstreamRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "repositories": {
+    "app": {
+      "name": "calliopeai/astrolift-app"
+    },
+    "cli": {
+      "name": "calliopeai/astrolift-cli",
+      "revision": "baf38fe90c3c92a39e7f1471d531f846709145ab"
+    },
+    "opscode": {
+      "name": "calliopeai/astrolift-opscode",
+      "revision": "ee0b0d5b4b01dccfc562296b450c69df08bc462c"
+    }
+  },
+  "evidence": {
+    "http-fixture": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_client.py",
+      "kind": "test",
+      "scope": "Each HTTP operation reaches its own route/surface over a controlled HTTP peer; response fixtures are not native controller execution.",
+      "symbol": "test_every_pinned_operation_reaches_its_own_surface_over_real_http"
+    },
+    "action-validation": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_operations.py",
+      "kind": "test",
+      "scope": "Every catalog action validates a complete request; checks do not contact a site.",
+      "symbol": "test_every_catalog_action_has_a_valid_complete_request_without_contacting_a_site"
+    },
+    "api-catalog": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_schema.py",
+      "kind": "test",
+      "scope": "Real GraphQL catalog and shared permission/audit/admission checks; no per-action native effects claim.",
+      "symbol": "test_complete_execution_catalog_is_available_through_real_schema"
+    },
+    "ui-wiring": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/nvke-routes.test.tsx",
+      "kind": "test",
+      "scope": "Shared route hooks and reviewed action/recovery tests with controlled Apollo responses."
+    },
+    "ui-resource": {
+      "repository": "app",
+      "path": "frontend/components/screens/nvke/nvke-resource-actions.test.tsx",
+      "kind": "test",
+      "scope": "Resource editor/confirmation tests; not exhaustive rendered execution of every native action."
+    },
+    "cli-wiring": {
+      "repository": "cli",
+      "path": "cmd/nvke_test.go",
+      "kind": "test",
+      "scope": "All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.",
+      "symbol": "TestNVKEFullCatalogCommandsAreReachableWithoutNetwork",
+      "sha256": "1f05b99a5fb8f4fe0ffb11047fb29621cd1f8128199de68d15cafad8f8e425a8"
+    },
+    "paired-cli": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_contracts.py",
+      "kind": "test",
+      "scope": "Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.",
+      "symbol": "test_pinned_cli_vocabulary_matches_every_paired_server_action",
+      "sha256": "e30bbd98369118029d25558635a4f99811bbf45ea22f5e17716a6a5927a160a2"
+    },
+    "crd-admission": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_datastore_integration.py",
+      "kind": "test",
+      "scope": "CRUDL for each of six CRDs against real Kubernetes admission; no native reconciler/garbage collector.",
+      "symbol": "test_crudl_against_real_nvke_admission"
+    },
+    "release-deprecation": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_datastore_integration.py",
+      "kind": "test",
+      "scope": "Real Kubernetes deprecation/content immutability and UID/resource-version guards.",
+      "symbol": "test_release_deprecation_preserves_published_content_and_rejects_image_rewrite"
+    },
+    "kubeconfig-ownership": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_datastore_integration.py",
+      "kind": "test",
+      "scope": "Real Secret/CAPI ownership guards for kubeconfig access; this does not establish network access to physical workload nodes.",
+      "symbol": "test_kubeconfig_download_from_real_kubernetes_secret"
+    },
+    "app-kube-operation": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_operations.py",
+      "kind": "test",
+      "scope": "Real Astro database/Kubernetes dry-run and observed MachineImage creation.",
+      "symbol": "test_real_database_and_kubernetes_operation_dry_run_and_observed_create"
+    },
+    "resource-admission": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_resource_operations.py",
+      "kind": "test",
+      "scope": "Reviewed-source target binding, read ETags and durable mutation admission, including controlled controller fixtures."
+    },
+    "native-temporal": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_native_operations.py",
+      "kind": "test",
+      "scope": "Real Astro/native Temporal interaction using test-defined native workflows under pinned entry-point names; no node certificate/etcd effects."
+    },
+    "native-reset": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_native_reset.py",
+      "kind": "test",
+      "scope": "Real Temporal reset acknowledgement-loss and phase/history checks against test-defined workflows; no physical etcd rotation."
+    },
+    "browser-native": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_browser_integration.py",
+      "kind": "test",
+      "scope": "Chromium through real Astro/Temporal/database with native workflow fixtures; retains exact review and receipt recovery."
+    },
+    "metric-parser": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_credential_metrics.py",
+      "kind": "test",
+      "scope": "All pinned gauge/label/credential states projected from controlled exporter text, with exact numeric strings and strict rejection."
+    },
+    "metric-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_credential_observations.py",
+      "kind": "test",
+      "scope": "Real database, TLS listener and controller-identity fixtures for durable collection/history; not live NVKE exporter behavior."
+    },
+    "metric-browser": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_credential_browser_integration.py",
+      "kind": "test",
+      "scope": "Real browser/API/database/Temporal collection and lost reply recovery; controlled native HTTP/exporter peers."
+    },
+    "metric-ui": {
+      "repository": "app",
+      "path": "frontend/components/screens/nvke/nvke-metrics.test.tsx",
+      "kind": "test",
+      "scope": "Historical credential rendering, unknowns and exact numeric strings with fixture props; server paging is tested separately in hooks and connected-browser scenarios."
+    },
+    "sites-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_sites.py",
+      "kind": "test",
+      "scope": "Site/authority CRUD, encryption and org/permission boundaries in the real database."
+    },
+    "access-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_access.py",
+      "kind": "test",
+      "scope": "Imported access enrollment, ownership/CAPI checks and grant boundaries against real local Kubernetes and controlled controller."
+    },
+    "maintenance-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_maintenance.py",
+      "kind": "test",
+      "scope": "Maintenance state projection and retained-lock/expiry distinctions from controlled controller/native state."
+    },
+    "diagnostics": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_diagnostics.py",
+      "kind": "test",
+      "scope": "Typed condition and diagnostic projections with bounded output; not an NKTP installation or native provider health probe."
+    },
+    "native-tooling": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_tooling.py",
+      "kind": "test",
+      "scope": "Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.",
+      "sha256": "e1e8062c87ab21275e7a4e2b7b697b5a4789579ada9218af589313a80ea6148a"
+    },
+    "cli-tooling": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_tooling.py",
+      "kind": "test",
+      "scope": "Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.",
+      "sha256": "2289c3d9e93cb80ceb849c9c3611f90c7a7d31c516fe0cf1bb667ad301f52fd6"
+    },
+    "tooling-source": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/tooling.py",
+      "kind": "implementation",
+      "scope": "Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.",
+      "sha256": "0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd"
+    },
+    "nktp-runtime": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_nktp_runtime.py",
+      "kind": "test",
+      "scope": "Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.",
+      "sha256": "41aaaa374b5a943f821b30f2e110960e36fad3b4142b630e66ed43c3d3dcd0b6"
+    },
+    "nktp-kind": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/nktp-kind-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.",
+      "sha256": "568410bd0c9a66742cd542cf5c293c03067f82051dd45788e4856308cb5a6857"
+    },
+    "limits": {
+      "repository": "app",
+      "path": "docs/operators/nvke-site-connections.md",
+      "kind": "implementation",
+      "scope": "Documented source ownership, readiness, native reset and live qualification limits."
+    }
+  },
+  "rows": {
+    "actions": {
+      "createCluster": {
+        "mapping": "astro nvke controller create-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "createNodePool": {
+        "mapping": "astro nvke controller create-node-pool; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "deleteCluster": {
+        "mapping": "astro nvke controller delete-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "deleteNode": {
+        "mapping": "astro nvke controller delete-node; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "deleteNodePool": {
+        "mapping": "astro nvke controller delete-node-pool; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "getCluster": {
+        "mapping": "astro nvke controller get-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "getClusterControlPlane": {
+        "mapping": "astro nvke controller get-cluster-control-plane; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "getClusterControlPlaneConfigHistory": {
+        "mapping": "astro nvke controller get-cluster-control-plane-config-history; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "getClusterSpireServer": {
+        "mapping": "astro nvke controller get-cluster-spire-server; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "getNode": {
+        "mapping": "astro nvke controller get-node; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "getNodePool": {
+        "mapping": "astro nvke controller get-node-pool; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "getNodeSet": {
+        "mapping": "astro nvke controller get-node-set; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "listClusters": {
+        "mapping": "astro nvke controller list-clusters; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "listConfigProfiles": {
+        "mapping": "astro nvke controller list-config-profiles; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "listNodePools": {
+        "mapping": "astro nvke controller list-node-pools; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "listNodeSets": {
+        "mapping": "astro nvke controller list-node-sets; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "listNodes": {
+        "mapping": "astro nvke controller list-nodes; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "listReleases": {
+        "mapping": "astro nvke controller list-releases; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.createClusterRelease": {
+        "mapping": "astro nvke operator create-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.createClusterReleaseChannel": {
+        "mapping": "astro nvke operator create-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.createControlPlaneClass": {
+        "mapping": "astro nvke operator create-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.createMachineImage": {
+        "mapping": "astro nvke operator create-machine-image; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.createNodePoolRelease": {
+        "mapping": "astro nvke operator create-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.deleteClusterRelease": {
+        "mapping": "astro nvke operator delete-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.deleteClusterReleaseChannel": {
+        "mapping": "astro nvke operator delete-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.deleteControlPlaneClass": {
+        "mapping": "astro nvke operator delete-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.deleteMachineImage": {
+        "mapping": "astro nvke operator delete-machine-image; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.deleteNodePoolRelease": {
+        "mapping": "astro nvke operator delete-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.getClusterRelease": {
+        "mapping": "astro nvke operator get-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.getClusterReleaseChannel": {
+        "mapping": "astro nvke operator get-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.getControlPlaneClass": {
+        "mapping": "astro nvke operator get-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.getMachineImage": {
+        "mapping": "astro nvke operator get-machine-image; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.getNodePoolRelease": {
+        "mapping": "astro nvke operator get-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.healthz": {
+        "mapping": "astro nvke operator healthz; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.listClusterRelease": {
+        "mapping": "astro nvke operator list-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.listClusterReleaseChannel": {
+        "mapping": "astro nvke operator list-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.listControlPlaneClass": {
+        "mapping": "astro nvke operator list-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.listMachineImage": {
+        "mapping": "astro nvke operator list-machine-image; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.listNodePoolRelease": {
+        "mapping": "astro nvke operator list-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.readyz": {
+        "mapping": "astro nvke operator readyz; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.updateClusterRelease": {
+        "mapping": "astro nvke operator update-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.updateClusterReleaseChannel": {
+        "mapping": "astro nvke operator update-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.updateControlPlaneClass": {
+        "mapping": "astro nvke operator update-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.updateMachineImage": {
+        "mapping": "astro nvke operator update-machine-image; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "operator.updateNodePoolRelease": {
+        "mapping": "astro nvke operator update-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "tenant.createNVKECluster": {
+        "mapping": "astro nvke tenant create-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "tenant.deleteNVKECluster": {
+        "mapping": "astro nvke tenant delete-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "tenant.getNVKECluster": {
+        "mapping": "astro nvke tenant get-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "tenant.healthz": {
+        "mapping": "astro nvke tenant healthz; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "tenant.listNVKECluster": {
+        "mapping": "astro nvke tenant list-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "tenant.readyz": {
+        "mapping": "astro nvke tenant readyz; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "tenant.updateNVKECluster": {
+        "mapping": "astro nvke tenant update-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "updateCluster": {
+        "mapping": "astro nvke controller update-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "updateClusterSpireServer": {
+        "mapping": "astro nvke controller update-cluster-spire-server; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "updateNodePool": {
+        "mapping": "astro nvke controller update-node-pool; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+      },
+      "datastore.getClusterReleaseChannel": {
+        "mapping": "astro nvke datastore get-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.listClusterReleaseChannel": {
+        "mapping": "astro nvke datastore list-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.createClusterReleaseChannel": {
+        "mapping": "astro nvke datastore create-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.replaceClusterReleaseChannel": {
+        "mapping": "astro nvke datastore replace-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deleteClusterReleaseChannel": {
+        "mapping": "astro nvke datastore delete-cluster-release-channel; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.getClusterRelease": {
+        "mapping": "astro nvke datastore get-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.listClusterRelease": {
+        "mapping": "astro nvke datastore list-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.createClusterRelease": {
+        "mapping": "astro nvke datastore create-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.replaceClusterRelease": {
+        "mapping": "astro nvke datastore replace-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deleteClusterRelease": {
+        "mapping": "astro nvke datastore delete-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.getControlPlaneClass": {
+        "mapping": "astro nvke datastore get-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.listControlPlaneClass": {
+        "mapping": "astro nvke datastore list-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.createControlPlaneClass": {
+        "mapping": "astro nvke datastore create-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.replaceControlPlaneClass": {
+        "mapping": "astro nvke datastore replace-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deleteControlPlaneClass": {
+        "mapping": "astro nvke datastore delete-control-plane-class; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.getMachineImage": {
+        "mapping": "astro nvke datastore get-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.listMachineImage": {
+        "mapping": "astro nvke datastore list-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.createMachineImage": {
+        "mapping": "astro nvke datastore create-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission",
+          "app-kube-operation",
+          "paired-cli"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.replaceMachineImage": {
+        "mapping": "astro nvke datastore replace-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deleteMachineImage": {
+        "mapping": "astro nvke datastore delete-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.getNodePoolRelease": {
+        "mapping": "astro nvke datastore get-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.listNodePoolRelease": {
+        "mapping": "astro nvke datastore list-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.createNodePoolRelease": {
+        "mapping": "astro nvke datastore create-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.replaceNodePoolRelease": {
+        "mapping": "astro nvke datastore replace-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deleteNodePoolRelease": {
+        "mapping": "astro nvke datastore delete-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.getNVKECluster": {
+        "mapping": "astro nvke datastore get-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.listNVKECluster": {
+        "mapping": "astro nvke datastore list-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.createNVKECluster": {
+        "mapping": "astro nvke datastore create-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.replaceNVKECluster": {
+        "mapping": "astro nvke datastore replace-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deleteNVKECluster": {
+        "mapping": "astro nvke datastore delete-nvke-cluster; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deprecateClusterRelease": {
+        "mapping": "astro nvke datastore deprecate-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission",
+          "release-deprecation"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.deprecateNodePoolRelease": {
+        "mapping": "astro nvke datastore deprecate-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission",
+          "release-deprecation"
+        ],
+        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+      },
+      "datastore.getWorkloadKubeconfig": {
+        "mapping": "astro nvke datastore get-workload-kubeconfig; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission",
+          "kubeconfig-ownership",
+          "access-api"
+        ],
+        "remaining": "Live workload API reachability and physical-node access handoff remain unqualified."
+      }
+    },
+    "resources": {
+      "ClusterReleaseChannel": {
+        "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
+        "qualification": "local",
+        "evidence": [
+          "crd-admission",
+          "resource-admission",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+      },
+      "ClusterRelease": {
+        "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
+        "qualification": "local",
+        "evidence": [
+          "crd-admission",
+          "resource-admission",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+      },
+      "ControlPlaneClass": {
+        "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
+        "qualification": "local",
+        "evidence": [
+          "crd-admission",
+          "resource-admission",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+      },
+      "MachineImage": {
+        "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
+        "qualification": "local",
+        "evidence": [
+          "crd-admission",
+          "resource-admission",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+      },
+      "NodePoolRelease": {
+        "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
+        "qualification": "local",
+        "evidence": [
+          "crd-admission",
+          "resource-admission",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+      },
+      "NVKECluster": {
+        "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
+        "qualification": "local",
+        "evidence": [
+          "crd-admission",
+          "resource-admission",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+      }
+    },
+    "workflows": {
+      "RenewK8sCertsV2": {
+        "mapping": "Astro native workflow authority, reviewed source admission, history/recovery and paired CLI",
+        "qualification": "local",
+        "evidence": [
+          "native-temporal",
+          "browser-native",
+          "paired-cli"
+        ],
+        "remaining": "Native workflow tests use test-defined implementations; actual certificate renewal, etcd convergence and lost-node teardown on NVKE nodes remain pending."
+      },
+      "RotateEtcdEncryptionKey": {
+        "mapping": "Astro native workflow authority, reviewed source admission, history/recovery and paired CLI",
+        "qualification": "local",
+        "evidence": [
+          "native-temporal",
+          "browser-native",
+          "paired-cli",
+          "native-reset"
+        ],
+        "remaining": "Native workflow tests use test-defined implementations; actual certificate renewal, etcd convergence and lost-node teardown on NVKE nodes remain pending."
+      },
+      "RetireLostEtcdRotationNode": {
+        "mapping": "Astro native workflow authority, reviewed source admission, history/recovery and paired CLI",
+        "qualification": "local",
+        "evidence": [
+          "native-temporal",
+          "browser-native",
+          "paired-cli"
+        ],
+        "remaining": "Native workflow tests use test-defined implementations; actual certificate renewal, etcd convergence and lost-node teardown on NVKE nodes remain pending."
+      }
+    },
+    "metrics": {
+      "certificate_inspection_available": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "certificate_not_after_timestamp_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "certificate_observation_age_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "certificate_observation_available": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "certificate_required": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "certificate_warning_window_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "credential_metrics_collection_success": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "credential_monitoring_enabled": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "etcd_key_rotation_progress_age_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "etcd_key_rotation_state": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "renewal_active_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "renewal_automation_enabled": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "renewal_mutation_lock_retained": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "renewal_overdue_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "renewal_state": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "serving_csr_count": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "serving_csr_observation_age_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      },
+      "serving_csr_oldest_pending_age_seconds": {
+        "mapping": "Separate metrics authority; source-bound collection, encrypted history, UI and CLI views",
+        "qualification": "local",
+        "evidence": [
+          "metric-parser",
+          "metric-api",
+          "metric-browser",
+          "metric-ui",
+          "paired-cli"
+        ],
+        "remaining": "Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse."
+      }
+    },
+    "commands": {
+      "nvkectl bootstrap site": {
+        "mapping": "astro nvke tooling run -- bootstrap site",
+        "qualification": "partial",
+        "evidence": [
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Actual seed/node bootstrap, image supply chain and API/UI bootstrap control remain pending."
+      },
+      "nvkectl config set-site": {
+        "mapping": "astro nvke site create/configure; NVKE site UI",
+        "qualification": "local",
+        "evidence": [
+          "sites-api",
+          "ui-wiring",
+          "cli-wiring"
+        ],
+        "remaining": "Live interface/private route qualification remains required."
+      },
+      "nvkectl config use-site": {
+        "mapping": "Explicit --site GUID and selected site route",
+        "qualification": "partial",
+        "evidence": [
+          "sites-api",
+          "ui-wiring",
+          "cli-wiring"
+        ],
+        "remaining": "Astro uses explicit site selection; native active-site config-file state is not imported."
+      },
+      "nvkectl config view": {
+        "mapping": "astro nvke site get/list; site metadata UI",
+        "qualification": "local",
+        "evidence": [
+          "sites-api",
+          "ui-wiring",
+          "cli-wiring"
+        ],
+        "remaining": "Connection secrets intentionally require their declared secure paths; live route qualification remains required."
+      },
+      "nvkectl create cluster": {
+        "mapping": "astro nvke controller create-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl create clusterrelease": {
+        "mapping": "astro nvke datastore create-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl create machineimage": {
+        "mapping": "astro nvke datastore create-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission",
+          "app-kube-operation",
+          "paired-cli"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl create nodepool": {
+        "mapping": "astro nvke controller create-node-pool; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl create nodepoolrelease": {
+        "mapping": "astro nvke datastore create-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl delete cluster": {
+        "mapping": "astro nvke controller delete-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl delete clusterrelease": {
+        "mapping": "astro nvke datastore delete-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl delete machineimage": {
+        "mapping": "astro nvke datastore delete-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl delete nodepool": {
+        "mapping": "astro nvke controller delete-node-pool; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl delete nodepoolrelease": {
+        "mapping": "astro nvke datastore delete-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl deprecate": {
+        "mapping": "Choose datastore deprecate-cluster-release or deprecate-node-pool-release",
+        "qualification": "local",
+        "evidence": [
+          "release-deprecation",
+          "cli-wiring"
+        ],
+        "remaining": "No physical release reconciliation claim from deprecation admission."
+      },
+      "nvkectl deprecate clusterrelease": {
+        "mapping": "astro nvke datastore deprecate-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission",
+          "release-deprecation"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl deprecate nodepoolrelease": {
+        "mapping": "astro nvke datastore deprecate-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission",
+          "release-deprecation"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl generate oidc-kubeconfig": {
+        "mapping": "astro nvke tooling run -- generate oidc-kubeconfig",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl generate sitespec": {
+        "mapping": "astro nvke tooling run -- generate sitespec",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl get bootstrap-manifest": {
+        "mapping": "astro nvke tooling run -- get bootstrap-manifest",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl get clusterreleases": {
+        "mapping": "astro nvke datastore list-cluster-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl get clusters": {
+        "mapping": "astro nvke controller list-clusters; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl get kubeconfig": {
+        "mapping": "astro nvke datastore get-workload-kubeconfig; reviewed access UI/API",
+        "qualification": "local",
+        "evidence": [
+          "kubeconfig-ownership",
+          "access-api",
+          "paired-cli"
+        ],
+        "remaining": "Live private workload API reachability and credential handoff remain pending."
+      },
+      "nvkectl get machineimages": {
+        "mapping": "astro nvke datastore list-machine-image; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl get nodepoolreleases": {
+        "mapping": "astro nvke datastore list-node-pool-release; shared reviewed API/UI action forms",
+        "qualification": "local",
+        "evidence": [
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring",
+          "crd-admission",
+          "resource-admission"
+        ],
+        "remaining": "Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending."
+      },
+      "nvkectl get nodepools": {
+        "mapping": "astro nvke controller list-node-pools; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl get providers": {
+        "mapping": "No equivalent Astro API/UI/CLI observation yet; tracked in #2667",
+        "qualification": "missing",
+        "evidence": [],
+        "remaining": "Implement pinned CRD/manager/Secret-presence and provider-reported credential-health freshness semantics; qualify NICo and enabled LaunchLayer."
+      },
+      "nvkectl inspect nvkr-release": {
+        "mapping": "astro nvke tooling run -- inspect nvkr-release",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl inspect sitespec": {
+        "mapping": "astro nvke tooling run -- inspect sitespec",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl inspect stack-config": {
+        "mapping": "astro nvke tooling run -- inspect stack-config",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl inspect values": {
+        "mapping": "astro nvke tooling run -- inspect values",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl patch cluster": {
+        "mapping": "astro nvke controller update-cluster; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl patch nodepool": {
+        "mapping": "astro nvke controller update-node-pool; shared reviewed API/UI action forms",
+        "qualification": "fixture",
+        "evidence": [
+          "http-fixture",
+          "action-validation",
+          "api-catalog",
+          "ui-wiring",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
+      },
+      "nvkectl render deploy-path": {
+        "mapping": "astro nvke tooling run -- render deploy-path",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl validate sitespec": {
+        "mapping": "astro nvke tooling run -- validate sitespec",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification."
+      },
+      "nvkectl version": {
+        "mapping": "astro version; pinned native tooling version",
+        "qualification": "local",
+        "evidence": [
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Published/release build qualification remains part of final delivery."
+      }
+    },
+    "operators": {
+      "site-configuration": {
+        "mapping": "Register/select/edit/probe/remove sites and interfaces",
+        "qualification": "local",
+        "evidence": [
+          "sites-api",
+          "ui-wiring",
+          "cli-wiring"
+        ],
+        "remaining": "Live routes and deployed token/login acceptance remain pending."
+      },
+      "node-preparation": {
+        "mapping": "Native bootstrap inputs and provisioned-provider path",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling"
+        ],
+        "remaining": "Node/image preparation, TPM/SPIRE attestation alternatives and verified artifact delivery remain unqualified; API/UI control absent."
+      },
+      "site-specs": {
+        "mapping": "Generate/inspect/validate and bootstrap dry-run through pinned tooling",
+        "qualification": "partial",
+        "evidence": [
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Dedicated API/UI preparation controls and live bootstrap qualification remain pending."
+      },
+      "deployment-rendering": {
+        "mapping": "Pinned native deploy-path, stack/values inspection and management install planning",
+        "qualification": "partial",
+        "evidence": [
+          "tooling-source",
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
+      },
+      "bootstrap": {
+        "mapping": "Pinned local bootstrap, private outputs and durable attempt guard",
+        "qualification": "partial",
+        "evidence": [
+          "native-tooling",
+          "cli-tooling"
+        ],
+        "remaining": "Actual seed/node bootstrap and API/UI admission/observation controls remain pending."
+      },
+      "installation": {
+        "mapping": "Pinned management install/check/access with ordered dry-run",
+        "qualification": "partial",
+        "evidence": [
+          "native-tooling",
+          "cli-tooling",
+          "nktp-kind"
+        ],
+        "remaining": "NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending."
+      },
+      "infrastructure-providers": {
+        "mapping": "Provider fields preserved in native schemas; no provider inspection control yet",
+        "qualification": "partial",
+        "evidence": [
+          "action-validation",
+          "limits"
+        ],
+        "remaining": "#2667: add provider status/credential-health observation and API/UI/CLI; qualify NICo and enabled LaunchLayer credentials/controllers/hardware."
+      },
+      "artifacts": {
+        "mapping": "All six management CRDs plus public operator APIs",
+        "qualification": "local",
+        "evidence": [
+          "crd-admission",
+          "release-deprecation",
+          "http-fixture",
+          "resource-admission",
+          "cli-wiring"
+        ],
+        "remaining": "Image/release/channel/profile supply chain and native reconciliation remain pending."
+      },
+      "access": {
+        "mapping": "Ownership-guarded kubeconfig retrieval, imported grants and NVKE-only token scopes",
+        "qualification": "local",
+        "evidence": [
+          "access-api",
+          "kubeconfig-ownership",
+          "paired-cli"
+        ],
+        "remaining": "Live OIDC/private route and physical workload access handoff remain pending."
+      },
+      "credentials": {
+        "mapping": "Separate credential observations and native certificate/SPIRE maintenance controls",
+        "qualification": "local",
+        "evidence": [
+          "metric-api",
+          "metric-browser",
+          "maintenance-api",
+          "native-temporal"
+        ],
+        "remaining": "Actual native exporter, SPIRE/node effects and deployment acceptance remain pending."
+      },
+      "maintenance": {
+        "mapping": "Controller mutations, node diagnostics and native workflow/reset recovery",
+        "qualification": "local",
+        "evidence": [
+          "http-fixture",
+          "maintenance-api",
+          "native-temporal",
+          "native-reset",
+          "browser-native"
+        ],
+        "remaining": "Actual node upgrades/replacement/drain, certificate renewal and etcd convergence remain pending."
+      },
+      "networking": {
+        "mapping": "Native network/CNI/VIP fields through reviewed schemas and resources",
+        "qualification": "fixture",
+        "evidence": [
+          "action-validation",
+          "resource-admission",
+          "ui-resource",
+          "cli-wiring"
+        ],
+        "remaining": "Native network behavior and private connectivity remain unqualified."
+      },
+      "telemetry": {
+        "mapping": "Credential observation UI/API/CLI plus pinned local NKTP production backend profiles",
+        "qualification": "partial",
+        "evidence": [
+          "metric-api",
+          "metric-browser",
+          "nktp-runtime",
+          "nktp-kind",
+          "diagnostics"
+        ],
+        "remaining": "NKTP local HTTP installation and both transport protocols qualified; Astro API/UI NKTP deployment/health controls, deployed negative/recovery tests and NVKE-site telemetry remain pending."
+      },
+      "unsupported-upstream": {
+        "mapping": "Unsupported self-management, management-plane upgrade and backup/restore are not exposed as verified capabilities",
+        "qualification": "unsupported",
+        "evidence": [
+          "limits"
+        ],
+        "remaining": "No support claim without a separately verified upstream implementation."
+      }
+    }
+  }
+}

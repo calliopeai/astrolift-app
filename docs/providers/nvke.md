@@ -17,9 +17,9 @@ Native reset recovery requires exact owner/run/event review; a closed workflow d
 
 | Workflow | Input | Permission | Source | Qualification |
 |---|---|---|---|---|
-| `RenewK8sCertsV2` | `RenewK8sCertsInput` | `nvke.admin` | `controller/internal/temporal/workflows/renew_k8s_certs.go` | pending |
-| `RotateEtcdEncryptionKey` | `RotateEtcdEncryptionKeyInput` | `nvke.admin` | `controller/internal/temporal/workflows/rotate_etcd_encryption_key.go` | pending |
-| `RetireLostEtcdRotationNode` | `RetireLostEtcdRotationNodeInput` | `nvke.admin` | `controller/internal/temporal/workflows/retire_lost_etcd_rotation_node.go` | pending |
+| `RenewK8sCertsV2` | `RenewK8sCertsInput` | `nvke.admin` | `controller/internal/temporal/workflows/renew_k8s_certs.go` | **local** — [native-temporal](#evidence-native-temporal), [browser-native](#evidence-browser-native), [paired-cli](#evidence-paired-cli). Remaining: Native workflow tests use test-defined implementations; actual certificate renewal, etcd convergence and lost-node teardown on NVKE nodes remain pending. |
+| `RotateEtcdEncryptionKey` | `RotateEtcdEncryptionKeyInput` | `nvke.admin` | `controller/internal/temporal/workflows/rotate_etcd_encryption_key.go` | **local** — [native-temporal](#evidence-native-temporal), [browser-native](#evidence-browser-native), [paired-cli](#evidence-paired-cli), [native-reset](#evidence-native-reset). Remaining: Native workflow tests use test-defined implementations; actual certificate renewal, etcd convergence and lost-node teardown on NVKE nodes remain pending. |
+| `RetireLostEtcdRotationNode` | `RetireLostEtcdRotationNodeInput` | `nvke.admin` | `controller/internal/temporal/workflows/retire_lost_etcd_rotation_node.go` | **local** — [native-temporal](#evidence-native-temporal), [browser-native](#evidence-browser-native), [paired-cli](#evidence-paired-cli). Remaining: Native workflow tests use test-defined implementations; actual certificate renewal, etcd convergence and lost-node teardown on NVKE nodes remain pending. |
 
 The snapshot also pins 115 exported controller activity names for secret-safe history projection.
 Activity inputs/results, failure messages and unknown activity names are excluded from that projection.
@@ -29,34 +29,43 @@ Activity inputs/results, failure messages and unknown activity names are exclude
 These gauges come from the separate controller metrics listener, not the REST API.
 The snapshot pins the collector, label definitions and all 16 supported kubeadm credential names.
 Stored NotAfter, observation freshness and latest inspection availability have distinct meanings.
-An absent series never proves healthy credentials. Application/UI/CLI/live qualification remains required.
+An absent series never proves healthy credentials. Each row separates local evidence from native qualification.
 
 | Gauge suffix (`nvke_controller_`) | Exact labels | Qualification |
 |---|---|---|
-| `certificate_inspection_available` | `tenant_cluster`, `node` | pending |
-| `certificate_not_after_timestamp_seconds` | `tenant_cluster`, `node`, `credential` | pending |
-| `certificate_observation_age_seconds` | `tenant_cluster`, `node` | pending |
-| `certificate_observation_available` | `tenant_cluster`, `node`, `credential` | pending |
-| `certificate_required` | `tenant_cluster`, `node`, `credential` | pending |
-| `certificate_warning_window_seconds` | none | pending |
-| `credential_metrics_collection_success` | none | pending |
-| `credential_monitoring_enabled` | none | pending |
-| `etcd_key_rotation_progress_age_seconds` | `tenant_cluster` | pending |
-| `etcd_key_rotation_state` | `tenant_cluster`, `state` | pending |
-| `renewal_active_seconds` | `tenant_cluster` | pending |
-| `renewal_automation_enabled` | none | pending |
-| `renewal_mutation_lock_retained` | `tenant_cluster` | pending |
-| `renewal_overdue_seconds` | `tenant_cluster` | pending |
-| `renewal_state` | `tenant_cluster`, `state` | pending |
-| `serving_csr_count` | `tenant_cluster`, `state` | pending |
-| `serving_csr_observation_age_seconds` | `tenant_cluster` | pending |
-| `serving_csr_oldest_pending_age_seconds` | `tenant_cluster` | pending |
+| `certificate_inspection_available` | `tenant_cluster`, `node` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `certificate_not_after_timestamp_seconds` | `tenant_cluster`, `node`, `credential` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `certificate_observation_age_seconds` | `tenant_cluster`, `node` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `certificate_observation_available` | `tenant_cluster`, `node`, `credential` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `certificate_required` | `tenant_cluster`, `node`, `credential` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `certificate_warning_window_seconds` | none | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `credential_metrics_collection_success` | none | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `credential_monitoring_enabled` | none | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `etcd_key_rotation_progress_age_seconds` | `tenant_cluster` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `etcd_key_rotation_state` | `tenant_cluster`, `state` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `renewal_active_seconds` | `tenant_cluster` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `renewal_automation_enabled` | none | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `renewal_mutation_lock_retained` | `tenant_cluster` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `renewal_overdue_seconds` | `tenant_cluster` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `renewal_state` | `tenant_cluster`, `state` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `serving_csr_count` | `tenant_cluster`, `state` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `serving_csr_observation_age_seconds` | `tenant_cluster` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
+| `serving_csr_oldest_pending_age_seconds` | `tenant_cluster` | **local** — [metric-parser](#evidence-metric-parser), [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [metric-ui](#evidence-metric-ui), [paired-cli](#evidence-paired-cli). Remaining: Live pinned NVKE collector behavior and physical credential maintenance remain unqualified; retained name-labelled gauges cannot prove incarnation after name reuse. |
 
 ## Delivery and ownership
 
-This is a coverage inventory, not a support claim. Every row starts pending. Completion requires
+This is a coverage inventory, not a support claim. Every row is reconciled in `scripts/nvke_evidence.json`.
+Completion requires
 a working tenant-scoped API, permission/audit mapping, UI and CLI behavior and execution evidence.
 Provider transport tests alone do not prove the application integration or live NVKE behavior.
+
+Ledger labels describe evidence scope, not completion:
+
+- **fixture**: protocol/schema/shared wiring evidence; no native controller effect proven.
+- **local**: named local execution/observation with explicit limits; no broad live support claim.
+- **partial**: only some required surfaces/scenarios exist; gaps remain listed.
+- **missing**: no equivalent Astro delivery found; implementation is still required.
+- **unsupported**: no verified upstream implementation is exposed as supported.
 
 - Sites belong to an Astro organization. Cross-organization site IDs answer as missing.
 - Site-wide controller/operator actions require an operator permission; the controller API has
@@ -79,63 +88,63 @@ and `astro nvke` commands. Reads require `nvke.read`; mutations require `nvke.ma
 operator/artifact APIs, credential access and site administration require `nvke.admin`.
 The catalog derives permissions from the executable allowlist; delivery still needs UI/CLI/live evidence.
 
-| Operation | Surface | Upstream route | Planned permission | Delivery evidence |
+| Operation | Surface | Upstream route | Permission | Delivery evidence |
 |---|---|---|---|---|
-| `createCluster` | controller | `POST /clusters` | `nvke.manage` | Pending |
-| `createNodePool` | controller | `POST /nodePools` | `nvke.manage` | Pending |
-| `deleteCluster` | controller | `DELETE /clusters/{clusterID}` | `nvke.manage` | Pending |
-| `deleteNode` | controller | `DELETE /nodes/{nodeID}` | `nvke.manage` | Pending |
-| `deleteNodePool` | controller | `DELETE /nodePools/{nodePoolID}` | `nvke.manage` | Pending |
-| `getCluster` | controller | `GET /clusters/{clusterID}` | `nvke.read` | Pending |
-| `getClusterControlPlane` | controller | `GET /clusters/{clusterID}/control-plane` | `nvke.read` | Pending |
-| `getClusterControlPlaneConfigHistory` | controller | `GET /clusters/{clusterID}/control-plane/configHistory` | `nvke.read` | Pending |
-| `getClusterSpireServer` | controller | `GET /clusters/{clusterID}/spire-server` | `nvke.read` | Pending |
-| `getNode` | controller | `GET /nodes/{nodeID}` | `nvke.read` | Pending |
-| `getNodePool` | controller | `GET /nodePools/{nodePoolID}` | `nvke.read` | Pending |
-| `getNodeSet` | controller | `GET /nodeSets/{nodeSetID}` | `nvke.read` | Pending |
-| `listClusters` | controller | `GET /clusters` | `nvke.read` | Pending |
-| `listConfigProfiles` | controller | `GET /configProfiles` | `nvke.admin` | Pending |
-| `listNodePools` | controller | `GET /nodePools` | `nvke.read` | Pending |
-| `listNodeSets` | controller | `GET /nodeSets` | `nvke.read` | Pending |
-| `listNodes` | controller | `GET /nodes` | `nvke.read` | Pending |
-| `listReleases` | controller | `GET /releases` | `nvke.read` | Pending |
-| `operator.createClusterRelease` | operator | `POST /v1/cluster-releases` | `nvke.admin` | Pending |
-| `operator.createClusterReleaseChannel` | operator | `POST /v1/cluster-release-channels` | `nvke.admin` | Pending |
-| `operator.createControlPlaneClass` | operator | `POST /v1/control-plane-classes` | `nvke.admin` | Pending |
-| `operator.createMachineImage` | operator | `POST /v1/machine-images` | `nvke.admin` | Pending |
-| `operator.createNodePoolRelease` | operator | `POST /v1/node-profiles` | `nvke.admin` | Pending |
-| `operator.deleteClusterRelease` | operator | `DELETE /v1/cluster-releases/{name}` | `nvke.admin` | Pending |
-| `operator.deleteClusterReleaseChannel` | operator | `DELETE /v1/cluster-release-channels/{name}` | `nvke.admin` | Pending |
-| `operator.deleteControlPlaneClass` | operator | `DELETE /v1/control-plane-classes/{name}` | `nvke.admin` | Pending |
-| `operator.deleteMachineImage` | operator | `DELETE /v1/machine-images/{name}` | `nvke.admin` | Pending |
-| `operator.deleteNodePoolRelease` | operator | `DELETE /v1/node-profiles/{name}` | `nvke.admin` | Pending |
-| `operator.getClusterRelease` | operator | `GET /v1/cluster-releases/{name}` | `nvke.admin` | Pending |
-| `operator.getClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels/{name}` | `nvke.admin` | Pending |
-| `operator.getControlPlaneClass` | operator | `GET /v1/control-plane-classes/{name}` | `nvke.admin` | Pending |
-| `operator.getMachineImage` | operator | `GET /v1/machine-images/{name}` | `nvke.admin` | Pending |
-| `operator.getNodePoolRelease` | operator | `GET /v1/node-profiles/{name}` | `nvke.admin` | Pending |
-| `operator.healthz` | operator | `GET /healthz` | `nvke.admin` | Pending |
-| `operator.listClusterRelease` | operator | `GET /v1/cluster-releases` | `nvke.admin` | Pending |
-| `operator.listClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels` | `nvke.admin` | Pending |
-| `operator.listControlPlaneClass` | operator | `GET /v1/control-plane-classes` | `nvke.admin` | Pending |
-| `operator.listMachineImage` | operator | `GET /v1/machine-images` | `nvke.admin` | Pending |
-| `operator.listNodePoolRelease` | operator | `GET /v1/node-profiles` | `nvke.admin` | Pending |
-| `operator.readyz` | operator | `GET /readyz` | `nvke.admin` | Pending |
-| `operator.updateClusterRelease` | operator | `PUT /v1/cluster-releases/{name}` | `nvke.admin` | Pending |
-| `operator.updateClusterReleaseChannel` | operator | `PUT /v1/cluster-release-channels/{name}` | `nvke.admin` | Pending |
-| `operator.updateControlPlaneClass` | operator | `PUT /v1/control-plane-classes/{name}` | `nvke.admin` | Pending |
-| `operator.updateMachineImage` | operator | `PUT /v1/machine-images/{name}` | `nvke.admin` | Pending |
-| `operator.updateNodePoolRelease` | operator | `PUT /v1/node-profiles/{name}` | `nvke.admin` | Pending |
-| `tenant.createNVKECluster` | tenant | `POST /v1/clusters` | `nvke.manage` | Pending |
-| `tenant.deleteNVKECluster` | tenant | `DELETE /v1/clusters/{name}` | `nvke.manage` | Pending |
-| `tenant.getNVKECluster` | tenant | `GET /v1/clusters/{name}` | `nvke.read` | Pending |
-| `tenant.healthz` | tenant | `GET /healthz` | `nvke.read` | Pending |
-| `tenant.listNVKECluster` | tenant | `GET /v1/clusters` | `nvke.read` | Pending |
-| `tenant.readyz` | tenant | `GET /readyz` | `nvke.read` | Pending |
-| `tenant.updateNVKECluster` | tenant | `PUT /v1/clusters/{name}` | `nvke.manage` | Pending |
-| `updateCluster` | controller | `PATCH /clusters/{clusterID}` | `nvke.manage` | Pending |
-| `updateClusterSpireServer` | controller | `PATCH /clusters/{clusterID}/spire-server` | `nvke.admin` | Pending |
-| `updateNodePool` | controller | `PATCH /nodePools/{nodePoolID}` | `nvke.manage` | Pending |
+| `createCluster` | controller | `POST /clusters` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `createNodePool` | controller | `POST /nodePools` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `deleteCluster` | controller | `DELETE /clusters/{clusterID}` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `deleteNode` | controller | `DELETE /nodes/{nodeID}` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `deleteNodePool` | controller | `DELETE /nodePools/{nodePoolID}` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `getCluster` | controller | `GET /clusters/{clusterID}` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `getClusterControlPlane` | controller | `GET /clusters/{clusterID}/control-plane` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `getClusterControlPlaneConfigHistory` | controller | `GET /clusters/{clusterID}/control-plane/configHistory` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `getClusterSpireServer` | controller | `GET /clusters/{clusterID}/spire-server` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `getNode` | controller | `GET /nodes/{nodeID}` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `getNodePool` | controller | `GET /nodePools/{nodePoolID}` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `getNodeSet` | controller | `GET /nodeSets/{nodeSetID}` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `listClusters` | controller | `GET /clusters` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `listConfigProfiles` | controller | `GET /configProfiles` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `listNodePools` | controller | `GET /nodePools` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `listNodeSets` | controller | `GET /nodeSets` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `listNodes` | controller | `GET /nodes` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `listReleases` | controller | `GET /releases` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.createClusterRelease` | operator | `POST /v1/cluster-releases` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.createClusterReleaseChannel` | operator | `POST /v1/cluster-release-channels` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.createControlPlaneClass` | operator | `POST /v1/control-plane-classes` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.createMachineImage` | operator | `POST /v1/machine-images` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.createNodePoolRelease` | operator | `POST /v1/node-profiles` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.deleteClusterRelease` | operator | `DELETE /v1/cluster-releases/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.deleteClusterReleaseChannel` | operator | `DELETE /v1/cluster-release-channels/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.deleteControlPlaneClass` | operator | `DELETE /v1/control-plane-classes/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.deleteMachineImage` | operator | `DELETE /v1/machine-images/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.deleteNodePoolRelease` | operator | `DELETE /v1/node-profiles/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.getClusterRelease` | operator | `GET /v1/cluster-releases/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.getClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.getControlPlaneClass` | operator | `GET /v1/control-plane-classes/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.getMachineImage` | operator | `GET /v1/machine-images/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.getNodePoolRelease` | operator | `GET /v1/node-profiles/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.healthz` | operator | `GET /healthz` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.listClusterRelease` | operator | `GET /v1/cluster-releases` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.listClusterReleaseChannel` | operator | `GET /v1/cluster-release-channels` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.listControlPlaneClass` | operator | `GET /v1/control-plane-classes` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.listMachineImage` | operator | `GET /v1/machine-images` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.listNodePoolRelease` | operator | `GET /v1/node-profiles` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.readyz` | operator | `GET /readyz` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.updateClusterRelease` | operator | `PUT /v1/cluster-releases/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.updateClusterReleaseChannel` | operator | `PUT /v1/cluster-release-channels/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.updateControlPlaneClass` | operator | `PUT /v1/control-plane-classes/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.updateMachineImage` | operator | `PUT /v1/machine-images/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `operator.updateNodePoolRelease` | operator | `PUT /v1/node-profiles/{name}` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `tenant.createNVKECluster` | tenant | `POST /v1/clusters` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `tenant.deleteNVKECluster` | tenant | `DELETE /v1/clusters/{name}` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `tenant.getNVKECluster` | tenant | `GET /v1/clusters/{name}` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `tenant.healthz` | tenant | `GET /healthz` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `tenant.listNVKECluster` | tenant | `GET /v1/clusters` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `tenant.readyz` | tenant | `GET /readyz` | `nvke.read` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `tenant.updateNVKECluster` | tenant | `PUT /v1/clusters/{name}` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `updateCluster` | controller | `PATCH /clusters/{clusterID}` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `updateClusterSpireServer` | controller | `PATCH /clusters/{clusterID}/spire-server` | `nvke.admin` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
+| `updateNodePool` | controller | `PATCH /nodePools/{nodePoolID}` | `nvke.manage` | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending. |
 
 ## Management Kubernetes resources
 
@@ -146,33 +155,73 @@ implicit bypass of tenant/operator public API authorization.
 
 | Kind | Group/version | Collection | Scope | Delivery evidence |
 |---|---|---|---|---|
-| `ClusterReleaseChannel` | `internal.nvke.nvidia.com/v1` | `clusterreleasechannels` | Site | Pending |
-| `ClusterRelease` | `internal.nvke.nvidia.com/v1` | `clusterreleases` | Site | Pending |
-| `ControlPlaneClass` | `internal.nvke.nvidia.com/v1` | `controlplaneclasses` | Site | Pending |
-| `MachineImage` | `internal.nvke.nvidia.com/v1` | `machineimages` | Site | Pending |
-| `NodePoolRelease` | `internal.nvke.nvidia.com/v1` | `nodepoolreleases` | Site | Pending |
-| `NVKECluster` | `internal.nvke.nvidia.com/v1` | `nvkeclusters` | Organization namespace | Pending |
+| `ClusterReleaseChannel` | `internal.nvke.nvidia.com/v1` | `clusterreleasechannels` | Site | **local** — [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controllers and physical effects are not established by Kubernetes admission. |
+| `ClusterRelease` | `internal.nvke.nvidia.com/v1` | `clusterreleases` | Site | **local** — [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controllers and physical effects are not established by Kubernetes admission. |
+| `ControlPlaneClass` | `internal.nvke.nvidia.com/v1` | `controlplaneclasses` | Site | **local** — [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controllers and physical effects are not established by Kubernetes admission. |
+| `MachineImage` | `internal.nvke.nvidia.com/v1` | `machineimages` | Site | **local** — [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controllers and physical effects are not established by Kubernetes admission. |
+| `NodePoolRelease` | `internal.nvke.nvidia.com/v1` | `nodepoolreleases` | Site | **local** — [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controllers and physical effects are not established by Kubernetes admission. |
+| `NVKECluster` | `internal.nvke.nvidia.com/v1` | `nvkeclusters` | Organization namespace | **local** — [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native controllers and physical effects are not established by Kubernetes admission. |
+
+## Executable management Kubernetes actions
+
+Every datastore action is separate from its resource kind; admission does not prove native reconciliation.
+
+| Action | Kind/verb | Permission | Delivery evidence |
+|---|---|---|---|
+| `datastore.getClusterReleaseChannel` | `ClusterReleaseChannel` / `get` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.listClusterReleaseChannel` | `ClusterReleaseChannel` / `list` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.createClusterReleaseChannel` | `ClusterReleaseChannel` / `create` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.replaceClusterReleaseChannel` | `ClusterReleaseChannel` / `replace` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deleteClusterReleaseChannel` | `ClusterReleaseChannel` / `delete` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.getClusterRelease` | `ClusterRelease` / `get` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.listClusterRelease` | `ClusterRelease` / `list` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.createClusterRelease` | `ClusterRelease` / `create` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.replaceClusterRelease` | `ClusterRelease` / `replace` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deleteClusterRelease` | `ClusterRelease` / `delete` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.getControlPlaneClass` | `ControlPlaneClass` / `get` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.listControlPlaneClass` | `ControlPlaneClass` / `list` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.createControlPlaneClass` | `ControlPlaneClass` / `create` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.replaceControlPlaneClass` | `ControlPlaneClass` / `replace` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deleteControlPlaneClass` | `ControlPlaneClass` / `delete` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.getMachineImage` | `MachineImage` / `get` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.listMachineImage` | `MachineImage` / `list` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.createMachineImage` | `MachineImage` / `create` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [app-kube-operation](#evidence-app-kube-operation), [paired-cli](#evidence-paired-cli). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.replaceMachineImage` | `MachineImage` / `replace` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deleteMachineImage` | `MachineImage` / `delete` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.getNodePoolRelease` | `NodePoolRelease` / `get` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.listNodePoolRelease` | `NodePoolRelease` / `list` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.createNodePoolRelease` | `NodePoolRelease` / `create` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.replaceNodePoolRelease` | `NodePoolRelease` / `replace` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deleteNodePoolRelease` | `NodePoolRelease` / `delete` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.getNVKECluster` | `NVKECluster` / `get` | `nvke.read` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.listNVKECluster` | `NVKECluster` / `list` | `nvke.read` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.createNVKECluster` | `NVKECluster` / `create` | `nvke.manage` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.replaceNVKECluster` | `NVKECluster` / `replace` | `nvke.manage` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deleteNVKECluster` | `NVKECluster` / `delete` | `nvke.manage` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deprecateClusterRelease` | `ClusterRelease` / `deprecate` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [release-deprecation](#evidence-release-deprecation). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.deprecateNodePoolRelease` | `NodePoolRelease` / `deprecate` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [release-deprecation](#evidence-release-deprecation). Remaining: Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action. |
+| `datastore.getWorkloadKubeconfig` | `kubeconfig` / `kubeconfig` | `nvke.admin` | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [kubeconfig-ownership](#evidence-kubeconfig-ownership), [access-api](#evidence-access-api). Remaining: Live workload API reachability and physical-node access handoff remain unqualified. |
 
 ## Operator and bootstrap operations
 
-These require dedicated workflows and verification beyond the HTTP client. All are pending.
+Each family retains the complete required behavior. Local tooling is distinct from API/UI and physical-site qualification.
 
-| Operation family | Required behavior |
-|---|---|
-| Site configuration | Register/select/edit/probe/remove sites, secret references, supported interface discovery |
-| Node preparation | Images, registry/boot artifacts, SPIRE CA/TPM or admitted alternative, pre-provisioned nodes |
-| Site specs | Generate, inspect, validate and dry-run the complete spec; report field errors without secrets |
-| Deployment rendering | Inspect Helm values and stack config; render pinned deploy path and release inputs |
-| Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, kubeconfig and encryption-key outputs |
-| Installation | Ordered CAPI/provider/management-plane install; validate pinned images, versions, storage and network |
-| Infrastructure providers | NICo and enabled LaunchLayer; CRDs, credentials and manager state; credential-health freshness |
-| Artifacts | Machine images, cluster releases, node-pool releases, release channels and control-plane classes |
-| Access | Kubeconfig retrieval and OIDC config generation, narrow automation identity, private route validation |
-| Credentials | Certificate expiry/renewal, SPIRE settings, bootstrap outputs and secure output/download |
-| Maintenance | Control-plane and worker version changes, node replacement, drain/rollout conditions and partial failure |
-| Networking | CNI, VIP and API access/CIDRs; separate immutable creation fields from day-2 updates |
-| Telemetry | NKTP/OTLP deployment and collection; health/events/logs/metrics, config and connectivity diagnostics |
-| Unsupported upstream | No claimed self-management, management-plane upgrade or backup/restore without a verified implementation |
+| Operation family | Required behavior | Existing mapping | Delivery evidence |
+|---|---|---|---|
+| Site configuration | Register/select/edit/probe/remove sites, secret references, supported interface discovery | Register/select/edit/probe/remove sites and interfaces | **local** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Live routes and deployed token/login acceptance remain pending. |
+| Node preparation | Images, registry/boot artifacts, SPIRE CA/TPM or admitted alternative, pre-provisioned nodes | Native bootstrap inputs and provisioned-provider path | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling). Remaining: Node/image preparation, TPM/SPIRE attestation alternatives and verified artifact delivery remain unqualified; API/UI control absent. |
+| Site specs | Generate, inspect, validate and dry-run the complete spec; report field errors without secrets | Generate/inspect/validate and bootstrap dry-run through pinned tooling | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Dedicated API/UI preparation controls and live bootstrap qualification remain pending. |
+| Deployment rendering | Inspect Helm values and stack config; render pinned deploy path and release inputs | Pinned native deploy-path, stack/values inspection and management install planning | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete. |
+| Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, kubeconfig and encryption-key outputs | Pinned local bootstrap, private outputs and durable attempt guard | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Actual seed/node bootstrap and API/UI admission/observation controls remain pending. |
+| Installation | Ordered CAPI/provider/management-plane install; validate pinned images, versions, storage and network | Pinned management install/check/access with ordered dry-run | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [nktp-kind](#evidence-nktp-kind). Remaining: NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending. |
+| Infrastructure providers | NICo and enabled LaunchLayer; CRDs, credentials and manager state; credential-health freshness | Provider fields preserved in native schemas; no provider inspection control yet | **partial** — [action-validation](#evidence-action-validation), [limits](#evidence-limits). Remaining: #2667: add provider status/credential-health observation and API/UI/CLI; qualify NICo and enabled LaunchLayer credentials/controllers/hardware. |
+| Artifacts | Machine images, cluster releases, node-pool releases, release channels and control-plane classes | All six management CRDs plus public operator APIs | **local** — [crd-admission](#evidence-crd-admission), [release-deprecation](#evidence-release-deprecation), [http-fixture](#evidence-http-fixture), [resource-admission](#evidence-resource-admission), [cli-wiring](#evidence-cli-wiring). Remaining: Image/release/channel/profile supply chain and native reconciliation remain pending. |
+| Access | Kubeconfig retrieval and OIDC config generation, narrow automation identity, private route validation | Ownership-guarded kubeconfig retrieval, imported grants and NVKE-only token scopes | **local** — [access-api](#evidence-access-api), [kubeconfig-ownership](#evidence-kubeconfig-ownership), [paired-cli](#evidence-paired-cli). Remaining: Live OIDC/private route and physical workload access handoff remain pending. |
+| Credentials | Certificate expiry/renewal, SPIRE settings, bootstrap outputs and secure output/download | Separate credential observations and native certificate/SPIRE maintenance controls | **local** — [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [maintenance-api](#evidence-maintenance-api), [native-temporal](#evidence-native-temporal). Remaining: Actual native exporter, SPIRE/node effects and deployment acceptance remain pending. |
+| Maintenance | Control-plane and worker version changes, node replacement, drain/rollout conditions and partial failure | Controller mutations, node diagnostics and native workflow/reset recovery | **local** — [http-fixture](#evidence-http-fixture), [maintenance-api](#evidence-maintenance-api), [native-temporal](#evidence-native-temporal), [native-reset](#evidence-native-reset), [browser-native](#evidence-browser-native). Remaining: Actual node upgrades/replacement/drain, certificate renewal and etcd convergence remain pending. |
+| Networking | CNI, VIP and API access/CIDRs; separate immutable creation fields from day-2 updates | Native network/CNI/VIP fields through reviewed schemas and resources | **fixture** — [action-validation](#evidence-action-validation), [resource-admission](#evidence-resource-admission), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Native network behavior and private connectivity remain unqualified. |
+| Telemetry | NKTP/OTLP deployment and collection; health/events/logs/metrics, config and connectivity diagnostics | Credential observation UI/API/CLI plus pinned local NKTP production backend profiles | **partial** — [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [nktp-runtime](#evidence-nktp-runtime), [nktp-kind](#evidence-nktp-kind), [diagnostics](#evidence-diagnostics). Remaining: NKTP local HTTP installation and both transport protocols qualified; Astro API/UI NKTP deployment/health controls, deployed negative/recovery tests and NVKE-site telemetry remain pending. |
+| Unsupported upstream | No claimed self-management, management-plane upgrade or backup/restore without a verified implementation | Unsupported self-management, management-plane upgrade and backup/restore are not exposed as verified capabilities | **unsupported** — [limits](#evidence-limits). Remaining: No support claim without a separately verified upstream implementation. |
 
 ## Executable upstream CLI inventory
 
@@ -183,42 +232,197 @@ source declarations are also preserved. Help/completion/version use Astro's exis
 
 | Upstream command | Astro mapping | Delivery evidence |
 |---|---|---|
-| `nvkectl bootstrap site` | NVKE domain operation | Pending |
-| `nvkectl config set-site` | NVKE domain operation | Pending |
-| `nvkectl config use-site` | NVKE domain operation | Pending |
-| `nvkectl config view` | NVKE domain operation | Pending |
-| `nvkectl create cluster` | NVKE domain operation | Pending |
-| `nvkectl create clusterrelease` | NVKE domain operation | Pending |
-| `nvkectl create machineimage` | NVKE domain operation | Pending |
-| `nvkectl create nodepool` | NVKE domain operation | Pending |
-| `nvkectl create nodepoolrelease` | NVKE domain operation | Pending |
-| `nvkectl delete cluster` | NVKE domain operation | Pending |
-| `nvkectl delete clusterrelease` | NVKE domain operation | Pending |
-| `nvkectl delete machineimage` | NVKE domain operation | Pending |
-| `nvkectl delete nodepool` | NVKE domain operation | Pending |
-| `nvkectl delete nodepoolrelease` | NVKE domain operation | Pending |
-| `nvkectl deprecate` | NVKE domain operation | Pending |
-| `nvkectl deprecate clusterrelease` | NVKE domain operation | Pending |
-| `nvkectl deprecate nodepoolrelease` | NVKE domain operation | Pending |
-| `nvkectl generate oidc-kubeconfig` | NVKE domain operation | Pending |
-| `nvkectl generate sitespec` | NVKE domain operation | Pending |
-| `nvkectl get bootstrap-manifest` | NVKE domain operation | Pending |
-| `nvkectl get clusterreleases` | NVKE domain operation | Pending |
-| `nvkectl get clusters` | NVKE domain operation | Pending |
-| `nvkectl get kubeconfig` | NVKE domain operation | Pending |
-| `nvkectl get machineimages` | NVKE domain operation | Pending |
-| `nvkectl get nodepoolreleases` | NVKE domain operation | Pending |
-| `nvkectl get nodepools` | NVKE domain operation | Pending |
-| `nvkectl get providers` | NVKE domain operation | Pending |
-| `nvkectl inspect nvkr-release` | NVKE domain operation | Pending |
-| `nvkectl inspect sitespec` | NVKE domain operation | Pending |
-| `nvkectl inspect stack-config` | NVKE domain operation | Pending |
-| `nvkectl inspect values` | NVKE domain operation | Pending |
-| `nvkectl patch cluster` | NVKE domain operation | Pending |
-| `nvkectl patch nodepool` | NVKE domain operation | Pending |
-| `nvkectl render deploy-path` | NVKE domain operation | Pending |
-| `nvkectl validate sitespec` | NVKE domain operation | Pending |
-| `nvkectl version` | Existing CLI utility | Pending |
+| `nvkectl bootstrap site` | astro nvke tooling run -- bootstrap site | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Actual seed/node bootstrap, image supply chain and API/UI bootstrap control remain pending. |
+| `nvkectl config set-site` | astro nvke site create/configure; NVKE site UI | **local** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Live interface/private route qualification remains required. |
+| `nvkectl config use-site` | Explicit --site GUID and selected site route | **partial** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Astro uses explicit site selection; native active-site config-file state is not imported. |
+| `nvkectl config view` | astro nvke site get/list; site metadata UI | **local** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Connection secrets intentionally require their declared secure paths; live route qualification remains required. |
+| `nvkectl create cluster` | astro nvke controller create-cluster; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl create clusterrelease` | astro nvke datastore create-cluster-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl create machineimage` | astro nvke datastore create-machine-image; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [app-kube-operation](#evidence-app-kube-operation), [paired-cli](#evidence-paired-cli). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl create nodepool` | astro nvke controller create-node-pool; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl create nodepoolrelease` | astro nvke datastore create-node-pool-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl delete cluster` | astro nvke controller delete-cluster; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl delete clusterrelease` | astro nvke datastore delete-cluster-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl delete machineimage` | astro nvke datastore delete-machine-image; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl delete nodepool` | astro nvke controller delete-node-pool; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl delete nodepoolrelease` | astro nvke datastore delete-node-pool-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl deprecate` | Choose datastore deprecate-cluster-release or deprecate-node-pool-release | **local** — [release-deprecation](#evidence-release-deprecation), [cli-wiring](#evidence-cli-wiring). Remaining: No physical release reconciliation claim from deprecation admission. |
+| `nvkectl deprecate clusterrelease` | astro nvke datastore deprecate-cluster-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [release-deprecation](#evidence-release-deprecation). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl deprecate nodepoolrelease` | astro nvke datastore deprecate-node-pool-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission), [release-deprecation](#evidence-release-deprecation). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl generate oidc-kubeconfig` | astro nvke tooling run -- generate oidc-kubeconfig | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl generate sitespec` | astro nvke tooling run -- generate sitespec | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl get bootstrap-manifest` | astro nvke tooling run -- get bootstrap-manifest | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl get clusterreleases` | astro nvke datastore list-cluster-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl get clusters` | astro nvke controller list-clusters; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl get kubeconfig` | astro nvke datastore get-workload-kubeconfig; reviewed access UI/API | **local** — [kubeconfig-ownership](#evidence-kubeconfig-ownership), [access-api](#evidence-access-api), [paired-cli](#evidence-paired-cli). Remaining: Live private workload API reachability and credential handoff remain pending. |
+| `nvkectl get machineimages` | astro nvke datastore list-machine-image; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl get nodepoolreleases` | astro nvke datastore list-node-pool-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
+| `nvkectl get nodepools` | astro nvke controller list-node-pools; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl get providers` | No equivalent Astro API/UI/CLI observation yet; tracked in #2667 | **missing** — No delivery evidence. Remaining: Implement pinned CRD/manager/Secret-presence and provider-reported credential-health freshness semantics; qualify NICo and enabled LaunchLayer. |
+| `nvkectl inspect nvkr-release` | astro nvke tooling run -- inspect nvkr-release | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl inspect sitespec` | astro nvke tooling run -- inspect sitespec | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl inspect stack-config` | astro nvke tooling run -- inspect stack-config | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl inspect values` | astro nvke tooling run -- inspect values | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl patch cluster` | astro nvke controller update-cluster; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl patch nodepool` | astro nvke controller update-node-pool; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
+| `nvkectl render deploy-path` | astro nvke tooling run -- render deploy-path | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl validate sitespec` | astro nvke tooling run -- validate sitespec | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
+| `nvkectl version` | astro version; pinned native tooling version | **local** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Published/release build qualification remains part of final delivery. |
+
+## Evidence sources and limits
+
+These references describe source/test scope and recorded observations, not a current green test run.
+Paired repository links name local immutable commits and become remotely readable after those commits are pushed.
+All linked suites and required build/lint/type gates must run again as appropriate before the final PR.
+
+### Evidence http-fixture
+
+[backend/providers/tests/nvke/test_client.py](../../backend/providers/tests/nvke/test_client.py) — test. Each HTTP operation reaches its own route/surface over a controlled HTTP peer; response fixtures are not native controller execution.
+
+Selector: `test_every_pinned_operation_reaches_its_own_surface_over_real_http`.
+
+### Evidence action-validation
+
+[backend/providers/tests/nvke/test_operations.py](../../backend/providers/tests/nvke/test_operations.py) — test. Every catalog action validates a complete request; checks do not contact a site.
+
+Selector: `test_every_catalog_action_has_a_valid_complete_request_without_contacting_a_site`.
+
+### Evidence api-catalog
+
+[backend/astrolift_clusters/tests/test_nvke_schema.py](../../backend/astrolift_clusters/tests/test_nvke_schema.py) — test. Real GraphQL catalog and shared permission/audit/admission checks; no per-action native effects claim.
+
+Selector: `test_complete_execution_catalog_is_available_through_real_schema`.
+
+### Evidence ui-wiring
+
+[frontend/graphql/nvke/nvke-routes.test.tsx](../../frontend/graphql/nvke/nvke-routes.test.tsx) — test. Shared route hooks and reviewed action/recovery tests with controlled Apollo responses.
+
+### Evidence ui-resource
+
+[frontend/components/screens/nvke/nvke-resource-actions.test.tsx](../../frontend/components/screens/nvke/nvke-resource-actions.test.tsx) — test. Resource editor/confirmation tests; not exhaustive rendered execution of every native action.
+
+### Evidence cli-wiring
+
+[cmd/nvke_test.go](https://github.com/calliopeai/astrolift-cli/blob/baf38fe90c3c92a39e7f1471d531f846709145ab/cmd/nvke_test.go) — test. All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.
+
+Selector: `TestNVKEFullCatalogCommandsAreReachableWithoutNetwork`.
+
+Paired source SHA-256: `1f05b99a5fb8f4fe0ffb11047fb29621cd1f8128199de68d15cafad8f8e425a8`.
+
+### Evidence paired-cli
+
+[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/baf38fe90c3c92a39e7f1471d531f846709145ab/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.
+
+Selector: `test_pinned_cli_vocabulary_matches_every_paired_server_action`.
+
+Paired source SHA-256: `e30bbd98369118029d25558635a4f99811bbf45ea22f5e17716a6a5927a160a2`.
+
+### Evidence crd-admission
+
+[backend/providers/tests/nvke/test_datastore_integration.py](../../backend/providers/tests/nvke/test_datastore_integration.py) — test. CRUDL for each of six CRDs against real Kubernetes admission; no native reconciler/garbage collector.
+
+Selector: `test_crudl_against_real_nvke_admission`.
+
+### Evidence release-deprecation
+
+[backend/providers/tests/nvke/test_datastore_integration.py](../../backend/providers/tests/nvke/test_datastore_integration.py) — test. Real Kubernetes deprecation/content immutability and UID/resource-version guards.
+
+Selector: `test_release_deprecation_preserves_published_content_and_rejects_image_rewrite`.
+
+### Evidence kubeconfig-ownership
+
+[backend/providers/tests/nvke/test_datastore_integration.py](../../backend/providers/tests/nvke/test_datastore_integration.py) — test. Real Secret/CAPI ownership guards for kubeconfig access; this does not establish network access to physical workload nodes.
+
+Selector: `test_kubeconfig_download_from_real_kubernetes_secret`.
+
+### Evidence app-kube-operation
+
+[backend/astrolift_clusters/tests/test_nvke_operations.py](../../backend/astrolift_clusters/tests/test_nvke_operations.py) — test. Real Astro database/Kubernetes dry-run and observed MachineImage creation.
+
+Selector: `test_real_database_and_kubernetes_operation_dry_run_and_observed_create`.
+
+### Evidence resource-admission
+
+[backend/astrolift_clusters/tests/test_nvke_resource_operations.py](../../backend/astrolift_clusters/tests/test_nvke_resource_operations.py) — test. Reviewed-source target binding, read ETags and durable mutation admission, including controlled controller fixtures.
+
+### Evidence native-temporal
+
+[backend/astrolift_clusters/tests/test_nvke_native_operations.py](../../backend/astrolift_clusters/tests/test_nvke_native_operations.py) — test. Real Astro/native Temporal interaction using test-defined native workflows under pinned entry-point names; no node certificate/etcd effects.
+
+### Evidence native-reset
+
+[backend/astrolift_clusters/tests/test_nvke_native_reset.py](../../backend/astrolift_clusters/tests/test_nvke_native_reset.py) — test. Real Temporal reset acknowledgement-loss and phase/history checks against test-defined workflows; no physical etcd rotation.
+
+### Evidence browser-native
+
+[backend/astrolift_clusters/tests/test_nvke_browser_integration.py](../../backend/astrolift_clusters/tests/test_nvke_browser_integration.py) — test. Chromium through real Astro/Temporal/database with native workflow fixtures; retains exact review and receipt recovery.
+
+### Evidence metric-parser
+
+[backend/providers/tests/nvke/test_credential_metrics.py](../../backend/providers/tests/nvke/test_credential_metrics.py) — test. All pinned gauge/label/credential states projected from controlled exporter text, with exact numeric strings and strict rejection.
+
+### Evidence metric-api
+
+[backend/astrolift_clusters/tests/test_nvke_credential_observations.py](../../backend/astrolift_clusters/tests/test_nvke_credential_observations.py) — test. Real database, TLS listener and controller-identity fixtures for durable collection/history; not live NVKE exporter behavior.
+
+### Evidence metric-browser
+
+[backend/astrolift_clusters/tests/test_nvke_credential_browser_integration.py](../../backend/astrolift_clusters/tests/test_nvke_credential_browser_integration.py) — test. Real browser/API/database/Temporal collection and lost reply recovery; controlled native HTTP/exporter peers.
+
+### Evidence metric-ui
+
+[frontend/components/screens/nvke/nvke-metrics.test.tsx](../../frontend/components/screens/nvke/nvke-metrics.test.tsx) — test. Historical credential rendering, unknowns and exact numeric strings with fixture props; server paging is tested separately in hooks and connected-browser scenarios.
+
+### Evidence sites-api
+
+[backend/astrolift_clusters/tests/test_nvke_sites.py](../../backend/astrolift_clusters/tests/test_nvke_sites.py) — test. Site/authority CRUD, encryption and org/permission boundaries in the real database.
+
+### Evidence access-api
+
+[backend/astrolift_clusters/tests/test_nvke_access.py](../../backend/astrolift_clusters/tests/test_nvke_access.py) — test. Imported access enrollment, ownership/CAPI checks and grant boundaries against real local Kubernetes and controlled controller.
+
+### Evidence maintenance-api
+
+[backend/astrolift_clusters/tests/test_nvke_maintenance.py](../../backend/astrolift_clusters/tests/test_nvke_maintenance.py) — test. Maintenance state projection and retained-lock/expiry distinctions from controlled controller/native state.
+
+### Evidence diagnostics
+
+[backend/astrolift_clusters/tests/test_nvke_diagnostics.py](../../backend/astrolift_clusters/tests/test_nvke_diagnostics.py) — test. Typed condition and diagnostic projections with bounded output; not an NKTP installation or native provider health probe.
+
+### Evidence native-tooling
+
+[kubernetes/nvke/test_tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/test_tooling.py) — test. Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.
+
+Paired source SHA-256: `e1e8062c87ab21275e7a4e2b7b697b5a4789579ada9218af589313a80ea6148a`.
+
+### Evidence cli-tooling
+
+[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/baf38fe90c3c92a39e7f1471d531f846709145ab/scripts/integration/test_nvke_tooling.py) — test. Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.
+
+Paired source SHA-256: `2289c3d9e93cb80ceb849c9c3611f90c7a7d31c516fe0cf1bb667ad301f52fd6`.
+
+### Evidence tooling-source
+
+[kubernetes/nvke/tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/tooling.py) — implementation. Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.
+
+Paired source SHA-256: `0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd`.
+
+### Evidence nktp-runtime
+
+[kubernetes/nvke/test_nktp_runtime.py](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/test_nktp_runtime.py) — test. Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.
+
+Paired source SHA-256: `41aaaa374b5a943f821b30f2e110960e36fad3b4142b630e66ed43c3d3dcd0b6`.
+
+### Evidence nktp-kind
+
+[kubernetes/nvke/qualification/nktp-kind-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/qualification/nktp-kind-2026-11-08.json) — observation. Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.
+
+Paired source SHA-256: `568410bd0c9a66742cd542cf5c293c03067f82051dd45788e4856308cb5a6857`.
+
+### Evidence limits
+
+[docs/operators/nvke-site-connections.md](../../docs/operators/nvke-site-connections.md) — implementation. Documented source ownership, readiness, native reset and live qualification limits.
+
 
 ## Verification
 
@@ -228,8 +432,12 @@ cd backend/providers
 # then, from that checkout: go run ./cli/cmd/astro-inventory > /tmp/nvke-cli.json
 python -m scripts.nvke_contract --upstream /path/to/pinned/nvke --cli-inventory /tmp/nvke-cli.json --check
 python -m scripts.nvke_coverage --check
+# Also verify paired immutable evidence when the local checkouts are available:
+python -m scripts.nvke_coverage --check --cli /path/to/cli --opscode /path/to/opscode
 python -m pytest tests/nvke
 ```
 
 Changing the upstream revision requires regenerating the snapshot and reviewing source hashes,
 schemas, CLI source declarations and every coverage row. Do not fetch or accept latest at runtime.
+Update `scripts/nvke_evidence.json` only after inspecting the linked implementations and tests.
+The validator requires every native row, explicit remaining work and scoped sources; it does not prove tests passed.
