@@ -269,7 +269,21 @@ def test_a_team_grant_of_scm_write_does_not_reach_org_connections(world):
 
 
 def test_org_owner_role_can_create(world):
-    role = Role.objects.get(slug="org_owner", is_system=True, organization=None)
+    from astrolift_identity.system_roles import SYSTEM_ROLES
+
+    # Transactional tests flush migration-seeded rows before this module runs.
+    slug, level, name, description, permissions = next(row for row in SYSTEM_ROLES if row[0] == "org_owner")
+    role, _ = Role.objects.get_or_create(
+        slug=slug,
+        is_system=True,
+        organization=None,
+        defaults={
+            "scope_level": level,
+            "name": name,
+            "description": description,
+            "permissions": [permission.value for permission in permissions],
+        },
+    )
     assert "scm.write" in role.permissions
     RoleBinding.objects.create(user=world.user, role=role, scope_kind="ORG", scope_id=world.org.pk)
     with _tenant(world):
