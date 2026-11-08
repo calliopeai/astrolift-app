@@ -55,8 +55,10 @@ verify, disable and remove it through the GraphQL metrics-authority mutations.
 Verification records `METRICS_READ`, which proves readable pinned metrics rather
 than successful collection or cluster health. The controller serves these gauges
 on its separate metrics listener; Astrolift does not infer its address or reuse
-REST or management kubeconfig credentials. Browser and CLI controls remain open
-under #2666, a child of #2661.
+REST or management kubeconfig credentials. The paired CLI exposes
+`astro nvke metrics catalog/get/configure/verify/enable/disable/remove`, durable
+`request/recover`, and historical `observation/certificates/samples` commands.
+Browser controls remain open under #2666, a child of #2661.
 
 The reader pins all 18 credential gauges and 16 kubeadm credential names from the
 upstream collector and agent catalog. It selects only an exact cluster name's
