@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "a1276f97db480d6d41dc495bd6cdb44fe996dc1e"
+      "revision": "43c96bb9d0cca4b1ae15d25fe9ea7d3f656c23f5"
     }
   },
   "evidence": {
@@ -310,6 +310,13 @@
       "kind": "test",
       "scope": "Refuses torn/uncertain/mismatched receipts, modified bundles, shared/symlinked inputs, incomplete/unready/deleting/version-mismatched nodes and unsafe kubeconfig credential plugins or TLS overrides. Controlled qualification inputs; live bootstrap evidence is separate.",
       "sha256": "5e393a7691f2fa95ab6925a242801c7c43228f87d66de0a132b51fc63230c833"
+    },
+    "native-management-base": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/native-management-base-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Actual guarded default NICo stack install, SPIFFE access setup and native site diagnostics. Six deployed stack Helm releases, active workload/certificate readiness, source-built controller identity, healthy database/Temporal, and SDK GETs for the three installed CRDs over certificate-validated private SSH transport. Optional management-engine/public APIs, tenant provisioning, production telemetry delivery and API/UI install controls are not qualified.",
+      "sha256": "5af9b8ba1edbf003912412f4a47e5866f0b4b50bfde05dc000c369c1306f9bfc"
     }
   },
   "rows": {
@@ -2295,7 +2302,8 @@
         "evidence": [
           "tooling-source",
           "native-tooling",
-          "cli-tooling"
+          "cli-tooling",
+          "native-management-base"
         ],
         "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
       },
@@ -2312,14 +2320,15 @@
         "remaining": "One local seed/node bootstrap is qualified; API/UI admission/observation controls, production artifact supply-chain verification and live deployment remain pending."
       },
       "installation": {
-        "mapping": "Pinned management install/check/access with ordered dry-run",
+        "mapping": "Pinned management install/check/access with guarded actual local default-stack installation",
         "qualification": "partial",
         "evidence": [
           "native-tooling",
           "cli-tooling",
-          "nktp-kind"
+          "nktp-kind",
+          "native-management-base"
         ],
-        "remaining": "NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending."
+        "remaining": "Default NICo management stack is locally qualified. Optional management-engine/operator/tenant API deployment, tenant provisioning, API/UI install controls, verified production release supply chain and live deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
@@ -2406,7 +2415,8 @@
           "metric-browser",
           "nktp-runtime",
           "nktp-kind",
-          "diagnostics"
+          "diagnostics",
+          "native-management-base"
         ],
         "remaining": "NKTP local HTTP installation and both transport protocols qualified; Astro API/UI NKTP deployment/health controls, deployed negative/recovery tests and NVKE-site telemetry remain pending."
       },
