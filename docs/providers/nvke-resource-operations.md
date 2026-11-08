@@ -48,6 +48,15 @@ the submitted preconditions at the write, including a replacement racing after
 preflight. Existing callers may still use ordinary replacement without the new
 optional UID.
 
+The datastore adapter additionally reads the current native object before a
+replacement. It verifies the exact kind, namespace, name, UID and reviewed version,
+then retains controller metadata, including cleanup finalizers and owner references.
+The spec is replaced in full; labels and annotations are replaced when supplied and
+otherwise retained. Submitted documents cannot inject server-owned metadata. This
+read requires native GET authority alongside PUT authority. Each request runs the
+authority checkpoint, and the final PUT still carries UID/resource-version fences
+for changes after the metadata read. A deleting resource is refused.
+
 Public list projections omit per-resource ETags. Their editor therefore returns a
 preparation GET action until a successful resource read supplies the native ETag.
 The prepared edit fixes that exact value into `If-Match`. It never invents a

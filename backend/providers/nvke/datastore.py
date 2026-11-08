@@ -194,9 +194,33 @@ class NvkeDatastore(NvkeClient):
         body = self._document(kind, document)
         if body["metadata"]["name"] != _name(name):
             raise NvkeError("INVALID_INPUT", "NVKE document name must match the resource path")
-        body["metadata"]["resourceVersion"] = _version(resource_version)
-        if uid is not None:
-            body["metadata"]["uid"] = _version(uid)
+        expected_version = _version(resource_version)
+        expected_uid = _version(uid) if uid is not None else None
+        current = self.get(kind, name)
+        metadata = current.data.get("metadata", {})
+        resource = self._resource(kind)
+        if (
+            current.data.get("kind") != kind
+            or current.data.get("apiVersion") != f"{resource.group}/{resource.version}"
+            or metadata.get("name") != name
+            or metadata.get("namespace", "") != (self._namespace if resource.namespaced else "")
+            or not isinstance(metadata.get("uid"), str)
+            or not metadata["uid"]
+            or not current.resource_version
+        ):
+            raise NvkeError("INVALID_RESPONSE", "NVKE management Kubernetes returned an invalid resource identity")
+        if (
+            current.resource_version != expected_version
+            or (expected_uid is not None and metadata["uid"] != expected_uid)
+            or metadata.get("deletionTimestamp")
+        ):
+            raise NvkeError("CONFLICT", "NVKE management resource changed; read its current identity and version")
+        # A full spec replacement must retain native cleanup responsibility and
+        # ownership. The final PUT still fences changes after this read.
+        preserved = copy.deepcopy(metadata)
+        preserved.update(body["metadata"])
+        preserved.update(resourceVersion=expected_version, uid=metadata["uid"])
+        body["metadata"] = preserved
         query = {"fieldValidation": "Strict"}
         if dry_run:
             query["dryRun"] = "All"

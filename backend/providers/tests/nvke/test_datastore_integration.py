@@ -96,6 +96,74 @@ def test_crudl_against_real_nvke_admission(live: tuple[NvkeDatastore, httpx.Clie
     assert deleted.value.code == "NOT_FOUND"
 
 
+def test_replace_preserves_controller_metadata_and_replaces_the_entire_spec(live) -> None:
+    client, raw, namespace = live
+    name = "nvke-preserve-" + uuid4().hex[:12]
+    spec = copy.deepcopy(PUBLIC_SPECS["NVKECluster"])
+    spec["acceleratedRuntime"] = {"name": "none"}
+    created = client.create("NVKECluster", {"metadata": {"name": name}, "spec": spec})
+    owner = {"apiVersion": "v1", "kind": "ConfigMap", "name": "native-owner", "uid": str(uuid4())}
+    finalizers = ["internal.nvke.nvidia.com/cluster-cleanup"]
+    route = f"/apis/internal.nvke.nvidia.com/v1/namespaces/{namespace}/nvkeclusters/{name}"
+    preserved = {
+        "finalizers": finalizers,
+        "ownerReferences": [owner],
+        "annotations": {"controller.example/owned": "keep"},
+        "labels": {"controller.example/owned": "keep"},
+    }
+    patched = raw.patch(route, json={"metadata": preserved}, headers={"Content-Type": "application/merge-patch+json"})
+    patched.raise_for_status()
+    fresh = client.get("NVKECluster", name)
+    replacement = copy.deepcopy(spec)
+    replacement.pop("acceleratedRuntime")
+    replacement["controlPlaneClass"] = "replacement-class"
+    updated = client.replace(
+        "NVKECluster",
+        name,
+        {"metadata": {"name": name}, "spec": replacement},
+        resource_version=fresh.resource_version,
+        uid=created.data["metadata"]["uid"],
+    )
+    for key, value in preserved.items():
+        assert updated.data["metadata"].get(key) == value
+    assert updated.data["spec"] == replacement
+
+
+def test_replace_keeps_the_server_version_fence_after_metadata_read(live, monkeypatch) -> None:
+    client, raw, namespace = live
+    name = "nvke-race-" + uuid4().hex[:12]
+    spec = copy.deepcopy(PUBLIC_SPECS["NVKECluster"])
+    created = client.create("NVKECluster", {"metadata": {"name": name}, "spec": spec})
+    route = f"/apis/internal.nvke.nvidia.com/v1/namespaces/{namespace}/nvkeclusters/{name}"
+    checks = 0
+
+    def race():
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            changed = raw.patch(
+                route,
+                json={"metadata": {"annotations": {"controller.example/race": "keep"}}},
+                headers={"Content-Type": "application/merge-patch+json"},
+            )
+            changed.raise_for_status()
+
+    monkeypatch.setattr(client, "_before_request", race)
+    replacement = {**spec, "controlPlaneClass": "replacement-class"}
+    with pytest.raises(NvkeError) as error:
+        client.replace(
+            "NVKECluster",
+            name,
+            {"metadata": {"name": name}, "spec": replacement},
+            resource_version=created.resource_version,
+            uid=created.data["metadata"]["uid"],
+        )
+    assert error.value.code == "CONFLICT" and error.value.status_code == 409
+    retained = client.get("NVKECluster", name).data
+    assert retained["spec"] == spec
+    assert retained["metadata"]["annotations"]["controller.example/race"] == "keep"
+
+
 def test_release_deprecation_preserves_published_content_and_rejects_image_rewrite(
     live: tuple[NvkeDatastore, httpx.Client, str],
 ) -> None:

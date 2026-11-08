@@ -395,6 +395,26 @@
       "kind": "observation",
       "scope": "Actual isolated native management API through CA/client-certificate-verified private SSH transport. Eight GET-only requests; credential Secret metadata only. NICo CONFIGURED and available, credential health NO-IDENTITY, LaunchLayer NOT-INSTALLED. No physical provisioning or hosted provider observation/recovery claim.",
       "sha256": "b7dddf55701431d69e7be0b2d4de3a9081590f60707dc4d8e18a523ad99e4491"
+    },
+    "datastore-metadata-preservation": {
+      "repository": "app",
+      "path": "backend/providers/nvke/datastore.py",
+      "kind": "implementation",
+      "scope": "Replacement reads the exact native identity/version, preserves cleanup finalizers/owners and unspecified metadata, replaces the complete spec, rechecks authority per I/O and retains UID/version fences on the final PUT. No server-metadata injection from submitted documents."
+    },
+    "datastore-metadata-regression": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_datastore_integration.py",
+      "kind": "test",
+      "scope": "Real Kubernetes regression: native cleanup finalizer, owner reference, labels and annotations survive a replacement while omitted optional spec fields are removed. The old adapter failed this test by removing the cleanup finalizer.",
+      "symbol": "test_replace_preserves_controller_metadata_and_replaces_the_entire_spec"
+    },
+    "datastore-metadata-race": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_datastore_integration.py",
+      "kind": "test",
+      "scope": "Real Kubernetes changes metadata after the preservation read and before PUT; server returns conflict, keeps the intervening annotation and does not apply the submitted spec.",
+      "symbol": "test_replace_keeps_the_server_version_fence_after_metadata_read"
     }
   },
   "rows": {
@@ -1519,7 +1539,9 @@
           "ui-resource",
           "cli-wiring",
           "crd-admission",
-          "resource-admission"
+          "resource-admission",
+          "datastore-metadata-regression",
+          "datastore-metadata-race"
         ],
         "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
       },
@@ -1592,7 +1614,8 @@
           "crd-admission",
           "resource-admission",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "datastore-metadata-preservation"
         ],
         "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
       },
@@ -1604,7 +1627,8 @@
           "resource-admission",
           "ui-resource",
           "cli-wiring",
-          "sdk-tenant-native"
+          "sdk-tenant-native",
+          "datastore-metadata-preservation"
         ],
         "remaining": "One native local container release set was published and consumed by the legacy controller. Full hosted API/UI/CLI flows, physical image/boot effects and production artifact provenance remain unqualified."
       },
@@ -1615,7 +1639,8 @@
           "crd-admission",
           "resource-admission",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "datastore-metadata-preservation"
         ],
         "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
       },
@@ -1627,7 +1652,8 @@
           "resource-admission",
           "ui-resource",
           "cli-wiring",
-          "sdk-tenant-native"
+          "sdk-tenant-native",
+          "datastore-metadata-preservation"
         ],
         "remaining": "One native local container release set was published and consumed by the legacy controller. Full hosted API/UI/CLI flows, physical image/boot effects and production artifact provenance remain unqualified."
       },
@@ -1639,7 +1665,8 @@
           "resource-admission",
           "ui-resource",
           "cli-wiring",
-          "sdk-tenant-native"
+          "sdk-tenant-native",
+          "datastore-metadata-preservation"
         ],
         "remaining": "One native local container release set was published and consumed by the legacy controller. Full hosted API/UI/CLI flows, physical image/boot effects and production artifact provenance remain unqualified."
       },
@@ -1650,7 +1677,10 @@
           "crd-admission",
           "resource-admission",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "datastore-metadata-preservation",
+          "datastore-metadata-regression",
+          "datastore-metadata-race"
         ],
         "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
       }

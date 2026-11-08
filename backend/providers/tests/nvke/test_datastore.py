@@ -29,7 +29,17 @@ def test_every_management_resource_supports_complete_crudl_transport(peer: Peer,
     }
     original = copy.deepcopy(document)
     peer.body = json.dumps(
-        {**document, "metadata": {"name": "resource-a", "uid": "uid-1", "resourceVersion": "rv-9"}}
+        {
+            **document,
+            "apiVersion": "internal.nvke.nvidia.com/v1",
+            "kind": resource.kind,
+            "metadata": {
+                "name": "resource-a",
+                "uid": "uid-1",
+                "resourceVersion": "rv-9",
+                **({"namespace": NAMESPACE} if resource.namespaced else {}),
+            },
+        }
     ).encode()
     with datastore(peer) as client:
         assert client.create(resource.kind, document, dry_run=True).resource_version == "rv-9"
@@ -46,6 +56,7 @@ def test_every_management_resource_supports_complete_crudl_transport(peer: Peer,
         ("POST", prefix),
         ("GET", prefix + "/resource-a"),
         ("GET", prefix),
+        ("GET", prefix + "/resource-a"),
         ("PUT", prefix + "/resource-a"),
         ("DELETE", prefix + "/resource-a"),
     ]
@@ -57,8 +68,8 @@ def test_every_management_resource_supports_complete_crudl_transport(peer: Peer,
         assert created["metadata"]["namespace"] == NAMESPACE
     else:
         assert "namespace" not in created["metadata"]
-    assert json.loads(peer.requests[3]["body"])["metadata"]["resourceVersion"] == "rv-9"
-    assert json.loads(peer.requests[4]["body"])["preconditions"] == {"uid": "uid-1", "resourceVersion": "rv-9"}
+    assert json.loads(peer.requests[4]["body"])["metadata"]["resourceVersion"] == "rv-9"
+    assert json.loads(peer.requests[5]["body"])["preconditions"] == {"uid": "uid-1", "resourceVersion": "rv-9"}
     assert "continue=opaque%2B%2F%3D" in peer.requests[2]["path"]
     assert all(r["headers"]["Authorization"] == f"Bearer {TOKEN}" for r in peer.requests)
 
@@ -105,6 +116,66 @@ def test_datastore_does_not_fall_back_to_a_public_operator_connection(peer: Peer
     with pytest.raises(ValueError, match="dedicated datastore"):
         NvkeDatastore(Endpoint("operator", peer.url, allow_http=True), organization_namespace=NAMESPACE)
     assert not peer.requests
+
+
+@pytest.mark.parametrize(
+    "change,expected",
+    [
+        ({"uid": "other-uid"}, "CONFLICT"),
+        ({"resourceVersion": "new-version"}, "CONFLICT"),
+        ({"deletionTimestamp": "2026-11-08T00:00:00Z"}, "CONFLICT"),
+        ({"namespace": "other-org"}, "INVALID_RESPONSE"),
+        ({"name": "another-cluster"}, "INVALID_RESPONSE"),
+        ({"uid": None}, "INVALID_RESPONSE"),
+    ],
+)
+def test_replace_refuses_changed_or_foreign_metadata_before_writing(peer: Peer, change, expected) -> None:
+    metadata = {"name": "cluster-a", "namespace": NAMESPACE, "uid": "uid-1", "resourceVersion": "rv-9", **change}
+    peer.body = json.dumps(
+        {"apiVersion": "internal.nvke.nvidia.com/v1", "kind": "NVKECluster", "metadata": metadata}
+    ).encode()
+    with datastore(peer) as client, pytest.raises(NvkeError) as error:
+        client.replace(
+            "NVKECluster",
+            "cluster-a",
+            {"metadata": {"name": "cluster-a"}, "spec": PUBLIC_SPECS["NVKECluster"]},
+            resource_version="rv-9",
+            uid="uid-1",
+        )
+    assert error.value.code == expected
+    assert [request["method"] for request in peer.requests] == ["GET"]
+
+
+def test_replace_rechecks_authority_after_the_metadata_read(peer: Peer) -> None:
+    peer.body = json.dumps(
+        {
+            "apiVersion": "internal.nvke.nvidia.com/v1",
+            "kind": "NVKECluster",
+            "metadata": {"name": "cluster-a", "namespace": NAMESPACE, "uid": "uid-1", "resourceVersion": "rv-9"},
+        }
+    ).encode()
+    checks = 0
+
+    def authority():
+        nonlocal checks
+        checks += 1
+        if checks == 2:
+            raise NvkeError("AUTHORITY_CHANGED", "Authority changed before the write")
+
+    with (
+        NvkeDatastore(
+            Endpoint("datastore", peer.url, allow_http=True), organization_namespace=NAMESPACE, before_request=authority
+        ) as client,
+        pytest.raises(NvkeError) as error,
+    ):
+        client.replace(
+            "NVKECluster",
+            "cluster-a",
+            {"metadata": {"name": "cluster-a"}, "spec": PUBLIC_SPECS["NVKECluster"]},
+            resource_version="rv-9",
+        )
+    assert error.value.code == "AUTHORITY_CHANGED"
+    assert [request["method"] for request in peer.requests] == ["GET"]
 
 
 @pytest.mark.parametrize("uid,version", [("", "rv-9"), ("uid-1", ""), ("*", "rv-9"), ("uid-1", "*")])
