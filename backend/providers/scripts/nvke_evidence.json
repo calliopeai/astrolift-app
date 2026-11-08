@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "b0b851497cb4501f60a0d85b164a9c7d468f433b"
+      "revision": "b2024bb2b4b1eea5e5544cdf4aba57df70daa052"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "8e741bca21689920e06f2a30bfc7d6c21d059b69"
+      "revision": "4dab36b2a5a975d371844e57a21bfdb304c61559"
     }
   },
   "evidence": {
@@ -492,15 +492,15 @@
       "repository": "opscode",
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
-      "scope": "Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools.",
-      "sha256": "d8c78c926e2eb7db666132e389ae6ffa8cd6f902ef4a0fec795649036a2e1064"
+      "scope": "Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.",
+      "sha256": "009facbabb2ff109cb337eac7b1639e73796743a0699ebd347e2467cc51f48c5"
     },
     "operator-agent-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
-      "scope": "Twenty-two focused tests use real TLS/native utilities and private filesystem receipts; lost reply yields one native run, finished journal reconciles without replay, unresolved effects block new mutation, cross-site/instance/bundle/intent and input authority are refused. Deadline uses a synthetic owned process; no infrastructure mutation. A journal-write fault after launch stops the owned process group and retains the uncertain fence.",
-      "sha256": "741c2d1fa145068aa161c15ed43ad52daff954219a4209c32707e5a4aa5a4039"
+      "scope": "Thirty-two real TLS/native-utility and filesystem cases cover original receipt recovery, durable never-admitted fencing across restart, delayed original PUT refusal, journal tampering/removal, retained evidence, serialization and legacy-history refusal. Owned-process stopping is synthetic and preserves uncertainty; no infrastructure bootstrap is executed.",
+      "sha256": "8ba0bf417637c22a7866ad5a026eb274179cef38a86dcf0505807d2eba226e7c"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -559,7 +559,7 @@
       "path": "cmd/nvke_agent.go",
       "kind": "implementation",
       "scope": "astro nvke agent exposes connected command catalog plus reviewed, private mTLS configure/get/verify/enable/disable/remove controls.",
-      "sha256": "75ecd242798d9b07f04a8a38bbcba543043d1eb40400b9a820f20ef132975054"
+      "sha256": "9e0f6d18748f59ce412ad4b4e2797a7c3df3b9faf613b90061afd68e66a4cc89"
     },
     "operator-cli-request": {
       "repository": "cli",
@@ -572,30 +572,30 @@
       "repository": "cli",
       "path": "cmd/nvke_agent_artifact.go",
       "kind": "implementation",
-      "scope": "Current reviewed admin can reconcile the original uncertain job read-only; artifact downloader streams protected exclusive files, binds chunks and source identity, validates final size/hash and retains partial downloads on failure.",
-      "sha256": "b5a961e5bb6095a592f04b24338d33bdc08ac161115ba93fce34a547653eee60"
+      "scope": "Current reviewed admin can reconcile the original uncertain job read-only; artifact downloader streams protected exclusive files, binds chunks and source identity, validates final size/hash and retains partial downloads on failure. Reviewed stop/fence binds the original uncertain operation and exact current versions, without replacement admission.",
+      "sha256": "a290eb134fddb3b0603d5d708cf0e8217f057f545179f1b1d1c7a8dc39aca734"
     },
     "operator-cli-tests": {
       "repository": "cli",
       "path": "cmd/nvke_agent_test.go",
       "kind": "test",
       "scope": "Controlled HTTP cases preserve private credentials and original request; refuse malformed authority, changed input/site/authority/deadline/acknowledgement, missing original receipt, bad artifact identity/range/hash/source, no progress, oversize and output replacement.",
-      "sha256": "388788e1f20c392406820a4d5bc01feba4723be4d898d4df42a6b89f21e9e591"
+      "sha256": "b04c8f3291e922740af77f17a1c06065191ceccc7c679617353ce445417cb8e1"
     },
     "operator-cli-redirect-tests": {
       "repository": "cli",
       "path": "internal/api/nvke_agent_test.go",
       "kind": "test",
       "scope": "Three concrete HTTP 307 cases reproduced private configure/request/artifact body forwarding before the dedicated transport refused redirects. Agent API calls now never follow that destination.",
-      "sha256": "b7797a2ef487af98262641d0b764c7e603e119303c876a95f25f641dc2460b7d",
+      "sha256": "4d8250b4581f226c1b2b0d06009ebe607f591e63966797d811dc12ecfcc554d6",
       "symbol": "TestNVKEAgentPrivateRequestsNeverFollowRedirects"
     },
     "operator-cli-paired": {
       "repository": "cli",
       "path": "scripts/integration/test_nvke_agent.py",
       "kind": "test",
-      "scope": "Compiled CLI creates an actual Astro site, configures/verifies actual mTLS agent, recovers lost Astro admission reply after deleting native input, waits for one native generation process, exports private hash-checked bytes, reconciles an explicit uncertain fixture without replay and refuses revoked-token download.",
-      "sha256": "3dc3a6c7187723fdb7c7fa9dc80a5fe27e20cd020a94acdc3aad053d3d24f4c9",
+      "scope": "Compiled CLI creates an actual Astro site, configures/verifies actual mTLS agent, recovers lost Astro admission reply after deleting native input, waits for one native generation process, exports private hash-checked bytes, reconciles an explicit uncertain fixture without replay and refuses revoked-token download. Confirmed and deliberately lost stop replies on two never-dispatched uncertain fixtures recover original cancelled operations and reject delayed PUTs without another native run.",
+      "sha256": "20890ace3e13b143d289dc51364bbbc71f0afc357e54eb9a5b54bca454af4baf",
       "symbol": "test_compiled_cli_agent_configuration_original_recovery_and_private_export"
     },
     "operator-cli-local": {
@@ -683,7 +683,7 @@
       "repository": "app",
       "path": "backend/astrolift_clusters/nvke_operator_jobs.py",
       "kind": "implementation",
-      "scope": "Reviewed current-admin original-job metadata and artifact pagination, signed caller/version/physical-agent/receipt-bound cursors, guarded artifact reads and read-only reconciliation. Missing receipts remain uncertain and preserve infrastructure intent fencing; native stop/fencing remains open."
+      "scope": "Reviewed current-admin metadata/artifact pagination and source/receipt-bound cursors; guarded artifact reads, read-only reconciliation and explicit stop/fencing under the original observer lease. Missing receipts retain uncertainty until durable never-admitted closure is confirmed."
     },
     "operator-job-absence-fence": {
       "repository": "app",
@@ -695,19 +695,19 @@
       "repository": "app",
       "path": "frontend/components/screens/nvke/NvkeOperatorJobPanel.tsx",
       "kind": "implementation",
-      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1\u2013256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details."
+      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1\u2013256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details. Reviewed original stop/fencing, eligibility/source-change review invalidation and explicit refresh after unconfirmed stop are included."
     },
     "operator-job-hook": {
       "repository": "app",
       "path": "frontend/graphql/nvke/use-nvke-operator-job.ts",
       "kind": "implementation",
-      "scope": "Caller/source epochs, strict public projection and shape/identity checks, explicit no-cache receipt reads, same-source chunk downloads with abort/cancellation, and reviewed original operation/version reconciliation without native replay."
+      "scope": "Caller/source epochs, strict public projection and shape/identity checks, explicit no-cache receipt reads, same-source chunk downloads with abort/cancellation, and reviewed original operation/version reconciliation without native replay. Stop requires the reviewed original receipt/source; safe integer advanced replies are checked and unconfirmed mutations block retained stop/reconcile/download callbacks until refresh."
     },
     "operator-job-hook-tests": {
       "repository": "app",
       "path": "frontend/graphql/nvke/use-nvke-operator-job.test.tsx",
       "kind": "test",
-      "scope": "Twenty-one cases cover explicit load, native source/actor/version binding, A-to-B-to-A stale callback refusal, malformed metadata, dropped private extras, no cache/storage, local transfer cancellation and unconfirmed reconciliation blocking."
+      "scope": "Thirty-eight controlled Apollo cases cover explicit load, original source/actor/version binding, stale callbacks, malformed/private metadata, no cache/storage, transfer cancellation, stop/fence on missing receipts, unconfirmed mutation blocking and malformed advanced versions."
     },
     "operator-artifact-browser": {
       "repository": "app",
@@ -733,6 +733,27 @@
       "kind": "observation",
       "scope": "Committed sources and safe log digests bind 34 API/real-browser cases, 523 scoped frontend cases, 17 selected story renders, 31 browser checks, private native export, one-run reconciliation, absence-fence and null-search fixes and frontend build/contracts/lint gates. Backend mypy remains at the documented 830-error baseline. Native stop/fencing and infrastructure qualification stay open.",
       "sha256": "3ae06ce1d859449cbc2786f243175a2e65fef5f631fed9ae9114d505d4ac7c61"
+    },
+    "operator-stop-sdk-tests": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_operator_agent_client.py",
+      "kind": "test",
+      "symbol": "test_real_tls_stop_fences_original_intent_without_native_execution",
+      "scope": "Real mTLS durable fence, repeated receipt recovery, conflict refusal and delayed original PUT rejection without native execution; capability-negative cases refuse writes to unsupported agents."
+    },
+    "operator-stop-browser": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_operator_browser_integration.py",
+      "kind": "test",
+      "symbol": "test_browser_reviews_original_infrastructure_fence_without_native_dispatch",
+      "scope": "Real rendered operation/hook against GraphQL/Postgres/mTLS for confirmed fence, deliberately lost reply with explicit original-receipt refresh, and intercepted stale-version refusal. Never-dispatched uncertain fixtures, zero native jobs/runs; successful fences reject delayed original PUTs. No natural uncertainty or bootstrap-execution claim."
+    },
+    "operator-stop-ui-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-stop-ui-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Source/log-bound 74 API/SDK/browser cases, 549 frontend cases, 37 story renders, 38 Chromium checks and compiled CLI confirmed/lost stop recovery; production build/lint/contracts gates pass. Combined ASGI teardown cancellation diagnostic is explicit; no clean backend mypy or live-infrastructure-stop claim. Agent-driven Linux bootstrap/install/access remains open in #96.",
+      "sha256": "4213e98a0a80e1dcd9f26121ad3d9372d559e57dbe8a4d769a42ff888f55a3ab"
     }
   },
   "rows": {
@@ -2732,9 +2753,12 @@
           "operator-authority-hook",
           "operator-authority-ui-tests",
           "operator-authority-browser",
-          "operator-authority-ui-local"
+          "operator-authority-ui-local",
+          "operator-stop-sdk-tests",
+          "operator-stop-browser",
+          "operator-stop-ui-local"
         ],
-        "remaining": "Agent connection lifecycle and original-job inspection/export/reconciliation are locally browser-qualified. Reviewed native stop/fencing, remaining infrastructure effects, deployed login/token acceptance and live routes remain pending."
+        "remaining": "Agent lifecycle and original-job inspection/export/reconciliation/stop/fencing are locally browser/compiled-CLI-qualified. Remaining infrastructure effects, deployed login/token acceptance and live routes remain pending."
       },
       "node-preparation": {
         "mapping": "Native bootstrap inputs and provisioned-provider path",
@@ -2786,9 +2810,12 @@
           "operator-artifact-browser",
           "operator-artifact-browser-tests",
           "operator-job-browser",
-          "operator-job-ui-local"
+          "operator-job-ui-local",
+          "operator-stop-sdk-tests",
+          "operator-stop-browser",
+          "operator-stop-ui-local"
         ],
-        "remaining": "Actual native generation and private artifact export are locally qualified through compiled remote CLI and browser UI against encrypted API/outbox/Temporal/mTLS, including lost-reply recovery and reviewed original-job observation. Missing native receipts retain uncertainty and infrastructure intent fencing. Durable native stop/fencing, remaining command-family effects and actual agent-driven Linux bootstrap/install remain pending."
+        "remaining": "Actual native generation/private export and reviewed original recovery are locally qualified through compiled CLI/browser against encrypted API/outbox/Temporal/mTLS. Missing receipts preserve uncertainty until durably fenced. Stop/fence fixtures never dispatch bootstrap; remaining command-family effects and agent-driven Linux bootstrap/install remain pending (#96)."
       },
       "deployment-rendering": {
         "mapping": "Pinned native deploy-path, stack/values inspection and management install planning",
@@ -2887,9 +2914,12 @@
           "operator-artifact-browser",
           "operator-artifact-browser-tests",
           "operator-job-browser",
-          "operator-job-ui-local"
+          "operator-job-ui-local",
+          "operator-stop-sdk-tests",
+          "operator-stop-browser",
+          "operator-stop-ui-local"
         ],
-        "remaining": "Local seed/node bootstrap and separate agent utility/dry-run proof are qualified. Astro API/CLI handles the complete declared envelope, durable original recovery and private artifacts; actual agent-driven bootstrap/install, reviewed native stop/fencing, production artifact verification and deployed acceptance remain pending."
+        "remaining": "Direct guarded-runner Linux seed/node bootstrap and separate hosted agent utility/dry-run proof are qualified. Original stop/fencing is locally browser/compiled-CLI-qualified on never-dispatched uncertain fixtures. Actual agent-driven bootstrap/install, production artifact verification and deployed acceptance remain pending (#96)."
       },
       "installation": {
         "mapping": "Pinned management install/check/access with guarded actual local default-stack installation",
@@ -2937,9 +2967,12 @@
           "operator-artifact-browser",
           "operator-artifact-browser-tests",
           "operator-job-browser",
-          "operator-job-ui-local"
+          "operator-job-ui-local",
+          "operator-stop-sdk-tests",
+          "operator-stop-browser",
+          "operator-stop-ui-local"
         ],
-        "remaining": "Default stack, private APIs/controller, native declarative create/access, worker growth/explicit deletion and native cluster cleanup are locally qualified. Reviewed Astro API/remote CLI transport exists; reviewed native stop/fencing, actual agent-driven install, hosted new tenant/delete admission, upgrades, verified production supply chain, physical providers and deployment remain pending."
+        "remaining": "Default stack, private APIs/controller, native declarative create/access, worker growth/deletion and native cleanup are locally qualified. Reviewed Astro API/CLI/UI admission and original stop/fencing exist; actual agent-driven install, hosted new tenant/delete, upgrades, verified supply chain, physical providers and deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
