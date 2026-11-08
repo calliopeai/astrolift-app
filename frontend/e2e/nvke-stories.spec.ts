@@ -4,6 +4,21 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-operation--install-review",
+  "screens-nvke-operation--install-review-read-only",
+  "screens-nvke-install-review--full",
+  "screens-nvke-install-review--long-strings",
+  "screens-nvke-install-review--unloaded",
+  "screens-nvke-install-review--loading",
+  "screens-nvke-install-review--read-only",
+  "screens-nvke-install-review--unverified",
+  "screens-nvke-install-review--failure",
+  "screens-nvke-install-review--expired",
+  "screens-nvke-install-review--stale-source",
+  "screens-nvke-install-review--paging",
+  "screens-nvke-install-review--empty",
+  "screens-nvke-install-review--observed-ready",
+  "screens-nvke-install-review--width-768",
   "screens-nvke-operation--operator-job",
   "screens-nvke-operation--operator-job-read-only",
   "screens-nvke-operation--operator-job-uncertain",
@@ -856,5 +871,24 @@ test("operator job oversized artifacts refuse before review within a narrow view
   await page.getByRole("button", { name: "Download private file", exact: true }).click();
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("install review keeps original uncertainty visible beside exact current counts", async ({
+  page,
+}, testInfo) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-install-review--full&viewMode=story&globals=a11y.manual:!true"
+  );
+  await expect(page.getByText(/The original install remains uncertain/)).toBeVisible();
+  await expect(page.getByText("9007199254740993", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("Native exit code", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /continue/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Prepare review", exact: true })).toBeEnabled();
+  await page.screenshot({
+    path: testInfo.outputPath("install-review-full.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

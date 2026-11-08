@@ -18081,6 +18081,34 @@
       "pending": "Conservez cette demande initiale tant que son résultat est incertain.",
       "deadline": "Délai d’observation (secondes)",
       "review": "{site}, version du site {siteVersion}. Connexion de gestion {connection}, version {connectionVersion} ; cible {endpoint}. Révision amont {revision}. Délai d’observation : {timeout} secondes."
+    },
+    "installReview": {
+      "title": "Examen de l’installation conservée",
+      "help": "Cet examen audité en lecture seule conserve le reçu et les protections d’origine. La continuation reste indisponible.",
+      "prepare": "Préparer l’examen",
+      "workloads": "Observations des charges",
+      "search": "Rechercher des charges",
+      "kind": "Type",
+      "generation": "Génération",
+      "observedGeneration": "Génération observée",
+      "desired": "Réplicas souhaités",
+      "readyCount": "Réplicas prêts",
+      "updated": "Réplicas mis à jour",
+      "observation": "Observation",
+      "unknown": "Inconnu",
+      "ready": "Observé prêt",
+      "requiresReview": "Examen requis",
+      "originalUncertain": "L’installation initiale reste incertaine. La disponibilité actuelle ne la termine pas et ne modifie pas son reçu initial.",
+      "apiReady": "API prête",
+      "observedAt": "Observé le",
+      "expiresAt": "Expiration",
+      "nativeRun": "Exécution native initiale",
+      "digest": "SHA-256 de l’examen",
+      "loading": "Préparation de l’instantané en lecture seule…",
+      "unavailable": "Instantané expiré ou source modifiée. Préparez un nouvel examen.",
+      "unloaded": "Préparez un examen de l’installation conservée.",
+      "pageFailed": "Page illisible. Préparez un nouvel examen si elle a expiré.",
+      "empty": "Aucune observation correspondante"
     }
   }
 }

@@ -18081,6 +18081,34 @@
       "pending": "Conserve esta solicitud original mientras el resultado no esté confirmado.",
       "deadline": "Plazo de observación (segundos)",
       "review": "{site}, versión del sitio {siteVersion}. Conexión de administración {connection}, versión {connectionVersion}; destino {endpoint}. Revisión de origen {revision}. Plazo de observación: {timeout} segundos."
+    },
+    "installReview": {
+      "title": "Revisión de instalación conservada",
+      "help": "Esta revisión auditada de solo lectura conserva el recibo y las protecciones originales. La continuación aún no está disponible.",
+      "prepare": "Preparar revisión",
+      "workloads": "Observaciones de cargas",
+      "search": "Buscar cargas",
+      "kind": "Tipo",
+      "generation": "Generación",
+      "observedGeneration": "Generación observada",
+      "desired": "Réplicas deseadas",
+      "readyCount": "Réplicas listas",
+      "updated": "Réplicas actualizadas",
+      "observation": "Observación",
+      "unknown": "Desconocido",
+      "ready": "Lista al observar",
+      "requiresReview": "Requiere revisión",
+      "originalUncertain": "La instalación original sigue incierta. La disponibilidad actual no la completa ni cambia su recibo original.",
+      "apiReady": "API lista",
+      "observedAt": "Observado el",
+      "expiresAt": "Caducidad",
+      "nativeRun": "Ejecución nativa original",
+      "digest": "SHA-256 de revisión",
+      "loading": "Preparando instantánea de solo lectura…",
+      "unavailable": "Instantánea caducada u origen cambiado. Prepare otra revisión.",
+      "unloaded": "Prepare una revisión de la instalación conservada.",
+      "pageFailed": "No se pudo leer esta página. Prepare otra revisión si caducó.",
+      "empty": "No hay observaciones coincidentes"
     }
   }
 }

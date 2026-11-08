@@ -21,6 +21,7 @@ import { NvkeProvidersPanel } from "./NvkeProvidersPanel";
 import { NvkeCredentialPanel } from "./NvkeCredentialPanel";
 import { NvkeCredentialRequestPanel } from "./NvkeCredentialRequestPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
+import { NvkeOperatorInstallReviewPanel } from "./NvkeOperatorInstallReviewPanel";
 import { NvkeOperatorJobPanel } from "./NvkeOperatorJobPanel";
 import { nvkeFinished, type NvkeOperationScreenProps } from "./types";
 
@@ -44,6 +45,7 @@ export function NvkeOperationScreen({
   workflows,
   workloadAccess,
   operatorJob,
+  operatorInstallReview,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
   const [confirm, setConfirm] = useState<"cancel" | "resume" | "download" | null>(null);
@@ -175,6 +177,13 @@ export function NvkeOperationScreen({
         <NvkeOperatorJobPanel
           {...operatorJob}
           canManage={operatorJob.canManage && canAct && !error && (!pending || operatorJob.pending)}
+        />
+      )}
+      {operatorInstallReview && (
+        <NvkeOperatorInstallReviewPanel
+          {...operatorInstallReview}
+          canReview={operatorInstallReview.canReview && canAct && !error}
+          pending={pending || operatorInstallReview.pending}
         />
       )}
       {diagnostics && <NvkeDiagnosticsPanel {...diagnostics} />}

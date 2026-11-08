@@ -18081,6 +18081,34 @@
       "pending": "Bewahren Sie den ursprünglichen Auftrag auf, solange das Ergebnis unbestätigt ist.",
       "deadline": "Beobachtungsfrist (Sekunden)",
       "review": "{site}, Site-Version {siteVersion}. Management-Verbindung {connection}, Version {connectionVersion}; Ziel {endpoint}. Upstream-Revision {revision}. Beobachtungsfrist: {timeout} Sekunden."
+    },
+    "installReview": {
+      "title": "Beibehaltene Installation prüfen",
+      "help": "Diese protokollierte schreibgeschützte Prüfung erhält den ursprünglichen Beleg und die Schutzsperren. Fortsetzung noch nicht verfügbar.",
+      "prepare": "Prüfung vorbereiten",
+      "workloads": "Workload-Beobachtungen",
+      "search": "Workloads suchen",
+      "kind": "Typ",
+      "generation": "Generation",
+      "observedGeneration": "Beobachtete Generation",
+      "desired": "Gewünschte Replikate",
+      "readyCount": "Bereite Replikate",
+      "updated": "Aktualisierte Replikate",
+      "observation": "Beobachtung",
+      "unknown": "Unbekannt",
+      "ready": "Als bereit beobachtet",
+      "requiresReview": "Prüfung erforderlich",
+      "originalUncertain": "Die ursprüngliche Installation bleibt ungewiss. Aktuelle Bereitschaft schließt sie nicht ab und ändert ihren ursprünglichen Beleg nicht.",
+      "apiReady": "API bereit",
+      "observedAt": "Beobachtet am",
+      "expiresAt": "Snapshot läuft ab",
+      "nativeRun": "Ursprünglicher nativer Lauf",
+      "digest": "Prüfungs-SHA-256",
+      "loading": "Schreibgeschützten Snapshot vorbereiten…",
+      "unavailable": "Snapshot abgelaufen oder Quelle geändert. Neue Prüfung vorbereiten.",
+      "unloaded": "Bereiten Sie eine Prüfung der beibehaltenen Installation vor.",
+      "pageFailed": "Snapshot-Seite nicht lesbar. Bei Ablauf neue Prüfung vorbereiten.",
+      "empty": "Keine passenden Beobachtungen"
     }
   }
 }

@@ -30,6 +30,7 @@ import { useNvkeMaintenance } from "./use-nvke-maintenance";
 import { useNvkeProviders } from "./use-nvke-providers";
 import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
+import { useNvkeOperatorInstallReview } from "./use-nvke-operator-install-review";
 import { useNvkeOperatorJob } from "./use-nvke-operator-job";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
@@ -177,6 +178,12 @@ export const useNvkeOperation = (
     enabled: !loading && !failed && !(mutation?.key === visitKey && mutation.pending),
     onRefresh: refresh,
   });
+  const operatorInstallReview = useNvkeOperatorInstallReview({
+    context,
+    source: operatorJob,
+    pending: Boolean((mutation?.key === visitKey && mutation.pending) || operatorJob?.pending),
+    onRefresh: refresh,
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -184,6 +191,7 @@ export const useNvkeOperation = (
       !operation ||
       busy.current ||
       operatorJob?.pending ||
+      operatorInstallReview?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -230,6 +238,7 @@ export const useNvkeOperation = (
     scopeKey: visitKey,
     operation,
     operatorJob,
+    operatorInstallReview,
     diagnostics,
     maintenance,
     credentials,
@@ -240,14 +249,24 @@ export const useNvkeOperation = (
     siteName: site.data?.astroliftNvkeSite?.name ?? "",
     loading,
     error: failed ? t("readFailed") : mutation?.key === visitKey ? mutation.error : null,
-    pending: (mutation?.key === visitKey && mutation.pending) || Boolean(operatorJob?.pending),
+    pending:
+      (mutation?.key === visitKey && mutation.pending) ||
+      Boolean(operatorJob?.pending || operatorInstallReview?.pending),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
     onRefresh: refresh,
     onCancel: () => control(false),
     onResume: () => control(true),
     onDownload: async () => {
-      if (!current() || !canAct || busy.current || operatorJob?.pending || !operation) return;
+      if (
+        !current() ||
+        !canAct ||
+        busy.current ||
+        operatorJob?.pending ||
+        operatorInstallReview?.pending ||
+        !operation
+      )
+        return;
       busy.current = true;
       setMutation({ key: visitKey, pending: true, error: null });
       try {

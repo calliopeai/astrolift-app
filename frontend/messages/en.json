@@ -18078,6 +18078,34 @@
       "pending": "Preserve this original request while its outcome is unconfirmed.",
       "deadline": "Observation deadline (seconds)",
       "review": "{site}, site version {siteVersion}. Management connection {connection}, version {connectionVersion}; target {endpoint}. Upstream revision {revision}. Observation deadline: {timeout} seconds."
+    },
+    "installReview": {
+      "title": "Retained installation review",
+      "help": "This audited read-only review preserves the original receipt and guards. Continuation is not yet available.",
+      "prepare": "Prepare review",
+      "workloads": "Workload observations",
+      "search": "Search workloads",
+      "kind": "Kind",
+      "generation": "Generation",
+      "observedGeneration": "Observed generation",
+      "desired": "Desired replicas",
+      "readyCount": "Ready replicas",
+      "updated": "Updated replicas",
+      "observation": "Observation",
+      "unknown": "Unknown",
+      "ready": "Observed ready",
+      "requiresReview": "Requires review",
+      "originalUncertain": "The original install remains uncertain. Current readiness does not complete it or change its original receipt.",
+      "apiReady": "API ready",
+      "observedAt": "Observed at",
+      "expiresAt": "Snapshot expires",
+      "nativeRun": "Original native run",
+      "digest": "Review SHA-256",
+      "loading": "Preparing a read-only snapshot…",
+      "unavailable": "Snapshot expired or source changed. Prepare a new review.",
+      "unloaded": "Prepare a review to observe the retained installation.",
+      "pageFailed": "Could not read this snapshot page. Prepare a new review if it expired.",
+      "empty": "No matching workload observations"
     }
   }
 }

@@ -178,6 +178,9 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  operatorInstallReview?:
+    | import("./NvkeOperatorInstallReviewPanel").NvkeOperatorInstallReviewPanelProps
+    | null;
   operatorJob?: import("./NvkeOperatorJobPanel").NvkeOperatorJobPanelProps | null;
   providers?: import("./NvkeProvidersPanel").NvkeProvidersPanelProps | null;
   credentialRequest?: import("./NvkeCredentialRequestPanel").NvkeCredentialRequestPanelProps | null;

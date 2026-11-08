@@ -18078,6 +18078,34 @@
       "pending": "结果未确认时请保留原始请求。",
       "deadline": "观测期限（秒）",
       "review": "{site}，站点版本 {siteVersion}。管理连接 {connection}，版本 {connectionVersion}；目标 {endpoint}。上游修订版本 {revision}。观测时限：{timeout} 秒。"
+    },
+    "installReview": {
+      "title": "保留安装审查",
+      "help": "此带审计的只读审查保留原始记录和保护措施。暂不支持继续安装。",
+      "prepare": "准备审查",
+      "workloads": "工作负载观察",
+      "search": "搜索工作负载",
+      "kind": "类型",
+      "generation": "代数",
+      "observedGeneration": "已观察代数",
+      "desired": "期望副本数",
+      "readyCount": "就绪副本数",
+      "updated": "已更新副本数",
+      "observation": "观察结果",
+      "unknown": "未知",
+      "ready": "观察到就绪",
+      "requiresReview": "需要审查",
+      "originalUncertain": "原始安装仍处于不确定状态。当前就绪状态不会完成该安装或更改原始执行记录。",
+      "apiReady": "API 就绪",
+      "observedAt": "观察时间",
+      "expiresAt": "快照到期时间",
+      "nativeRun": "原始本机执行",
+      "digest": "审查 SHA-256",
+      "loading": "正在准备只读快照…",
+      "unavailable": "快照已过期或来源已更改。请准备新的审查。",
+      "unloaded": "准备审查以观察保留的安装。",
+      "pageFailed": "无法读取此页。如已过期，请准备新的审查。",
+      "empty": "没有匹配的观察"
     }
   }
 }

@@ -18078,6 +18078,34 @@
       "pending": "結果が確定するまで元の要求を保持してください。",
       "deadline": "観測期限（秒）",
       "review": "{site}、サイトバージョン {siteVersion}。管理接続 {connection}、バージョン {connectionVersion}、対象 {endpoint}。アップストリームリビジョン {revision}。観測の制限時間: {timeout} 秒。"
+    },
+    "installReview": {
+      "title": "保持されたインストールの確認",
+      "help": "この監査付き読み取り専用確認は元の記録と保護を維持します。続行はまだ利用できません。",
+      "prepare": "確認を準備",
+      "workloads": "ワークロードの観測",
+      "search": "ワークロードを検索",
+      "kind": "種類",
+      "generation": "世代",
+      "observedGeneration": "観測された世代",
+      "desired": "希望レプリカ数",
+      "readyCount": "準備完了レプリカ数",
+      "updated": "更新済みレプリカ数",
+      "observation": "観測",
+      "unknown": "不明",
+      "ready": "準備完了を観測",
+      "requiresReview": "確認が必要",
+      "originalUncertain": "元のインストールは不確実なままです。現在の準備状態によって完了したり、元の実行記録が変更されたりすることはありません。",
+      "apiReady": "API準備完了",
+      "observedAt": "観測日時",
+      "expiresAt": "有効期限",
+      "nativeRun": "元のネイティブ実行",
+      "digest": "確認SHA-256",
+      "loading": "読み取り専用スナップショットを準備中…",
+      "unavailable": "期限切れまたはソースが変更されました。新しい確認を準備してください。",
+      "unloaded": "保持されたインストールの確認を準備してください。",
+      "pageFailed": "ページを読み取れません。期限切れの場合は新しい確認を準備してください。",
+      "empty": "一致する観測はありません"
     }
   }
 }

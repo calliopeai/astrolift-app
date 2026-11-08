@@ -5,6 +5,7 @@ import accessStory from "./NvkeWorkloadAccessPanel.stories";
 import { PROVIDER_PROPS } from "./NvkeProvidersPanel.stories";
 import { CREDENTIAL_PROPS } from "./NvkeCredentialPanel.stories";
 import { COLLECTION_PROPS } from "./NvkeCredentialRequestPanel.stories";
+import { INSTALL_REVIEW_PROPS } from "./NvkeOperatorInstallReviewPanel.stories";
 import { OPERATOR_JOB_PROPS } from "./NvkeOperatorJobPanel.stories";
 import { fakeController } from "@/components/data-table/fixtures";
 import {
@@ -209,5 +210,21 @@ export const Providers: Story = {
       version: 12,
     },
     providers: PROVIDER_PROPS,
+  },
+};
+
+export const InstallReview: Story = {
+  args: {
+    operation: INSTALL_REVIEW_PROPS.operation,
+    operatorInstallReview: INSTALL_REVIEW_PROPS,
+    canResume: false,
+  },
+};
+export const InstallReviewReadOnly: Story = {
+  args: {
+    operation: INSTALL_REVIEW_PROPS.operation,
+    operatorInstallReview: INSTALL_REVIEW_PROPS,
+    canAct: false,
+    canResume: false,
   },
 };

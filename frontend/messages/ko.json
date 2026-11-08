@@ -18078,6 +18078,34 @@
       "pending": "결과가 확인될 때까지 원래 요청을 보존하세요.",
       "deadline": "관측 기한(초)",
       "review": "{site}, 사이트 버전 {siteVersion}. 관리 연결 {connection}, 버전 {connectionVersion}, 대상 {endpoint}. 업스트림 리비전 {revision}. 관측 제한 시간: {timeout}초."
+    },
+    "installReview": {
+      "title": "보존된 설치 검토",
+      "help": "감사되는 읽기 전용 검토는 원래 기록과 보호 장치를 유지합니다. 계속 진행은 아직 사용할 수 없습니다.",
+      "prepare": "검토 준비",
+      "workloads": "워크로드 관찰",
+      "search": "워크로드 검색",
+      "kind": "종류",
+      "generation": "세대",
+      "observedGeneration": "관찰된 세대",
+      "desired": "원하는 복제본",
+      "readyCount": "준비된 복제본",
+      "updated": "업데이트된 복제본",
+      "observation": "관찰",
+      "unknown": "알 수 없음",
+      "ready": "준비 완료 관찰",
+      "requiresReview": "검토 필요",
+      "originalUncertain": "원래 설치는 불확실한 상태로 유지됩니다. 현재 준비 상태는 설치를 완료하거나 원래 실행 기록을 변경하지 않습니다.",
+      "apiReady": "API 준비 완료",
+      "observedAt": "관찰 시간",
+      "expiresAt": "만료 시간",
+      "nativeRun": "원래 네이티브 실행",
+      "digest": "검토 SHA-256",
+      "loading": "읽기 전용 스냅샷 준비 중…",
+      "unavailable": "스냅샷이 만료되었거나 소스가 변경되었습니다. 새 검토를 준비하세요.",
+      "unloaded": "보존된 설치 검토를 준비하세요.",
+      "pageFailed": "페이지를 읽을 수 없습니다. 만료되었다면 새 검토를 준비하세요.",
+      "empty": "일치하는 관찰 없음"
     }
   }
 }

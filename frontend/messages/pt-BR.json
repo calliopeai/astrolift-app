@@ -18078,6 +18078,34 @@
       "pending": "Preserve esta solicitação original enquanto o resultado não for confirmado.",
       "deadline": "Prazo de observação (segundos)",
       "review": "{site}, versão do site {siteVersion}. Conexão de gerenciamento {connection}, versão {connectionVersion}; destino {endpoint}. Revisão de origem {revision}. Prazo da observação: {timeout} segundos."
+    },
+    "installReview": {
+      "title": "Revisão da instalação preservada",
+      "help": "Esta revisão auditada e somente leitura preserva o recibo e as proteções originais. A continuação ainda não está disponível.",
+      "prepare": "Preparar revisão",
+      "workloads": "Observações das cargas",
+      "search": "Buscar cargas",
+      "kind": "Tipo",
+      "generation": "Geração",
+      "observedGeneration": "Geração observada",
+      "desired": "Réplicas desejadas",
+      "readyCount": "Réplicas prontas",
+      "updated": "Réplicas atualizadas",
+      "observation": "Observação",
+      "unknown": "Desconhecido",
+      "ready": "Observado pronto",
+      "requiresReview": "Requer revisão",
+      "originalUncertain": "A instalação original continua incerta. A prontidão atual não a conclui nem altera o recibo original.",
+      "apiReady": "API pronta",
+      "observedAt": "Observado em",
+      "expiresAt": "Expiração",
+      "nativeRun": "Execução nativa original",
+      "digest": "SHA-256 da revisão",
+      "loading": "Preparando snapshot somente leitura…",
+      "unavailable": "Snapshot expirado ou origem alterada. Prepare outra revisão.",
+      "unloaded": "Prepare uma revisão da instalação preservada.",
+      "pageFailed": "Não foi possível ler esta página. Prepare outra revisão se expirou.",
+      "empty": "Nenhuma observação correspondente"
     }
   }
 }
