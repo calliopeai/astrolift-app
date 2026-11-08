@@ -21255,6 +21255,34 @@ export type GetModelSubscriptionMetricsQueryVariables = Exact<{
 
 export type GetModelSubscriptionMetricsQuery = { astroliftModelSubscriptionMetrics?: { serviceId: string, clusterId: string, subscriptionId: string, start: string, end: string, retrievedAt: string, stepSeconds: number, scope: string, metrics: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> } | null };
 
+export type ConfigureNvkeTemporalMutationVariables = Exact<{
+  input: ConfigureNvkeTemporalAuthorityInput;
+}>;
+
+
+export type ConfigureNvkeTemporalMutation = { configureNvkeTemporalAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
+export type VerifyNvkeTemporalMutationVariables = Exact<{
+  input: NvkeTemporalAuthorityReviewInput;
+}>;
+
+
+export type VerifyNvkeTemporalMutation = { verifyNvkeTemporalAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
+export type SetNvkeTemporalEnabledMutationVariables = Exact<{
+  input: SetNvkeTemporalAuthorityEnabledInput;
+}>;
+
+
+export type SetNvkeTemporalEnabledMutation = { setNvkeTemporalAuthorityEnabled: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
+export type RemoveNvkeTemporalMutationVariables = Exact<{
+  input: NvkeTemporalAuthorityReviewInput;
+}>;
+
+
+export type RemoveNvkeTemporalMutation = { removeNvkeTemporalAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
 export type EnrollNvkeAccessMutationVariables = Exact<{
   input: EnrollNvkeWorkloadAccessInput;
 }>;
@@ -21338,6 +21366,15 @@ export type RequestNvkeResourceOperationMutationVariables = Exact<{
 
 
 export type RequestNvkeResourceOperationMutation = { requestNvkeResourceOperation: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
+export type NvkeTemporalFieldsFragment = { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null };
+
+export type GetNvkeTemporalQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetNvkeTemporalQuery = { astroliftNvkeTemporalAuthority?: { id: string, version: number, siteId: string, siteVersion: number, address: string, namespace: string, taskQueue: string, serverName: string, useTls: boolean, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null };
 
 export type GetNvkeMaintenanceQueryVariables = Exact<{
   siteId: Scalars['GUID']['input'];

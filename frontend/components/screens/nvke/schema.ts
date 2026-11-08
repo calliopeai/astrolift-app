@@ -46,3 +46,23 @@ export const spireServerSchema = z.object({
   port: z.number().int().min(1).max(65535),
   timeoutSeconds: z.number().int().min(30).max(86400),
 });
+
+export const temporalAuthoritySchema = z
+  .object({
+    address: z.string().min(1).max(512),
+    namespace: z.string().min(1).max(255),
+    taskQueue: z.string().min(1).max(255),
+    serverName: z.string().max(253),
+    useTls: z.boolean(),
+    timeoutSeconds: z.number().int().min(1).max(300),
+    credentialMode: z.enum(["preserve", "replace", "clear"]),
+    apiKey: z.string().max(16384),
+    caPem: z.string().max(262144),
+    clientCertificatePem: z.string().max(262144),
+    clientKeyPem: z.string().max(262144),
+  })
+  .refine(
+    (v) =>
+      v.credentialMode !== "replace" || Boolean(v.clientCertificatePem) === Boolean(v.clientKeyPem)
+  )
+  .refine((v) => v.useTls || (!v.serverName && v.credentialMode !== "replace"));

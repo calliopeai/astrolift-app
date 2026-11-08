@@ -17836,6 +17836,20 @@
         "operation_failed": "Operation failed",
         "canceled": "Canceled"
       }
-    }
+    },
+    "temporalTitle": "Native Temporal",
+    "temporalHelp": "Configure the native controller’s separate Temporal authority. Verification proves namespace access only, not a polling worker. Removal withdraws this connection registration; it does not stop native workflows.",
+    "temporalAddress": "Native address (host:port)",
+    "temporalNamespace": "Native namespace",
+    "temporalQueue": "Native task queue",
+    "temporalServerName": "TLS server name",
+    "temporalTls": "Use TLS",
+    "temporalApiKey": "Native API key",
+    "temporalVerify": "Verify namespace",
+    "temporalEnable": "Enable native connection",
+    "temporalDisable": "Disable native connection",
+    "temporalRemove": "Remove native connection",
+    "temporalVerified": "Namespace access verified",
+    "temporalReview": "{site}, site version {siteVersion}; native authority version {version}. Target: {address}; namespace: {namespace}; queue: {queue}."
   }
 }

@@ -33,6 +33,7 @@ import {
 import { admitNvkeRequest, NvkeAdmissionError } from "@/lib/nvke/admission";
 import { useNvkeContext, useNvkeEpoch } from "./nvke.hooks";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
+import { useNvkeTemporal } from "./use-nvke-temporal";
 import { NVKE_REQUEST_CONTEXT, useNvkeRead } from "./use-scoped-read";
 import {
   GET_NVKE_SITE,
@@ -140,6 +141,13 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     catalog.refresh();
     operations.refetch();
   };
+  const temporal = useNvkeTemporal({
+    context,
+    scopeKey: visitKey,
+    site,
+    enabled: !error && !loadFailed && !siteQuery.loading && !pending,
+    onSiteRefresh: siteQuery.refresh,
+  });
   const runConfiguration = async (
     document: DocumentNode,
     input: object,
@@ -184,13 +192,14 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     }
   };
   return {
+    temporal,
     workloadAccess,
     scopeKey: visitKey,
     site,
     loading: context.loading || siteQuery.loading,
     error,
     access: context.access,
-    pending,
+    pending: pending || Boolean(temporal?.pending),
     operations,
     actions: contract?.actions ?? [],
     contractRevision: contract?.revision ?? null,

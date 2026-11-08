@@ -1,5 +1,33 @@
 import { gql } from "@apollo/client";
 
+export const NVKE_TEMPORAL_FIELDS = gql`
+  fragment NvkeTemporalFields on NvkeTemporalAuthorityType {
+    id
+    version
+    siteId
+    siteVersion
+    address
+    namespace
+    taskQueue
+    serverName
+    useTls
+    isEnabled
+    timeoutSeconds
+    hasCredentials
+    verifiedAt
+    verificationCode
+    deletedAt
+  }
+`;
+export const GET_NVKE_TEMPORAL = gql`
+  query GetNvkeTemporal($siteId: GUID!) {
+    astroliftNvkeTemporalAuthority(siteId: $siteId) {
+      ...NvkeTemporalFields
+    }
+  }
+  ${NVKE_TEMPORAL_FIELDS}
+`;
+
 export const GET_NVKE_MAINTENANCE = gql`
   query GetNvkeMaintenance(
     $siteId: GUID!

@@ -17836,6 +17836,20 @@
         "operation_failed": "Operation failed",
         "canceled": "Canceled"
       }
-    }
+    },
+    "temporalTitle": "네이티브 Temporal",
+    "temporalHelp": "네이티브 컨트롤러의 별도 Temporal 연결을 구성합니다. 검증은 네임스페이스 접근만 확인하며 활성 워커의 존재를 보장하지 않습니다. 제거는 연결 등록만 해제하며 네이티브 워크플로를 중지하지 않습니다.",
+    "temporalAddress": "네이티브 주소 (호스트:포트)",
+    "temporalNamespace": "네이티브 네임스페이스",
+    "temporalQueue": "네이티브 작업 큐",
+    "temporalServerName": "TLS 서버 이름",
+    "temporalTls": "TLS 사용",
+    "temporalApiKey": "네이티브 API 키",
+    "temporalVerify": "네임스페이스 검증",
+    "temporalEnable": "네이티브 연결 활성화",
+    "temporalDisable": "네이티브 연결 비활성화",
+    "temporalRemove": "네이티브 연결 제거",
+    "temporalVerified": "네임스페이스 접근 검증됨",
+    "temporalReview": "{site}, 사이트 버전 {siteVersion}, 네이티브 연결 버전 {version}. 대상: {address}, 네임스페이스: {namespace}, 큐: {queue}."
   }
 }

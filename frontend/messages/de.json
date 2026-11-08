@@ -17839,6 +17839,20 @@
         "operation_failed": "Operation failed",
         "canceled": "Canceled"
       }
-    }
+    },
+    "temporalTitle": "Natives Temporal",
+    "temporalHelp": "Konfigurieren Sie die separate Temporal-Verbindung des nativen Controllers. Die Prüfung bestätigt nur den Namespace-Zugriff, keinen aktiven Worker. Das Entfernen löscht diese Verbindungsregistrierung und stoppt keine nativen Workflows.",
+    "temporalAddress": "Native Adresse (Host:Port)",
+    "temporalNamespace": "Nativer Namespace",
+    "temporalQueue": "Native Aufgabenwarteschlange",
+    "temporalServerName": "TLS-Servername",
+    "temporalTls": "TLS verwenden",
+    "temporalApiKey": "Nativer API-Schlüssel",
+    "temporalVerify": "Namespace prüfen",
+    "temporalEnable": "Native Verbindung aktivieren",
+    "temporalDisable": "Native Verbindung deaktivieren",
+    "temporalRemove": "Native Verbindung entfernen",
+    "temporalVerified": "Namespace-Zugriff bestätigt",
+    "temporalReview": "{site}, Standortversion {siteVersion}; Version der nativen Verbindung {version}. Ziel: {address}; Namespace: {namespace}; Warteschlange: {queue}."
   }
 }

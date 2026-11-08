@@ -1,5 +1,67 @@
 import { gql } from "@apollo/client";
-import { NVKE_ACCESS_FIELDS, NVKE_OPERATION_FIELDS, NVKE_SITE_FIELDS } from "./nvke.queries";
+import {
+  NVKE_ACCESS_FIELDS,
+  NVKE_OPERATION_FIELDS,
+  NVKE_SITE_FIELDS,
+  NVKE_TEMPORAL_FIELDS,
+} from "./nvke.queries";
+
+export const CONFIGURE_NVKE_TEMPORAL = gql`
+  mutation ConfigureNvkeTemporal($input: ConfigureNvkeTemporalAuthorityInput!) {
+    configureNvkeTemporalAuthority(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeTemporalFields
+      }
+    }
+  }
+  ${NVKE_TEMPORAL_FIELDS}
+`;
+export const VERIFY_NVKE_TEMPORAL = gql`
+  mutation VerifyNvkeTemporal($input: NvkeTemporalAuthorityReviewInput!) {
+    verifyNvkeTemporalAuthority(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeTemporalFields
+      }
+    }
+  }
+  ${NVKE_TEMPORAL_FIELDS}
+`;
+export const SET_NVKE_TEMPORAL_ENABLED = gql`
+  mutation SetNvkeTemporalEnabled($input: SetNvkeTemporalAuthorityEnabledInput!) {
+    setNvkeTemporalAuthorityEnabled(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeTemporalFields
+      }
+    }
+  }
+  ${NVKE_TEMPORAL_FIELDS}
+`;
+export const REMOVE_NVKE_TEMPORAL = gql`
+  mutation RemoveNvkeTemporal($input: NvkeTemporalAuthorityReviewInput!) {
+    removeNvkeTemporalAuthority(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeTemporalFields
+      }
+    }
+  }
+  ${NVKE_TEMPORAL_FIELDS}
+`;
 
 export const ENROLL_NVKE_ACCESS = gql`
   mutation EnrollNvkeAccess($input: EnrollNvkeWorkloadAccessInput!) {

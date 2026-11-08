@@ -146,6 +146,7 @@ export interface NvkeSitesScreenProps {
   onCreate: (values: NvkeCreateValues) => Promise<boolean>;
 }
 export interface NvkeSiteScreenProps {
+  temporal?: import("./NvkeTemporalPanel").NvkeTemporalPanelProps | null;
   workloadAccess?: NvkeWorkloadAccessPanelProps | null;
   site: NvkeSiteView | null;
   loading: boolean;

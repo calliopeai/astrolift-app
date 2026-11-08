@@ -17839,6 +17839,20 @@
         "operation_failed": "Operation failed",
         "canceled": "Canceled"
       }
-    }
+    },
+    "temporalTitle": "Temporal nativo",
+    "temporalHelp": "Configura la autoridad Temporal independiente del controlador nativo. La verificación solo acredita acceso al espacio de nombres, no un trabajador activo. Eliminar retira este registro de conexión; no detiene los flujos nativos.",
+    "temporalAddress": "Dirección nativa (host:puerto)",
+    "temporalNamespace": "Espacio de nombres nativo",
+    "temporalQueue": "Cola de tareas nativa",
+    "temporalServerName": "Nombre del servidor TLS",
+    "temporalTls": "Usar TLS",
+    "temporalApiKey": "Clave API nativa",
+    "temporalVerify": "Verificar espacio de nombres",
+    "temporalEnable": "Habilitar conexión nativa",
+    "temporalDisable": "Deshabilitar conexión nativa",
+    "temporalRemove": "Eliminar conexión nativa",
+    "temporalVerified": "Acceso al espacio de nombres verificado",
+    "temporalReview": "{site}, versión del sitio {siteVersion}; versión de la autoridad nativa {version}. Destino: {address}; espacio de nombres: {namespace}; cola: {queue}."
   }
 }

@@ -17836,6 +17836,20 @@
         "operation_failed": "Operation failed",
         "canceled": "Canceled"
       }
-    }
+    },
+    "temporalTitle": "原生 Temporal",
+    "temporalHelp": "配置原生控制器独立的 Temporal 连接。验证仅证明命名空间访问权限，不证明存在轮询中的工作进程。移除只会注销此连接，不会停止原生工作流。",
+    "temporalAddress": "原生地址（主机:端口）",
+    "temporalNamespace": "原生命名空间",
+    "temporalQueue": "原生任务队列",
+    "temporalServerName": "TLS 服务器名称",
+    "temporalTls": "使用 TLS",
+    "temporalApiKey": "原生 API 密钥",
+    "temporalVerify": "验证命名空间",
+    "temporalEnable": "启用原生连接",
+    "temporalDisable": "禁用原生连接",
+    "temporalRemove": "移除原生连接",
+    "temporalVerified": "命名空间访问已验证",
+    "temporalReview": "{site}，站点版本 {siteVersion}；原生连接版本 {version}。目标：{address}；命名空间：{namespace}；队列：{queue}。"
   }
 }

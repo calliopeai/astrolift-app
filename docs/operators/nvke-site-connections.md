@@ -365,3 +365,26 @@ Collect fresh controller observations and site qualification evidence to prove
 certificate outcomes, cleared rotation ownership, all-node convergence, and
 preexisting Secret rewrite/readability. The local Temporal transport tests use
 fixture workflows; they do not qualify native hardware or encryption changes.
+
+## Browser native Temporal connection controls
+
+The site's Native Temporal panel reads connection metadata without caching it.
+Administrators can configure, verify namespace access, enable, disable, and
+remove the registration. Configuration reviews the explicit target, namespace,
+queue, TLS/credential mode, site version and authority version before submission.
+Disabling or removing the registration requires confirmation; it does not cancel
+native workflows or release their locks. Read-only users can inspect metadata
+and refresh it.
+
+Credential replacement fields are write-only. They are excluded from review
+text and persistent browser storage, cleared after submission/closing, and
+discarded with the draft when caller/site/authority scope changes. Preservation
+sends no replacement bundle; clearing is explicit. Current actor and versions
+are sent with each mutation. A late response from an old caller visit cannot
+update the current panel, including switching away and back to the same caller.
+
+An unconfirmed mutation blocks further writes until metadata is refreshed.
+Refresh and review the resulting versions before another change. Namespace
+verification is labelled as namespace access evidence and does not claim worker
+availability, certificate renewal or encryption readiness. Browser native
+workflow submission and history-reset controls remain separate work in #2665.

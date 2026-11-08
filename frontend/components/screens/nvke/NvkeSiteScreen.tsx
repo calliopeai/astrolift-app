@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 import { NvkeNativePanel } from "./NvkeNativePanel";
+import { NvkeTemporalPanel } from "./NvkeTemporalPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { connectionSchema } from "./schema";
 import {
@@ -287,6 +288,7 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
           empty={{ icon: <CableIcon />, title: t("notConfigured") }}
         />
       </Section>
+      {props.temporal && <NvkeTemporalPanel {...props.temporal} />}
       <NvkeNativePanel
         key={`${site.id}:${props.contractRevision}:${props.actions.length}:${props.recovery?.requestId ?? "new"}`}
         {...props}

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fakeController } from "@/components/data-table/fixtures";
 import { NvkeSiteScreen } from "./NvkeSiteScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
+import temporalStory from "./NvkeTemporalPanel.stories";
 import { SITE, SITE_DETAIL } from "./fixtures";
 
 export default {
@@ -14,6 +15,7 @@ export const ImportedAccess: Story = {
   args: { workloadAccess: { ...accessStory.args, candidate: null } },
 };
 export const Full: Story = {};
+export const NativeTemporal: Story = { args: { temporal: temporalStory.args } };
 export const Loading: Story = { args: { site: null, loading: true } };
 export const Empty: Story = {
   args: {

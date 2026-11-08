@@ -17836,6 +17836,20 @@
         "operation_failed": "Operation failed",
         "canceled": "Canceled"
       }
-    }
+    },
+    "temporalTitle": "ネイティブ Temporal",
+    "temporalHelp": "ネイティブコントローラー専用の Temporal 接続を設定します。検証で確認できるのは名前空間へのアクセスのみで、稼働中のワーカーの存在ではありません。削除は接続登録を解除し、ネイティブワークフローを停止しません。",
+    "temporalAddress": "ネイティブアドレス (ホスト:ポート)",
+    "temporalNamespace": "ネイティブ名前空間",
+    "temporalQueue": "ネイティブタスクキュー",
+    "temporalServerName": "TLS サーバー名",
+    "temporalTls": "TLS を使用",
+    "temporalApiKey": "ネイティブ API キー",
+    "temporalVerify": "名前空間を検証",
+    "temporalEnable": "ネイティブ接続を有効化",
+    "temporalDisable": "ネイティブ接続を無効化",
+    "temporalRemove": "ネイティブ接続を削除",
+    "temporalVerified": "名前空間へのアクセスを検証済み",
+    "temporalReview": "{site}、サイトバージョン {siteVersion}、ネイティブ接続バージョン {version}。接続先: {address}、名前空間: {namespace}、キュー: {queue}。"
   }
 }

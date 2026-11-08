@@ -4,6 +4,11 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-native-temporal--full",
+  "screens-nvke-native-temporal--empty",
+  "screens-nvke-native-temporal--read-only",
+  "screens-nvke-native-temporal--failure",
+  "screens-nvke-site--native-temporal",
   "screens-nvke-sites--full",
   "screens-nvke-site--full",
   "screens-nvke-native-actions--full",
@@ -33,6 +38,39 @@ const stories = [
   "screens-nvke-maintenance--retained-rotation",
   "screens-nvke-operation--maintenance",
 ];
+
+test("nvke native Temporal review names exact authority and keeps credentials out of confirmation", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-native-temporal--full&viewMode=story");
+  await page.getByRole("button", { name: "Configure connection", exact: true }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("combobox").click();
+  await page.getByRole("option", { name: "Replace credential bundle", exact: true }).click();
+  await sheet.getByLabel("Native API key", { exact: true }).fill("PRIVATE_NATIVE_KEY");
+  await sheet.getByRole("button", { name: "Review change", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("site version 7");
+  await expect(review).toContainText("native authority version 2");
+  await expect(review).toContainText("native-controller-tasks");
+  await expect(review).toContainText("Replace credential bundle");
+  await expect(review).not.toContainText("PRIVATE_NATIVE_KEY");
+  await review.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(review).not.toBeVisible();
+  await expect(sheet).not.toBeVisible();
+  await page.getByRole("button", { name: "Configure connection", exact: true }).click();
+  await page.getByRole("dialog").getByRole("combobox").click();
+  await page.getByRole("option", { name: "Replace credential bundle", exact: true }).click();
+  await expect(page.getByLabel("Native API key", { exact: true })).toHaveValue("");
+});
+
+test("nvke native Temporal long identifiers stay within the viewport", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-native-temporal--long-strings&viewMode=story");
+  await page.getByRole("heading", { name: "Native Temporal", exact: true }).waitFor();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+});
 
 test("nvke renewal failures expose retained ownership and distinguish schedule from expiry", async ({
   page,
