@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "84a931dbe8a6521cdf2b03bcec248205c00d0b59"
+      "revision": "563fdbd23a57fb94bdb11190564de682dd228461"
     }
   },
   "evidence": {
@@ -473,6 +473,13 @@
       "kind": "observation",
       "scope": "Ten passing compiled CLI/API/Postgres/Temporal/envtest scenarios; in-flight wait expiry preserves remote operation, original reset receipt survives lost reply with one actual Temporal reset RPC on a fixture workflow. Supported 120s native review timeout independent of 1ms local CLI wait. No actual native etcd/certificate convergence claim.",
       "sha256": "84f35fa8081f65d873da37850a56c66848efdfae6efb4fc7a19fdbaf420c239d"
+    },
+    "management-engine-cluster-deletion-native": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-engine-cluster-deletion-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "One actual native UID/version-bound NVKECluster deletion completed naturally after isolated VM/SPIFFE recovery. Native resource/controller/CAPI/NICo/simulator objects absent; original tenant healthy with two Ready nodes and native TLS. No forced finalizer removal, repeated delete, hosted admission, latency/production or physical-provider claim.",
+      "sha256": "0d819a125e7db746c6e033a97c0000e332709ec935d17b4e9e4b86d5ef7c84e9"
     }
   },
   "rows": {
@@ -1623,9 +1630,10 @@
           "ui-resource",
           "cli-wiring",
           "crd-admission",
-          "resource-admission"
+          "resource-admission",
+          "management-engine-cluster-deletion-native"
         ],
-        "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
+        "remaining": "Actual isolated native datastore deletion and finalizer/infrastructure cleanup are locally qualified. Hosted Astro delete admission and physical/production providers remain pending."
       },
       "datastore.deprecateClusterRelease": {
         "mapping": "astro nvke datastore deprecate-cluster-release; shared reviewed API/UI action forms",
@@ -1754,7 +1762,8 @@
           "datastore-metadata-regression",
           "datastore-metadata-race",
           "management-engine-declarative-native",
-          "management-engine-worker-lifecycle-native"
+          "management-engine-worker-lifecycle-native",
+          "management-engine-cluster-deletion-native"
         ],
         "remaining": "One local declarative create/release/class/worker reconciliation, worker growth, explicit surplus-worker deletion and ownership-checked access are qualified. Automatic shrink of provisioned workers is not implemented upstream. Hosted flows, cluster upgrades/deletion completion and physical providers remain separate."
       }
@@ -2526,9 +2535,10 @@
           "management-apis-native",
           "management-controller-startup-native",
           "management-engine-declarative-native",
-          "management-engine-worker-lifecycle-native"
+          "management-engine-worker-lifecycle-native",
+          "management-engine-cluster-deletion-native"
         ],
-        "remaining": "Default stack, private APIs, native controller and declarative create/access are locally qualified, as are controller profile CLI, worker growth and explicit surplus-worker deletion. Hosted API/UI installation/admission/recovery, cluster upgrades/deletion, verified production supply chain, physical providers and live deployment remain pending."
+        "remaining": "Default stack, private APIs, native controller, declarative create/access, worker growth/explicit surplus deletion and native cluster cleanup are locally qualified. Hosted bootstrap/install/delete API/UI controls, new tenant provisioning, cluster upgrades, verified production supply chain, physical providers and live deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
