@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "ee0b0d5b4b01dccfc562296b450c69df08bc462c"
+      "revision": "8fc135707172ef0bf5c7b15083362f65de948a12"
     }
   },
   "evidence": {
@@ -282,6 +282,13 @@
       "symbol": "test_compiled_cli_provider_collection_recovery_history_and_identity_pages",
       "scope": "Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.",
       "sha256": "563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0"
+    },
+    "native-linux-utilities": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Prepared source-pinned ARM64 Linux CLI and working virtual TPM proxy; fourteen tooling tests passed, one Kubernetes-proxy case skipped. Actual bootstrap, installation, hardware and API/UI controls remain unqualified.",
+      "sha256": "86490f9d2bfec8916a3ffd5b143be4a7b8c551cfa57c707602af3dbd90e66826"
     }
   },
   "rows": {
@@ -2254,7 +2261,8 @@
         "qualification": "partial",
         "evidence": [
           "native-tooling",
-          "cli-tooling"
+          "cli-tooling",
+          "native-linux-utilities"
         ],
         "remaining": "Dedicated API/UI preparation controls and live bootstrap qualification remain pending."
       },

@@ -210,7 +210,7 @@ Each family retains the complete required behavior. Local tooling is distinct fr
 |---|---|---|---|
 | Site configuration | Register/select/edit/probe/remove sites, secret references, supported interface discovery | Register/select/edit/probe/remove sites and interfaces | **local** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Live routes and deployed token/login acceptance remain pending. |
 | Node preparation | Images, registry/boot artifacts, SPIRE CA/TPM or admitted alternative, pre-provisioned nodes | Native bootstrap inputs and provisioned-provider path | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling). Remaining: Node/image preparation, TPM/SPIRE attestation alternatives and verified artifact delivery remain unqualified; API/UI control absent. |
-| Site specs | Generate, inspect, validate and dry-run the complete spec; report field errors without secrets | Generate/inspect/validate and bootstrap dry-run through pinned tooling | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Dedicated API/UI preparation controls and live bootstrap qualification remain pending. |
+| Site specs | Generate, inspect, validate and dry-run the complete spec; report field errors without secrets | Generate/inspect/validate and bootstrap dry-run through pinned tooling | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [native-linux-utilities](#evidence-native-linux-utilities). Remaining: Dedicated API/UI preparation controls and live bootstrap qualification remain pending. |
 | Deployment rendering | Inspect Helm values and stack config; render pinned deploy path and release inputs | Pinned native deploy-path, stack/values inspection and management install planning | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete. |
 | Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, kubeconfig and encryption-key outputs | Pinned local bootstrap, private outputs and durable attempt guard | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Actual seed/node bootstrap and API/UI admission/observation controls remain pending. |
 | Installation | Ordered CAPI/provider/management-plane install; validate pinned images, versions, storage and network | Pinned management install/check/access with ordered dry-run | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [nktp-kind](#evidence-nktp-kind). Remaining: NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending. |
@@ -391,7 +391,7 @@ Selector: `test_real_database_and_kubernetes_operation_dry_run_and_observed_crea
 
 ### Evidence native-tooling
 
-[kubernetes/nvke/test_tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/test_tooling.py) — test. Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.
+[kubernetes/nvke/test_tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/test_tooling.py) — test. Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.
 
 Paired source SHA-256: `e1e8062c87ab21275e7a4e2b7b697b5a4789579ada9218af589313a80ea6148a`.
 
@@ -403,19 +403,19 @@ Paired source SHA-256: `2289c3d9e93cb80ceb849c9c3611f90c7a7d31c516fe0cf1bb667ad3
 
 ### Evidence tooling-source
 
-[kubernetes/nvke/tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/tooling.py) — implementation. Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.
+[kubernetes/nvke/tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/tooling.py) — implementation. Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.
 
 Paired source SHA-256: `0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd`.
 
 ### Evidence nktp-runtime
 
-[kubernetes/nvke/test_nktp_runtime.py](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/test_nktp_runtime.py) — test. Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.
+[kubernetes/nvke/test_nktp_runtime.py](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/test_nktp_runtime.py) — test. Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.
 
 Paired source SHA-256: `41aaaa374b5a943f821b30f2e110960e36fad3b4142b630e66ed43c3d3dcd0b6`.
 
 ### Evidence nktp-kind
 
-[kubernetes/nvke/qualification/nktp-kind-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/ee0b0d5b4b01dccfc562296b450c69df08bc462c/kubernetes/nvke/qualification/nktp-kind-2026-11-08.json) — observation. Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.
+[kubernetes/nvke/qualification/nktp-kind-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/qualification/nktp-kind-2026-11-08.json) — observation. Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.
 
 Paired source SHA-256: `568410bd0c9a66742cd542cf5c293c03067f82051dd45788e4856308cb5a6857`.
 
@@ -482,6 +482,12 @@ Paired source SHA-256: `722dc771aa2e6c617ab62aa478de0967d37326cb82983ffb26f62dba
 Selector: `test_compiled_cli_provider_collection_recovery_history_and_identity_pages`.
 
 Paired source SHA-256: `563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0`.
+
+### Evidence native-linux-utilities
+
+[kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json) — observation. Prepared source-pinned ARM64 Linux CLI and working virtual TPM proxy; fourteen tooling tests passed, one Kubernetes-proxy case skipped. Actual bootstrap, installation, hardware and API/UI controls remain unqualified.
+
+Paired source SHA-256: `86490f9d2bfec8916a3ffd5b143be4a7b8c551cfa57c707602af3dbd90e66826`.
 
 
 ## Verification
