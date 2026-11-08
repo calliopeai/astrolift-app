@@ -13,6 +13,7 @@ from urllib.parse import quote, urlsplit
 import httpx
 from jsonschema import Draft4Validator, FormatChecker
 
+from nvke._private_http import private_http
 from nvke.contract import Operation, Surface, controller_spec, operation, resource_schema
 
 if TYPE_CHECKING:
@@ -51,26 +52,30 @@ class Endpoint:
     allow_http: bool = False
 
     def __post_init__(self) -> None:
-        try:
-            parsed = urlsplit(self.url)
-            valid = (
-                parsed.scheme in ({"https", "http"} if self.allow_http else {"https"})
-                and bool(parsed.hostname)
-                and parsed.username is None
-                and parsed.password is None
-                and not parsed.query
-                and not parsed.fragment
-                and parsed.port != 0
-                and not any(c in self.url for c in ("\\", "%", "\r", "\n", "\t", " "))
-                and not any(ord(c) < 33 or ord(c) == 127 for c in self.url)
-                and all(segment not in {".", ".."} for segment in parsed.path.split("/"))
-            )
-        except ValueError:
-            valid = False
-        if not valid:
-            raise ValueError("NVKE endpoint must be a valid HTTPS base URL without credentials, query or fragment")
+        validate_endpoint_url(self.url, allow_http=self.allow_http)
         if self.surface not in {"controller", "tenant", "operator", "datastore"}:
             raise ValueError("unknown NVKE endpoint surface")
+
+
+def validate_endpoint_url(url: str, *, allow_http: bool = False) -> None:
+    try:
+        parsed = urlsplit(url)
+        valid = (
+            parsed.scheme in ({"https", "http"} if allow_http else {"https"})
+            and bool(parsed.hostname)
+            and parsed.username is None
+            and parsed.password is None
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.port != 0
+            and not any(c in url for c in ("\\", "%", "\r", "\n", "\t", " "))
+            and not any(ord(c) < 33 or ord(c) == 127 for c in url)
+            and all(segment not in {".", ".."} for segment in parsed.path.split("/"))
+        )
+    except (ValueError, TypeError, AttributeError):
+        valid = False
+    if not valid:
+        raise ValueError("NVKE endpoint must be a valid HTTPS base URL without credentials, query or fragment")
 
 
 @dataclass(frozen=True)
@@ -337,6 +342,17 @@ class NvkeClient:
             _validate(request["content"]["application/json"]["schema"], body, components=self._spec["components"])
 
     def _send(
+        self,
+        op: Operation,
+        url: str,
+        query: Mapping[str, Any],
+        body: dict[str, Any] | None,
+        headers: dict[str, str],
+    ) -> NvkeResponse:
+        with private_http():
+            return self._send_private(op, url, query, body, headers)
+
+    def _send_private(
         self,
         op: Operation,
         url: str,

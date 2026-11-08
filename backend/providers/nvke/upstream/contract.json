@@ -5,6 +5,7 @@
   "sources": {
     "LICENSE": "d07c0367e2861e7fe70fa1b679f879f4fa2f9138ade4457d44ecf8b2e135bb45",
     "NOTICE": "a3ae2f67d846a0083d74acbb72203e384b31e032617c5f666d55d315275b57ad",
+    "agent/pkg/certificates/catalog.go": "b1a4862585491725e9aff64c4571cc29d2f8658fddb046e0dd11b81e8148c06f",
     "cli/docs/reference/README.md": "d17c4dd5855e399bd089b1889f69189b8a2566553566696699004adf8708e94b",
     "cli/docs/reference/nvkectl.md": "89b1eb955cb16933b4ac2085d478c33f8028b67a3cd4328c0b83e8b7636ebccb",
     "cli/docs/reference/nvkectl_bootstrap.md": "92057350a48ccddb08c660621e5a2764525819adf1198338c22dc6136ff912e9",
@@ -163,6 +164,8 @@
     "controller/internal/controllers/tenantaccess/breakglass.go": "5d661540a718952e0850485287d6fd3585e01c035c6530761ba0a0201cbf6a2d",
     "controller/internal/db/clusters.go": "f912a316a1f8ed61b6c70bb185f708f692e1511fe2fa7c594e55eae666cf8a10",
     "controller/internal/db/etcd_key_rotation.go": "2dfd3d41e8274e7f2492f5b7ca10a39665449239abd15a33bafcecf1005c3da5",
+    "controller/internal/dbmetrics/credentials.go": "eb85ab2e1300954a6a5440bc1efae68797e964ec0c6609f83852e533d9d7e6b1",
+    "controller/internal/dbmetrics/dbmetrics.go": "702c406f06ad1c885eff6a5566bfc49615bbb85ce4e291b8fae75a0fec5ae9e8",
     "controller/internal/rollout/operations/etcd/dependency.go": "d98e24f7408aa5bd914eac608d135095c24ed4973fe44515b4b3b24187aee2ae",
     "controller/internal/rollout/operations/etcd/encryption.go": "13a6a30d98a96c2eb72b5c24da6cc81ce087bb7e40f49a7d59775e7ccd752a70",
     "controller/internal/rollout/operations/etcd/option.go": "cdf0580b721d2276aca0540033cbf80d15b3335f26e8065ad3ce3917f539d7c7",
@@ -9646,6 +9649,210 @@
       }
     }
   ],
+  "credential_metrics": {
+    "prefix": "nvke_controller_",
+    "format": "prometheus-text-0.0.4",
+    "source": "controller/internal/dbmetrics/credentials.go",
+    "credential_source": "agent/pkg/certificates/catalog.go",
+    "metrics": [
+      {
+        "name": "certificate_inspection_available",
+        "labels": [
+          "tenant_cluster",
+          "node"
+        ]
+      },
+      {
+        "name": "certificate_not_after_timestamp_seconds",
+        "labels": [
+          "tenant_cluster",
+          "node",
+          "credential"
+        ]
+      },
+      {
+        "name": "certificate_observation_age_seconds",
+        "labels": [
+          "tenant_cluster",
+          "node"
+        ]
+      },
+      {
+        "name": "certificate_observation_available",
+        "labels": [
+          "tenant_cluster",
+          "node",
+          "credential"
+        ]
+      },
+      {
+        "name": "certificate_required",
+        "labels": [
+          "tenant_cluster",
+          "node",
+          "credential"
+        ]
+      },
+      {
+        "name": "certificate_warning_window_seconds",
+        "labels": []
+      },
+      {
+        "name": "credential_metrics_collection_success",
+        "labels": []
+      },
+      {
+        "name": "credential_monitoring_enabled",
+        "labels": []
+      },
+      {
+        "name": "etcd_key_rotation_progress_age_seconds",
+        "labels": [
+          "tenant_cluster"
+        ]
+      },
+      {
+        "name": "etcd_key_rotation_state",
+        "labels": [
+          "tenant_cluster",
+          "state"
+        ]
+      },
+      {
+        "name": "renewal_active_seconds",
+        "labels": [
+          "tenant_cluster"
+        ]
+      },
+      {
+        "name": "renewal_automation_enabled",
+        "labels": []
+      },
+      {
+        "name": "renewal_mutation_lock_retained",
+        "labels": [
+          "tenant_cluster"
+        ]
+      },
+      {
+        "name": "renewal_overdue_seconds",
+        "labels": [
+          "tenant_cluster"
+        ]
+      },
+      {
+        "name": "renewal_state",
+        "labels": [
+          "tenant_cluster",
+          "state"
+        ]
+      },
+      {
+        "name": "serving_csr_count",
+        "labels": [
+          "tenant_cluster",
+          "state"
+        ]
+      },
+      {
+        "name": "serving_csr_observation_age_seconds",
+        "labels": [
+          "tenant_cluster"
+        ]
+      },
+      {
+        "name": "serving_csr_oldest_pending_age_seconds",
+        "labels": [
+          "tenant_cluster"
+        ]
+      }
+    ],
+    "states": {
+      "renewal_state": [
+        "unknown",
+        "accepted",
+        "succeeded",
+        "failed"
+      ],
+      "etcd_key_rotation_state": [
+        "unknown",
+        "running",
+        "succeeded",
+        "failed"
+      ],
+      "serving_csr_count": [
+        "pending",
+        "failed",
+        "denied"
+      ]
+    },
+    "credentials": [
+      {
+        "name": "kubelet-client",
+        "required": true
+      },
+      {
+        "name": "kubelet-serving",
+        "required": true
+      },
+      {
+        "name": "apiserver",
+        "required": true
+      },
+      {
+        "name": "apiserver-kubelet-client",
+        "required": true
+      },
+      {
+        "name": "front-proxy-client",
+        "required": true
+      },
+      {
+        "name": "apiserver-etcd-client",
+        "required": true
+      },
+      {
+        "name": "etcd-server",
+        "required": true
+      },
+      {
+        "name": "etcd-peer",
+        "required": true
+      },
+      {
+        "name": "etcd-healthcheck-client",
+        "required": true
+      },
+      {
+        "name": "kubernetes-ca",
+        "required": true
+      },
+      {
+        "name": "front-proxy-ca",
+        "required": true
+      },
+      {
+        "name": "etcd-ca",
+        "required": true
+      },
+      {
+        "name": "admin",
+        "required": true
+      },
+      {
+        "name": "super-admin",
+        "required": false
+      },
+      {
+        "name": "controller-manager",
+        "required": true
+      },
+      {
+        "name": "scheduler",
+        "required": true
+      }
+    ]
+  },
   "native_activity_names": [
     "ApplyCAPIClusterResources",
     "ApplyCAPIMachineRebootAnnotation",

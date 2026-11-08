@@ -13,8 +13,12 @@ from typing import Any
 import yaml
 
 if __package__:
+    from .nvke_credential_metrics import SOURCES as CREDENTIAL_SOURCES
+    from .nvke_credential_metrics import inventory as credential_metrics
     from .nvke_native_workflows import inventory as native_workflows
 else:
+    from nvke_credential_metrics import SOURCES as CREDENTIAL_SOURCES
+    from nvke_credential_metrics import inventory as credential_metrics
     from nvke_native_workflows import inventory as native_workflows
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -108,6 +112,7 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
             declarations.append({"use": use, "source": str(path.relative_to(checkout))})
 
     sources = {
+        *CREDENTIAL_SOURCES,
         spec_path,
         registration_path,
         surface_path,
@@ -157,6 +162,7 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
         "cli_source_declarations": declarations,
         "cli_runtime": runtime_commands,
         "native_workflows": native_workflows(checkout),
+        "credential_metrics": credential_metrics(checkout),
         "native_activity_names": sorted(
             {
                 name

@@ -49,6 +49,33 @@ with the minimum NVKE scopes through the existing token-management screen.
 
 ## Interfaces
 
+The provider package also contains a pinned controller credential-metrics reader.
+It is transport groundwork; site metrics authority, durable observations and
+their API/browser/CLI controls are still pending under #2661. It does not reuse
+the REST endpoint or infer a metrics address from a management kubeconfig.
+The controller serves these gauges on its separate metrics listener.
+
+The reader pins all 18 credential gauges and 16 kubeadm credential names from the
+upstream collector and agent catalog. It selects only an exact cluster name's
+series and global subsystem flags. Binding that selector to the UUID in a reviewed
+controller observation remains application work; a supplied name alone is not
+ownership evidence. It preserves exact reported numeric values as
+decimal strings. Prometheus upstream gauges use float64, so this does not recover
+precision already lost by the exporter. Stored certificate NotAfter, fresh
+successful inventory, latest inspection availability, and monitoring enablement
+remain independent facts. Missing series and a failed collection are not healthy
+credential evidence. Renewal schedule timestamps never become expiry dates.
+
+Reads have response/sample budgets, socket and elapsed scrape deadlines, explicit
+TLS/bearer configuration, no redirects, no ambient proxy credentials and no
+automatic retries. Conflicting/duplicate or timestamped samples, undeclared
+labels/credentials/states and nonfinite values fail explicitly. Private endpoint
+paths, filters and HTTP headers are excluded from HTTP logs and OpenTelemetry/
+Sentry client spans for
+both the new reader and existing REST/datastore transport. Unrelated HTTP
+logging and tracing remain active. Real HTTP/TLS and instrumented-client tests
+qualify this boundary; they do not qualify native node inspection or alerts.
+
 Configure each required interface separately:
 
 | Surface | Endpoint base | Purpose |

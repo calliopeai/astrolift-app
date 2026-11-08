@@ -24,6 +24,34 @@ Native reset recovery requires exact owner/run/event review; a closed workflow d
 The snapshot also pins 115 exported controller activity names for secret-safe history projection.
 Activity inputs/results, failure messages and unknown activity names are excluded from that projection.
 
+## Controller credential metric vocabulary
+
+These gauges come from the separate controller metrics listener, not the REST API.
+The snapshot pins the collector, label definitions and all 16 supported kubeadm credential names.
+Stored NotAfter, observation freshness and latest inspection availability have distinct meanings.
+An absent series never proves healthy credentials. Application/UI/CLI/live qualification remains required.
+
+| Gauge suffix (`nvke_controller_`) | Exact labels | Qualification |
+|---|---|---|
+| `certificate_inspection_available` | `tenant_cluster`, `node` | pending |
+| `certificate_not_after_timestamp_seconds` | `tenant_cluster`, `node`, `credential` | pending |
+| `certificate_observation_age_seconds` | `tenant_cluster`, `node` | pending |
+| `certificate_observation_available` | `tenant_cluster`, `node`, `credential` | pending |
+| `certificate_required` | `tenant_cluster`, `node`, `credential` | pending |
+| `certificate_warning_window_seconds` | none | pending |
+| `credential_metrics_collection_success` | none | pending |
+| `credential_monitoring_enabled` | none | pending |
+| `etcd_key_rotation_progress_age_seconds` | `tenant_cluster` | pending |
+| `etcd_key_rotation_state` | `tenant_cluster`, `state` | pending |
+| `renewal_active_seconds` | `tenant_cluster` | pending |
+| `renewal_automation_enabled` | none | pending |
+| `renewal_mutation_lock_retained` | `tenant_cluster` | pending |
+| `renewal_overdue_seconds` | `tenant_cluster` | pending |
+| `renewal_state` | `tenant_cluster`, `state` | pending |
+| `serving_csr_count` | `tenant_cluster`, `state` | pending |
+| `serving_csr_observation_age_seconds` | `tenant_cluster` | pending |
+| `serving_csr_oldest_pending_age_seconds` | `tenant_cluster` | pending |
+
 ## Delivery and ownership
 
 This is a coverage inventory, not a support claim. Every row starts pending. Completion requires

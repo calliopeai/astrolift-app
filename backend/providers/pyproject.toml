@@ -15,6 +15,7 @@ dependencies = []
 
 [project.optional-dependencies]
 nvke = [
+    "prometheus-client>=0.25,<1",
     "httpx>=0.27,<1",
     "jsonschema>=4.23,<5",
     "kubernetes>=29.0,<36",
@@ -112,6 +113,7 @@ dev = [
     # tests/_sdk/test_telemetry.py exercises the real registry; the
     # runtime import in _sdk/_telemetry.py is optional (try/except).
     "prometheus-client>=0.20",
+    "sentry-sdk>=2,<3",
     # Standalone CI must record spans for private-delivery failure assertions.
     "opentelemetry-sdk>=1.41,<2",
     # Gateway privacy tests exercise real client header/error instrumentation.

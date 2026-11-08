@@ -42,6 +42,20 @@ def render() -> str:
         "for secret-safe history projection.",
         "Activity inputs/results, failure messages and unknown activity names are excluded from that projection.",
         "",
+        "## Controller credential metric vocabulary",
+        "",
+        "These gauges come from the separate controller metrics listener, not the REST API.",
+        "The snapshot pins the collector, label definitions and all 16 supported kubeadm credential names.",
+        "Stored NotAfter, observation freshness and latest inspection availability have distinct meanings.",
+        "An absent series never proves healthy credentials. Application/UI/CLI/live qualification remains required.",
+        "",
+        "| Gauge suffix (`nvke_controller_`) | Exact labels | Qualification |",
+        "|---|---|---|",
+        *[
+            f"| `{row['name']}` | {', '.join(f'`{label}`' for label in row['labels']) or 'none'} | pending |"
+            for row in _contract()["credential_metrics"]["metrics"]
+        ],
+        "",
         "## Delivery and ownership",
         "",
         "This is a coverage inventory, not a support claim. Every row starts pending. Completion requires",
