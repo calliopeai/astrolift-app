@@ -204,6 +204,12 @@
       "path": "docs/operators/nvke-site-connections.md",
       "kind": "implementation",
       "scope": "Documented source ownership, readiness, native reset and live qualification limits."
+    },
+    "provider-classifier": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_infrastructure.py",
+      "kind": "test",
+      "scope": "Pure source-pinned provider registry and credential-health classifier, including exact freshness boundaries and conservative malformed-field handling. No Kubernetes reader, Astro API/UI/CLI observation or native provider execution."
     }
   },
   "rows": {
@@ -2197,11 +2203,12 @@
         "remaining": "NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending."
       },
       "infrastructure-providers": {
-        "mapping": "Provider fields preserved in native schemas; no provider inspection control yet",
+        "mapping": "Provider fields preserved in native schemas; pinned credential-health classifier; inspection reader/control still pending",
         "qualification": "partial",
         "evidence": [
           "action-validation",
-          "limits"
+          "limits",
+          "provider-classifier"
         ],
         "remaining": "#2667: add provider status/credential-health observation and API/UI/CLI; qualify NICo and enabled LaunchLayer credentials/controllers/hardware."
       },
