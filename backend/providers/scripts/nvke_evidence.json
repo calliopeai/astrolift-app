@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "dda15afe89e7219b54a78351bae70274f79ae2fa"
+      "revision": "c2ee8a3ee345aa87deaf80ec2f67dab5955525c2"
     }
   },
   "evidence": {
@@ -444,6 +444,13 @@
       "kind": "observation",
       "scope": "Committed CLI rebuild reproduced the already-qualified native manager manifest byte for byte. Full Go tests/fmt/vet/lint, nine vendor tests and six compiled tests passed; two opt-in cases skipped. Pure rendering only.",
       "sha256": "8d4e586a909cbcae8320468e221123381406a2f80d09aca30ecca3cc79c49808"
+    },
+    "management-engine-worker-lifecycle-native": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-engine-worker-lifecycle-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Actual isolated native worker growth via explicit datastore: one to two workers, three Ready workload nodes; desired-count reduction preserved native cleanup finalizer; separately reviewed deleteNode removed only the added worker, CAPI/NICo machine and simulator container. Original two-node workload retained readiness. Public update field ownership conflict and upstream lack of automatic provisioned-worker shrink are explicit. No cluster deletion/upgrade, hosted admission or production claim.",
+      "sha256": "7355a694b43ddcb5a0f963607e86196a3b349e7741ee31984929a3559ba76240"
     }
   },
   "rows": {
@@ -497,7 +504,8 @@
           "api-catalog",
           "ui-wiring",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "management-engine-worker-lifecycle-native"
         ],
         "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
       },
@@ -575,7 +583,8 @@
           "api-catalog",
           "ui-wiring",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "management-engine-worker-lifecycle-native"
         ],
         "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
       },
@@ -588,7 +597,8 @@
           "api-catalog",
           "ui-wiring",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "management-engine-worker-lifecycle-native"
         ],
         "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
       },
@@ -1570,7 +1580,8 @@
           "crd-admission",
           "resource-admission",
           "datastore-metadata-regression",
-          "datastore-metadata-race"
+          "datastore-metadata-race",
+          "management-engine-worker-lifecycle-native"
         ],
         "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
       },
@@ -1712,9 +1723,10 @@
           "datastore-metadata-preservation",
           "datastore-metadata-regression",
           "datastore-metadata-race",
-          "management-engine-declarative-native"
+          "management-engine-declarative-native",
+          "management-engine-worker-lifecycle-native"
         ],
-        "remaining": "One isolated native declarative create/release/class/worker reconciliation and ownership-checked workload access are qualified. Hosted flows, scaling/upgrades/deletion completion and physical providers remain separate."
+        "remaining": "One local declarative create/release/class/worker reconciliation, worker growth, explicit surplus-worker deletion and ownership-checked access are qualified. Automatic shrink of provisioned workers is not implemented upstream. Hosted flows, cluster upgrades/deletion completion and physical providers remain separate."
       }
     },
     "workflows": {
@@ -2483,9 +2495,10 @@
           "native-management-base",
           "management-apis-native",
           "management-controller-startup-native",
-          "management-engine-declarative-native"
+          "management-engine-declarative-native",
+          "management-engine-worker-lifecycle-native"
         ],
-        "remaining": "Default stack, private APIs, native controller and one declarative tenant create/release/class/worker reconciliation with SDK ownership-checked access are locally qualified. Controller profile CLI is qualified. Hosted API/UI installation/admission/recovery, verified production supply chain, physical providers and live deployment remain pending; local create proof does not establish scaling, upgrades or deletion completion."
+        "remaining": "Default stack, private APIs, native controller and declarative create/access are locally qualified, as are controller profile CLI, worker growth and explicit surplus-worker deletion. Hosted API/UI installation/admission/recovery, cluster upgrades/deletion, verified production supply chain, physical providers and live deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
