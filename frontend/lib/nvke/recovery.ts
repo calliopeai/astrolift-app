@@ -27,6 +27,12 @@ export type NvkeRecoveryRecord = RecoveryMetadata &
       }
     | { format: 5; mode: "credentials"; source: NvkeResourceSource; authorityVersion: number }
     | { format: 6; mode: "providers"; source: NvkeProviderRequestSource }
+    | {
+        format: 7;
+        mode: "tooling";
+        authorityVersion: number;
+        acknowledgeInfrastructureChange: boolean;
+      }
   );
 export interface NvkeProviderRequestSource {
   connectionId: string;
@@ -163,13 +169,15 @@ export function validateRecovery(
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   const row = value as Record<string, unknown>;
   const expectedFields =
-    row.format === 4 || row.format === 5
-      ? [...fields, "mode", "source", "authorityVersion"]
-      : row.format === 3 || row.format === 6
-        ? [...fields, "mode", "source"]
-        : row.format === 2
-          ? [...fields, "mode"]
-          : fields;
+    row.format === 7
+      ? [...fields, "mode", "authorityVersion", "acknowledgeInfrastructureChange"]
+      : row.format === 4 || row.format === 5
+        ? [...fields, "mode", "source", "authorityVersion"]
+        : row.format === 3 || row.format === 6
+          ? [...fields, "mode", "source"]
+          : row.format === 2
+            ? [...fields, "mode"]
+            : fields;
   if (
     Object.keys(row).length !== expectedFields.length ||
     Object.keys(row).some((key) => !expectedFields.includes(key)) ||
@@ -178,7 +186,13 @@ export function validateRecovery(
       row.format !== 3 &&
       row.format !== 4 &&
       row.format !== 5 &&
-      row.format !== 6) ||
+      row.format !== 6 &&
+      row.format !== 7) ||
+    (row.format === 7 &&
+      (row.mode !== "tooling" ||
+        !Number.isSafeInteger(row.authorityVersion) ||
+        Number(row.authorityVersion) < 1 ||
+        typeof row.acknowledgeInfrastructureChange !== "boolean")) ||
     (row.format === 6 &&
       (row.mode !== "providers" ||
         row.operationKey !== "infrastructure.providers" ||
@@ -225,7 +239,9 @@ export function validateRecovery(
     typeof row.parametersDigest !== "string" ||
     !/^[0-9a-f]{64}$/.test(row.parametersDigest) ||
     typeof row.operationKey !== "string" ||
-    !/^[A-Za-z][A-Za-z0-9.]{0,127}$/.test(row.operationKey)
+    !(
+      row.format === 7 ? /^tooling\.[a-z][a-z0-9.-]{0,119}$/ : /^[A-Za-z][A-Za-z0-9.]{0,127}$/
+    ).test(row.operationKey)
   )
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   return row as unknown as NvkeRecoveryRecord;
