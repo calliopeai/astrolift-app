@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "6d6f1c09d400b0921fd20ec91bd4d75725a61e15"
+      "revision": "28075c86096b2c9e45e6676f999222fff335a478"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "c2ee8a3ee345aa87deaf80ec2f67dab5955525c2"
+      "revision": "84a931dbe8a6521cdf2b03bcec248205c00d0b59"
     }
   },
   "evidence": {
@@ -54,7 +54,7 @@
       "kind": "test",
       "scope": "All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.",
       "symbol": "TestNVKEFullCatalogCommandsAreReachableWithoutNetwork",
-      "sha256": "1f05b99a5fb8f4fe0ffb11047fb29621cd1f8128199de68d15cafad8f8e425a8"
+      "sha256": "aa63f9b30d8f17355f8efb6b63f4b4fce989d49125609b7ace4013e404792215"
     },
     "paired-cli": {
       "repository": "cli",
@@ -62,7 +62,7 @@
       "kind": "test",
       "scope": "Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.",
       "symbol": "test_pinned_cli_vocabulary_matches_every_paired_server_action",
-      "sha256": "563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0"
+      "sha256": "8d86416edf53e6e35287c1de1c3a37d27169d4f8c556cdff4d147c8a39c4be46"
     },
     "crd-admission": {
       "repository": "app",
@@ -281,7 +281,7 @@
       "kind": "test",
       "symbol": "test_compiled_cli_provider_collection_recovery_history_and_identity_pages",
       "scope": "Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.",
-      "sha256": "563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0"
+      "sha256": "8d86416edf53e6e35287c1de1c3a37d27169d4f8c556cdff4d147c8a39c4be46"
     },
     "native-linux-utilities": {
       "repository": "opscode",
@@ -451,6 +451,28 @@
       "kind": "observation",
       "scope": "Actual isolated native worker growth via explicit datastore: one to two workers, three Ready workload nodes; desired-count reduction preserved native cleanup finalizer; separately reviewed deleteNode removed only the added worker, CAPI/NICo machine and simulator container. Original two-node workload retained readiness. Public update field ownership conflict and upstream lack of automatic provisioned-worker shrink are explicit. No cluster deletion/upgrade, hosted admission or production claim.",
       "sha256": "7355a694b43ddcb5a0f963607e86196a3b349e7741ee31984929a3559ba76240"
+    },
+    "hosted-native-cli-test": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_native_site.py",
+      "kind": "test",
+      "scope": "Compiled CLI through real Astro API, Postgres, Temporal and source-pinned isolated native APIs; lost reply/read-only recovery, imported access, exported workload TLS/readiness, guarded MachineImage create/delete, revoke-before-Secret-read and history privacy. Only transport is routed; fixture configures site connections.",
+      "sha256": "764533589946ae27fa0469bacc5c2489f5ff8b87ac237d3485dc5533ef934331",
+      "symbol": "test_compiled_cli_native_site_receipt_recovery_enrollment_access_and_image_lifecycle"
+    },
+    "hosted-native-cli-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/hosted-native-cli-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Actual hosted native test passed: one native MachineImage POST/DELETE, two Ready workload nodes reached using Astro-exported kubeconfig with CA/client TLS, read-only lost-reply recovery and revocation refusal before Secret read. Prior SPIFFE/read failure and isolated VM CPU/collector caps retained. No hosted tenant provisioning, installation, deletion/upgrade or physical-provider claim.",
+      "sha256": "2bf2d0f82e73f70a0341de0d678ecfd4f7e6e9a4ac8dd4bbe4f1b77b24891769"
+    },
+    "cli-reset-recovery-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/cli-reset-recovery-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Ten passing compiled CLI/API/Postgres/Temporal/envtest scenarios; in-flight wait expiry preserves remote operation, original reset receipt survives lost reply with one actual Temporal reset RPC on a fixture workflow. Supported 120s native review timeout independent of 1ms local CLI wait. No actual native etcd/certificate convergence claim.",
+      "sha256": "84f35fa8081f65d873da37850a56c66848efdfae6efb4fc7a19fdbaf420c239d"
     }
   },
   "rows": {
@@ -524,16 +546,18 @@
       },
       "getCluster": {
         "mapping": "astro nvke controller get-cluster; shared reviewed API/UI action forms",
-        "qualification": "fixture",
+        "qualification": "local",
         "evidence": [
           "http-fixture",
           "action-validation",
           "api-catalog",
           "ui-wiring",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "hosted-native-cli-test",
+          "hosted-native-cli-local"
         ],
-        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+        "remaining": "Native simulator controller read and hosted recovery are locally qualified; production/private-route and broader controller effects remain pending."
       },
       "getClusterControlPlane": {
         "mapping": "astro nvke controller get-cluster-control-plane; shared reviewed API/UI action forms",
@@ -1424,7 +1448,9 @@
           "crd-admission",
           "resource-admission",
           "app-kube-operation",
-          "paired-cli"
+          "paired-cli",
+          "hosted-native-cli-test",
+          "hosted-native-cli-local"
         ],
         "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
       },
@@ -1452,7 +1478,9 @@
           "ui-resource",
           "cli-wiring",
           "crd-admission",
-          "resource-admission"
+          "resource-admission",
+          "hosted-native-cli-test",
+          "hosted-native-cli-local"
         ],
         "remaining": "Real Kubernetes admission is covered; native reconcilers, deletion completion and hardware effects remain pending. API/UI/CLI execution is scenario-based, not exhaustive for this action."
       },
@@ -1641,7 +1669,9 @@
           "crd-admission",
           "resource-admission",
           "kubeconfig-ownership",
-          "access-api"
+          "access-api",
+          "hosted-native-cli-test",
+          "hosted-native-cli-local"
         ],
         "remaining": "Live workload API reachability and physical-node access handoff remain unqualified."
       }
@@ -2540,9 +2570,11 @@
         "evidence": [
           "access-api",
           "kubeconfig-ownership",
-          "paired-cli"
+          "paired-cli",
+          "hosted-native-cli-test",
+          "hosted-native-cli-local"
         ],
-        "remaining": "Live OIDC/private route and physical workload access handoff remain pending."
+        "remaining": "Native simulator imported enrollment/download/revocation and actual TLS workload access through Astro are locally qualified. Site setup was fixture-service configuration; deployed OIDC/private-route and physical workload access remain pending."
       },
       "credentials": {
         "mapping": "Separate credential observations and native certificate/SPIRE maintenance controls",
@@ -2563,7 +2595,8 @@
           "maintenance-api",
           "native-temporal",
           "native-reset",
-          "browser-native"
+          "browser-native",
+          "cli-reset-recovery-local"
         ],
         "remaining": "Actual node upgrades/replacement/drain, certificate renewal and etcd convergence remain pending."
       },
