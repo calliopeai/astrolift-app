@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "2d2054a090ce877da84153cb26f0106037529315"
+      "revision": "e1c699fcc769601363cc5e47b526c70e584b1b51"
     }
   },
   "evidence": {
@@ -493,14 +493,14 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.",
-      "sha256": "009facbabb2ff109cb337eac7b1639e73796743a0699ebd347e2467cc51f48c5"
+      "sha256": "27c432f1721147a8c33dd5c1d9fd2c1164ed153f7c86a20ac81f415d8c0534ac"
     },
     "operator-agent-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
-      "scope": "Thirty-two real TLS/native-utility and filesystem cases cover original receipt recovery, durable never-admitted fencing across restart, delayed original PUT refusal, journal tampering/removal, retained evidence, serialization and legacy-history refusal. Owned-process stopping is synthetic and preserves uncertainty; no infrastructure bootstrap is executed.",
-      "sha256": "8ba0bf417637c22a7866ad5a026eb274179cef38a86dcf0505807d2eba226e7c"
+      "scope": "Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.",
+      "sha256": "856c10be4fbeba694ee21dfa8f8b5641eb70b9b222653e772f68a68b8573ed4f"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -810,6 +810,32 @@
       "kind": "observation",
       "scope": "One actual agent install failed its LGTM readiness deadline with native exit 1; original UNCERTAIN effects/fence/guard retained without replay. Live source-bound review and 83 tooling tests (80 passed/3 opt-in skipped). Inotify prerequisite corrected. Reviewed agent/API/UI/CLI continuation remains open in #97.",
       "sha256": "fbad1dcc08c2d9fad724c7238f4cec0e56ca3068a49cf56328ba099591f0c369"
+    },
+    "operator-install-review-agent": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/operator_agent.py",
+      "kind": "implementation",
+      "scope": "Original intent/mTLS/site/instance/bundle and authenticated native-run binding for read-only partial-install review. Executor reservation refuses admissions, source drift is rejected, original uncertainty/guards remain intact; no continuation admitted.",
+      "sha256": "27c432f1721147a8c33dd5c1d9fd2c1164ed153f7c86a20ac81f415d8c0534ac"
+    },
+    "operator-install-review-sdk": {
+      "repository": "app",
+      "path": "backend/providers/nvke/_operator_install_review.py",
+      "kind": "implementation",
+      "scope": "Strict source/digest/receipt/manifest/workload projection drops arbitrary diagnostics and limitations, checks failed-native identity and current authority/instance through the SDK. No automatic writes or continuation."
+    },
+    "operator-install-review-sdk-tests": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_operator_agent_client.py",
+      "kind": "test",
+      "scope": "Forty-seven cases including real mTLS/native utility fixtures; changed source, malformed counts/readiness, unknown fields, private text, digest, original-success, unsupported capability and identity replacement refusal. Review transport itself is fixture-backed; real failed-install SDK observation is recorded separately."
+    },
+    "operator-install-review-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-install-review-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Actual original failed install reviewed through SDK/mTLS after an identity-preserving agent restart. Six original files unchanged, original effect fence retained, LGTM later Ready, bounded local evaluation sizing rendered. 89 tooling tests/3 opt-in skips, 47 SDK tests and clean typed projection. Application permission/version review and continuation remain open in #97.",
+      "sha256": "0e4c23be46a38a20215d3cfe740c29fab4ae96a80261c5cc0a59a57a47cb3bfe"
     }
   },
   "rows": {
@@ -3047,9 +3073,13 @@
           "operator-watch-tests",
           "operator-partial-install-review",
           "operator-partial-install-tests",
-          "operator-partial-install-local"
+          "operator-partial-install-local",
+          "operator-install-review-agent",
+          "operator-install-review-sdk",
+          "operator-install-review-sdk-tests",
+          "operator-install-review-local"
         ],
-        "remaining": "Direct-runner default stack and native tenant lifecycle are locally qualified. The first agent-driven install ended with exit 1 at LGTM readiness; original UNCERTAIN effects/fence/guard remain intact, with a source-bound read-only review. Reviewed partial-install continuation (#97), successful agent install/access (#96), hosted new tenant/delete, upgrades, verified supply chain, physical providers and deployment remain open."
+        "remaining": "The first agent install failed at LGTM readiness and remains UNCERTAIN with preserved guards. Source-bound SDK/mTLS review of that original job is locally qualified; guarded bounded evaluation sizing later recovered LGTM. Application permission/version gates, reviewed continuation across API/CLI/UI (#97), completed agent install/access (#96), hosted new tenant/delete, upgrades, verified supply chain, physical providers and deployed acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
