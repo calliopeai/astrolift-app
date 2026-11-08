@@ -28,6 +28,7 @@ import { useNvkeDiagnostics } from "./use-nvke-diagnostics";
 import { useNvkeWorkflows } from "./use-nvke-workflows";
 import { useNvkeMaintenance } from "./use-nvke-maintenance";
 import { useNvkeCredentials } from "./use-nvke-credentials";
+import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
 
@@ -148,6 +149,15 @@ export const useNvkeOperation = (
     enabled: canAct,
     onRefresh: refresh,
   });
+  const credentialRequest = useNvkeCredentialRequest({
+    context,
+    scopeKey: visitKey,
+    site: site.data?.astroliftNvkeSite?.id === siteId ? site.data.astroliftNvkeSite : null,
+    operation,
+    maintenance,
+    enabled: !loading && !failed,
+    onRefresh: refresh,
+  });
   const control = async (resume: boolean) => {
     if (!current() || !canAct || !operation || busy.current || (resume && !context.access.admin))
       return false;
@@ -196,6 +206,7 @@ export const useNvkeOperation = (
     diagnostics,
     maintenance,
     credentials,
+    credentialRequest,
     workflows,
     workloadAccess,
     siteName: site.data?.astroliftNvkeSite?.name ?? "",

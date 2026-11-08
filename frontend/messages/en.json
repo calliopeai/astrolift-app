@@ -17940,6 +17940,17 @@
       "automation": "Renewal automation enabled",
       "window": "Warning window (s)",
       "empty": "No reported observations"
+    },
+    "credentialCollection": {
+      "title": "Collect credential observations",
+      "help": "Collect a new historical report using this reviewed controller read and the separate metrics authority. The browser saves a private recovery identity before submission. Recovery only looks up the original receipt; an unknown outcome blocks a second intent.",
+      "collect": "Collect credentials",
+      "retry": "Retry original collection",
+      "recover": "Recover original receipt",
+      "unavailable": "Collection requires administrator access, a current cluster read and enabled metrics authority.",
+      "pending": "Preserve this original request while its outcome is unconfirmed.",
+      "deadline": "Observation deadline (seconds)",
+      "review": "{site}, site version {siteVersion}. Controller read {source}, version {sourceVersion}; cluster {cluster}. Metrics authority version {authority}, target {endpoint}. Observation deadline: {timeout} seconds."
     }
   }
 }

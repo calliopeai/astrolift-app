@@ -3,6 +3,7 @@ import { WORKFLOW_PROPS, WORKFLOW_HISTORY } from "./NvkeWorkflowPanel.stories";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
 import { CREDENTIAL_PROPS } from "./NvkeCredentialPanel.stories";
+import { COLLECTION_PROPS } from "./NvkeCredentialRequestPanel.stories";
 import { fakeController } from "@/components/data-table/fixtures";
 import {
   DIAGNOSTIC_OBSERVATION,
@@ -18,6 +19,12 @@ export default {
   args: OPERATION_DETAIL,
 } satisfies Meta<typeof NvkeOperationScreen>;
 type Story = StoryObj<typeof NvkeOperationScreen>;
+export const CollectCredentials: Story = {
+  args: {
+    operation: { ...OPERATION, operationKey: "getCluster", status: "SUCCEEDED" },
+    credentialRequest: COLLECTION_PROPS,
+  },
+};
 export const Credentials: Story = {
   args: {
     operation: {

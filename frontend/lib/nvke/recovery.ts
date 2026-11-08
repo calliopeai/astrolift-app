@@ -25,6 +25,7 @@ export type NvkeRecoveryRecord = RecoveryMetadata &
         source: NvkeResourceSource;
         authorityVersion: number;
       }
+    | { format: 5; mode: "credentials"; source: NvkeResourceSource; authorityVersion: number }
   );
 export interface NvkeResourceSource {
   operationId: string;
@@ -125,7 +126,7 @@ export function validateRecovery(
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   const row = value as Record<string, unknown>;
   const expectedFields =
-    row.format === 4
+    row.format === 4 || row.format === 5
       ? [...fields, "mode", "source", "authorityVersion"]
       : row.format === 3
         ? [...fields, "mode", "source"]
@@ -135,7 +136,18 @@ export function validateRecovery(
   if (
     Object.keys(row).length !== expectedFields.length ||
     Object.keys(row).some((key) => !expectedFields.includes(key)) ||
-    (row.format !== 1 && row.format !== 2 && row.format !== 3 && row.format !== 4) ||
+    (row.format !== 1 &&
+      row.format !== 2 &&
+      row.format !== 3 &&
+      row.format !== 4 &&
+      row.format !== 5) ||
+    (row.format === 5 &&
+      (row.mode !== "credentials" ||
+        row.operationKey !== "metrics.credentials" ||
+        !validResourceSource(row.source) ||
+        row.source.resourceKey !== null ||
+        !Number.isSafeInteger(row.authorityVersion) ||
+        (row.authorityVersion as number) < 1)) ||
     (row.format === 4 &&
       ((row.mode !== "workflow" && row.mode !== "reset") ||
         !validResourceSource(row.source) ||

@@ -4,6 +4,13 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-credential-collection--full",
+  "screens-nvke-credential-collection--read-only",
+  "screens-nvke-credential-collection--unknown-outcome",
+  "screens-nvke-credential-collection--read-only-recovery",
+  "screens-nvke-credential-collection--missing-authority",
+  "screens-nvke-credential-collection--other-pending-request",
+  "screens-nvke-operation--collect-credentials",
   "screens-nvke-metrics-authority--full",
   "screens-nvke-metrics-authority--empty",
   "screens-nvke-metrics-authority--read-only",
@@ -58,6 +65,64 @@ const stories = [
   "screens-nvke-maintenance--retained-rotation",
   "screens-nvke-operation--maintenance",
 ];
+
+test("credential collection reviews the exact authority and source before admission", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(
+    "/iframe.html?id=screens-nvke-credential-collection--full&viewMode=story&globals=a11y.manual:!true"
+  );
+  await page.getByRole("button", { name: "Collect credentials", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Review change", exact: true })
+    .click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("metrics.example.test/controller/metrics");
+  await expect(review).toContainText("600 seconds");
+  await expect(review).toContainText("123e4567-e89b-12d3-a456-426614174092");
+  await expect(review).toHaveCSS("opacity", "1");
+  await page.addScriptTag({ content: axe });
+  const violations = await page.evaluate(async () => {
+    const engine = (
+      window as unknown as {
+        axe: {
+          run: (root: Element, options: unknown) => Promise<{ violations: { id: string }[] }>;
+        };
+      }
+    ).axe;
+    return (
+      await engine.run(document.querySelector('[role="alertdialog"]')!, {
+        runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] },
+      })
+    ).violations.map((item) => item.id);
+  });
+  expect(violations).toEqual([]);
+  await page.screenshot({
+    path: test.info().outputPath("nvke-credential-collection-review.png"),
+    fullPage: true,
+  });
+  await review.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(review).not.toBeVisible();
+});
+
+test("credential recovery stays available without metrics authority or administrator access", async ({
+  page,
+}) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-credential-collection--read-only-recovery&viewMode=story"
+  );
+  await expect(
+    page.getByRole("button", { name: "Recover original receipt", exact: true })
+  ).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Collect credentials", exact: true })).toHaveCount(
+    0
+  );
+  await expect(
+    page.getByRole("button", { name: "Retry original collection", exact: true })
+  ).toHaveCount(0);
+});
 
 test("metrics authority reviews the exact URL without retaining the bearer", async ({ page }) => {
   await page.goto("/iframe.html?id=screens-nvke-metrics-authority--full&viewMode=story");
@@ -304,7 +369,9 @@ test("nvke credentials are write-only and discarded when a configuration sheet c
 
 for (const mode of ["light", "dark"]) {
   test(`nvke removal confirmation is accessible in ${mode}`, async ({ page }) => {
-    await page.goto(`/iframe.html?id=screens-nvke-site--full&viewMode=story&globals=mode:${mode}`);
+    await page.goto(
+      `/iframe.html?id=screens-nvke-site--full&viewMode=story&globals=mode:${mode};a11y.manual:!true`
+    );
     await page.getByRole("button", { name: "Remove registration", exact: true }).click();
     const dialog = page.getByRole("alertdialog");
     await expect(dialog).toContainText("Existing upstream infrastructure continues running");
@@ -449,7 +516,7 @@ test("nvke workflow retirement requires acknowledgement of the exact node and ow
   page,
 }) => {
   await page.goto(
-    "/iframe.html?id=screens-nvke-native-maintenance-workflows--retained-rotation&viewMode=story"
+    "/iframe.html?id=screens-nvke-native-maintenance-workflows--retained-rotation&viewMode=story&globals=a11y.manual:!true"
   );
   await page.getByRole("button", { name: "Submit native workflow", exact: true }).click();
   const sheet = page.getByRole("dialog");

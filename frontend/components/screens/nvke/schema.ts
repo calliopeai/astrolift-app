@@ -108,6 +108,9 @@ export const nativeWorkflowFormSchema = z.object({
   timeoutSeconds: z.number().int().min(30).max(86400),
   acknowledgeLostNodeTeardown: z.boolean(),
 });
+export const credentialObservationSchema = z.object({
+  timeoutSeconds: z.number().int().min(30).max(86400),
+});
 export const nativeResetFormSchema = z
   .object({
     mode: z

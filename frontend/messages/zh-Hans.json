@@ -17940,6 +17940,17 @@
       "automation": "自动续期已启用",
       "window": "警告窗口（秒）",
       "empty": "无报告的观测"
+    },
+    "credentialCollection": {
+      "title": "采集凭据观测",
+      "help": "使用已审阅的控制器读取和独立的指标权限采集历史报告。浏览器会在提交前保存恢复标识。恢复仅查询原始回执；结果未知时会阻止第二次请求。",
+      "collect": "采集凭据",
+      "retry": "重试原始采集",
+      "recover": "恢复原始回执",
+      "unavailable": "采集需要管理员权限、当前集群读取及已启用的指标权限。",
+      "pending": "结果未确认时请保留原始请求。",
+      "deadline": "观测期限（秒）",
+      "review": "{site}，站点版本 {siteVersion}。读取 {source}，版本 {sourceVersion}；集群 {cluster}。指标权限版本 {authority}，目标 {endpoint}。期限：{timeout} 秒。"
     }
   }
 }

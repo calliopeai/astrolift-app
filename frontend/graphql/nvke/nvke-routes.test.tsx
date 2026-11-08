@@ -24,6 +24,7 @@ import { useNvkeResourceActions } from "./use-nvke-resource-actions";
 import { useNvkeSite } from "./use-nvke-site";
 import { useNvkeOperation } from "./use-nvke-operation";
 import { CREDENTIAL_PROPS } from "@/components/screens/nvke/NvkeCredentialPanel.stories";
+import { METRICS_AUTHORITY } from "@/components/screens/nvke/NvkeMetricsPanel.stories";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
@@ -1372,6 +1373,47 @@ it("does not infer permission or historical views for an unknown metrics key", a
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.canAct).toBe(false);
   expect(result.current.credentials).toBeNull();
+  h.client.stop();
+});
+
+it("wires metrics collection from a successful controller source independently of native Temporal", async () => {
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeMetricsAuthority")
+      return { astroliftNvkeMetricsAuthority: METRICS_AUTHORITY };
+    if (request.operationName === "RequestNvkeCredentialObservation")
+      return {
+        requestNvkeCredentialObservation: {
+          ok: true,
+          errors: [],
+          data: {
+            ...OPERATION,
+            operationKey: "metrics.credentials",
+            requestId: request.variables.input.requestId,
+            resourceSource: null,
+          },
+        },
+      };
+    return {
+      astroliftNvkeOperation: { ...OPERATION, operationKey: "getCluster", status: "SUCCEEDED" },
+      astroliftNvkeRequest: null,
+    };
+  });
+  const { result } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.credentialRequest?.canManage).toBe(true));
+  await act(async () => expect(await result.current.credentialRequest!.onRequest(600)).toBe(true));
+  const request = h.calls.find(
+    (call) => call.operationName === "RequestNvkeCredentialObservation"
+  )!;
+  expect(request.variables.input).toMatchObject({
+    sourceOperationId: OPERATION.id,
+    expectedSourceVersion: OPERATION.version,
+    expectedSiteVersion: SITE.version,
+    expectedAuthorityVersion: METRICS_AUTHORITY.version,
+  });
+  expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${OPERATION.id}`);
+  expect(h.cache.extract()).toEqual({});
   h.client.stop();
 });
 

@@ -17943,6 +17943,17 @@
       "automation": "Renouvellement automatique activé",
       "window": "Fenêtre d’avertissement (s)",
       "empty": "Aucune observation signalée"
+    },
+    "credentialCollection": {
+      "title": "Collecter les observations des identifiants",
+      "help": "Collectez un rapport historique avec cette lecture vérifiée du contrôleur et l’autorité de métriques distincte. Le navigateur enregistre une identité de récupération avant l’envoi. La récupération cherche uniquement le reçu initial ; un résultat inconnu bloque une seconde demande.",
+      "collect": "Collecter les identifiants",
+      "retry": "Réessayer la collecte initiale",
+      "recover": "Récupérer le reçu initial",
+      "unavailable": "La collecte exige un accès administrateur, une lecture actuelle du cluster et une autorité de métriques active.",
+      "pending": "Conservez cette demande initiale tant que son résultat est incertain.",
+      "deadline": "Délai d’observation (secondes)",
+      "review": "{site}, version du site {siteVersion}. Lecture {source}, version {sourceVersion} ; cluster {cluster}. Autorité de métriques {authority}, cible {endpoint}. Délai : {timeout} secondes."
     }
   }
 }

@@ -17943,6 +17943,17 @@
       "automation": "Automatische Erneuerung aktiviert",
       "window": "Warnzeitraum (s)",
       "empty": "Keine Beobachtungen gemeldet"
+    },
+    "credentialCollection": {
+      "title": "Anmeldedatenbeobachtungen erfassen",
+      "help": "Erfassen Sie einen historischen Bericht mit diesem geprüften Controllerabruf und der separaten Metrikberechtigung. Der Browser speichert vor dem Senden eine Wiederherstellungs-ID. Wiederherstellung sucht nur den ursprünglichen Beleg; ein unbekanntes Ergebnis blockiert einen zweiten Auftrag.",
+      "collect": "Anmeldedaten erfassen",
+      "retry": "Ursprüngliche Erfassung wiederholen",
+      "recover": "Ursprünglichen Beleg abrufen",
+      "unavailable": "Erfassung erfordert Administratorzugriff, einen aktuellen Clusterabruf und eine aktivierte Metrikberechtigung.",
+      "pending": "Bewahren Sie den ursprünglichen Auftrag auf, solange das Ergebnis unbestätigt ist.",
+      "deadline": "Beobachtungsfrist (Sekunden)",
+      "review": "{site}, Standortversion {siteVersion}. Controllerabruf {source}, Version {sourceVersion}; Cluster {cluster}. Metrikberechtigung {authority}, Ziel {endpoint}. Frist: {timeout} Sekunden."
     }
   }
 }

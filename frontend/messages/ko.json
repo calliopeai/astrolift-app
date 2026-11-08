@@ -17940,6 +17940,17 @@
       "automation": "자동 갱신 활성화",
       "window": "경고 기간 (초)",
       "empty": "보고된 관측 없음"
+    },
+    "credentialCollection": {
+      "title": "자격 증명 관측 수집",
+      "help": "검토된 컨트롤러 읽기와 별도의 메트릭 권한을 사용하여 과거 보고를 수집합니다. 브라우저는 전송 전에 복구 ID를 저장합니다. 복구는 원래 영수증만 조회하며 결과가 불명확하면 두 번째 요청을 차단합니다.",
+      "collect": "자격 증명 수집",
+      "retry": "원래 수집 재시도",
+      "recover": "원래 영수증 복구",
+      "unavailable": "수집하려면 관리자 권한, 현재 클러스터 읽기 및 활성화된 메트릭 권한이 필요합니다.",
+      "pending": "결과가 확인될 때까지 원래 요청을 보존하세요.",
+      "deadline": "관측 기한(초)",
+      "review": "{site}, 사이트 버전 {siteVersion}. 읽기 {source}, 버전 {sourceVersion}, 클러스터 {cluster}. 메트릭 권한 {authority}, 대상 {endpoint}. 기한: {timeout}초."
     }
   }
 }

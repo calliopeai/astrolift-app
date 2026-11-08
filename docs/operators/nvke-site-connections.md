@@ -62,8 +62,14 @@ The browser site page supports metrics-authority configuration, verification,
 enable/disable and removal. Successful `metrics.credentials` operation pages show
 historical subsystem flags and server-paged certificate/sample tables with search.
 READ access permits these views; raw downloads and operation controls require
-administrator access. Browser request/recovery controls remain open under #2666,
-a child of #2661; the CLI can already collect and recover observations.
+administrator access. Successful controller-read pages also offer collection with
+an explicit deadline and review of the cluster UUID, source receipt/version, site
+version and metrics target/version. The browser flushes a metadata-only recovery
+journal before admission and uses the original UUID after a lost reply. A pending
+intent prevents replacement with a second request. Receipt-only recovery remains
+available with READ access after metrics authority removal or source changes.
+Without a visible receipt, retries retain the exact original tuple. Collection
+shares the per-site Web Lock and journal with native maintenance operations.
 
 The reader pins all 18 credential gauges and 16 kubeadm credential names from the
 upstream collector and agent catalog. It selects only an exact cluster name's
@@ -97,8 +103,10 @@ from latest inspection availability. Expiry comparison is explicitly **at scrape
 time**. Missing observations remain unknown. Historical reads do not contact the
 native listener and survive later authority rotation; raw result access still
 requires administrator permission. Local HTTP/TLS, PostgreSQL, GraphQL and real
-Temporal tests qualify this flow; live collector/node inspection remains to be
-qualified on an NVKE installation.
+Temporal tests qualify this flow. Connected Chromium qualification drops the API
+reply after actual admission, waits for one scrape to complete, removes the metrics
+authority and recovers the original receipt and historical views using a READ-only
+token. Live collector/node inspection remains to be qualified on an NVKE installation.
 
 Reads have response/sample budgets, socket and elapsed scrape deadlines, explicit
 TLS/bearer configuration, no redirects, no ambient proxy credentials and no

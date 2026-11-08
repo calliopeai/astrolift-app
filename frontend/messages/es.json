@@ -17943,6 +17943,17 @@
       "automation": "Renovación automática activada",
       "window": "Ventana de advertencia (s)",
       "empty": "Sin observaciones informadas"
+    },
+    "credentialCollection": {
+      "title": "Recopilar observaciones de credenciales",
+      "help": "Recopile un informe histórico con esta lectura revisada del controlador y la autoridad de métricas independiente. El navegador guarda una identidad de recuperación antes de enviar. La recuperación solo consulta el recibo original; un resultado desconocido bloquea otra solicitud.",
+      "collect": "Recopilar credenciales",
+      "retry": "Reintentar recopilación original",
+      "recover": "Recuperar recibo original",
+      "unavailable": "Se requiere acceso de administrador, una lectura actual del clúster y una autoridad de métricas activa.",
+      "pending": "Conserve esta solicitud original mientras el resultado no esté confirmado.",
+      "deadline": "Plazo de observación (segundos)",
+      "review": "{site}, versión del sitio {siteVersion}. Lectura {source}, versión {sourceVersion}; clúster {cluster}. Autoridad de métricas {authority}, destino {endpoint}. Plazo: {timeout} segundos."
     }
   }
 }
