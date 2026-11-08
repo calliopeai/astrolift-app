@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "f9271c6aeb05f1df9d674336d8e488a48936242f"
+      "revision": "068e8c30ce399945c78143623e77db35e5cb3e64"
     }
   },
   "evidence": {
@@ -869,6 +869,43 @@
       "kind": "observation",
       "scope": "Actual compiled CLI/API/PostgreSQL/SDK/mTLS review of the original Linux partial install, 24 workloads across four snapshot pages, search cursor rebinding refusal and persistent private-safe audit. Original UNCERTAIN/version 23 retained. 62 backend tests, full Go suite, vet/lint, frontend types/codegen/contracts passed. UI and once-only continuation remain pending.",
       "sha256": "e9a07492a32343c7c0e0fc4d8b8a73068386009e75f04a508644bb6b19673b6d"
+    },
+    "operator-install-review-ui": {
+      "repository": "app",
+      "path": "frontend/components/screens/nvke/NvkeOperatorInstallReviewPanel.tsx",
+      "kind": "implementation",
+      "scope": "Explicit audited review separates original native failure from current API/workload facts; the server-paged table preserves exact counters/nulls and hides stale or unauthorized observations in eight locales."
+    },
+    "operator-install-review-ui-hook": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-operator-install-review.ts",
+      "kind": "implementation",
+      "scope": "In-memory actor/source/visit-bound snapshots, explicit refresh, expiry without native reread, source/digest/page validation and scoped server search/cursors. No continuation or infrastructure admission."
+    },
+    "operator-install-review-ui-tests": {
+      "repository": "app",
+      "path": "frontend/components/screens/nvke/nvke-operator-install-review.test.tsx",
+      "kind": "test",
+      "scope": "Ten panel/operation-screen cases cover explicit review, original uncertainty, precision, unknown readiness, source/permission/expiry/error/loading invalidation and server search/pagination delegation."
+    },
+    "operator-install-review-ui-hook-tests": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-operator-install-review.test.tsx",
+      "kind": "test",
+      "scope": "Eleven scoped Apollo cases cover exact pins/current actor, late actor/permission/source/visit replies, malformed review, foreign snapshots, cursor walk, revocation and expiry without new native observation."
+    },
+    "operator-install-review-ui-browser": {
+      "repository": "app",
+      "path": "frontend/e2e/nvke-install-review-connected-runner.mjs",
+      "kind": "test",
+      "scope": "Owned Chromium operation-screen runner forwards real loopback API requests, refuses infrastructure mutations, checks explicit review and stale-version refusal, walks one snapshot completely, searches server-side and excludes private values from storage/output."
+    },
+    "operator-install-review-ui-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-install-review-ui-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Two real retained-install Chromium/API/mTLS cases each walked 24 workloads and searched LGTM. Stale version refused; original UNCERTAIN/version 23 and eight native files/five jobs/runs unchanged. 31 release Chromium checks passed. Connected Storybook only; deployed login/routes, final type/release gates and continuation remain separate.",
+      "sha256": "7e4ccf32b06cd153be48bfb09d010ee661e1cc5b9cf03e3178d5729e65c81b1f"
     }
   },
   "rows": {
@@ -3115,9 +3152,15 @@
           "operator-install-review-api-tests",
           "operator-install-review-cli",
           "operator-install-review-cli-tests",
-          "operator-install-review-api-cli-local"
+          "operator-install-review-api-cli-local",
+          "operator-install-review-ui",
+          "operator-install-review-ui-hook",
+          "operator-install-review-ui-tests",
+          "operator-install-review-ui-hook-tests",
+          "operator-install-review-ui-browser",
+          "operator-install-review-ui-local"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin/version-gated API/compiled CLI review and encrypted snapshot pagination are locally qualified against that original job, with unchanged effect fences and later LGTM recovery. Operator review UI, immutable phase plan and linked continuation (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers and deployed acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin/version-gated API/compiled CLI and connected operation-screen review with encrypted snapshot pagination are locally qualified against that original job, with unchanged effect fences and later LGTM recovery. Immutable phase planning and linked continuation (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, final release gates and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
