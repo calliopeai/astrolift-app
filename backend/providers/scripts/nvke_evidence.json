@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "0527b2fa4a1aff029552b15bf421f645a68f75a2"
+      "revision": "b0b851497cb4501f60a0d85b164a9c7d468f433b"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "61bf5fdc8312da494c51eaab8134289b3f7952be"
+      "revision": "25809d75ed8b9fddc949e1c0ebf3309b86a26d8a"
     }
   },
   "evidence": {
@@ -580,7 +580,7 @@
       "path": "cmd/nvke_agent_test.go",
       "kind": "test",
       "scope": "Controlled HTTP cases preserve private credentials and original request; refuse malformed authority, changed input/site/authority/deadline/acknowledgement, missing original receipt, bad artifact identity/range/hash/source, no progress, oversize and output replacement.",
-      "sha256": "f0340f4f78b3c17ddf430eece89bda01bbb75fd3504322f59f341b981b57df26"
+      "sha256": "388788e1f20c392406820a4d5bc01feba4723be4d898d4df42a6b89f21e9e591"
     },
     "operator-cli-redirect-tests": {
       "repository": "cli",
@@ -602,8 +602,8 @@
       "repository": "opscode",
       "path": "kubernetes/nvke/qualification/operator-cli-local-2026-11-08.json",
       "kind": "observation",
-      "scope": "Clean committed 515e068 compiled CLI and real Astro/Postgres/Temporal/mTLS/native generation qualification passed in 39.11s; full Go suite/vet/lint/build passed. Supplemental 0527b2f tests refuse changed original versions/deadline/acknowledgement. No Storybook UI or agent-driven live bootstrap/install claim.",
-      "sha256": "822a1e81882e19c1dbc724d91fb55c7d341d86fb85bc100397c4715020348c90"
+      "scope": "Clean committed 515e068 compiled CLI and real Astro/Postgres/Temporal/mTLS/native generation qualification passed in 39.11s; full Go suite/vet/lint/build passed. Supplemental 0527b2f tests refuse changed original versions/deadline/acknowledgement. No Storybook UI or agent-driven live bootstrap/install claim. Protected cross-platform input fixtures and Windows test-executable compilation are additionally bound at b0b8514; no Windows runtime qualification.",
+      "sha256": "fef09ecc767ed65f6b038685bbaf1214962c66c392f6277b0cc78d83c8b8b740"
     }
   },
   "rows": {
