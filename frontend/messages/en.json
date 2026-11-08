@@ -17602,6 +17602,8 @@
       "download": "Download private file",
       "load": "Read original receipt",
       "reconcile": "Reconcile original job",
+      "stop": "Stop or fence original job",
+      "stopHelp": "Stop only the original agent’s owned process, or durably reject a provably never-admitted original intent. A capable agent is required; missing or incomplete history cannot prove nonexecution. Remote effects can remain uncertain. This action never replays work or rolls back infrastructure. If the reply is unconfirmed, refresh and reconcile the original receipt.",
       "cancelDownload": "Cancel download",
       "progress": "Verified transfer: {completed} of {total} bytes.",
       "unloaded": "Read the original receipt to inspect this job. Operator permission and current verified agent authority are required.",

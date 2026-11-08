@@ -17602,6 +17602,8 @@
       "download": "Baixar arquivo privado",
       "load": "Ler recibo original",
       "reconcile": "Conciliar trabalho original",
+      "stop": "Interromper ou bloquear tarefa original",
+      "stopHelp": "Interrompe apenas o grupo de processos próprio do agente original ou rejeita permanentemente uma intenção original comprovadamente nunca aceita. Exige um agente compatível; histórico ausente ou incompleto não comprova ausência de execução. Efeitos remotos podem permanecer incertos. Não repete trabalho nem reverte infraestrutura. Se a resposta não for confirmada, atualize e reconcilie o recibo original.",
       "cancelDownload": "Cancelar download",
       "progress": "Transferência verificada: {completed} de {total} bytes.",
       "unloaded": "Leia o recibo original para inspecionar este trabalho. São necessários permissão de operador e um agente verificado vigente.",

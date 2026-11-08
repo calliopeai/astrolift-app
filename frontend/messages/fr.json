@@ -17605,6 +17605,8 @@
       "download": "Télécharger le fichier privé",
       "load": "Lire le reçu initial",
       "reconcile": "Réconcilier la tâche initiale",
+      "stop": "Arrêter ou bloquer la tâche d’origine",
+      "stopHelp": "Arrête uniquement le groupe de processus détenu par l’agent d’origine, ou refuse durablement une intention dont la non-admission est prouvée. Un agent compatible est requis ; un historique absent ou incomplet ne prouve pas l’absence d’exécution. Les effets distants peuvent rester incertains. Cette action ne relance aucun travail et ne restaure pas l’infrastructure. Si la réponse reste non confirmée, actualisez et rapprochez le reçu d’origine.",
       "cancelDownload": "Annuler le téléchargement",
       "progress": "Transfert vérifié : {completed} sur {total} octets.",
       "unloaded": "Lisez le reçu initial pour inspecter cette tâche. Une permission opérateur et un agent actuellement vérifié sont requis.",

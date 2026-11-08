@@ -36,12 +36,14 @@ export interface NvkeOperatorJobPanelProps {
   loading: boolean;
   canManage: boolean;
   canReconcile: boolean;
+  canStop: boolean;
   pending: boolean;
   error: string | null;
   progress: { completed: number; total: number } | null;
   onLoad: () => void;
   onRefresh: () => void;
   onReconcile: () => Promise<boolean>;
+  onStop: () => Promise<boolean>;
   onDownload: (artifact: NvkeOperatorArtifact, maximumBytes: number) => Promise<boolean>;
   onCancelDownload: () => void;
 }
@@ -65,6 +67,8 @@ export function NvkeOperatorJobPanel(props: NvkeOperatorJobPanelProps) {
         props.authority,
         props.receipt?.receiptSha256,
         props.canManage,
+        props.canReconcile,
+        props.canStop,
         props.pending,
       ])}
       {...props}
@@ -77,6 +81,7 @@ function JobControls(props: NvkeOperatorJobPanelProps) {
   const [review, setReview] = useState<
     | { kind: "download"; artifact: NvkeOperatorArtifact; maximumBytes: number }
     | { kind: "reconcile" }
+    | { kind: "stop" }
     | null
   >(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
@@ -159,6 +164,15 @@ function JobControls(props: NvkeOperatorJobPanelProps) {
         <Button variant="outline" disabled={!allowed || props.loaded} onClick={props.onLoad}>
           {j("load")}
         </Button>
+        {props.operation.status === "UNCERTAIN" && (
+          <Button
+            variant="destructive"
+            disabled={!allowed || !props.canStop}
+            onClick={() => setReview({ kind: "stop" })}
+          >
+            {j("stop")}
+          </Button>
+        )}
         {props.operation.status === "UNCERTAIN" && (
           <Button
             disabled={!allowed || !props.canReconcile}
@@ -283,8 +297,14 @@ function JobControls(props: NvkeOperatorJobPanelProps) {
         onOpenChange={(open) => {
           if (!open) setReview(null);
         }}
-        title={j(review?.kind === "download" ? "download" : "reconcile")}
-        confirmDisabled={!allowed || (review?.kind === "reconcile" && !props.canReconcile)}
+        title={j(
+          review?.kind === "download" ? "download" : review?.kind === "stop" ? "stop" : "reconcile"
+        )}
+        confirmDisabled={
+          !allowed ||
+          (review?.kind === "reconcile" && !props.canReconcile) ||
+          (review?.kind === "stop" && !props.canStop)
+        }
         description={
           <>
             {j("review", {
@@ -302,7 +322,13 @@ function JobControls(props: NvkeOperatorJobPanelProps) {
               {props.authority?.endpoint ?? "—"} · {j("receiptState")}: {receipt?.state ?? "—"}
             </span>
             <span className="mt-2 block">
-              {j(review?.kind === "download" ? "downloadHelp" : "reconcileHelp")}
+              {j(
+                review?.kind === "download"
+                  ? "downloadHelp"
+                  : review?.kind === "stop"
+                    ? "stopHelp"
+                    : "reconcileHelp"
+              )}
             </span>
             {review?.kind === "download" && (
               <span className="mt-2 block font-mono text-xs [overflow-wrap:anywhere]">
@@ -313,13 +339,20 @@ function JobControls(props: NvkeOperatorJobPanelProps) {
           </>
         }
         onConfirm={async () => {
-          if (!review || !allowed || (review.kind === "reconcile" && !props.canReconcile))
+          if (
+            !review ||
+            !allowed ||
+            (review.kind === "reconcile" && !props.canReconcile) ||
+            (review.kind === "stop" && !props.canStop)
+          )
             return false;
           try {
             const ok =
               review.kind === "download"
                 ? await props.onDownload(review.artifact, review.maximumBytes)
-                : await props.onReconcile();
+                : review.kind === "stop"
+                  ? await props.onStop()
+                  : await props.onReconcile();
             if (!ok) setUnconfirmed(true);
             return ok;
           } catch {

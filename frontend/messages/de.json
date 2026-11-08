@@ -17605,6 +17605,8 @@
       "download": "Private Datei herunterladen",
       "load": "Ursprünglichen Beleg lesen",
       "reconcile": "Ursprünglichen Auftrag abgleichen",
+      "stop": "Ursprünglichen Auftrag stoppen oder sperren",
+      "stopHelp": "Stoppt nur die eigene Prozessgruppe des ursprünglichen Agenten oder lehnt eine nachweislich nie angenommene ursprüngliche Absicht dauerhaft ab. Ein kompatibler Agent ist erforderlich; fehlende oder unvollständige Historie beweist keine Nichtausführung. Externe Auswirkungen können ungewiss bleiben. Arbeit wird nicht erneut ausgeführt und Infrastruktur nicht zurückgesetzt. Bei unbestätigter Antwort aktualisieren und den ursprünglichen Beleg abgleichen.",
       "cancelDownload": "Download abbrechen",
       "progress": "Geprüfte Übertragung: {completed} von {total} Bytes.",
       "unloaded": "Lesen Sie den ursprünglichen Beleg zur Prüfung dieses Auftrags. Operatorberechtigung und aktuell verifizierter Agent sind erforderlich.",

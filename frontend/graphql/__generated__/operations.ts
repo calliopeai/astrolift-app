@@ -21992,6 +21992,13 @@ export type ReconcileNvkeOperatorJobMutationVariables = Exact<{
 
 export type ReconcileNvkeOperatorJobMutation = { reconcileNvkeOperatorJob: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
 
+export type StopNvkeOperatorJobMutationVariables = Exact<{
+  input: NvkeOperatorJobReviewInput;
+}>;
+
+
+export type StopNvkeOperatorJobMutation = { stopNvkeOperatorJob: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
 export type NvkeOperatorAuthorityFieldsFragment = { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, instanceId: string, bundleManifestSha256: string, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null };
 
 export type GetNvkeOperatorAuthorityQueryVariables = Exact<{

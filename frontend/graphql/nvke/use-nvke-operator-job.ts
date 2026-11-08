@@ -10,6 +10,7 @@ import type {
   GetNvkeOperatorJobPageQuery,
   GetNvkeOperatorArtifactTextQuery,
   ReconcileNvkeOperatorJobMutation,
+  StopNvkeOperatorJobMutation,
   ReconcileNvkeOperatorJobMutationVariables,
 } from "@/graphql/__generated__/operations";
 import { operatorJobPageSchema } from "@/lib/nvke/operator-job";
@@ -27,7 +28,7 @@ import {
   GET_NVKE_OPERATOR_JOB_PAGE,
   GET_NVKE_OPERATOR_ARTIFACT_TEXT,
 } from "./nvke-operator.queries";
-import { RECONCILE_NVKE_OPERATOR_JOB } from "./nvke-operator.mutations";
+import { RECONCILE_NVKE_OPERATOR_JOB, STOP_NVKE_OPERATOR_JOB } from "./nvke-operator.mutations";
 import { operatorAuthorityMetadata } from "./use-nvke-operator-agent";
 
 export const useNvkeOperatorJob = (args: {
@@ -228,6 +229,78 @@ export const useNvkeOperatorJob = (args: {
     args.onRefresh();
   };
   if (!eligible || !site || !operation) return null;
+  const reviewedAction = async (stop: boolean) => {
+    if (
+      !current() ||
+      !sourceReady ||
+      !active ||
+      !matched ||
+      operation.status !== "UNCERTAIN" ||
+      busy.current ||
+      blockedEpoch.current === key
+    )
+      return false;
+    busy.current = true;
+    setMutation({ key, pending: true, error: null, progress: null });
+    try {
+      const response = await client.mutate<
+        ReconcileNvkeOperatorJobMutation | StopNvkeOperatorJobMutation,
+        ReconcileNvkeOperatorJobMutationVariables
+      >({
+        mutation: stop ? STOP_NVKE_OPERATOR_JOB : RECONCILE_NVKE_OPERATOR_JOB,
+        variables: {
+          input: {
+            operationId: operation.id,
+            expectedActorId: context.scope!.actorId,
+            expectedSiteVersion: site.version,
+            expectedAuthorityVersion: authority!.version,
+            expectedOperationVersion: operation.version,
+          },
+        },
+        fetchPolicy: "no-cache",
+        context: requestContext,
+      });
+      if (!current()) return false;
+      const data = response.data;
+      const reply =
+        data &&
+        (stop
+          ? "stopNvkeOperatorJob" in data
+            ? data.stopNvkeOperatorJob
+            : null
+          : "reconcileNvkeOperatorJob" in data
+            ? data.reconcileNvkeOperatorJob
+            : null);
+      const row = reply?.data;
+      if (
+        reply?.ok !== true ||
+        !Array.isArray(reply.errors) ||
+        reply.errors.length ||
+        !row ||
+        row.id !== operation.id ||
+        row.siteId !== site.id ||
+        row.requestId !== operation.requestId ||
+        row.operationKey !== operation.operationKey ||
+        !Number.isSafeInteger(row.version) ||
+        row.version <= operation.version ||
+        !["SUCCEEDED", "FAILED", "CANCELLED", "UNCERTAIN"].includes(row.status)
+      )
+        throw new Error("UNCONFIRMED");
+      setMutation({ key, pending: false, error: null, progress: null });
+      setActivated("");
+      args.onRefresh();
+      setRefreshEpoch((value) => value + 1);
+      return true;
+    } catch {
+      if (current()) {
+        blockedEpoch.current = key;
+        setMutation({ key, pending: false, error: t("requestFailed"), progress: null });
+      }
+      return false;
+    } finally {
+      busy.current = false;
+    }
+  };
   const {
     items: _items,
     nextCursor: _nextCursor,
@@ -269,6 +342,12 @@ export const useNvkeOperatorJob = (args: {
       matched &&
       operation.status === "UNCERTAIN" &&
       !(mutation?.key === key && mutation.error),
+    canStop:
+      sourceReady &&
+      active &&
+      matched &&
+      operation.status === "UNCERTAIN" &&
+      !(mutation?.key === key && mutation.error),
     pending: mutation?.key === key && mutation.pending,
     progress: mutation?.key === key ? mutation.progress : null,
     error:
@@ -286,68 +365,8 @@ export const useNvkeOperatorJob = (args: {
     onCancelDownload: () => {
       if (current()) download.current?.abort();
     },
-    onReconcile: async () => {
-      if (
-        !current() ||
-        !sourceReady ||
-        !active ||
-        !matched ||
-        operation.status !== "UNCERTAIN" ||
-        busy.current ||
-        blockedEpoch.current === key
-      )
-        return false;
-      busy.current = true;
-      setMutation({ key, pending: true, error: null, progress: null });
-      try {
-        const response = await client.mutate<
-          ReconcileNvkeOperatorJobMutation,
-          ReconcileNvkeOperatorJobMutationVariables
-        >({
-          mutation: RECONCILE_NVKE_OPERATOR_JOB,
-          variables: {
-            input: {
-              operationId: operation.id,
-              expectedActorId: context.scope!.actorId,
-              expectedSiteVersion: site.version,
-              expectedAuthorityVersion: authority!.version,
-              expectedOperationVersion: operation.version,
-            },
-          },
-          fetchPolicy: "no-cache",
-          context: requestContext,
-        });
-        if (!current()) return false;
-        const reply = response.data?.reconcileNvkeOperatorJob,
-          row = reply?.data;
-        if (
-          reply?.ok !== true ||
-          !Array.isArray(reply.errors) ||
-          reply.errors.length ||
-          !row ||
-          row.id !== operation.id ||
-          row.siteId !== site.id ||
-          row.requestId !== operation.requestId ||
-          row.operationKey !== operation.operationKey ||
-          row.version <= operation.version ||
-          !["SUCCEEDED", "FAILED", "CANCELLED", "UNCERTAIN"].includes(row.status)
-        )
-          throw new Error("UNCONFIRMED");
-        setMutation({ key, pending: false, error: null, progress: null });
-        setActivated("");
-        args.onRefresh();
-        setRefreshEpoch((value) => value + 1);
-        return true;
-      } catch {
-        if (current()) {
-          blockedEpoch.current = key;
-          setMutation({ key, pending: false, error: t("requestFailed"), progress: null });
-        }
-        return false;
-      } finally {
-        busy.current = false;
-      }
-    },
+    onReconcile: () => reviewedAction(false),
+    onStop: () => reviewedAction(true),
     onDownload: async (requestedArtifact, maximumBytes) => {
       const artifact = { ...requestedArtifact };
       if (
@@ -356,6 +375,7 @@ export const useNvkeOperatorJob = (args: {
         !active ||
         !matched ||
         !summary.found ||
+        blockedEpoch.current === key ||
         busy.current ||
         table.state !== "ready" ||
         !table.rows.some(

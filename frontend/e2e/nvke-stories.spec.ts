@@ -14,6 +14,10 @@ const stories = [
   "screens-nvke-operator-job--read-only",
   "screens-nvke-operator-job--uncertain",
   "screens-nvke-operator-job--missing-receipt",
+  "screens-nvke-operator-job--stop-uncertain",
+  "screens-nvke-operator-job--stop-missing-receipt",
+  "screens-nvke-operator-job--stop-pending",
+  "screens-nvke-operator-job--stop-read-only",
   "screens-nvke-operator-job--downloading",
   "screens-nvke-operator-job--failure",
   "screens-nvke-operator-job--long-strings",
@@ -821,6 +825,26 @@ test("operator job reconciliation reviews observation-only original identity", a
   const review = page.getByRole("alertdialog");
   await expect(review).toContainText("admits no new native process");
   await expect(review).toContainText("Original operation 123e4567-e89b-12d3-a456-426614174003");
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(review).not.toBeVisible();
+});
+
+test("operator job stop reviews durable fencing and uncertain remote effects", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-job--stop-missing-receipt&viewMode=story");
+  await page.getByRole("button", { name: "Stop or fence original job", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("Original operation 123e4567-e89b-12d3-a456-426614174003");
+  await expect(review).toContainText("provably never-admitted original intent");
+  await expect(review).toContainText("Remote effects can remain uncertain");
+  await expect(review).toContainText("not_found");
+  await page.screenshot({
+    animations: "disabled",
+    path: testInfo.outputPath("operator-stop-review.png"),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await review.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(review).not.toBeVisible();
 });

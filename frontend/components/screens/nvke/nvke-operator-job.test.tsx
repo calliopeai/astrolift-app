@@ -16,6 +16,7 @@ function props() {
     ...OPERATOR_JOB_PROPS,
     onDownload: vi.fn(async () => true),
     onReconcile: vi.fn(async () => true),
+    onStop: vi.fn(async () => true),
     onLoad: vi.fn(),
     onRefresh: vi.fn(),
     onCancelDownload: vi.fn(),
@@ -67,6 +68,100 @@ it("reviews read-only reconciliation without native replay claims", async () => 
   );
   await waitFor(() => expect(p.onReconcile).toHaveBeenCalledOnce());
   expect(p.onDownload).not.toHaveBeenCalled();
+});
+it("reviews original stop or fencing separately from read-only reconciliation and download", async () => {
+  const p = props();
+  render(
+    <NvkeOperatorJobPanel
+      {...p}
+      operation={{ ...p.operation, status: "UNCERTAIN" }}
+      canStop
+      canReconcile
+    />,
+    { wrapper }
+  );
+  fireEvent.click(screen.getByRole("button", { name: j.stop }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog).toHaveTextContent(j.stopHelp);
+  expect(dialog).toHaveTextContent(p.operation.id);
+  expect(dialog).toHaveTextContent(p.authority!.instanceId);
+  expect(dialog).toHaveTextContent(p.authority!.bundleManifestSha256);
+  expect(p.onStop).not.toHaveBeenCalled();
+  fireEvent.click(
+    within(dialog).getByRole("button", { name: messages.shared.confirmation.confirm })
+  );
+  await waitFor(() => expect(p.onStop).toHaveBeenCalledOnce());
+  expect(p.onReconcile).not.toHaveBeenCalled();
+  expect(p.onDownload).not.toHaveBeenCalled();
+});
+it("requires a loaded reviewed original source before stopping an uncertain job", () => {
+  const p = props();
+  render(
+    <NvkeOperatorJobPanel
+      {...p}
+      operation={{ ...p.operation, status: "UNCERTAIN" }}
+      loaded={false}
+      receipt={null}
+    />,
+    { wrapper }
+  );
+  expect(screen.getByRole("button", { name: j.stop })).toBeDisabled();
+  expect(p.onStop).not.toHaveBeenCalled();
+});
+it.each(["scope", "source", "operation", "role", "pending", "eligibility"])(
+  "invalidates an open stop review after %s changes",
+  async (change) => {
+    const p = props(),
+      original = {
+        ...p,
+        operation: { ...p.operation, status: "UNCERTAIN" as const },
+        canStop: true,
+      },
+      r = render(<NvkeOperatorJobPanel {...original} />, { wrapper });
+    fireEvent.click(screen.getByRole("button", { name: j.stop }));
+    await screen.findByRole("alertdialog");
+    r.rerender(
+      <NvkeOperatorJobPanel
+        {...original}
+        scopeKey={change === "scope" ? "other" : p.scopeKey}
+        authority={change === "source" ? { ...p.authority!, version: 99 } : p.authority}
+        operation={
+          change === "operation" ? { ...original.operation, version: 99 } : original.operation
+        }
+        canManage={change !== "role"}
+        pending={change === "pending"}
+        canStop={change !== "eligibility"}
+      />
+    );
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(p.onStop).not.toHaveBeenCalled();
+  }
+);
+it("holds an unconfirmed stop until explicit refresh without leaking callback diagnostics", async () => {
+  const p = props();
+  p.onStop.mockRejectedValue(new Error("PRIVATE_STOP_DIAGNOSTIC"));
+  render(
+    <NvkeOperatorJobPanel
+      {...p}
+      operation={{ ...p.operation, status: "UNCERTAIN" }}
+      canStop
+      canReconcile
+    />,
+    { wrapper }
+  );
+  fireEvent.click(screen.getByRole("button", { name: j.stop }));
+  fireEvent.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", {
+      name: messages.shared.confirmation.confirm,
+    })
+  );
+  await screen.findByRole("alert");
+  expect(screen.queryByText("PRIVATE_STOP_DIAGNOSTIC")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: j.stop })).toBeDisabled();
+  expect(screen.getByRole("button", { name: j.reconcile })).toBeDisabled();
+  expect(p.onStop).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole("button", { name: messages.nvke.refresh }));
+  expect(p.onRefresh).toHaveBeenCalledOnce();
 });
 it.each(["scope", "source", "operation", "role", "pending"])(
   "invalidates an open artifact review after %s changes",

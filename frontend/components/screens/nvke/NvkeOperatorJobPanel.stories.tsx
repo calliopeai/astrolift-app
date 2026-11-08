@@ -40,12 +40,14 @@ export const OPERATOR_JOB_PROPS: NvkeOperatorJobPanelProps = {
   loading: false,
   canManage: true,
   canReconcile: false,
+  canStop: false,
   pending: false,
   error: null,
   progress: null,
   onLoad: () => {},
   onRefresh: () => {},
   onReconcile: async () => true,
+  onStop: async () => true,
   onDownload: async () => true,
   onCancelDownload: () => {},
 };
@@ -79,6 +81,18 @@ export const MissingReceipt: Story = {
     },
     table: fakeController({ rows: [] }),
   },
+};
+export const StopUncertain: Story = {
+  args: { ...Uncertain.args, canStop: true },
+};
+export const StopMissingReceipt: Story = {
+  args: { ...MissingReceipt.args, canStop: true },
+};
+export const StopPending: Story = {
+  args: { ...StopMissingReceipt.args, pending: true },
+};
+export const StopReadOnly: Story = {
+  args: { ...StopMissingReceipt.args, canManage: false, canStop: false },
 };
 export const Downloading: Story = {
   args: { pending: true, progress: { completed: 262144, total: 1048576 } },

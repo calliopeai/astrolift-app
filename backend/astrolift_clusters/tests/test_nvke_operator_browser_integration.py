@@ -13,6 +13,8 @@ from uuid import UUID, uuid4
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.db import transaction
+from nvke.client import NvkeError
 
 from astrolift_clusters.models import NvkeOperation, NvkeOperatorAuthority
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
@@ -20,6 +22,8 @@ from astrolift_clusters.tests.test_nvke_browser_integration import FRONTEND
 from astrolift_clusters.tests.test_nvke_browser_integration import browser_endpoint as _browser_endpoint
 from astrolift_clusters.tests.test_nvke_browser_integration import story_origin as _story_origin
 from astrolift_clusters.tests.test_nvke_operator import configured as _configured_operator
+from astrolift_clusters.tests.test_nvke_operator import request as operator_request
+from astrolift_clusters.tests.test_nvke_operator import reserve as reserve_operator
 from astrolift_clusters.tests.test_nvke_sites import context, create
 from astrolift_clusters.tests.test_nvke_sites import world as _world
 from astrolift_identity.api_tokens import mint_token
@@ -177,6 +181,76 @@ def browser_operator_job_source(tmp_path):
         yield _configured_operator.__wrapped__(world, state)
     finally:
         agent.close()
+
+
+@pytest.mark.parametrize("mode", ["confirmed", "lost_reply", "stale_review"])
+def test_browser_reviews_original_infrastructure_fence_without_native_dispatch(
+    browser_operator_job_source, story_origin, browser_endpoint, mode
+):
+    state = browser_operator_job_source
+    private = operator_request(
+        state,
+        command="bootstrap.site",
+        positionals=[],
+        options={"sitespec": "input:site.yaml"},
+        files={"site.yaml": "never-dispatch-stop-fixture"},
+    )
+    # Establish a never-dispatched uncertain fixture before its outbox callback.
+    with transaction.atomic():
+        row = reserve_operator(state, request_text=private, acknowledge_infrastructure_change=True)
+        row.status = "uncertain"
+        row.save(update_fields=["status", "version"])
+    issued = mint_token()
+    ApiToken.objects.create(
+        user=state.world.user,
+        organization=state.world.org,
+        name="owned original stop browser",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["read:nvke", "admin:nvke"],
+    )
+    result = subprocess.run(
+        [shutil.which("node"), str(FRONTEND / "e2e/nvke-stop-connected-runner.mjs")],
+        input=json.dumps(
+            {
+                "storyOrigin": story_origin,
+                "endpoint": browser_endpoint,
+                "token": issued.plaintext,
+                "organizationId": str(state.world.org.guid),
+                "actorId": state.world.user.pk,
+                "siteId": str(state.site.guid),
+                "operationId": str(row.guid),
+                "mode": mode,
+            }
+        ),
+        capture_output=True,
+        text=True,
+        timeout=100,
+        check=False,
+        env=os.environ.copy(),
+    )
+    for sensitive in (issued.plaintext, "PRIVATE KEY", "never-dispatch-stop-fixture", row.request_digest):
+        assert sensitive not in result.stdout + result.stderr
+    assert result.returncode == 0, result.stderr
+    receipt = json.loads(result.stdout)
+    assert receipt["operationId"] == str(row.guid) and receipt["stops"] == 1
+    row.refresh_from_db()
+    assert not list((state.agent.root / "state/jobs").iterdir())
+    assert not (state.agent.root / "state/workspace/runs").exists()
+    if mode == "stale_review":
+        assert row.status == "uncertain" and receipt["staleRefused"] and not receipt["fenced"]
+        journal = json.loads((state.agent.root / "state/admissions.json").read_bytes())
+        assert journal["payload"]["entries"] == {}
+    else:
+        assert row.status == "cancelled" and receipt["fenced"]
+        with pytest.raises(NvkeError) as delayed:
+            state.agent.client.submit(str(row.guid), json.loads(private), intent=row.request_digest)
+        assert delayed.value.code == "OPERATOR_JOB_FENCED"
+    stops = list(
+        MutationAuditLog.objects.filter(organization_id=state.world.org.pk, operation="nvke.operator_stop")
+    )
+    assert len(stops) == 1
+    assert row.request_digest not in str(stops[0].variables) and "site.yaml" not in str(stops[0].variables)
 
 
 async def test_browser_native_generation_recovers_lost_admission_without_replay(

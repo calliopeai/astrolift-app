@@ -11,9 +11,11 @@ against real GraphQL/Postgres/mTLS. The native command workbench and original-re
 the site screen and locally browser-qualified for one actual native utility.
 Original-job receipt inspection, private browser artifact downloads and reviewed
 read-only reconciliation are implemented locally. Original-job stop/fencing is
-implemented in the agent, SDK, reviewed GraphQL recovery API and CLI; browser
-controls and end-to-end compiled stop qualification remain pending. Agent-driven Linux bootstrap/install, production
-supply-chain checks and deployed acceptance remain separate qualification work.
+implemented in the agent, SDK, reviewed GraphQL recovery API, CLI and operation
+screen. Real Chromium and compiled CLI qualification cover durable fencing of
+explicitly never-dispatched uncertain fixtures, including a deliberately lost
+reply and delayed-submission refusal. Agent-driven Linux bootstrap/install,
+production supply-chain checks and deployed acceptance remain separate work.
 
 ## Native tooling in the site screen
 
@@ -69,6 +71,17 @@ preserves its infrastructure intent fence. Only a confirmed durable native-agent
 fence can settle such an absent admission safely.
 The existing generic cancellation request is consumed by an active observer;
 the reviewed recovery API below can stop/fence after that observer has closed.
+
+After reading the original receipt of an uncertain job, **Stop or fence original
+job** reviews that same operation, site, authority, instance and bundle. A missing
+receipt can be durably fenced only where the agent can prove it was never
+admitted. An admitted process can be stopped without establishing that remote
+effects were cancelled. An unconfirmed reply disables further actions until an
+explicit refresh; refresh can recover the original operation's confirmed fence
+without another stop or native admission. A stale review is refused before any
+agent closure. The local browser stale-review test deliberately alters the
+expected version to exercise this refusal; it does not claim a naturally occurring
+concurrent operator change.
 
 The local browser qualification generates a native site spec, deliberately loses
 its admission response, recovers the original request receipt, downloads and
@@ -188,8 +201,11 @@ rolling back admission history is unsupported.
 The CLI exposes this as `nvke agent stop OPERATION_GUID --site GUID
 --site-version N --authority-version N --version N`. It checks the original
 operation identity and exact reviewed versions before writing and refuses a
-reply for another operation. Its local command tests, build and Go gates pass;
-the new compiled stop path through a real Astro endpoint is not yet qualified.
+reply for another operation. The compiled command is locally qualified against
+real Astro/Postgres/mTLS for confirmed and deliberately lost stop replies,
+original-operation recovery and delayed original PUT refusal. These fixtures
+never execute bootstrap and leave the one earlier native generation run intact;
+they do not qualify stopping live infrastructure effects.
 
 `astroliftNvkeOperatorArtifactText` returns a bounded, base64-encoded chunk from a
 retained private artifact. Review the operation and current authority versions for

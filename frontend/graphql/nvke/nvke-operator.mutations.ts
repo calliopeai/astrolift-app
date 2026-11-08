@@ -91,3 +91,18 @@ export const RECONCILE_NVKE_OPERATOR_JOB = gql`
   }
   ${NVKE_OPERATION_FIELDS}
 `;
+
+export const STOP_NVKE_OPERATOR_JOB = gql`
+  mutation StopNvkeOperatorJob($input: NvkeOperatorJobReviewInput!) {
+    stopNvkeOperatorJob(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        ...NvkeOperationFields
+      }
+    }
+  }
+  ${NVKE_OPERATION_FIELDS}
+`;

@@ -101,7 +101,10 @@ async function load(
 ) {
   await waitFor(() => expect(r.result.current?.canManage).toBe(true));
   act(() => r.result.current!.onLoad());
-  await waitFor(() => expect(r.result.current?.table.state).toBe("ready"));
+  await waitFor(() => expect(r.result.current?.receipt).toBeTruthy());
+  await waitFor(() =>
+    expect(r.result.current?.table.state).toBe(h.state.page.items.length ? "ready" : "empty")
+  );
 }
 const create = vi.fn((_blob: Blob) => "blob:owned-native"),
   revoke = vi.fn();
@@ -317,3 +320,177 @@ it("accepts only an advanced, matching original operation reconciliation receipt
   expect(a.onRefresh).toHaveBeenCalledOnce();
   expect(h.cache.extract()).toEqual({});
 });
+
+it("requires explicit original receipt review then stops a missing original without admitting work", async () => {
+  const h = await harness(),
+    a = args();
+  a.operation.status = "UNCERTAIN";
+  h.state.page.found = false;
+  h.state.page.state = "not_found";
+  h.state.page.items = [];
+  h.state.page.totalCount = 0;
+  const r = renderHook(() => useNvkeOperatorJob(a), { wrapper: h.wrapper });
+  await waitFor(() => expect(r.result.current?.canManage).toBe(true));
+  expect(r.result.current?.canStop).toBe(false);
+  expect(await r.result.current!.onStop()).toBe(false);
+  await load(h, r);
+  expect(r.result.current?.canStop).toBe(true);
+  let pending: Promise<boolean>;
+  act(() => {
+    pending = r.result.current!.onStop();
+  });
+  await waitFor(() => expect(h.calls.at(-1)?.request.operationName).toBe("StopNvkeOperatorJob"));
+  const call = h.calls.at(-1)!;
+  expect(call.request.variables.input).toEqual({
+    operationId: a.operation.id,
+    expectedActorId: 41,
+    expectedSiteVersion: SITE.version,
+    expectedAuthorityVersion: OPERATOR_AGENT_AUTHORITY.version,
+    expectedOperationVersion: a.operation.version,
+  });
+  expect(call.request.getContext()).toMatchObject({
+    redactDiagnostics: true,
+    queryDeduplication: false,
+    fetchOptions: { redirect: "error", cache: "no-store" },
+  });
+  await act(async () => {
+    call.reply({
+      stopNvkeOperatorJob: {
+        ok: true,
+        errors: [],
+        data: { ...a.operation, version: a.operation.version + 1, status: "CANCELLED" },
+      },
+    });
+    expect(await pending!).toBe(true);
+  });
+  expect(a.onRefresh).toHaveBeenCalledOnce();
+  expect(h.calls.some((call) => call.request.operationName === "RequestNvkeOperatorJob")).toBe(
+    false
+  );
+  expect(h.cache.extract()).toEqual({});
+});
+
+it("does not retry an unconfirmed stop or reuse its saved callback after refresh", async () => {
+  const h = await harness(),
+    a = args();
+  a.operation.status = "UNCERTAIN";
+  const r = renderHook(() => useNvkeOperatorJob(a), { wrapper: h.wrapper });
+  await load(h, r);
+  const saved = r.result.current!.onStop;
+  const savedDownload = r.result.current!.onDownload;
+  let pending: Promise<boolean>;
+  act(() => {
+    pending = saved();
+  });
+  await waitFor(() => expect(h.calls.at(-1)?.request.operationName).toBe("StopNvkeOperatorJob"));
+  await act(async () => {
+    h.calls.at(-1)!.fail();
+    expect(await pending!).toBe(false);
+  });
+  expect(r.result.current?.error).toBe(messages.nvke.requestFailed);
+  expect(await saved()).toBe(false);
+  expect(await r.result.current!.onReconcile()).toBe(false);
+  const beforeDownload = h.calls.length;
+  expect(
+    await Promise.race([savedDownload(h.artifact, 1048576), Promise.resolve("started I/O")])
+  ).toBe(false);
+  expect(h.calls).toHaveLength(beforeDownload);
+  act(() => r.result.current!.onRefresh());
+  expect(await saved()).toBe(false);
+  expect(
+    h.calls.filter((call) => call.request.operationName === "StopNvkeOperatorJob")
+  ).toHaveLength(1);
+});
+
+it.each([5.5, "999", Number.MAX_SAFE_INTEGER + 1])(
+  "refuses a stop receipt with malformed advanced version %s",
+  async (version) => {
+    const h = await harness(),
+      a = args();
+    a.operation.status = "UNCERTAIN";
+    const r = renderHook(() => useNvkeOperatorJob(a), { wrapper: h.wrapper });
+    await load(h, r);
+    let pending: Promise<boolean>;
+    act(() => {
+      pending = r.result.current!.onStop();
+    });
+    await waitFor(() => expect(h.calls.at(-1)?.request.operationName).toBe("StopNvkeOperatorJob"));
+    await act(async () => {
+      h.calls.at(-1)!.reply({
+        stopNvkeOperatorJob: {
+          ok: true,
+          errors: [],
+          data: { ...a.operation, status: "CANCELLED", version },
+        },
+      });
+      expect(await pending!).toBe(false);
+    });
+    expect(a.onRefresh).not.toHaveBeenCalled();
+  }
+);
+
+it.each(["scope", "actor", "site", "operation", "authority", "permission"])(
+  "refuses a retained stop callback after %s changes",
+  async (change) => {
+    const h = await harness(),
+      initial = args();
+    initial.operation.status = "UNCERTAIN";
+    const r = renderHook((value) => useNvkeOperatorJob(value), {
+      initialProps: initial,
+      wrapper: h.wrapper,
+    });
+    await load(h, r);
+    const saved = r.result.current!.onStop;
+    const next = {
+      ...initial,
+      context: {
+        ...initial.context,
+        scope: { ...initial.context.scope },
+        access: { ...initial.context.access },
+      },
+      site: { ...initial.site },
+      operation: { ...initial.operation },
+    };
+    if (change === "scope") next.scopeKey = "new-visit";
+    if (change === "actor") next.context.scope.actorId++;
+    if (change === "site") next.site.version++;
+    if (change === "operation") next.operation.version++;
+    if (change === "authority") h.state.authority = { ...h.state.authority, version: 99 };
+    if (change === "permission") next.context.access.admin = false;
+    if (change === "authority") act(() => r.result.current!.onRefresh());
+    r.rerender(next);
+    await waitFor(() => expect(r.result.current?.canStop).toBe(false));
+    expect(await saved()).toBe(false);
+    expect(h.calls.some((call) => call.request.operationName === "StopNvkeOperatorJob")).toBe(
+      false
+    );
+  }
+);
+
+it.each(["id", "siteId", "requestId", "operationKey", "version", "status"])(
+  "refuses a stop reply with changed %s",
+  async (field) => {
+    const h = await harness(),
+      a = args();
+    a.operation.status = "UNCERTAIN";
+    const r = renderHook(() => useNvkeOperatorJob(a), { wrapper: h.wrapper });
+    await load(h, r);
+    let pending: Promise<boolean>;
+    act(() => {
+      pending = r.result.current!.onStop();
+    });
+    await waitFor(() => expect(h.calls.at(-1)?.request.operationName).toBe("StopNvkeOperatorJob"));
+    const data = {
+      ...a.operation,
+      version: a.operation.version + 1,
+      status: "CANCELLED",
+      [field]: field === "version" ? a.operation.version : "FOREIGN",
+    };
+    await act(async () => {
+      h.calls.at(-1)!.reply({ stopNvkeOperatorJob: { ok: true, errors: [], data } });
+      expect(await pending!).toBe(false);
+    });
+    expect(r.result.current?.error).toBe(messages.nvke.requestFailed);
+    expect(a.onRefresh).not.toHaveBeenCalled();
+  }
+);
