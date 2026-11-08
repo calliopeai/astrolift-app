@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "28075c86096b2c9e45e6676f999222fff335a478"
+      "revision": "0527b2fa4a1aff029552b15bf421f645a68f75a2"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "4481d84282a4c211a2c7cec5f3166e9f88acd8bb"
+      "revision": "61bf5fdc8312da494c51eaab8134289b3f7952be"
     }
   },
   "evidence": {
@@ -538,7 +538,7 @@
       "repository": "app",
       "path": "backend/astrolift_clusters/schema/nvke_operator.py",
       "kind": "implementation",
-      "scope": "Permission-gated GraphQL configuration/lifecycle/verification, complete typed catalog, reviewed admission, private artifacts and current-admin read-only reconciliation. Typed frontend documents exist; screens and remote CLI remain pending."
+      "scope": "Permission-gated GraphQL configuration/lifecycle/verification, complete typed catalog, reviewed admission, private artifacts and current-admin read-only reconciliation. Typed frontend documents and remote CLI exist; Storybook screens remain pending."
     },
     "operator-api-tests": {
       "repository": "app",
@@ -553,6 +553,57 @@
       "kind": "observation",
       "scope": "Committed source-bound local Astro adapter proof: 415 backend regression tests passed/3 skipped, five additional malformed-authority cases, 525 SDK tests passed/18 skipped, 22 evidence checks. Real TLS/native utility through Postgres/Temporal, lost PUT reply with one process, current-admin read-only recovery after original-role revocation, private history/artifacts and audit masking. No hosted CLI/UI or live agent-driven bootstrap/install qualification.",
       "sha256": "784c516bb5b82871264b42fac588f93d388d0adedd36711e27a2b06cfc5953fd"
+    },
+    "operator-cli-authority": {
+      "repository": "cli",
+      "path": "cmd/nvke_agent.go",
+      "kind": "implementation",
+      "scope": "astro nvke agent exposes connected command catalog plus reviewed, private mTLS configure/get/verify/enable/disable/remove controls.",
+      "sha256": "75ecd242798d9b07f04a8a38bbcba543043d1eb40400b9a820f20ef132975054"
+    },
+    "operator-cli-request": {
+      "repository": "cli",
+      "path": "cmd/nvke_agent_request.go",
+      "kind": "implementation",
+      "scope": "Full native envelope remains text; private recovery identity/digest/version/acknowledgement is flushed before admission. Original receipt lookup precedes input/current-source reads; recover never submits. Server owns complete native validation.",
+      "sha256": "70772d9c7ae73241cb7d16fb0a106a9f1dd2db5b6d27e4231e84beebaa26aaad"
+    },
+    "operator-cli-artifact": {
+      "repository": "cli",
+      "path": "cmd/nvke_agent_artifact.go",
+      "kind": "implementation",
+      "scope": "Current reviewed admin can reconcile the original uncertain job read-only; artifact downloader streams protected exclusive files, binds chunks and source identity, validates final size/hash and retains partial downloads on failure.",
+      "sha256": "b5a961e5bb6095a592f04b24338d33bdc08ac161115ba93fce34a547653eee60"
+    },
+    "operator-cli-tests": {
+      "repository": "cli",
+      "path": "cmd/nvke_agent_test.go",
+      "kind": "test",
+      "scope": "Controlled HTTP cases preserve private credentials and original request; refuse malformed authority, changed input/site/authority/deadline/acknowledgement, missing original receipt, bad artifact identity/range/hash/source, no progress, oversize and output replacement.",
+      "sha256": "f0340f4f78b3c17ddf430eece89bda01bbb75fd3504322f59f341b981b57df26"
+    },
+    "operator-cli-redirect-tests": {
+      "repository": "cli",
+      "path": "internal/api/nvke_agent_test.go",
+      "kind": "test",
+      "scope": "Three concrete HTTP 307 cases reproduced private configure/request/artifact body forwarding before the dedicated transport refused redirects. Agent API calls now never follow that destination.",
+      "sha256": "b7797a2ef487af98262641d0b764c7e603e119303c876a95f25f641dc2460b7d",
+      "symbol": "TestNVKEAgentPrivateRequestsNeverFollowRedirects"
+    },
+    "operator-cli-paired": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_agent.py",
+      "kind": "test",
+      "scope": "Compiled CLI creates an actual Astro site, configures/verifies actual mTLS agent, recovers lost Astro admission reply after deleting native input, waits for one native generation process, exports private hash-checked bytes, reconciles an explicit uncertain fixture without replay and refuses revoked-token download.",
+      "sha256": "3dc3a6c7187723fdb7c7fa9dc80a5fe27e20cd020a94acdc3aad053d3d24f4c9",
+      "symbol": "test_compiled_cli_agent_configuration_original_recovery_and_private_export"
+    },
+    "operator-cli-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-cli-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Clean committed 515e068 compiled CLI and real Astro/Postgres/Temporal/mTLS/native generation qualification passed in 39.11s; full Go suite/vet/lint/build passed. Supplemental 0527b2f tests refuse changed original versions/deadline/acknowledgement. No Storybook UI or agent-driven live bootstrap/install claim.",
+      "sha256": "822a1e81882e19c1dbc724d91fb55c7d341d86fb85bc100397c4715020348c90"
     }
   },
   "rows": {
@@ -2540,7 +2591,14 @@
         "evidence": [
           "sites-api",
           "ui-wiring",
-          "cli-wiring"
+          "cli-wiring",
+          "operator-cli-authority",
+          "operator-cli-request",
+          "operator-cli-artifact",
+          "operator-cli-tests",
+          "operator-cli-redirect-tests",
+          "operator-cli-paired",
+          "operator-cli-local"
         ],
         "remaining": "Live routes and deployed token/login acceptance remain pending."
       },
@@ -2555,7 +2613,7 @@
         "remaining": "Local software-TPM substrate and source-built node bootstrap are exercised. Production node/image preparation, other TPM/SPIRE attestation paths, physical-provider qualification, verified artifact delivery and API/UI control remain pending."
       },
       "site-specs": {
-        "mapping": "Generate/inspect/validate and bootstrap dry-run through pinned tooling",
+        "mapping": "Pinned generate/inspect/validate/dry-run tooling with Astro API/outbox and remote CLI envelope/recovery/private artifacts",
         "qualification": "partial",
         "evidence": [
           "native-tooling",
@@ -2571,9 +2629,16 @@
           "operator-runtime",
           "operator-api",
           "operator-api-tests",
-          "operator-api-local"
+          "operator-api-local",
+          "operator-cli-authority",
+          "operator-cli-request",
+          "operator-cli-artifact",
+          "operator-cli-tests",
+          "operator-cli-redirect-tests",
+          "operator-cli-paired",
+          "operator-cli-local"
         ],
-        "remaining": "Generation/validation/dry-run execute through the standalone agent, and actual native generation completes through the encrypted Astro GraphQL/outbox/Temporal transport. Hosted CLI/UI controls, remaining command-family end-to-end qualification and agent-driven live bootstrap/install remain pending."
+        "remaining": "Actual native generation completes through compiled remote CLI, a CLI-created Astro site, encrypted API/outbox/Temporal and mTLS agent. Storybook UI controls, remaining command-family end-to-end qualification and actual agent-driven Linux bootstrap/install remain pending."
       },
       "deployment-rendering": {
         "mapping": "Pinned native deploy-path, stack/values inspection and management install planning",
@@ -2603,12 +2668,19 @@
           "operator-runtime",
           "operator-api",
           "operator-api-tests",
-          "operator-api-local"
+          "operator-api-local",
+          "operator-cli-authority",
+          "operator-cli-request",
+          "operator-cli-artifact",
+          "operator-cli-tests",
+          "operator-cli-redirect-tests",
+          "operator-cli-paired",
+          "operator-cli-local"
         ],
         "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
       },
       "bootstrap": {
-        "mapping": "Pinned bootstrap/attempt guard with site-bound mTLS agent and reviewed Astro API/outbox admission",
+        "mapping": "Pinned bootstrap/attempt guard with site-bound mTLS agent and reviewed Astro API/outbox/remote CLI admission",
         "qualification": "partial",
         "evidence": [
           "native-tooling",
@@ -2626,9 +2698,16 @@
           "operator-runtime",
           "operator-api",
           "operator-api-tests",
-          "operator-api-local"
+          "operator-api-local",
+          "operator-cli-authority",
+          "operator-cli-request",
+          "operator-cli-artifact",
+          "operator-cli-tests",
+          "operator-cli-redirect-tests",
+          "operator-cli-paired",
+          "operator-cli-local"
         ],
-        "remaining": "Local seed/node bootstrap and separate agent utility/dry-run proof are qualified. Astro transport handles the declared envelope; actual agent-driven bootstrap/install, hosted CLI/UI controls, production artifact verification and deployed acceptance remain pending."
+        "remaining": "Local seed/node bootstrap and separate agent utility/dry-run proof are qualified. Astro API/CLI handles the complete declared envelope, durable original recovery and private artifacts; actual agent-driven bootstrap/install, Storybook UI controls, production artifact verification and deployed acceptance remain pending."
       },
       "installation": {
         "mapping": "Pinned management install/check/access with guarded actual local default-stack installation",
@@ -2653,9 +2732,16 @@
           "operator-runtime",
           "operator-api",
           "operator-api-tests",
-          "operator-api-local"
+          "operator-api-local",
+          "operator-cli-authority",
+          "operator-cli-request",
+          "operator-cli-artifact",
+          "operator-cli-tests",
+          "operator-cli-redirect-tests",
+          "operator-cli-paired",
+          "operator-cli-local"
         ],
-        "remaining": "Default stack, private APIs, native controller, declarative create/access, worker growth/explicit surplus deletion and native cluster cleanup are locally qualified. Reviewed Astro API transport exists; hosted CLI/UI controls, agent-driven install, hosted new tenant/delete admission, upgrades, verified production supply chain, physical providers and deployment remain pending."
+        "remaining": "Default stack, private APIs/controller, native declarative create/access, worker growth/explicit deletion and native cluster cleanup are locally qualified. Reviewed Astro API/remote CLI transport exists; Storybook UI, actual agent-driven install, hosted new tenant/delete admission, upgrades, verified production supply chain, physical providers and deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",

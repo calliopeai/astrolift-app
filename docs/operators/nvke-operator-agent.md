@@ -5,7 +5,7 @@ server and Temporal worker never execute the native toolchain themselves. The
 agent protocol and installation instructions live in
 [`astrolift-opscode/kubernetes/nvke/OPERATOR-AGENT.md`](https://github.com/calliopeai/astrolift-opscode/blob/feature/nvke-2656-full-surface/kubernetes/nvke/OPERATOR-AGENT.md).
 
-This is a local integration under development. Hosted CLI/UI control, agent-driven
+This is a local integration under development. Storybook UI controls, agent-driven
 Linux bootstrap/install, production supply-chain checks and deployed acceptance
 remain separate qualification work.
 
@@ -97,3 +97,28 @@ retained private artifact. Review the operation and current authority versions f
 each request. Offsets and sizes are decimal strings. Verify the complete assembled
 file against the receipt SHA-256, save credentials privately, and keep private
 diagnostics out of issue comments and workflow history.
+
+
+## Remote CLI
+
+`astro nvke agent catalog` shows the full connected command contract. Use
+`agent configure/get/verify/enable/disable/remove` for agent authority lifecycle.
+`agent request --file PRIVATE.json --request-file NEW-RECOVERY.json` takes the
+complete envelope with reviewed `--site`, `--site-version` and
+`--authority-version`. Acknowledged infrastructure changes use
+`--acknowledge-infrastructure-change`. `agent recover --request-file FILE` reads
+the original receipt without another admission and needs no input file.
+
+Use `nvke operation get/wait/cancel/result` for durable operation state and private
+artifact metadata. `nvke agent reconcile OPERATION_GUID` and
+`nvke agent artifact OPERATION_GUID --name ARTIFACT --output NEW-PRIVATE-FILE`
+require current reviewed site/authority versions and operation `--version`.
+Artifact downloads stream to an exclusive protected local file, check original
+size/hash and retain private partial files on failure. `--max-bytes` defaults to
+64 MiB and can be raised explicitly. The remote agent API refuses redirects.
+
+The compiled local qualification covers CLI site creation, actual TLS agent
+verification, one native generation run, deliberately lost admission reply,
+original recovery without the input file, private output, read-only settlement
+from an explicit uncertain fixture and revoked-token refusal. Other native
+command families and infrastructure effects remain separate qualification work.
