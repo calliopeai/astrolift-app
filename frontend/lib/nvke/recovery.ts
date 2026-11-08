@@ -274,14 +274,21 @@ export async function withRecoveryLock<T>(
   return navigator.locks.request(recoveryKey(scope, siteId), { mode: "exclusive" }, run);
 }
 
-/** These admission failures occur before insertion, after any existing receipt is returned.
- * Authorization, source changes, conflicts and internal failures do not prove rejection. */
+/** Standard codes follow the receipt lookup. Additional native refusals are
+ * definitive only for the first reply to a newly issued UUID. Authority/source
+ * changes, conflicts and unknown outcomes retain their original identity. */
 export function archiveRejectedRecovery(
   storage: RecoveryStorage,
   record: NvkeRecoveryRecord,
-  code: string
+  code: string,
+  policy: "standard" | "native_first_reply" = "standard"
 ): boolean {
-  if (!["INVALID_INPUT", "VERSION_MISMATCH", "SURFACE_UNAVAILABLE"].includes(code)) return false;
+  const allowed =
+    ["INVALID_INPUT", "VERSION_MISMATCH", "SURFACE_UNAVAILABLE"].includes(code) ||
+    (policy === "native_first_reply" &&
+      record.format === 4 &&
+      ["PRECONDITION", "RESOURCE_BUSY", "UNSUPPORTED"].includes(code));
+  if (!allowed) return false;
   try {
     const key = recoveryKey(record, record.siteId);
     if (JSON.stringify(readRecovery(storage, record, record.siteId)) !== JSON.stringify(record))

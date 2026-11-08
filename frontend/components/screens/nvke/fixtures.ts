@@ -137,6 +137,7 @@ export const MAINTENANCE_OBSERVATION: NvkeMaintenanceObservation = {
   siteId: SITE.id,
   operationId: "123e4567-e89b-12d3-a456-426614174003",
   operationVersion: 9,
+  sourceSiteVersion: SITE.version,
   observedAt: "2026-11-07T12:00:00Z",
   clusterId: "123e4567-e89b-12d3-a456-426614174088",
   nextCertificateRenewalDue: "2026-11-07T10:00:00Z",

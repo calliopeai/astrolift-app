@@ -52,6 +52,8 @@ export interface NvkeWorkflowPanelProps {
   owners: Partial<Record<"RenewK8sCertsV2" | "RotateEtcdEncryptionKey", string>>;
   workflows: { name: NvkeNativeWorkflow; schemaText: string }[];
   canManage: boolean;
+  canRecover: boolean;
+  retirementEligible: boolean;
   canInspect: boolean;
   loading: boolean;
   pending: boolean;
@@ -181,6 +183,7 @@ function WorkflowEditor(props: NvkeWorkflowPanelProps) {
     bound &&
     history?.workflow === "RotateEtcdEncryptionKey" &&
     history.retainedMutationLock === true &&
+    ["failed", "running"].includes(history.recordedState ?? "") &&
     phases.includes(history.recordedPhase ?? "") &&
     ["FAILED", "CANCELED", "TERMINATED", "TIMED_OUT"].includes(history.status) &&
     !props.historyError &&
@@ -264,6 +267,7 @@ function WorkflowEditor(props: NvkeWorkflowPanelProps) {
       if (workflow === "RetireLostEtcdRotationNode") {
         const fields = input as Record<string, unknown>;
         if (
+          !props.retirementEligible ||
           !validNvkeGuid(fields.nodeID) ||
           !props.owners.RotateEtcdEncryptionKey ||
           fields.rotationWorkflowID !== props.owners.RotateEtcdEncryptionKey ||
@@ -361,7 +365,7 @@ function WorkflowEditor(props: NvkeWorkflowPanelProps) {
         {props.recovery && (
           <Button
             variant="outline"
-            disabled={!props.canManage || props.pending}
+            disabled={!props.canRecover || props.pending}
             onClick={props.onRecover}
           >
             {t("recover")}
@@ -380,6 +384,10 @@ function WorkflowEditor(props: NvkeWorkflowPanelProps) {
       )}
       {props.loading && <Skeleton className="h-24" />}
       {!props.canManage && <p className="text-muted-foreground text-sm">{t("readOnly")}</p>}
+      {!props.retirementEligible &&
+        props.workflows.some((item) => item.name === "RetireLostEtcdRotationNode") && (
+          <p className="text-muted-foreground text-sm">{t("retirementHelp")}</p>
+        )}
       <DefinitionList
         items={[
           { term: m("clusterId"), description: text(props.clusterId) },
@@ -452,7 +460,11 @@ function WorkflowEditor(props: NvkeWorkflowPanelProps) {
                 value={workflow}
                 onValueChange={(value) => {
                   const next = props.workflows.find((item) => item.name === value);
-                  if (!next) return;
+                  if (
+                    !next ||
+                    (next.name === "RetireLostEtcdRotationNode" && !props.retirementEligible)
+                  )
+                    return;
                   setWorkflow(next.name);
                   setReview(null);
                   setInvalid(false);
@@ -468,7 +480,13 @@ function WorkflowEditor(props: NvkeWorkflowPanelProps) {
                 </SelectTrigger>
                 <SelectContent>
                   {props.workflows.map((item) => (
-                    <SelectItem key={item.name} value={item.name}>
+                    <SelectItem
+                      key={item.name}
+                      value={item.name}
+                      disabled={
+                        item.name === "RetireLostEtcdRotationNode" && !props.retirementEligible
+                      }
+                    >
                       {item.name}
                     </SelectItem>
                   ))}
@@ -484,7 +502,12 @@ function WorkflowEditor(props: NvkeWorkflowPanelProps) {
               />
               <details>
                 <summary>{common("schema")}</summary>
-                <pre className="max-h-64 overflow-auto text-xs">
+                <pre
+                  tabIndex={0}
+                  role="region"
+                  aria-label={common("schema")}
+                  className="max-h-64 overflow-auto text-xs"
+                >
                   {props.workflows.find((item) => item.name === workflow)?.schemaText}
                 </pre>
               </details>

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { WORKFLOW_PROPS, WORKFLOW_HISTORY } from "./NvkeWorkflowPanel.stories";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
 import { fakeController } from "@/components/data-table/fixtures";
@@ -122,6 +123,36 @@ export const NativeResetUnconfirmed: Story = {
       status: "UNCERTAIN",
       stage: "native_reset_review_required",
       errorCode: "RESET_UNCONFIRMED",
+    },
+  },
+};
+
+export const NativeMaintenanceControls: Story = {
+  args: {
+    operation: { ...OPERATION, operationKey: "getCluster", status: "SUCCEEDED" },
+    workflows: WORKFLOW_PROPS,
+    maintenance: {
+      observation: {
+        ...MAINTENANCE_OBSERVATION,
+        operationId: OPERATION.id,
+        operationVersion: OPERATION.version,
+        sourceSiteVersion: WORKFLOW_PROPS.site.version,
+        renewal: null,
+        mutationLockOwner: "etcd_key_rotation",
+        etcdKeyRotation: {
+          workflowId: WORKFLOW_HISTORY.workflowId,
+          state: "failed",
+          phase: "rewrite",
+          retainedMutationLock: true,
+          startedAt: null,
+          lastProgressAt: null,
+          completedAt: null,
+          failureReason: "operation_failed",
+        },
+      },
+      loading: false,
+      error: null,
+      onRefresh: () => {},
     },
   },
 };

@@ -25,6 +25,7 @@ import {
   GET_NVKE_SITE,
 } from "./nvke.queries";
 import { useNvkeDiagnostics } from "./use-nvke-diagnostics";
+import { useNvkeWorkflows } from "./use-nvke-workflows";
 import { useNvkeMaintenance } from "./use-nvke-maintenance";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
@@ -126,6 +127,16 @@ export const useNvkeOperation = (
     site.refresh();
     catalog.refresh();
   };
+  const workflows = useNvkeWorkflows({
+    context,
+    scopeKey: visitKey,
+    site: site.data?.astroliftNvkeSite?.id === siteId ? site.data.astroliftNvkeSite : null,
+    operation,
+    contract: catalog.data?.astroliftNvkeContract,
+    maintenance,
+    enabled: canAct,
+    onRefresh: refresh,
+  });
   const control = async (resume: boolean) => {
     if (!current() || !canAct || !operation || busy.current || (resume && !context.access.admin))
       return false;
@@ -173,6 +184,7 @@ export const useNvkeOperation = (
     operation,
     diagnostics,
     maintenance,
+    workflows,
     workloadAccess,
     siteName: site.data?.astroliftNvkeSite?.name ?? "",
     loading,

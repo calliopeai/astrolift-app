@@ -17889,7 +17889,9 @@
       "reviewHelp": "El plazo de observación no cancela el trabajo nativo ni libera bloqueos. Completar el flujo nativo no demuestra la salud del sitio.",
       "targetNode": "Nodo a retirar",
       "cancelHelp": "Solo detiene el envío de Astro antes de despacharlo; no cancela la ejecución nativa, detiene tareas de nodos ni libera bloqueos.",
-      "resumeHelp": "Observe la ejecución nativa original con la misma autoridad. Las RPC de inicio o reinicio no se repiten tras el envío y no se libera ningún bloqueo."
+      "resumeHelp": "Observe la ejecución nativa original con la misma autoridad. Las RPC de inicio o reinicio no se repiten tras el envío y no se libera ningún bloqueo.",
+      "sourceUnavailable": "Realice una nueva lectura getCluster del controlador con la autoridad actual del sitio antes de ejecutar o inspeccionar el historial nativo.",
+      "retirementHelp": "Inspeccione la rotación fallida que conserva el bloqueo y su ejecución nativa actual antes de retirar un nodo."
     }
   }
 }

@@ -236,3 +236,30 @@ it("does not expose an invalid private schedule in renewal confirmation", async 
   fireEvent.click(screen.getByRole("button", { name: messages.nvke.reviewRequest }));
   expect(await screen.findByRole("alertdialog")).not.toHaveTextContent("PRIVATE_SCHEDULE");
 });
+
+it("allows receipt-only recovery when execution capability is unavailable", async () => {
+  const p = props();
+  render(
+    <NvkeWorkflowPanel
+      {...p}
+      canManage={false}
+      canInspect={false}
+      canRecover={true}
+      recovery={{ requestId: "original", operationKey: "temporal.RenewK8sCertsV2" }}
+    />,
+    { wrapper }
+  );
+  fireEvent.click(screen.getByRole("button", { name: copy.recover }));
+  await waitFor(() => expect(p.onRecover).toHaveBeenCalledOnce());
+  expect(p.onRequest).not.toHaveBeenCalled();
+});
+it("requires inspection before choosing node retirement", async () => {
+  const p = props();
+  render(<NvkeWorkflowPanel {...p} retirementEligible={false} />, { wrapper });
+  fireEvent.click(screen.getByRole("button", { name: copy.submit }));
+  fireEvent.click(screen.getByRole("combobox"));
+  expect(await screen.findByRole("option", { name: "RetireLostEtcdRotationNode" })).toHaveAttribute(
+    "data-disabled"
+  );
+  expect(p.onRequest).not.toHaveBeenCalled();
+});

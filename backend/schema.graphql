@@ -11495,6 +11495,7 @@ type NvkeMaintenanceObservationType {
   siteId: GUID!
   operationId: GUID!
   operationVersion: Int!
+  sourceSiteVersion: Int!
   observedAt: DateTime
   clusterId: GUID!
   nextCertificateRenewalDue: String
@@ -11552,6 +11553,7 @@ type NvkeNativeWorkflowType {
   source: String!
   permission: String!
   inputSchema: JSON!
+  inputSchemaText: String!
 }
 
 enum NvkeOperationStatus {

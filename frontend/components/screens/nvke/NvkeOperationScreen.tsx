@@ -15,6 +15,7 @@ import { nativeMaintenancePermission } from "@/lib/nvke/contract";
 import { nvkeInventoryHref } from "@/lib/nvke/inventory";
 
 import { NvkeDiagnosticsPanel } from "./NvkeDiagnosticsPanel";
+import { NvkeWorkflowPanel } from "./NvkeWorkflowPanel";
 import { NvkeMaintenancePanel } from "./NvkeMaintenancePanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { nvkeFinished, type NvkeOperationScreenProps } from "./types";
@@ -33,6 +34,7 @@ export function NvkeOperationScreen({
   onDownload,
   diagnostics,
   maintenance,
+  workflows,
   workloadAccess,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
@@ -157,6 +159,7 @@ export function NvkeOperationScreen({
       />
       {diagnostics && <NvkeDiagnosticsPanel {...diagnostics} />}
       {maintenance && <NvkeMaintenancePanel {...maintenance} />}
+      {workflows && <NvkeWorkflowPanel {...workflows} />}
       {workloadAccess && <NvkeWorkloadAccessPanel {...workloadAccess} />}
       <p className="text-muted-foreground text-sm">{t("resultHelp")}</p>
       <ConfirmDialog

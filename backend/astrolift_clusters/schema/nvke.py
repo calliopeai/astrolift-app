@@ -1,5 +1,6 @@
 """Permission-gated NVKE site metadata and write-only connection credentials."""
 
+import json
 from dataclasses import asdict
 from datetime import datetime
 from enum import Enum
@@ -518,6 +519,10 @@ class NvkeNativeWorkflowType:
     permission: str
     input_schema: JSON
 
+    @strawberry.field
+    def input_schema_text(self) -> str:
+        return json.dumps(self.input_schema, ensure_ascii=False, sort_keys=True, indent=2)
+
 
 @strawberry.type
 class NvkeContractType:
@@ -667,6 +672,7 @@ class NvkeMaintenanceObservationType:
     site_id: GUID
     operation_id: GUID
     operation_version: int
+    source_site_version: int
     observed_at: datetime | None
     cluster_id: GUID
     next_certificate_renewal_due: str | None
@@ -760,6 +766,7 @@ class NvkeQuery:
             site_id=GUID(str(row.site.guid)),
             operation_id=GUID(str(row.guid)),
             operation_version=row.version,
+            source_site_version=row.expected_site_version,
             observed_at=row.finished_at,
             **{
                 **data,

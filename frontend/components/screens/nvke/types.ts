@@ -1,3 +1,4 @@
+import type { NvkeWorkflowPanelProps } from "./NvkeWorkflowPanel";
 import type { NvkeDiagnosticsPanelProps } from "./NvkeDiagnosticsPanel";
 import type { NvkeMaintenancePanelProps } from "./NvkeMaintenancePanel";
 import type { NvkeWorkloadAccessPanelProps } from "./NvkeWorkloadAccessPanel";
@@ -167,6 +168,7 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  workflows?: NvkeWorkflowPanelProps | null;
   maintenance?: NvkeMaintenancePanelProps | null;
   workloadAccess?: NvkeWorkloadAccessPanelProps | null;
   diagnostics?: NvkeDiagnosticsPanelProps | null;

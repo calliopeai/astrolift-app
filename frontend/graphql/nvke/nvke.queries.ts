@@ -44,6 +44,7 @@ export const GET_NVKE_MAINTENANCE = gql`
       siteId
       operationId
       operationVersion
+      sourceSiteVersion
       observedAt
       clusterId
       nextCertificateRenewalDue
@@ -223,6 +224,7 @@ export const GET_NVKE_CONTRACT = gql`
         source
         permission
         inputSchema
+        inputSchemaText
       }
       collections {
         key

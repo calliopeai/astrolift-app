@@ -78,6 +78,8 @@ export const WORKFLOW_PROPS: NvkeWorkflowPanelProps = {
     ),
   })),
   canManage: true,
+  canRecover: true,
+  retirementEligible: true,
   canInspect: true,
   loading: false,
   pending: false,
@@ -150,3 +152,15 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const ReadOnlyRecovery: Story = {
+  args: {
+    canManage: false,
+    canInspect: false,
+    canRecover: true,
+    retirementEligible: false,
+    history: null,
+    recovery: { requestId: OPERATION.requestId, operationKey: "temporal.RenewK8sCertsV2" },
+  },
+};
+export const RetirementNotInspected: Story = { args: { retirementEligible: false, history: null } };

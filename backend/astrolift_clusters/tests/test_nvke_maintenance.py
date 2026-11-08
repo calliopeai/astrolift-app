@@ -263,3 +263,23 @@ def test_malformed_saved_response_has_a_safe_failure(configured, data):
         read(configured, source)
     assert error.value.code == "SNAPSHOT_UNAVAILABLE"
     assert "PRIVATE" not in str(error.value)
+
+
+def test_maintenance_source_site_version_remains_historical(configured):
+    source, _, _ = support.observed(configured, overrides=payload())
+    saved = source.expected_site_version
+    configured.site.is_active = False
+    configured.site.save()
+    result = execute(
+        configured.world,
+        """query($site:GUID!,$op:GUID!,$actor:Int!,$version:Int!){astroliftNvkeMaintenanceObservation(siteId:$site,operationId:$op,expectedActorId:$actor,expectedVersion:$version){sourceSiteVersion}}""",
+        {
+            "site": str(configured.site.guid),
+            "op": str(source.guid),
+            "actor": configured.world.user.pk,
+            "version": source.version,
+        },
+    )
+    assert not result.errors
+    assert result.data["astroliftNvkeMaintenanceObservation"]["sourceSiteVersion"] == saved
+    assert configured.site.version > saved

@@ -13159,6 +13159,7 @@ export type NvkeMaintenanceObservationType = {
   renewal?: Maybe<NvkeCertificateRenewalObservationType>;
   renewalScheduleOverdueAtObservation?: Maybe<Scalars['Boolean']['output']>;
   siteId: Scalars['GUID']['output'];
+  sourceSiteVersion: Scalars['Int']['output'];
 };
 
 export type NvkeNativeConditionType = {
@@ -13203,6 +13204,7 @@ export type NvkeNativeHistoryPageTypeMutationResult = {
 
 export type NvkeNativeWorkflowType = {
   inputSchema: Scalars['JSON']['output'];
+  inputSchemaText: Scalars['String']['output'];
   inputType: Scalars['String']['output'];
   name: Scalars['String']['output'];
   permission: Scalars['String']['output'];
@@ -21481,7 +21483,7 @@ export type GetNvkeMaintenanceQueryVariables = Exact<{
 }>;
 
 
-export type GetNvkeMaintenanceQuery = { astroliftNvkeMaintenanceObservation: { siteId: string, operationId: string, operationVersion: number, observedAt?: string | null, clusterId: string, nextCertificateRenewalDue?: string | null, renewalScheduleOverdueAtObservation?: boolean | null, mutationLockReported?: boolean | null, mutationLockOwner?: string | null, mutationLockStartedAt?: string | null, renewal?: { workflowId?: string | null, state?: string | null, outcome?: string | null, forced?: boolean | null, scheduledFor?: string | null, startedAt?: string | null, completedAt?: string | null, failedNodeId?: string | null, phase?: string | null, retainedMutationLock?: boolean | null } | null, etcdKeyRotation?: { workflowId?: string | null, state?: string | null, phase?: string | null, startedAt?: string | null, lastProgressAt?: string | null, completedAt?: string | null, failureReason?: string | null, retainedMutationLock?: boolean | null } | null } };
+export type GetNvkeMaintenanceQuery = { astroliftNvkeMaintenanceObservation: { siteId: string, operationId: string, operationVersion: number, sourceSiteVersion: number, observedAt?: string | null, clusterId: string, nextCertificateRenewalDue?: string | null, renewalScheduleOverdueAtObservation?: boolean | null, mutationLockReported?: boolean | null, mutationLockOwner?: string | null, mutationLockStartedAt?: string | null, renewal?: { workflowId?: string | null, state?: string | null, outcome?: string | null, forced?: boolean | null, scheduledFor?: string | null, startedAt?: string | null, completedAt?: string | null, failedNodeId?: string | null, phase?: string | null, retainedMutationLock?: boolean | null } | null, etcdKeyRotation?: { workflowId?: string | null, state?: string | null, phase?: string | null, startedAt?: string | null, lastProgressAt?: string | null, completedAt?: string | null, failureReason?: string | null, retainedMutationLock?: boolean | null } | null } };
 
 export type NvkeAccessFieldsFragment = { id: string, version: number, siteId: string, controllerConnectionId: string, sourceOperationId: string, clusterId: string, upstreamRevision: string, createdAt: string, deletedAt?: string | null };
 
@@ -21539,7 +21541,7 @@ export type GetNvkeOperationResultQuery = { astroliftNvkeOperationResult: { ok: 
 export type GetNvkeContractQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetNvkeContractQuery = { astroliftNvkeContract: { revision: string, controllerOpenapi: unknown, nativeWorkflows: Array<{ name: string, inputType: string, source: string, permission: string, inputSchema: unknown }>, collections: Array<{ key: string, surface: NvkeSurface, resourceKind: string, namespaced: boolean, permission: string, defaultParametersText: string, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }> }>, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }>, resources: Array<{ kind: string, namespaced: boolean, schema: unknown }> } };
+export type GetNvkeContractQuery = { astroliftNvkeContract: { revision: string, controllerOpenapi: unknown, nativeWorkflows: Array<{ name: string, inputType: string, source: string, permission: string, inputSchema: unknown, inputSchemaText: string }>, collections: Array<{ key: string, surface: NvkeSurface, resourceKind: string, namespaced: boolean, permission: string, defaultParametersText: string, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }> }>, actions: Array<{ key: string, surface: NvkeSurface, verb: string, resourceKind: string, mutates: boolean, permission: string, path: string }>, resources: Array<{ kind: string, namespaced: boolean, schema: unknown }> } };
 
 export type GetNvkeIdentityQueryVariables = Exact<{ [key: string]: never; }>;
 

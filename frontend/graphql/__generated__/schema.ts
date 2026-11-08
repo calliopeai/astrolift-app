@@ -13159,6 +13159,7 @@ export type NvkeMaintenanceObservationType = {
   renewal?: Maybe<NvkeCertificateRenewalObservationType>;
   renewalScheduleOverdueAtObservation?: Maybe<Scalars['Boolean']['output']>;
   siteId: Scalars['GUID']['output'];
+  sourceSiteVersion: Scalars['Int']['output'];
 };
 
 export type NvkeNativeConditionType = {
@@ -13203,6 +13204,7 @@ export type NvkeNativeHistoryPageTypeMutationResult = {
 
 export type NvkeNativeWorkflowType = {
   inputSchema: Scalars['JSON']['output'];
+  inputSchemaText: Scalars['String']['output'];
   inputType: Scalars['String']['output'];
   name: Scalars['String']['output'];
   permission: Scalars['String']['output'];

@@ -314,8 +314,8 @@ The contract query's `nativeWorkflows` catalog separately exposes the three
 pinned operator workflow input schemas, with upstream declaration and
 registration checks. These are additional to the 88 HTTP/datastore actions.
 Reviewed execution, owner history and rotation reset are available through the
-APIs below and the paired CLI commands described in this guide. Dedicated browser
-workflow/history/reset controls remain in #2665.
+APIs below, the paired CLI commands, and the browser controls on successful
+controller `getCluster` operation pages described in this guide.
 
 ## Reviewed native workflow requests
 
@@ -494,8 +494,8 @@ The observation deadline never cancels the native workflow or releases its lock.
 A successful operation means that the proved reset workflow completed; it does
 not independently certify encryption health. Local qualification uses real
 PostgreSQL, controller HTTP reads and Temporal with fixture workflows. Full native
-controller, agent and topology qualification, plus browser workflow/history/reset
-controls, remain release requirements tracked in #2665.
+controller, agent and topology qualification, plus connected browser/backend
+qualification, remain release requirements tracked in #2665.
 
 
 The paired CLI exposes `astro nvke temporal workflow history WORKFLOW` with the
@@ -529,14 +529,15 @@ identity are checked immediately before submission, and a late response cannot
 archive a request from an old visit. A first structured admission rejection can
 be archived for the declared pre-insertion failure codes. `INVALID_INPUT` for an
 already unconfirmed native request retains the journal because native input
-validation can precede receipt lookup.
+validation can precede receipt lookup. Native `PRECONDITION`, `RESOURCE_BUSY`
+and `UNSUPPORTED` refusals archive only a newly issued request's first structured
+reply. They cannot discard an older request whose outcome remains unknown.
 
 The history response guard binds site/authority/source versions, cluster, owner
 and native run before publishing a page. It rejects inexact IDs, out-of-order
 events, invalid scheduling references and mismatched pages. Native status and
-controller-recorded state remain separate. These are browser protocol foundations;
-Storybook workflow/history/reset forms are fixture-qualified; their application
-query/admission wiring remains pending.
+controller-recorded state remain separate. The application hook uses these guards
+for summary and cursor reads, with every page bound to the inspected run.
 
 The real browser journal qualification runs without a live NVKE site:
 
@@ -556,9 +557,21 @@ work, deployed UI or backend workflow execution.
 
 The Storybook `NvkeWorkflowPanel` provides all three pinned native workflow
 choices and their JSON/schema editor, owner-history selection and cursor-list
-presentation, and reviewed rotation reset forms. It is not yet wired into the
-application's cluster observation page. Its callbacks are fixtures until the
-scope-fenced query/admission hook is connected and qualified.
+presentation, and reviewed rotation reset forms. Successful controller
+`getCluster` operation pages connect it through `useNvkeWorkflows`. Execution and
+history inspection require current read/admin permissions, enabled explicit
+native authority, and a source observation recorded at the current site version.
+Historical maintenance metadata remains readable after site authority changes,
+but cannot authorize native execution or history inspection; obtain a new
+controller observation first. The contract's `inputSchemaText` preserves exact
+native integer bounds when rendering the schema in a JavaScript browser.
+
+Receipt-only recovery requires read permission and the original actor's journal;
+it remains available after admin permission or native authority is removed.
+Storage/Web Lock failures disable new admission while permitted owner inspection
+remains available. Retirement additionally requires inspection of the closed,
+unsuccessful current rotation run, its retained lock and a recoverable source
+phase before its workflow choice becomes available.
 
 Workflow input text remains verbatim. The selected cluster must match the source
 observation; retirement additionally names the exact retained rotation owner and
@@ -588,6 +601,7 @@ Local verification includes form interactions, all eight locale catalogs,
 Storybook render/build, the production Next build and browser checks of metadata,
 exact IDs, private-field clearing, accessibility and narrow layouts. These checks
 use callback fixtures and do not qualify live native controller or node changes.
-The next wiring work must retain original receipt lookup, storage/authority
-failures and definitive pre-admission rejection recovery, and must bind cursor
-pages to one inspected native run before exposing a reset proposal.
+Connected hook tests exercise exact schema/input text, stale site observations,
+lost replies, authority removal, read-only receipt recovery, storage refusal,
+changed runs and actor visits. Real browser-to-backend qualification remains a
+release requirement; these isolated checks do not prove that integration.

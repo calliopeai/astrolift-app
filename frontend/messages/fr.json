@@ -17889,7 +17889,9 @@
       "reviewHelp": "Le délai d’observation n’annule pas le travail natif et ne libère aucun verrou. Un workflow natif terminé ne prouve pas le bon fonctionnement du site.",
       "targetNode": "Nœud à retirer",
       "cancelHelp": "Arrête l’envoi Astro uniquement avant expédition ; n’annule pas l’exécution native, n’arrête pas les nœuds et ne libère pas les verrous.",
-      "resumeHelp": "Observez l’exécution native d’origine avec la même autorité. Aucun RPC de démarrage ou de réinitialisation n’est rejoué après envoi et aucun verrou n’est libéré."
+      "resumeHelp": "Observez l’exécution native d’origine avec la même autorité. Aucun RPC de démarrage ou de réinitialisation n’est rejoué après envoi et aucun verrou n’est libéré.",
+      "sourceUnavailable": "Effectuez une nouvelle lecture getCluster du contrôleur avec l’autorité actuelle du site avant toute exécution ou inspection native.",
+      "retirementHelp": "Inspectez la rotation en échec qui conserve le verrou et son exécution native actuelle avant de retirer un nœud."
     }
   }
 }

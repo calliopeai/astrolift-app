@@ -17886,7 +17886,9 @@
       "reviewHelp": "O prazo de observação não cancela o trabalho nativo nem libera bloqueios. A conclusão do fluxo nativo não comprova a integridade do site.",
       "targetNode": "Nó a remover",
       "cancelHelp": "Interrompe o envio do Astro somente antes do despacho; não cancela a execução nativa, interrompe tarefas nos nós nem libera bloqueios.",
-      "resumeHelp": "Observe a execução nativa original com a mesma autoridade. Nenhuma RPC de início ou reinicialização é repetida após o envio e nenhum bloqueio é liberado."
+      "resumeHelp": "Observe a execução nativa original com a mesma autoridade. Nenhuma RPC de início ou reinicialização é repetida após o envio e nenhum bloqueio é liberado.",
+      "sourceUnavailable": "Execute uma nova leitura getCluster do controlador com a autoridade atual do site antes de executar ou inspecionar o histórico nativo.",
+      "retirementHelp": "Inspecione a rotação com falha que mantém o bloqueio e sua execução nativa atual antes de remover um nó."
     }
   }
 }

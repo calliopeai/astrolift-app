@@ -184,7 +184,7 @@ export async function admitNvkeNative<T extends NvkeRecoveryOperation>(options: 
         reply?.ok === false &&
         !reply.data &&
         (code !== "INVALID_INPUT" || fresh) &&
-        archiveRejectedRecovery(storage, frozen, code)
+        archiveRejectedRecovery(storage, frozen, code, fresh ? "native_first_reply" : "standard")
       ) {
         options.onRecord(null);
         throw new NvkeAdmissionError("REQUEST_REJECTED");

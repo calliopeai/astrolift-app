@@ -461,3 +461,17 @@ def test_browser_receipt_is_not_shared_with_another_authorized_actor_in_the_same
     )
     assert result.errors is None
     assert result.data["astroliftNvkeRequest"] is None
+
+
+def test_native_schema_text_preserves_exact_int64_limits(world):
+    from nvke.native_workflows import workflows
+
+    result = execute(world, "{astroliftNvkeContract{nativeWorkflows{name inputSchemaText}}}")
+    assert not result.errors
+    rows = result.data["astroliftNvkeContract"]["nativeWorkflows"]
+    assert {row["name"] for row in rows} == {row["name"] for row in workflows()}
+    for row in rows:
+        expected = next(item["input_schema"] for item in workflows() if item["name"] == row["name"])
+        assert json.loads(row["inputSchemaText"]) == expected
+    renewal = next(row for row in rows if row["name"] == "RenewK8sCertsV2")
+    assert '"maximum": 9223372036854775807' in renewal["inputSchemaText"]

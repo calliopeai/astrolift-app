@@ -17886,7 +17886,9 @@
       "reviewHelp": "The observation deadline does not cancel native work or release a lock. Native workflow completion is not proof of site health.",
       "targetNode": "Node to retire",
       "cancelHelp": "Stops Astro dispatch only before sending; it does not cancel native execution, stop node work or release locks.",
-      "resumeHelp": "Observe the original native execution under unchanged authority. No start or reset RPC is replayed after sending, and no lock is released."
+      "resumeHelp": "Observe the original native execution under unchanged authority. No start or reset RPC is replayed after sending, and no lock is released.",
+      "sourceUnavailable": "Perform a new controller getCluster read under the current site authority before native execution or history inspection.",
+      "retirementHelp": "Inspect the failed retained rotation and its current native run before retiring a node."
     }
   }
 }

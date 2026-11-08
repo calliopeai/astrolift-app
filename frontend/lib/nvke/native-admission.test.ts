@@ -396,3 +396,25 @@ it("accepts an identical typed review despite object field ordering", async () =
   await admitNvkeNative(options);
   expect(options.admit).toHaveBeenCalledTimes(2);
 });
+
+it.each(["PRECONDITION", "RESOURCE_BUSY", "UNSUPPORTED"])(
+  "releases a definitively rejected new native %s intent",
+  async (code) => {
+    const { options } = setup();
+    options.admit.mockResolvedValue({ ok: false, errors: [{ code }], data: null });
+    await expect(admitNvkeNative(options)).rejects.toThrow("REQUEST_REJECTED");
+    expect(readRecovery(options.storage, scope, siteId)).toBeNull();
+  }
+);
+it.each(["PRECONDITION", "RESOURCE_BUSY", "UNSUPPORTED"])(
+  "preserves prior unknown identity on later %s rejection",
+  async (code) => {
+    const { options } = setup();
+    options.admit.mockRejectedValueOnce(new Error("LOST"));
+    await expect(admitNvkeNative(options)).rejects.toThrow();
+    const original = readRecovery(options.storage, scope, siteId);
+    options.admit.mockResolvedValue({ ok: false, errors: [{ code }], data: null });
+    await expect(admitNvkeNative(options)).rejects.toThrow("REQUEST_FAILED");
+    expect(readRecovery(options.storage, scope, siteId)).toEqual(original);
+  }
+);

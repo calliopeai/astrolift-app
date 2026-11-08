@@ -8,6 +8,9 @@ const stories = [
   "screens-nvke-native-maintenance-workflows--read-only",
   "screens-nvke-native-maintenance-workflows--missing-authority",
   "screens-nvke-native-maintenance-workflows--completed",
+  "screens-nvke-native-maintenance-workflows--read-only-recovery",
+  "screens-nvke-native-maintenance-workflows--retirement-not-inspected",
+  "screens-nvke-operation--native-maintenance-controls",
   "screens-nvke-operation--native-workflow",
   "screens-nvke-operation--native-reset-unconfirmed",
   "screens-nvke-native-temporal--full",
@@ -405,4 +408,34 @@ test("nvke native workflow long identifiers fit the viewport", async ({ page }) 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   );
+});
+
+test("nvke read-only callers can recover receipts without enabling native admission", async ({
+  page,
+}) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-native-maintenance-workflows--read-only-recovery&viewMode=story"
+  );
+  await expect(
+    page.getByRole("button", { name: "Recover original receipt", exact: true })
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Submit native workflow", exact: true })
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Inspect RotateEtcdEncryptionKey", exact: true })
+  ).toBeDisabled();
+});
+
+test("nvke retirement stays unavailable before inspecting the retained rotation", async ({
+  page,
+}) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-native-maintenance-workflows--retirement-not-inspected&viewMode=story"
+  );
+  await page.getByRole("button", { name: "Submit native workflow", exact: true }).click();
+  await page.getByRole("dialog").getByRole("combobox").click();
+  await expect(
+    page.getByRole("option", { name: "RetireLostEtcdRotationNode", exact: true })
+  ).toBeDisabled();
 });
