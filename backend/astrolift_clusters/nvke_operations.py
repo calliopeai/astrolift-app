@@ -79,6 +79,11 @@ def connection_digest(row):
 
 
 def operation_permission(key):
+    if key.startswith("tooling."):
+        from astrolift_clusters.nvke_operator_jobs import command_key
+
+        command_key(key)
+        return Permission.NVKE_ADMIN
     if key == "infrastructure.providers":
         return Permission.NVKE_ADMIN
     if key == "metrics.credentials":
@@ -251,6 +256,10 @@ def original_actor(row):
 
 
 def checkpoint(row):
+    if row.operation_key.startswith("tooling."):
+        from astrolift_clusters.nvke_operator_authority import checkpoint as operator_checkpoint
+
+        return operator_checkpoint(row)
     if row.operation_key == "infrastructure.providers":
         from astrolift_clusters.nvke_provider_observations import checkpoint as provider_checkpoint
 

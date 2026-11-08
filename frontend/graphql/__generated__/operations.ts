@@ -7680,6 +7680,18 @@ export type ConfigureNvkeMetricsAuthorityInput = {
   timeoutSeconds: Scalars['Int']['input'];
 };
 
+export type ConfigureNvkeOperatorAuthorityInput = {
+  bundleManifestSha256: Scalars['String']['input'];
+  credentials: InputMaybe<NvkeOperatorCredentialsInput>;
+  endpoint: Scalars['String']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  instanceId: Scalars['GUID']['input'];
+  siteId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
 export type ConfigureNvkeTemporalAuthorityInput = {
   address: Scalars['String']['input'];
   credentials: InputMaybe<NvkeTemporalCredentialsInput>;
@@ -9880,6 +9892,7 @@ export type Mutation = {
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
   configureNvkeConnection: NvkeSiteTypeMutationResult;
   configureNvkeMetricsAuthority: NvkeMetricsAuthorityTypeMutationResult;
+  configureNvkeOperatorAuthority: NvkeOperatorAuthorityTypeMutationResult;
   configureNvkeTemporalAuthority: NvkeTemporalAuthorityTypeMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
@@ -10097,6 +10110,7 @@ export type Mutation = {
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
   reconcileManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
+  reconcileNvkeOperatorJob: NvkeOperationTypeMutationResult;
   /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
   reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
@@ -10125,6 +10139,7 @@ export type Mutation = {
   removeAppDomain: AppdomainremovedpayloadMutationResult;
   removeEmailSuppressionEntry: EmailsuppressionremovepayloadMutationResult;
   removeNvkeMetricsAuthority: NvkeMetricsAuthorityTypeMutationResult;
+  removeNvkeOperatorAuthority: NvkeOperatorAuthorityTypeMutationResult;
   removeNvkeSite: NvkeSiteTypeMutationResult;
   removeNvkeTemporalAuthority: NvkeTemporalAuthorityTypeMutationResult;
   removeOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
@@ -10145,6 +10160,7 @@ export type Mutation = {
   requestNvkeNativeWorkflow: NvkeOperationTypeMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestNvkeOperationText: NvkeOperationTypeMutationResult;
+  requestNvkeOperatorJob: NvkeOperationTypeMutationResult;
   requestNvkeProviderObservation: NvkeOperationTypeMutationResult;
   requestNvkeResourceOperation: NvkeOperationTypeMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
@@ -10235,6 +10251,7 @@ export type Mutation = {
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   setNotificationQuietHours: AstroliftNotificationQuietHoursMutationResult;
   setNvkeMetricsAuthorityEnabled: NvkeMetricsAuthorityTypeMutationResult;
+  setNvkeOperatorAuthorityEnabled: NvkeOperatorAuthorityTypeMutationResult;
   setNvkeSiteEnabled: NvkeSiteTypeMutationResult;
   setNvkeTemporalAuthorityEnabled: NvkeTemporalAuthorityTypeMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
@@ -10358,6 +10375,7 @@ export type Mutation = {
   verifyConversationTransfer: AstroliftConversationTransferMutationResult;
   verifyManagedDomain: VerifyManagedDomainPayloadMutationResult;
   verifyNvkeMetricsAuthority: NvkeMetricsAuthorityTypeMutationResult;
+  verifyNvkeOperatorAuthority: NvkeOperatorAuthorityTypeMutationResult;
   verifyNvkeTemporalAuthority: NvkeTemporalAuthorityTypeMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
 };
@@ -10708,6 +10726,11 @@ export type MutationConfigureNvkeConnectionArgs = {
 
 export type MutationConfigureNvkeMetricsAuthorityArgs = {
   input: ConfigureNvkeMetricsAuthorityInput;
+};
+
+
+export type MutationConfigureNvkeOperatorAuthorityArgs = {
+  input: ConfigureNvkeOperatorAuthorityInput;
 };
 
 
@@ -11676,6 +11699,11 @@ export type MutationReconcileManagedDomainAppRouteArgs = {
 };
 
 
+export type MutationReconcileNvkeOperatorJobArgs = {
+  input: NvkeOperatorJobReviewInput;
+};
+
+
 export type MutationReconcileWorkflowScheduleArgs = {
   expectedActive: Scalars['Boolean']['input'];
   expectedVersion: Scalars['Int']['input'];
@@ -11817,6 +11845,11 @@ export type MutationRemoveNvkeMetricsAuthorityArgs = {
 };
 
 
+export type MutationRemoveNvkeOperatorAuthorityArgs = {
+  input: NvkeOperatorAuthorityReviewInput;
+};
+
+
 export type MutationRemoveNvkeSiteArgs = {
   input: RemoveNvkeSiteInput;
 };
@@ -11907,6 +11940,11 @@ export type MutationRequestNvkeOperationArgs = {
 
 export type MutationRequestNvkeOperationTextArgs = {
   input: RequestNvkeOperationTextInput;
+};
+
+
+export type MutationRequestNvkeOperatorJobArgs = {
+  input: RequestNvkeOperatorJobInput;
 };
 
 
@@ -12338,6 +12376,11 @@ export type MutationSetNotificationQuietHoursArgs = {
 
 export type MutationSetNvkeMetricsAuthorityEnabledArgs = {
   input: SetNvkeMetricsAuthorityEnabledInput;
+};
+
+
+export type MutationSetNvkeOperatorAuthorityEnabledArgs = {
+  input: SetNvkeOperatorAuthorityEnabledInput;
 };
 
 
@@ -12924,6 +12967,11 @@ export type MutationVerifyNvkeMetricsAuthorityArgs = {
 };
 
 
+export type MutationVerifyNvkeOperatorAuthorityArgs = {
+  input: NvkeOperatorAuthorityReviewInput;
+};
+
+
 export type MutationVerifyNvkeTemporalAuthorityArgs = {
   input: NvkeTemporalAuthorityReviewInput;
 };
@@ -13433,6 +13481,68 @@ export type NvkeOperationTypePage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type NvkeOperatorAuthorityReviewInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+export type NvkeOperatorAuthorityType = {
+  bundleManifestSha256: Scalars['String']['output'];
+  deletedAt?: Maybe<Scalars['DateTime']['output']>;
+  endpoint: Scalars['String']['output'];
+  hasCredentials: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  instanceId: Scalars['GUID']['output'];
+  isEnabled: Scalars['Boolean']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  timeoutSeconds: Scalars['Int']['output'];
+  verificationCode: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorAuthorityTypeMutationResult = {
+  data?: Maybe<NvkeOperatorAuthorityType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeOperatorCommandType = {
+  infrastructureChange: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
+  options: Array<NvkeOperatorOptionType>;
+  positionals: Array<Scalars['String']['output']>;
+};
+
+export type NvkeOperatorContractType = {
+  commands: Array<NvkeOperatorCommandType>;
+  revision: Scalars['String']['output'];
+};
+
+export type NvkeOperatorCredentialsInput = {
+  caPem: Scalars['String']['input'];
+  clientCertificatePem: Scalars['String']['input'];
+  clientKeyPem: Scalars['String']['input'];
+};
+
+export type NvkeOperatorJobReviewInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+};
+
+export type NvkeOperatorOptionType = {
+  choices: Array<Scalars['String']['output']>;
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  required: Scalars['Boolean']['output'];
 };
 
 export type NvkeProviderCredentialHealthType = {
@@ -14216,6 +14326,9 @@ export type Query = {
   astroliftNvkeOperationResult: JsonMutationResult;
   astroliftNvkeOperationResultText: StrMutationResult;
   astroliftNvkeOperations: NvkeOperationTypePage;
+  astroliftNvkeOperatorArtifactText: StrMutationResult;
+  astroliftNvkeOperatorAuthority?: Maybe<NvkeOperatorAuthorityType>;
+  astroliftNvkeOperatorContract: NvkeOperatorContractType;
   astroliftNvkeProviderIdentitiesPage: NvkeProviderIdentitiesPageTypeMutationResult;
   astroliftNvkeProviderObservation: NvkeProviderObservationTypeMutationResult;
   astroliftNvkeRequest?: Maybe<NvkeOperationType>;
@@ -15890,6 +16003,16 @@ export type QueryAstroliftNvkeOperationsArgs = {
 };
 
 
+export type QueryAstroliftNvkeOperatorArtifactTextArgs = {
+  input: ReadNvkeOperatorArtifactInput;
+};
+
+
+export type QueryAstroliftNvkeOperatorAuthorityArgs = {
+  siteId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftNvkeProviderIdentitiesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   expectedActorId: Scalars['Int']['input'];
@@ -17200,6 +17323,17 @@ export type ReadNvkeNativeHistoryInput = {
   workflow: Scalars['String']['input'];
 };
 
+export type ReadNvkeOperatorArtifactInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  limit: Scalars['Int']['input'];
+  name: Scalars['String']['input'];
+  offset: Scalars['String']['input'];
+  operationId: Scalars['GUID']['input'];
+};
+
 export type ReapCloudOrphanInput = {
   clusterSlug: InputMaybe<Scalars['String']['input']>;
   forceDestroy: Scalars['Boolean']['input'];
@@ -17539,6 +17673,17 @@ export type RequestNvkeOperationTextInput = {
   operationKey: Scalars['String']['input'];
   parametersText: Scalars['String']['input'];
   requestId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+};
+
+export type RequestNvkeOperatorJobInput = {
+  acknowledgeInfrastructureChange: Scalars['Boolean']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  requestId: Scalars['String']['input'];
+  requestText: Scalars['String']['input'];
   siteId: Scalars['GUID']['input'];
   timeoutSeconds: Scalars['Int']['input'];
 };
@@ -18080,6 +18225,14 @@ export type SetNotificationQuietHoursInput = {
 };
 
 export type SetNvkeMetricsAuthorityEnabledInput = {
+  enabled: Scalars['Boolean']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+};
+
+export type SetNvkeOperatorAuthorityEnabledInput = {
   enabled: Scalars['Boolean']['input'];
   expectedActorId: Scalars['Int']['input'];
   expectedSiteVersion: Scalars['Int']['input'];
@@ -21745,6 +21898,69 @@ export type GetNvkeCredentialCertificatesQueryVariables = Exact<{
 
 
 export type GetNvkeCredentialCertificatesQuery = { astroliftNvkeCredentialCertificatesPage: { ok: boolean, errors: Array<{ code: string }>, data?: { siteId: string, operationId: string, operationVersion: number, scrapedAt: string, totalCount: number, nextCursor?: string | null, items: Array<{ key: string, node: string, credential: string, required?: boolean | null, observationAvailable?: boolean | null, latestInspectionAvailable?: boolean | null, observationAgeSeconds?: string | null, reportedNotAfter?: string | null, reportedExpiredAtScrape?: boolean | null }> } | null } };
+
+export type ConfigureNvkeOperatorAuthorityMutationVariables = Exact<{
+  input: ConfigureNvkeOperatorAuthorityInput;
+}>;
+
+
+export type ConfigureNvkeOperatorAuthorityMutation = { configureNvkeOperatorAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, instanceId: string, bundleManifestSha256: string, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
+export type VerifyNvkeOperatorAuthorityMutationVariables = Exact<{
+  input: NvkeOperatorAuthorityReviewInput;
+}>;
+
+
+export type VerifyNvkeOperatorAuthorityMutation = { verifyNvkeOperatorAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, instanceId: string, bundleManifestSha256: string, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
+export type SetNvkeOperatorAuthorityEnabledMutationVariables = Exact<{
+  input: SetNvkeOperatorAuthorityEnabledInput;
+}>;
+
+
+export type SetNvkeOperatorAuthorityEnabledMutation = { setNvkeOperatorAuthorityEnabled: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, instanceId: string, bundleManifestSha256: string, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
+export type RemoveNvkeOperatorAuthorityMutationVariables = Exact<{
+  input: NvkeOperatorAuthorityReviewInput;
+}>;
+
+
+export type RemoveNvkeOperatorAuthorityMutation = { removeNvkeOperatorAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, instanceId: string, bundleManifestSha256: string, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null } };
+
+export type RequestNvkeOperatorJobMutationVariables = Exact<{
+  input: RequestNvkeOperatorJobInput;
+}>;
+
+
+export type RequestNvkeOperatorJobMutation = { requestNvkeOperatorJob: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
+export type ReconcileNvkeOperatorJobMutationVariables = Exact<{
+  input: NvkeOperatorJobReviewInput;
+}>;
+
+
+export type ReconcileNvkeOperatorJobMutation = { reconcileNvkeOperatorJob: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
+export type NvkeOperatorAuthorityFieldsFragment = { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, instanceId: string, bundleManifestSha256: string, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null };
+
+export type GetNvkeOperatorAuthorityQueryVariables = Exact<{
+  siteId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetNvkeOperatorAuthorityQuery = { astroliftNvkeOperatorAuthority?: { id: string, version: number, siteId: string, siteVersion: number, endpoint: string, instanceId: string, bundleManifestSha256: string, isEnabled: boolean, timeoutSeconds: number, hasCredentials: boolean, verifiedAt?: string | null, verificationCode: string, deletedAt?: string | null } | null };
+
+export type GetNvkeOperatorContractQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetNvkeOperatorContractQuery = { astroliftNvkeOperatorContract: { revision: string, commands: Array<{ key: string, positionals: Array<string>, infrastructureChange: boolean, options: Array<{ name: string, kind: string, required: boolean, choices: Array<string> }> }> } };
+
+export type GetNvkeOperatorArtifactTextQueryVariables = Exact<{
+  input: ReadNvkeOperatorArtifactInput;
+}>;
+
+
+export type GetNvkeOperatorArtifactTextQuery = { astroliftNvkeOperatorArtifactText: { ok: boolean, data?: string | null, errors: Array<{ code: string }> } };
 
 export type RequestNvkeProviderObservationMutationVariables = Exact<{
   input: RequestNvkeProviderObservationInput;

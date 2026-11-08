@@ -8292,6 +8292,18 @@ input ConfigureNvkeMetricsAuthorityInput {
   timeoutSeconds: Int! = 30
 }
 
+input ConfigureNvkeOperatorAuthorityInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+  endpoint: String!
+  instanceId: GUID!
+  bundleManifestSha256: String!
+  timeoutSeconds: Int! = 30
+  credentials: NvkeOperatorCredentialsInput = null
+}
+
 input ConfigureNvkeTemporalAuthorityInput {
   siteId: GUID!
   expectedActorId: Int!
@@ -10896,6 +10908,12 @@ type Mutation {
   configureNvkeConnection(input: ConfigureNvkeConnectionInput!): NvkeSiteTypeMutationResult!
   setNvkeSiteEnabled(input: SetNvkeSiteEnabledInput!): NvkeSiteTypeMutationResult!
   removeNvkeSite(input: RemoveNvkeSiteInput!): NvkeSiteTypeMutationResult!
+  configureNvkeOperatorAuthority(input: ConfigureNvkeOperatorAuthorityInput!): NvkeOperatorAuthorityTypeMutationResult!
+  verifyNvkeOperatorAuthority(input: NvkeOperatorAuthorityReviewInput!): NvkeOperatorAuthorityTypeMutationResult!
+  setNvkeOperatorAuthorityEnabled(input: SetNvkeOperatorAuthorityEnabledInput!): NvkeOperatorAuthorityTypeMutationResult!
+  removeNvkeOperatorAuthority(input: NvkeOperatorAuthorityReviewInput!): NvkeOperatorAuthorityTypeMutationResult!
+  requestNvkeOperatorJob(input: RequestNvkeOperatorJobInput!): NvkeOperationTypeMutationResult!
+  reconcileNvkeOperatorJob(input: NvkeOperatorJobReviewInput!): NvkeOperationTypeMutationResult!
   prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
@@ -11753,6 +11771,68 @@ type NvkeOperationTypePage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+input NvkeOperatorAuthorityReviewInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+}
+
+type NvkeOperatorAuthorityType {
+  id: GUID!
+  version: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  endpoint: String!
+  instanceId: GUID!
+  bundleManifestSha256: String!
+  isEnabled: Boolean!
+  timeoutSeconds: Int!
+  hasCredentials: Boolean!
+  verifiedAt: DateTime
+  verificationCode: String!
+  deletedAt: DateTime
+}
+
+type NvkeOperatorAuthorityTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorAuthorityType
+}
+
+type NvkeOperatorCommandType {
+  key: String!
+  positionals: [String!]!
+  options: [NvkeOperatorOptionType!]!
+  infrastructureChange: Boolean!
+}
+
+type NvkeOperatorContractType {
+  revision: String!
+  commands: [NvkeOperatorCommandType!]!
+}
+
+input NvkeOperatorCredentialsInput {
+  caPem: String! = ""
+  clientCertificatePem: String! = ""
+  clientKeyPem: String! = ""
+}
+
+input NvkeOperatorJobReviewInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+}
+
+type NvkeOperatorOptionType {
+  name: String!
+  kind: String!
+  required: Boolean!
+  choices: [String!]!
 }
 
 type NvkeProviderCredentialHealthType {
@@ -12659,6 +12739,9 @@ type Query {
   astroliftNvkeOperationResultText(operationId: GUID!): StrMutationResult!
   astroliftNvkeSites(after: String = null, limit: Int! = 50): NvkeSiteTypePage!
   astroliftNvkeSite(siteId: GUID!): NvkeSiteType
+  astroliftNvkeOperatorAuthority(siteId: GUID!): NvkeOperatorAuthorityType
+  astroliftNvkeOperatorContract: NvkeOperatorContractType!
+  astroliftNvkeOperatorArtifactText(input: ReadNvkeOperatorArtifactInput!): StrMutationResult!
   astroliftQuotas: [AstroliftQuota!]!
   astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!
   astroliftSourceConnections: [AstroliftSourceConnection!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage.")
@@ -12967,6 +13050,17 @@ input ReadNvkeNativeHistoryInput {
   workflow: String!
   after: String = null
   limit: Int! = 50
+}
+
+input ReadNvkeOperatorArtifactInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  name: String!
+  offset: String! = "0"
+  limit: Int! = 262144
 }
 
 input ReapCloudOrphanInput {
@@ -13333,6 +13427,17 @@ input RequestNvkeOperationTextInput {
   requestId: String!
   operationKey: String!
   parametersText: String!
+  timeoutSeconds: Int! = 7200
+}
+
+input RequestNvkeOperatorJobInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  requestId: String!
+  requestText: String!
+  acknowledgeInfrastructureChange: Boolean! = false
   timeoutSeconds: Int! = 7200
 }
 
@@ -13885,6 +13990,14 @@ input SetNotificationQuietHoursInput {
 }
 
 input SetNvkeMetricsAuthorityEnabledInput {
+  siteId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedVersion: Int!
+  enabled: Boolean!
+}
+
+input SetNvkeOperatorAuthorityEnabledInput {
   siteId: GUID!
   expectedActorId: Int!
   expectedSiteVersion: Int!

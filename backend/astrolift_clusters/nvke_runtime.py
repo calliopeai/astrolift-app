@@ -21,7 +21,17 @@ from astrolift_clusters.nvke_sites import NvkeSiteError
 from core.mutations import AuditEntry, emit_audit
 
 
-def _state(row, status, stage, *, progress=None, error=None, reference=None, expected_run_id=None):
+def _state(
+    row,
+    status,
+    stage,
+    *,
+    progress=None,
+    error=None,
+    reference=None,
+    expected_run_id=None,
+    audit_actor_id=None,
+):
     fields = {
         "status": status,
         "stage": stage,
@@ -30,6 +40,8 @@ def _state(row, status, stage, *, progress=None, error=None, reference=None, exp
         "error_code": error.code if error else "",
         "error_message": str(error)[:256] if error else "",
     }
+    if audit_actor_id is not None:
+        fields["updated_by_id"] = audit_actor_id
     if status in {"succeeded", "failed", "cancelled"}:
         fields["finished_at"] = timezone.now()
     if progress is not None:
@@ -46,7 +58,7 @@ def _state(row, status, stage, *, progress=None, error=None, reference=None, exp
         return "execution_refused"
     emit_audit(
         AuditEntry(
-            actor_user_id=row.actor_id,
+            actor_user_id=row.actor_id if audit_actor_id is None else audit_actor_id,
             organization_id=row.organization_id,
             action="nvke.operation_state",
             permissions=(outbox.operation_permission(row.operation_key).value,),
@@ -241,6 +253,10 @@ def _observe(row, client, selected, request, progress):
     return _state(row, "awaiting_ready", "waiting_for_readiness", progress=progress)
 
 
+def operation_lease_key(identifier):
+    return int.from_bytes(hashlib.sha256(str(identifier).encode()).digest()[:8], "big", signed=True)
+
+
 def attempt(row_id, generation, *, execution):
     row = NvkeOperation.objects.select_related("site").get(pk=row_id)
     if row.generation != generation:
@@ -251,7 +267,7 @@ def attempt(row_id, generation, *, execution):
         return "execution_refused"
     if row.workflow_run_id and row.workflow_run_id != execution[1]:
         return "execution_refused"
-    lease = int.from_bytes(hashlib.sha256(str(row.guid).encode()).digest()[:8], "big", signed=True)
+    lease = operation_lease_key(row.guid)
     with database.cursor() as cursor:
         cursor.execute("SELECT pg_try_advisory_lock(%s)", [lease])
         acquired = cursor.fetchone()[0]
@@ -269,6 +285,10 @@ def attempt(row_id, generation, *, execution):
             return "execution_refused"
         NvkeOperation.objects.filter(pk=row.pk, workflow_run_id="").update(workflow_run_id=execution[1])
         NvkeOperation.objects.filter(pk=row.pk, started_at__isnull=True).update(started_at=timezone.now())
+        if row.operation_key.startswith("tooling."):
+            from astrolift_clusters.nvke_operator_runtime import attempt as operator_attempt
+
+            return operator_attempt(row, execution=execution)
         if row.operation_key == "infrastructure.providers":
             from astrolift_clusters.nvke_provider_observations import attempt as provider_attempt
 

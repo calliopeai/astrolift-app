@@ -96,6 +96,9 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "StartWorkflowDefinitionInput.inputs",
         # Rejected endpoint URLs can still contain embedded credentials.
         "ConfigureNvkeConnectionInput.endpoint",
+        "ConfigureNvkeOperatorAuthorityInput.endpoint",
+        "NvkeOperatorCredentialsInput.clientKeyPem",
+        "RequestNvkeOperatorJobInput.requestText",
         "ConfigureNvkeTemporalAuthorityInput.address",
         "ConfigureNvkeMetricsAuthorityInput.endpoint",
         "RequestNvkeOperationInput.parameters",

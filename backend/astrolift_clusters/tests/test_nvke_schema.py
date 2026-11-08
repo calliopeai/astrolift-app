@@ -134,7 +134,6 @@ def test_missing_admin_permission_returns_a_complete_envelope_and_writes_nothing
 
 
 def test_read_permission_does_not_grant_connection_configuration(world):
-
     from astrolift_identity.models import RoleBinding
     from core.permissions import Permission
 
