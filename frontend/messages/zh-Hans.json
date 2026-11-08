@@ -17852,6 +17852,18 @@
         "canceled": "已取消"
       }
     },
+    "agentTitle": "运维代理",
+    "agentHelp": "在站点专用执行环境中运行原生准备和管理操作。验证仅确认代理身份和资源包，不代表基础设施已就绪。删除此连接不会停止已接受的作业。",
+    "agentInstance": "代理实例 GUID",
+    "agentBundle": "资源包清单 SHA-256",
+    "agentVerify": "验证代理",
+    "agentEnable": "启用代理",
+    "agentDisable": "禁用代理",
+    "agentRemove": "删除代理连接",
+    "agentVerified": "代理身份已验证",
+    "agentCredentialHelp": "使用代理信任的 CA 和配对的客户端证书及密钥。证书必须与代理批准的指纹一致。省略将保留当前资源包；凭据不会被读回。",
+    "agentAuthorityEffect": "更改连接会清除验证状态，并可能中断观测。已接受的作业及其对基础设施的影响仍会继续。",
+    "agentReview": "{site}，站点版本 {siteVersion}；代理连接版本 {version}。端点：{endpoint}；实例：{instance}；资源包：{bundle}。",
     "temporalTitle": "原生 Temporal",
     "temporalHelp": "配置原生控制器独立的 Temporal 连接。验证仅证明命名空间访问权限，不证明存在轮询中的工作进程。移除只会注销此连接，不会停止原生工作流。",
     "temporalAddress": "原生地址（主机:端口）",

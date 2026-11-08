@@ -17852,6 +17852,18 @@
         "canceled": "취소됨"
       }
     },
+    "agentTitle": "운영 에이전트",
+    "agentHelp": "사이트 전용 실행 환경에서 네이티브 준비 및 관리를 실행합니다. 검증은 에이전트 식별 정보와 번들을 확인하며 인프라 준비 상태를 보장하지 않습니다. 이 연결을 제거해도 수락된 작업은 중지되지 않습니다.",
+    "agentInstance": "에이전트 인스턴스 GUID",
+    "agentBundle": "번들 매니페스트 SHA-256",
+    "agentVerify": "에이전트 검증",
+    "agentEnable": "에이전트 활성화",
+    "agentDisable": "에이전트 비활성화",
+    "agentRemove": "에이전트 연결 제거",
+    "agentVerified": "에이전트 식별 정보 검증됨",
+    "agentCredentialHelp": "에이전트가 신뢰하는 CA와 짝이 맞는 클라이언트 인증서 및 키를 사용하세요. 인증서는 에이전트가 승인한 지문과 일치해야 합니다. 생략하면 현재 번들을 유지하며 자격 증명은 다시 반환되지 않습니다.",
+    "agentAuthorityEffect": "연결을 변경하면 검증이 해제되고 관찰이 중단될 수 있습니다. 수락된 작업과 인프라에 대한 영향은 계속됩니다.",
+    "agentReview": "{site}, 사이트 버전 {siteVersion}, 에이전트 연결 버전 {version}. 엔드포인트: {endpoint}, 인스턴스: {instance}, 번들: {bundle}.",
     "temporalTitle": "네이티브 Temporal",
     "temporalHelp": "네이티브 컨트롤러의 별도 Temporal 연결을 구성합니다. 검증은 네임스페이스 접근만 확인하며 활성 워커의 존재를 보장하지 않습니다. 제거는 연결 등록만 해제하며 네이티브 워크플로를 중지하지 않습니다.",
     "temporalAddress": "네이티브 주소 (호스트:포트)",

@@ -25,6 +25,8 @@ import { useNvkeSite } from "./use-nvke-site";
 import { useNvkeOperation } from "./use-nvke-operation";
 import { PROVIDER_PROPS } from "@/components/screens/nvke/NvkeProvidersPanel.stories";
 import { CREDENTIAL_PROPS } from "@/components/screens/nvke/NvkeCredentialPanel.stories";
+import { OPERATOR_AGENT_AUTHORITY } from "@/components/screens/nvke/NvkeOperatorAgentPanel.stories";
+import type { NvkeOperatorAgentAuthority } from "@/components/screens/nvke/NvkeOperatorAgentPanel";
 import { METRICS_AUTHORITY } from "@/components/screens/nvke/NvkeMetricsPanel.stories";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
 
@@ -78,7 +80,8 @@ afterEach(() => vi.unstubAllGlobals());
 function harness(
   respond: (operation: Operation) => Record<string, unknown> | Promise<Record<string, unknown>>,
   collection = COLLECTION,
-  site = SITE
+  site = SITE,
+  agentAuthority: NvkeOperatorAgentAuthority | null = null
 ) {
   const calls: Operation[] = [];
   const cache = new InMemoryCache();
@@ -113,6 +116,8 @@ function harness(
                     resources: [],
                   },
                 };
+              if (operation.operationName === "GetNvkeOperatorAuthority")
+                return { astroliftNvkeOperatorAuthority: agentAuthority };
               if (operation.operationName === "ListNvkeOperations")
                 return { astroliftNvkeOperations: { items: [], nextCursor: null, totalCount: 0 } };
               if (operation.operationName === "GetNvkeMaintenance")
@@ -1574,6 +1579,64 @@ it("collects provider facts from the site page and keeps the shared journal curr
   });
   expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${OPERATION.id}`);
   await waitFor(() => expect(result.current.recovery).toBeNull());
+  expect(h.cache.extract()).toEqual({});
+  h.client.stop();
+});
+
+it("wires reviewed operator agent authority into site details with private mutation transport", async () => {
+  const h = harness(
+    (request) => {
+      if (request.operationName === "ConfigureNvkeOperatorAuthority")
+        return {
+          configureNvkeOperatorAuthority: {
+            ok: true,
+            errors: [],
+            data: {
+              ...OPERATOR_AGENT_AUTHORITY,
+              version: OPERATOR_AGENT_AUTHORITY.version + 1,
+              siteVersion: SITE.version + 1,
+              verifiedAt: null,
+              verificationCode: "",
+            },
+          },
+        };
+      return {};
+    },
+    COLLECTION,
+    SITE,
+    OPERATOR_AGENT_AUTHORITY
+  );
+  const { result } = renderHook(() => useNvkeSite(SITE.id), { wrapper: h.wrapper });
+  await waitFor(() => expect(result.current.operatorAgent?.canManage).toBe(true));
+  let submitted: Promise<boolean>;
+  act(() => {
+    submitted = result.current.operatorAgent!.onConfigure({
+      endpoint: OPERATOR_AGENT_AUTHORITY.endpoint,
+      instanceId: OPERATOR_AGENT_AUTHORITY.instanceId,
+      bundleManifestSha256: OPERATOR_AGENT_AUTHORITY.bundleManifestSha256,
+      timeoutSeconds: 30,
+      credentialMode: "replace",
+      caPem: "",
+      clientCertificatePem: "PRIVATE_AGENT_CERT",
+      clientKeyPem: "PRIVATE_AGENT_KEY",
+    });
+  });
+  await act(async () => expect(await submitted!).toBe(true));
+  const sent = h.calls.filter(
+    (request) => request.operationName === "ConfigureNvkeOperatorAuthority"
+  );
+  expect(sent).toHaveLength(1);
+  expect(sent[0].variables.input).toMatchObject({
+    expectedActorId: 41,
+    expectedSiteVersion: SITE.version,
+    expectedVersion: OPERATOR_AGENT_AUTHORITY.version,
+    credentials: { clientKeyPem: "PRIVATE_AGENT_KEY" },
+  });
+  expect(sent[0].getContext()).toMatchObject({
+    redactDiagnostics: true,
+    queryDeduplication: false,
+    expectedNvkeOrganization: scope.organizationId,
+  });
   expect(h.cache.extract()).toEqual({});
   h.client.stop();
 });

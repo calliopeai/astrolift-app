@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fakeController } from "@/components/data-table/fixtures";
 import { NvkeSiteScreen } from "./NvkeSiteScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
+import operatorAgentStory from "./NvkeOperatorAgentPanel.stories";
 import temporalStory from "./NvkeTemporalPanel.stories";
 import metricsStory from "./NvkeMetricsPanel.stories";
 import { SITE, SITE_DETAIL } from "./fixtures";
@@ -54,3 +55,11 @@ export const Width768: Story = {
 };
 
 export const ProviderCollection: Story = { args: { providerRequest: PROVIDER_REQUEST_PROPS } };
+
+export const OperatorAgent: Story = { args: { operatorAgent: operatorAgentStory.args } };
+export const OperatorAgentReadOnly: Story = {
+  args: {
+    operatorAgent: operatorAgentStory.args,
+    access: { read: true, manage: false, admin: false, loading: false },
+  },
+};

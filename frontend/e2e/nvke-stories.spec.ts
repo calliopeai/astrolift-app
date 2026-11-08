@@ -4,6 +4,19 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-site--operator-agent",
+  "screens-nvke-site--operator-agent-read-only",
+  "screens-nvke-operator-agent--full",
+  "screens-nvke-operator-agent--empty",
+  "screens-nvke-operator-agent--loading",
+  "screens-nvke-operator-agent--read-only",
+  "screens-nvke-operator-agent--pending",
+  "screens-nvke-operator-agent--disabled",
+  "screens-nvke-operator-agent--unverified",
+  "screens-nvke-operator-agent--failure",
+  "screens-nvke-operator-agent--long-strings",
+  "screens-nvke-operator-agent--width-768",
+
   "screens-nvke-credential-collection--full",
   "screens-nvke-credential-collection--read-only",
   "screens-nvke-credential-collection--unknown-outcome",
@@ -601,4 +614,74 @@ test("nvke retirement stays unavailable before inspecting the retained rotation"
   await expect(
     page.getByRole("option", { name: "RetireLostEtcdRotationNode", exact: true })
   ).toBeDisabled();
+});
+
+test("operator agent reviews immutable identity without exposing or retaining mTLS input", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-agent--full&viewMode=story");
+  await page.getByRole("button", { name: "Configure connection", exact: true }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("combobox").click();
+  await page.getByRole("option", { name: "Replace credential bundle", exact: true }).click();
+  await sheet.getByLabel("Client certificate (PEM)", { exact: true }).fill("PRIVATE_AGENT_CERT");
+  await sheet.getByLabel("Client private key (PEM)", { exact: true }).fill("PRIVATE_AGENT_KEY");
+  await sheet.getByRole("button", { name: "Review change", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("agent authority version 2");
+  await expect(review).toContainText("https://site-agent.example.test");
+  await expect(review).toContainText("123e4567-e89b-12d3-a456-426614174092");
+  await expect(review).not.toContainText("PRIVATE_AGENT");
+  await expect(page.locator("#nvke-agent-clientKeyPem")).toHaveValue("");
+  await expect(page.locator("#nvke-agent-clientCertificatePem")).toHaveValue("");
+  await review.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(sheet).not.toBeVisible();
+  await page.getByRole("button", { name: "Configure connection", exact: true }).click();
+  await page.getByRole("dialog").getByRole("combobox").click();
+  await page.getByRole("option", { name: "Replace credential bundle", exact: true }).click();
+  await expect(page.getByLabel("Client private key (PEM)", { exact: true })).toHaveValue("");
+});
+
+test("operator agent creation requires paired client credentials before review", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-agent--empty&viewMode=story");
+  await page.getByRole("button", { name: "Configure connection", exact: true }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByLabel("Endpoint", { exact: true }).fill("https://site-agent.example.test");
+  await sheet
+    .getByLabel("Agent instance GUID", { exact: true })
+    .fill("123e4567-e89b-12d3-a456-426614174092");
+  await sheet.getByLabel("Bundle manifest SHA-256", { exact: true }).fill("b".repeat(64));
+  await sheet.getByRole("button", { name: "Review change", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(sheet.getByRole("alert")).toBeVisible();
+});
+
+test("operator agent long identity and removal review stay within the viewport", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-agent--long-strings&viewMode=story");
+  await page.getByRole("heading", { name: "Operator agent", exact: true }).waitFor();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+  await page.getByRole("button", { name: "Remove agent connection", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("bundle:");
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+    await Promise.all(
+      document.getAnimations().map((animation) => animation.finished.catch(() => {}))
+    );
+  });
+  await page.screenshot({
+    animations: "disabled",
+    path: testInfo.outputPath("agent-identity-review.png"),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
 });

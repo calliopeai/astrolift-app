@@ -17852,6 +17852,18 @@
         "canceled": "Canceled"
       }
     },
+    "agentTitle": "Operator agent",
+    "agentHelp": "Run native preparation and management on a dedicated site executor. Verification confirms the agent identity and bundle; it does not establish infrastructure readiness. Removing this connection does not stop accepted jobs.",
+    "agentInstance": "Agent instance GUID",
+    "agentBundle": "Bundle manifest SHA-256",
+    "agentVerify": "Verify agent",
+    "agentEnable": "Enable agent",
+    "agentDisable": "Disable agent",
+    "agentRemove": "Remove agent connection",
+    "agentVerified": "Agent identity verified",
+    "agentCredentialHelp": "Use the agent’s trusted CA and a paired client certificate/key. The client certificate must match the agent’s approved fingerprint. Omission preserves the current bundle; credentials are never read back.",
+    "agentAuthorityEffect": "Connection changes clear verification and may interrupt observation. Accepted jobs and their infrastructure effects continue.",
+    "agentReview": "{site}, site version {siteVersion}; agent authority version {version}. Endpoint: {endpoint}; instance: {instance}; bundle: {bundle}.",
     "temporalTitle": "Native Temporal",
     "temporalHelp": "Configure the native controller’s separate Temporal authority. Verification proves namespace access only, not a polling worker. Removal withdraws this connection registration; it does not stop native workflows.",
     "temporalAddress": "Native address (host:port)",

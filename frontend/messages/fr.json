@@ -17855,6 +17855,18 @@
         "canceled": "Annulé"
       }
     },
+    "agentTitle": "Agent d’exploitation",
+    "agentHelp": "Exécutez la préparation et la gestion natives sur un exécuteur dédié au site. La vérification confirme l’identité et le paquet de l’agent, pas la disponibilité de l’infrastructure. Supprimer cette connexion n’arrête pas les tâches acceptées.",
+    "agentInstance": "GUID de l’instance de l’agent",
+    "agentBundle": "SHA-256 du manifeste du paquet",
+    "agentVerify": "Vérifier l’agent",
+    "agentEnable": "Activer l’agent",
+    "agentDisable": "Désactiver l’agent",
+    "agentRemove": "Supprimer la connexion de l’agent",
+    "agentVerified": "Identité de l’agent vérifiée",
+    "agentCredentialHelp": "Utilisez l’autorité de certification approuvée par l’agent et une paire certificat/clé client. Le certificat doit correspondre à l’empreinte approuvée par l’agent. Leur omission conserve le paquet actuel ; les identifiants ne sont jamais renvoyés.",
+    "agentAuthorityEffect": "Les modifications de connexion effacent la vérification et peuvent interrompre le suivi. Les tâches acceptées et leurs effets sur l’infrastructure se poursuivent.",
+    "agentReview": "{site}, version du site {siteVersion} ; version de l’autorité de l’agent {version}. Cible : {endpoint} ; instance : {instance} ; paquet : {bundle}.",
     "temporalTitle": "Temporal natif",
     "temporalHelp": "Configurez l’autorité Temporal distincte du contrôleur natif. La vérification prouve uniquement l’accès à l’espace de noms, pas la présence d’un worker actif. La suppression retire cet enregistrement de connexion sans arrêter les workflows natifs.",
     "temporalAddress": "Adresse native (hôte:port)",

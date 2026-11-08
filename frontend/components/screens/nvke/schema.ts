@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validNvkeGuid } from "@/lib/nvke/recovery";
 
 export const createSiteSchema = z.object({
   name: z.string().trim().min(1).max(200),
@@ -135,4 +136,44 @@ export const nativeResetFormSchema = z
   })
   .refine(
     (value) => value.mode !== "refresh_survivors" || Boolean(value.retirementWorkflowId.trim())
+  );
+
+export const operatorAgentAuthoritySchema = z
+  .object({
+    endpoint: z
+      .string()
+      .min(1)
+      .max(2048)
+      .refine((value) => {
+        try {
+          const url = new URL(value);
+          return (
+            url.protocol === "https:" &&
+            !!url.hostname &&
+            !url.username &&
+            !url.password &&
+            !url.search &&
+            !url.hash &&
+            url.port !== "0" &&
+            url.pathname === "/" &&
+            !/[\\%\s\p{C}]/u.test(value) &&
+            !value.includes("?") &&
+            !value.includes("#") &&
+            !value.split("/").some((segment) => segment === "." || segment === "..")
+          );
+        } catch {
+          return false;
+        }
+      }),
+    instanceId: z.string().refine(validNvkeGuid),
+    bundleManifestSha256: z.string().regex(/^[a-f0-9]{64}$/),
+    timeoutSeconds: z.number().int().min(1).max(300),
+    credentialMode: z.enum(["preserve", "replace"]),
+    caPem: z.string().max(262144),
+    clientCertificatePem: z.string().max(262144),
+    clientKeyPem: z.string().max(262144),
+  })
+  .refine(
+    (value) =>
+      value.credentialMode !== "replace" || (!!value.clientCertificatePem && !!value.clientKeyPem)
   );

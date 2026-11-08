@@ -5,11 +5,22 @@ server and Temporal worker never execute the native toolchain themselves. The
 agent protocol and installation instructions live in
 [`astrolift-opscode/kubernetes/nvke/OPERATOR-AGENT.md`](https://github.com/calliopeai/astrolift-opscode/blob/feature/nvke-2656-full-surface/kubernetes/nvke/OPERATOR-AGENT.md).
 
-This is a local integration under development. Storybook UI controls, agent-driven
-Linux bootstrap/install, production supply-chain checks and deployed acceptance
-remain separate qualification work.
+This is a local integration under development. Agent connection management is
+wired into the site screen and locally qualified in Storybook and Chromium
+against real GraphQL/Postgres/mTLS. The command/job/recovery/artifact workbench,
+agent-driven Linux bootstrap/install, production supply-chain checks and deployed
+acceptance remain separate qualification work.
 
 ## Connect an agent
+
+The site screen’s operator-agent section exposes configuration, verification,
+enable/disable and removal with reviewed site/authority versions and agent pins.
+Replacement credentials are cleared from visible fields when review opens and
+are never displayed in confirmation. Cancelling or changing caller/site scope
+discards the draft. An unconfirmed write blocks further writes until refresh;
+refresh reads the existing authority instead of repeating configuration. Private
+NVKE HTTP requests refuse redirects and bypass the browser HTTP cache.
+
 
 1. Start one agent for the existing Astro site GUID with the pinned native bundle.
    Keep its state directory and instance identity across restarts.

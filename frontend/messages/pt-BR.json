@@ -17852,6 +17852,18 @@
         "canceled": "Cancelado"
       }
     },
+    "agentTitle": "Agente de operações",
+    "agentHelp": "Execute a preparação e a gestão nativas em um executor dedicado ao site. A verificação confirma a identidade e o pacote do agente, não a prontidão da infraestrutura. Remover esta conexão não interrompe tarefas aceitas.",
+    "agentInstance": "GUID da instância do agente",
+    "agentBundle": "SHA-256 do manifesto do pacote",
+    "agentVerify": "Verificar agente",
+    "agentEnable": "Habilitar agente",
+    "agentDisable": "Desabilitar agente",
+    "agentRemove": "Remover conexão do agente",
+    "agentVerified": "Identidade do agente verificada",
+    "agentCredentialHelp": "Use a CA confiável do agente e um par de certificado e chave de cliente. O certificado deve corresponder à impressão digital aprovada pelo agente. A omissão preserva o pacote atual; as credenciais nunca são retornadas.",
+    "agentAuthorityEffect": "Alterações na conexão removem a verificação e podem interromper a observação. As tarefas aceitas e seus efeitos na infraestrutura continuam.",
+    "agentReview": "{site}, versão do site {siteVersion}; versão da autoridade do agente {version}. Destino: {endpoint}; instância: {instance}; pacote: {bundle}.",
     "temporalTitle": "Temporal nativo",
     "temporalHelp": "Configure a autoridade Temporal separada do controlador nativo. A verificação comprova apenas acesso ao namespace, não um worker ativo. A remoção retira este registro de conexão; não interrompe workflows nativos.",
     "temporalAddress": "Endereço nativo (host:porta)",

@@ -33,6 +33,7 @@ import {
 import { admitNvkeRequest, NvkeAdmissionError } from "@/lib/nvke/admission";
 import { useNvkeContext, useNvkeEpoch } from "./nvke.hooks";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
+import { useNvkeOperatorAgent } from "./use-nvke-operator-agent";
 import { useNvkeTemporal } from "./use-nvke-temporal";
 import { useNvkeProviderRequest } from "./use-nvke-provider-request";
 import { useNvkeMetrics } from "./use-nvke-metrics";
@@ -150,18 +151,31 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     catalog.refresh();
     operations.refetch();
   };
-  const temporal = useNvkeTemporal({
+  const operatorAgent = useNvkeOperatorAgent({
     context,
     scopeKey: visitKey,
     site,
     enabled: !error && !loadFailed && !siteQuery.loading && !pending,
     onSiteRefresh: siteQuery.refresh,
   });
+  const temporal = useNvkeTemporal({
+    context,
+    scopeKey: visitKey,
+    site,
+    enabled: !error && !loadFailed && !siteQuery.loading && !pending && !operatorAgent?.pending,
+    onSiteRefresh: siteQuery.refresh,
+  });
   const metrics = useNvkeMetrics({
     context,
     scopeKey: visitKey,
     site,
-    enabled: !error && !loadFailed && !siteQuery.loading && !pending && !temporal?.pending,
+    enabled:
+      !error &&
+      !loadFailed &&
+      !siteQuery.loading &&
+      !pending &&
+      !operatorAgent?.pending &&
+      !temporal?.pending,
     onSiteRefresh: siteQuery.refresh,
   });
   const providerRequest = useNvkeProviderRequest({
@@ -174,6 +188,7 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
       !siteQuery.loading &&
       !siteQuery.failed &&
       !pending &&
+      !operatorAgent?.pending &&
       !temporal?.pending &&
       !metrics?.pending,
     onRefresh: refresh,
@@ -223,6 +238,7 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     }
   };
   return {
+    operatorAgent,
     temporal,
     metrics,
     providerRequest,
@@ -234,6 +250,7 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     access: context.access,
     pending:
       pending ||
+      Boolean(operatorAgent?.pending) ||
       Boolean(temporal?.pending) ||
       Boolean(metrics?.pending) ||
       Boolean(providerRequest?.pending),

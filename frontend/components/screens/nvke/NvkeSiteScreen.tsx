@@ -39,6 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
 import { NvkeNativePanel } from "./NvkeNativePanel";
+import { NvkeOperatorAgentPanel } from "./NvkeOperatorAgentPanel";
 import { NvkeTemporalPanel } from "./NvkeTemporalPanel";
 import { NvkeProviderRequestPanel } from "./NvkeProviderRequestPanel";
 import { NvkeMetricsPanel } from "./NvkeMetricsPanel";
@@ -290,18 +291,40 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
           empty={{ icon: <CableIcon />, title: t("notConfigured") }}
         />
       </Section>
+      {props.operatorAgent && (
+        <NvkeOperatorAgentPanel
+          {...props.operatorAgent}
+          canManage={
+            props.operatorAgent.canManage &&
+            access.admin &&
+            !access.loading &&
+            !error &&
+            (!pending || props.operatorAgent.pending) &&
+            !props.temporal?.pending &&
+            !props.metrics?.pending &&
+            !props.providerRequest?.pending
+          }
+        />
+      )}
       {props.temporal && (
         <NvkeTemporalPanel
           {...props.temporal}
           canManage={
-            props.temporal.canManage && !props.metrics?.pending && !props.providerRequest?.pending
+            props.temporal.canManage &&
+            !props.operatorAgent?.pending &&
+            !props.metrics?.pending &&
+            !props.providerRequest?.pending
           }
         />
       )}
       {props.metrics && (
         <NvkeMetricsPanel
           {...props.metrics}
-          canManage={props.metrics.canManage && !props.providerRequest?.pending}
+          canManage={
+            props.metrics.canManage &&
+            !props.operatorAgent?.pending &&
+            !props.providerRequest?.pending
+          }
         />
       )}
       {props.providerRequest && <NvkeProviderRequestPanel {...props.providerRequest} />}

@@ -17855,6 +17855,18 @@
         "canceled": "Abgebrochen"
       }
     },
+    "agentTitle": "Betriebsagent",
+    "agentHelp": "Führen Sie native Vorbereitung und Verwaltung auf einem dedizierten Standort-Executor aus. Die Prüfung bestätigt Identität und Paket des Agenten, nicht die Betriebsbereitschaft der Infrastruktur. Das Entfernen dieser Verbindung stoppt keine angenommenen Aufträge.",
+    "agentInstance": "GUID der Agenteninstanz",
+    "agentBundle": "SHA-256 des Paketmanifests",
+    "agentVerify": "Agent prüfen",
+    "agentEnable": "Agent aktivieren",
+    "agentDisable": "Agent deaktivieren",
+    "agentRemove": "Agentenverbindung entfernen",
+    "agentVerified": "Agentenidentität bestätigt",
+    "agentCredentialHelp": "Verwenden Sie die vertrauenswürdige CA des Agenten und ein zusammengehöriges Clientzertifikat mit Schlüssel. Das Zertifikat muss dem vom Agenten genehmigten Fingerabdruck entsprechen. Ohne Angabe bleibt das aktuelle Paket erhalten; Zugangsdaten werden nie zurückgegeben.",
+    "agentAuthorityEffect": "Verbindungsänderungen löschen die Prüfung und können die Beobachtung unterbrechen. Angenommene Aufträge und ihre Auswirkungen auf die Infrastruktur laufen weiter.",
+    "agentReview": "{site}, Standortversion {siteVersion}; Version der Agentenverbindung {version}. Ziel: {endpoint}; Instanz: {instance}; Paket: {bundle}.",
     "temporalTitle": "Natives Temporal",
     "temporalHelp": "Konfigurieren Sie die separate Temporal-Verbindung des nativen Controllers. Die Prüfung bestätigt nur den Namespace-Zugriff, keinen aktiven Worker. Das Entfernen löscht diese Verbindungsregistrierung und stoppt keine nativen Workflows.",
     "temporalAddress": "Native Adresse (Host:Port)",

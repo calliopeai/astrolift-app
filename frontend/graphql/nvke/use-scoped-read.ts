@@ -4,7 +4,11 @@ import type { DocumentNode, OperationVariables } from "@apollo/client";
 import { useApolloClient } from "@apollo/client/react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-export const NVKE_REQUEST_CONTEXT = { queryDeduplication: false, redactDiagnostics: true };
+export const NVKE_REQUEST_CONTEXT = {
+  queryDeduplication: false,
+  redactDiagnostics: true,
+  fetchOptions: { redirect: "error" as const, cache: "no-store" as const },
+};
 
 /** A response belongs to one visit to one caller scope; returning to it starts a fresh read. */
 export const useNvkeRead = <T, V extends OperationVariables = OperationVariables>(
