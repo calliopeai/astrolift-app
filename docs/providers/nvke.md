@@ -21,7 +21,7 @@ Native reset recovery requires exact owner/run/event review; a closed workflow d
 | `RotateEtcdEncryptionKey` | `RotateEtcdEncryptionKeyInput` | `nvke.admin` | `controller/internal/temporal/workflows/rotate_etcd_encryption_key.go` | pending |
 | `RetireLostEtcdRotationNode` | `RetireLostEtcdRotationNodeInput` | `nvke.admin` | `controller/internal/temporal/workflows/retire_lost_etcd_rotation_node.go` | pending |
 
-The snapshot also pins 100 exported controller activity names for secret-safe history projection.
+The snapshot also pins 115 exported controller activity names for secret-safe history projection.
 Activity inputs/results, failure messages and unknown activity names are excluded from that projection.
 
 ## Delivery and ownership

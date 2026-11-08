@@ -100,6 +100,8 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "RequestNvkeOperationInput.parameters",
         "RequestNvkeOperationTextInput.parametersText",
         "RequestNvkeNativeWorkflowInput.parametersText",
+        "RequestNvkeNativeResetInput.rationale",
+        "RequestNvkeNativeResetInput.quiescenceEvidence",
         "RequestNvkeResourceOperationInput.parametersText",
         "NvkeCredentialsInput.clientKeyPem",
         "NvkeTemporalCredentialsInput.apiKey",

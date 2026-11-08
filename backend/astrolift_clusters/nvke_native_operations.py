@@ -149,7 +149,7 @@ def reserve(
                     "PRECONDITION", "Review the failed rotation's exact retained owner and recoverable phase"
                 )
         if (
-            NvkeOperation.objects.filter(
+            NvkeOperation.all_objects.filter(
                 site=site,
                 operation_key__startswith=PREFIX,
                 authority__native_cluster_id=parameters["clusterID"],

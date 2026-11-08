@@ -129,6 +129,8 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
     }
     for pattern in (
         "controller/internal/temporal/activities/*.go",
+        "controller/internal/rollout/temporal/*.go",
+        "controller/internal/rollout/operations/etcd/*.go",
         "management-engine/apis/v1/*.go",
         "management-engine/pkg/resource/*.go",
         "management-engine/config/crd/bases/*.yaml",
@@ -161,6 +163,12 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
                 for path in (checkout / "controller/internal/temporal/activities").glob("*.go")
                 if not path.name.endswith("_test.go")
                 for name in re.findall(r"func \(\w+ \*Activities\) ([A-Z]\w*)\(", path.read_text())
+            }
+            | {
+                name
+                for path in (checkout / "controller/internal/rollout/temporal").glob("*.go")
+                if not path.name.endswith("_test.go")
+                for name in re.findall(r'Activity\w+\s*=\s*"(rollout\.[\w.]+)"', path.read_text())
             }
         ),
     }

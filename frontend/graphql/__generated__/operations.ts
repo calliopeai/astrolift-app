@@ -10127,6 +10127,7 @@ export type Mutation = {
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
   requestModelConnection: ModelConnectionRequestMutationResult;
   requestNvkeInventory: NvkeOperationTypeMutationResult;
+  requestNvkeNativeReset: NvkeOperationTypeMutationResult;
   requestNvkeNativeWorkflow: NvkeOperationTypeMutationResult;
   requestNvkeOperation: NvkeOperationTypeMutationResult;
   requestNvkeOperationText: NvkeOperationTypeMutationResult;
@@ -11854,6 +11855,11 @@ export type MutationRequestModelConnectionArgs = {
 
 export type MutationRequestNvkeInventoryArgs = {
   input: RequestNvkeOperationTextInput;
+};
+
+
+export type MutationRequestNvkeNativeResetArgs = {
+  input: RequestNvkeNativeResetInput;
 };
 
 
@@ -17168,6 +17174,30 @@ export type RequestModelConnectionInput = {
   modelDeploymentId: Scalars['GUID']['input'];
   organizationId: Scalars['GUID']['input'];
   policyVersion: Scalars['String']['input'];
+};
+
+export type RequestNvkeNativeResetInput = {
+  acknowledgeBoundaryReviewed: Scalars['Boolean']['input'];
+  acknowledgeConflictingWorkStopped: Scalars['Boolean']['input'];
+  activityEventId: Scalars['String']['input'];
+  activityType: Scalars['String']['input'];
+  baseRunId: Scalars['String']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  mode: Scalars['String']['input'];
+  phase: Scalars['String']['input'];
+  quiescenceEvidence: Scalars['String']['input'];
+  rationale: Scalars['String']['input'];
+  requestId: Scalars['String']['input'];
+  retirementWorkflowId: Scalars['String']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  timeoutSeconds: Scalars['Int']['input'];
+  workflow: Scalars['String']['input'];
+  workflowId: Scalars['String']['input'];
+  workflowTaskEventId: Scalars['String']['input'];
 };
 
 export type RequestNvkeNativeWorkflowInput = {

@@ -313,8 +313,8 @@ polling the configured queue or that a workflow type is registered there.
 The contract query's `nativeWorkflows` catalog separately exposes the three
 pinned operator workflow input schemas, with upstream declaration and
 registration checks. These are additional to the 88 HTTP/datastore actions.
-Reviewed execution is available through the API below. Native history reset and
-dedicated browser/CLI controls remain in #2665.
+Reviewed execution, owner history and rotation reset are available through the
+APIs below. Dedicated browser/CLI reset controls remain in #2665.
 
 ## Reviewed native workflow requests
 
@@ -426,5 +426,72 @@ Temporal reset can terminate the current run even when given an older base run;
 local qualification also produced another run when the same reset request was
 replayed after its first reset run completed. Reset admission/recovery must not
 depend on repeated reset RPCs as a generic lost-reply strategy. Phase-specific
-boundaries, terminal node-work checks and durable reset-history proof remain
-required work in #2665 before exposing a reset control.
+boundaries, operator confirmation of terminal conflicting node work and durable
+reset-history proof are required before dispatching the reset described below.
+
+## Reviewed native rotation reset API
+
+`requestNvkeNativeReset` admits a durable `NvkeOperation` for the documented
+`RotateEtcdEncryptionKey` recovery procedure. It requires `nvke.admin` and current
+`nvke.read` authority, the original actor ID, site/version, explicit native
+Temporal authority/version, and a successful exact `getCluster` source operation
+ID/version. The source must still report the retained rotation owner, phase and
+mutation lock. Execution reads the controller again before history review and
+immediately before dispatch. A completed native owner is refused even when the
+controller observation still reports failure. Renewal reset is refused: upstream
+requires a fresh cycle or incident-specific recovery, not reopening a failed cycle.
+
+Review `workflowId`, exact `baseRunId`, decimal-string `workflowTaskEventId` and
+`activityEventId`, and the pinned `activityType`. The activity must have been
+scheduled by that exact workflow task. A successfully completed Begin activity
+must precede it and prove this cluster and owner. The first workflow task is
+never an accepted boundary. The last successfully recorded native phase before
+the boundary must match the review, preserving earlier phase work. Choose the
+recorded `phase` and one `mode`:
+
+| Mode | Required boundary |
+|---|---|
+| `retry_activity` | An unsuccessful phase-appropriate activity. Key rollout inputs must match this cluster and phase. Post-rewrite checks must preserve the acknowledged rewrite start. Successful earlier mutations are refused. An unsuccessful Record phase transition can retry only the next phase for the retained owner. A rollout result containing a native business error counts as unsuccessful. |
+| `resume_rewrite` | A rewrite status poll retaining the exact acknowledged node and operation ID, within the original six-hour allowance. |
+| `restart_rewrite` | The rewrite Start activity, after confirming earlier conflicting rewrite work is terminal. This can intentionally replay an earlier Start result. |
+| `refresh_survivors` | Prepare after Begin, following a completed `retirementWorkflowId` whose native input proves this cluster and retained rotation owner. Available before finalization in the distribution/rewrite/removal phases. |
+
+A retained `prepare` owner is accepted only when its controller state remains
+running and its native run was terminated or timed out. A recorded prepare
+failure uses a fresh workflow ID after lock release. Finalization recovery accepts
+only Finalize or Complete boundaries, preserving completed key distribution.
+
+Supply nonempty `rationale` and `quiescenceEvidence` references, each at most
+4,000 UTF-8 bytes, and explicitly set both `acknowledgeBoundaryReviewed` and
+`acknowledgeConflictingWorkStopped`. These are operator attestations: Astro does
+not independently inspect agent processes or prove hardware quiescence. They
+must cover late activities and node work that can outlive a closed Temporal run.
+When resuming a matching acknowledged rewrite, confirm that *conflicting* work is
+stopped; the matching rewrite may still be running. Retirement workflow completion
+proves its recorded native execution, not an independent hardware observation.
+
+Coordinate external Temporal operators during review and dispatch. Astro checks
+that the exact reviewed run is still current immediately before reset, but the
+native reset RPC has no atomic compare-and-swap against another client's reset.
+A base run ID alone does not protect a newer current run from termination.
+
+Astro encrypts the review and evidence at rest and redacts both text fields in
+mutation audit variables. They are not passed as reset reasons. Native reset
+history receives only an opaque Astro operation ID and keyed review digest.
+Each request ID is bound to one immutable review; changing any reviewed field
+requires a new request ID. An unresolved maintenance operation blocks another
+for the cluster even if the operation was soft-deleted.
+
+Dispatch persists a one-way sending state before one reset RPC, with SDK retry
+disabled. A crash before that RPC can therefore leave an unconfirmed intent that
+requires operator investigation. Astro never resends it. Lost replies are
+recovered only from a matching native reset history event containing the exact
+base/new run IDs, reviewed workflow-task boundary and opaque intent proof.
+Common operation resume performs observation only once sending was recorded.
+The observation deadline never cancels the native workflow or releases its lock.
+
+A successful operation means that the proved reset workflow completed; it does
+not independently certify encryption health. Local qualification uses real
+PostgreSQL, controller HTTP reads and Temporal with fixture workflows. Full native
+controller, agent and topology qualification, plus browser/CLI reset controls,
+remain release requirements tracked in #2665.

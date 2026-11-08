@@ -10861,6 +10861,7 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  requestNvkeNativeReset(input: RequestNvkeNativeResetInput!): NvkeOperationTypeMutationResult!
   requestNvkeNativeWorkflow(input: RequestNvkeNativeWorkflowInput!): NvkeOperationTypeMutationResult!
   configureNvkeTemporalAuthority(input: ConfigureNvkeTemporalAuthorityInput!): NvkeTemporalAuthorityTypeMutationResult!
   setNvkeTemporalAuthorityEnabled(input: SetNvkeTemporalAuthorityEnabledInput!): NvkeTemporalAuthorityTypeMutationResult!
@@ -13051,6 +13052,30 @@ input RequestModelConnectionInput {
   ifMatchAppVersion: Int!
   policyVersion: String!
   idempotencyKey: GUID!
+}
+
+input RequestNvkeNativeResetInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  expectedActorId: Int!
+  expectedAuthorityVersion: Int!
+  sourceOperationId: GUID!
+  expectedSourceVersion: Int!
+  requestId: String!
+  workflow: String!
+  workflowId: String!
+  baseRunId: String!
+  workflowTaskEventId: String!
+  activityEventId: String!
+  activityType: String!
+  phase: String!
+  mode: String!
+  rationale: String!
+  quiescenceEvidence: String!
+  acknowledgeBoundaryReviewed: Boolean! = false
+  acknowledgeConflictingWorkStopped: Boolean! = false
+  retirementWorkflowId: String! = ""
+  timeoutSeconds: Int! = 7200
 }
 
 input RequestNvkeNativeWorkflowInput {

@@ -79,6 +79,8 @@ def connection_digest(row):
 
 
 def operation_permission(key):
+    if key == "temporal.reset.RotateEtcdEncryptionKey":
+        return Permission.NVKE_ADMIN
     if key.startswith("temporal."):
         from astrolift_clusters.nvke_native_operations import workflow_name
 
