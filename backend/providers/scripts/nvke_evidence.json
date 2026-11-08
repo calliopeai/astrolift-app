@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "43c96bb9d0cca4b1ae15d25fe9ea7d3f656c23f5"
+      "revision": "93619bca993b501c4b34b04a0460d483a53c5146"
     }
   },
   "evidence": {
@@ -317,22 +317,51 @@
       "kind": "observation",
       "scope": "Actual guarded default NICo stack install, SPIFFE access setup and native site diagnostics. Six deployed stack Helm releases, active workload/certificate readiness, source-built controller identity, healthy database/Temporal, and SDK GETs for the three installed CRDs over certificate-validated private SSH transport. Optional management-engine/public APIs, tenant provisioning, production telemetry delivery and API/UI install controls are not qualified.",
       "sha256": "5af9b8ba1edbf003912412f4a47e5866f0b4b50bfde05dc000c369c1306f9bfc"
+    },
+    "management-api-profile": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/management_api.py",
+      "kind": "implementation",
+      "scope": "Pinned native operator/tenant API manifests, immutable image references, fixed tenant namespace/RBAC, private ClusterIP services and default-deny or namespace-and-pod-scoped ingress. Pure renderer; no upstream caller authentication or controller-manager installation.",
+      "sha256": "d16b7ed50a5c03d1ba6e972aa06fab04ea4dc8942109f32ae5212c7769ef7b18"
+    },
+    "management-api-profile-tests": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_management_api.py",
+      "kind": "test",
+      "scope": "Eight profile and pinned-source rendering tests: field/image validation, caller selector scope, tenant RBAC/pod security preservation, default/scoped ingress, source drift and private exclusive CLI output.",
+      "sha256": "5d71c67a9c11b4f74aeeb460f815d828eb1c76459141ff4e8ab069cd8941e3f7"
+    },
+    "management-apis-native": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-apis-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Renderer output applied to native local site: source-build-bound runtime image IDs, Ready private APIs, all six established/readable CRDs, ten SDK public health/list checks and actual untrusted-pod ingress denial after removing the temporary policy. Caller authentication remains deferred upstream; no management-engine reconciliation or hosted installation-control claim.",
+      "sha256": "b5aff8693318c81b6f94f67874453a9141d9f43c97846f6f989981c98a0406a1"
+    },
+    "sdk-tenant-native": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/sdk-tenant-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "SDK-driven local legacy-controller NICo simulator: MachineImage public create/read, complete ClusterRelease/NodePoolRelease datastore publication with native annotations, controller create request, two Ready workload nodes and ownership-checked private kubeconfig export. Not hosted Astro API/UI/CLI admission/recovery/access enrollment, physical hardware or declarative NVKECluster reconciliation.",
+      "sha256": "80718a3fa4b3800e89eb85c82b31669bd59349bf60435ae7b32b96aa5b799ca1"
     }
   },
   "rows": {
     "actions": {
       "createCluster": {
         "mapping": "astro nvke controller create-cluster; shared reviewed API/UI action forms",
-        "qualification": "fixture",
+        "qualification": "partial",
         "evidence": [
           "http-fixture",
           "action-validation",
           "api-catalog",
           "ui-wiring",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "sdk-tenant-native"
         ],
-        "remaining": "Native controller/provider effect and per-action API/UI/CLI end-to-end qualification remain pending."
+        "remaining": "One SDK-driven local NICo-simulator create reached two Ready nodes. Per-action hosted API/UI/CLI admission/recovery, other provider inputs and live deployment remain pending."
       },
       "createNodePool": {
         "mapping": "astro nvke controller create-node-pool; shared reviewed API/UI action forms",
@@ -1524,9 +1553,10 @@
           "crd-admission",
           "resource-admission",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "sdk-tenant-native"
         ],
-        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+        "remaining": "One native local container release set was published and consumed by the legacy controller. Full hosted API/UI/CLI flows, physical image/boot effects and production artifact provenance remain unqualified."
       },
       "ControlPlaneClass": {
         "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
@@ -1546,9 +1576,10 @@
           "crd-admission",
           "resource-admission",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "sdk-tenant-native"
         ],
-        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+        "remaining": "One native local container release set was published and consumed by the legacy controller. Full hosted API/UI/CLI flows, physical image/boot effects and production artifact provenance remain unqualified."
       },
       "NodePoolRelease": {
         "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
@@ -1557,9 +1588,10 @@
           "crd-admission",
           "resource-admission",
           "ui-resource",
-          "cli-wiring"
+          "cli-wiring",
+          "sdk-tenant-native"
         ],
-        "remaining": "Native controllers and physical effects are not established by Kubernetes admission."
+        "remaining": "One native local container release set was published and consumed by the legacy controller. Full hosted API/UI/CLI flows, physical image/boot effects and production artifact provenance remain unqualified."
       },
       "NVKECluster": {
         "mapping": "Explicit datastore interface; CRUDL and guarded release deprecation where declared",
@@ -2303,7 +2335,9 @@
           "tooling-source",
           "native-tooling",
           "cli-tooling",
-          "native-management-base"
+          "native-management-base",
+          "management-api-profile",
+          "management-api-profile-tests"
         ],
         "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
       },
@@ -2326,9 +2360,10 @@
           "native-tooling",
           "cli-tooling",
           "nktp-kind",
-          "native-management-base"
+          "native-management-base",
+          "management-apis-native"
         ],
-        "remaining": "Default NICo management stack is locally qualified. Optional management-engine/operator/tenant API deployment, tenant provisioning, API/UI install controls, verified production release supply chain and live deployment remain pending."
+        "remaining": "Default stack and private operator/tenant APIs are locally qualified. Management-engine controller reconciliation, hosted API/UI installation controls, profile CLI exposure, verified production supply chain and live deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
