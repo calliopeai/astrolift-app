@@ -17590,6 +17590,23 @@
     "expand": "展开"
   },
   "nvke": {
+    "operatorWorkbench": {
+      "title": "原生工具",
+      "help": "通过已验证的站点代理运行固定命令。提交前请审核每个请求。",
+      "command": "命令",
+      "import": "导入私有请求 JSON",
+      "request": "私有请求（JSON）",
+      "privateHelp": "将文件作为 UTF-8 字符串放入 files。打开审核时会清除私有文本，恢复记录不会存储这些文本。",
+      "options": "声明的命令选项",
+      "references": "输入使用 input:NAME，输出使用 output:NAME，保留产物使用 job:UUID:NAME，固定目录使用已声明的 source: 引用。不允许主机路径。",
+      "acknowledge": "我确认此请求可能更改站点基础设施。",
+      "recover": "查询原始回执",
+      "recovery": "{command} 的原始请求 {id} 尚未解决。再次提交前请查询其回执。",
+      "unavailable": "新请求需要活动站点及审核版本下已验证的代理。现有回执可单独恢复。",
+      "review": "在 {site} 执行命令 {command}，站点版本 {siteVersion}，代理版本 {authorityVersion}。原生修订版 {revision}。代理 {endpoint}，实例 {instance}，软件包 {bundle}。请求 SHA-256 {digest}，UTF-8 共 {bytes} 字节。观察期限 {timeout} 秒。",
+      "effect": "此命令可能更改基础设施。接受请求不代表已就绪；取消后远程影响可能仍然存在。",
+      "utility": "此请求运行声明的工具或试运行。请检查回执及私有产物。"
+    },
     "title": "NVIDIA Kubernetes Engine",
     "sitesDescription": "管理此组织的 NVKE 站点、原生资源和受观察的操作。",
     "name": "名称",

@@ -154,6 +154,7 @@ export interface NvkeSitesScreenProps {
 }
 export interface NvkeSiteScreenProps {
   operatorAgent?: import("./NvkeOperatorAgentPanel").NvkeOperatorAgentPanelProps | null;
+  operatorWorkbench?: import("./NvkeOperatorWorkbench").NvkeOperatorWorkbenchProps | null;
   providerRequest?: import("./NvkeProviderRequestPanel").NvkeProviderRequestPanelProps | null;
   metrics?: import("./NvkeMetricsPanel").NvkeMetricsPanelProps | null;
   temporal?: import("./NvkeTemporalPanel").NvkeTemporalPanelProps | null;

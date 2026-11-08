@@ -17593,6 +17593,23 @@
     "expand": "Vergrößern"
   },
   "nvke": {
+    "operatorWorkbench": {
+      "title": "Native Werkzeuge",
+      "help": "Führen Sie festgelegte Befehle über den verifizierten Standortagenten aus. Prüfen Sie jede Anfrage vor dem Senden.",
+      "command": "Befehl",
+      "import": "Private Anfrage als JSON importieren",
+      "request": "Private Anfrage (JSON)",
+      "privateHelp": "Dateien gehören als UTF-8-Zeichenfolgen in files. Privater Text wird beim Öffnen der Prüfung gelöscht und nie für die Wiederherstellung gespeichert.",
+      "options": "Deklarierte Befehlsoptionen",
+      "references": "Nutzen Sie input:NAME für Dateien, output:NAME für Ausgaben, job:UUID:NAME für gespeicherte Artefakte und deklarierte source:-Verweise für festgelegte Verzeichnisse. Hostpfade werden abgelehnt.",
+      "acknowledge": "Ich bestätige, dass diese Anfrage die Standortinfrastruktur ändern kann.",
+      "recover": "Ursprünglichen Beleg suchen",
+      "recovery": "Die ursprüngliche Anfrage {id} für {command} ist ungeklärt. Suchen Sie vor erneutem Senden den Beleg.",
+      "unavailable": "Neue Anfragen erfordern einen aktiven Standort und einen verifizierten Agenten mit den geprüften Versionen. Die Belegwiederherstellung bleibt getrennt.",
+      "review": "Befehl {command} auf {site}, Standortversion {siteVersion}, Agentversion {authorityVersion}. Native Revision {revision}. Agent {endpoint}, Instanz {instance}, Paket {bundle}. SHA-256 {digest}, {bytes} UTF-8-Bytes. Beobachtungsfrist: {timeout} Sekunden.",
+      "effect": "Dieser Befehl kann die Infrastruktur ändern. Annahme bedeutet keine Bereitschaft; ein Abbruch kann entfernte Auswirkungen hinterlassen.",
+      "utility": "Diese Anfrage führt das deklarierte Werkzeug oder den Testlauf aus. Prüfen Sie den Beleg und private Artefakte."
+    },
     "title": "NVIDIA Kubernetes Engine",
     "sitesDescription": "NVKE-Standorte, native Ressourcen und beobachtete Vorgänge dieser Organisation verwalten.",
     "name": "Name",

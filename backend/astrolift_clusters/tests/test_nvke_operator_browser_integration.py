@@ -1,5 +1,6 @@
 """Owned Chromium -> real GraphQL/Postgres/mTLS authority lifecycle qualification."""
 
+import asyncio
 import importlib.util
 import json
 import os
@@ -8,20 +9,23 @@ import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from types import SimpleNamespace
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
+from asgiref.sync import sync_to_async
 
-from astrolift_clusters.models import NvkeOperatorAuthority
+from astrolift_clusters.models import NvkeOperation, NvkeOperatorAuthority
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
 from astrolift_clusters.tests.test_nvke_browser_integration import FRONTEND
 from astrolift_clusters.tests.test_nvke_browser_integration import browser_endpoint as _browser_endpoint
 from astrolift_clusters.tests.test_nvke_browser_integration import story_origin as _story_origin
+from astrolift_clusters.tests.test_nvke_operator import configured as _configured_operator
 from astrolift_clusters.tests.test_nvke_sites import context, create
 from astrolift_clusters.tests.test_nvke_sites import world as _world
 from astrolift_identity.api_tokens import mint_token
 from astrolift_identity.models import ApiToken
 from core.schema.audit import MutationAuditLog
+from core.testing.temporal import temporal_test_env, temporal_worker
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -158,3 +162,98 @@ def test_browser_configures_once_recovers_fresh_versions_and_verifies_actual_age
         ApiToken.objects.filter(pk=token.pk).update(is_revoked=True)
     finally:
         agent.close()
+
+
+@pytest.fixture
+def browser_operator_job_source(tmp_path):
+    world = _world.__wrapped__()
+    source = FRONTEND.parent / "backend/providers/tests/nvke/test_operator_agent_client.py"
+    spec = importlib.util.spec_from_file_location("browser_operator_job_helpers", source)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    agent = module.real_operator_agent.__wrapped__(tmp_path)
+    state = next(agent)
+    try:
+        yield _configured_operator.__wrapped__(world, state)
+    finally:
+        agent.close()
+
+
+async def test_browser_native_generation_recovers_lost_admission_without_replay(
+    browser_operator_job_source, story_origin, browser_endpoint, monkeypatch
+):
+    from astrolift_clusters import nvke_operations as outbox
+    from astrolift_workflows import client as workflow_client
+    from astrolift_workflows.activities.nvke import nvke_operation_attempt
+    from astrolift_workflows.workflows.nvke import NvkeOperationWorkflow
+
+    state = browser_operator_job_source
+    issued = mint_token()
+    await sync_to_async(ApiToken.objects.create)(
+        user=state.world.user,
+        organization=state.world.org,
+        name="owned browser tooling qualification",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["read:nvke", "admin:nvke"],
+    )
+    config = {
+        "storyOrigin": story_origin,
+        "endpoint": browser_endpoint,
+        "token": issued.plaintext,
+        "organizationId": str(state.world.org.guid),
+        "actorId": state.world.user.pk,
+        "siteId": str(state.site.guid),
+        "revision": state.site.upstream_revision,
+    }
+    async with temporal_test_env() as env:
+        queue = "nvke-browser-agent-" + uuid4().hex
+
+        async def get_client():
+            return env.client
+
+        monkeypatch.setattr(workflow_client, "_get_client_async", get_client)
+        monkeypatch.setattr(workflow_client, "_temporal_enabled", lambda: True)
+        monkeypatch.setattr(workflow_client, "_task_queue", lambda: queue)
+        async with temporal_worker(
+            env, task_queue=queue, workflows=[NvkeOperationWorkflow], activities=[nvke_operation_attempt]
+        ):
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [shutil.which("node"), str(FRONTEND / "e2e/nvke-workbench-connected-runner.mjs")],
+                input=json.dumps(config),
+                capture_output=True,
+                text=True,
+                timeout=100,
+                check=False,
+                env=os.environ.copy(),
+            )
+            assert issued.plaintext not in result.stdout + result.stderr
+            assert "PRIVATE KEY" not in result.stdout + result.stderr
+            assert result.returncode == 0, result.stderr
+            receipt = json.loads(result.stdout)
+            assert receipt["admissions"] == receipt["receiptReads"] == 1
+            assert receipt["privateDraftCleared"]
+            row = await sync_to_async(NvkeOperation.objects.get)(guid=receipt["operationId"])
+            assert str(row.request_id) == receipt["requestId"]
+            assert row.operation_key == "tooling.generate.sitespec"
+            handle = env.client.get_workflow_handle(row.workflow_id, run_id=row.workflow_run_id or None)
+            assert await asyncio.wait_for(handle.result(), timeout=65) == "succeeded"
+            await sync_to_async(row.refresh_from_db)()
+            progress = await sync_to_async(outbox.decode_result)(row)
+            assert progress["operator_job"]["state"] == "completed"
+            assert progress["operator_job"]["intent"] == row.request_digest
+            assert len(list((state.agent.root / "state/workspace/runs").glob("*/started.json"))) == 1
+            assert b"browser-private-native-site" not in bytes(row.input_ciphertext)
+            assert b"browser-private-native-site" not in bytes(row.result_ciphertext)
+            history = (await handle.fetch_history()).to_json()
+            for private in ("browser-private-native-site", "nodes.csv", "PRIVATE KEY", row.request_digest):
+                assert private not in history
+            logs = await sync_to_async(list)(
+                MutationAuditLog.objects.filter(
+                    organization_id=state.world.org.pk, operation="nvke.operator_request"
+                )
+            )
+            assert len(logs) == 1
+            assert "browser-private-native-site" not in str(logs[0].variables)
+            assert "nodes.csv" not in str(logs[0].variables)

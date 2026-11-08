@@ -89,11 +89,12 @@ export const useNvkeOperation = (
   const loading = context.loading || detail.loading || site.loading || catalog.loading;
   const failed =
     context.failed || detail.failed || site.failed || catalog.failed || (!context.loading && !key);
-  const permission = ["metrics.credentials", "infrastructure.providers"].includes(
-    operation?.operationKey ?? ""
-  )
-    ? "nvke.admin"
-    : (nativeMaintenancePermission(operation?.operationKey) ?? action?.permission);
+  const isTooling = operation?.operationKey.startsWith("tooling.") === true;
+  const permission =
+    isTooling ||
+    ["metrics.credentials", "infrastructure.providers"].includes(operation?.operationKey ?? "")
+      ? "nvke.admin"
+      : (nativeMaintenancePermission(operation?.operationKey) ?? action?.permission);
   const canAct =
     !!key &&
     !loading &&
@@ -168,7 +169,13 @@ export const useNvkeOperation = (
     onRefresh: refresh,
   });
   const control = async (resume: boolean) => {
-    if (!current() || !canAct || !operation || busy.current || (resume && !context.access.admin))
+    if (
+      !current() ||
+      !canAct ||
+      !operation ||
+      busy.current ||
+      (resume && (!context.access.admin || isTooling))
+    )
       return false;
     busy.current = true;
     setMutation({ key: visitKey, pending: true, error: null });
@@ -224,7 +231,7 @@ export const useNvkeOperation = (
     error: failed ? t("readFailed") : mutation?.key === visitKey ? mutation.error : null,
     pending: mutation?.key === visitKey && mutation.pending,
     canAct,
-    canResume: canAct && context.access.admin,
+    canResume: canAct && context.access.admin && !isTooling,
     onRefresh: refresh,
     onCancel: () => control(false),
     onResume: () => control(true),

@@ -112,6 +112,12 @@ export const nativeWorkflowFormSchema = z.object({
 export const credentialObservationSchema = z.object({
   timeoutSeconds: z.number().int().min(30).max(86400),
 });
+export const operatorJobFormSchema = z.object({
+  operationKey: z.string().regex(/^tooling\.[a-z][a-z0-9.-]{0,119}$/),
+  requestText: z.string().min(2).max(1048576),
+  timeoutSeconds: z.number().int().min(30).max(86400),
+  acknowledgeInfrastructureChange: z.boolean(),
+});
 export const nativeResetFormSchema = z
   .object({
     mode: z

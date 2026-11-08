@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { NvkeNativePanel } from "./NvkeNativePanel";
 import { NvkeOperatorAgentPanel } from "./NvkeOperatorAgentPanel";
+import { NvkeOperatorWorkbench } from "./NvkeOperatorWorkbench";
 import { NvkeTemporalPanel } from "./NvkeTemporalPanel";
 import { NvkeProviderRequestPanel } from "./NvkeProviderRequestPanel";
 import { NvkeMetricsPanel } from "./NvkeMetricsPanel";
@@ -302,6 +303,7 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
             (!pending || props.operatorAgent.pending) &&
             !props.temporal?.pending &&
             !props.metrics?.pending &&
+            !props.operatorWorkbench?.pending &&
             !props.providerRequest?.pending
           }
         />
@@ -311,6 +313,7 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
           {...props.temporal}
           canManage={
             props.temporal.canManage &&
+            !props.operatorWorkbench?.pending &&
             !props.operatorAgent?.pending &&
             !props.metrics?.pending &&
             !props.providerRequest?.pending
@@ -322,15 +325,38 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
           {...props.metrics}
           canManage={
             props.metrics.canManage &&
+            !props.operatorWorkbench?.pending &&
             !props.operatorAgent?.pending &&
             !props.providerRequest?.pending
           }
         />
       )}
-      {props.providerRequest && <NvkeProviderRequestPanel {...props.providerRequest} />}
+      {props.providerRequest && (
+        <NvkeProviderRequestPanel
+          {...props.providerRequest}
+          canManage={props.providerRequest.canManage && !props.operatorWorkbench?.pending}
+        />
+      )}
+      {props.operatorWorkbench && (
+        <NvkeOperatorWorkbench
+          {...props.operatorWorkbench}
+          canManage={
+            props.operatorWorkbench.canManage &&
+            access.admin &&
+            !access.loading &&
+            !error &&
+            (!pending || props.operatorWorkbench.pending) &&
+            !props.operatorAgent?.pending &&
+            !props.temporal?.pending &&
+            !props.metrics?.pending &&
+            !props.providerRequest?.pending
+          }
+        />
+      )}
       <NvkeNativePanel
         key={`${site.id}:${props.contractRevision}:${props.actions.length}:${props.recovery?.requestId ?? "new"}`}
         {...props}
+        disabled={props.recovery?.operationKey.startsWith("tooling.")}
         access={{ ...access, loading: access.loading || Boolean(error) }}
       />
       {props.workloadAccess && <NvkeWorkloadAccessPanel {...props.workloadAccess} />}

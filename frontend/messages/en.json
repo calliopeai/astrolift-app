@@ -17590,6 +17590,23 @@
     "expand": "Expand"
   },
   "nvke": {
+    "operatorWorkbench": {
+      "title": "Native tooling",
+      "help": "Run pinned commands through the verified site agent. Review every request before submission.",
+      "command": "Command",
+      "import": "Import private request JSON",
+      "request": "Private request envelope (JSON)",
+      "privateHelp": "Input files belong in files as UTF-8 strings. Private text is cleared when review opens and is never stored for recovery.",
+      "options": "Declared command options",
+      "references": "Use input:NAME for supplied files, output:NAME for outputs, job:UUID:NAME for retained artifacts, and declared source: references for pinned directories. Host paths are refused.",
+      "acknowledge": "I acknowledge that this request may change site infrastructure.",
+      "recover": "Look up original receipt",
+      "recovery": "Original request {id} for {command} is unresolved. Look up its receipt before submitting again.",
+      "unavailable": "New requests require an active site and a verified agent at the reviewed versions. Existing receipt recovery remains separate.",
+      "review": "Command {command} on {site}, site version {siteVersion}, agent version {authorityVersion}. Native revision {revision}. Agent {endpoint}, instance {instance}, bundle {bundle}. Request SHA-256 {digest}, {bytes} UTF-8 bytes. Observation deadline {timeout} seconds.",
+      "effect": "This command may change infrastructure. Acceptance is not readiness; cancellation may leave remote effects.",
+      "utility": "This request runs the declared utility or dry-run. Inspect the resulting receipt and private artifacts."
+    },
     "title": "NVIDIA Kubernetes Engine",
     "sitesDescription": "Manage NVKE sites, native resources and observed operations for this organization.",
     "name": "Name",

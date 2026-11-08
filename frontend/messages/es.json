@@ -17593,6 +17593,23 @@
     "expand": "Ampliar"
   },
   "nvke": {
+    "operatorWorkbench": {
+      "title": "Herramientas nativas",
+      "help": "Ejecute comandos fijados mediante el agente verificado del sitio. Revise cada solicitud antes de enviarla.",
+      "command": "Comando",
+      "import": "Importar JSON privado de la solicitud",
+      "request": "Solicitud privada (JSON)",
+      "privateHelp": "Incluya archivos en files como cadenas UTF-8. El texto privado se borra al abrir la revisión y nunca se guarda para recuperación.",
+      "options": "Opciones declaradas del comando",
+      "references": "Use input:NOMBRE para archivos, output:NOMBRE para salidas, job:UUID:NOMBRE para artefactos conservados y referencias source: declaradas para directorios fijados. No se permiten rutas del host.",
+      "acknowledge": "Reconozco que esta solicitud puede cambiar la infraestructura del sitio.",
+      "recover": "Consultar recibo original",
+      "recovery": "La solicitud original {id} de {command} sigue sin resolverse. Consulte su recibo antes de reenviarla.",
+      "unavailable": "Las solicitudes nuevas requieren un sitio activo y un agente verificado con las versiones revisadas. La recuperación del recibo es independiente.",
+      "review": "Comando {command} en {site}, versión del sitio {siteVersion}, versión del agente {authorityVersion}. Revisión nativa {revision}. Agente {endpoint}, instancia {instance}, paquete {bundle}. SHA-256 {digest}, {bytes} bytes UTF-8. Plazo de observación: {timeout} segundos.",
+      "effect": "Este comando puede cambiar la infraestructura. La aceptación no implica disponibilidad; cancelar puede dejar efectos remotos.",
+      "utility": "Esta solicitud ejecuta la utilidad o simulación declarada. Revise el recibo y los artefactos privados."
+    },
     "title": "NVIDIA Kubernetes Engine",
     "sitesDescription": "Administra sitios NVKE, recursos nativos y operaciones observadas de esta organización.",
     "name": "Nombre",

@@ -4,6 +4,7 @@ import { fakeController } from "@/components/data-table/fixtures";
 import { NvkeSiteScreen } from "./NvkeSiteScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
 import operatorAgentStory from "./NvkeOperatorAgentPanel.stories";
+import workbenchStory from "./NvkeOperatorWorkbench.stories";
 import temporalStory from "./NvkeTemporalPanel.stories";
 import metricsStory from "./NvkeMetricsPanel.stories";
 import { SITE, SITE_DETAIL } from "./fixtures";
@@ -18,6 +19,22 @@ export const ImportedAccess: Story = {
   args: { workloadAccess: { ...accessStory.args, candidate: null } },
 };
 export const Full: Story = {};
+export const OperatorWorkbench: Story = {
+  args: { operatorAgent: operatorAgentStory.args, operatorWorkbench: workbenchStory.args },
+};
+export const OperatorWorkbenchReadOnly: Story = {
+  args: {
+    access: { read: true, manage: false, admin: false, loading: false },
+    operatorWorkbench: workbenchStory.args,
+  },
+};
+export const OperatorWorkbenchPending: Story = {
+  args: {
+    pending: true,
+    operatorAgent: operatorAgentStory.args,
+    operatorWorkbench: { ...workbenchStory.args, pending: true },
+  },
+};
 export const NativeTemporal: Story = { args: { temporal: temporalStory.args } };
 export const Metrics: Story = { args: { metrics: metricsStory.args } };
 export const Loading: Story = { args: { site: null, loading: true } };

@@ -26,6 +26,7 @@ import { useNvkeOperation } from "./use-nvke-operation";
 import { PROVIDER_PROPS } from "@/components/screens/nvke/NvkeProvidersPanel.stories";
 import { CREDENTIAL_PROPS } from "@/components/screens/nvke/NvkeCredentialPanel.stories";
 import { OPERATOR_AGENT_AUTHORITY } from "@/components/screens/nvke/NvkeOperatorAgentPanel.stories";
+import operatorContract from "@/components/screens/nvke/operator-contract.fixture.json";
 import type { NvkeOperatorAgentAuthority } from "@/components/screens/nvke/NvkeOperatorAgentPanel";
 import { METRICS_AUTHORITY } from "@/components/screens/nvke/NvkeMetricsPanel.stories";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
@@ -118,6 +119,8 @@ function harness(
                 };
               if (operation.operationName === "GetNvkeOperatorAuthority")
                 return { astroliftNvkeOperatorAuthority: agentAuthority };
+              if (operation.operationName === "GetNvkeOperatorContract")
+                return { astroliftNvkeOperatorContract: operatorContract };
               if (operation.operationName === "ListNvkeOperations")
                 return { astroliftNvkeOperations: { items: [], nextCursor: null, totalCount: 0 } };
               if (operation.operationName === "GetNvkeMaintenance")
@@ -1638,5 +1641,87 @@ it("wires reviewed operator agent authority into site details with private mutat
     expectedNvkeOrganization: scope.organizationId,
   });
   expect(h.cache.extract()).toEqual({});
+  h.client.stop();
+});
+
+it("wires complete native tooling admission and private recovery through the actual site hook", async () => {
+  const h = harness(
+    (request) => {
+      if (request.operationName === "RequestNvkeOperatorJob")
+        return {
+          requestNvkeOperatorJob: {
+            ok: true,
+            errors: [],
+            data: {
+              ...OPERATION,
+              requestId: request.variables.input.requestId,
+              operationKey: "tooling.generate.sitespec",
+              resourceSource: null,
+              providerSource: null,
+            },
+          },
+        };
+      return { astroliftNvkeRequest: null };
+    },
+    COLLECTION,
+    SITE,
+    OPERATOR_AGENT_AUTHORITY
+  );
+  const { result } = renderHook(() => useNvkeSite(SITE.id), { wrapper: h.wrapper });
+  await waitFor(() => expect(result.current.operatorWorkbench?.canManage).toBe(true));
+  const requestText = JSON.stringify({
+    format: 1,
+    revision: SITE.upstreamRevision,
+    siteId: SITE.id,
+    command: "generate.sitespec",
+    positionals: ["private-browser-site"],
+    options: { nodes: "input:nodes.csv" },
+    files: { "nodes.csv": "name,ip\ncp-1,192.0.2.10\n" },
+  });
+  await act(async () =>
+    expect(
+      await result.current.operatorWorkbench!.onRequest({
+        operationKey: "tooling.generate.sitespec",
+        requestText,
+        timeoutSeconds: 600,
+        acknowledgeInfrastructureChange: false,
+      })
+    ).toBe(true)
+  );
+  const requests = h.calls.filter((call) => call.operationName === "RequestNvkeOperatorJob");
+  expect(requests).toHaveLength(1);
+  expect(requests[0].variables.input).toMatchObject({
+    expectedActorId: 41,
+    expectedSiteVersion: SITE.version,
+    expectedAuthorityVersion: OPERATOR_AGENT_AUTHORITY.version,
+    requestText,
+  });
+  expect(requests[0].getContext()).toMatchObject({
+    redactDiagnostics: true,
+    fetchOptions: { redirect: "error", cache: "no-store" },
+  });
+  expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${OPERATION.id}`);
+  expect(JSON.stringify(h.cache.extract())).not.toContain("private-browser-site");
+  h.client.stop();
+});
+
+it("uses operator permission for native tooling history and keeps generic resume unavailable", async () => {
+  caller.manage = false;
+  const h = harness((request) =>
+    request.operationName === "GetNvkeOperation"
+      ? { astroliftNvkeOperation: { ...OPERATION, operationKey: "tooling.generate.sitespec" } }
+      : {}
+  );
+  const { result, rerender } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.canAct).toBe(true));
+  expect(result.current.canResume).toBe(false);
+  await expect(result.current.onResume()).resolves.toBe(false);
+  expect(h.calls.some((call) => call.operationName === "ResumeNvkeOperation")).toBe(false);
+  caller.admin = false;
+  caller.manage = true;
+  rerender();
+  expect(result.current.canAct).toBe(false);
   h.client.stop();
 });

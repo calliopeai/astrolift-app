@@ -4,9 +4,11 @@ import { ApolloProvider } from "@apollo/client/react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { GetNvkeSiteQuery } from "@/graphql/__generated__/operations";
 import { useNvkeOperatorAgent } from "@/graphql/nvke/use-nvke-operator-agent";
+import { useNvkeOperatorWorkbench } from "@/graphql/nvke/use-nvke-operator-workbench";
 import { useNvkeRead } from "@/graphql/nvke/use-scoped-read";
 import { GET_NVKE_SITE } from "@/graphql/nvke/nvke.queries";
 import { NvkeOperatorAgentPanel } from "./NvkeOperatorAgentPanel";
+import { NvkeOperatorWorkbench } from "./NvkeOperatorWorkbench";
 
 type Qualification = {
   endpoint: string;
@@ -20,7 +22,13 @@ declare global {
     __NVKE_LOCAL_AGENT__?: Qualification;
   }
 }
-function ConnectedPanel({ config }: { config: Qualification }) {
+function ConnectedPanel({
+  config,
+  mode,
+}: {
+  config: Qualification;
+  mode: "authority" | "workbench";
+}) {
   const context = {
     scope: {
       server: config.endpoint,
@@ -46,13 +54,28 @@ function ConnectedPanel({ config }: { config: Qualification }) {
     enabled: !site.loading && !site.failed,
     onSiteRefresh: site.refresh,
   });
+  const workbench = useNvkeOperatorWorkbench({
+    context,
+    scopeKey: context.scopeKey,
+    site: site.data?.astroliftNvkeSite ?? null,
+    authority: panel?.authority ?? null,
+    enabled: mode === "workbench" && !site.loading && !site.failed && !!panel && !panel.loading,
+    onRefresh: site.refresh,
+    onJournalChange: () => {},
+  });
+  if (mode === "workbench")
+    return workbench ? (
+      <NvkeOperatorWorkbench {...workbench} />
+    ) : (
+      <p>Waiting for local qualification source.</p>
+    );
   return panel ? (
     <NvkeOperatorAgentPanel {...panel} />
   ) : (
     <p>Waiting for local qualification source.</p>
   );
 }
-function LocalQualification() {
+function LocalQualification({ mode = "authority" }: { mode?: "authority" | "workbench" }) {
   const config = typeof window === "undefined" ? undefined : window.__NVKE_LOCAL_AGENT__;
   const client = useMemo(() => {
     if (!config) return null;
@@ -81,7 +104,7 @@ function LocalQualification() {
   }, [config]);
   return client && config ? (
     <ApolloProvider client={client}>
-      <ConnectedPanel config={config} />
+      <ConnectedPanel config={config} mode={mode} />
     </ApolloProvider>
   ) : (
     <p>Requires an owned local backend qualification runner.</p>
@@ -95,3 +118,4 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Connected: Story = {};
+export const Workbench: Story = { args: { mode: "workbench" } };

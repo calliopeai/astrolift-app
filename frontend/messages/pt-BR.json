@@ -17590,6 +17590,23 @@
     "expand": "Ampliar"
   },
   "nvke": {
+    "operatorWorkbench": {
+      "title": "Ferramentas nativas",
+      "help": "Execute comandos fixados pelo agente verificado do site. Revise cada solicitação antes de enviar.",
+      "command": "Comando",
+      "import": "Importar JSON privado da solicitação",
+      "request": "Solicitação privada (JSON)",
+      "privateHelp": "Inclua arquivos em files como strings UTF-8. O texto privado é apagado ao abrir a revisão e nunca é salvo para recuperação.",
+      "options": "Opções declaradas do comando",
+      "references": "Use input:NOME para arquivos, output:NOME para saídas, job:UUID:NOME para artefatos retidos e referências source: declaradas para diretórios fixados. Caminhos do host são recusados.",
+      "acknowledge": "Reconheço que esta solicitação pode alterar a infraestrutura do site.",
+      "recover": "Consultar recibo original",
+      "recovery": "A solicitação original {id} para {command} está indefinida. Consulte seu recibo antes de enviar novamente.",
+      "unavailable": "Novas solicitações exigem um site ativo e um agente verificado nas versões revisadas. A recuperação do recibo é independente.",
+      "review": "Comando {command} em {site}, versão do site {siteVersion}, versão do agente {authorityVersion}. Revisão nativa {revision}. Agente {endpoint}, instância {instance}, pacote {bundle}. SHA-256 {digest}, {bytes} bytes UTF-8. Prazo de observação: {timeout} segundos.",
+      "effect": "Este comando pode alterar a infraestrutura. Aceitação não significa prontidão; cancelar pode deixar efeitos remotos.",
+      "utility": "Esta solicitação executa o utilitário ou a simulação declarada. Examine o recibo e os artefatos privados."
+    },
     "title": "NVIDIA Kubernetes Engine",
     "sitesDescription": "Gerencie sites NVKE, recursos nativos e operações observadas desta organização.",
     "name": "Nome",

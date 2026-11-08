@@ -17590,6 +17590,23 @@
     "expand": "拡大"
   },
   "nvke": {
+    "operatorWorkbench": {
+      "title": "ネイティブツール",
+      "help": "検証済みサイトエージェントで固定されたコマンドを実行します。送信前に各リクエストを確認してください。",
+      "command": "コマンド",
+      "import": "非公開リクエストJSONを読み込む",
+      "request": "非公開リクエスト（JSON）",
+      "privateHelp": "ファイルは files にUTF-8文字列として指定します。非公開テキストは確認画面を開くと消去され、復旧用には保存されません。",
+      "options": "宣言されたコマンドオプション",
+      "references": "入力は input:NAME、出力は output:NAME、保持済み成果物は job:UUID:NAME、固定ディレクトリは宣言された source: 参照を使用します。ホストのパスは拒否されます。",
+      "acknowledge": "このリクエストがサイトのインフラを変更する可能性を理解しました。",
+      "recover": "元の受領記録を検索",
+      "recovery": "{command} の元のリクエスト {id} は未解決です。再送前に受領記録を検索してください。",
+      "unavailable": "新規リクエストには稼働中のサイトと確認済みバージョンの検証済みエージェントが必要です。受領記録の復旧は別途実行できます。",
+      "review": "{site} でコマンド {command}、サイトバージョン {siteVersion}、エージェントバージョン {authorityVersion}。ネイティブリビジョン {revision}。エージェント {endpoint}、インスタンス {instance}、バンドル {bundle}。SHA-256 {digest}、UTF-8で {bytes} バイト。監視期限 {timeout} 秒。",
+      "effect": "このコマンドはインフラを変更する可能性があります。受理は稼働準備完了を意味しません。キャンセル後もリモートへの影響が残る場合があります。",
+      "utility": "宣言されたユーティリティまたはドライランを実行します。受領記録と非公開成果物を確認してください。"
+    },
     "title": "NVIDIA Kubernetes Engine",
     "sitesDescription": "この組織のNVKEサイト、ネイティブリソース、監視対象の操作を管理します。",
     "name": "名前",

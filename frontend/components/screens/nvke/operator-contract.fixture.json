@@ -1,0 +1,688 @@
+{
+  "revision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "commands": [
+    {
+      "key": "version",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "generate.sitespec",
+      "positionals": ["string"],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "nodes",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "set",
+          "kind": "strings",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "generate.oidc-kubeconfig",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "kubeconfig",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "oidc-issuer-url",
+          "kind": "string",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "oidc-client-id",
+          "kind": "string",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "oidc-extra-scope",
+          "kind": "strings",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "headless",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "output-file",
+          "kind": "output",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "inspect.sitespec",
+      "positionals": ["file"],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "inspect.stack-config",
+      "positionals": ["file"],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "inspect.values",
+      "positionals": ["file"],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "get.bootstrap-manifest",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "inspect.nvkr-release",
+      "positionals": ["file"],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "artifacts",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "meta",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "kind",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "select",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "arch",
+          "kind": "choice",
+          "choices": ["linux/amd64", "linux/arm64"],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "validate.sitespec",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "sitespec",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "bootstrap-only",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "disable-mtls",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "allow-control-plane-without-vip",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "bootstrap.site",
+      "positionals": [],
+      "infrastructureChange": true,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "sitespec",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "arch",
+          "kind": "choice",
+          "choices": ["linux/amd64", "linux/arm64"],
+          "required": false
+        },
+        {
+          "name": "release",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "diagnostics-dir",
+          "kind": "output-directory",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "encryption-key-out",
+          "kind": "output",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "kubeconfig-out",
+          "kind": "output",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "nvke-controller-image",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "provisioned-provider-image",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "otlp-endpoint",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "timeout",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "dry-run",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "disable-mtls",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "allow-control-plane-without-vip",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "keep-bootstrap-cluster",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "otlp-insecure",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "render.deploy-path",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "deploy-path",
+          "kind": "directory",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "sitespec",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "stack-config",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "release",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "nvkr-run-dir",
+          "kind": "directory",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "out",
+          "kind": "output-directory",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "arch",
+          "kind": "choice",
+          "choices": ["linux/amd64", "linux/arm64"],
+          "required": false
+        },
+        {
+          "name": "credentials",
+          "kind": "choice",
+          "choices": ["rendered", "external"],
+          "required": false
+        },
+        {
+          "name": "ephemeral",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "plain-http-registries",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "management.install",
+      "positionals": [],
+      "infrastructureChange": true,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "deploy-path",
+          "kind": "directory",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "sitespec",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "stack-config",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "release",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "nvkr-run-dir",
+          "kind": "directory",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "config",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "arch",
+          "kind": "choice",
+          "choices": ["linux/amd64", "linux/arm64"],
+          "required": false
+        },
+        {
+          "name": "kubeconfig",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "timeout",
+          "kind": "string",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "values-for",
+          "kind": "item-files",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "dry-run",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "management.check",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "sitespec",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "stack-config",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "kubeconfig",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "release",
+          "kind": "file",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "nvkr-run-dir",
+          "kind": "directory",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "diagnostics",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        }
+      ]
+    },
+    {
+      "key": "management.configure-access",
+      "positionals": [],
+      "infrastructureChange": true,
+      "options": [
+        {
+          "name": "json-logs",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "verbose",
+          "kind": "boolean",
+          "choices": [],
+          "required": false
+        },
+        {
+          "name": "kubeconfig",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "render.nktp-backend",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "profile",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "output",
+          "kind": "output",
+          "choices": [],
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "render.management-apis",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "profile",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "output",
+          "kind": "output",
+          "choices": [],
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "render.management-controller",
+      "positionals": [],
+      "infrastructureChange": false,
+      "options": [
+        {
+          "name": "profile",
+          "kind": "file",
+          "choices": [],
+          "required": true
+        },
+        {
+          "name": "output",
+          "kind": "output",
+          "choices": [],
+          "required": true
+        }
+      ]
+    }
+  ]
+}

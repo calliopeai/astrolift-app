@@ -4,6 +4,19 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-site--operator-workbench",
+  "screens-nvke-site--operator-workbench-read-only",
+  "screens-nvke-site--operator-workbench-pending",
+  "screens-nvke-operator-workbench--full",
+  "screens-nvke-operator-workbench--empty",
+  "screens-nvke-operator-workbench--loading",
+  "screens-nvke-operator-workbench--read-only",
+  "screens-nvke-operator-workbench--pending",
+  "screens-nvke-operator-workbench--failure",
+  "screens-nvke-operator-workbench--recovery",
+  "screens-nvke-operator-workbench--recovery-after-authority-removal",
+  "screens-nvke-operator-workbench--long-strings",
+  "screens-nvke-operator-workbench--width-768",
   "screens-nvke-site--operator-agent",
   "screens-nvke-site--operator-agent-read-only",
   "screens-nvke-operator-agent--full",
@@ -684,4 +697,74 @@ test("operator agent long identity and removal review stay within the viewport",
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   );
+});
+
+test("operator workbench reviews private UTF-8 text without exposing the payload", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-workbench--full&viewMode=story");
+  const input = page.getByLabel("Private request envelope (JSON)", { exact: true });
+  const envelope = JSON.parse(await input.inputValue());
+  envelope.files = { "private.csv": "PRIVATE_NATIVE_PAYLOAD\n18446744073709551615" };
+  const text = JSON.stringify(envelope, null, 2);
+  await input.fill(text);
+  await page.getByRole("button", { name: "Review change", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("Request SHA-256");
+  await expect(review).toContainText("agent version 2");
+  await expect(review).not.toContainText("PRIVATE_NATIVE_PAYLOAD");
+  await expect(input).toHaveValue("");
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+    await Promise.all(
+      document.getAnimations().map((animation) => animation.finished.catch(() => {}))
+    );
+  });
+  await page.screenshot({
+    animations: "disabled",
+    path: testInfo.outputPath("operator-job-review.png"),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(review).not.toBeVisible();
+  await expect(input).toHaveValue("");
+});
+
+test("operator workbench preserves private imported text and exposes the complete vocabulary", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-workbench--full&viewMode=story");
+  const input = page.getByLabel("Private request envelope (JSON)", { exact: true });
+  const envelope = JSON.parse(await input.inputValue());
+  envelope.command = "inspect.stack-config";
+  envelope.positionals = ["input:stack.json"];
+  envelope.files = { "stack.json": '{"nativeInteger":18446744073709551615}' };
+  const text = JSON.stringify(envelope, null, 2) + "\n";
+  await page.getByLabel("Import private request JSON", { exact: true }).setInputFiles({
+    name: "private.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(text),
+  });
+  await expect(input).toHaveValue(text);
+  await expect(page.getByRole("combobox")).toContainText("inspect.stack-config");
+  await page.getByRole("combobox").click();
+  await expect(page.getByRole("option")).toHaveCount(17);
+});
+
+test("operator workbench infrastructure changes require acknowledgement", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-workbench--full&viewMode=story");
+  await page.getByRole("combobox").click();
+  await page.getByRole("option", { name: "bootstrap.site", exact: true }).click();
+  await page.getByRole("button", { name: "Review change", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Review change", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).toContainText("may change infrastructure");
+  await expect(page.getByRole("alertdialog")).toContainText("Observation deadline 7200 seconds");
 });

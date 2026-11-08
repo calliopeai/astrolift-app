@@ -7,9 +7,38 @@ agent protocol and installation instructions live in
 
 This is a local integration under development. Agent connection management is
 wired into the site screen and locally qualified in Storybook and Chromium
-against real GraphQL/Postgres/mTLS. The command/job/recovery/artifact workbench,
-agent-driven Linux bootstrap/install, production supply-chain checks and deployed
-acceptance remain separate qualification work.
+against real GraphQL/Postgres/mTLS. The native command workbench and original-receipt recovery are also wired into
+the site screen and locally browser-qualified for one actual native utility.
+Private browser artifact downloads, reviewed job reconciliation UI, agent-driven
+Linux bootstrap/install, production supply-chain checks and deployed acceptance
+remain separate qualification work.
+
+## Native tooling in the site screen
+
+The Native tooling section exposes all 17 source-pinned commands and their
+declared positional arguments, options and choices. Choose a command, edit its
+complete private JSON envelope or import a UTF-8 JSON file, then review the site
+and agent versions, persistent instance, bundle digest, command, exact request
+SHA-256 and observation deadline. Infrastructure-changing requests require an
+explicit acknowledgement; a declared `dry-run: true` is reviewed as a dry-run.
+Native option validation still runs at the API and agent boundaries.
+
+Supply file contents as UTF-8 strings in `files` and refer to them as
+`input:NAME`. Outputs use `output:NAME`; retained artifacts use
+`job:UUID:NAME`; directory inputs accept the declared pinned `source:` references.
+Host file paths are refused. User-edited/imported text is submitted unchanged.
+Private text is cleared when review opens and is excluded from browser recovery
+storage and Apollo cache. Cancelling review discards that private snapshot.
+
+After an unconfirmed submission, refresh and use **Look up original receipt**.
+This reads the existing request identity without submitting another job, even
+when the configured agent was subsequently removed or changed. If no receipt is
+visible, the identity remains unresolved; any explicit resubmission must retain
+the exact original text, versions, deadline and acknowledgement. The local
+browser qualification deliberately drops the admission response, recovers the
+original receipt, and observes exactly one native site-spec generation process
+through real PostgreSQL/Temporal/mTLS. Other native command-family effects need
+separate qualification.
 
 ## Connect an agent
 

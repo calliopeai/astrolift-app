@@ -17593,6 +17593,23 @@
     "expand": "Agrandir"
   },
   "nvke": {
+    "operatorWorkbench": {
+      "title": "Outils natifs",
+      "help": "Exécutez les commandes épinglées via l’agent vérifié du site. Vérifiez chaque demande avant envoi.",
+      "command": "Commande",
+      "import": "Importer une demande JSON privée",
+      "request": "Demande privée (JSON)",
+      "privateHelp": "Placez les fichiers dans files sous forme de chaînes UTF-8. Le texte privé est effacé à l’ouverture de la vérification et n’est jamais enregistré pour la récupération.",
+      "options": "Options déclarées de la commande",
+      "references": "Utilisez input:NOM pour les fichiers, output:NOM pour les sorties, job:UUID:NOM pour les artefacts conservés et les références source: déclarées pour les répertoires épinglés. Les chemins hôte sont refusés.",
+      "acknowledge": "Je reconnais que cette demande peut modifier l’infrastructure du site.",
+      "recover": "Rechercher le reçu initial",
+      "recovery": "La demande initiale {id} pour {command} reste incertaine. Recherchez son reçu avant un nouvel envoi.",
+      "unavailable": "Les nouvelles demandes exigent un site actif et un agent vérifié aux versions examinées. La récupération du reçu reste distincte.",
+      "review": "Commande {command} sur {site}, version du site {siteVersion}, version de l’agent {authorityVersion}. Révision native {revision}. Agent {endpoint}, instance {instance}, paquet {bundle}. SHA-256 {digest}, {bytes} octets UTF-8. Délai d’observation : {timeout} secondes.",
+      "effect": "Cette commande peut modifier l’infrastructure. L’acceptation ne prouve pas la disponibilité ; l’annulation peut laisser des effets distants.",
+      "utility": "Cette demande exécute l’utilitaire ou la simulation déclaré. Examinez le reçu et les artefacts privés."
+    },
     "title": "NVIDIA Kubernetes Engine",
     "sitesDescription": "Gérer les sites NVKE, les ressources natives et les opérations observées de cette organisation.",
     "name": "Nom",
