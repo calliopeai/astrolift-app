@@ -11,8 +11,8 @@ against real GraphQL/Postgres/mTLS. The native command workbench and original-re
 the site screen and locally browser-qualified for one actual native utility.
 Original-job receipt inspection, private browser artifact downloads and reviewed
 read-only reconciliation are implemented locally. Original-job stop/fencing is
-implemented in the agent, SDK and reviewed GraphQL recovery API; browser and CLI
-controls remain pending. Agent-driven Linux bootstrap/install, production
+implemented in the agent, SDK, reviewed GraphQL recovery API and CLI; browser
+controls and end-to-end compiled stop qualification remain pending. Agent-driven Linux bootstrap/install, production
 supply-chain checks and deployed acceptance remain separate qualification work.
 
 ## Native tooling in the site screen
@@ -184,6 +184,12 @@ resolve uncertainty. Caller/source versions and authority are rechecked around
 the capability handshake and stop exchange. Agent state backups must preserve
 identity, admission journal, digest key and private receipts together; pruning or
 rolling back admission history is unsupported.
+
+The CLI exposes this as `nvke agent stop OPERATION_GUID --site GUID
+--site-version N --authority-version N --version N`. It checks the original
+operation identity and exact reviewed versions before writing and refuses a
+reply for another operation. Its local command tests, build and Go gates pass;
+the new compiled stop path through a real Astro endpoint is not yet qualified.
 
 `astroliftNvkeOperatorArtifactText` returns a bounded, base64-encoded chunk from a
 retained private artifact. Review the operation and current authority versions for
