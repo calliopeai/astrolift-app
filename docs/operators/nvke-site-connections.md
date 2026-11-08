@@ -494,8 +494,8 @@ The observation deadline never cancels the native workflow or releases its lock.
 A successful operation means that the proved reset workflow completed; it does
 not independently certify encryption health. Local qualification uses real
 PostgreSQL, controller HTTP reads and Temporal with fixture workflows. Full native
-controller, agent and topology qualification, plus connected browser/backend
-qualification, remain release requirements tracked in #2665.
+controller, agent and topology qualification, plus deployed browser qualification,
+remain release requirements tracked in #2665.
 
 
 The paired CLI exposes `astro nvke temporal workflow history WORKFLOW` with the
@@ -603,5 +603,40 @@ exact IDs, private-field clearing, accessibility and narrow layouts. These check
 use callback fixtures and do not qualify live native controller or node changes.
 Connected hook tests exercise exact schema/input text, stale site observations,
 lost replies, authority removal, read-only receipt recovery, storage refusal,
-changed runs and actor visits. Real browser-to-backend qualification remains a
-release requirement; these isolated checks do not prove that integration.
+changed runs and actor visits. These isolated checks do not prove backend
+integration; the separate connected qualification below exercises that boundary.
+
+### Connected local browser qualification
+
+`test_nvke_browser_integration.py` starts owned loopback Storybook and ASGI
+servers against real PostgreSQL and Temporal. It runs the shipped maintenance
+hook and panel in Chromium. A successful controller observation executes through
+the real Astro workflow worker; controller responses and the native rotation
+worker are fixtures. The browser inspects the failed retained rotation, selects
+its rewrite activity, reviews the exact run/event boundary and submits a reset.
+
+The test drops the API reply after durable admission and separately drops the
+native reset RPC reply after Temporal accepts it. Receipt-only browser recovery
+must recover the original request without another admission. Assertions require
+one durable operation, one native reset RPC, completed resumed native work,
+encrypted private review storage, redacted audit variables, and no private
+review or cluster input in Astro workflow history. The token is injected through
+child stdin and browser memory, never story args, URLs or persistent storage.
+The harness refuses non-loopback origins and is only present in Storybook.
+
+Build the catalog, then run with the backend's configured disposable PostgreSQL,
+Redis and Temporal test environment and installed Playwright Chromium:
+
+```sh
+cd frontend
+npm run build-storybook -- --output-dir /tmp/nvke-connected-storybook
+cd ../backend
+ASTROLIFT_NVKE_STORYBOOK=/tmp/nvke-connected-storybook python -m pytest \
+  astrolift_clusters/tests/test_nvke_browser_integration.py \
+  -o asyncio_mode=auto -q
+```
+
+The test skips unless a static build is explicitly selected; a selected build
+with missing Node/Chromium or unavailable services fails. This qualifies the
+connected local reset/recovery flow. It does not qualify deployed login, live
+native controller/agent/hardware changes, or every browser workflow procedure.
