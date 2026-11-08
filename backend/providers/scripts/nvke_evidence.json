@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "f102cef0d001cdfded497ac8f423cd15c84b5eff"
+      "revision": "4481d84282a4c211a2c7cec5f3166e9f88acd8bb"
     }
   },
   "evidence": {
@@ -546,6 +546,13 @@
       "kind": "test",
       "scope": "Real Postgres/Temporal/mTLS/native generation, deliberate lost PUT reply, exactly one native process, private history/artifacts, current-admin reconciliation after original-role revocation, intent/token/version fences and aliased audit masking. Fixture site registration does not qualify hosted bootstrap/install.",
       "symbol": "test_real_temporal_postgres_and_tls_agent_complete_one_private_native_job"
+    },
+    "operator-api-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-api-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Committed source-bound local Astro adapter proof: 415 backend regression tests passed/3 skipped, five additional malformed-authority cases, 525 SDK tests passed/18 skipped, 22 evidence checks. Real TLS/native utility through Postgres/Temporal, lost PUT reply with one process, current-admin read-only recovery after original-role revocation, private history/artifacts and audit masking. No hosted CLI/UI or live agent-driven bootstrap/install qualification.",
+      "sha256": "784c516bb5b82871264b42fac588f93d388d0adedd36711e27a2b06cfc5953fd"
     }
   },
   "rows": {
@@ -2563,7 +2570,8 @@
           "operator-authority",
           "operator-runtime",
           "operator-api",
-          "operator-api-tests"
+          "operator-api-tests",
+          "operator-api-local"
         ],
         "remaining": "Generation/validation/dry-run execute through the standalone agent, and actual native generation completes through the encrypted Astro GraphQL/outbox/Temporal transport. Hosted CLI/UI controls, remaining command-family end-to-end qualification and agent-driven live bootstrap/install remain pending."
       },
@@ -2594,7 +2602,8 @@
           "operator-authority",
           "operator-runtime",
           "operator-api",
-          "operator-api-tests"
+          "operator-api-tests",
+          "operator-api-local"
         ],
         "remaining": "Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete."
       },
@@ -2616,7 +2625,8 @@
           "operator-authority",
           "operator-runtime",
           "operator-api",
-          "operator-api-tests"
+          "operator-api-tests",
+          "operator-api-local"
         ],
         "remaining": "Local seed/node bootstrap and separate agent utility/dry-run proof are qualified. Astro transport handles the declared envelope; actual agent-driven bootstrap/install, hosted CLI/UI controls, production artifact verification and deployed acceptance remain pending."
       },
@@ -2642,7 +2652,8 @@
           "operator-authority",
           "operator-runtime",
           "operator-api",
-          "operator-api-tests"
+          "operator-api-tests",
+          "operator-api-local"
         ],
         "remaining": "Default stack, private APIs, native controller, declarative create/access, worker growth/explicit surplus deletion and native cluster cleanup are locally qualified. Reviewed Astro API transport exists; hosted CLI/UI controls, agent-driven install, hosted new tenant/delete admission, upgrades, verified production supply chain, physical providers and deployment remain pending."
       },
