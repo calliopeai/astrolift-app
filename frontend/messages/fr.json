@@ -11115,13 +11115,16 @@
         "secrets": "Secrets",
         "agents": "Agents",
         "workflows": "Flux de travail",
-        "administration": "Administration"
+        "administration": "Administration",
+        "nvke": "NVKE"
       },
       "presets": {
         "read_only": "Lecture seule",
         "cli": "CLI par défaut",
         "ci_deploy": "Déploiement CI",
-        "cluster_operator": "Opérateur de cluster"
+        "cluster_operator": "Opérateur de cluster",
+        "nvke_reader": "Lecteur NVKE",
+        "nvke_operator": "Opérateur NVKE"
       }
     },
     "catalog": {
@@ -11200,6 +11203,18 @@
       "scope18": {
         "label": "Administration",
         "description": "Tout ce que le propriétaire peut faire, maintenant et après l'ajout de permissions. Préférez des portées limitées."
+      },
+      "scope19": {
+        "label": "Lire NVKE",
+        "description": "Lire les sites NVKE, les observations et les reçus autorisés de cette organisation."
+      },
+      "scope20": {
+        "label": "Gérer les ressources NVKE",
+        "description": "Créer, modifier et supprimer les ressources natives des locataires NVKE. Sélectionnez Lire NVKE séparément."
+      },
+      "scope21": {
+        "label": "Administrer NVKE",
+        "description": "Configurer les accès NVKE, récupérer les identifiants des charges de travail et lancer la maintenance native. Sélectionnez Lire NVKE séparément."
       }
     }
   },

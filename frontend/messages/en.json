@@ -11112,13 +11112,16 @@
         "secrets": "Secrets",
         "agents": "Agents",
         "workflows": "Workflows",
-        "administration": "Administration"
+        "administration": "Administration",
+        "nvke": "NVKE"
       },
       "presets": {
         "read_only": "Read-only",
         "cli": "CLI default",
         "ci_deploy": "CI deploy",
-        "cluster_operator": "Cluster operator"
+        "cluster_operator": "Cluster operator",
+        "nvke_reader": "NVKE reader",
+        "nvke_operator": "NVKE operator"
       }
     },
     "catalog": {
@@ -11197,6 +11200,18 @@
       "scope18": {
         "label": "Admin",
         "description": "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes."
+      },
+      "scope19": {
+        "label": "Read NVKE",
+        "description": "Read NVKE sites, observations and permitted receipts in this organization."
+      },
+      "scope20": {
+        "label": "Manage NVKE resources",
+        "description": "Create, update and delete native NVKE tenant resources. Select Read NVKE separately."
+      },
+      "scope21": {
+        "label": "Administer NVKE",
+        "description": "Configure NVKE authority, retrieve workload credentials and run native maintenance. Select Read NVKE separately."
       }
     }
   },

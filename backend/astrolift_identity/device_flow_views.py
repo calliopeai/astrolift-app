@@ -458,6 +458,7 @@ def _render_approve(
     from core.permissions import is_platform_operator
 
     admin_request = device_flow.is_admin_session(row)
+    requested_scopes = device_flow.token_scopes_for_client_kind(row.client_kind)
     can_approve = not admin_request or is_platform_operator(request.user)
     return render(
         request,
@@ -465,7 +466,8 @@ def _render_approve(
         {
             "session": row,
             "multi_org_options": multi_org_options,
-            "requested_scopes": device_flow.token_scopes_for_client_kind(row.client_kind),
+            "requested_scopes": requested_scopes,
+            "nvke_admin_request": "admin:nvke" in requested_scopes,
             "admin_request": admin_request,
             "admin_hours": int(device_flow.admin_session_ttl().total_seconds() // 3600),
             "can_approve": can_approve,

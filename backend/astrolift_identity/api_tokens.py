@@ -39,6 +39,9 @@ SCOPE_READ_APPS = "read:apps"
 SCOPE_WRITE_APPS = "write:apps"
 SCOPE_READ_CLUSTERS = "read:clusters"
 SCOPE_READ_ZENTINELLE = "read:zentinelle"
+SCOPE_READ_NVKE = "read:nvke"
+SCOPE_MANAGE_NVKE = "manage:nvke"
+SCOPE_ADMIN_NVKE = "admin:nvke"
 # The cluster surface, narrow enough for a script to set a cluster's config or
 # run its recipe without minting ``admin`` (#2120). Registering and removing a
 # cluster stay admin-only: those change what the platform runs on.
@@ -72,6 +75,9 @@ ALLOWED_SCOPES: frozenset[str] = frozenset(
         SCOPE_WRITE_APPS,
         SCOPE_READ_CLUSTERS,
         SCOPE_READ_ZENTINELLE,
+        SCOPE_READ_NVKE,
+        SCOPE_MANAGE_NVKE,
+        SCOPE_ADMIN_NVKE,
         SCOPE_WRITE_CLUSTERS,
         SCOPE_MANAGE_CLUSTERS,
         SCOPE_MANAGE_AUTH_USERS,
@@ -136,6 +142,14 @@ CLI_OPERATOR_DEVICE_SCOPES: tuple[str, ...] = (
 
 # Explicit browser consent adds reads only; defaults and cluster sessions do not change.
 CLI_ZENTINELLE_DEVICE_SCOPES: tuple[str, ...] = (*CLI_DEVICE_SCOPES, SCOPE_READ_ZENTINELLE)
+# Explicit NVKE sessions carry only NVKE permissions, without app/operator defaults.
+CLI_NVKE_READ_DEVICE_SCOPES: tuple[str, ...] = (SCOPE_READ_NVKE,)
+CLI_NVKE_DEVICE_SCOPES: tuple[str, ...] = (SCOPE_READ_NVKE, SCOPE_MANAGE_NVKE, SCOPE_ADMIN_NVKE)
+_NVKE_SCOPE_PERMISSIONS = {
+    SCOPE_READ_NVKE: "nvke.read",
+    SCOPE_MANAGE_NVKE: "nvke.manage",
+    SCOPE_ADMIN_NVKE: "nvke.admin",
+}
 _ZENTINELLE_READ_PERMISSIONS = frozenset(
     {
         "zentinelle.status_view",
@@ -204,6 +218,8 @@ def token_scope_allows_permission(token, permission: str) -> bool:
     if token is None or has_scope(token, SCOPE_ADMIN):
         return True
     scopes = set(token.scopes or [])
+    if any(scope in scopes and permission == slug for scope, slug in _NVKE_SCOPE_PERMISSIONS.items()):
+        return True
     if SCOPE_READ_ZENTINELLE in scopes and permission in _ZENTINELLE_READ_PERMISSIONS:
         return True
     if SCOPE_READ_APPS in scopes and permission in _READ_APP_PERMISSIONS:
@@ -280,6 +296,13 @@ def token_scope_hint(permission: str) -> str:
     whatever the account's roles hold. The default sign-in keeps its scopes;
     the refusal says how to get this one.
     """
+    nvke_scope = next((scope for scope, slug in _NVKE_SCOPE_PERMISSIONS.items() if slug == permission), None)
+    if nvke_scope:
+        profile = "nvke-read" if permission == "nvke.read" else "nvke"
+        return (
+            f"Use an API token with the {nvke_scope} scope, or sign in with "
+            f"astro auth login --scope {profile}; the account's NVKE roles still apply"
+        )
     if permission != "audit_log.read":
         return ""
     return (
@@ -288,14 +311,14 @@ def token_scope_hint(permission: str) -> str:
     )
 
 
-# Permissions the SCM scopes grant only at the token's own organization.
-_ORG_ONLY_SCOPE_PERMISSIONS = frozenset({"scm.read", "scm.write"})
+# These access classes hold only at the token's own organization.
+_ORG_ONLY_SCOPE_PERMISSIONS = frozenset({"scm.read", "scm.write", *_NVKE_SCOPE_PERMISSIONS.values()})
 
 
 def token_scope_reaches(token, permission: str, scope) -> bool:
     """Does the token's scope reach ``scope`` for ``permission``?
 
-    ``scm:read`` and ``scm:write`` hold only on an explicit organization
+    SCM and NVKE scopes hold only on an explicit organization
     scope equal to the token's own organization (#2605). An any-scope
     collection gate (``scope`` None) or a team, project or app scope does
     not qualify. ``admin`` keeps its existing reach; every other scope is
@@ -342,6 +365,26 @@ SCOPE_CATALOG: tuple[ScopeInfo, ...] = (
         "Read status, policies, token usage, conformance and audit. No export or writes.",
     ),
     ScopeInfo(SCOPE_READ_CLUSTERS, "Read clusters", "clusters", "List clusters and read provider state."),
+    ScopeInfo(
+        SCOPE_READ_NVKE,
+        "Read NVKE",
+        "nvke",
+        "Read NVKE sites, observations and permitted receipts in this organization.",
+    ),
+    ScopeInfo(
+        SCOPE_MANAGE_NVKE,
+        "Manage NVKE resources",
+        "nvke",
+        "Create, update and delete native NVKE tenant resources. Select Read NVKE separately.",
+        sensitive=True,
+    ),
+    ScopeInfo(
+        SCOPE_ADMIN_NVKE,
+        "Administer NVKE",
+        "nvke",
+        "Configure NVKE authority, retrieve workload credentials and run native maintenance. Select Read NVKE separately.",
+        sensitive=True,
+    ),
     ScopeInfo(
         SCOPE_WRITE_CLUSTERS,
         "Update clusters",
@@ -430,6 +473,8 @@ SCOPE_PRESETS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("read_only", "Read-only", DEFAULT_SCOPES),
     ("cli", "CLI default", CLI_DEVICE_SCOPES),
     ("ci_deploy", "CI deploy", (SCOPE_READ_APPS, SCOPE_WRITE_APPS)),
+    ("nvke_reader", "NVKE reader", CLI_NVKE_READ_DEVICE_SCOPES),
+    ("nvke_operator", "NVKE operator", CLI_NVKE_DEVICE_SCOPES),
     (
         "cluster_operator",
         "Cluster operator",

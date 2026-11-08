@@ -4,6 +4,8 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-tokens-scopepicker--nvke-automation",
+  "screens-tokens-scopepicker--nvke-reader-role",
   "screens-nvke-native-maintenance-workflows--retained-rotation",
   "screens-nvke-native-maintenance-workflows--read-only",
   "screens-nvke-native-maintenance-workflows--missing-authority",
@@ -47,6 +49,31 @@ const stories = [
   "screens-nvke-maintenance--retained-rotation",
   "screens-nvke-operation--maintenance",
 ];
+
+test("NVKE automation presets select only explicit NVKE scopes", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-tokens-scopepicker--nvke-automation&viewMode=story");
+  await page.getByRole("button", { name: "NVKE operator", exact: true }).click();
+  await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(3);
+  await expect(page.getByRole("checkbox", { name: /^Administer NVKE/ })).toBeChecked();
+  await expect(page.getByText("admin", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText(/retrieve workload credentials and run native maintenance/)
+  ).toBeVisible();
+  await page.getByRole("button", { name: "NVKE reader", exact: true }).click();
+  await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(1);
+  await expect(page.getByRole("checkbox", { name: /^Read NVKE/ })).toBeChecked();
+  await page.screenshot({ path: test.info().outputPath("nvke-scope-picker.png"), fullPage: true });
+});
+
+test("NVKE operator preset cannot select scopes withheld by the current roles", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-tokens-scopepicker--nvke-reader-role&viewMode=story");
+  await page.getByRole("button", { name: "NVKE operator", exact: true }).click();
+  await expect(page.getByRole("checkbox", { checked: true })).toHaveCount(1);
+  await expect(page.getByRole("checkbox", { name: /^Administer NVKE/ })).toBeDisabled();
+  await expect(page.getByRole("checkbox", { name: /^Manage NVKE resources/ })).toBeDisabled();
+});
 
 test("nvke native Temporal review names exact authority and keeps credentials out of confirmation", async ({
   page,
@@ -137,8 +164,13 @@ test("nvke imported revocation explains independent ownership sources", async ({
 for (const mode of ["light", "dark"]) {
   for (const id of stories) {
     test(`nvke accessibility ${id} in ${mode}`, async ({ page }) => {
+      await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(`/iframe.html?id=${id}&viewMode=story&globals=mode:${mode}`);
-      await page.locator("#storybook-root").locator("h1,h2").first().waitFor();
+      if (id.startsWith("screens-tokens-scopepicker--"))
+        await page.getByRole("group", { name: "NVKE", exact: true }).waitFor();
+      else await page.locator("#storybook-root").locator("h1,h2").first().waitFor();
+      if (mode === "dark") await expect(page.locator("html")).toHaveClass(/dark/);
+      else await expect(page.locator("html")).not.toHaveClass(/dark/);
       await page.addScriptTag({ content: axe });
       const violations = await page.evaluate(async () => {
         const engine = (

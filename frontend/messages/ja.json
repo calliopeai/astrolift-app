@@ -11112,13 +11112,16 @@
         "secrets": "シークレット",
         "agents": "エージェント",
         "workflows": "ワークフロー",
-        "administration": "管理"
+        "administration": "管理",
+        "nvke": "NVKE"
       },
       "presets": {
         "read_only": "読み取り専用",
         "cli": "CLI の既定",
         "ci_deploy": "CI デプロイ",
-        "cluster_operator": "クラスターオペレーター"
+        "cluster_operator": "クラスターオペレーター",
+        "nvke_reader": "NVKE閲覧者",
+        "nvke_operator": "NVKE運用担当者"
       }
     },
     "catalog": {
@@ -11197,6 +11200,18 @@
       "scope18": {
         "label": "管理者",
         "description": "現在および将来追加される権限を含め、所有者に可能なすべての操作です。限定的なスコープを優先してください。"
+      },
+      "scope19": {
+        "label": "NVKEの読み取り",
+        "description": "この組織のNVKEサイト、観測結果、許可された受付記録を読み取ります。"
+      },
+      "scope20": {
+        "label": "NVKEリソースの管理",
+        "description": "NVKEテナントのネイティブリソースを作成、更新、削除します。「NVKEの読み取り」は個別に選択してください。"
+      },
+      "scope21": {
+        "label": "NVKEの管理者操作",
+        "description": "NVKEの接続権限を設定し、ワークロード認証情報を取得し、ネイティブ保守を実行します。「NVKEの読み取り」は個別に選択してください。"
       }
     }
   },

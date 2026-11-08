@@ -11112,13 +11112,16 @@
         "secrets": "비밀",
         "agents": "에이전트",
         "workflows": "워크플로",
-        "administration": "관리"
+        "administration": "관리",
+        "nvke": "NVKE"
       },
       "presets": {
         "read_only": "읽기 전용",
         "cli": "CLI 기본값",
         "ci_deploy": "CI 배포",
-        "cluster_operator": "클러스터 운영자"
+        "cluster_operator": "클러스터 운영자",
+        "nvke_reader": "NVKE 조회자",
+        "nvke_operator": "NVKE 운영자"
       }
     },
     "catalog": {
@@ -11197,6 +11200,18 @@
       "scope18": {
         "label": "관리자",
         "description": "현재와 새 권한이 추가된 뒤에 소유자가 할 수 있는 모든 작업입니다. 좁은 범위를 선택하세요."
+      },
+      "scope19": {
+        "label": "NVKE 읽기",
+        "description": "이 조직의 NVKE 사이트, 관측 결과 및 허용된 접수 기록을 읽습니다."
+      },
+      "scope20": {
+        "label": "NVKE 리소스 관리",
+        "description": "NVKE 테넌트의 네이티브 리소스를 생성, 수정 및 삭제합니다. NVKE 읽기는 별도로 선택하세요."
+      },
+      "scope21": {
+        "label": "NVKE 관리자 작업",
+        "description": "NVKE 연결 권한을 설정하고 워크로드 자격 증명을 가져오며 네이티브 유지보수를 실행합니다. NVKE 읽기는 별도로 선택하세요."
       }
     }
   },

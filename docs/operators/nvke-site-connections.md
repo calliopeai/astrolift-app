@@ -19,9 +19,33 @@ of the organization, or be the platform operator. Another organization's site
 ID and an unknown site ID produce the same result.
 
 Organization owners and admins receive the explicit permissions through the
-role migration. Custom roles can grant them separately. The existing `admin`
-bearer scope covers them; ordinary cluster bearer scopes do not carry NVKE
-authority.
+role migration. Custom roles can grant them separately. Ordinary cluster bearer
+scopes do not carry NVKE authority. Explicit automation scopes avoid the broad
+platform `admin` wildcard:
+
+| Token scope | Exact permission ceiling |
+|---|---|
+| `read:nvke` | `nvke.read` |
+| `manage:nvke` | `nvke.manage` |
+| `admin:nvke` | `nvke.admin` |
+
+Select read separately for operations that require both read and mutation
+authority. The token picker provides NVKE reader/operator presets and shows the
+intersection with the owner's current roles. These scopes hold only in the
+token's issuing organization. They grant no app, generic cluster, secret-store,
+token-minting or future NVKE permission. Existing broad `admin` tokens retain
+their behavior; no existing token or default device session gains NVKE scopes.
+
+`astro auth login --scope nvke-read` requests only `read:nvke`.
+`astro auth login --scope nvke` requests all three NVKE scopes, including workload
+credential access and native maintenance where the account's roles permit it.
+The browser names those scopes and explains the sensitive administrator access.
+Both profiles require the server capability `identity.nvke_scopes`; the CLI
+refuses older servers before starting sign-in. Refresh retains the approved
+profile, while preapproved enrollment cannot gain it by claiming a client label.
+Membership, role removal, token expiry/revocation and the native worker's
+original-actor checks still apply. For unattended use, mint an expiring API token
+with the minimum NVKE scopes through the existing token-management screen.
 
 ## Interfaces
 

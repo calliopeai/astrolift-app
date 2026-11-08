@@ -104,12 +104,31 @@ export const STOCK_SCOPE_COPY: Record<string, { label: string; description: stri
         "Everything the owner can do, now and as new permissions are added. Prefer the narrow scopes.",
       key: "scope18",
     },
+    "read:nvke": {
+      label: "Read NVKE",
+      description: "Read NVKE sites, observations and permitted receipts in this organization.",
+      key: "scope19",
+    },
+    "manage:nvke": {
+      label: "Manage NVKE resources",
+      description:
+        "Create, update and delete native NVKE tenant resources. Select Read NVKE separately.",
+      key: "scope20",
+    },
+    "admin:nvke": {
+      label: "Administer NVKE",
+      description:
+        "Configure NVKE authority, retrieve workload credentials and run native maintenance. Select Read NVKE separately.",
+      key: "scope21",
+    },
   };
 const STOCK_PRESET_LABELS: Record<string, string> = {
   read_only: "Read-only",
   cli: "CLI default",
   ci_deploy: "CI deploy",
   cluster_operator: "Cluster operator",
+  nvke_reader: "NVKE reader",
+  nvke_operator: "NVKE operator",
 };
 export function scopePresentation(
   scope: AstroliftApiTokenScopeCatalog["scopes"][number],

@@ -11112,13 +11112,16 @@
         "secrets": "机密",
         "agents": "代理",
         "workflows": "工作流",
-        "administration": "管理"
+        "administration": "管理",
+        "nvke": "NVKE"
       },
       "presets": {
         "read_only": "只读",
         "cli": "CLI 默认",
         "ci_deploy": "CI 部署",
-        "cluster_operator": "集群操作员"
+        "cluster_operator": "集群操作员",
+        "nvke_reader": "NVKE 读取者",
+        "nvke_operator": "NVKE 运维人员"
       }
     },
     "catalog": {
@@ -11197,6 +11200,18 @@
       "scope18": {
         "label": "管理员",
         "description": "所有者现在以及新增权限后可执行的全部操作。请优先选择较小的权限范围。"
+      },
+      "scope19": {
+        "label": "读取 NVKE",
+        "description": "读取此组织的 NVKE 站点、观测数据和允许访问的请求回执。"
+      },
+      "scope20": {
+        "label": "管理 NVKE 资源",
+        "description": "创建、更新和删除 NVKE 租户的原生资源。请单独选择“读取 NVKE”。"
+      },
+      "scope21": {
+        "label": "NVKE 管理员操作",
+        "description": "配置 NVKE 连接权限、获取工作负载凭据并执行原生维护。请单独选择“读取 NVKE”。"
       }
     }
   },

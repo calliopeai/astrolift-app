@@ -161,7 +161,7 @@ async def test_connected_browser_reset_recovers_original_admission_and_native_lo
         name="owned browser native qualification",
         token_hash=issued.token_hash,
         token_last_4=issued.last4,
-        scopes=["admin"],
+        scopes=["read:nvke", "admin:nvke"],
     )
     async with temporal_test_env() as env:
         native_queue, astro_queue = "browser-native-" + uuid4().hex, "browser-astro-" + uuid4().hex

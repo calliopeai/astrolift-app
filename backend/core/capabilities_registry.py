@@ -145,6 +145,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # installs.
     "server_info.handshake",
     "identity.zentinelle_read_scope",
+    "identity.nvke_scopes",
 )
 
 

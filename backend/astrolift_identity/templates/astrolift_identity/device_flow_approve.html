@@ -26,6 +26,12 @@
       </dd>
     </dl>
 
+    {% if nvke_admin_request %}
+      <div class="error">
+        <strong>{% trans "NVKE administrative access." %}</strong>
+        {% trans "This device may configure NVKE connections, retrieve workload credentials, run native maintenance and retire nodes in the approved organization, where your roles permit it. It cannot administer other platform services or create API tokens." %}
+      </div>
+    {% endif %}
     {% if admin_request %}
       <div class="error">
         <strong>{% trans "Full administrative access." %}</strong>

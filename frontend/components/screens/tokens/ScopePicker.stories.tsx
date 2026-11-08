@@ -28,6 +28,73 @@ export default meta;
 
 type Story = StoryObj;
 
+const NVKE_SCOPE_CATALOG = {
+  scopes: [
+    {
+      value: "read:nvke",
+      label: "Read NVKE",
+      surface: "nvke",
+      description: "Read NVKE sites, observations and permitted receipts in this organization.",
+      sensitive: false,
+      permissions: ["nvke.read"],
+      available: true,
+      unavailableReason: "",
+    },
+    {
+      value: "manage:nvke",
+      label: "Manage NVKE resources",
+      surface: "nvke",
+      description:
+        "Create, update and delete native NVKE tenant resources. Select Read NVKE separately.",
+      sensitive: true,
+      permissions: ["nvke.manage"],
+      available: true,
+      unavailableReason: "",
+    },
+    {
+      value: "admin:nvke",
+      label: "Administer NVKE",
+      surface: "nvke",
+      description:
+        "Configure NVKE authority, retrieve workload credentials and run native maintenance. Select Read NVKE separately.",
+      sensitive: true,
+      permissions: ["nvke.admin"],
+      available: true,
+      unavailableReason: "",
+    },
+  ],
+  presets: [
+    { key: "nvke_reader", label: "NVKE reader", scopes: ["read:nvke"] },
+    {
+      key: "nvke_operator",
+      label: "NVKE operator",
+      scopes: ["read:nvke", "manage:nvke", "admin:nvke"],
+    },
+  ],
+};
+
+export const NvkeAutomation: Story = {
+  render: () => <Picker {...SCOPE_PICKER} catalog={NVKE_SCOPE_CATALOG} initial={["read:nvke"]} />,
+};
+
+export const NvkeReaderRole: Story = {
+  render: () => (
+    <Picker
+      {...SCOPE_PICKER}
+      initial={["read:nvke"]}
+      catalog={{
+        ...NVKE_SCOPE_CATALOG,
+        scopes: NVKE_SCOPE_CATALOG.scopes.map((scope) => ({
+          ...scope,
+          available: scope.value === "read:nvke",
+          unavailableReason:
+            scope.value === "read:nvke" ? "" : "Your roles grant none of what this scope unlocks.",
+        })),
+      }}
+    />
+  ),
+};
+
 function Picker({
   initial = ["read:apps", "read:clusters", "mcp:read"],
   ...props

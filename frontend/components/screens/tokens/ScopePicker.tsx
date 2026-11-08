@@ -21,6 +21,7 @@ const SURFACE_TITLES: Record<string, string> = {
   agents: "Agents",
   workflows: "Workflows",
   administration: "Administration",
+  nvke: "NVKE",
 };
 
 type Catalog = AstroliftApiTokenScopeCatalog;
@@ -130,7 +131,7 @@ function ScopeRow({
       className={cn(
         "flex min-w-0 gap-3 rounded-md border p-2.5",
         checked ? "border-primary/60 bg-primary/5" : "border-input",
-        disabled && "opacity-60"
+        disabled && "border-dashed"
       )}
     >
       <Checkbox

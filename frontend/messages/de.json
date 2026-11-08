@@ -11115,13 +11115,16 @@
         "secrets": "Geheimnisse",
         "agents": "Agenten",
         "workflows": "Workflows",
-        "administration": "Verwaltung"
+        "administration": "Verwaltung",
+        "nvke": "NVKE"
       },
       "presets": {
         "read_only": "Nur Lesen",
         "cli": "CLI-Standard",
         "ci_deploy": "CI-Bereitstellung",
-        "cluster_operator": "Cluster-Operator"
+        "cluster_operator": "Cluster-Operator",
+        "nvke_reader": "NVKE-Leser",
+        "nvke_operator": "NVKE-Operator"
       }
     },
     "catalog": {
@@ -11200,6 +11203,18 @@
       "scope18": {
         "label": "Administration",
         "description": "Alles, was der Besitzer tun kann, jetzt und mit neuen Berechtigungen. Engere Bereiche bevorzugen."
+      },
+      "scope19": {
+        "label": "NVKE lesen",
+        "description": "NVKE-Standorte, Beobachtungen und zulässige Belege dieser Organisation lesen."
+      },
+      "scope20": {
+        "label": "NVKE-Ressourcen verwalten",
+        "description": "Native NVKE-Mandantenressourcen erstellen, aktualisieren und löschen. NVKE lesen separat auswählen."
+      },
+      "scope21": {
+        "label": "NVKE administrieren",
+        "description": "NVKE-Zugriffsberechtigungen konfigurieren, Workload-Zugangsdaten abrufen und native Wartung ausführen. NVKE lesen separat auswählen."
       }
     }
   },

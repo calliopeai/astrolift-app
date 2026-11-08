@@ -11112,13 +11112,16 @@
         "secrets": "Segredos",
         "agents": "Agentes",
         "workflows": "Fluxos de trabalho",
-        "administration": "Administração"
+        "administration": "Administração",
+        "nvke": "NVKE"
       },
       "presets": {
         "read_only": "Somente leitura",
         "cli": "Padrão da CLI",
         "ci_deploy": "Implantação de CI",
-        "cluster_operator": "Operador de cluster"
+        "cluster_operator": "Operador de cluster",
+        "nvke_reader": "Leitor NVKE",
+        "nvke_operator": "Operador NVKE"
       }
     },
     "catalog": {
@@ -11197,6 +11200,18 @@
       "scope18": {
         "label": "Administração",
         "description": "Tudo o que o titular pode fazer, agora e quando novas permissões forem adicionadas. Prefira escopos restritos."
+      },
+      "scope19": {
+        "label": "Ler NVKE",
+        "description": "Ler sites NVKE, observações e comprovantes permitidos nesta organização."
+      },
+      "scope20": {
+        "label": "Gerenciar recursos NVKE",
+        "description": "Criar, atualizar e excluir recursos nativos de locatários NVKE. Selecione Ler NVKE separadamente."
+      },
+      "scope21": {
+        "label": "Administrar NVKE",
+        "description": "Configurar a autoridade NVKE, obter credenciais de cargas de trabalho e executar manutenção nativa. Selecione Ler NVKE separadamente."
       }
     }
   },
