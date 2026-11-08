@@ -170,6 +170,10 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["_sdk", "aws", "gcp", "azure", "k8s_native"]
 
+[tool.ruff.format]
+# Keep this vendored module byte-identical to its source/provenance record.
+exclude = ["nvke/operator_contract.py"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
