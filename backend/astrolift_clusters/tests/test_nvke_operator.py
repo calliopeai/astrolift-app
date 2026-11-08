@@ -398,8 +398,10 @@ def test_reviewed_absence_reconciliation_never_submits_the_missing_original(conf
     row.save(update_fields=["status", "version"])
     with context(state.world):
         recovered = jobs.reconcile(**source_review(state, row))
-    assert recovered.status == "failed" and recovered.error_code == "OPERATOR_NOT_ADMITTED"
+    assert recovered.status == "uncertain" and recovered.error_code == "OPERATOR_RECEIPT_NOT_FOUND"
     assert not list((state.agent.root / "state/jobs").iterdir())
+    late = state.agent.client.submit(str(row.guid), outbox.decode_input(row), intent=row.request_digest)
+    assert late["id"] == str(row.guid)
 
 
 def test_token_identity_is_part_of_the_original_reviewed_intent(configured):
@@ -456,3 +458,141 @@ def test_invalid_agent_authority_is_refused_without_storage_changes(configured, 
     assert refused.value.code == "INVALID_INPUT" and "PRIVATE" not in str(refused.value)
     state.authority.refresh_from_db()
     assert state.authority.verified_at and state.authority.verification_code == "AGENT_VERIFIED"
+
+
+def test_reviewed_artifact_pages_observe_one_native_job_with_bound_cursors(configured):
+    import time
+
+    state = configured
+    row = reserve(state)
+    reviewed = source_review(state, row)
+    with context(state.world):
+        absent = jobs.artifact_page(**reviewed)
+    assert not absent["found"] and absent["state"] == "not_found" and absent["items"] == []
+    state.agent.client.submit(str(row.guid), outbox.decode_input(row), intent=row.request_digest)
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        receipt = state.agent.client.observe(
+            str(row.guid), command="generate.sitespec", intent=row.request_digest
+        )
+        if receipt["state"] == "completed":
+            break
+        time.sleep(0.02)
+    assert receipt["state"] == "completed"
+    with context(state.world):
+        first = jobs.artifact_page(**reviewed, limit=1)
+        assert first["found"] and first["command"] == "generate.sitespec"
+        assert first["instance_id"] == state.agent.instance
+        assert first["next_cursor"] and first["total_count"] > 1
+        names = [first["items"][0]["name"]]
+        cursor = first["next_cursor"]
+        while cursor:
+            page = jobs.artifact_page(**reviewed, after=cursor, limit=1)
+            assert page["receipt_sha256"] == first["receipt_sha256"]
+            names.extend(item["name"] for item in page["items"])
+            cursor = page["next_cursor"]
+        assert names == sorted(item["name"] for item in receipt["artifacts"])
+        filtered = jobs.artifact_page(**reviewed, search="stdout")
+        assert all("stdout" in item["name"] for item in filtered["items"])
+        for changes in ({"search": "different"}, {"limit": 2}, {"after": first["next_cursor"] + "x"}):
+            kwargs = {"after": first["next_cursor"], "limit": 1, **changes}
+            with pytest.raises(NvkeError) as invalid:
+                jobs.artifact_page(**reviewed, **kwargs)
+            assert invalid.value.code == "INVALID_CURSOR"
+        row.status = "uncertain"
+        row.save(update_fields=["status", "version"])
+        with pytest.raises(NvkeError) as stale:
+            jobs.artifact_page(**source_review(state, row), after=first["next_cursor"], limit=1)
+        assert stale.value.code == "INVALID_CURSOR"
+    assert len(list((state.agent.root / "state/workspace/runs").glob("*/started.json"))) == 1
+    serialized = json.dumps(first)
+    for private in (row.request_digest, "private-operator-site", "nodes.csv", "PRIVATE KEY"):
+        assert private not in serialized
+
+
+def test_operator_job_page_is_typed_private_and_does_not_admit_a_job(configured):
+    from astrolift_clusters.tests.test_nvke_schema import execute
+
+    state = configured
+    row = reserve(state)
+    query = """query($input:NvkeOperatorJobReviewInput!,$search:String){astroliftNvkeOperatorJobPage(input:$input,search:$search){ok errors{code} data{siteId siteVersion operationId operationVersion authorityId authorityVersion instanceId bundleManifestSha256 nativeRevision command found state effectful receiptSha256 items{name size sha256} nextCursor totalCount}}}"""
+    variables = {
+        "input": {
+            "operationId": str(row.guid),
+            "expectedActorId": state.world.user.pk,
+            "expectedSiteVersion": state.site.version,
+            "expectedAuthorityVersion": state.authority.version,
+            "expectedOperationVersion": row.version,
+        }
+    }
+    variables["search"] = None
+    result = execute(state.world, query, variables)
+    assert result.errors is None
+    page = result.data["astroliftNvkeOperatorJobPage"]
+    assert page["ok"] and page["data"]["operationId"] == str(row.guid)
+    assert page["data"]["state"] == "not_found" and page["data"]["totalCount"] == 0
+    assert row.request_digest not in json.dumps(page)
+    assert not list((state.agent.root / "state/jobs").iterdir())
+    variables["input"]["expectedActorId"] += 1
+    changed = execute(state.world, query, variables)
+    assert changed.errors is None and not changed.data["astroliftNvkeOperatorJobPage"]["ok"]
+    RoleBinding.objects.filter(user=state.world.user).update(deleted_at=timezone.now())
+    variables["input"]["expectedActorId"] = state.world.user.pk
+    revoked = execute(state.world, query, variables)
+    assert revoked.errors is None and not revoked.data["astroliftNvkeOperatorJobPage"]["ok"]
+
+
+@pytest.mark.parametrize(
+    "changes", [{"limit": 0}, {"limit": True}, {"limit": 101}, {"search": "x" * 201}, {"search": None}]
+)
+def test_operator_artifact_page_refuses_unbounded_queries(configured, changes):
+    state = configured
+    row = reserve(state)
+    with context(state.world), pytest.raises(NvkeError) as invalid:
+        jobs.artifact_page(**source_review(state, row), **changes)
+    assert invalid.value.code == "INVALID_INPUT"
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+def test_operator_artifact_page_refuses_changed_native_effect_classification(configured, monkeypatch):
+    state = configured
+    row = reserve(state)
+    monkeypatch.setattr(OperatorAgentClient, "observe", lambda *args, **kwargs: {"effectful": True})
+    with context(state.world), pytest.raises(NvkeError) as invalid:
+        jobs.artifact_page(**source_review(state, row))
+    assert invalid.value.code == "OPERATOR_INVALID_RESPONSE"
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+@pytest.mark.parametrize("code", [2**31, -(2**31) - 1])
+def test_operator_artifact_page_refuses_unrepresentable_exit_code(configured, monkeypatch, code):
+    state = configured
+    row = reserve(state)
+    monkeypatch.setattr(
+        OperatorAgentClient, "observe", lambda *args, **kwargs: {"effectful": False, "nativeExitCode": code}
+    )
+    with context(state.world), pytest.raises(NvkeError) as invalid:
+        jobs.artifact_page(**source_review(state, row))
+    assert invalid.value.code == "OPERATOR_INVALID_RESPONSE"
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+def test_missing_agent_receipt_keeps_unknown_infrastructure_intent_fenced(configured):
+    state = configured
+    effect = request(
+        state,
+        command="bootstrap.site",
+        positionals=[],
+        options={"sitespec": "input:site.yaml"},
+        files={"site.yaml": "not executed"},
+    )
+    row = reserve(state, request_text=effect, acknowledge_infrastructure_change=True)
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    with context(state.world):
+        recovered = jobs.reconcile(**source_review(state, row))
+    assert recovered.status == "uncertain"
+    with pytest.raises(NvkeError) as fenced:
+        reserve(state, request_text=effect, acknowledge_infrastructure_change=True)
+    assert fenced.value.code == "RESOURCE_BUSY"
+    assert not list((state.agent.root / "state/jobs").iterdir())

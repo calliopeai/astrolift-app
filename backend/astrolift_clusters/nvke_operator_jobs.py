@@ -7,6 +7,7 @@ from datetime import timedelta
 from uuid import UUID
 
 from django.conf import settings
+from django.core import signing
 from django.db import connection, transaction
 from django.utils import timezone
 from nvke.client import NvkeError
@@ -243,6 +244,81 @@ def artifact(
     return result
 
 
+def artifact_page(*, after=None, limit=50, search="", **review):
+    caller, row, selected, checkpoint = reviewed_source(**review)
+    if type(limit) is not int or not 1 <= limit <= 100 or not isinstance(search, str) or len(search) > 200:
+        raise NvkeError("INVALID_INPUT", "Use a bounded artifact search and page size")
+    with authority.open_agent(selected, checkpoint=checkpoint) as client:
+        try:
+            peer = client.observe(
+                str(row.guid), command=command_key(row.operation_key), intent=row.request_digest
+            )
+        except NvkeError as error:
+            if error.code != "OPERATOR_JOB_NOT_FOUND":
+                raise
+            peer = None
+    checkpoint()
+    if peer is not None and peer["effectful"] != row.authority["tooling_effectful"]:
+        raise NvkeError("OPERATOR_INVALID_RESPONSE", "The original operator effect classification changed")
+    if (
+        peer is not None
+        and peer.get("nativeExitCode") is not None
+        and not -(2**31) <= peer["nativeExitCode"] < 2**31
+    ):
+        raise NvkeError("OPERATOR_INVALID_RESPONSE", "The operator native exit code is invalid")
+    metadata = {
+        "site_id": str(row.site.guid),
+        "site_version": row.site.version,
+        "operation_id": str(row.guid),
+        "operation_version": row.version,
+        "authority_id": str(selected.guid),
+        "authority_version": selected.version,
+        "instance_id": str(selected.instance_id),
+        "bundle_manifest_sha256": selected.bundle_manifest_sha256,
+        "native_revision": row.authority["revision"],
+        "command": command_key(row.operation_key),
+        "found": peer is not None,
+        "state": peer["state"] if peer else "not_found",
+        "effectful": row.authority["tooling_effectful"],
+        "cancellation_requested": peer["cancellationRequested"] if peer else False,
+        "native_exit_code": peer.get("nativeExitCode") if peer else None,
+        "error_code": peer.get("errorCode") if peer else None,
+        "reconciled_from_native_receipt": peer.get("reconciledFromNativeReceipt", False) if peer else False,
+    }
+    artifacts = sorted(peer["artifacts"], key=lambda item: item["name"]) if peer else []
+    digest = hashlib.sha256(outbox.canonical({**metadata, "artifacts": artifacts})).hexdigest()
+    scope = [caller.pk, row.organization_id, metadata, digest, search, limit]
+    salt = "nvke.operator.artifacts.v1"
+    offset = 0
+    if after is not None:
+        try:
+            if not isinstance(after, str) or len(after) > 8192:
+                raise ValueError
+            cursor = signing.loads(after, salt=salt, max_age=3600)
+            offset = cursor["offset"]
+            if cursor["scope"] != scope or type(offset) is not int or offset < 0:
+                raise ValueError
+        except Exception:
+            raise NvkeError("INVALID_CURSOR", "Use a cursor from this reviewed operator receipt") from None
+    values = [item for item in artifacts if search.casefold() in item["name"].casefold()]
+    if offset > len(values):
+        raise NvkeError("INVALID_CURSOR", "The operator artifact cursor is outside this receipt")
+    items = values[offset : offset + limit]
+    next_offset = offset + len(items)
+    next_cursor = (
+        signing.dumps({"scope": scope, "offset": next_offset}, salt=salt, compress=True)
+        if next_offset < len(values)
+        else None
+    )
+    return {
+        **metadata,
+        "receipt_sha256": digest,
+        "items": items,
+        "next_cursor": next_cursor,
+        "total_count": len(values),
+    }
+
+
 def reconcile(**review):
     from astrolift_clusters.nvke_operator_runtime import record_peer
     from astrolift_clusters.nvke_runtime import _state, operation_lease_key
@@ -266,14 +342,15 @@ def reconcile(**review):
             except NvkeError as error:
                 if error.code != "OPERATOR_JOB_NOT_FOUND":
                     raise
+                # Absence cannot fence a delayed original PUT still in flight.
                 _state(
                     row,
-                    "failed",
-                    "operator_intent_not_admitted",
+                    "uncertain",
+                    "operator_receipt_missing",
                     progress=progress,
                     error=NvkeError(
-                        "OPERATOR_NOT_ADMITTED",
-                        "The original bound agent confirms that this job was not admitted",
+                        "OPERATOR_RECEIPT_NOT_FOUND",
+                        "The original receipt is absent; a delayed admission remains possible and infrastructure intent stays fenced",
                     ),
                     audit_actor_id=caller.pk,
                 )

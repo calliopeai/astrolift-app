@@ -11773,6 +11773,12 @@ type NvkeOperationTypePage {
   pageSize: Int
 }
 
+type NvkeOperatorArtifactType {
+  name: String!
+  size: String!
+  sha256: String!
+}
+
 input NvkeOperatorAuthorityReviewInput {
   siteId: GUID!
   expectedActorId: Int!
@@ -11818,6 +11824,36 @@ input NvkeOperatorCredentialsInput {
   caPem: String! = ""
   clientCertificatePem: String! = ""
   clientKeyPem: String! = ""
+}
+
+type NvkeOperatorJobPageType {
+  siteId: GUID!
+  siteVersion: Int!
+  operationId: GUID!
+  operationVersion: Int!
+  authorityId: GUID!
+  authorityVersion: Int!
+  instanceId: GUID!
+  bundleManifestSha256: String!
+  nativeRevision: String!
+  command: String!
+  found: Boolean!
+  state: String!
+  effectful: Boolean!
+  cancellationRequested: Boolean!
+  nativeExitCode: Int
+  errorCode: String
+  reconciledFromNativeReceipt: Boolean!
+  receiptSha256: String!
+  items: [NvkeOperatorArtifactType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeOperatorJobPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorJobPageType
 }
 
 input NvkeOperatorJobReviewInput {
@@ -12739,6 +12775,7 @@ type Query {
   astroliftNvkeOperationResultText(operationId: GUID!): StrMutationResult!
   astroliftNvkeSites(after: String = null, limit: Int! = 50): NvkeSiteTypePage!
   astroliftNvkeSite(siteId: GUID!): NvkeSiteType
+  astroliftNvkeOperatorJobPage(input: NvkeOperatorJobReviewInput!, after: String = null, limit: Int! = 50, search: String = null): NvkeOperatorJobPageTypeMutationResult!
   astroliftNvkeOperatorAuthority(siteId: GUID!): NvkeOperatorAuthorityType
   astroliftNvkeOperatorContract: NvkeOperatorContractType!
   astroliftNvkeOperatorArtifactText(input: ReadNvkeOperatorArtifactInput!): StrMutationResult!

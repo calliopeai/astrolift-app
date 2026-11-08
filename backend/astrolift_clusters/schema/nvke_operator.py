@@ -132,6 +132,38 @@ class NvkeOperatorContractType:
     commands: list[NvkeOperatorCommandType]
 
 
+@strawberry.type
+class NvkeOperatorArtifactType:
+    name: str
+    size: str
+    sha256: str
+
+
+@strawberry.type
+class NvkeOperatorJobPageType:
+    site_id: GUID
+    site_version: int
+    operation_id: GUID
+    operation_version: int
+    authority_id: GUID
+    authority_version: int
+    instance_id: GUID
+    bundle_manifest_sha256: str
+    native_revision: str
+    command: str
+    found: bool
+    state: str
+    effectful: bool
+    cancellation_requested: bool
+    native_exit_code: int | None
+    error_code: str | None
+    reconciled_from_native_receipt: bool
+    receipt_sha256: str
+    items: list[NvkeOperatorArtifactType]
+    next_cursor: str | None
+    total_count: int
+
+
 def contract_type():
     return NvkeOperatorContractType(
         revision=REVISION,
@@ -158,6 +190,28 @@ def contract_type():
 
 @strawberry.type
 class NvkeOperatorQuery:
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def astrolift_nvke_operator_job_page(
+        self,
+        info: Info,
+        input: NvkeOperatorJobReviewInput,
+        after: str | None = None,
+        limit: int = 50,
+        search: str | None = None,
+    ) -> MutationResultType[NvkeOperatorJobPageType]:
+        data = jobs.artifact_page(after=after, limit=limit, search=search or "", **asdict(input))
+        return success(
+            NvkeOperatorJobPageType(
+                **{
+                    **data,
+                    "items": [NvkeOperatorArtifactType(**item) for item in data["items"]],
+                }
+            )
+        )
+
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()

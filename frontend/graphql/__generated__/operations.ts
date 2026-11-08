@@ -13483,6 +13483,12 @@ export type NvkeOperationTypePage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type NvkeOperatorArtifactType = {
+  name: Scalars['String']['output'];
+  sha256: Scalars['String']['output'];
+  size: Scalars['String']['output'];
+};
+
 export type NvkeOperatorAuthorityReviewInput = {
   expectedActorId: Scalars['Int']['input'];
   expectedSiteVersion: Scalars['Int']['input'];
@@ -13528,6 +13534,36 @@ export type NvkeOperatorCredentialsInput = {
   caPem: Scalars['String']['input'];
   clientCertificatePem: Scalars['String']['input'];
   clientKeyPem: Scalars['String']['input'];
+};
+
+export type NvkeOperatorJobPageType = {
+  authorityId: Scalars['GUID']['output'];
+  authorityVersion: Scalars['Int']['output'];
+  bundleManifestSha256: Scalars['String']['output'];
+  cancellationRequested: Scalars['Boolean']['output'];
+  command: Scalars['String']['output'];
+  effectful: Scalars['Boolean']['output'];
+  errorCode?: Maybe<Scalars['String']['output']>;
+  found: Scalars['Boolean']['output'];
+  instanceId: Scalars['GUID']['output'];
+  items: Array<NvkeOperatorArtifactType>;
+  nativeExitCode?: Maybe<Scalars['Int']['output']>;
+  nativeRevision: Scalars['String']['output'];
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  receiptSha256: Scalars['String']['output'];
+  reconciledFromNativeReceipt: Scalars['Boolean']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  state: Scalars['String']['output'];
+  totalCount: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorJobPageTypeMutationResult = {
+  data?: Maybe<NvkeOperatorJobPageType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type NvkeOperatorJobReviewInput = {
@@ -14329,6 +14365,7 @@ export type Query = {
   astroliftNvkeOperatorArtifactText: StrMutationResult;
   astroliftNvkeOperatorAuthority?: Maybe<NvkeOperatorAuthorityType>;
   astroliftNvkeOperatorContract: NvkeOperatorContractType;
+  astroliftNvkeOperatorJobPage: NvkeOperatorJobPageTypeMutationResult;
   astroliftNvkeProviderIdentitiesPage: NvkeProviderIdentitiesPageTypeMutationResult;
   astroliftNvkeProviderObservation: NvkeProviderObservationTypeMutationResult;
   astroliftNvkeRequest?: Maybe<NvkeOperationType>;
@@ -16010,6 +16047,14 @@ export type QueryAstroliftNvkeOperatorArtifactTextArgs = {
 
 export type QueryAstroliftNvkeOperatorAuthorityArgs = {
   siteId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftNvkeOperatorJobPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  input: NvkeOperatorJobReviewInput;
+  limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -21961,6 +22006,16 @@ export type GetNvkeOperatorArtifactTextQueryVariables = Exact<{
 
 
 export type GetNvkeOperatorArtifactTextQuery = { astroliftNvkeOperatorArtifactText: { ok: boolean, data?: string | null, errors: Array<{ code: string }> } };
+
+export type GetNvkeOperatorJobPageQueryVariables = Exact<{
+  input: NvkeOperatorJobReviewInput;
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetNvkeOperatorJobPageQuery = { astroliftNvkeOperatorJobPage: { ok: boolean, errors: Array<{ code: string }>, data?: { siteId: string, siteVersion: number, operationId: string, operationVersion: number, authorityId: string, authorityVersion: number, instanceId: string, bundleManifestSha256: string, nativeRevision: string, command: string, found: boolean, state: string, effectful: boolean, cancellationRequested: boolean, nativeExitCode?: number | null, errorCode?: string | null, reconciledFromNativeReceipt: boolean, receiptSha256: string, nextCursor?: string | null, totalCount: number, items: Array<{ name: string, size: string, sha256: string }> } | null } };
 
 export type RequestNvkeProviderObservationMutationVariables = Exact<{
   input: RequestNvkeProviderObservationInput;
