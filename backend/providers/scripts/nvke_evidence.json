@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "25809d75ed8b9fddc949e1c0ebf3309b86a26d8a"
+      "revision": "ddb1d961c68cb0ea040c67417fc0a8f827ddc03f"
     }
   },
   "evidence": {
@@ -604,6 +604,37 @@
       "kind": "observation",
       "scope": "Clean committed 515e068 compiled CLI and real Astro/Postgres/Temporal/mTLS/native generation qualification passed in 39.11s; full Go suite/vet/lint/build passed. Supplemental 0527b2f tests refuse changed original versions/deadline/acknowledgement. No Storybook UI or agent-driven live bootstrap/install claim. Protected cross-platform input fixtures and Windows test-executable compilation are additionally bound at b0b8514; no Windows runtime qualification.",
       "sha256": "fef09ecc767ed65f6b038685bbaf1214962c66c392f6277b0cc78d83c8b8b740"
+    },
+    "operator-authority-ui": {
+      "repository": "app",
+      "path": "frontend/components/screens/nvke/NvkeOperatorAgentPanel.tsx",
+      "kind": "implementation",
+      "scope": "Pure Storybook-first connection lifecycle with frozen private review, visible credential clearing, scope/version remount, generic uncertainty and read-only parent enforcement."
+    },
+    "operator-authority-hook": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-operator-agent.ts",
+      "kind": "implementation",
+      "scope": "Fresh caller/site/authority version binding, strict response identity checks, no-cache private mutations and stale callback blocking after unconfirmed writes."
+    },
+    "operator-authority-ui-tests": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-operator-agent.test.tsx",
+      "kind": "test",
+      "scope": "Controlled Apollo tests cover stale actor/org/permissions and A-to-B-to-A scopes, malformed replies, unknown credential fields, fresh refresh and no replay after uncertainty. Panel, route and browser tests provide separate coverage."
+    },
+    "operator-authority-browser": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_operator_browser_integration.py",
+      "kind": "test",
+      "scope": "Actual Chromium/GraphQL/Postgres/mTLS configuration with a deliberately lost reply, refresh, verification, disable/enable/remove and redacted encrypted credentials. A second real-browser case refuses private credential redirect forwarding; no native job launches."
+    },
+    "operator-authority-ui-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-authority-ui-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Committed application sources and safe log digests bind 397 scoped frontend tests, 13 composed stories, 27 Chromium accessibility/interaction checks, two real browser lifecycle/redirect cases and lint/types/production build. Connection management only; command/job/recovery/artifact UI and live infrastructure remain open.",
+      "sha256": "8fdb3e164d1fdb133a53f4b1f00621e601911cc0f9e1b7ef0e5c1cab21d3f912"
     }
   },
   "rows": {
@@ -2598,9 +2629,14 @@
           "operator-cli-tests",
           "operator-cli-redirect-tests",
           "operator-cli-paired",
-          "operator-cli-local"
+          "operator-cli-local",
+          "operator-authority-ui",
+          "operator-authority-hook",
+          "operator-authority-ui-tests",
+          "operator-authority-browser",
+          "operator-authority-ui-local"
         ],
-        "remaining": "Live routes and deployed token/login acceptance remain pending."
+        "remaining": "Agent connection lifecycle is locally browser-qualified; the tooling command/job/recovery/artifact UI, deployed login/token acceptance and live routes remain pending."
       },
       "node-preparation": {
         "mapping": "Native bootstrap inputs and provisioned-provider path",
@@ -2638,7 +2674,7 @@
           "operator-cli-paired",
           "operator-cli-local"
         ],
-        "remaining": "Actual native generation completes through compiled remote CLI, a CLI-created Astro site, encrypted API/outbox/Temporal and mTLS agent. Storybook UI controls, remaining command-family end-to-end qualification and actual agent-driven Linux bootstrap/install remain pending."
+        "remaining": "Actual native generation completes through compiled remote CLI, a CLI-created Astro site, encrypted API/outbox/Temporal and mTLS agent. command/job/recovery/artifact UI, remaining command-family end-to-end qualification and actual agent-driven Linux bootstrap/install remain pending."
       },
       "deployment-rendering": {
         "mapping": "Pinned native deploy-path, stack/values inspection and management install planning",
@@ -2707,7 +2743,7 @@
           "operator-cli-paired",
           "operator-cli-local"
         ],
-        "remaining": "Local seed/node bootstrap and separate agent utility/dry-run proof are qualified. Astro API/CLI handles the complete declared envelope, durable original recovery and private artifacts; actual agent-driven bootstrap/install, Storybook UI controls, production artifact verification and deployed acceptance remain pending."
+        "remaining": "Local seed/node bootstrap and separate agent utility/dry-run proof are qualified. Astro API/CLI handles the complete declared envelope, durable original recovery and private artifacts; actual agent-driven bootstrap/install, command/job/recovery/artifact UI, production artifact verification and deployed acceptance remain pending."
       },
       "installation": {
         "mapping": "Pinned management install/check/access with guarded actual local default-stack installation",
@@ -2741,7 +2777,7 @@
           "operator-cli-paired",
           "operator-cli-local"
         ],
-        "remaining": "Default stack, private APIs/controller, native declarative create/access, worker growth/explicit deletion and native cluster cleanup are locally qualified. Reviewed Astro API/remote CLI transport exists; Storybook UI, actual agent-driven install, hosted new tenant/delete admission, upgrades, verified production supply chain, physical providers and deployment remain pending."
+        "remaining": "Default stack, private APIs/controller, native declarative create/access, worker growth/explicit deletion and native cluster cleanup are locally qualified. Reviewed Astro API/remote CLI transport exists; command/job/recovery/artifact UI, actual agent-driven install, hosted new tenant/delete admission, upgrades, verified production supply chain, physical providers and deployment remain pending."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
