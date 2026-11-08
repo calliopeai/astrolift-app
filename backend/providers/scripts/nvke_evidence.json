@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "8fc135707172ef0bf5c7b15083362f65de948a12"
+      "revision": "a1276f97db480d6d41dc495bd6cdb44fe996dc1e"
     }
   },
   "evidence": {
@@ -289,6 +289,27 @@
       "kind": "observation",
       "scope": "Prepared source-pinned ARM64 Linux CLI and working virtual TPM proxy; fourteen tooling tests passed, one Kubernetes-proxy case skipped. Actual bootstrap, installation, hardware and API/UI controls remain unqualified.",
       "sha256": "86490f9d2bfec8916a3ffd5b143be4a7b8c551cfa57c707602af3dbd90e66826"
+    },
+    "native-bootstrap-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/native-bootstrap-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "One actual source-pinned seed/node bootstrap through Astro runner on an isolated ARM64 Linux host. Completed receipt plus live API readiness and the expected Ready node at Kubernetes 1.36.4. Not full management-stack installation, tenant provisioning, physical provider or API/UI control qualification.",
+      "sha256": "ea1a2a06b5ab755c80e3b950112592846db5b806391181abab6aa6c961a33b58"
+    },
+    "native-bootstrap-checker": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualify_bootstrap.py",
+      "kind": "implementation",
+      "scope": "Read-only source-bound bootstrap qualification: exact successful retained attempt, pinned binary/source, private embedded-TLS kubeconfig, live readyz and complete expected node set/version. No credential or raw native output export.",
+      "sha256": "3dd6e779185ed8484e823e80e7fd1660e391ea3ee1657cea4505b0aa243f8159"
+    },
+    "native-bootstrap-checker-tests": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_qualify_bootstrap.py",
+      "kind": "test",
+      "scope": "Refuses torn/uncertain/mismatched receipts, modified bundles, shared/symlinked inputs, incomplete/unready/deleting/version-mismatched nodes and unsafe kubeconfig credential plugins or TLS overrides. Controlled qualification inputs; live bootstrap evidence is separate.",
+      "sha256": "5e393a7691f2fa95ab6925a242801c7c43228f87d66de0a132b51fc63230c833"
     }
   },
   "rows": {
@@ -1802,9 +1823,10 @@
         "qualification": "partial",
         "evidence": [
           "native-tooling",
-          "cli-tooling"
+          "cli-tooling",
+          "native-bootstrap-local"
         ],
-        "remaining": "Actual seed/node bootstrap, image supply chain and API/UI bootstrap control remain pending."
+        "remaining": "One source-pinned local seed/node bootstrap is qualified; production image/release supply-chain verification and API/UI bootstrap control remain pending."
       },
       "nvkectl config set-site": {
         "mapping": "astro nvke site create/configure; NVKE site UI",
@@ -2252,9 +2274,10 @@
         "qualification": "partial",
         "evidence": [
           "tooling-source",
-          "native-tooling"
+          "native-tooling",
+          "native-bootstrap-local"
         ],
-        "remaining": "Node/image preparation, TPM/SPIRE attestation alternatives and verified artifact delivery remain unqualified; API/UI control absent."
+        "remaining": "Local software-TPM substrate and source-built node bootstrap are exercised. Production node/image preparation, other TPM/SPIRE attestation paths, physical-provider qualification, verified artifact delivery and API/UI control remain pending."
       },
       "site-specs": {
         "mapping": "Generate/inspect/validate and bootstrap dry-run through pinned tooling",
@@ -2281,9 +2304,12 @@
         "qualification": "partial",
         "evidence": [
           "native-tooling",
-          "cli-tooling"
+          "cli-tooling",
+          "native-bootstrap-local",
+          "native-bootstrap-checker",
+          "native-bootstrap-checker-tests"
         ],
-        "remaining": "Actual seed/node bootstrap and API/UI admission/observation controls remain pending."
+        "remaining": "One local seed/node bootstrap is qualified; API/UI admission/observation controls, production artifact supply-chain verification and live deployment remain pending."
       },
       "installation": {
         "mapping": "Pinned management install/check/access with ordered dry-run",

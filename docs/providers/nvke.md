@@ -209,10 +209,10 @@ Each family retains the complete required behavior. Local tooling is distinct fr
 | Operation family | Required behavior | Existing mapping | Delivery evidence |
 |---|---|---|---|
 | Site configuration | Register/select/edit/probe/remove sites, secret references, supported interface discovery | Register/select/edit/probe/remove sites and interfaces | **local** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Live routes and deployed token/login acceptance remain pending. |
-| Node preparation | Images, registry/boot artifacts, SPIRE CA/TPM or admitted alternative, pre-provisioned nodes | Native bootstrap inputs and provisioned-provider path | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling). Remaining: Node/image preparation, TPM/SPIRE attestation alternatives and verified artifact delivery remain unqualified; API/UI control absent. |
+| Node preparation | Images, registry/boot artifacts, SPIRE CA/TPM or admitted alternative, pre-provisioned nodes | Native bootstrap inputs and provisioned-provider path | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [native-bootstrap-local](#evidence-native-bootstrap-local). Remaining: Local software-TPM substrate and source-built node bootstrap are exercised. Production node/image preparation, other TPM/SPIRE attestation paths, physical-provider qualification, verified artifact delivery and API/UI control remain pending. |
 | Site specs | Generate, inspect, validate and dry-run the complete spec; report field errors without secrets | Generate/inspect/validate and bootstrap dry-run through pinned tooling | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [native-linux-utilities](#evidence-native-linux-utilities). Remaining: Dedicated API/UI preparation controls and live bootstrap qualification remain pending. |
 | Deployment rendering | Inspect Helm values and stack config; render pinned deploy path and release inputs | Pinned native deploy-path, stack/values inspection and management install planning | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete. |
-| Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, kubeconfig and encryption-key outputs | Pinned local bootstrap, private outputs and durable attempt guard | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Actual seed/node bootstrap and API/UI admission/observation controls remain pending. |
+| Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, kubeconfig and encryption-key outputs | Pinned local bootstrap, private outputs and durable attempt guard | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [native-bootstrap-local](#evidence-native-bootstrap-local), [native-bootstrap-checker](#evidence-native-bootstrap-checker), [native-bootstrap-checker-tests](#evidence-native-bootstrap-checker-tests). Remaining: One local seed/node bootstrap is qualified; API/UI admission/observation controls, production artifact supply-chain verification and live deployment remain pending. |
 | Installation | Ordered CAPI/provider/management-plane install; validate pinned images, versions, storage and network | Pinned management install/check/access with ordered dry-run | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [nktp-kind](#evidence-nktp-kind). Remaining: NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending. |
 | Infrastructure providers | NICo and enabled LaunchLayer; CRDs, credentials and manager state; credential-health freshness | Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI | **partial** — [action-validation](#evidence-action-validation), [limits](#evidence-limits), [provider-classifier](#evidence-provider-classifier), [provider-reader](#evidence-provider-reader), [provider-reader-kube](#evidence-provider-reader-kube), [provider-api](#evidence-provider-api), [provider-api-kube](#evidence-provider-api-kube), [provider-ui](#evidence-provider-ui), [provider-hooks](#evidence-provider-hooks), [provider-journal](#evidence-provider-journal), [provider-collection-ui](#evidence-provider-collection-ui), [provider-browser](#evidence-provider-browser), [provider-cli](#evidence-provider-cli), [provider-cli-paired](#evidence-provider-cli-paired). Remaining: Native NICo and enabled LaunchLayer credential/controller/hardware qualification remains pending; local transport/admission evidence does not establish physical provider effects. |
 | Artifacts | Machine images, cluster releases, node-pool releases, release channels and control-plane classes | All six management CRDs plus public operator APIs | **local** — [crd-admission](#evidence-crd-admission), [release-deprecation](#evidence-release-deprecation), [http-fixture](#evidence-http-fixture), [resource-admission](#evidence-resource-admission), [cli-wiring](#evidence-cli-wiring). Remaining: Image/release/channel/profile supply chain and native reconciliation remain pending. |
@@ -232,7 +232,7 @@ source declarations are also preserved. Help/completion/version use Astro's exis
 
 | Upstream command | Astro mapping | Delivery evidence |
 |---|---|---|
-| `nvkectl bootstrap site` | astro nvke tooling run -- bootstrap site | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Actual seed/node bootstrap, image supply chain and API/UI bootstrap control remain pending. |
+| `nvkectl bootstrap site` | astro nvke tooling run -- bootstrap site | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [native-bootstrap-local](#evidence-native-bootstrap-local). Remaining: One source-pinned local seed/node bootstrap is qualified; production image/release supply-chain verification and API/UI bootstrap control remain pending. |
 | `nvkectl config set-site` | astro nvke site create/configure; NVKE site UI | **local** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Live interface/private route qualification remains required. |
 | `nvkectl config use-site` | Explicit --site GUID and selected site route | **partial** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Astro uses explicit site selection; native active-site config-file state is not imported. |
 | `nvkectl config view` | astro nvke site get/list; site metadata UI | **local** — [sites-api](#evidence-sites-api), [ui-wiring](#evidence-ui-wiring), [cli-wiring](#evidence-cli-wiring). Remaining: Connection secrets intentionally require their declared secure paths; live route qualification remains required. |
@@ -391,7 +391,7 @@ Selector: `test_real_database_and_kubernetes_operation_dry_run_and_observed_crea
 
 ### Evidence native-tooling
 
-[kubernetes/nvke/test_tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/test_tooling.py) — test. Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.
+[kubernetes/nvke/test_tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/test_tooling.py) — test. Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.
 
 Paired source SHA-256: `e1e8062c87ab21275e7a4e2b7b697b5a4789579ada9218af589313a80ea6148a`.
 
@@ -403,19 +403,19 @@ Paired source SHA-256: `2289c3d9e93cb80ceb849c9c3611f90c7a7d31c516fe0cf1bb667ad3
 
 ### Evidence tooling-source
 
-[kubernetes/nvke/tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/tooling.py) — implementation. Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.
+[kubernetes/nvke/tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/tooling.py) — implementation. Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.
 
 Paired source SHA-256: `0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd`.
 
 ### Evidence nktp-runtime
 
-[kubernetes/nvke/test_nktp_runtime.py](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/test_nktp_runtime.py) — test. Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.
+[kubernetes/nvke/test_nktp_runtime.py](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/test_nktp_runtime.py) — test. Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.
 
 Paired source SHA-256: `41aaaa374b5a943f821b30f2e110960e36fad3b4142b630e66ed43c3d3dcd0b6`.
 
 ### Evidence nktp-kind
 
-[kubernetes/nvke/qualification/nktp-kind-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/qualification/nktp-kind-2026-11-08.json) — observation. Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.
+[kubernetes/nvke/qualification/nktp-kind-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/qualification/nktp-kind-2026-11-08.json) — observation. Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.
 
 Paired source SHA-256: `568410bd0c9a66742cd542cf5c293c03067f82051dd45788e4856308cb5a6857`.
 
@@ -485,9 +485,27 @@ Paired source SHA-256: `563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5
 
 ### Evidence native-linux-utilities
 
-[kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/8fc135707172ef0bf5c7b15083362f65de948a12/kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json) — observation. Prepared source-pinned ARM64 Linux CLI and working virtual TPM proxy; fourteen tooling tests passed, one Kubernetes-proxy case skipped. Actual bootstrap, installation, hardware and API/UI controls remain unqualified.
+[kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json) — observation. Prepared source-pinned ARM64 Linux CLI and working virtual TPM proxy; fourteen tooling tests passed, one Kubernetes-proxy case skipped. Actual bootstrap, installation, hardware and API/UI controls remain unqualified.
 
 Paired source SHA-256: `86490f9d2bfec8916a3ffd5b143be4a7b8c551cfa57c707602af3dbd90e66826`.
+
+### Evidence native-bootstrap-local
+
+[kubernetes/nvke/qualification/native-bootstrap-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/qualification/native-bootstrap-local-2026-11-08.json) — observation. One actual source-pinned seed/node bootstrap through Astro runner on an isolated ARM64 Linux host. Completed receipt plus live API readiness and the expected Ready node at Kubernetes 1.36.4. Not full management-stack installation, tenant provisioning, physical provider or API/UI control qualification.
+
+Paired source SHA-256: `ea1a2a06b5ab755c80e3b950112592846db5b806391181abab6aa6c961a33b58`.
+
+### Evidence native-bootstrap-checker
+
+[kubernetes/nvke/qualify_bootstrap.py](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/qualify_bootstrap.py) — implementation. Read-only source-bound bootstrap qualification: exact successful retained attempt, pinned binary/source, private embedded-TLS kubeconfig, live readyz and complete expected node set/version. No credential or raw native output export.
+
+Paired source SHA-256: `3dd6e779185ed8484e823e80e7fd1660e391ea3ee1657cea4505b0aa243f8159`.
+
+### Evidence native-bootstrap-checker-tests
+
+[kubernetes/nvke/test_qualify_bootstrap.py](https://github.com/calliopeai/astrolift-opscode/blob/a1276f97db480d6d41dc495bd6cdb44fe996dc1e/kubernetes/nvke/test_qualify_bootstrap.py) — test. Refuses torn/uncertain/mismatched receipts, modified bundles, shared/symlinked inputs, incomplete/unready/deleting/version-mismatched nodes and unsafe kubeconfig credential plugins or TLS overrides. Controlled qualification inputs; live bootstrap evidence is separate.
+
+Paired source SHA-256: `5e393a7691f2fa95ab6925a242801c7c43228f87d66de0a132b51fc63230c833`.
 
 
 ## Verification
