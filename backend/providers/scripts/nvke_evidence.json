@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "b2024bb2b4b1eea5e5544cdf4aba57df70daa052"
+      "revision": "f9f858c185b35ebc208305fb67619bf65d962647"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "d6687011c0c23b158b71d659a363e78455bc0a9a"
+      "revision": "2e60bd669d7fb5530ede24afa3c84ca5181323a9"
     }
   },
   "evidence": {
@@ -54,7 +54,7 @@
       "kind": "test",
       "scope": "All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.",
       "symbol": "TestNVKEFullCatalogCommandsAreReachableWithoutNetwork",
-      "sha256": "aa63f9b30d8f17355f8efb6b63f4b4fce989d49125609b7ace4013e404792215"
+      "sha256": "90744212b02cf237ee9621c47edd685110181208b53583c5ddea40a749d14714"
     },
     "paired-cli": {
       "repository": "cli",
@@ -775,6 +775,20 @@
       "kind": "observation",
       "scope": "One actual compiled CLI/API/PostgreSQL/production-registry Temporal/mTLS Linux agent bootstrap admission, original SUCCEEDED receipt, checked private artifact export and host live node access. Original watcher failed generically; read-only recovery did not replay bootstrap. Management install/access and deployed/physical qualification remain open.",
       "sha256": "afb842d1f0aa885a1ebbc839256b6ed77ca3bf93c342d24c3094552b56f18273"
+    },
+    "operator-watch-recovery": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-watch-recovery-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Signed CLI source plus full Go/fmt/vet/lint proof: safe watch failure categories, no automatic retry or mutation, original ID/recovery command and explicit read-only recovery. Original live watch failure cause remains unproven.",
+      "sha256": "50339de6d128fbd1f0d833b10fe007ad80f3b6bd11d6b01935a03c46376f6d99"
+    },
+    "operator-watch-tests": {
+      "repository": "cli",
+      "path": "cmd/nvke_test.go",
+      "kind": "test",
+      "scope": "HTTP/GraphQL refusal, invisible and mismatched receipts stop initial/subsequent watches after one read; recovery preserves the original operation and never re-admits work.",
+      "sha256": "90744212b02cf237ee9621c47edd685110181208b53583c5ddea40a749d14714"
     }
   },
   "rows": {
@@ -2324,7 +2338,9 @@
           "native-bootstrap-local",
           "operator-agent-linux-prerequisites",
           "operator-agent-bootstrap-native",
-          "operator-agent-bootstrap-local"
+          "operator-agent-bootstrap-local",
+          "operator-watch-recovery",
+          "operator-watch-tests"
         ],
         "remaining": "One actual agent-driven Linux bootstrap is locally qualified through compiled CLI/API/Temporal with retained artifacts and independent node readiness. The original watcher failed generically; original-operation recovery succeeded without replay. Deployed login/UI acceptance and production image/release supply-chain verification remain pending."
       },
@@ -2950,7 +2966,9 @@
           "operator-stop-ui-local",
           "operator-agent-linux-prerequisites",
           "operator-agent-bootstrap-native",
-          "operator-agent-bootstrap-local"
+          "operator-agent-bootstrap-local",
+          "operator-watch-recovery",
+          "operator-watch-tests"
         ],
         "remaining": "Direct-runner and actual agent-driven Linux bootstrap/readiness are locally qualified, with one original hosted admission and private output export. The original watcher failed generically and was recovered read-only. Agent-driven management install/access, production artifact verification, physical providers and deployed acceptance remain pending (#96; CLI #212)."
       },
@@ -3003,7 +3021,9 @@
           "operator-job-ui-local",
           "operator-stop-sdk-tests",
           "operator-stop-browser",
-          "operator-stop-ui-local"
+          "operator-stop-ui-local",
+          "operator-watch-recovery",
+          "operator-watch-tests"
         ],
         "remaining": "Default stack, private APIs/controller, native declarative create/access, worker growth/deletion and native cleanup are locally qualified. Reviewed Astro API/CLI/UI admission and original stop/fencing exist; actual agent-driven install, hosted new tenant/delete, upgrades, verified supply chain, physical providers and deployment remain pending."
       },
