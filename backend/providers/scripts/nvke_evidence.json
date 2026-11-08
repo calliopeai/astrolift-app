@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "f9f858c185b35ebc208305fb67619bf65d962647"
+      "revision": "4e7b473c0cd548cd92519c6dea4e98ab479a2879"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "e1c699fcc769601363cc5e47b526c70e584b1b51"
+      "revision": "f9271c6aeb05f1df9d674336d8e488a48936242f"
     }
   },
   "evidence": {
@@ -538,7 +538,7 @@
       "repository": "app",
       "path": "backend/astrolift_clusters/schema/nvke_operator.py",
       "kind": "implementation",
-      "scope": "Permission-gated GraphQL configuration/lifecycle/verification, complete typed catalog, reviewed admission, private artifacts and current-admin read-only reconciliation. Typed frontend documents and remote CLI exist; Storybook screens remain pending."
+      "scope": "Permission-gated configuration/catalog/admission, original receipts/artifacts, current-admin reconciliation/stop and audited install review. Typed install metadata and encrypted actor/token/source-bound snapshot paging preserve the original fence. Workbench/job UI have separate evidence; install-review UI and continuation remain pending."
     },
     "operator-api-tests": {
       "repository": "app",
@@ -559,7 +559,7 @@
       "path": "cmd/nvke_agent.go",
       "kind": "implementation",
       "scope": "astro nvke agent exposes connected command catalog plus reviewed, private mTLS configure/get/verify/enable/disable/remove controls.",
-      "sha256": "9e0f6d18748f59ce412ad4b4e2797a7c3df3b9faf613b90061afd68e66a4cc89"
+      "sha256": "f74d6b1203c93d36cd01a1ac9ed2b11943758256a84b76e77bff2905f10e3eb5"
     },
     "operator-cli-request": {
       "repository": "cli",
@@ -836,6 +836,39 @@
       "kind": "observation",
       "scope": "Actual original failed install reviewed through SDK/mTLS after an identity-preserving agent restart. Six original files unchanged, original effect fence retained, LGTM later Ready, bounded local evaluation sizing rendered. 89 tooling tests/3 opt-in skips, 47 SDK tests and clean typed projection. Application permission/version review and continuation remain open in #97.",
       "sha256": "0e4c23be46a38a20215d3cfe740c29fab4ae96a80261c5cc0a59a57a47cb3bfe"
+    },
+    "operator-install-review-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/nvke_operator_jobs.py",
+      "kind": "implementation",
+      "scope": "Current admin/read and actor/token/site/authority/operation checkpoints surround source-bound install review. Typed allowlisted metadata drops original intent; encrypted 600-second snapshots and signed cursor pages never re-observe or admit native effects."
+    },
+    "operator-install-review-api-tests": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_operator.py",
+      "kind": "test",
+      "scope": "62 backend cases include tenant/version fencing, role/token/authority revocation during I/O, audit/precision/privacy, unchanged original effects, current-admin review after caller revocation, full 113-row snapshot traversal, search/cursor binding, expiry and token/source separation."
+    },
+    "operator-install-review-cli": {
+      "repository": "cli",
+      "path": "cmd/nvke_install_review.go",
+      "kind": "implementation",
+      "scope": "Compiled astro nvke agent install-review binds exact original operation/version and current verified agent identity/bundle, validates non-authorization and complete typed readiness facts, preserves decimal strings/nulls, and never admits or stops work.",
+      "sha256": "196973e19786bc5009f6ca9638f6705e0c4d1f9290ce8e14b0ee01a57f374a0d"
+    },
+    "operator-install-review-cli-tests": {
+      "repository": "cli",
+      "path": "cmd/nvke_install_review_test.go",
+      "kind": "test",
+      "scope": "22 command cases cover source/authority changes, missing readiness and continuation fields, malformed counts/evidence, duplicate/false-ready workloads, guarded native failure and sanitized refusal. One bookkeeping review action at most; no native admission mutation.",
+      "sha256": "f560ef9351d5ae9dc7006ba5199b074cf6305204ea5f7a7b2326f3eb88478fa8"
+    },
+    "operator-install-review-api-cli-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-install-review-api-cli-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Actual compiled CLI/API/PostgreSQL/SDK/mTLS review of the original Linux partial install, 24 workloads across four snapshot pages, search cursor rebinding refusal and persistent private-safe audit. Original UNCERTAIN/version 23 retained. 62 backend tests, full Go suite, vet/lint, frontend types/codegen/contracts passed. UI and once-only continuation remain pending.",
+      "sha256": "e9a07492a32343c7c0e0fc4d8b8a73068386009e75f04a508644bb6b19673b6d"
     }
   },
   "rows": {
@@ -3077,9 +3110,14 @@
           "operator-install-review-agent",
           "operator-install-review-sdk",
           "operator-install-review-sdk-tests",
-          "operator-install-review-local"
+          "operator-install-review-local",
+          "operator-install-review-api",
+          "operator-install-review-api-tests",
+          "operator-install-review-cli",
+          "operator-install-review-cli-tests",
+          "operator-install-review-api-cli-local"
         ],
-        "remaining": "The first agent install failed at LGTM readiness and remains UNCERTAIN with preserved guards. Source-bound SDK/mTLS review of that original job is locally qualified; guarded bounded evaluation sizing later recovered LGTM. Application permission/version gates, reviewed continuation across API/CLI/UI (#97), completed agent install/access (#96), hosted new tenant/delete, upgrades, verified supply chain, physical providers and deployed acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin/version-gated API/compiled CLI review and encrypted snapshot pagination are locally qualified against that original job, with unchanged effect fences and later LGTM recovery. Operator review UI, immutable phase plan and linked continuation (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers and deployed acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
