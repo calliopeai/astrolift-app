@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import hmac
+import logging
 from datetime import timedelta
 from uuid import UUID
 
@@ -31,6 +32,7 @@ from core.permissions import PermissionDenied
 from core.secrets import encrypt_at_rest
 
 KEY = "temporal.reset.RotateEtcdEncryptionKey"
+logger = logging.getLogger(__name__)
 
 
 def _uuid(value):
@@ -393,7 +395,8 @@ def attempt(row, *, execution):
             progress=progress,
             error=NvkeError("AUTHORITY_REVOKED", "The original native reset caller is no longer authorized"),
         )
-    except Exception:
+    except Exception as exc:
+        logger.warning("Native reset execution failed (%s); original intent retained", type(exc).__name__)
         return _state(
             row,
             "uncertain" if progress.get("sending") else "failed",
