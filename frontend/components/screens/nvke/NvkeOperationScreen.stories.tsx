@@ -5,6 +5,7 @@ import accessStory from "./NvkeWorkloadAccessPanel.stories";
 import { PROVIDER_PROPS } from "./NvkeProvidersPanel.stories";
 import { CREDENTIAL_PROPS } from "./NvkeCredentialPanel.stories";
 import { COLLECTION_PROPS } from "./NvkeCredentialRequestPanel.stories";
+import { OPERATOR_JOB_PROPS } from "./NvkeOperatorJobPanel.stories";
 import { fakeController } from "@/components/data-table/fixtures";
 import {
   DIAGNOSTIC_OBSERVATION,
@@ -20,6 +21,28 @@ export default {
   args: OPERATION_DETAIL,
 } satisfies Meta<typeof NvkeOperationScreen>;
 type Story = StoryObj<typeof NvkeOperationScreen>;
+export const OperatorJob: Story = {
+  args: { operation: OPERATOR_JOB_PROPS.operation, operatorJob: OPERATOR_JOB_PROPS },
+};
+export const OperatorJobReadOnly: Story = {
+  args: {
+    operation: OPERATOR_JOB_PROPS.operation,
+    operatorJob: OPERATOR_JOB_PROPS,
+    canAct: false,
+    canResume: false,
+  },
+};
+export const OperatorJobUncertain: Story = {
+  args: {
+    operation: { ...OPERATOR_JOB_PROPS.operation, status: "UNCERTAIN" },
+    operatorJob: {
+      ...OPERATOR_JOB_PROPS,
+      operation: { ...OPERATOR_JOB_PROPS.operation, status: "UNCERTAIN" },
+      canReconcile: true,
+    },
+    canResume: false,
+  },
+};
 export const CollectCredentials: Story = {
   args: {
     operation: { ...OPERATION, operationKey: "getCluster", status: "SUCCEEDED" },

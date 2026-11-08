@@ -21,6 +21,7 @@ import { NvkeProvidersPanel } from "./NvkeProvidersPanel";
 import { NvkeCredentialPanel } from "./NvkeCredentialPanel";
 import { NvkeCredentialRequestPanel } from "./NvkeCredentialRequestPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
+import { NvkeOperatorJobPanel } from "./NvkeOperatorJobPanel";
 import { nvkeFinished, type NvkeOperationScreenProps } from "./types";
 
 export function NvkeOperationScreen({
@@ -42,6 +43,7 @@ export function NvkeOperationScreen({
   credentialRequest,
   workflows,
   workloadAccess,
+  operatorJob,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
   const [confirm, setConfirm] = useState<"cancel" | "resume" | "download" | null>(null);
@@ -61,6 +63,7 @@ export function NvkeOperationScreen({
       </PageShell>
     );
   const native = !!nativeMaintenancePermission(operation.operationKey);
+  const tooling = operation.operationKey.startsWith("tooling.");
   const allowed = canAct && !pending && !error;
   return (
     <PageShell
@@ -98,7 +101,7 @@ export function NvkeOperationScreen({
               {t("cancelOperation")}
             </Button>
           )}
-          {operation.status === "UNCERTAIN" && (
+          {operation.status === "UNCERTAIN" && !tooling && (
             <Button disabled={!canResume || !allowed} onClick={() => setConfirm("resume")}>
               {t("reconcile")}
             </Button>
@@ -117,21 +120,24 @@ export function NvkeOperationScreen({
       >
         <Badge variant="outline">{t(`status.${operation.status}`)}</Badge>
         <p className="mt-2">
-          {operation.operationKey === "infrastructure.providers" && operation.status === "SUCCEEDED"
-            ? t("providers.collectedHelp")
-            : native
-              ? t("workflow.reviewHelp")
-              : t(
-                  operation.status === "SUCCEEDED"
-                    ? "observedHelp"
-                    : operation.status === "UNCERTAIN"
-                      ? "uncertainHelp"
-                      : operation.status === "CANCELLED"
-                        ? "cancelledHelp"
-                        : operation.status === "FAILED"
-                          ? "failedHelp"
-                          : "acceptedHelp"
-                )}
+          {tooling
+            ? t("operatorJob.processHelp")
+            : operation.operationKey === "infrastructure.providers" &&
+                operation.status === "SUCCEEDED"
+              ? t("providers.collectedHelp")
+              : native
+                ? t("workflow.reviewHelp")
+                : t(
+                    operation.status === "SUCCEEDED"
+                      ? "observedHelp"
+                      : operation.status === "UNCERTAIN"
+                        ? "uncertainHelp"
+                        : operation.status === "CANCELLED"
+                          ? "cancelledHelp"
+                          : operation.status === "FAILED"
+                            ? "failedHelp"
+                            : "acceptedHelp"
+                  )}
         </p>
       </div>
       <DefinitionList
@@ -165,6 +171,12 @@ export function NvkeOperationScreen({
           },
         ]}
       />
+      {operatorJob && (
+        <NvkeOperatorJobPanel
+          {...operatorJob}
+          canManage={operatorJob.canManage && canAct && !error && (!pending || operatorJob.pending)}
+        />
+      )}
       {diagnostics && <NvkeDiagnosticsPanel {...diagnostics} />}
       {maintenance && <NvkeMaintenancePanel {...maintenance} />}
       {credentials && <NvkeCredentialPanel {...credentials} />}
@@ -186,15 +198,17 @@ export function NvkeOperationScreen({
               : "cancelOperation"
         )}
         description={
-          native && confirm !== "download"
-            ? t(confirm === "resume" ? "workflow.resumeHelp" : "workflow.cancelHelp")
-            : t(
-                confirm === "resume"
-                  ? "reconcileHelp"
-                  : confirm === "download"
-                    ? "resultHelp"
-                    : "cancelHelp"
-              )
+          tooling && confirm === "cancel"
+            ? t("operatorJob.cancelHelp")
+            : native && confirm !== "download"
+              ? t(confirm === "resume" ? "workflow.resumeHelp" : "workflow.cancelHelp")
+              : t(
+                  confirm === "resume"
+                    ? "reconcileHelp"
+                    : confirm === "download"
+                      ? "resultHelp"
+                      : "cancelHelp"
+                )
         }
         destructive={confirm === "cancel"}
         confirmDisabled={!allowed || (confirm === "resume" && !canResume)}

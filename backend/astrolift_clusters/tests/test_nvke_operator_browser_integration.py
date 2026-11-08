@@ -257,3 +257,33 @@ async def test_browser_native_generation_recovers_lost_admission_without_replay(
             assert len(logs) == 1
             assert "browser-private-native-site" not in str(logs[0].variables)
             assert "nodes.csv" not in str(logs[0].variables)
+            row.status = "uncertain"
+            await sync_to_async(row.save)(update_fields=["status", "version"])
+            reviewed_version = row.version
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [shutil.which("node"), str(FRONTEND / "e2e/nvke-job-connected-runner.mjs")],
+                input=json.dumps({**config, "operationId": str(row.guid)}),
+                capture_output=True,
+                text=True,
+                timeout=100,
+                check=False,
+                env=os.environ.copy(),
+            )
+            assert issued.plaintext not in result.stdout + result.stderr
+            assert "PRIVATE KEY" not in result.stdout + result.stderr
+            assert result.returncode == 0, result.stderr
+            inspected = json.loads(result.stdout)
+            assert inspected["operationId"] == str(row.guid)
+            assert inspected["privateArtifactVerified"] and inspected["chunks"] > 0
+            assert inspected["reconciliations"] == 1
+            await sync_to_async(row.refresh_from_db)()
+            assert row.status == "succeeded" and row.version > reviewed_version
+            assert len(list((state.agent.root / "state/workspace/runs").glob("*/started.json"))) == 1
+            reconciliations = await sync_to_async(list)(
+                MutationAuditLog.objects.filter(
+                    organization_id=state.world.org.pk, operation="nvke.operator_reconcile"
+                )
+            )
+            assert len(reconciliations) == 1
+            assert "browser-private-native-site" not in str(reconciliations[0].variables)

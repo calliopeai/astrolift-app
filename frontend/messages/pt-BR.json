@@ -17590,6 +17590,32 @@
     "expand": "Ampliar"
   },
   "nvke": {
+    "operatorJob": {
+      "effectful": "Pode alterar a infraestrutura",
+      "agentCancellation": "Cancelamento solicitado ao agente",
+      "nativeRecovered": "Recuperado do recibo nativo retido",
+      "receiptDigest": "SHA-256 dos metadados do recibo",
+      "title": "Trabalho nativo original",
+      "help": "Inspecione o recibo original do agente e baixe os artefatos privados após revisar a identidade e o hash.",
+      "artifacts": "Artefatos privados",
+      "size": "Bytes",
+      "download": "Baixar arquivo privado",
+      "load": "Ler recibo original",
+      "reconcile": "Conciliar trabalho original",
+      "cancelDownload": "Cancelar download",
+      "progress": "Transferência verificada: {completed} de {total} bytes.",
+      "unloaded": "Leia o recibo original para inspecionar este trabalho. São necessários permissão de operador e um agente verificado vigente.",
+      "receiptState": "Estado do recibo do agente",
+      "exitCode": "Código de saída nativo",
+      "maximum": "Tamanho máximo (MiB, 1–256)",
+      "empty": "Nenhum artefato retido",
+      "review": "Site {site}, versão {siteVersion}. Operação original {operation}, versão {operationVersion}. Agente versão {authorityVersion}, instância {instance}, pacote {bundle}, revisão nativa {revision}.",
+      "downloadHelp": "Este arquivo pode conter saída nativa privada. O download é oferecido somente após verificar cada intervalo e o SHA-256 completo do artefato revisado.",
+      "reconcileHelp": "Observe o trabalho original com a fonte revisada e concilie o resultado registrado. Esta ação não inicia um novo processo nem repete alterações de infraestrutura.",
+      "processHelp": "Este estado descreve o processo nativo original. A prontidão da infraestrutura e os efeitos remotos restantes exigem verificações separadas.",
+      "cancelHelp": "O cancelamento solicita parar o processo original enquanto seu observador está ativo. Efeitos remotos podem permanecer; inspecione trabalhos incertos antes de outras alterações.",
+      "tooLarge": "O artefato excede o limite de memória revisado. Escolha um limite permitido maior ou use a exportação em fluxo do CLI."
+    },
     "operatorWorkbench": {
       "title": "Ferramentas nativas",
       "help": "Execute comandos fixados pelo agente verificado do site. Revise cada solicitação antes de enviar.",

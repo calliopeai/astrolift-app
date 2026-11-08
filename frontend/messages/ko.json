@@ -17590,6 +17590,32 @@
     "expand": "확대"
   },
   "nvke": {
+    "operatorJob": {
+      "effectful": "인프라 변경 가능",
+      "agentCancellation": "에이전트 취소 요청",
+      "nativeRecovered": "보존된 네이티브 수신 기록에서 복구",
+      "receiptDigest": "수신 기록 메타데이터 SHA-256",
+      "title": "원래 네이티브 작업",
+      "help": "원래 에이전트 수신 기록을 검사하고 ID와 해시를 검토한 뒤 비공개 산출물을 다운로드합니다.",
+      "artifacts": "비공개 산출물",
+      "size": "바이트",
+      "download": "비공개 파일 다운로드",
+      "load": "원래 수신 기록 읽기",
+      "reconcile": "원래 작업 조정",
+      "cancelDownload": "다운로드 취소",
+      "progress": "검증된 전송: {total}바이트 중 {completed}바이트.",
+      "unloaded": "작업을 검사하려면 원래 수신 기록을 읽으세요. 운영자 권한과 현재 검증된 에이전트가 필요합니다.",
+      "receiptState": "에이전트 수신 기록 상태",
+      "exitCode": "네이티브 종료 코드",
+      "maximum": "최대 파일 크기 (MiB, 1–256)",
+      "empty": "보존된 산출물 없음",
+      "review": "사이트 {site}, 버전 {siteVersion}. 원래 작업 {operation}, 버전 {operationVersion}. 에이전트 버전 {authorityVersion}, 인스턴스 {instance}, 번들 {bundle}, 네이티브 리비전 {revision}.",
+      "downloadHelp": "파일에 비공개 네이티브 출력이 포함될 수 있습니다. 모든 범위와 전체 SHA-256이 검토된 산출물과 일치한 뒤 다운로드합니다.",
+      "reconcileHelp": "검토된 소스로 원래 작업을 관찰하고 기록된 결과를 조정합니다. 새 프로세스를 시작하거나 인프라 변경을 반복하지 않습니다.",
+      "processHelp": "원래 네이티브 프로세스의 상태입니다. 인프라 준비 상태와 남은 원격 영향은 별도로 확인해야 합니다.",
+      "cancelHelp": "관찰자가 활성 상태일 때 취소는 원래 프로세스의 중지를 요청합니다. 원격 영향이 남을 수 있으므로 추가 변경 전에 불확실한 작업을 검사하세요.",
+      "tooLarge": "산출물이 검토된 메모리 제한을 초과합니다. 허용된 범위에서 제한을 늘리거나 CLI 스트리밍 내보내기를 사용하세요."
+    },
     "operatorWorkbench": {
       "title": "네이티브 도구",
       "help": "검증된 사이트 에이전트로 고정된 명령을 실행합니다. 제출 전에 각 요청을 검토하세요.",

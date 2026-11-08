@@ -53,6 +53,25 @@ const validMetadata = (value: unknown): value is NvkeOperatorAgentAuthority => {
   );
 };
 
+export const operatorAuthorityMetadata = (value: unknown): NvkeOperatorAgentAuthority | null => {
+  if (!validMetadata(value)) return null;
+  return {
+    id: value.id,
+    version: value.version,
+    siteId: value.siteId,
+    siteVersion: value.siteVersion,
+    endpoint: value.endpoint,
+    instanceId: value.instanceId,
+    bundleManifestSha256: value.bundleManifestSha256,
+    isEnabled: value.isEnabled,
+    timeoutSeconds: value.timeoutSeconds,
+    hasCredentials: value.hasCredentials,
+    verifiedAt: value.verifiedAt,
+    verificationCode: value.verificationCode,
+    deletedAt: value.deletedAt,
+  };
+};
+
 export const useNvkeOperatorAgent = (args: {
   context: ReturnType<typeof useNvkeContext>;
   scopeKey: string;

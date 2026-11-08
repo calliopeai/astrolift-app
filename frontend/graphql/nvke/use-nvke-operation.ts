@@ -30,6 +30,7 @@ import { useNvkeMaintenance } from "./use-nvke-maintenance";
 import { useNvkeProviders } from "./use-nvke-providers";
 import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
+import { useNvkeOperatorJob } from "./use-nvke-operator-job";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
 
@@ -168,12 +169,21 @@ export const useNvkeOperation = (
     enabled: !loading && !failed,
     onRefresh: refresh,
   });
+  const operatorJob = useNvkeOperatorJob({
+    context,
+    scopeKey: visitKey,
+    site: site.data?.astroliftNvkeSite?.id === siteId ? site.data.astroliftNvkeSite : null,
+    operation,
+    enabled: !loading && !failed && !(mutation?.key === visitKey && mutation.pending),
+    onRefresh: refresh,
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
       !canAct ||
       !operation ||
       busy.current ||
+      operatorJob?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -219,6 +229,7 @@ export const useNvkeOperation = (
   return {
     scopeKey: visitKey,
     operation,
+    operatorJob,
     diagnostics,
     maintenance,
     credentials,
@@ -229,14 +240,14 @@ export const useNvkeOperation = (
     siteName: site.data?.astroliftNvkeSite?.name ?? "",
     loading,
     error: failed ? t("readFailed") : mutation?.key === visitKey ? mutation.error : null,
-    pending: mutation?.key === visitKey && mutation.pending,
+    pending: (mutation?.key === visitKey && mutation.pending) || Boolean(operatorJob?.pending),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
     onRefresh: refresh,
     onCancel: () => control(false),
     onResume: () => control(true),
     onDownload: async () => {
-      if (!current() || !canAct || busy.current || !operation) return;
+      if (!current() || !canAct || busy.current || operatorJob?.pending || !operation) return;
       busy.current = true;
       setMutation({ key: visitKey, pending: true, error: null });
       try {

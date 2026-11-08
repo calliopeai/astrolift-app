@@ -2,13 +2,15 @@ import { useMemo } from "react";
 import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type { GetNvkeSiteQuery } from "@/graphql/__generated__/operations";
+import type { GetNvkeSiteQuery, GetNvkeOperationQuery } from "@/graphql/__generated__/operations";
 import { useNvkeOperatorAgent } from "@/graphql/nvke/use-nvke-operator-agent";
 import { useNvkeOperatorWorkbench } from "@/graphql/nvke/use-nvke-operator-workbench";
+import { useNvkeOperatorJob } from "@/graphql/nvke/use-nvke-operator-job";
 import { useNvkeRead } from "@/graphql/nvke/use-scoped-read";
-import { GET_NVKE_SITE } from "@/graphql/nvke/nvke.queries";
+import { GET_NVKE_SITE, GET_NVKE_OPERATION } from "@/graphql/nvke/nvke.queries";
 import { NvkeOperatorAgentPanel } from "./NvkeOperatorAgentPanel";
 import { NvkeOperatorWorkbench } from "./NvkeOperatorWorkbench";
+import { NvkeOperationScreen } from "./NvkeOperationScreen";
 
 type Qualification = {
   endpoint: string;
@@ -16,6 +18,7 @@ type Qualification = {
   organizationId: string;
   actorId: number;
   siteId: string;
+  operationId?: string;
 };
 declare global {
   interface Window {
@@ -27,7 +30,7 @@ function ConnectedPanel({
   mode,
 }: {
   config: Qualification;
-  mode: "authority" | "workbench";
+  mode: "authority" | "workbench" | "operation";
 }) {
   const context = {
     scope: {
@@ -63,6 +66,51 @@ function ConnectedPanel({
     onRefresh: site.refresh,
     onJournalChange: () => {},
   });
+  const operation = useNvkeRead<GetNvkeOperationQuery>(
+    GET_NVKE_OPERATION,
+    { operationId: config.operationId },
+    mode === "operation" && config.operationId
+      ? JSON.stringify([context.scopeKey, config.operationId])
+      : "",
+    0,
+    config.organizationId
+  );
+  const refreshOperation = () => {
+    operation.refresh();
+    site.refresh();
+  };
+  const job = useNvkeOperatorJob({
+    context,
+    scopeKey: context.scopeKey,
+    site: site.data?.astroliftNvkeSite ?? null,
+    operation: operation.data?.astroliftNvkeOperation ?? null,
+    enabled:
+      mode === "operation" &&
+      !site.loading &&
+      !site.failed &&
+      !operation.loading &&
+      !operation.failed,
+    onRefresh: refreshOperation,
+  });
+  if (mode === "operation")
+    return (
+      <NvkeOperationScreen
+        operation={operation.data?.astroliftNvkeOperation ?? null}
+        siteName={site.data?.astroliftNvkeSite?.name ?? ""}
+        loading={site.loading || operation.loading}
+        error={
+          site.failed || operation.failed ? "Local qualification source is unavailable." : null
+        }
+        pending={job?.pending ?? false}
+        canAct={context.access.admin}
+        canResume={false}
+        onRefresh={refreshOperation}
+        onCancel={async () => false}
+        onResume={async () => false}
+        onDownload={async () => {}}
+        operatorJob={job}
+      />
+    );
   if (mode === "workbench")
     return workbench ? (
       <NvkeOperatorWorkbench {...workbench} />
@@ -75,7 +123,11 @@ function ConnectedPanel({
     <p>Waiting for local qualification source.</p>
   );
 }
-function LocalQualification({ mode = "authority" }: { mode?: "authority" | "workbench" }) {
+function LocalQualification({
+  mode = "authority",
+}: {
+  mode?: "authority" | "workbench" | "operation";
+}) {
   const config = typeof window === "undefined" ? undefined : window.__NVKE_LOCAL_AGENT__;
   const client = useMemo(() => {
     if (!config) return null;
@@ -119,3 +171,4 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Connected: Story = {};
 export const Workbench: Story = { args: { mode: "workbench" } };
+export const Operation: Story = { args: { mode: "operation" } };

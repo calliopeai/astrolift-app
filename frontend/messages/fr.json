@@ -17593,6 +17593,32 @@
     "expand": "Agrandir"
   },
   "nvke": {
+    "operatorJob": {
+      "effectful": "Peut modifier l’infrastructure",
+      "agentCancellation": "Annulation demandée à l’agent",
+      "nativeRecovered": "Récupéré depuis le reçu natif conservé",
+      "receiptDigest": "SHA-256 des métadonnées du reçu",
+      "title": "Tâche native initiale",
+      "help": "Inspectez le reçu initial de l’agent et téléchargez ses artefacts privés après vérification de leur identité et empreinte.",
+      "artifacts": "Artefacts privés",
+      "size": "Octets",
+      "download": "Télécharger le fichier privé",
+      "load": "Lire le reçu initial",
+      "reconcile": "Réconcilier la tâche initiale",
+      "cancelDownload": "Annuler le téléchargement",
+      "progress": "Transfert vérifié : {completed} sur {total} octets.",
+      "unloaded": "Lisez le reçu initial pour inspecter cette tâche. Une permission opérateur et un agent actuellement vérifié sont requis.",
+      "receiptState": "État du reçu de l’agent",
+      "exitCode": "Code de sortie natif",
+      "maximum": "Taille maximale (MiB, 1–256)",
+      "empty": "Aucun artefact conservé",
+      "review": "Site {site}, version {siteVersion}. Opération initiale {operation}, version {operationVersion}. Agent version {authorityVersion}, instance {instance}, paquet {bundle}, révision native {revision}.",
+      "downloadHelp": "Ce fichier peut contenir une sortie native privée. Le téléchargement est proposé après vérification de chaque plage et du SHA-256 complet de l’artefact examiné.",
+      "reconcileHelp": "Observez la tâche initiale avec la source examinée et réconciliez son résultat enregistré. Cette action ne lance aucun nouveau processus et ne répète pas les modifications d’infrastructure.",
+      "processHelp": "Cet état décrit le processus natif initial. La disponibilité de l’infrastructure et les effets distants restants nécessitent des contrôles distincts.",
+      "cancelHelp": "L’annulation demande l’arrêt du processus initial tant que son observateur est actif. Des effets distants peuvent subsister ; inspectez les tâches incertaines avant toute modification.",
+      "tooLarge": "L’artefact dépasse la limite mémoire examinée. Choisissez une limite autorisée plus élevée ou utilisez l’export en flux du CLI."
+    },
     "operatorWorkbench": {
       "title": "Outils natifs",
       "help": "Exécutez les commandes épinglées via l’agent vérifié du site. Vérifiez chaque demande avant envoi.",

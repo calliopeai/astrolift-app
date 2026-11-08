@@ -4,6 +4,20 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-operation--operator-job",
+  "screens-nvke-operation--operator-job-read-only",
+  "screens-nvke-operation--operator-job-uncertain",
+  "screens-nvke-operator-job--full",
+  "screens-nvke-operator-job--unloaded",
+  "screens-nvke-operator-job--empty",
+  "screens-nvke-operator-job--loading",
+  "screens-nvke-operator-job--read-only",
+  "screens-nvke-operator-job--uncertain",
+  "screens-nvke-operator-job--missing-receipt",
+  "screens-nvke-operator-job--downloading",
+  "screens-nvke-operator-job--failure",
+  "screens-nvke-operator-job--long-strings",
+  "screens-nvke-operator-job--width-768",
   "screens-nvke-site--operator-workbench",
   "screens-nvke-site--operator-workbench-read-only",
   "screens-nvke-site--operator-workbench-pending",
@@ -767,4 +781,56 @@ test("operator workbench infrastructure changes require acknowledgement", async 
   await page.getByRole("button", { name: "Review change", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toContainText("may change infrastructure");
   await expect(page.getByRole("alertdialog")).toContainText("Observation deadline 7200 seconds");
+});
+
+test("operator job artifact review names original pins and freezes the memory budget", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-job--full&viewMode=story");
+  await page.getByLabel("Maximum file size (MiB, 1–256)", { exact: true }).fill("128");
+  await page
+    .getByRole("row")
+    .filter({ has: page.getByText("stdout", { exact: true }) })
+    .getByRole("button", { name: "Download private file", exact: true })
+    .click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("128 MiB");
+  await expect(review).toContainText("a".repeat(64));
+  await expect(review).toContainText("123e4567-e89b-12d3-a456-426614174092");
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+    await Promise.all(
+      document.getAnimations().map((animation) => animation.finished.catch(() => {}))
+    );
+  });
+  await page.screenshot({
+    animations: "disabled",
+    path: testInfo.outputPath("operator-artifact-review.png"),
+    fullPage: true,
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await review.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(review).not.toBeVisible();
+});
+
+test("operator job reconciliation reviews observation-only original identity", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-job--uncertain&viewMode=story");
+  await page.getByRole("button", { name: "Reconcile original job", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("admits no new native process");
+  await expect(review).toContainText("Original operation 123e4567-e89b-12d3-a456-426614174003");
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(review).not.toBeVisible();
+});
+
+test("operator job oversized artifacts refuse before review within a narrow viewport", async ({
+  page,
+}) => {
+  await page.goto("/iframe.html?id=screens-nvke-operator-job--long-strings&viewMode=story");
+  await page.getByRole("button", { name: "Download private file", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

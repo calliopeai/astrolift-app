@@ -17593,6 +17593,32 @@
     "expand": "Ampliar"
   },
   "nvke": {
+    "operatorJob": {
+      "effectful": "Puede cambiar la infraestructura",
+      "agentCancellation": "Cancelación solicitada al agente",
+      "nativeRecovered": "Recuperado desde el recibo nativo conservado",
+      "receiptDigest": "SHA-256 de metadatos del recibo",
+      "title": "Trabajo nativo original",
+      "help": "Inspeccione el recibo original del agente y descargue sus artefactos privados tras revisar su identidad y hash.",
+      "artifacts": "Artefactos privados",
+      "size": "Bytes",
+      "download": "Descargar archivo privado",
+      "load": "Leer recibo original",
+      "reconcile": "Conciliar trabajo original",
+      "cancelDownload": "Cancelar descarga",
+      "progress": "Transferencia verificada: {completed} de {total} bytes.",
+      "unloaded": "Lea el recibo original para inspeccionar este trabajo. Se requieren permiso de operador y un agente verificado vigente.",
+      "receiptState": "Estado del recibo del agente",
+      "exitCode": "Código de salida nativo",
+      "maximum": "Tamaño máximo (MiB, 1–256)",
+      "empty": "Sin artefactos conservados",
+      "review": "Sitio {site}, versión {siteVersion}. Operación original {operation}, versión {operationVersion}. Agente versión {authorityVersion}, instancia {instance}, paquete {bundle}, revisión nativa {revision}.",
+      "downloadHelp": "Este archivo puede contener salida nativa privada. La descarga se ofrece solo después de verificar todos los rangos y el SHA-256 completo del artefacto revisado.",
+      "reconcileHelp": "Observe el trabajo original con la fuente revisada y concilie su resultado registrado. Esta acción no admite procesos nuevos ni repite cambios de infraestructura.",
+      "processHelp": "Este estado describe el proceso nativo original. La disponibilidad de la infraestructura y los efectos remotos requieren comprobaciones independientes.",
+      "cancelHelp": "La cancelación solicita detener el proceso original mientras su observador está activo. Pueden quedar efectos remotos; inspeccione trabajos inciertos antes de otros cambios.",
+      "tooLarge": "El artefacto supera el límite de memoria revisado. Elija un límite permitido mayor o utilice la exportación en flujo del CLI."
+    },
     "operatorWorkbench": {
       "title": "Herramientas nativas",
       "help": "Ejecute comandos fijados mediante el agente verificado del sitio. Revise cada solicitud antes de enviarla.",

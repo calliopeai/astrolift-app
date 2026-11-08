@@ -9,9 +9,10 @@ This is a local integration under development. Agent connection management is
 wired into the site screen and locally qualified in Storybook and Chromium
 against real GraphQL/Postgres/mTLS. The native command workbench and original-receipt recovery are also wired into
 the site screen and locally browser-qualified for one actual native utility.
-Private browser artifact downloads, reviewed job reconciliation UI, agent-driven
-Linux bootstrap/install, production supply-chain checks and deployed acceptance
-remain separate qualification work.
+Original-job receipt inspection, private browser artifact downloads and reviewed
+read-only reconciliation are implemented locally. Reviewed native stop/fencing,
+agent-driven Linux bootstrap/install, production supply-chain checks and deployed
+acceptance remain separate qualification work.
 
 ## Native tooling in the site screen
 
@@ -39,6 +40,42 @@ browser qualification deliberately drops the admission response, recovers the
 original receipt, and observes exactly one native site-spec generation process
 through real PostgreSQL/Temporal/mTLS. Other native command-family effects need
 separate qualification.
+
+## Inspect and export original jobs
+
+The operation detail screen has an **Original native job** section. **Read original
+receipt** explicitly observes the same site-bound agent and original job UUID.
+Artifact names, decimal byte sizes and SHA-256 digests are server-paginated;
+searches and cursors bind to the caller, operation/site/authority versions,
+physical agent pins and receipt metadata. No native request body or opaque intent
+is returned by this metadata projection.
+
+**Download private file** reviews those source pins, the original artifact name,
+size and full SHA-256. The default browser file limit is 64 MiB, adjustable from
+1 to 256 MiB. Every returned chunk must match the original job/name/size/hash and
+contiguous byte range; the complete file hash must match before a Blob download
+is offered. Cancelling the transfer or changing callers/sources discards the
+partial bytes. Use the CLI streaming export for larger files. Artifact bytes
+never enter UI state, browser storage, URLs or Apollo cache.
+
+For an uncertain operation, **Reconcile original job** acquires the original
+operation lease and observes that same agent/job/intent without launching a
+process. A completed native receipt can update the recorded outcome; completion
+of the native process alone does not establish infrastructure readiness.
+A `not_found` receipt is only an observation of absence: a delayed original PUT
+can still arrive. Reconciliation therefore keeps the operation uncertain and
+preserves its infrastructure intent fence. A durable native-agent stop/fence
+capability is still required to settle such an absent admission safely.
+The existing generic cancellation request is consumed by an active observer;
+reviewed stop/fencing after that observer has closed remains open.
+
+The local browser qualification generates a native site spec, deliberately loses
+its admission response, recovers the original request receipt, downloads and
+independently verifies the real private stdout artifact, and reconciles that same
+job. Reconciliation starts from an explicitly marked uncertain fixture after the
+native job completed; no natural infrastructure uncertainty is claimed. Exactly
+one native process remains recorded across admission recovery, download and
+reconciliation.
 
 ## Connect an agent
 

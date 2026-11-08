@@ -17590,6 +17590,32 @@
     "expand": "Expand"
   },
   "nvke": {
+    "operatorJob": {
+      "effectful": "Can change infrastructure",
+      "agentCancellation": "Agent cancellation requested",
+      "nativeRecovered": "Recovered from retained native receipt",
+      "receiptDigest": "Receipt metadata SHA-256",
+      "title": "Original native job",
+      "help": "Inspect the original agent receipt and download its private artifacts after reviewing their identity and hash.",
+      "artifacts": "Private artifacts",
+      "size": "Bytes",
+      "download": "Download private file",
+      "load": "Read original receipt",
+      "reconcile": "Reconcile original job",
+      "cancelDownload": "Cancel download",
+      "progress": "Verified transfer: {completed} of {total} bytes.",
+      "unloaded": "Read the original receipt to inspect this job. Operator permission and current verified agent authority are required.",
+      "receiptState": "Agent receipt state",
+      "exitCode": "Native exit code",
+      "maximum": "Maximum file size (MiB, 1–256)",
+      "empty": "No retained artifacts",
+      "review": "Site {site}, version {siteVersion}. Original operation {operation}, version {operationVersion}. Agent version {authorityVersion}, instance {instance}, bundle {bundle}, native revision {revision}.",
+      "downloadHelp": "This file may contain private native output. A download is offered only after every range and the complete SHA-256 match the reviewed artifact.",
+      "reconcileHelp": "Observe the original job under the reviewed source and settle its recorded outcome. This action admits no new native process and does not repeat infrastructure changes.",
+      "processHelp": "This status describes the original native process. Infrastructure readiness and remaining remote effects require separate checks.",
+      "cancelHelp": "Cancellation requests stopping the original process when its observer is active. Remote effects can remain; inspect uncertain jobs before further changes.",
+      "tooLarge": "The artifact exceeds the reviewed browser memory limit. Choose a larger allowed limit or use the CLI’s streaming export."
+    },
     "operatorWorkbench": {
       "title": "Native tooling",
       "help": "Run pinned commands through the verified site agent. Review every request before submission.",

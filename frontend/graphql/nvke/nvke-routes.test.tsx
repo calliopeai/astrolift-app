@@ -27,6 +27,7 @@ import { PROVIDER_PROPS } from "@/components/screens/nvke/NvkeProvidersPanel.sto
 import { CREDENTIAL_PROPS } from "@/components/screens/nvke/NvkeCredentialPanel.stories";
 import { OPERATOR_AGENT_AUTHORITY } from "@/components/screens/nvke/NvkeOperatorAgentPanel.stories";
 import operatorContract from "@/components/screens/nvke/operator-contract.fixture.json";
+import { OPERATOR_JOB_PROPS } from "@/components/screens/nvke/NvkeOperatorJobPanel.stories";
 import type { NvkeOperatorAgentAuthority } from "@/components/screens/nvke/NvkeOperatorAgentPanel";
 import { METRICS_AUTHORITY } from "@/components/screens/nvke/NvkeMetricsPanel.stories";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
@@ -1723,5 +1724,74 @@ it("uses operator permission for native tooling history and keeps generic resume
   caller.manage = true;
   rerender();
   expect(result.current.canAct).toBe(false);
+  h.client.stop();
+});
+
+it("wires explicit native receipt reads and reviewed reconciliation through the operation hook", async () => {
+  let reconciled = false;
+  const original = {
+    ...OPERATOR_JOB_PROPS.operation,
+    status: "UNCERTAIN",
+    resourceSource: null,
+    providerSource: null,
+  };
+  const h = harness(
+    (request) => {
+      if (request.operationName === "GetNvkeOperation")
+        return {
+          astroliftNvkeOperation: {
+            ...original,
+            status: reconciled ? "SUCCEEDED" : "UNCERTAIN",
+            version: reconciled ? original.version + 1 : original.version,
+          },
+        };
+      if (request.operationName === "GetNvkeOperatorJobPage")
+        return {
+          astroliftNvkeOperatorJobPage: {
+            ok: true,
+            errors: [],
+            data: {
+              ...OPERATOR_JOB_PROPS.receipt!,
+              items: OPERATOR_JOB_PROPS.table.rows,
+              nextCursor: null,
+              totalCount: OPERATOR_JOB_PROPS.table.rows.length,
+            },
+          },
+        };
+      if (request.operationName === "ReconcileNvkeOperatorJob") {
+        reconciled = true;
+        return {
+          reconcileNvkeOperatorJob: {
+            ok: true,
+            errors: [],
+            data: { ...original, status: "SUCCEEDED", version: original.version + 1 },
+          },
+        };
+      }
+      return {};
+    },
+    COLLECTION,
+    SITE,
+    OPERATOR_AGENT_AUTHORITY
+  );
+  const { result } = renderHook(() => useNvkeOperation(SITE.id, original.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.operatorJob?.canManage).toBe(true));
+  expect(h.calls.some((call) => call.operationName === "GetNvkeOperatorJobPage")).toBe(false);
+  act(() => result.current.operatorJob!.onLoad());
+  await waitFor(() => expect(result.current.operatorJob?.canReconcile).toBe(true));
+  await act(async () => expect(await result.current.operatorJob!.onReconcile()).toBe(true));
+  const sent = h.calls.filter((call) => call.operationName === "ReconcileNvkeOperatorJob");
+  expect(sent).toHaveLength(1);
+  expect(sent[0].variables.input).toMatchObject({
+    expectedActorId: 41,
+    expectedSiteVersion: SITE.version,
+    expectedOperationVersion: original.version,
+    expectedAuthorityVersion: OPERATOR_AGENT_AUTHORITY.version,
+  });
+  await waitFor(() => expect(result.current.operation?.status).toBe("SUCCEEDED"));
+  expect(result.current.canResume).toBe(false);
+  expect(h.cache.extract()).toEqual({});
   h.client.stop();
 });

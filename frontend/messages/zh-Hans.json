@@ -17590,6 +17590,32 @@
     "expand": "展开"
   },
   "nvke": {
+    "operatorJob": {
+      "effectful": "可能更改基础设施",
+      "agentCancellation": "已请求代理取消",
+      "nativeRecovered": "从保留的原生回执恢复",
+      "receiptDigest": "回执元数据 SHA-256",
+      "title": "原始原生任务",
+      "help": "检查原始代理回执，并在核对标识和哈希后下载私有产物。",
+      "artifacts": "私有产物",
+      "size": "字节",
+      "download": "下载私有文件",
+      "load": "读取原始回执",
+      "reconcile": "核对原始任务",
+      "cancelDownload": "取消下载",
+      "progress": "已验证传输：{total} 字节中的 {completed} 字节。",
+      "unloaded": "请读取原始回执来检查任务。需要操作员权限及当前已验证的代理。",
+      "receiptState": "代理回执状态",
+      "exitCode": "原生退出代码",
+      "maximum": "最大文件大小（MiB，1–256）",
+      "empty": "没有保留的产物",
+      "review": "站点 {site}，版本 {siteVersion}。原始操作 {operation}，版本 {operationVersion}。代理版本 {authorityVersion}，实例 {instance}，软件包 {bundle}，原生修订版 {revision}。",
+      "downloadHelp": "此文件可能包含私有原生输出。只有所有字节范围及完整 SHA-256 与审核产物匹配后才会提供下载。",
+      "reconcileHelp": "使用审核过的数据源观察原始任务并核对其记录结果。此操作不会启动新的原生进程，也不会重复基础设施变更。",
+      "processHelp": "此状态描述原始原生进程。基础设施就绪情况及剩余远程影响需要单独检查。",
+      "cancelHelp": "观察程序处于活动状态时，取消会请求停止原始进程。远程影响可能仍然存在；进一步变更前请检查不确定的任务。",
+      "tooLarge": "产物超过审核的内存限制。请选择允许范围内更高的限制，或使用 CLI 流式导出。"
+    },
     "operatorWorkbench": {
       "title": "原生工具",
       "help": "通过已验证的站点代理运行固定命令。提交前请审核每个请求。",

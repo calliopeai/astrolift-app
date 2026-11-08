@@ -17593,6 +17593,32 @@
     "expand": "Vergrößern"
   },
   "nvke": {
+    "operatorJob": {
+      "effectful": "Kann Infrastruktur ändern",
+      "agentCancellation": "Agentabbruch angefordert",
+      "nativeRecovered": "Aus gespeichertem nativen Beleg wiederhergestellt",
+      "receiptDigest": "SHA-256 der Belegmetadaten",
+      "title": "Ursprünglicher nativer Auftrag",
+      "help": "Prüfen Sie den ursprünglichen Agentbeleg und laden Sie private Artefakte nach Prüfung von Identität und Hash herunter.",
+      "artifacts": "Private Artefakte",
+      "size": "Bytes",
+      "download": "Private Datei herunterladen",
+      "load": "Ursprünglichen Beleg lesen",
+      "reconcile": "Ursprünglichen Auftrag abgleichen",
+      "cancelDownload": "Download abbrechen",
+      "progress": "Geprüfte Übertragung: {completed} von {total} Bytes.",
+      "unloaded": "Lesen Sie den ursprünglichen Beleg zur Prüfung dieses Auftrags. Operatorberechtigung und aktuell verifizierter Agent sind erforderlich.",
+      "receiptState": "Status des Agentbelegs",
+      "exitCode": "Nativer Exitcode",
+      "maximum": "Maximale Dateigröße (MiB, 1–256)",
+      "empty": "Keine gespeicherten Artefakte",
+      "review": "Standort {site}, Version {siteVersion}. Ursprüngliche Operation {operation}, Version {operationVersion}. Agentversion {authorityVersion}, Instanz {instance}, Paket {bundle}, native Revision {revision}.",
+      "downloadHelp": "Diese Datei kann private native Ausgaben enthalten. Der Download wird erst angeboten, wenn alle Bereiche und der vollständige SHA-256 zum geprüften Artefakt passen.",
+      "reconcileHelp": "Beobachten Sie den ursprünglichen Auftrag mit der geprüften Quelle und gleichen Sie das gespeicherte Ergebnis ab. Dies startet keinen neuen nativen Prozess und wiederholt keine Infrastrukturänderungen.",
+      "processHelp": "Dieser Status beschreibt den ursprünglichen nativen Prozess. Infrastrukturbereitschaft und verbleibende entfernte Auswirkungen erfordern eigene Prüfungen.",
+      "cancelHelp": "Ein Abbruch fordert das Stoppen des ursprünglichen Prozesses bei aktivem Beobachter an. Entfernte Auswirkungen können bleiben; prüfen Sie ungeklärte Aufträge vor weiteren Änderungen.",
+      "tooLarge": "Das Artefakt überschreitet das geprüfte Speicherlimit. Wählen Sie ein höheres erlaubtes Limit oder den Streaming-Export des CLI."
+    },
     "operatorWorkbench": {
       "title": "Native Werkzeuge",
       "help": "Führen Sie festgelegte Befehle über den verifizierten Standortagenten aus. Prüfen Sie jede Anfrage vor dem Senden.",
