@@ -103,3 +103,25 @@ export const Diagnostics: Story = {
     },
   },
 };
+
+export const NativeWorkflow: Story = {
+  args: {
+    operation: {
+      ...OPERATION,
+      operationKey: "temporal.RenewK8sCertsV2",
+      status: "SUCCEEDED",
+      stage: "native_workflow_completed",
+    },
+  },
+};
+export const NativeResetUnconfirmed: Story = {
+  args: {
+    operation: {
+      ...OPERATION,
+      operationKey: "temporal.reset.RotateEtcdEncryptionKey",
+      status: "UNCERTAIN",
+      stage: "native_reset_review_required",
+      errorCode: "RESET_UNCONFIRMED",
+    },
+  },
+};

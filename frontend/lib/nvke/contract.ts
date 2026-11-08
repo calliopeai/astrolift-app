@@ -53,3 +53,14 @@ export function nativeTemplateText(action: NvkeActionView): string {
     request.resource_version = "";
   return JSON.stringify(request, null, 2);
 }
+
+export const nativeMaintenancePermission = (key: string | undefined) =>
+  key &&
+  [
+    "temporal.RenewK8sCertsV2",
+    "temporal.RotateEtcdEncryptionKey",
+    "temporal.RetireLostEtcdRotationNode",
+    "temporal.reset.RotateEtcdEncryptionKey",
+  ].includes(key)
+    ? "nvke.admin"
+    : null;

@@ -26,7 +26,7 @@ import { useNvkeOperation } from "./use-nvke-operation";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
-const caller = vi.hoisted(() => ({ actorId: 41, manage: true }));
+const caller = vi.hoisted(() => ({ actorId: 41, manage: true, admin: true }));
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
 vi.mock("./nvke.hooks", async (original) => {
@@ -42,7 +42,7 @@ vi.mock("./nvke.hooks", async (original) => {
       return {
         scope,
         scopeKey: JSON.stringify([scope.server, scope.organizationId, scope.actorId]),
-        access: { read: true, manage: caller.manage, admin: true, loading: false },
+        access: { read: true, manage: caller.manage, admin: caller.admin, loading: false },
         loading: false,
         failed: false,
       };
@@ -63,6 +63,7 @@ beforeEach(() => {
   localStorage.clear();
   caller.actorId = 41;
   caller.manage = true;
+  caller.admin = true;
   navigation.push.mockReset();
   vi.stubGlobal("navigator", {
     locks: {
@@ -1267,4 +1268,88 @@ it("suppresses a late diagnostic summary across actor A to B to A", async () => 
   });
   expect(result.current.diagnostics?.observation?.summary.requestedAddress).toBe("new-visit.test");
   expect(h.cache.extract()).toEqual({});
+});
+
+it.each([
+  "temporal.RenewK8sCertsV2",
+  "temporal.RotateEtcdEncryptionKey",
+  "temporal.RetireLostEtcdRotationNode",
+  "temporal.reset.RotateEtcdEncryptionKey",
+])(
+  "allows native operation controls through explicit admin authority for %s",
+  async (operationKey) => {
+    const h = harness(() => ({
+      astroliftNvkeOperation: { ...OPERATION, operationKey, status: "UNCERTAIN" },
+    }));
+    const { result, rerender } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+      wrapper: h.wrapper,
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.canAct).toBe(true);
+    expect(result.current.canResume).toBe(true);
+    caller.admin = false;
+    rerender();
+    await waitFor(() => expect(result.current.canAct).toBe(false));
+    expect(result.current.canResume).toBe(false);
+    expect(h.calls.some((call) => call.operationName?.includes("Result"))).toBe(false);
+    h.client.stop();
+  }
+);
+it("does not infer permission for an unknown temporal operation", async () => {
+  const h = harness(() => ({
+    astroliftNvkeOperation: { ...OPERATION, operationKey: "temporal.UnknownWorkflow" },
+  }));
+  const { result } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.canAct).toBe(false);
+  h.client.stop();
+});
+
+it("does not download a native result whose administrator authority was revoked during the read", async () => {
+  let release!: (value: Record<string, unknown>) => void;
+  const late = new Promise<Record<string, unknown>>((resolve) => {
+    release = resolve;
+  });
+  const create = vi.fn(() => "blob:native-result");
+  const previous = Object.getOwnPropertyDescriptor(URL, "createObjectURL");
+  Object.defineProperty(URL, "createObjectURL", { value: create, configurable: true });
+  const h = harness((operation) =>
+    operation.operationName === "GetNvkeOperationResultText"
+      ? late
+      : { astroliftNvkeOperation: { ...OPERATION, operationKey: "temporal.RenewK8sCertsV2" } }
+  );
+  try {
+    const { result, rerender } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+      wrapper: h.wrapper,
+    });
+    await waitFor(() => expect(result.current.canAct).toBe(true));
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.onDownload();
+    });
+    await waitFor(() =>
+      expect(h.calls.some((call) => call.operationName === "GetNvkeOperationResultText")).toBe(true)
+    );
+    caller.admin = false;
+    rerender();
+    await waitFor(() => expect(result.current.canAct).toBe(false));
+    await act(async () => {
+      release({
+        astroliftNvkeOperationResultText: {
+          ok: true,
+          errors: [],
+          data: '{"private":"PRIVATE_NATIVE_RESULT"}',
+        },
+      });
+      await pending;
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(h.cache.extract()).toEqual({});
+  } finally {
+    h.client.stop();
+    if (previous) Object.defineProperty(URL, "createObjectURL", previous);
+    else delete (URL as unknown as Record<string, unknown>).createObjectURL;
+  }
 });

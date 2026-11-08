@@ -535,7 +535,8 @@ The history response guard binds site/authority/source versions, cluster, owner
 and native run before publishing a page. It rejects inexact IDs, out-of-order
 events, invalid scheduling references and mismatched pages. Native status and
 controller-recorded state remain separate. These are browser protocol foundations;
-Storybook workflow/history/reset forms and application wiring are still pending.
+Storybook workflow/history/reset forms are fixture-qualified; their application
+query/admission wiring remains pending.
 
 The real browser journal qualification runs without a live NVKE site:
 
@@ -549,3 +550,44 @@ The Playwright fixture serves the application protocol modules in an owned
 loopback origin and exercises actual Web Locks/localStorage across two tabs.
 Its admission/receipt callbacks are fixtures; it does not qualify native node
 work, deployed UI or backend workflow execution.
+
+
+### Browser maintenance review components
+
+The Storybook `NvkeWorkflowPanel` provides all three pinned native workflow
+choices and their JSON/schema editor, owner-history selection and cursor-list
+presentation, and reviewed rotation reset forms. It is not yet wired into the
+application's cluster observation page. Its callbacks are fixtures until the
+scope-fenced query/admission hook is connected and qualified.
+
+Workflow input text remains verbatim. The selected cluster must match the source
+observation; retirement additionally names the exact retained rotation owner and
+node and requires permanent-removal acknowledgement. Renewal confirmation shows
+force/schedule metadata. Unsafe-size integer input is not rounded into its
+confirmation; the original JSON remains authoritative and backend-validated.
+
+A reset proposal starts from an inspected scheduled activity, retaining exact
+string run/activity/workflow-task IDs and the recorded phase. Begin is not a
+selectable shortcut. A mode must be chosen explicitly, with guidance about the
+original rewrite deadline, old-operation termination and survivor retirement.
+Both boundary review and stopped conflicting node-work attestations are required.
+Changing mode clears those attestations. Rationale/evidence stay out of
+confirmation text and clear on closing/submission or scope/authority/source/run
+changes. Completed, running, stale, mismatched or unauthorized history cannot
+propose a reset. Backend phase/history proof remains the dispatch authority;
+activity selection is not a client-side safety proof.
+
+Native receipt pages now map the four declared maintenance operation keys to
+`nvke.admin`, in addition to the read access required to enter the page. Arbitrary
+Temporal names do not inherit this mapping. Capability changes invalidate pending
+private result reads, including administrator revocation within the same actor
+visit. Native completion copy does not certify site health; cancellation and
+reconciliation explain the native owner/lock and no-replay semantics.
+
+Local verification includes form interactions, all eight locale catalogs,
+Storybook render/build, the production Next build and browser checks of metadata,
+exact IDs, private-field clearing, accessibility and narrow layouts. These checks
+use callback fixtures and do not qualify live native controller or node changes.
+The next wiring work must retain original receipt lookup, storage/authority
+failures and definitive pre-admission rejection recovery, and must bind cursor
+pages to one inspected native run before exposing a reset proposal.

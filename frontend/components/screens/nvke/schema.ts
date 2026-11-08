@@ -66,3 +66,45 @@ export const temporalAuthoritySchema = z
       v.credentialMode !== "replace" || Boolean(v.clientCertificatePem) === Boolean(v.clientKeyPem)
   )
   .refine((v) => v.useTls || (!v.serverName && v.credentialMode !== "replace"));
+
+const nativePrivateText = z
+  .string()
+  .refine(
+    (value) =>
+      Boolean(value.trim()) &&
+      new TextEncoder().encode(value).length <= 4000 &&
+      !/[\p{C}\p{Z}]/u.test(value.replace(/[ \n\r\t]/g, ""))
+  );
+export const nativeWorkflowFormSchema = z.object({
+  parametersText: z
+    .string()
+    .min(2)
+    .refine((value) => new TextEncoder().encode(value).length <= 65536),
+  timeoutSeconds: z.number().int().min(30).max(86400),
+  acknowledgeLostNodeTeardown: z.boolean(),
+});
+export const nativeResetFormSchema = z
+  .object({
+    mode: z
+      .string()
+      .refine((value) =>
+        ["retry_activity", "restart_rewrite", "resume_rewrite", "refresh_survivors"].includes(value)
+      ),
+    rationale: nativePrivateText,
+    quiescenceEvidence: nativePrivateText,
+    acknowledgeBoundaryReviewed: z.boolean().refine((value) => value),
+    acknowledgeConflictingWorkStopped: z.boolean().refine((value) => value),
+    retirementWorkflowId: z
+      .string()
+      .refine(
+        (value) =>
+          value === "" ||
+          (Boolean(value.trim()) &&
+            new TextEncoder().encode(value).length <= 1000 &&
+            !/[\p{C}\p{Z}]/u.test(value.replace(/ /g, "")))
+      ),
+    timeoutSeconds: z.number().int().min(30).max(86400),
+  })
+  .refine(
+    (value) => value.mode !== "refresh_survivors" || Boolean(value.retirementWorkflowId.trim())
+  );

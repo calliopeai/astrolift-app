@@ -14,6 +14,7 @@ import type {
   ResumeNvkeOperationMutation,
   ResumeNvkeOperationMutationVariables,
 } from "@/graphql/__generated__/operations";
+import { nativeMaintenancePermission } from "@/lib/nvke/contract";
 import { validNvkeGuid } from "@/lib/nvke/recovery";
 import { useNvkeContext, useNvkeEpoch } from "./nvke.hooks";
 import { NVKE_REQUEST_CONTEXT, useNvkeRead } from "./use-scoped-read";
@@ -37,7 +38,15 @@ export const useNvkeOperation = (
     t = useTranslations("nvke");
   const key =
     context.scopeKey && context.access.read && validNvkeGuid(siteId) && validNvkeGuid(operationId)
-      ? JSON.stringify([context.scopeKey, siteId, operationId])
+      ? JSON.stringify([
+          context.scopeKey,
+          siteId,
+          operationId,
+          context.access.read,
+          context.access.manage,
+          context.access.admin,
+          context.access.loading,
+        ])
       : "";
   const { isCurrent: current, key: visitKey } = useNvkeEpoch(key);
   const requestContext = {
@@ -76,13 +85,14 @@ export const useNvkeOperation = (
   const loading = context.loading || detail.loading || site.loading || catalog.loading;
   const failed =
     context.failed || detail.failed || site.failed || catalog.failed || (!context.loading && !key);
+  const permission = nativeMaintenancePermission(operation?.operationKey) ?? action?.permission;
   const canAct =
     !!key &&
     !loading &&
     !failed &&
     !!operation &&
-    !!action &&
-    mayExecute(context.access, action.permission);
+    !!permission &&
+    mayExecute(context.access, permission);
   const diagnostics = useNvkeDiagnostics({
     context,
     scopeKey: visitKey,

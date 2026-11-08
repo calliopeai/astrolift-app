@@ -4,6 +4,12 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-native-maintenance-workflows--retained-rotation",
+  "screens-nvke-native-maintenance-workflows--read-only",
+  "screens-nvke-native-maintenance-workflows--missing-authority",
+  "screens-nvke-native-maintenance-workflows--completed",
+  "screens-nvke-operation--native-workflow",
+  "screens-nvke-operation--native-reset-unconfirmed",
   "screens-nvke-native-temporal--full",
   "screens-nvke-native-temporal--empty",
   "screens-nvke-native-temporal--read-only",
@@ -208,14 +214,17 @@ for (const mode of ["light", "dark"]) {
       const engine = (
         window as unknown as {
           axe: {
-            run: (root: Element, options: unknown) => Promise<{ violations: { id: string }[] }>;
+            run: (
+              root: Element,
+              options: unknown
+            ) => Promise<{ violations: { id: string; nodes?: unknown[] }[] }>;
           };
         }
       ).axe;
       const result = await engine.run(document.querySelector('[role="alertdialog"]')!, {
         runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] },
       });
-      return result.violations.map((v) => v.id);
+      return result.violations.map((v) => ({ id: v.id, nodes: v.nodes }));
     });
     expect(violations).toEqual([]);
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -289,4 +298,111 @@ test("nvke read-only diagnostic tables scroll with the keyboard", async ({ page 
   await expect(region).toBeFocused();
   await page.keyboard.press("ArrowRight");
   await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+});
+
+test("nvke workflow reset reviews exact string IDs and clears private evidence", async ({
+  page,
+}) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-native-maintenance-workflows--retained-rotation&viewMode=story"
+  );
+  const select = page.getByRole("button", { name: "Select for reset", exact: true });
+  await expect(select.first()).toBeDisabled();
+  await select.nth(1).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByLabel("Reset rationale (private)", { exact: true }).fill("PRIVATE_RESET_REASON");
+  await sheet
+    .getByLabel("Conflicting node-work evidence reference (private)", { exact: true })
+    .fill("PRIVATE_NODE_EVIDENCE");
+  await sheet.getByRole("combobox").click();
+  await page.getByRole("option", { name: "restart_rewrite", exact: true }).click();
+  await sheet
+    .getByRole("checkbox", {
+      name: "I reviewed this exact native phase, run and event boundary.",
+      exact: true,
+    })
+    .check();
+  await sheet
+    .getByRole("checkbox", { name: "I confirm conflicting node work has stopped.", exact: true })
+    .check();
+  await sheet.getByRole("button", { name: "Review change", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("9007199254740993");
+  await expect(review).toContainText("9007199254740992");
+  await expect(review).toContainText("rotation-owner-更新");
+  await expect(review).toContainText("restart_rewrite");
+  await expect(review).not.toContainText("PRIVATE");
+  await page.screenshot({
+    path: test.info().outputPath("native-reset-review.png"),
+    fullPage: true,
+  });
+  await review.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(review).not.toBeVisible();
+  await expect(sheet).not.toBeVisible();
+  await select.nth(1).click();
+  await expect(page.getByLabel("Reset rationale (private)", { exact: true })).toHaveValue("");
+  await expect(
+    page.getByLabel("Conflicting node-work evidence reference (private)", { exact: true })
+  ).toHaveValue("");
+});
+
+test("nvke workflow retirement requires acknowledgement of the exact node and owner", async ({
+  page,
+}) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-native-maintenance-workflows--retained-rotation&viewMode=story"
+  );
+  await page.getByRole("button", { name: "Submit native workflow", exact: true }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("combobox").click();
+  await page.getByRole("option", { name: "RetireLostEtcdRotationNode", exact: true }).click();
+  const node = "123e4567-e89b-12d3-a456-426614174099";
+  await sheet.getByLabel("Native parameters (JSON)", { exact: true }).fill(
+    JSON.stringify({
+      clusterID: "123e4567-e89b-12d3-a456-426614174088",
+      nodeID: node,
+      rotationWorkflowID: "rotation-owner-更新",
+    })
+  );
+  await sheet.getByRole("button", { name: "Review change", exact: true }).click();
+  await expect(page.getByRole("alertdialog")).not.toBeVisible();
+  await sheet
+    .getByRole("checkbox", {
+      name: "I acknowledge permanent removal of the exact control-plane node in this input.",
+      exact: true,
+    })
+    .check();
+  await sheet.getByRole("button", { name: "Review change", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText(node);
+  await expect(review).toContainText("rotation-owner-更新");
+  await page.addScriptTag({ content: axe });
+  const violations = await page.evaluate(async () => {
+    const engine = (
+      window as unknown as {
+        axe: {
+          run: (
+            root: Element,
+            options: unknown
+          ) => Promise<{ violations: { id: string; nodes?: unknown[] }[] }>;
+        };
+      }
+    ).axe;
+    return (
+      await engine.run(document.querySelector('[role="alertdialog"]')!, {
+        runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21aa"] },
+      })
+    ).violations.map((item) => ({ id: item.id, nodes: item.nodes }));
+  });
+  expect(violations).toEqual([]);
+});
+
+test("nvke native workflow long identifiers fit the viewport", async ({ page }) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-native-maintenance-workflows--long-strings&viewMode=story"
+  );
+  await page.getByRole("heading", { name: "Native maintenance workflows", exact: true }).waitFor();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true
+  );
 });

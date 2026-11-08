@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Skeleton } from "@/components/ui/skeleton";
+import { nativeMaintenancePermission } from "@/lib/nvke/contract";
 import { nvkeInventoryHref } from "@/lib/nvke/inventory";
 
 import { NvkeDiagnosticsPanel } from "./NvkeDiagnosticsPanel";
@@ -51,6 +52,7 @@ export function NvkeOperationScreen({
         </Button>
       </PageShell>
     );
+  const native = !!nativeMaintenancePermission(operation.operationKey);
   const allowed = canAct && !pending && !error;
   return (
     <PageShell
@@ -107,17 +109,19 @@ export function NvkeOperationScreen({
       >
         <Badge variant="outline">{t(`status.${operation.status}`)}</Badge>
         <p className="mt-2">
-          {t(
-            operation.status === "SUCCEEDED"
-              ? "observedHelp"
-              : operation.status === "UNCERTAIN"
-                ? "uncertainHelp"
-                : operation.status === "CANCELLED"
-                  ? "cancelledHelp"
-                  : operation.status === "FAILED"
-                    ? "failedHelp"
-                    : "acceptedHelp"
-          )}
+          {native
+            ? t("workflow.reviewHelp")
+            : t(
+                operation.status === "SUCCEEDED"
+                  ? "observedHelp"
+                  : operation.status === "UNCERTAIN"
+                    ? "uncertainHelp"
+                    : operation.status === "CANCELLED"
+                      ? "cancelledHelp"
+                      : operation.status === "FAILED"
+                        ? "failedHelp"
+                        : "acceptedHelp"
+              )}
         </p>
       </div>
       <DefinitionList
@@ -167,13 +171,17 @@ export function NvkeOperationScreen({
               ? "downloadResult"
               : "cancelOperation"
         )}
-        description={t(
-          confirm === "resume"
-            ? "reconcileHelp"
-            : confirm === "download"
-              ? "resultHelp"
-              : "cancelHelp"
-        )}
+        description={
+          native && confirm !== "download"
+            ? t(confirm === "resume" ? "workflow.resumeHelp" : "workflow.cancelHelp")
+            : t(
+                confirm === "resume"
+                  ? "reconcileHelp"
+                  : confirm === "download"
+                    ? "resultHelp"
+                    : "cancelHelp"
+              )
+        }
         destructive={confirm === "cancel"}
         confirmDisabled={!allowed || (confirm === "resume" && !canResume)}
         onConfirm={async () => {
