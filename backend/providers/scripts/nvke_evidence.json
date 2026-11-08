@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "4dab36b2a5a975d371844e57a21bfdb304c61559"
+      "revision": "d6687011c0c23b158b71d659a363e78455bc0a9a"
     }
   },
   "evidence": {
@@ -754,6 +754,27 @@
       "kind": "observation",
       "scope": "Source/log-bound 74 API/SDK/browser cases, 549 frontend cases, 37 story renders, 38 Chromium checks and compiled CLI confirmed/lost stop recovery; production build/lint/contracts gates pass. Combined ASGI teardown cancellation diagnostic is explicit; no clean backend mypy or live-infrastructure-stop claim. Agent-driven Linux bootstrap/install/access remains open in #96.",
       "sha256": "4213e98a0a80e1dcd9f26121ad3d9372d559e57dbe8a4d769a42ff888f55a3ab"
+    },
+    "operator-agent-linux-prerequisites": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-agent-linux-prerequisites-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Fresh isolated ARM64 Linux executor preparation for actual agent bootstrap: pinned source/binary, independent site/CA/credentials and runtime container starts. Existing qualification VM/tenant preserved. This record alone proves no native infrastructure effect.",
+      "sha256": "b5327f6c2b1350670bdc5b9e5edc07890ffb29cc379a6dfed77a5777ba8420be"
+    },
+    "operator-agent-bootstrap-native": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-agent-bootstrap-native-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Original native agent bootstrap retained attempt completed with exit zero; pinned bundle/source, private embedded-TLS kubeconfig, live API and complete expected Ready v1.36.4 node checked. This checker alone does not establish hosted admission.",
+      "sha256": "ebc1aa6ef7453882ef55255730199f5832719923f85cdbda0dbe71f97cbe548d"
+    },
+    "operator-agent-bootstrap-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-agent-bootstrap-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "One actual compiled CLI/API/PostgreSQL/production-registry Temporal/mTLS Linux agent bootstrap admission, original SUCCEEDED receipt, checked private artifact export and host live node access. Original watcher failed generically; read-only recovery did not replay bootstrap. Management install/access and deployed/physical qualification remain open.",
+      "sha256": "afb842d1f0aa885a1ebbc839256b6ed77ca3bf93c342d24c3094552b56f18273"
     }
   },
   "rows": {
@@ -2300,9 +2321,12 @@
         "evidence": [
           "native-tooling",
           "cli-tooling",
-          "native-bootstrap-local"
+          "native-bootstrap-local",
+          "operator-agent-linux-prerequisites",
+          "operator-agent-bootstrap-native",
+          "operator-agent-bootstrap-local"
         ],
-        "remaining": "One source-pinned local seed/node bootstrap is qualified; production image/release supply-chain verification and API/UI bootstrap control remain pending."
+        "remaining": "One actual agent-driven Linux bootstrap is locally qualified through compiled CLI/API/Temporal with retained artifacts and independent node readiness. The original watcher failed generically; original-operation recovery succeeded without replay. Deployed login/UI acceptance and production image/release supply-chain verification remain pending."
       },
       "nvkectl config set-site": {
         "mapping": "astro nvke site create/configure; NVKE site UI",
@@ -2766,7 +2790,10 @@
         "evidence": [
           "tooling-source",
           "native-tooling",
-          "native-bootstrap-local"
+          "native-bootstrap-local",
+          "operator-agent-linux-prerequisites",
+          "operator-agent-bootstrap-native",
+          "operator-agent-bootstrap-local"
         ],
         "remaining": "Local software-TPM substrate and source-built node bootstrap are exercised. Production node/image preparation, other TPM/SPIRE attestation paths, physical-provider qualification, verified artifact delivery and API/UI control remain pending."
       },
@@ -2813,9 +2840,12 @@
           "operator-job-ui-local",
           "operator-stop-sdk-tests",
           "operator-stop-browser",
-          "operator-stop-ui-local"
+          "operator-stop-ui-local",
+          "operator-agent-linux-prerequisites",
+          "operator-agent-bootstrap-native",
+          "operator-agent-bootstrap-local"
         ],
-        "remaining": "Actual native generation/private export and reviewed original recovery are locally qualified through compiled CLI/browser against encrypted API/outbox/Temporal/mTLS. Missing receipts preserve uncertainty until durably fenced. Stop/fence fixtures never dispatch bootstrap; remaining command-family effects and agent-driven Linux bootstrap/install remain pending (#96)."
+        "remaining": "Actual native generation/private export and original recovery are locally qualified through compiled CLI/browser; the generated site spec also drove one successful agent-mediated Linux bootstrap. Remaining command-family effects, management install/access and deployed acceptance remain pending (#96)."
       },
       "deployment-rendering": {
         "mapping": "Pinned native deploy-path, stack/values inspection and management install planning",
@@ -2917,9 +2947,12 @@
           "operator-job-ui-local",
           "operator-stop-sdk-tests",
           "operator-stop-browser",
-          "operator-stop-ui-local"
+          "operator-stop-ui-local",
+          "operator-agent-linux-prerequisites",
+          "operator-agent-bootstrap-native",
+          "operator-agent-bootstrap-local"
         ],
-        "remaining": "Direct guarded-runner Linux seed/node bootstrap and separate hosted agent utility/dry-run proof are qualified. Original stop/fencing is locally browser/compiled-CLI-qualified on never-dispatched uncertain fixtures. Actual agent-driven bootstrap/install, production artifact verification and deployed acceptance remain pending (#96)."
+        "remaining": "Direct-runner and actual agent-driven Linux bootstrap/readiness are locally qualified, with one original hosted admission and private output export. The original watcher failed generically and was recovered read-only. Agent-driven management install/access, production artifact verification, physical providers and deployed acceptance remain pending (#96; CLI #212)."
       },
       "installation": {
         "mapping": "Pinned management install/check/access with guarded actual local default-stack installation",
