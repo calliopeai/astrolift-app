@@ -749,3 +749,448 @@ def test_current_admin_can_fence_original_intent_after_original_caller_revocatio
         str(row.guid), command="generate.sitespec", intent=row.request_digest
     )
     assert receipt["errorCode"] == "ORIGINAL_JOB_FENCED"
+
+
+def partial_install(state):
+    row = reserve(
+        state,
+        request_text=request(
+            state,
+            command="management.install",
+            positionals=[],
+            options={"kubeconfig": "input:management.yaml"},
+            files={"management.yaml": "PRIVATE_INSTALL_INPUT"},
+        ),
+        acknowledge_infrastructure_change=True,
+    )
+    row.status = "uncertain"
+    row.save(update_fields=["status", "version"])
+    return row
+
+
+def install_review_result(state, row):
+    run_id = str(uuid4())
+    return {
+        "source": {
+            "format": 1,
+            "revision": row.authority["revision"],
+            "siteId": str(state.site.guid),
+            "instanceId": str(state.authority.instance_id),
+            "bundleManifestSha256": state.authority.bundle_manifest_sha256,
+            "id": str(row.guid),
+            "intent": row.request_digest,
+            "command": "management.install",
+            "nativeRunId": run_id,
+        },
+        "reviewDigest": "d" * 64,
+        "observedAt": "2026-11-08T21:00:00+00:00",
+        "originalAttempt": {
+            "runId": run_id,
+            "startedAt": "2026-11-08T20:22:39+00:00",
+            "argumentsDigest": "a" * 64,
+            "exitCode": 1,
+            "phase": "uncertain",
+        },
+        "apiReady": True,
+        "continuationAuthorized": False,
+        "reviewerSha256": "b" * 64,
+        "qualificationHelperSha256": "c" * 64,
+        "privateEvidenceSha256": {k: "e" * 64 for k in ("guard", "started", "finished", "stdout", "stderr")},
+        "workloads": [
+            {
+                "name": "collector",
+                "namespace": "nktp",
+                "kind": "StatefulSet",
+                "generation": 9007199254740993,
+                "observedGeneration": None,
+                "desiredReplicas": 2,
+                "readyReplicas": None,
+                "updatedReplicas": 1,
+                "observation": "requires-review",
+            }
+        ],
+        "rawNativeDiagnostics": "PRIVATE_INSTALL_DIAGNOSTICS",
+    }
+
+
+def test_install_review_projects_only_bound_facts_and_leaves_original_unchanged(configured, monkeypatch):
+    state = configured
+    row = partial_install(state)
+    peer = install_review_result(state, row)
+    original = (
+        row.version,
+        row.status,
+        row.request_digest,
+        bytes(row.input_ciphertext),
+        bytes(row.result_ciphertext),
+    )
+
+    def inspect(client, job_id, *, intent):
+        assert job_id == str(row.guid) and intent == row.request_digest
+        assert client.instance_id == str(state.authority.instance_id)
+        return peer
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", inspect)
+    with context(state.world):
+        data = jobs.install_review(**source_review(state, row))
+    row.refresh_from_db()
+    assert original == (
+        row.version,
+        row.status,
+        row.request_digest,
+        bytes(row.input_ciphertext),
+        bytes(row.result_ciphertext),
+    )
+    assert data["operation_id"] == str(row.guid) and not data["continuation_authorized"]
+    assert data["workloads"][0]["generation"] == "9007199254740993"
+    assert (
+        data["workloads"][0]["observed_generation"] is None and data["workloads"][0]["ready_replicas"] is None
+    )
+    serialized = json.dumps(data, default=str)
+    assert (
+        "PRIVATE_INSTALL" not in serialized
+        and row.request_digest not in serialized
+        and "intent" not in serialized
+    )
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+@pytest.mark.parametrize(
+    "field", ["expected_site_version", "expected_authority_version", "expected_operation_version"]
+)
+def test_install_review_refuses_stale_versions_before_remote_io(configured, monkeypatch, field):
+    state = configured
+    row = partial_install(state)
+
+    def unexpected(*_args, **_kwargs):
+        pytest.fail("stale review contacted the agent")
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", unexpected)
+    reviewed = source_review(state, row)
+    reviewed[field] += 1
+    with context(state.world), pytest.raises(sites.NvkeSiteError) as failure:
+        jobs.install_review(**reviewed)
+    assert failure.value.code == "VERSION_MISMATCH"
+
+
+@pytest.mark.parametrize("status", ["queued", "succeeded", "failed", "cancelled"])
+def test_install_review_requires_original_uncertain_install_before_remote_io(configured, monkeypatch, status):
+    state = configured
+    row = partial_install(state)
+    row.status = status
+    row.save(update_fields=["status", "version"])
+    monkeypatch.setattr(
+        OperatorAgentClient, "install_review", lambda *_a, **_k: pytest.fail("invalid source contacted agent")
+    )
+    with context(state.world), pytest.raises(NvkeError) as failure:
+        jobs.install_review(**source_review(state, row))
+    assert failure.value.code == "PRECONDITION"
+
+
+@pytest.mark.parametrize("field", ["site", "authority", "operation", "roles", "token"])
+def test_install_review_rechecks_current_authority_after_remote_io(configured, monkeypatch, field):
+    from astrolift_identity.api_tokens import mint_token, reset_current_api_token, set_current_api_token
+    from astrolift_identity.models import ApiToken
+
+    state = configured
+    row = partial_install(state)
+    peer = install_review_result(state, row)
+    issued = mint_token()
+    token = ApiToken.objects.create(
+        user=state.world.user,
+        organization=state.world.org,
+        name="review fixture",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["admin", "read"],
+    )
+
+    def inspect(*_args, **_kwargs):
+        if field == "roles":
+            RoleBinding.objects.filter(user=state.world.user).update(deleted_at=timezone.now())
+        elif field == "token":
+            ApiToken.objects.filter(pk=token.pk).update(is_revoked=True)
+        else:
+            selected = {"site": state.site, "authority": state.authority, "operation": row}[field]
+            selected.version += 1
+            selected.save(update_fields=["version"])
+        return peer
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", inspect)
+    reviewed = source_review(state, row)
+    mark = set_current_api_token(token)
+    try:
+        with context(state.world), pytest.raises((NvkeError, sites.NvkeSiteError, PermissionDenied)):
+            jobs.install_review(**reviewed)
+    finally:
+        reset_current_api_token(mark)
+
+
+def test_install_review_refuses_other_tenant_and_mismatched_remote_source(configured, monkeypatch):
+    state = configured
+    row = partial_install(state)
+    calls = []
+    peer = install_review_result(state, row)
+    peer["source"]["id"] = str(uuid4())
+
+    def inspect(*_args, **_kwargs):
+        calls.append(True)
+        return peer
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", inspect)
+    other = _world.__wrapped__()
+    with context(other), pytest.raises((NvkeError, sites.NvkeSiteError, PermissionDenied)):
+        jobs.install_review(**source_review(state, row))
+    assert not calls
+    with context(state.world), pytest.raises(NvkeError) as failure:
+        jobs.install_review(**source_review(state, row))
+    assert failure.value.code == "OPERATOR_INVALID_RESPONSE" and len(calls) == 1
+
+
+def test_install_review_transport_failure_does_not_release_infrastructure_fence(configured, monkeypatch):
+    state = configured
+    row = partial_install(state)
+
+    def unavailable(*_args, **_kwargs):
+        raise NvkeError("OPERATOR_UNAVAILABLE", "Read-only review unavailable", retryable=True)
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", unavailable)
+    with context(state.world), pytest.raises(NvkeError) as failure:
+        jobs.install_review(**source_review(state, row))
+    assert failure.value.code == "OPERATOR_UNAVAILABLE"
+    row.refresh_from_db()
+    assert row.status == "uncertain"
+    with pytest.raises(NvkeError) as busy:
+        reserve(
+            state,
+            request_text=request(
+                state,
+                command="management.configure-access",
+                positionals=[],
+                options={"kubeconfig": "input:management.yaml"},
+                files={"management.yaml": "PRIVATE_INSTALL_INPUT"},
+            ),
+            acknowledge_infrastructure_change=True,
+        )
+    assert busy.value.code == "RESOURCE_BUSY"
+
+
+def test_install_review_schema_is_typed_audited_and_refuses_revoked_admin(configured, monkeypatch):
+    from astrolift_clusters.tests.test_nvke_schema import execute
+    from core.schema.audit import MutationAuditLog
+
+    state = configured
+    row = partial_install(state)
+    peer = install_review_result(state, row)
+    calls = []
+
+    def inspect(*_args, **_kwargs):
+        calls.append(True)
+        return peer
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", inspect)
+    query = """mutation($review:NvkeOperatorJobReviewInput!){reviewNvkeOperatorInstall(input:$review){
+      ok errors{code} data{operationId operationVersion nativeRunId continuationAuthorized
+      evidence{guardSha256} workloads{generation observedGeneration desiredReplicas readyReplicas}}}}"""
+    variables = {
+        "review": {
+            "operationId": str(row.guid),
+            "expectedActorId": state.world.user.pk,
+            "expectedSiteVersion": state.site.version,
+            "expectedAuthorityVersion": state.authority.version,
+            "expectedOperationVersion": row.version,
+        }
+    }
+    response = execute(state.world, query, variables)
+    assert response.errors is None and response.data["reviewNvkeOperatorInstall"]["ok"]
+    data = response.data["reviewNvkeOperatorInstall"]["data"]
+    assert data["operationId"] == str(row.guid) and data["operationVersion"] == row.version
+    assert data["workloads"] == [
+        {
+            "generation": "9007199254740993",
+            "observedGeneration": None,
+            "desiredReplicas": "2",
+            "readyReplicas": None,
+        }
+    ]
+    assert data["continuationAuthorized"] is False and "PRIVATE_INSTALL" not in json.dumps(response.data)
+    audit = MutationAuditLog.objects.filter(operation="nvke.operator_install_review").latest("timestamp")
+    assert row.request_digest not in str(audit.variables)
+    RoleBinding.objects.filter(user=state.world.user).update(deleted_at=timezone.now())
+    denied = execute(state.world, query, variables)
+    assert denied.errors is None and not denied.data["reviewNvkeOperatorInstall"]["ok"] and len(calls) == 1
+
+
+def test_current_admin_can_review_install_after_original_caller_revocation(configured, monkeypatch):
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import Member
+    from core.permissions import Permission
+    from core.tests.utils.scope_world import bind_role
+
+    state = configured
+    row = partial_install(state)
+    peer = install_review_result(state, row)
+    caller = get_user_model().objects.create(username="install-review-" + uuid4().hex, is_active=True)
+    Member.objects.create(user=caller, scope_kind="ORG", scope_id=state.world.org.pk)
+    bind_role(
+        caller,
+        permissions=[Permission.NVKE_ADMIN, Permission.NVKE_READ],
+        kind="ORG",
+        scope_id=state.world.org.pk,
+        slug="install-review-" + uuid4().hex,
+    )
+    RoleBinding.objects.filter(user=state.world.user).update(deleted_at=timezone.now())
+    monkeypatch.setattr(OperatorAgentClient, "install_review", lambda *_a, **_k: peer)
+    reviewed = source_review(state, row)
+    reviewed["expected_actor_id"] = caller.pk
+    with context(SimpleNamespace(org=state.world.org, user=caller)):
+        data = jobs.install_review(**reviewed)
+    assert data["operation_id"] == str(row.guid)
+    row.refresh_from_db()
+    assert row.status == "uncertain" and row.actor_id == state.world.user.pk
+
+
+def test_install_review_workloads_page_one_immutable_encrypted_snapshot(configured, monkeypatch):
+    state = configured
+    row = partial_install(state)
+    peer = install_review_result(state, row)
+    peer["workloads"] = [{**peer["workloads"][0], "name": f"collector-{n:03d}"} for n in range(113)]
+    calls = []
+
+    def inspect(*_args, **_kwargs):
+        calls.append(True)
+        return peer
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", inspect)
+    with context(state.world):
+        snapshot = jobs.install_review(**source_review(state, row))
+        sealed = jobs.cache.get(jobs._install_review_cache_key(snapshot["snapshot_id"]))
+        assert b"collector-000" not in bytes(
+            sealed["ciphertext"]
+        ) and row.request_digest.encode() not in bytes(sealed["ciphertext"])
+        args = {**source_review(state, row), "snapshot_id": snapshot["snapshot_id"]}
+        page = jobs.install_workload_page(**args, limit=25)
+        assert page["total_count"] == 113 and len(page["items"]) == 25 and page["next_cursor"]
+        names = [x["name"] for x in page["items"]]
+        while page["next_cursor"]:
+            page = jobs.install_workload_page(**args, limit=25, after=page["next_cursor"])
+            names.extend(x["name"] for x in page["items"])
+        assert names == [f"collector-{n:03d}" for n in range(113)]
+        selected = jobs.install_workload_page(**args, search="collector-112")
+        assert selected["total_count"] == 1 and selected["items"][0]["generation"] == "9007199254740993"
+        empty = jobs.install_workload_page(**args, search="absent")
+        assert empty["total_count"] == 0 and not empty["items"] and empty["next_cursor"] is None
+    assert len(calls) == 1 and not list((state.agent.root / "state/jobs").iterdir())
+
+
+def test_install_review_workload_cursor_binds_snapshot_search_and_limit(configured, monkeypatch):
+    state = configured
+    row = partial_install(state)
+    peer = install_review_result(state, row)
+    peer["workloads"] = [{**peer["workloads"][0], "name": f"collector-{n}"} for n in range(3)]
+    monkeypatch.setattr(OperatorAgentClient, "install_review", lambda *_a, **_k: peer)
+    with context(state.world):
+        one = jobs.install_review(**source_review(state, row))
+        two = jobs.install_review(**source_review(state, row))
+        args = {**source_review(state, row), "snapshot_id": one["snapshot_id"], "limit": 1}
+        cursor = jobs.install_workload_page(**args)["next_cursor"]
+        for changed in [
+            {"search": "collector"},
+            {"limit": 2},
+            {"snapshot_id": two["snapshot_id"]},
+            {"after": "PRIVATE_BAD_CURSOR"},
+        ]:
+            with pytest.raises(NvkeError) as failure:
+                jobs.install_workload_page(**{**args, "after": cursor, **changed})
+            assert failure.value.code == "INVALID_CURSOR" and "PRIVATE" not in str(failure.value)
+
+
+def test_install_review_workloads_expire_and_never_cross_token_identity(configured, monkeypatch):
+    from astrolift_identity.api_tokens import mint_token, reset_current_api_token, set_current_api_token
+    from astrolift_identity.models import ApiToken
+
+    state = configured
+    row = partial_install(state)
+    peer = install_review_result(state, row)
+    monkeypatch.setattr(OperatorAgentClient, "install_review", lambda *_a, **_k: peer)
+    with context(state.world):
+        snapshot = jobs.install_review(**source_review(state, row))
+        args = {**source_review(state, row), "snapshot_id": snapshot["snapshot_id"]}
+        issued = mint_token()
+        token = ApiToken.objects.create(
+            user=state.world.user,
+            organization=state.world.org,
+            name="other review token",
+            token_hash=issued.token_hash,
+            token_last_4=issued.last4,
+            scopes=["admin", "read"],
+        )
+        mark = set_current_api_token(token)
+        try:
+            with pytest.raises(NvkeError) as other:
+                jobs.install_workload_page(**args)
+            assert other.value.code == "REVIEW_EXPIRED"
+        finally:
+            reset_current_api_token(mark)
+        jobs.cache.delete(jobs._install_review_cache_key(snapshot["snapshot_id"]))
+        with pytest.raises(NvkeError) as expired:
+            jobs.install_workload_page(**args)
+        assert expired.value.code == "REVIEW_EXPIRED"
+
+
+def test_install_review_workloads_refuse_new_source_versions_and_unbounded_reads(configured, monkeypatch):
+    state = configured
+    row = partial_install(state)
+    monkeypatch.setattr(
+        OperatorAgentClient, "install_review", lambda *_a, **_k: install_review_result(state, row)
+    )
+    with context(state.world):
+        snapshot = jobs.install_review(**source_review(state, row))
+        args = {**source_review(state, row), "snapshot_id": snapshot["snapshot_id"]}
+        for changed in [{"limit": 0}, {"limit": 101}, {"limit": True}, {"search": "x" * 201}]:
+            with pytest.raises(NvkeError) as failure:
+                jobs.install_workload_page(**{**args, **changed})
+            assert failure.value.code == "INVALID_INPUT"
+        row.version += 1
+        row.save(update_fields=["version"])
+        with pytest.raises(sites.NvkeSiteError):
+            jobs.install_workload_page(**args)
+        with pytest.raises(NvkeError) as changed:
+            jobs.install_workload_page(**{**args, "expected_operation_version": row.version})
+        assert changed.value.code == "REVIEW_EXPIRED"
+
+
+def test_install_review_schema_pages_snapshot_without_new_native_review(configured, monkeypatch):
+    from astrolift_clusters.tests.test_nvke_schema import execute
+
+    state = configured
+    row = partial_install(state)
+    calls = []
+
+    def inspect(*_args, **_kwargs):
+        calls.append(True)
+        return install_review_result(state, row)
+
+    monkeypatch.setattr(OperatorAgentClient, "install_review", inspect)
+    with context(state.world):
+        snapshot = jobs.install_review(**source_review(state, row))
+    variables = {
+        "review": {
+            "operationId": str(row.guid),
+            "expectedActorId": state.world.user.pk,
+            "expectedSiteVersion": state.site.version,
+            "expectedAuthorityVersion": state.authority.version,
+            "expectedOperationVersion": row.version,
+        },
+        "snapshot": snapshot["snapshot_id"],
+    }
+    query = """query($review:NvkeOperatorJobReviewInput!,$snapshot:GUID!){
+      astroliftNvkeOperatorInstallWorkloadPage(input:$review,snapshotId:$snapshot,limit:1){
+      ok errors{code} data{snapshotId totalCount items{generation readyReplicas}}}}"""
+    response = execute(state.world, query, variables)
+    assert response.errors is None and response.data["astroliftNvkeOperatorInstallWorkloadPage"]["ok"]
+    assert response.data["astroliftNvkeOperatorInstallWorkloadPage"]["data"]["items"] == [
+        {"generation": "9007199254740993", "readyReplicas": None}
+    ]
+    assert len(calls) == 1

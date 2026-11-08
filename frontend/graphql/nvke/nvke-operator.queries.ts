@@ -100,3 +100,45 @@ export const GET_NVKE_OPERATOR_JOB_PAGE = gql`
     }
   }
 `;
+
+export const GET_NVKE_OPERATOR_INSTALL_WORKLOAD_PAGE = gql`
+  query GetNvkeOperatorInstallWorkloadPage(
+    $input: NvkeOperatorJobReviewInput!
+    $snapshotId: GUID!
+    $after: String
+    $limit: Int = 25
+    $search: String = ""
+  ) {
+    astroliftNvkeOperatorInstallWorkloadPage(
+      input: $input
+      snapshotId: $snapshotId
+      after: $after
+      limit: $limit
+      search: $search
+    ) {
+      ok
+      errors {
+        code
+      }
+      data {
+        snapshotId
+        operationId
+        operationVersion
+        reviewDigest
+        items {
+          namespace
+          kind
+          name
+          generation
+          observedGeneration
+          desiredReplicas
+          readyReplicas
+          updatedReplicas
+          observation
+        }
+        nextCursor
+        totalCount
+      }
+    }
+  }
+`;

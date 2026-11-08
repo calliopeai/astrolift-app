@@ -164,6 +164,67 @@ class NvkeOperatorJobPageType:
     total_count: int
 
 
+@strawberry.type
+class NvkeOperatorInstallEvidenceType:
+    guard_sha256: str
+    started_sha256: str
+    finished_sha256: str
+    stdout_sha256: str
+    stderr_sha256: str
+
+
+@strawberry.type
+class NvkeOperatorInstallWorkloadType:
+    namespace: str
+    kind: str
+    name: str
+    generation: str
+    observed_generation: str | None
+    desired_replicas: str
+    ready_replicas: str | None
+    updated_replicas: str | None
+    observation: str
+
+
+@strawberry.type
+class NvkeOperatorInstallReviewType:
+    snapshot_id: GUID
+    snapshot_expires_at: datetime
+    workload_count: int
+    site_id: GUID
+    site_version: int
+    operation_id: GUID
+    operation_version: int
+    authority_id: GUID
+    authority_version: int
+    instance_id: GUID
+    bundle_manifest_sha256: str
+    native_revision: str
+    native_run_id: GUID
+    review_digest: str
+    observed_at: datetime
+    original_started_at: datetime
+    native_arguments_sha256: str
+    native_exit_code: int
+    api_ready: bool
+    continuation_authorized: bool
+    reviewer_sha256: str
+    qualification_helper_sha256: str
+    evidence: NvkeOperatorInstallEvidenceType
+    workloads: list[NvkeOperatorInstallWorkloadType]
+
+
+@strawberry.type
+class NvkeOperatorInstallWorkloadPageType:
+    snapshot_id: GUID
+    operation_id: GUID
+    operation_version: int
+    review_digest: str
+    items: list[NvkeOperatorInstallWorkloadType]
+    next_cursor: str | None
+    total_count: int
+
+
 def contract_type():
     return NvkeOperatorContractType(
         revision=REVISION,
@@ -190,6 +251,28 @@ def contract_type():
 
 @strawberry.type
 class NvkeOperatorQuery:
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def astrolift_nvke_operator_install_workload_page(
+        self,
+        info: Info,
+        input: NvkeOperatorJobReviewInput,
+        snapshot_id: GUID,
+        after: str | None = None,
+        limit: int = 25,
+        search: str | None = None,
+    ) -> MutationResultType[NvkeOperatorInstallWorkloadPageType]:
+        data = jobs.install_workload_page(
+            snapshot_id=snapshot_id, after=after, limit=limit, search=search or "", **asdict(input)
+        )
+        return success(
+            NvkeOperatorInstallWorkloadPageType(
+                **{**data, "items": [NvkeOperatorInstallWorkloadType(**item) for item in data["items"]]}
+            )
+        )
+
     @strawberry.field
     @nvke_errors
     @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
@@ -324,3 +407,25 @@ class NvkeOperatorMutation:
         self, info: Info, input: NvkeOperatorJobReviewInput
     ) -> MutationResultType[NvkeOperationType]:
         return success(operation_type(jobs.stop(**asdict(input))))
+
+    @strawberry.mutation
+    @mutation_audit(
+        action="nvke.operator_install_review",
+        target=lambda root, info, input: ("nvke_operation", str(input.operation_id)),
+    )
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def review_nvke_operator_install(
+        self, info: Info, input: NvkeOperatorJobReviewInput
+    ) -> MutationResultType[NvkeOperatorInstallReviewType]:
+        data = jobs.install_review(**asdict(input))
+        return success(
+            NvkeOperatorInstallReviewType(
+                **{
+                    **data,
+                    "evidence": NvkeOperatorInstallEvidenceType(**data["evidence"]),
+                    "workloads": [NvkeOperatorInstallWorkloadType(**item) for item in data["workloads"]],
+                }
+            )
+        )

@@ -3,11 +3,12 @@
 import hashlib
 import hmac
 import json
-from datetime import timedelta
-from uuid import UUID
+from datetime import datetime, timedelta
+from uuid import UUID, uuid4
 
 from django.conf import settings
 from django.core import signing
+from django.core.cache import cache
 from django.db import connection, transaction
 from django.utils import timezone
 from nvke.client import NvkeError
@@ -19,9 +20,40 @@ from astrolift_clusters import nvke_operator_authority as authority
 from astrolift_clusters import nvke_sites as sites
 from astrolift_clusters.models import NvkeOperation, NvkeOperatorAuthority
 from astrolift_identity.api_tokens import get_current_api_token
-from core.secrets import encrypt_at_rest
+from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
 PREFIX = "tooling."
+INSTALL_REVIEW_TTL = 600
+
+
+def _install_review_cache_key(snapshot_id):
+    try:
+        identity = UUID(str(snapshot_id))
+        if not identity.int:
+            raise ValueError
+    except (ValueError, TypeError, AttributeError):
+        raise NvkeError("INVALID_INPUT", "Use the exact prepared installation review") from None
+    return "nvke.operator.install-review.v1:" + str(identity)
+
+
+def _install_review_binding(caller, row, selected):
+    token = get_current_api_token()
+    return {
+        "actor": caller.pk,
+        "token": str(token.guid) if token else None,
+        "organization": row.organization_id,
+        "site": str(row.site.guid),
+        "site_version": row.site.version,
+        "operation": str(row.guid),
+        "operation_version": row.version,
+        "operation_key": row.operation_key,
+        "intent": row.request_digest,
+        "authority": str(selected.guid),
+        "authority_version": selected.version,
+        "authority_digest": authority.digest(selected),
+        "instance": str(selected.instance_id),
+        "bundle": selected.bundle_manifest_sha256,
+    }
 
 
 def command_key(key):
@@ -242,6 +274,193 @@ def artifact(
         )
     checkpoint()
     return result
+
+
+def install_review(**review):
+    caller, row, selected, checkpoint = reviewed_source(**review)
+    if (
+        row.operation_key != PREFIX + "management.install"
+        or row.authority.get("tooling_effectful") is not True
+        or row.status != "uncertain"
+    ):
+        raise NvkeError("PRECONDITION", "Review the original uncertain management installation")
+    with authority.open_agent(selected, checkpoint=checkpoint) as client:
+        observed = client.install_review(str(row.guid), intent=row.request_digest)
+    checkpoint()
+    try:
+        source = observed["source"]
+        native_run = str(UUID(source["nativeRunId"]))
+        if (
+            source
+            != {
+                "format": 1,
+                "revision": row.authority["revision"],
+                "siteId": str(row.site.guid),
+                "instanceId": str(selected.instance_id),
+                "bundleManifestSha256": selected.bundle_manifest_sha256,
+                "id": str(row.guid),
+                "intent": row.request_digest,
+                "command": "management.install",
+                "nativeRunId": native_run,
+            }
+            or observed["continuationAuthorized"] is not False
+        ):
+            raise ValueError
+        attempt = observed["originalAttempt"]
+        if (
+            attempt["runId"] != native_run
+            or attempt["phase"] != "uncertain"
+            or type(attempt["exitCode"]) is not int
+            or attempt["exitCode"] == 0
+        ):
+            raise ValueError
+        hashes = observed["privateEvidenceSha256"]
+        result = {
+            "site_id": str(row.site.guid),
+            "site_version": row.site.version,
+            "operation_id": str(row.guid),
+            "operation_version": row.version,
+            "authority_id": str(selected.guid),
+            "authority_version": selected.version,
+            "instance_id": str(selected.instance_id),
+            "bundle_manifest_sha256": selected.bundle_manifest_sha256,
+            "native_revision": row.authority["revision"],
+            "native_run_id": native_run,
+            "review_digest": observed["reviewDigest"],
+            "observed_at": datetime.fromisoformat(observed["observedAt"]),
+            "original_started_at": datetime.fromisoformat(attempt["startedAt"]),
+            "native_arguments_sha256": attempt["argumentsDigest"],
+            "native_exit_code": attempt["exitCode"],
+            "api_ready": observed["apiReady"],
+            "continuation_authorized": False,
+            "reviewer_sha256": observed["reviewerSha256"],
+            "qualification_helper_sha256": observed["qualificationHelperSha256"],
+            "evidence": {
+                name + "_sha256": hashes[name]
+                for name in ("guard", "started", "finished", "stdout", "stderr")
+            },
+            "workloads": [
+                {
+                    "namespace": item["namespace"],
+                    "kind": item["kind"],
+                    "name": item["name"],
+                    "observation": item["observation"],
+                    **{
+                        target: str(item[key]) if item[key] is not None else None
+                        for target, key in (
+                            ("generation", "generation"),
+                            ("observed_generation", "observedGeneration"),
+                            ("desired_replicas", "desiredReplicas"),
+                            ("ready_replicas", "readyReplicas"),
+                            ("updated_replicas", "updatedReplicas"),
+                        )
+                    },
+                }
+                for item in observed["workloads"]
+            ],
+        }
+    except (KeyError, TypeError, ValueError, OverflowError):
+        raise NvkeError(
+            "OPERATOR_INVALID_RESPONSE", "The operator review did not confirm the original installation"
+        ) from None
+    checkpoint()
+    snapshot_id = str(uuid4())
+    payload = {
+        "binding": _install_review_binding(caller, row, selected),
+        "review_digest": result["review_digest"],
+        "items": result["workloads"],
+    }
+    try:
+        sealed = encrypt_at_rest(outbox.canonical(payload))
+        stored = cache.set(
+            _install_review_cache_key(snapshot_id),
+            {"backend_kind": sealed.backend_kind, "ciphertext": sealed.backend_ref},
+            timeout=INSTALL_REVIEW_TTL,
+        )
+        if stored is False:
+            raise ValueError
+    except Exception:
+        raise NvkeError(
+            "REVIEW_UNAVAILABLE", "Could not retain the review snapshot; the original install is unchanged"
+        ) from None
+    try:
+        checkpoint()
+    except Exception:
+        try:
+            cache.delete(_install_review_cache_key(snapshot_id))
+        except Exception:
+            pass  # Encrypted metadata expires even if best-effort cleanup is unavailable.
+        raise
+    result.update(
+        snapshot_id=snapshot_id,
+        snapshot_expires_at=timezone.now() + timedelta(seconds=INSTALL_REVIEW_TTL),
+        workload_count=len(result["workloads"]),
+    )
+    return result
+
+
+def install_workload_page(*, snapshot_id, after=None, limit=25, search="", **review):
+    caller, row, selected, checkpoint = reviewed_source(**review)
+    if type(limit) is not int or not 1 <= limit <= 100 or not isinstance(search, str) or len(search) > 200:
+        raise NvkeError("INVALID_INPUT", "Use a bounded workload search and page size")
+    key = _install_review_cache_key(snapshot_id)
+    try:
+        sealed = cache.get(key)
+        if not isinstance(sealed, dict):
+            raise ValueError
+        payload = json.loads(decrypt(EncryptedSecret(sealed["backend_kind"], bytes(sealed["ciphertext"]))))
+        binding = _install_review_binding(caller, row, selected)
+        if (
+            set(payload) != {"binding", "review_digest", "items"}
+            or payload["binding"] != binding
+            or not isinstance(payload["items"], list)
+            or len(payload["items"]) > 10000
+        ):
+            raise ValueError
+    except Exception:
+        raise NvkeError(
+            "REVIEW_EXPIRED", "Load a current installation review before paging its workloads"
+        ) from None
+    items = [
+        item
+        for item in payload["items"]
+        if search.casefold()
+        in " ".join((item["namespace"], item["kind"], item["name"], item["observation"])).casefold()
+    ]
+    position = 0
+    cursor_binding = {
+        "snapshot": str(UUID(str(snapshot_id))),
+        "binding": hashlib.sha256(outbox.canonical(binding)).hexdigest(),
+        "digest": payload["review_digest"],
+        "limit": limit,
+        "search": search,
+    }
+    salt = "nvke.operator.install.workloads.v1"
+    if after is not None:
+        try:
+            if not isinstance(after, str) or len(after) > 8192:
+                raise ValueError
+            decoded = signing.loads(after, salt=salt, max_age=INSTALL_REVIEW_TTL)
+            position = decoded.pop("position")
+            if decoded != cursor_binding or type(position) is not int or not 0 <= position <= len(items):
+                raise ValueError
+        except (signing.BadSignature, ValueError, TypeError, KeyError, AttributeError):
+            raise NvkeError(
+                "INVALID_CURSOR", "Use a cursor from this exact prepared workload review"
+            ) from None
+    end = position + limit
+    checkpoint()
+    return {
+        "snapshot_id": str(UUID(str(snapshot_id))),
+        "operation_id": str(row.guid),
+        "operation_version": row.version,
+        "review_digest": payload["review_digest"],
+        "items": items[position:end],
+        "total_count": len(items),
+        "next_cursor": signing.dumps({**cursor_binding, "position": end}, salt=salt)
+        if end < len(items)
+        else None,
+    }
 
 
 def artifact_page(*, after=None, limit=50, search="", **review):

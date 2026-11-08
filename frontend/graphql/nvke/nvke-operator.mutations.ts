@@ -106,3 +106,45 @@ export const STOP_NVKE_OPERATOR_JOB = gql`
   }
   ${NVKE_OPERATION_FIELDS}
 `;
+
+export const REVIEW_NVKE_OPERATOR_INSTALL = gql`
+  mutation ReviewNvkeOperatorInstall($input: NvkeOperatorJobReviewInput!) {
+    reviewNvkeOperatorInstall(input: $input) {
+      ok
+      errors {
+        code
+      }
+      data {
+        snapshotId
+        snapshotExpiresAt
+        workloadCount
+        siteId
+        siteVersion
+        operationId
+        operationVersion
+        authorityId
+        authorityVersion
+        instanceId
+        bundleManifestSha256
+        nativeRevision
+        nativeRunId
+        reviewDigest
+        observedAt
+        originalStartedAt
+        nativeArgumentsSha256
+        nativeExitCode
+        apiReady
+        continuationAuthorized
+        reviewerSha256
+        qualificationHelperSha256
+        evidence {
+          guardSha256
+          startedSha256
+          finishedSha256
+          stdoutSha256
+          stderrSha256
+        }
+      }
+    }
+  }
+`;

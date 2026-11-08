@@ -10915,6 +10915,7 @@ type Mutation {
   requestNvkeOperatorJob(input: RequestNvkeOperatorJobInput!): NvkeOperationTypeMutationResult!
   reconcileNvkeOperatorJob(input: NvkeOperatorJobReviewInput!): NvkeOperationTypeMutationResult!
   stopNvkeOperatorJob(input: NvkeOperatorJobReviewInput!): NvkeOperationTypeMutationResult!
+  reviewNvkeOperatorInstall(input: NvkeOperatorJobReviewInput!): NvkeOperatorInstallReviewTypeMutationResult!
   prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
@@ -11825,6 +11826,75 @@ input NvkeOperatorCredentialsInput {
   caPem: String! = ""
   clientCertificatePem: String! = ""
   clientKeyPem: String! = ""
+}
+
+type NvkeOperatorInstallEvidenceType {
+  guardSha256: String!
+  startedSha256: String!
+  finishedSha256: String!
+  stdoutSha256: String!
+  stderrSha256: String!
+}
+
+type NvkeOperatorInstallReviewType {
+  snapshotId: GUID!
+  snapshotExpiresAt: DateTime!
+  workloadCount: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  operationId: GUID!
+  operationVersion: Int!
+  authorityId: GUID!
+  authorityVersion: Int!
+  instanceId: GUID!
+  bundleManifestSha256: String!
+  nativeRevision: String!
+  nativeRunId: GUID!
+  reviewDigest: String!
+  observedAt: DateTime!
+  originalStartedAt: DateTime!
+  nativeArgumentsSha256: String!
+  nativeExitCode: Int!
+  apiReady: Boolean!
+  continuationAuthorized: Boolean!
+  reviewerSha256: String!
+  qualificationHelperSha256: String!
+  evidence: NvkeOperatorInstallEvidenceType!
+  workloads: [NvkeOperatorInstallWorkloadType!]!
+}
+
+type NvkeOperatorInstallReviewTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallReviewType
+}
+
+type NvkeOperatorInstallWorkloadPageType {
+  snapshotId: GUID!
+  operationId: GUID!
+  operationVersion: Int!
+  reviewDigest: String!
+  items: [NvkeOperatorInstallWorkloadType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeOperatorInstallWorkloadPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallWorkloadPageType
+}
+
+type NvkeOperatorInstallWorkloadType {
+  namespace: String!
+  kind: String!
+  name: String!
+  generation: String!
+  observedGeneration: String
+  desiredReplicas: String!
+  readyReplicas: String
+  updatedReplicas: String
+  observation: String!
 }
 
 type NvkeOperatorJobPageType {
@@ -12776,6 +12846,7 @@ type Query {
   astroliftNvkeOperationResultText(operationId: GUID!): StrMutationResult!
   astroliftNvkeSites(after: String = null, limit: Int! = 50): NvkeSiteTypePage!
   astroliftNvkeSite(siteId: GUID!): NvkeSiteType
+  astroliftNvkeOperatorInstallWorkloadPage(input: NvkeOperatorJobReviewInput!, snapshotId: GUID!, after: String = null, limit: Int! = 25, search: String = null): NvkeOperatorInstallWorkloadPageTypeMutationResult!
   astroliftNvkeOperatorJobPage(input: NvkeOperatorJobReviewInput!, after: String = null, limit: Int! = 50, search: String = null): NvkeOperatorJobPageTypeMutationResult!
   astroliftNvkeOperatorAuthority(siteId: GUID!): NvkeOperatorAuthorityType
   astroliftNvkeOperatorContract: NvkeOperatorContractType!
