@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "9e427c9eaa84c7bf17b074a6ac50c7189b0e4fd9"
+      "revision": "4c13c8191e98084ed69318f828f8260f698725ee"
     }
   },
   "evidence": {
@@ -388,6 +388,13 @@
       "kind": "observation",
       "scope": "Isolated ARM64 native manager Ready with exact image match, zero restarts, held leader Lease and eight live authorization checks including cross-tenant and Secret-read denial. Startup only; no NVKECluster submitted. Declarative reconciliation, hosted controls and production qualification remain pending.",
       "sha256": "a6a1deb3b58fb376877885444040a6948c2071cca30f6dc3de6365b31116731a"
+    },
+    "provider-observation-native": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/provider-observation-native-local-2026-11-08.json",
+      "kind": "observation",
+      "scope": "Actual isolated native management API through CA/client-certificate-verified private SSH transport. Eight GET-only requests; credential Secret metadata only. NICo CONFIGURED and available, credential health NO-IDENTITY, LaunchLayer NOT-INSTALLED. No physical provisioning or hosted provider observation/recovery claim.",
+      "sha256": "b7dddf55701431d69e7be0b2d4de3a9081590f60707dc4d8e18a523ad99e4491"
     }
   },
   "rows": {
@@ -2431,7 +2438,8 @@
           "provider-collection-ui",
           "provider-browser",
           "provider-cli",
-          "provider-cli-paired"
+          "provider-cli-paired",
+          "provider-observation-native"
         ],
         "remaining": "Native NICo and enabled LaunchLayer credential/controller/hardware qualification remains pending; local transport/admission evidence does not establish physical provider effects."
       },
