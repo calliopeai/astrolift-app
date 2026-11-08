@@ -199,6 +199,10 @@ def write_certificates(root):
 
 @pytest.fixture
 def real_operator_agent(tmp_path):
+    yield from operator_agent(tmp_path)
+
+
+def operator_agent(tmp_path, *, site_id=None):
     selected, selected_bundle = os.getenv("NVKE_TEST_AGENT_OPSCODE"), os.getenv("NVKE_TEST_AGENT_BUNDLE")
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
@@ -216,7 +220,7 @@ def real_operator_agent(tmp_path):
         port = sock.getsockname()[1]
     digest = hashlib.sha256((bundle / "bundle.json").read_bytes()).hexdigest()
     leaf = hashlib.sha256(ssl.PEM_cert_to_DER_cert((root / "client.pem").read_text())).hexdigest()
-    site = str(uuid4())
+    site = site_id if site_id is not None else str(uuid4())
     command = [
         sys.executable,
         "-I",
