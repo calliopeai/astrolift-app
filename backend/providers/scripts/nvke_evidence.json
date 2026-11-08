@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "068e8c30ce399945c78143623e77db35e5cb3e64"
+      "revision": "385b1563be777f23a5c9319da58c385206bdc584"
     }
   },
   "evidence": {
@@ -904,8 +904,22 @@
       "repository": "opscode",
       "path": "kubernetes/nvke/qualification/operator-install-review-ui-local-2026-11-08.json",
       "kind": "observation",
-      "scope": "Two real retained-install Chromium/API/mTLS cases each walked 24 workloads and searched LGTM. Stale version refused; original UNCERTAIN/version 23 and eight native files/five jobs/runs unchanged. 31 release Chromium checks passed. Connected Storybook only; deployed login/routes, final type/release gates and continuation remain separate.",
-      "sha256": "7e4ccf32b06cd153be48bfb09d010ee661e1cc5b9cf03e3178d5729e65c81b1f"
+      "scope": "Two real retained-install Chromium/API/mTLS cases each walked 24 workloads and searched LGTM. Stale version refused; original UNCERTAIN/version 23 and eight native files/five jobs/runs unchanged. 31 release Chromium checks passed. Connected Storybook only; deployed login/routes, production-build/deployed-route gates and continuation remain separate.",
+      "sha256": "553d60ea5c6b750987cd6a941cfe9ce03e7a950d45d6d29177f019b4934b5c81"
+    },
+    "operator-install-plan-core": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/management_plan.py",
+      "kind": "implementation",
+      "scope": "Pure source/input/review-bound remaining-install proposal compiler. Strict native inventory/observed-prefix validation preserves order and includes the final observed item. Native log order is unattested observation; the public digest is not administrator authority or admission. Source collection, sealed persistence and linked execution remain pending.",
+      "sha256": "8685c3b17474bde9ac7e21e744745d9406d7e75734e862552849cf5fd60006b2"
+    },
+    "operator-install-plan-core-tests": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_management_plan.py",
+      "kind": "test",
+      "scope": "Eight unit cases cover original prefix/remaining order, malformed or ambiguous inventories/traces, private-diagnostic exclusion, successful/unknown source refusal, changed bindings/tampering, custom inventories and 10,000-item proposals beyond the smaller command request limit. No native execution or API/UI/CLI continuation claim.",
+      "sha256": "e1323c728c8dc6a1224dfdac9a701521117577c4478d4e418e841e56c08e4e28"
     }
   },
   "rows": {
@@ -3158,9 +3172,11 @@
           "operator-install-review-ui-tests",
           "operator-install-review-ui-hook-tests",
           "operator-install-review-ui-browser",
-          "operator-install-review-ui-local"
+          "operator-install-review-ui-local",
+          "operator-install-plan-core",
+          "operator-install-plan-core-tests"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin/version-gated API/compiled CLI and connected operation-screen review with encrypted snapshot pagination are locally qualified against that original job, with unchanged effect fences and later LGTM recovery. Immutable phase planning and linked continuation (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, final release gates and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin/version-gated API/compiled CLI and connected operation-screen review with encrypted snapshot pagination are locally qualified against that original job, with unchanged effect fences and later LGTM recovery. A pure bound proposal compiler exists; private source collection, sealed durable plans and reviewed linked continuation (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
