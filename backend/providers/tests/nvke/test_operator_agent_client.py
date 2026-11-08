@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import json
 import os
@@ -24,7 +25,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from nvke.client import NvkeError
 from nvke.operator_agent_client import OperatorAgentClient, verify_contract
-from nvke.operator_contract import CATALOG, REVISION
+from nvke.operator_contract import CATALOG, REVISION, canonical
 
 SITE, INSTANCE, JOB = str(uuid4()), str(uuid4()), str(uuid4())
 INTENT = "b" * 64
@@ -207,8 +208,14 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "ce33b7c646f28272009dd1855405e1a9d8869771"
-    for name in ("operator_agent.py", "operator_contract.py"):
+    revision = "d5990f4a8a6434476423ece1017bccf1ecb07e1f"
+    for name in (
+        "operator_agent.py",
+        "operator_contract.py",
+        "management_recovery.py",
+        "qualify_bootstrap.py",
+        "tooling.py",
+    ):
         relative = "kubernetes/nvke/" + name
         assert (source / relative).read_bytes() == subprocess.check_output(
             ["git", "show", revision + ":" + relative], cwd=source
@@ -392,3 +399,188 @@ def test_stop_requires_explicit_current_capability_before_any_write(capability):
     ):
         client.stop_or_fence(JOB, command="generate.sitespec", intent=INTENT, effectful=False)
     assert error.value.code == "OPERATOR_CONTROL_UNSUPPORTED" and calls == ["GET"]
+
+
+def install_review_payload():
+    run = str(uuid4())
+    value = {
+        "source": {
+            "format": 1,
+            "revision": REVISION,
+            "siteId": SITE,
+            "instanceId": INSTANCE,
+            "bundleManifestSha256": DIGEST,
+            "id": JOB,
+            "intent": INTENT,
+            "command": "management.install",
+            "nativeRunId": run,
+        },
+        "review": {
+            "format": 1,
+            "scope": "read-only-retained-partial-management-install-review",
+            "nativeRevision": REVISION,
+            "observedAt": "2026-11-08T21:00:00+00:00",
+            "reviewerSha256": "c" * 64,
+            "qualificationHelperSha256": "d" * 64,
+            "bundle": {
+                "format": 1,
+                "revision": REVISION,
+                "capiVersion": "v1.13.6",
+                "binarySha256": "e" * 64,
+                "sourceArchiveSha256": "f" * 64,
+                "sourceTreeSha256": "a" * 64,
+            },
+            "originalAttempt": {
+                "runId": run,
+                "startedAt": "2026-11-08T20:22:39+00:00",
+                "argumentsDigest": "a" * 64,
+                "phase": "uncertain",
+                "exitCode": 1,
+            },
+            "privateEvidenceSha256": {k: "e" * 64 for k in ("guard", "started", "finished", "stdout", "stderr")},
+            "apiReady": True,
+            "continuationAuthorized": False,
+            "workloads": [
+                {
+                    "kind": "Deployment",
+                    "namespace": "nktp",
+                    "name": "lgtm",
+                    "generation": 1,
+                    "observedGeneration": 1,
+                    "desiredReplicas": 1,
+                    "readyReplicas": 0,
+                    "updatedReplicas": 1,
+                    "observation": "requires-review",
+                }
+            ],
+            "limitations": [PRIVATE],
+        },
+    }
+    value["reviewDigest"] = hashlib.sha256(canonical(value)).hexdigest()
+    return value
+
+
+def install_review_client(value, *, capability=None, replacement=False, original_status="uncertain"):
+    calls = []
+
+    def respond(request):
+        calls.append((request.method, request.url.path))
+        assert request.method == "GET"
+        if request.url.path == "/v1/identity":
+            return httpx.Response(
+                200,
+                json={
+                    "format": 1,
+                    "jobFormat": 2,
+                    "revision": REVISION,
+                    "siteId": SITE,
+                    "instanceId": str(uuid4()) if replacement and len(calls) > 1 else INSTANCE,
+                    "bundleManifestSha256": DIGEST,
+                    "commands": CATALOG,
+                    "installReview": capability
+                    if capability is not None
+                    else {"format": 1, "readOnly": True, "continuation": False},
+                },
+            )
+        assert request.headers["X-Astro-Nvke-Intent"] == INTENT
+        if request.url.path.endswith("/install-review"):
+            return httpx.Response(200, json=value)
+        return httpx.Response(
+            200,
+            json={
+                **receipt(),
+                "command": "management.install",
+                "state": original_status,
+                "effectful": True,
+                "nativeExitCode": 0 if original_status == "completed" else 1,
+            },
+        )
+
+    return OperatorAgentClient(
+        "https://agent.example",
+        site_id=SITE,
+        instance_id=INSTANCE,
+        bundle_manifest_sha256=DIGEST,
+        verify=ssl.create_default_context(),
+        transport=httpx.MockTransport(respond),
+    ), calls
+
+
+def test_install_review_projects_bound_facts_without_private_diagnostics_or_writes():
+    value = install_review_payload()
+    client, calls = install_review_client(value)
+    with client:
+        result = client.install_review(JOB, intent=INTENT)
+    assert result["source"] == value["source"] and result["reviewDigest"] == value["reviewDigest"]
+    assert result["continuationAuthorized"] is False and result["originalAttempt"]["phase"] == "uncertain"
+    assert result["workloads"][0]["observation"] == "requires-review"
+    assert "limitations" not in result and "bundle" not in result and PRIVATE not in json.dumps(result)
+    assert calls == [
+        ("GET", "/v1/identity"),
+        ("GET", "/v1/jobs/" + JOB),
+        ("GET", "/v1/jobs/" + JOB + "/install-review"),
+        ("GET", "/v1/identity"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "path,value",
+    [
+        (("source", "siteId"), str(uuid4())),
+        (("source", "nativeRunId"), "../other"),
+        (("source", "format"), True),
+        (("source", "intent"), "f" * 64),
+        (("review", "continuationAuthorized"), True),
+        (("review", "apiReady"), 1),
+        (("review", "originalAttempt", "exitCode"), 0),
+        (("review", "originalAttempt", "phase"), "completed"),
+        (("review", "originalAttempt", "runId"), str(uuid4())),
+        (("review", "observedAt"), "2026-11-08T21:00:00"),
+        (("review", "workloads", 0, "generation"), True),
+        (("review", "workloads", 0, "observation"), "ready"),
+        (("review", "workloads", 0, "name"), PRIVATE + "\n"),
+        (("review", "workloads", 0, "readyReplicas"), 2**63),
+        (("review", "bundle", "revision"), "b" * 40),
+        (("review", "privateEvidenceSha256", "stderr"), PRIVATE),
+        (("review", "reviewerSha256"), PRIVATE),
+    ],
+)
+def test_install_review_refuses_changed_or_malformed_sources_without_echoing_private_text(path, value):
+    data = install_review_payload()
+    target = data
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    data["reviewDigest"] = hashlib.sha256(canonical({"source": data["source"], "review": data["review"]})).hexdigest()
+    client, _calls = install_review_client(data)
+    with client, pytest.raises(NvkeError) as failure:
+        client.install_review(JOB, intent=INTENT)
+    assert failure.value.code == "OPERATOR_INVALID_RESPONSE" and PRIVATE not in str(failure.value)
+
+
+def test_install_review_requires_capability_original_failure_digest_and_stable_identity():
+    for changed in ["capability", "successful", "digest", "unknown", "duplicate", "replacement"]:
+        data = copy.deepcopy(install_review_payload())
+        if changed == "digest":
+            data["reviewDigest"] = "0" * 64
+        if changed == "unknown":
+            data["review"]["privateNativeOutput"] = PRIVATE
+        if changed == "duplicate":
+            data["review"]["workloads"] *= 2
+        if changed in {"unknown", "duplicate"}:
+            data["reviewDigest"] = hashlib.sha256(
+                canonical({"source": data["source"], "review": data["review"]})
+            ).hexdigest()
+        client, calls = install_review_client(
+            data,
+            capability={} if changed == "capability" else None,
+            replacement=changed == "replacement",
+            original_status="completed" if changed == "successful" else "uncertain",
+        )
+        with client, pytest.raises(NvkeError) as failure:
+            client.install_review(JOB, intent=INTENT)
+        assert PRIVATE not in str(failure.value) and all(method == "GET" for method, _path in calls)
+        if changed == "capability":
+            assert len(calls) == 1 and failure.value.code == "OPERATOR_CONTROL_UNSUPPORTED"
+        if changed == "successful":
+            assert len(calls) == 2 and failure.value.code == "PRECONDITION"

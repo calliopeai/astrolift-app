@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from nvke._operator_install_review import project as project_install_review
 from nvke._private_http import private_http
 from nvke.client import NvkeError, validate_endpoint_url
 from nvke.contract import upstream_revision
@@ -339,6 +340,47 @@ class OperatorAgentClient:
             result["state"] != "cancelled" or result["artifacts"] or "nativeExitCode" in result
         ):
             raise _invalid_response()
+        return result
+
+    def install_review(self, job_id: str, *, intent: str) -> dict[str, Any]:
+        self._bound()
+        try:
+            job_id = identifier(job_id)
+            if not isinstance(intent, str) or not _SHA.fullmatch(intent):
+                raise ValueError
+        except (ContractError, ValueError, TypeError):
+            raise NvkeError("INVALID_INPUT", "Use the original management-install identity and intent") from None
+        capability = self.identity().get("installReview")
+        if (
+            not isinstance(capability, dict)
+            or set(capability) != {"format", "readOnly", "continuation"}
+            or type(capability["format"]) is not int
+            or capability["format"] != 1
+            or capability["readOnly"] is not True
+            or capability["continuation"] is not False
+        ):
+            raise NvkeError("OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm read-only install review")
+        original = self.observe(job_id, command="management.install", intent=intent)
+        if (
+            original["state"] != "uncertain"
+            or original["effectful"] is not True
+            or (type(original.get("nativeExitCode")) is not int or original["nativeExitCode"] == 0)
+        ):
+            raise NvkeError("PRECONDITION", "Review requires the original retained unsuccessful install receipt")
+        data = self._request("GET", "/v1/jobs/" + job_id + "/install-review", intent=intent)
+        try:
+            result = project_install_review(
+                data,
+                site=self.site_id,
+                instance=str(self.instance_id),
+                bundle=str(self.bundle_digest),
+                job=job_id,
+                intent=intent,
+                exit_code=original["nativeExitCode"],
+            )
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+        self.identity()
         return result
 
     def artifact(
