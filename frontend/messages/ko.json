@@ -18010,6 +18010,17 @@
         "UNREADABLE": "확인을 읽을 수 없음"
       },
       "collectedHelp": "공급자 관측 정보를 저장했습니다. 완전성, 구성 및 자격 증명 확인 정보를 각각 검토하세요. 수집 성공은 공급자가 준비되었음을 보장하지 않습니다."
+    },
+    "providerCollection": {
+      "title": "공급자 관측 정보 수집",
+      "help": "검토한 관리 Kubernetes 연결을 통해 설치, 구성 및 자격 증명 확인 정보를 수집합니다. 제출 전에 원래 요청 ID를 저장합니다. 영수증 복구는 새 수집을 시작하지 않으며 수집 성공은 공급자의 준비 완료를 보장하지 않습니다.",
+      "collect": "공급자 수집",
+      "retry": "원래 수집 재시도",
+      "recover": "원래 영수증 복구",
+      "unavailable": "수집하려면 관리자 접근 권한, 활성 사이트 및 현재 계약과 일치하는 활성화된 관리 Kubernetes 연결이 필요합니다.",
+      "pending": "결과가 확인될 때까지 원래 요청을 보존하세요.",
+      "deadline": "관측 기한(초)",
+      "review": "{site}, 사이트 버전 {siteVersion}. 관리 연결 {connection}, 버전 {connectionVersion}, 대상 {endpoint}. 업스트림 리비전 {revision}. 관측 제한 시간: {timeout}초."
     }
   }
 }

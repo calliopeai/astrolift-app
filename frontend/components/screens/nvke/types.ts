@@ -153,6 +153,7 @@ export interface NvkeSitesScreenProps {
   onCreate: (values: NvkeCreateValues) => Promise<boolean>;
 }
 export interface NvkeSiteScreenProps {
+  providerRequest?: import("./NvkeProviderRequestPanel").NvkeProviderRequestPanelProps | null;
   metrics?: import("./NvkeMetricsPanel").NvkeMetricsPanelProps | null;
   temporal?: import("./NvkeTemporalPanel").NvkeTemporalPanelProps | null;
   workloadAccess?: NvkeWorkloadAccessPanelProps | null;

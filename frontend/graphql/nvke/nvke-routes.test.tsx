@@ -1521,3 +1521,59 @@ it("opens provider history without a live connection and clears it on administra
   expect(h.cache.extract()).toEqual({});
   h.client.stop();
 });
+
+it("collects provider facts from the site page and keeps the shared journal current", async () => {
+  const connection = {
+    id: "123e4567-e89b-12d3-a456-426614174091",
+    version: 3,
+    surface: "DATASTORE" as const,
+    endpoint: "https://management.example.test:6443",
+    isEnabled: true,
+    hasCredentials: true,
+    allowHttp: false,
+    timeoutSeconds: 30,
+    verificationCode: "",
+  };
+  const h = harness(
+    (request) => {
+      if (request.operationName === "RequestNvkeProviderObservation")
+        return {
+          requestNvkeProviderObservation: {
+            ok: true,
+            errors: [],
+            data: {
+              ...OPERATION,
+              requestId: request.variables.input.requestId,
+              operationKey: "infrastructure.providers",
+              isInventory: false,
+              providerSource: {
+                connectionId: connection.id,
+                connectionVersion: connection.version,
+                siteVersion: SITE.version,
+                upstreamRevision: SITE.upstreamRevision,
+              },
+            },
+          },
+        };
+      return { astroliftNvkeRequest: null };
+    },
+    COLLECTION,
+    { ...SITE, connections: [connection] }
+  );
+  const { result } = renderHook(() => useNvkeSite(SITE.id), { wrapper: h.wrapper });
+  await waitFor(() => expect(result.current.providerRequest?.canManage).toBe(true));
+  await act(async () => expect(await result.current.providerRequest!.onRequest(600)).toBe(true));
+  const request = h.calls.find((call) => call.operationName === "RequestNvkeProviderObservation")!;
+  expect(request.variables.input).toMatchObject({
+    siteId: SITE.id,
+    expectedSiteVersion: SITE.version,
+    expectedActorId: 41,
+    connectionId: connection.id,
+    expectedConnectionVersion: 3,
+    timeoutSeconds: 600,
+  });
+  expect(navigation.push).toHaveBeenCalledWith(`/nvke/${SITE.id}/operations/${OPERATION.id}`);
+  await waitFor(() => expect(result.current.recovery).toBeNull());
+  expect(h.cache.extract()).toEqual({});
+  h.client.stop();
+});

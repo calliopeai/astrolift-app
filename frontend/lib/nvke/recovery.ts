@@ -26,7 +26,43 @@ export type NvkeRecoveryRecord = RecoveryMetadata &
         authorityVersion: number;
       }
     | { format: 5; mode: "credentials"; source: NvkeResourceSource; authorityVersion: number }
+    | { format: 6; mode: "providers"; source: NvkeProviderRequestSource }
   );
+export interface NvkeProviderRequestSource {
+  connectionId: string;
+  connectionVersion: number;
+}
+export const validProviderRequestSource = (value: unknown): value is NvkeProviderRequestSource => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  return (
+    Object.keys(row).length === 2 &&
+    validNvkeGuid(row.connectionId) &&
+    Number.isSafeInteger(row.connectionVersion) &&
+    Number(row.connectionVersion) > 0
+  );
+};
+export const providerReceiptMatches = (record: NvkeRecoveryRecord, value: unknown) => {
+  if (record.format !== 6 || !value || typeof value !== "object" || Array.isArray(value))
+    return false;
+  const row = value as Record<string, unknown>;
+  return (
+    Object.keys(row).every((key) =>
+      [
+        "connectionId",
+        "connectionVersion",
+        "siteVersion",
+        "upstreamRevision",
+        "__typename",
+      ].includes(key)
+    ) &&
+    (row.__typename === undefined || row.__typename === "NvkeProviderSourceType") &&
+    row.connectionId === record.source.connectionId &&
+    row.connectionVersion === record.source.connectionVersion &&
+    row.siteVersion === record.expectedSiteVersion &&
+    row.upstreamRevision === record.revision
+  );
+};
 export interface NvkeResourceSource {
   operationId: string;
   version: number;
@@ -83,6 +119,7 @@ export interface NvkeRecoveryOperation {
   operationKey: string;
   isInventory: boolean;
   resourceSource?: unknown;
+  providerSource?: unknown;
 }
 export interface RecoveryStorage {
   getItem: (key: string) => string | null;
@@ -128,7 +165,7 @@ export function validateRecovery(
   const expectedFields =
     row.format === 4 || row.format === 5
       ? [...fields, "mode", "source", "authorityVersion"]
-      : row.format === 3
+      : row.format === 3 || row.format === 6
         ? [...fields, "mode", "source"]
         : row.format === 2
           ? [...fields, "mode"]
@@ -140,7 +177,12 @@ export function validateRecovery(
       row.format !== 2 &&
       row.format !== 3 &&
       row.format !== 4 &&
-      row.format !== 5) ||
+      row.format !== 5 &&
+      row.format !== 6) ||
+    (row.format === 6 &&
+      (row.mode !== "providers" ||
+        row.operationKey !== "infrastructure.providers" ||
+        !validProviderRequestSource(row.source))) ||
     (row.format === 5 &&
       (row.mode !== "credentials" ||
         row.operationKey !== "metrics.credentials" ||
@@ -253,6 +295,9 @@ export function archiveRecovery(
     (record.format === 3
       ? !sameResourceSource(record.source, operation.resourceSource)
       : operation.resourceSource != null) ||
+    (record.format === 6
+      ? !providerReceiptMatches(record, operation.providerSource)
+      : operation.providerSource != null) ||
     (recoveryMode(record) === "inventory") !== operation.isInventory ||
     record.operationKey !== operation.operationKey
   )

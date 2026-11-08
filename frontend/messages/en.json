@@ -18010,6 +18010,17 @@
         "UNREADABLE": "Check unreadable"
       },
       "collectedHelp": "The provider observation was saved. Review completeness, configuration and credential-check facts separately; collection success does not certify provider readiness."
+    },
+    "providerCollection": {
+      "title": "Collect provider observations",
+      "help": "Collect installation, configuration and credential-check facts through this reviewed management-Kubernetes connection. Save the original request identity before submission. Receipt recovery performs no new collection, and collection success does not certify provider readiness.",
+      "collect": "Collect providers",
+      "retry": "Retry original collection",
+      "recover": "Recover original receipt",
+      "unavailable": "Collection requires administrator access, an active site and an enabled management-Kubernetes connection matching the current contract.",
+      "pending": "Preserve this original request while its outcome is unconfirmed.",
+      "deadline": "Observation deadline (seconds)",
+      "review": "{site}, site version {siteVersion}. Management connection {connection}, version {connectionVersion}; target {endpoint}. Upstream revision {revision}. Observation deadline: {timeout} seconds."
     }
   }
 }

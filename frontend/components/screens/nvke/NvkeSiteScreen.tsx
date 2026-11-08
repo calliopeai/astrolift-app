@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { NvkeNativePanel } from "./NvkeNativePanel";
 import { NvkeTemporalPanel } from "./NvkeTemporalPanel";
+import { NvkeProviderRequestPanel } from "./NvkeProviderRequestPanel";
 import { NvkeMetricsPanel } from "./NvkeMetricsPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { connectionSchema } from "./schema";
@@ -292,10 +293,18 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
       {props.temporal && (
         <NvkeTemporalPanel
           {...props.temporal}
-          canManage={props.temporal.canManage && !props.metrics?.pending}
+          canManage={
+            props.temporal.canManage && !props.metrics?.pending && !props.providerRequest?.pending
+          }
         />
       )}
-      {props.metrics && <NvkeMetricsPanel {...props.metrics} />}
+      {props.metrics && (
+        <NvkeMetricsPanel
+          {...props.metrics}
+          canManage={props.metrics.canManage && !props.providerRequest?.pending}
+        />
+      )}
+      {props.providerRequest && <NvkeProviderRequestPanel {...props.providerRequest} />}
       <NvkeNativePanel
         key={`${site.id}:${props.contractRevision}:${props.actions.length}:${props.recovery?.requestId ?? "new"}`}
         {...props}

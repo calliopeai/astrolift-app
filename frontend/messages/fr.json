@@ -18013,6 +18013,17 @@
         "UNREADABLE": "Vérification illisible"
       },
       "collectedHelp": "L’observation du fournisseur a été enregistrée. Examinez séparément l’exhaustivité, la configuration et la vérification des identifiants ; une collecte réussie ne garantit pas la disponibilité du fournisseur."
+    },
+    "providerCollection": {
+      "title": "Collecter les observations des fournisseurs",
+      "help": "Collectez l’installation, la configuration et les vérifications des identifiants via cette connexion Kubernetes de gestion vérifiée. Enregistrez l’identité initiale avant l’envoi. La récupération du reçu ne relance aucune collecte et le succès ne garantit pas la disponibilité du fournisseur.",
+      "collect": "Collecter les fournisseurs",
+      "retry": "Réessayer la collecte initiale",
+      "recover": "Récupérer le reçu initial",
+      "unavailable": "La collecte nécessite un accès administrateur, un site actif et une connexion Kubernetes de gestion activée correspondant au contrat actuel.",
+      "pending": "Conservez cette demande initiale tant que son résultat est incertain.",
+      "deadline": "Délai d’observation (secondes)",
+      "review": "{site}, version du site {siteVersion}. Connexion de gestion {connection}, version {connectionVersion} ; cible {endpoint}. Révision amont {revision}. Délai d’observation : {timeout} secondes."
     }
   }
 }

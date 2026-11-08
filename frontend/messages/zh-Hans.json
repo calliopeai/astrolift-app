@@ -18010,6 +18010,17 @@
         "UNREADABLE": "无法读取检查"
       },
       "collectedHelp": "已保存提供商观测记录。请分别查看完整性、配置和凭据检查信息；收集成功并不能证明提供商已就绪。"
+    },
+    "providerCollection": {
+      "title": "收集提供商观测记录",
+      "help": "通过此已核对的管理 Kubernetes 连接收集安装、配置和凭据检查信息。提交前保存原始请求标识。恢复回执不会发起新收集，收集成功也不能证明提供商已就绪。",
+      "collect": "收集提供商信息",
+      "retry": "重试原始采集",
+      "recover": "恢复原始回执",
+      "unavailable": "收集需要管理员权限、活跃站点，以及与当前契约一致且已启用的管理 Kubernetes 连接。",
+      "pending": "结果未确认时请保留原始请求。",
+      "deadline": "观测期限（秒）",
+      "review": "{site}，站点版本 {siteVersion}。管理连接 {connection}，版本 {connectionVersion}；目标 {endpoint}。上游修订版本 {revision}。观测时限：{timeout} 秒。"
     }
   }
 }

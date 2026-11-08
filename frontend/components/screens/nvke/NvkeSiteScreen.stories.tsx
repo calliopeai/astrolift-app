@@ -1,3 +1,4 @@
+import { PROVIDER_REQUEST_PROPS } from "./NvkeProviderRequestPanel.stories";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fakeController } from "@/components/data-table/fixtures";
 import { NvkeSiteScreen } from "./NvkeSiteScreen";
@@ -51,3 +52,5 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const ProviderCollection: Story = { args: { providerRequest: PROVIDER_REQUEST_PROPS } };

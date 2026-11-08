@@ -784,8 +784,38 @@ server. The UI preserves nanoseconds and decimal strings, distinguishes partial
 collection from provider readiness, and clears retained facts on caller or
 capability changes. It does not require the original connection to remain live.
 
-The historical panel has all eight locale catalogs, Storybook states and browser
-accessibility/layout checks. Hook tests use controlled Apollo replies; these do
-not establish connected native execution. Provider collection/recovery UI, CLI
-wiring and native NICo/LaunchLayer controller, credential and physical
-infrastructure qualification remain pending in #2667.
+The site page now collects through the explicitly reviewed enabled management
+connection. Confirmation includes the site/connection IDs and versions, endpoint,
+pinned revision and deadline. Both read and administrator capabilities are required
+for admission. The shared browser journal uses recovery format 6 for provider
+requests: only caller/server/site metadata, connection ID/version, revision,
+deadline, request UUID and digest enter storage. Native connection endpoints,
+credentials and provider inventory remain outside storage. Unknown outcomes retain their original
+UUID and block a different intent; recovery looks up the original receipt before
+current authority/source checks. READ-only callers can recover receipt metadata
+after connection removal, but cannot read private provider history. The admitted
+source in each receipt must exactly match the journal before archival/navigation.
+
+Collection and history have all eight locale catalogs, Storybook states and
+browser accessibility/layout checks. The connected local browser test uses the
+real Astro API, PostgreSQL and Temporal with controlled Kubernetes HTTP responses.
+It drops the admission reply, removes the connection after successful collection,
+recovers the original receipt using a READ-only token and then checks history,
+paging, search and clearing search under administrator authority. Recovery/history
+perform no further native I/O. This caught and fixed empty-search null transport
+and old cursor resurrection when returning to an earlier filter.
+
+Run the connected case with a selected task-owned Storybook build, configured
+disposable database/Temporal services and Playwright Chromium:
+
+```sh
+ASTROLIFT_NVKE_STORYBOOK=/tmp/nvke-connected-storybook python -m pytest \
+  astrolift_clusters/tests/test_nvke_provider_browser_integration.py \
+  -o asyncio_mode=auto -q
+```
+
+The isolated Storybook harness only accepts owned loopback endpoints; tokens are
+injected through child stdin and browser memory. No native provider controller or
+hardware effects are established by these HTTP fixtures. Provider CLI wiring and
+native NICo/LaunchLayer controller, credential and physical infrastructure
+qualification remain pending in #2667.

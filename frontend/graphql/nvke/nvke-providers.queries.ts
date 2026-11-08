@@ -68,7 +68,7 @@ export const GET_NVKE_PROVIDER_IDENTITIES = gql`
     $expectedActorId: Int!
     $expectedVersion: Int!
     $provider: String!
-    $search: String
+    $search: String! = ""
     $limit: Int = 25
     $after: String
   ) {

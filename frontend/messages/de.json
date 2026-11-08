@@ -18013,6 +18013,17 @@
         "UNREADABLE": "Prüfung nicht lesbar"
       },
       "collectedHelp": "Die Anbieterbeobachtung wurde gespeichert. Prüfen Sie Vollständigkeit, Konfiguration und Zugangsdatenprüfung getrennt; eine erfolgreiche Erfassung bestätigt nicht die Betriebsbereitschaft."
+    },
+    "providerCollection": {
+      "title": "Anbieterbeobachtungen erfassen",
+      "help": "Erfassen Sie Installation, Konfiguration und Zugangsdatenprüfungen über diese geprüfte Management-Kubernetes-Verbindung. Speichern Sie die ursprüngliche Anforderungsidentität vor dem Senden. Die Belegwiederherstellung startet keine neue Erfassung; Erfolg bestätigt keine Betriebsbereitschaft.",
+      "collect": "Anbieter erfassen",
+      "retry": "Ursprüngliche Erfassung wiederholen",
+      "recover": "Ursprünglichen Beleg abrufen",
+      "unavailable": "Die Erfassung erfordert Administratorzugriff, eine aktive Site und eine aktivierte Management-Kubernetes-Verbindung passend zum aktuellen Vertrag.",
+      "pending": "Bewahren Sie den ursprünglichen Auftrag auf, solange das Ergebnis unbestätigt ist.",
+      "deadline": "Beobachtungsfrist (Sekunden)",
+      "review": "{site}, Site-Version {siteVersion}. Management-Verbindung {connection}, Version {connectionVersion}; Ziel {endpoint}. Upstream-Revision {revision}. Beobachtungsfrist: {timeout} Sekunden."
     }
   }
 }

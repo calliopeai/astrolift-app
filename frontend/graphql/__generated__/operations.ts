@@ -21746,6 +21746,13 @@ export type GetNvkeCredentialCertificatesQueryVariables = Exact<{
 
 export type GetNvkeCredentialCertificatesQuery = { astroliftNvkeCredentialCertificatesPage: { ok: boolean, errors: Array<{ code: string }>, data?: { siteId: string, operationId: string, operationVersion: number, scrapedAt: string, totalCount: number, nextCursor?: string | null, items: Array<{ key: string, node: string, credential: string, required?: boolean | null, observationAvailable?: boolean | null, latestInspectionAvailable?: boolean | null, observationAgeSeconds?: string | null, reportedNotAfter?: string | null, reportedExpiredAtScrape?: boolean | null }> } | null } };
 
+export type RequestNvkeProviderObservationMutationVariables = Exact<{
+  input: RequestNvkeProviderObservationInput;
+}>;
+
+
+export type RequestNvkeProviderObservationMutation = { requestNvkeProviderObservation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, siteId: string, requestId: string, operationKey: string, isInventory: boolean, status: NvkeOperationStatus, stage: string, generation: number, errorCode: string, errorMessage: string, cancellationRequestedAt?: string | null, startedAt?: string | null, finishedAt?: string | null, deadline: string, createdAt: string, updatedAt: string, providerSource?: { connectionId: string, connectionVersion: number, siteVersion: number, upstreamRevision: string } | null, resourceSource?: { operationId: string, version: number, resourceKey?: string | null } | null } | null } };
+
 export type GetNvkeProviderObservationQueryVariables = Exact<{
   siteId: Scalars['GUID']['input'];
   operationId: Scalars['GUID']['input'];
@@ -21762,7 +21769,7 @@ export type GetNvkeProviderIdentitiesQueryVariables = Exact<{
   expectedActorId: Scalars['Int']['input'];
   expectedVersion: Scalars['Int']['input'];
   provider: Scalars['String']['input'];
-  search?: InputMaybe<Scalars['String']['input']>;
+  search?: Scalars['String']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
   after?: InputMaybe<Scalars['String']['input']>;
 }>;

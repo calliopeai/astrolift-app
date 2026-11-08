@@ -133,6 +133,7 @@ export const useNvkeProviders = (args: {
       variables: { ...variables, provider: selected },
       skip: !ready,
       searchVariable: "search",
+      emptySearchValue: "",
       fetchPolicy: "no-cache",
       extract: (response) =>
         (response as GetNvkeProviderIdentitiesQuery | undefined)

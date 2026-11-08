@@ -18010,6 +18010,17 @@
         "UNREADABLE": "Verificação ilegível"
       },
       "collectedHelp": "A observação do provedor foi salva. Revise separadamente a integridade, a configuração e a verificação de credenciais; o sucesso da coleta não certifica que o provedor esteja pronto."
+    },
+    "providerCollection": {
+      "title": "Coletar observações dos provedores",
+      "help": "Colete dados de instalação, configuração e verificação de credenciais por esta conexão revisada ao Kubernetes de gerenciamento. Salve a identidade original antes do envio. A recuperação do recibo não inicia outra coleta, e o sucesso não certifica que o provedor esteja pronto.",
+      "collect": "Coletar provedores",
+      "retry": "Repetir coleta original",
+      "recover": "Recuperar recibo original",
+      "unavailable": "A coleta exige acesso de administrador, um site ativo e uma conexão habilitada ao Kubernetes de gerenciamento compatível com o contrato atual.",
+      "pending": "Preserve esta solicitação original enquanto o resultado não for confirmado.",
+      "deadline": "Prazo de observação (segundos)",
+      "review": "{site}, versão do site {siteVersion}. Conexão de gerenciamento {connection}, versão {connectionVersion}; destino {endpoint}. Revisão de origem {revision}. Prazo da observação: {timeout} segundos."
     }
   }
 }

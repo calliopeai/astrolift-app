@@ -58,6 +58,8 @@ export type CursorTableOptions<TRow, TVars extends OperationVariables> = {
    * is what client-side filtering over one fetched page amounted to.
    */
   searchVariable?: string;
+  /** Empty searches normally send null; use an empty string for required String arguments. */
+  emptySearchValue?: string | null;
   /**
    * Name of the query's cursor argument. The schema grew two spellings
    * before this hook existed — `after` on the events and audit pages,
@@ -143,6 +145,7 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
   extract,
   pageSize: initialPageSize = DEFAULT_PAGE_SIZE,
   searchVariable,
+  emptySearchValue = null,
   cursorVariable = "after",
   sortVariable,
   initialSort,
@@ -171,7 +174,14 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
   // against the old question: a cursor is a position in a result set, so
   // replaying one after the filter moved seeks into rows that may no longer
   // be there and the page silently skips or repeats.
-  const filterKey = JSON.stringify([debouncedSearch, pageSize, sort, variables, resetKey]);
+  const filterKey = JSON.stringify([
+    debouncedSearch,
+    pageSize,
+    sort,
+    variables,
+    resetKey,
+    emptySearchValue,
+  ]);
 
   /**
    * The walk. `stack[i]` is the cursor that produced page `i`, so page one
@@ -187,6 +197,7 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
     key: filterKey,
     stack: [null],
   });
+  if (walk.key !== filterKey) setWalk({ key: filterKey, stack: [null] });
   const stack = walk.key === filterKey ? walk.stack : [null];
   const cursor = stack[stack.length - 1];
 
@@ -208,7 +219,7 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
   const queryVariables = React.useMemo(() => {
     const vars: Record<string, unknown> = { ...variables, limit: pageSize };
     if (cursor) vars[cursorVariable] = cursor;
-    if (searchVariable) vars[searchVariable] = debouncedSearch || null;
+    if (searchVariable) vars[searchVariable] = debouncedSearch || emptySearchValue;
     if (sortVariable && sort) vars[sortVariable] = `${sort.key}:${sort.dir}`;
     return vars;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,6 +228,7 @@ export function useCursorTable<TRow, TVars extends OperationVariables = Operatio
     cursor,
     cursorVariable,
     searchVariable,
+    emptySearchValue,
     sortVariable,
     debouncedSearch,
     sort,

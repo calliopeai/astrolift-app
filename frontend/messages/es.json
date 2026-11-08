@@ -18013,6 +18013,17 @@
         "UNREADABLE": "Comprobación ilegible"
       },
       "collectedHelp": "Se guardó la observación del proveedor. Revise por separado la integridad, la configuración y la comprobación de credenciales; el éxito de la recopilación no certifica que el proveedor esté listo."
+    },
+    "providerCollection": {
+      "title": "Recopilar observaciones de proveedores",
+      "help": "Recopile datos de instalación, configuración y comprobación de credenciales mediante esta conexión revisada a Kubernetes de administración. Guarde la identidad original antes de enviar. Recuperar el recibo no inicia otra recopilación y el éxito no certifica que el proveedor esté listo.",
+      "collect": "Recopilar proveedores",
+      "retry": "Reintentar recopilación original",
+      "recover": "Recuperar recibo original",
+      "unavailable": "La recopilación requiere acceso de administrador, un sitio activo y una conexión habilitada a Kubernetes de administración que coincida con el contrato actual.",
+      "pending": "Conserve esta solicitud original mientras el resultado no esté confirmado.",
+      "deadline": "Plazo de observación (segundos)",
+      "review": "{site}, versión del sitio {siteVersion}. Conexión de administración {connection}, versión {connectionVersion}; destino {endpoint}. Revisión de origen {revision}. Plazo de observación: {timeout} segundos."
     }
   }
 }

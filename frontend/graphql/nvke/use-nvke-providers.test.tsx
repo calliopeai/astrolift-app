@@ -102,6 +102,7 @@ it("binds saved source and exact timestamps, then searches and pages the full re
   });
   await act(async () => h.calls[0].reply(summary()));
   await waitFor(() => expect(h.calls).toHaveLength(2));
+  expect(h.calls[1].request.variables.search).toBe("");
   await act(async () => h.calls[1].reply(page()));
   await waitFor(() => expect(result.current?.identities.rows).toHaveLength(1));
   expect(result.current?.observation?.providers[0].credentials?.identityGeneration).toBe(
@@ -119,6 +120,11 @@ it("binds saved source and exact timestamps, then searches and pages the full re
     provider: "nico",
   });
   expect(h.calls[3].request.variables.after ?? null).toBeNull();
+  await act(async () => h.calls[3].reply(page({ totalCount: 1, nextCursor: null })));
+  act(() => result.current!.identities.setSearch(""));
+  await waitFor(() => expect(h.calls).toHaveLength(5));
+  expect(h.calls[4].request.variables.search).toBe("");
+  expect(h.calls[4].request.variables.after ?? null).toBeNull();
   expect(h.cache.extract()).toEqual({});
   for (const call of h.calls)
     expect(call.request.getContext()).toMatchObject({

@@ -34,6 +34,7 @@ import { admitNvkeRequest, NvkeAdmissionError } from "@/lib/nvke/admission";
 import { useNvkeContext, useNvkeEpoch } from "./nvke.hooks";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { useNvkeTemporal } from "./use-nvke-temporal";
+import { useNvkeProviderRequest } from "./use-nvke-provider-request";
 import { useNvkeMetrics } from "./use-nvke-metrics";
 import { NVKE_REQUEST_CONTEXT, useNvkeRead } from "./use-scoped-read";
 import {
@@ -163,6 +164,21 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     enabled: !error && !loadFailed && !siteQuery.loading && !pending && !temporal?.pending,
     onSiteRefresh: siteQuery.refresh,
   });
+  const providerRequest = useNvkeProviderRequest({
+    context,
+    scopeKey: visitKey,
+    site,
+    contractRevision: contract?.revision ?? null,
+    enabled:
+      !context.failed &&
+      !siteQuery.loading &&
+      !siteQuery.failed &&
+      !pending &&
+      !temporal?.pending &&
+      !metrics?.pending,
+    onRefresh: refresh,
+    onJournalChange: () => setJournalEpoch((value) => value + 1),
+  });
   const runConfiguration = async (
     document: DocumentNode,
     input: object,
@@ -209,13 +225,18 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
   return {
     temporal,
     metrics,
+    providerRequest,
     workloadAccess,
     scopeKey: visitKey,
     site,
     loading: context.loading || siteQuery.loading,
     error,
     access: context.access,
-    pending: pending || Boolean(temporal?.pending) || Boolean(metrics?.pending),
+    pending:
+      pending ||
+      Boolean(temporal?.pending) ||
+      Boolean(metrics?.pending) ||
+      Boolean(providerRequest?.pending),
     operations,
     actions: contract?.actions ?? [],
     contractRevision: contract?.revision ?? null,
