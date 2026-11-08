@@ -214,7 +214,7 @@ Each family retains the complete required behavior. Local tooling is distinct fr
 | Deployment rendering | Inspect Helm values and stack config; render pinned deploy path and release inputs | Pinned native deploy-path, stack/values inspection and management install planning | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete. |
 | Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, kubeconfig and encryption-key outputs | Pinned local bootstrap, private outputs and durable attempt guard | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Actual seed/node bootstrap and API/UI admission/observation controls remain pending. |
 | Installation | Ordered CAPI/provider/management-plane install; validate pinned images, versions, storage and network | Pinned management install/check/access with ordered dry-run | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [nktp-kind](#evidence-nktp-kind). Remaining: NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending. |
-| Infrastructure providers | NICo and enabled LaunchLayer; CRDs, credentials and manager state; credential-health freshness | Pinned provider registry, metadata-only Kubernetes reader, durable observation API and provider collection/recovery/history UI | **partial** — [action-validation](#evidence-action-validation), [limits](#evidence-limits), [provider-classifier](#evidence-provider-classifier), [provider-reader](#evidence-provider-reader), [provider-reader-kube](#evidence-provider-reader-kube), [provider-api](#evidence-provider-api), [provider-api-kube](#evidence-provider-api-kube), [provider-ui](#evidence-provider-ui), [provider-hooks](#evidence-provider-hooks), [provider-journal](#evidence-provider-journal), [provider-collection-ui](#evidence-provider-collection-ui), [provider-browser](#evidence-provider-browser). Remaining: Provider CLI collection/history/recovery remains pending; qualify native NICo and enabled LaunchLayer credentials/controllers/hardware separately. |
+| Infrastructure providers | NICo and enabled LaunchLayer; CRDs, credentials and manager state; credential-health freshness | Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI | **partial** — [action-validation](#evidence-action-validation), [limits](#evidence-limits), [provider-classifier](#evidence-provider-classifier), [provider-reader](#evidence-provider-reader), [provider-reader-kube](#evidence-provider-reader-kube), [provider-api](#evidence-provider-api), [provider-api-kube](#evidence-provider-api-kube), [provider-ui](#evidence-provider-ui), [provider-hooks](#evidence-provider-hooks), [provider-journal](#evidence-provider-journal), [provider-collection-ui](#evidence-provider-collection-ui), [provider-browser](#evidence-provider-browser), [provider-cli](#evidence-provider-cli), [provider-cli-paired](#evidence-provider-cli-paired). Remaining: Native NICo and enabled LaunchLayer credential/controller/hardware qualification remains pending; local transport/admission evidence does not establish physical provider effects. |
 | Artifacts | Machine images, cluster releases, node-pool releases, release channels and control-plane classes | All six management CRDs plus public operator APIs | **local** — [crd-admission](#evidence-crd-admission), [release-deprecation](#evidence-release-deprecation), [http-fixture](#evidence-http-fixture), [resource-admission](#evidence-resource-admission), [cli-wiring](#evidence-cli-wiring). Remaining: Image/release/channel/profile supply chain and native reconciliation remain pending. |
 | Access | Kubeconfig retrieval and OIDC config generation, narrow automation identity, private route validation | Ownership-guarded kubeconfig retrieval, imported grants and NVKE-only token scopes | **local** — [access-api](#evidence-access-api), [kubeconfig-ownership](#evidence-kubeconfig-ownership), [paired-cli](#evidence-paired-cli). Remaining: Live OIDC/private route and physical workload access handoff remain pending. |
 | Credentials | Certificate expiry/renewal, SPIRE settings, bootstrap outputs and secure output/download | Separate credential observations and native certificate/SPIRE maintenance controls | **local** — [metric-api](#evidence-metric-api), [metric-browser](#evidence-metric-browser), [maintenance-api](#evidence-maintenance-api), [native-temporal](#evidence-native-temporal). Remaining: Actual native exporter, SPIRE/node effects and deployment acceptance remain pending. |
@@ -258,7 +258,7 @@ source declarations are also preserved. Help/completion/version use Astro's exis
 | `nvkectl get machineimages` | astro nvke datastore list-machine-image; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
 | `nvkectl get nodepoolreleases` | astro nvke datastore list-node-pool-release; shared reviewed API/UI action forms | **local** — [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring), [crd-admission](#evidence-crd-admission), [resource-admission](#evidence-resource-admission). Remaining: Kubernetes admission and shared Astro controls are covered; native reconciler/provider effects remain pending. |
 | `nvkectl get nodepools` | astro nvke controller list-node-pools; shared reviewed API/UI action forms | **fixture** — [http-fixture](#evidence-http-fixture), [action-validation](#evidence-action-validation), [api-catalog](#evidence-api-catalog), [ui-wiring](#evidence-ui-wiring), [ui-resource](#evidence-ui-resource), [cli-wiring](#evidence-cli-wiring). Remaining: Per-command native controller effects remain pending; catalog/path tests do not establish them. |
-| `nvkectl get providers` | Pinned provider registry, metadata-only Kubernetes reader, durable observation API and provider collection/recovery/history UI | **partial** — [provider-classifier](#evidence-provider-classifier), [provider-reader](#evidence-provider-reader), [provider-reader-kube](#evidence-provider-reader-kube), [provider-api](#evidence-provider-api), [provider-api-kube](#evidence-provider-api-kube), [provider-ui](#evidence-provider-ui), [provider-hooks](#evidence-provider-hooks), [provider-journal](#evidence-provider-journal), [provider-collection-ui](#evidence-provider-collection-ui), [provider-browser](#evidence-provider-browser). Remaining: Provider CLI collection/history/recovery remains pending; qualify native NICo and enabled LaunchLayer credentials/controllers/hardware separately. |
+| `nvkectl get providers` | Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI | **partial** — [provider-classifier](#evidence-provider-classifier), [provider-reader](#evidence-provider-reader), [provider-reader-kube](#evidence-provider-reader-kube), [provider-api](#evidence-provider-api), [provider-api-kube](#evidence-provider-api-kube), [provider-ui](#evidence-provider-ui), [provider-hooks](#evidence-provider-hooks), [provider-journal](#evidence-provider-journal), [provider-collection-ui](#evidence-provider-collection-ui), [provider-browser](#evidence-provider-browser), [provider-cli](#evidence-provider-cli), [provider-cli-paired](#evidence-provider-cli-paired). Remaining: Native NICo and enabled LaunchLayer credential/controller/hardware qualification remains pending; local transport/admission evidence does not establish physical provider effects. |
 | `nvkectl inspect nvkr-release` | astro nvke tooling run -- inspect nvkr-release | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
 | `nvkectl inspect sitespec` | astro nvke tooling run -- inspect sitespec | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
 | `nvkectl inspect stack-config` | astro nvke tooling run -- inspect stack-config | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling). Remaining: Native wrapper preserves options; executed scenarios vary by utility. No dedicated API/UI local-file workflow or live release supply-chain qualification. |
@@ -303,7 +303,7 @@ Selector: `test_complete_execution_catalog_is_available_through_real_schema`.
 
 ### Evidence cli-wiring
 
-[cmd/nvke_test.go](https://github.com/calliopeai/astrolift-cli/blob/baf38fe90c3c92a39e7f1471d531f846709145ab/cmd/nvke_test.go) — test. All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.
+[cmd/nvke_test.go](https://github.com/calliopeai/astrolift-cli/blob/472b155764e8118326257dc4049697fe6afc4f6b/cmd/nvke_test.go) — test. All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.
 
 Selector: `TestNVKEFullCatalogCommandsAreReachableWithoutNetwork`.
 
@@ -311,11 +311,11 @@ Paired source SHA-256: `1f05b99a5fb8f4fe0ffb11047fb29621cd1f8128199de68d15cafad8
 
 ### Evidence paired-cli
 
-[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/baf38fe90c3c92a39e7f1471d531f846709145ab/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.
+[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/472b155764e8118326257dc4049697fe6afc4f6b/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.
 
 Selector: `test_pinned_cli_vocabulary_matches_every_paired_server_action`.
 
-Paired source SHA-256: `e30bbd98369118029d25558635a4f99811bbf45ea22f5e17716a6a5927a160a2`.
+Paired source SHA-256: `563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0`.
 
 ### Evidence crd-admission
 
@@ -397,7 +397,7 @@ Paired source SHA-256: `e1e8062c87ab21275e7a4e2b7b697b5a4789579ada9218af589313a8
 
 ### Evidence cli-tooling
 
-[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/baf38fe90c3c92a39e7f1471d531f846709145ab/scripts/integration/test_nvke_tooling.py) — test. Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.
+[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/472b155764e8118326257dc4049697fe6afc4f6b/scripts/integration/test_nvke_tooling.py) — test. Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.
 
 Paired source SHA-256: `2289c3d9e93cb80ceb849c9c3611f90c7a7d31c516fe0cf1bb667ad301f52fd6`.
 
@@ -468,6 +468,20 @@ Selector: `test_real_database_and_tls_kubernetes_observation`.
 [backend/astrolift_clusters/tests/test_nvke_provider_browser_integration.py](../../backend/astrolift_clusters/tests/test_nvke_provider_browser_integration.py) — test. Owned Chromium through real Astro API/PostgreSQL/Temporal: dropped admission reply, one durable request, connection removal, READ-only receipt recovery, administrator-only historical data, server identity paging/search/clear and metadata-only browser storage. Controlled Kubernetes HTTP responses; no native provider controller/hardware effects.
 
 Selector: `test_browser_collects_once_recovers_read_only_and_reads_history_after_connection_removal`.
+
+### Evidence provider-cli
+
+[cmd/nvke_providers_test.go](https://github.com/calliopeai/astrolift-cli/blob/472b155764e8118326257dc4049697fe6afc4f6b/cmd/nvke_providers_test.go) — test. Controlled API peers for durable provider admission, frozen receipt provenance and wait fencing, private recovery records, exact timestamp/count strings and malformed history/identity-page refusal.
+
+Paired source SHA-256: `722dc771aa2e6c617ab62aa478de0967d37326cb82983ffb26f62dba59c9021e`.
+
+### Evidence provider-cli-paired
+
+[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/472b155764e8118326257dc4049697fe6afc4f6b/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.
+
+Selector: `test_compiled_cli_provider_collection_recovery_history_and_identity_pages`.
+
+Paired source SHA-256: `563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0`.
 
 
 ## Verification

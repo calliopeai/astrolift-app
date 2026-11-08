@@ -7,7 +7,7 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "baf38fe90c3c92a39e7f1471d531f846709145ab"
+      "revision": "472b155764e8118326257dc4049697fe6afc4f6b"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
@@ -62,7 +62,7 @@
       "kind": "test",
       "scope": "Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.",
       "symbol": "test_pinned_cli_vocabulary_matches_every_paired_server_action",
-      "sha256": "e30bbd98369118029d25558635a4f99811bbf45ea22f5e17716a6a5927a160a2"
+      "sha256": "563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0"
     },
     "crd-admission": {
       "repository": "app",
@@ -267,6 +267,21 @@
       "kind": "test",
       "symbol": "test_browser_collects_once_recovers_read_only_and_reads_history_after_connection_removal",
       "scope": "Owned Chromium through real Astro API/PostgreSQL/Temporal: dropped admission reply, one durable request, connection removal, READ-only receipt recovery, administrator-only historical data, server identity paging/search/clear and metadata-only browser storage. Controlled Kubernetes HTTP responses; no native provider controller/hardware effects."
+    },
+    "provider-cli": {
+      "repository": "cli",
+      "path": "cmd/nvke_providers_test.go",
+      "kind": "test",
+      "scope": "Controlled API peers for durable provider admission, frozen receipt provenance and wait fencing, private recovery records, exact timestamp/count strings and malformed history/identity-page refusal.",
+      "sha256": "722dc771aa2e6c617ab62aa478de0967d37326cb82983ffb26f62dba59c9021e"
+    },
+    "provider-cli-paired": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_contracts.py",
+      "kind": "test",
+      "symbol": "test_compiled_cli_provider_collection_recovery_history_and_identity_pages",
+      "scope": "Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.",
+      "sha256": "563f7c980da674b5746feb5b08b7e44867f754e77364ddd9578e63a5e2c79aa0"
     }
   },
   "rows": {
@@ -2100,7 +2115,7 @@
         "remaining": "Per-command native controller effects remain pending; catalog/path tests do not establish them."
       },
       "nvkectl get providers": {
-        "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API and provider collection/recovery/history UI",
+        "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
         "qualification": "partial",
         "evidence": [
           "provider-classifier",
@@ -2112,9 +2127,11 @@
           "provider-hooks",
           "provider-journal",
           "provider-collection-ui",
-          "provider-browser"
+          "provider-browser",
+          "provider-cli",
+          "provider-cli-paired"
         ],
-        "remaining": "Provider CLI collection/history/recovery remains pending; qualify native NICo and enabled LaunchLayer credentials/controllers/hardware separately."
+        "remaining": "Native NICo and enabled LaunchLayer credential/controller/hardware qualification remains pending; local transport/admission evidence does not establish physical provider effects."
       },
       "nvkectl inspect nvkr-release": {
         "mapping": "astro nvke tooling run -- inspect nvkr-release",
@@ -2271,7 +2288,7 @@
         "remaining": "NKTP local installation is qualified separately; full NVKE management-plane installation and API/UI controls remain pending."
       },
       "infrastructure-providers": {
-        "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API and provider collection/recovery/history UI",
+        "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
         "qualification": "partial",
         "evidence": [
           "action-validation",
@@ -2285,9 +2302,11 @@
           "provider-hooks",
           "provider-journal",
           "provider-collection-ui",
-          "provider-browser"
+          "provider-browser",
+          "provider-cli",
+          "provider-cli-paired"
         ],
-        "remaining": "Provider CLI collection/history/recovery remains pending; qualify native NICo and enabled LaunchLayer credentials/controllers/hardware separately."
+        "remaining": "Native NICo and enabled LaunchLayer credential/controller/hardware qualification remains pending; local transport/admission evidence does not establish physical provider effects."
       },
       "artifacts": {
         "mapping": "All six management CRDs plus public operator APIs",

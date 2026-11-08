@@ -816,6 +816,22 @@ ASTROLIFT_NVKE_STORYBOOK=/tmp/nvke-connected-storybook python -m pytest \
 
 The isolated Storybook harness only accepts owned loopback endpoints; tokens are
 injected through child stdin and browser memory. No native provider controller or
-hardware effects are established by these HTTP fixtures. Provider CLI wiring and
-native NICo/LaunchLayer controller, credential and physical infrastructure
-qualification remain pending in #2667.
+hardware effects are established by these HTTP fixtures.
+
+The paired CLI exposes `astro nvke providers catalog`, `request`, `recover`,
+`observation` and `identities`. New requests review explicit site/connection GUIDs
+and versions and flush an exclusive private metadata file before admission.
+Reusing the file looks up the original receipt before current authority reads;
+`recover` performs no admission, and READ-only tokens can recover metadata after
+connection removal. Receipt provenance and wait polling bind the admitted
+connection/version/site-version/pin. Historical provider fields preserve nulls,
+nanosecond times and decimal strings. Identity pages default to 25, allow 1–100,
+and bind search/provider/page-size/version through the server's opaque cursor.
+
+The compiled provider CLI case uses real Astro/PostgreSQL/Temporal with controlled
+Kubernetes HTTP responses and checks loss recovery, one durable collection,
+removed-authority history, exact values, server paging/search and READ-only payload
+refusal. The paired ten-case CLI suite additionally exercises the real Kubernetes
+API and existing native workflow fixtures; it does not qualify physical provider
+effects. Native NICo/LaunchLayer controller, credential and physical infrastructure
+qualification remains pending in #2667.
