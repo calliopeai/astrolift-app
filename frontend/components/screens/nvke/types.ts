@@ -147,6 +147,7 @@ export interface NvkeSitesScreenProps {
   onCreate: (values: NvkeCreateValues) => Promise<boolean>;
 }
 export interface NvkeSiteScreenProps {
+  metrics?: import("./NvkeMetricsPanel").NvkeMetricsPanelProps | null;
   temporal?: import("./NvkeTemporalPanel").NvkeTemporalPanelProps | null;
   workloadAccess?: NvkeWorkloadAccessPanelProps | null;
   site: NvkeSiteView | null;
@@ -168,6 +169,7 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  credentials?: import("./NvkeCredentialPanel").NvkeCredentialPanelProps | null;
   workflows?: NvkeWorkflowPanelProps | null;
   maintenance?: NvkeMaintenancePanelProps | null;
   workloadAccess?: NvkeWorkloadAccessPanelProps | null;

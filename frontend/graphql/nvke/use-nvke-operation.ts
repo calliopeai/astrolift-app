@@ -27,6 +27,7 @@ import {
 import { useNvkeDiagnostics } from "./use-nvke-diagnostics";
 import { useNvkeWorkflows } from "./use-nvke-workflows";
 import { useNvkeMaintenance } from "./use-nvke-maintenance";
+import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { CANCEL_NVKE_OPERATION, RESUME_NVKE_OPERATION } from "./nvke.mutations";
 
@@ -86,7 +87,10 @@ export const useNvkeOperation = (
   const loading = context.loading || detail.loading || site.loading || catalog.loading;
   const failed =
     context.failed || detail.failed || site.failed || catalog.failed || (!context.loading && !key);
-  const permission = nativeMaintenancePermission(operation?.operationKey) ?? action?.permission;
+  const permission =
+    operation?.operationKey === "metrics.credentials"
+      ? "nvke.admin"
+      : (nativeMaintenancePermission(operation?.operationKey) ?? action?.permission);
   const canAct =
     !!key &&
     !loading &&
@@ -107,6 +111,13 @@ export const useNvkeOperation = (
     siteId,
     operation,
     enabled: canAct,
+  });
+  const credentials = useNvkeCredentials({
+    context,
+    scopeKey: visitKey,
+    siteId,
+    operation,
+    enabled: !loading && !failed,
   });
   const workloadAccess = useNvkeWorkloadAccess({
     context,
@@ -184,6 +195,7 @@ export const useNvkeOperation = (
     operation,
     diagnostics,
     maintenance,
+    credentials,
     workflows,
     workloadAccess,
     siteName: site.data?.astroliftNvkeSite?.name ?? "",

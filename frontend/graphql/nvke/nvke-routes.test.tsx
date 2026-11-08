@@ -23,6 +23,7 @@ import { useNvkeContext } from "./nvke.hooks";
 import { useNvkeResourceActions } from "./use-nvke-resource-actions";
 import { useNvkeSite } from "./use-nvke-site";
 import { useNvkeOperation } from "./use-nvke-operation";
+import { CREDENTIAL_PROPS } from "@/components/screens/nvke/NvkeCredentialPanel.stories";
 import { useNvkeInventory, useNvkeResource } from "./use-nvke-inventory";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
@@ -1304,6 +1305,73 @@ it("does not infer permission for an unknown temporal operation", async () => {
   });
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.canAct).toBe(false);
+  h.client.stop();
+});
+
+it("wires historical credential views for readers while raw result controls require admin", async () => {
+  caller.admin = false;
+  caller.manage = false;
+  const h = harness((request) => {
+    if (request.operationName === "GetNvkeCredentialObservation")
+      return {
+        astroliftNvkeCredentialObservation: {
+          ok: true,
+          errors: [],
+          data: CREDENTIAL_PROPS.observation,
+        },
+      };
+    if (request.operationName?.startsWith("GetNvkeCredential")) {
+      const certificates = request.operationName.includes("Certificates");
+      return {
+        [certificates
+          ? "astroliftNvkeCredentialCertificatesPage"
+          : "astroliftNvkeCredentialMetricsPage"]: {
+          ok: true,
+          errors: [],
+          data: {
+            ...CREDENTIAL_PROPS.observation,
+            items: certificates
+              ? CREDENTIAL_PROPS.certificates.rows
+              : CREDENTIAL_PROPS.samples.rows,
+            totalCount: 1,
+            nextCursor: null,
+          },
+        },
+      };
+    }
+    return {
+      astroliftNvkeOperation: {
+        ...OPERATION,
+        operationKey: "metrics.credentials",
+        status: "SUCCEEDED",
+        version: 12,
+      },
+    };
+  });
+  const { result, rerender } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.credentials?.samples.rows).toHaveLength(1));
+  expect(result.current.credentials?.observation?.collectionSucceeded).toBe(false);
+  expect(result.current.canAct).toBe(false);
+  await act(async () => result.current.onDownload());
+  expect(h.calls.some((call) => call.operationName?.includes("Result"))).toBe(false);
+  caller.admin = true;
+  rerender();
+  await waitFor(() => expect(result.current.canAct).toBe(true));
+  h.client.stop();
+});
+
+it("does not infer permission or historical views for an unknown metrics key", async () => {
+  const h = harness(() => ({
+    astroliftNvkeOperation: { ...OPERATION, operationKey: "metrics.Unknown", status: "SUCCEEDED" },
+  }));
+  const { result } = renderHook(() => useNvkeOperation(SITE.id, OPERATION.id), {
+    wrapper: h.wrapper,
+  });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(result.current.canAct).toBe(false);
+  expect(result.current.credentials).toBeNull();
   h.client.stop();
 });
 

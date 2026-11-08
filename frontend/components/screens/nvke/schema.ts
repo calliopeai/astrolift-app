@@ -67,6 +67,31 @@ export const temporalAuthoritySchema = z
   )
   .refine((v) => v.useTls || (!v.serverName && v.credentialMode !== "replace"));
 
+export const metricsAuthoritySchema = z
+  .object(connectionSchema.shape)
+  .omit({ surface: true })
+  .refine(
+    (v) =>
+      v.credentialMode !== "replace" || Boolean(v.clientCertificatePem) === Boolean(v.clientKeyPem)
+  )
+  .refine((v) => {
+    try {
+      const url = new URL(v.endpoint);
+      return (
+        (url.protocol === "https:" || (v.allowHttp && url.protocol === "http:")) &&
+        !url.username &&
+        !url.password &&
+        !url.search &&
+        !url.hash &&
+        url.port !== "0" &&
+        !/[\\%\s\p{C}]/u.test(v.endpoint) &&
+        !v.endpoint.split("/").some((segment) => segment === "." || segment === "..")
+      );
+    } catch {
+      return false;
+    }
+  });
+
 const nativePrivateText = z
   .string()
   .refine(

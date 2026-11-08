@@ -17,6 +17,7 @@ import { nvkeInventoryHref } from "@/lib/nvke/inventory";
 import { NvkeDiagnosticsPanel } from "./NvkeDiagnosticsPanel";
 import { NvkeWorkflowPanel } from "./NvkeWorkflowPanel";
 import { NvkeMaintenancePanel } from "./NvkeMaintenancePanel";
+import { NvkeCredentialPanel } from "./NvkeCredentialPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { nvkeFinished, type NvkeOperationScreenProps } from "./types";
 
@@ -34,6 +35,7 @@ export function NvkeOperationScreen({
   onDownload,
   diagnostics,
   maintenance,
+  credentials,
   workflows,
   workloadAccess,
 }: NvkeOperationScreenProps) {
@@ -159,6 +161,7 @@ export function NvkeOperationScreen({
       />
       {diagnostics && <NvkeDiagnosticsPanel {...diagnostics} />}
       {maintenance && <NvkeMaintenancePanel {...maintenance} />}
+      {credentials && <NvkeCredentialPanel {...credentials} />}
       {workflows && <NvkeWorkflowPanel {...workflows} />}
       {workloadAccess && <NvkeWorkloadAccessPanel {...workloadAccess} />}
       <p className="text-muted-foreground text-sm">{t("resultHelp")}</p>

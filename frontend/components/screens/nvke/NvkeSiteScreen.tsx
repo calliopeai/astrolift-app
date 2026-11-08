@@ -40,6 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { NvkeNativePanel } from "./NvkeNativePanel";
 import { NvkeTemporalPanel } from "./NvkeTemporalPanel";
+import { NvkeMetricsPanel } from "./NvkeMetricsPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { connectionSchema } from "./schema";
 import {
@@ -288,7 +289,13 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
           empty={{ icon: <CableIcon />, title: t("notConfigured") }}
         />
       </Section>
-      {props.temporal && <NvkeTemporalPanel {...props.temporal} />}
+      {props.temporal && (
+        <NvkeTemporalPanel
+          {...props.temporal}
+          canManage={props.temporal.canManage && !props.metrics?.pending}
+        />
+      )}
+      {props.metrics && <NvkeMetricsPanel {...props.metrics} />}
       <NvkeNativePanel
         key={`${site.id}:${props.contractRevision}:${props.actions.length}:${props.recovery?.requestId ?? "new"}`}
         {...props}

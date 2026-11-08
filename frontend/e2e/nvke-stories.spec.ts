@@ -4,6 +4,15 @@ import { expect, test } from "@playwright/test";
 
 const axe = readFileSync(path.resolve("node_modules/axe-core/axe.min.js"), "utf8");
 const stories = [
+  "screens-nvke-metrics-authority--full",
+  "screens-nvke-metrics-authority--empty",
+  "screens-nvke-metrics-authority--read-only",
+  "screens-nvke-metrics-authority--failure",
+  "screens-nvke-credential-observations--retained-expiry",
+  "screens-nvke-credential-observations--missing",
+  "screens-nvke-credential-observations--failure",
+  "screens-nvke-site--metrics",
+  "screens-nvke-operation--credentials",
   "screens-tokens-scopepicker--nvke-automation",
   "screens-tokens-scopepicker--nvke-reader-role",
   "screens-nvke-native-maintenance-workflows--retained-rotation",
@@ -49,6 +58,58 @@ const stories = [
   "screens-nvke-maintenance--retained-rotation",
   "screens-nvke-operation--maintenance",
 ];
+
+test("metrics authority reviews the exact URL without retaining the bearer", async ({ page }) => {
+  await page.goto("/iframe.html?id=screens-nvke-metrics-authority--full&viewMode=story");
+  await page.getByRole("button", { name: "Configure connection", exact: true }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByRole("combobox").click();
+  await page.getByRole("option", { name: "Replace credential bundle", exact: true }).click();
+  await sheet.getByLabel("Metrics bearer token", { exact: true }).fill("PRIVATE_METRICS_TOKEN");
+  await sheet.getByRole("button", { name: "Review change", exact: true }).click();
+  const review = page.getByRole("alertdialog");
+  await expect(review).toContainText("metrics authority version 2");
+  await expect(review).toContainText("https://metrics.example.test/controller/metrics");
+  await expect(review).not.toContainText("PRIVATE_METRICS_TOKEN");
+  await review.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(sheet).not.toBeVisible();
+  await page.getByRole("button", { name: "Configure connection", exact: true }).click();
+  await page.getByRole("dialog").getByRole("combobox").click();
+  await page.getByRole("option", { name: "Replace credential bundle", exact: true }).click();
+  await expect(page.getByLabel("Metrics bearer token", { exact: true })).toHaveValue("");
+});
+
+test("credential views retain exact values and independent observation facts", async ({ page }) => {
+  await page.goto(
+    "/iframe.html?id=screens-nvke-credential-observations--retained-expiry&viewMode=story"
+  );
+  await expect(page.getByText("9007199254740993", { exact: true })).toBeVisible();
+  await expect(page.getByText("Collection succeeded", { exact: true }).locator("..")).toContainText(
+    "No"
+  );
+  await expect(
+    page.getByText("Renewal automation enabled", { exact: true }).locator("..")
+  ).toContainText("Not reported");
+  await expect(page.getByText("2026-11-01T00:00:00Z", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Historical exporter reports/)).toContainText("not current health");
+  await page.screenshot({
+    path: test.info().outputPath("nvke-credential-observations.png"),
+    fullPage: true,
+  });
+});
+
+test("metrics long identifiers fit the viewport", async ({ page }) => {
+  for (const id of [
+    "screens-nvke-metrics-authority--long-strings",
+    "screens-nvke-credential-observations--long-strings",
+  ]) {
+    await page.goto(`/iframe.html?id=${id}&viewMode=story`);
+    await page.getByRole("heading").first().waitFor();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+    ).toBe(true);
+  }
+});
 
 test("NVKE automation presets select only explicit NVKE scopes", async ({ page }) => {
   await page.goto("/iframe.html?id=screens-tokens-scopepicker--nvke-automation&viewMode=story");
@@ -165,7 +226,10 @@ for (const mode of ["light", "dark"]) {
   for (const id of stories) {
     test(`nvke accessibility ${id} in ${mode}`, async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
-      await page.goto(`/iframe.html?id=${id}&viewMode=story&globals=mode:${mode}`);
+      // This test owns the Axe scan; the addon's automatic scan would race it.
+      await page.goto(
+        `/iframe.html?id=${id}&viewMode=story&globals=mode:${mode};a11y.manual:!true`
+      );
       if (id.startsWith("screens-tokens-scopepicker--"))
         await page.getByRole("group", { name: "NVKE", exact: true }).waitFor();
       else await page.locator("#storybook-root").locator("h1,h2").first().waitFor();

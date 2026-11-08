@@ -34,6 +34,7 @@ import { admitNvkeRequest, NvkeAdmissionError } from "@/lib/nvke/admission";
 import { useNvkeContext, useNvkeEpoch } from "./nvke.hooks";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
 import { useNvkeTemporal } from "./use-nvke-temporal";
+import { useNvkeMetrics } from "./use-nvke-metrics";
 import { NVKE_REQUEST_CONTEXT, useNvkeRead } from "./use-scoped-read";
 import {
   GET_NVKE_SITE,
@@ -55,7 +56,14 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
   const t = useTranslations("nvke");
   const key =
     context.scopeKey && validNvkeGuid(siteId) && context.access.read
-      ? JSON.stringify([context.scopeKey, siteId])
+      ? JSON.stringify([
+          context.scopeKey,
+          siteId,
+          context.access.read,
+          context.access.manage,
+          context.access.admin,
+          context.access.loading,
+        ])
       : "";
   const { isCurrent: current, key: visitKey } = useNvkeEpoch(key);
   const requestContext = {
@@ -148,6 +156,13 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
     enabled: !error && !loadFailed && !siteQuery.loading && !pending,
     onSiteRefresh: siteQuery.refresh,
   });
+  const metrics = useNvkeMetrics({
+    context,
+    scopeKey: visitKey,
+    site,
+    enabled: !error && !loadFailed && !siteQuery.loading && !pending && !temporal?.pending,
+    onSiteRefresh: siteQuery.refresh,
+  });
   const runConfiguration = async (
     document: DocumentNode,
     input: object,
@@ -193,13 +208,14 @@ export const useNvkeSite = (siteId: string): NvkeSiteScreenProps & { scopeKey: s
   };
   return {
     temporal,
+    metrics,
     workloadAccess,
     scopeKey: visitKey,
     site,
     loading: context.loading || siteQuery.loading,
     error,
     access: context.access,
-    pending: pending || Boolean(temporal?.pending),
+    pending: pending || Boolean(temporal?.pending) || Boolean(metrics?.pending),
     operations,
     actions: contract?.actions ?? [],
     contractRevision: contract?.revision ?? null,

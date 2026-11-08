@@ -58,7 +58,12 @@ on its separate metrics listener; Astrolift does not infer its address or reuse
 REST or management kubeconfig credentials. The paired CLI exposes
 `astro nvke metrics catalog/get/configure/verify/enable/disable/remove`, durable
 `request/recover`, and historical `observation/certificates/samples` commands.
-Browser controls remain open under #2666, a child of #2661.
+The browser site page supports metrics-authority configuration, verification,
+enable/disable and removal. Successful `metrics.credentials` operation pages show
+historical subsystem flags and server-paged certificate/sample tables with search.
+READ access permits these views; raw downloads and operation controls require
+administrator access. Browser request/recovery controls remain open under #2666,
+a child of #2661; the CLI can already collect and recover observations.
 
 The reader pins all 18 credential gauges and 16 kubeadm credential names from the
 upstream collector and agent catalog. It selects only an exact cluster name's

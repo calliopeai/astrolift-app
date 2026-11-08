@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { WORKFLOW_PROPS, WORKFLOW_HISTORY } from "./NvkeWorkflowPanel.stories";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import accessStory from "./NvkeWorkloadAccessPanel.stories";
+import { CREDENTIAL_PROPS } from "./NvkeCredentialPanel.stories";
 import { fakeController } from "@/components/data-table/fixtures";
 import {
   DIAGNOSTIC_OBSERVATION,
@@ -17,6 +18,17 @@ export default {
   args: OPERATION_DETAIL,
 } satisfies Meta<typeof NvkeOperationScreen>;
 type Story = StoryObj<typeof NvkeOperationScreen>;
+export const Credentials: Story = {
+  args: {
+    operation: {
+      ...OPERATION,
+      operationKey: "metrics.credentials",
+      status: "SUCCEEDED",
+      version: 12,
+    },
+    credentials: CREDENTIAL_PROPS,
+  },
+};
 export const Maintenance: Story = {
   args: {
     operation: { ...OPERATION, operationKey: "getCluster", status: "SUCCEEDED" },
