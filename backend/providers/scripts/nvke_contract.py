@@ -128,6 +128,7 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
         "NOTICE",
     }
     for pattern in (
+        "controller/internal/temporal/activities/*.go",
         "management-engine/apis/v1/*.go",
         "management-engine/pkg/resource/*.go",
         "management-engine/config/crd/bases/*.yaml",
@@ -154,6 +155,14 @@ def inventory(checkout: Path, cli_inventory: Path) -> dict[str, Any]:
         "cli_source_declarations": declarations,
         "cli_runtime": runtime_commands,
         "native_workflows": native_workflows(checkout),
+        "native_activity_names": sorted(
+            {
+                name
+                for path in (checkout / "controller/internal/temporal/activities").glob("*.go")
+                if not path.name.endswith("_test.go")
+                for name in re.findall(r"func \(\w+ \*Activities\) ([A-Z]\w*)\(", path.read_text())
+            }
+        ),
     }
 
 

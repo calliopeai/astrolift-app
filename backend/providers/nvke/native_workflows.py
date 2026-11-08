@@ -14,6 +14,10 @@ def workflows() -> list[dict[str, Any]]:
     return copy.deepcopy(_contract()["native_workflows"])
 
 
+def activity_names() -> frozenset[str]:
+    return frozenset(_contract()["native_activity_names"])
+
+
 def validate_input(name: str, parameters: dict[str, Any]) -> dict[str, Any]:
     selected = next((row for row in workflows() if row["name"] == name), None)
     if selected is None:

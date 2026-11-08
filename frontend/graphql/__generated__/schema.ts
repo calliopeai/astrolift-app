@@ -13160,6 +13160,41 @@ export type NvkeNativeConditionType = {
   status: Scalars['String']['output'];
 };
 
+export type NvkeNativeHistoryEventType = {
+  activityType?: Maybe<Scalars['String']['output']>;
+  eventId: Scalars['String']['output'];
+  eventType: Scalars['String']['output'];
+  occurredAt?: Maybe<Scalars['DateTime']['output']>;
+  scheduledEventId?: Maybe<Scalars['String']['output']>;
+  workflowTaskCompletedEventId?: Maybe<Scalars['String']['output']>;
+};
+
+export type NvkeNativeHistoryPageType = {
+  authorityVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  items: Array<NvkeNativeHistoryEventType>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  observedAt: Scalars['DateTime']['output'];
+  recordedPhase?: Maybe<Scalars['String']['output']>;
+  recordedState?: Maybe<Scalars['String']['output']>;
+  retainedMutationLock?: Maybe<Scalars['Boolean']['output']>;
+  runId: Scalars['String']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  sourceObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  sourceOperationId: Scalars['GUID']['output'];
+  sourceVersion: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  workflow: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
+export type NvkeNativeHistoryPageTypeMutationResult = {
+  data?: Maybe<NvkeNativeHistoryPageType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeNativeWorkflowType = {
   inputSchema: Scalars['JSON']['output'];
   inputType: Scalars['String']['output'];
@@ -13928,6 +13963,7 @@ export type Query = {
   astroliftNvkeInventoryPage: NvkeInventoryPageType;
   astroliftNvkeInventoryResource: NvkeInventoryResourceType;
   astroliftNvkeMaintenanceObservation: NvkeMaintenanceObservationType;
+  astroliftNvkeNativeHistory: NvkeNativeHistoryPageTypeMutationResult;
   astroliftNvkeOperation?: Maybe<NvkeOperationType>;
   astroliftNvkeOperationResult: JsonMutationResult;
   astroliftNvkeOperationResultText: StrMutationResult;
@@ -15542,6 +15578,11 @@ export type QueryAstroliftNvkeMaintenanceObservationArgs = {
 };
 
 
+export type QueryAstroliftNvkeNativeHistoryArgs = {
+  input: ReadNvkeNativeHistoryInput;
+};
+
+
 export type QueryAstroliftNvkeOperationArgs = {
   operationId: Scalars['GUID']['input'];
 };
@@ -16841,6 +16882,18 @@ export type ReachabilityStatus =
   | 'NO_MANAGED_DOMAIN'
   | 'PROVISIONING'
   | 'REACHABLE';
+
+export type ReadNvkeNativeHistoryInput = {
+  after: InputMaybe<Scalars['String']['input']>;
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedSourceVersion: Scalars['Int']['input'];
+  limit: Scalars['Int']['input'];
+  siteId: Scalars['GUID']['input'];
+  sourceOperationId: Scalars['GUID']['input'];
+  workflow: Scalars['String']['input'];
+};
 
 export type ReapCloudOrphanInput = {
   clusterSlug: InputMaybe<Scalars['String']['input']>;

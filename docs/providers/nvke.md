@@ -10,6 +10,20 @@ The contract snapshot preserves full OpenAPI request/response definitions, all s
 CLI reference content, compiled command paths/flags, source declarations and source SHA-256 hashes.
 Upstream content is Apache-2.0; its license and notice accompany the snapshot.
 
+## Native operator workflows
+
+These separately pinned Temporal entry points are not HTTP/datastore actions.
+Native reset recovery requires exact owner/run/event review; a closed workflow does not prove node work stopped.
+
+| Workflow | Input | Permission | Source | Qualification |
+|---|---|---|---|---|
+| `RenewK8sCertsV2` | `RenewK8sCertsInput` | `nvke.admin` | `controller/internal/temporal/workflows/renew_k8s_certs.go` | pending |
+| `RotateEtcdEncryptionKey` | `RotateEtcdEncryptionKeyInput` | `nvke.admin` | `controller/internal/temporal/workflows/rotate_etcd_encryption_key.go` | pending |
+| `RetireLostEtcdRotationNode` | `RetireLostEtcdRotationNodeInput` | `nvke.admin` | `controller/internal/temporal/workflows/retire_lost_etcd_rotation_node.go` | pending |
+
+The snapshot also pins 100 exported controller activity names for secret-safe history projection.
+Activity inputs/results, failure messages and unknown activity names are excluded from that projection.
+
 ## Delivery and ownership
 
 This is a coverage inventory, not a support claim. Every row starts pending. Completion requires

@@ -27,6 +27,27 @@ from core.secrets import encrypt_at_rest
 PREFIX = "temporal."
 
 
+def cluster_observation(site, actor, source_id, expected_source_version):
+    with abac.request_attributes(replace(abac.attributes_for(actor.pk), cache={})):
+        source, observation = maintenance.read(
+            site_id=str(site.guid),
+            operation_id=str(source_id),
+            expected_actor_id=actor.pk,
+            expected_version=expected_source_version,
+        )
+    controller = NvkeConnection.objects.filter(site=site, surface="controller", is_enabled=True).first()
+    if (
+        controller is None
+        or source.expected_site_version != site.version
+        or source.authority.get("connection_id") != str(controller.guid)
+        or source.authority.get("connection_digest") != outbox.connection_digest(controller)
+        or source.authority.get("revision") != site.upstream_revision
+        or source.authority.get("organization_namespace") != site.organization_namespace
+    ):
+        raise NvkeError("SOURCE_CHANGED", "Review this cluster using the current controller authority")
+    return source, observation, controller
+
+
 def reserve_text(*, parameters_text, expected_actor_id, **kwargs):
     native._actor(expected_actor_id, require_read=True)
     try:
@@ -112,23 +133,8 @@ def reserve(
         if authority is None:
             raise NvkeError("SURFACE_UNAVAILABLE", "Configure explicit native Temporal authority first")
         sites._version(authority, expected_authority_version)
-        with abac.request_attributes(replace(abac.attributes_for(actor.pk), cache={})):
-            source, observation = maintenance.read(
-                site_id=str(site.guid),
-                operation_id=str(source_id),
-                expected_actor_id=actor.pk,
-                expected_version=expected_source_version,
-            )
-        controller = NvkeConnection.objects.filter(site=site, surface="controller", is_enabled=True).first()
-        if (
-            controller is None
-            or source.expected_site_version != site.version
-            or source.authority.get("connection_id") != str(controller.guid)
-            or source.authority.get("connection_digest") != outbox.connection_digest(controller)
-            or source.authority.get("revision") != site.upstream_revision
-            or source.authority.get("organization_namespace") != site.organization_namespace
-            or observation["cluster_id"] != parameters["clusterID"]
-        ):
+        source, observation, controller = cluster_observation(site, actor, source_id, expected_source_version)
+        if observation["cluster_id"] != parameters["clusterID"]:
             raise NvkeError("SOURCE_CHANGED", "Review this cluster using the current controller authority")
         if name == "RetireLostEtcdRotationNode":
             rotation = observation.get("etcd_key_rotation") or {}

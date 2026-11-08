@@ -388,3 +388,43 @@ Refresh and review the resulting versions before another change. Namespace
 verification is labelled as namespace access evidence and does not claim worker
 availability, certificate renewal or encryption readiness. Browser native
 workflow submission and history-reset controls remain separate work in #2665.
+
+## Native owner history inspection
+
+`astroliftNvkeNativeHistory(input: ReadNvkeNativeHistoryInput!)` returns a typed
+result envelope for a reviewed native owner. Supply `siteId`,
+`expectedSiteVersion`, `expectedActorId`, `expectedAuthorityVersion`,
+`sourceOperationId`, `expectedSourceVersion`, and `workflow` (`RenewK8sCertsV2`
+or `RotateEtcdEncryptionKey`). The source must be a successful current-authority
+controller `getCluster` observation. Its renewal cycle/rotation owner supplies
+the native workflow ID; callers cannot substitute an arbitrary owner. Both
+`nvke.admin` and `nvke.read` are required before credentials are opened.
+
+Inspection checks the native workflow type, queue, original input's exact cluster
+UUID and current run. Every I/O boundary rechecks current caller/token, site,
+native/controller authority and source observation. The response identifies the
+native run/status and inspection time separately from `recordedState`,
+`recordedPhase`, `retainedMutationLock` and `sourceObservedAt` from the saved
+controller read. A recorded failure does not override a now-completed native run.
+
+`items` contain decimal-string event IDs, event kinds, timestamps, known pinned
+activity names and scheduling/workflow-task-completion IDs. Inputs, results,
+failure messages, signal data, credentials, worker identities and unknown
+activity names are never returned. Event IDs stay exact beyond JavaScript's
+integer range. Inspect scheduled activities and their workflow-task-completion
+references when reviewing a recovery boundary; no first-task shortcut is chosen.
+
+Use `limit` 1–200 (default 50) and return `nextCursor` as `after` with the same
+review and page size. Cursors expire after 30 minutes and bind caller,
+site/authority/source, owner and run. A changed run invalidates the cursor rather
+than mixing histories. Only decoded, retained history is supported for this
+recovery view. Refresh the controller observation and restart inspection after
+authority or source changes.
+
+This query performs no reset, cancellation, node mutation or lock release.
+Temporal reset can terminate the current run even when given an older base run;
+local qualification also produced another run when the same reset request was
+replayed after its first reset run completed. Reset admission/recovery must not
+depend on repeated reset RPCs as a generic lost-reply strategy. Phase-specific
+boundaries, terminal node-work checks and durable reset-history proof remain
+required work in #2665 before exposing a reset control.

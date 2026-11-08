@@ -17,6 +17,7 @@ from strawberry.types import Info
 from astrolift_clusters import nvke_diagnostics as diagnostics
 from astrolift_clusters import nvke_inventory as inventory
 from astrolift_clusters import nvke_maintenance as maintenance
+from astrolift_clusters import nvke_native_history as native_history
 from astrolift_clusters import nvke_native_operations as native_operations
 from astrolift_clusters import nvke_operations as operations
 from astrolift_clusters import nvke_resource_operations as resource_operations
@@ -652,7 +653,62 @@ class NvkeMaintenanceObservationType:
 
 
 @strawberry.type
+class NvkeNativeHistoryEventType:
+    event_id: str
+    event_type: str
+    occurred_at: datetime | None
+    activity_type: str | None
+    scheduled_event_id: str | None
+    workflow_task_completed_event_id: str | None
+
+
+@strawberry.type
+class NvkeNativeHistoryPageType:
+    site_id: GUID
+    site_version: int
+    authority_version: int
+    source_operation_id: GUID
+    source_version: int
+    source_observed_at: datetime | None
+    cluster_id: GUID
+    workflow: str
+    workflow_id: str
+    run_id: str
+    status: str
+    recorded_state: str | None
+    recorded_phase: str | None
+    retained_mutation_lock: bool | None
+    observed_at: datetime
+    items: list[NvkeNativeHistoryEventType]
+    next_cursor: str | None
+
+
+@strawberry.input
+class ReadNvkeNativeHistoryInput:
+    site_id: GUID
+    expected_site_version: int
+    expected_actor_id: int
+    expected_authority_version: int
+    source_operation_id: GUID
+    expected_source_version: int
+    workflow: str
+    after: str | None = None
+    limit: int = 50
+
+
+@strawberry.type
 class NvkeQuery:
+    @strawberry.field
+    @nvke_errors
+    @require_permission(Permission.NVKE_ADMIN, scope=cluster_catalog_org_scope(Permission.NVKE_ADMIN))
+    @tenant_scoped()
+    def astrolift_nvke_native_history(
+        self, info: Info, input: ReadNvkeNativeHistoryInput
+    ) -> MutationResultType[NvkeNativeHistoryPageType]:
+        data = native_history.read(**asdict(input))
+        items = [NvkeNativeHistoryEventType(**item) for item in data.pop("items")]
+        return success(NvkeNativeHistoryPageType(**data, items=items))
+
     @strawberry.field
     @require_permission(Permission.NVKE_READ, scope=cluster_catalog_org_scope(Permission.NVKE_READ))
     @tenant_scoped()

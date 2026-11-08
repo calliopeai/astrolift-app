@@ -25,6 +25,23 @@ def render() -> str:
         "CLI reference content, compiled command paths/flags, source declarations and source SHA-256 hashes.",
         "Upstream content is Apache-2.0; its license and notice accompany the snapshot.",
         "",
+        "## Native operator workflows",
+        "",
+        "These separately pinned Temporal entry points are not HTTP/datastore actions.",
+        "Native reset recovery requires exact owner/run/event review; "
+        "a closed workflow does not prove node work stopped.",
+        "",
+        "| Workflow | Input | Permission | Source | Qualification |",
+        "|---|---|---|---|---|",
+        *[
+            f"| `{row['name']}` | `{row['input_type']}` | `{row['permission']}` | `{row['source']}` | pending |"
+            for row in _contract()["native_workflows"]
+        ],
+        "",
+        f"The snapshot also pins {len(_contract()['native_activity_names'])} exported controller activity names "
+        "for secret-safe history projection.",
+        "Activity inputs/results, failure messages and unknown activity names are excluded from that projection.",
+        "",
         "## Delivery and ownership",
         "",
         "This is a coverage inventory, not a support claim. Every row starts pending. Completion requires",

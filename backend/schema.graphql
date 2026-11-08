@@ -11510,6 +11510,41 @@ type NvkeNativeConditionType {
   status: String!
 }
 
+type NvkeNativeHistoryEventType {
+  eventId: String!
+  eventType: String!
+  occurredAt: DateTime
+  activityType: String
+  scheduledEventId: String
+  workflowTaskCompletedEventId: String
+}
+
+type NvkeNativeHistoryPageType {
+  siteId: GUID!
+  siteVersion: Int!
+  authorityVersion: Int!
+  sourceOperationId: GUID!
+  sourceVersion: Int!
+  sourceObservedAt: DateTime
+  clusterId: GUID!
+  workflow: String!
+  workflowId: String!
+  runId: String!
+  status: String!
+  recordedState: String
+  recordedPhase: String
+  retainedMutationLock: Boolean
+  observedAt: DateTime!
+  items: [NvkeNativeHistoryEventType!]!
+  nextCursor: String
+}
+
+type NvkeNativeHistoryPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeNativeHistoryPageType
+}
+
 type NvkeNativeWorkflowType {
   name: String!
   inputType: String!
@@ -12392,6 +12427,7 @@ type Query {
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!
   astroliftClusterLogCollectorOperation(operationId: GUID!): AstroliftClusterLogCollectorOperation!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
+  astroliftNvkeNativeHistory(input: ReadNvkeNativeHistoryInput!): NvkeNativeHistoryPageTypeMutationResult!
   astroliftNvkeTemporalAuthority(siteId: GUID!): NvkeTemporalAuthorityType
   astroliftNvkeMaintenanceObservation(siteId: GUID!, operationId: GUID!, expectedActorId: Int!, expectedVersion: Int!): NvkeMaintenanceObservationType!
   astroliftNvkeWorkloadAccessBindings(siteId: GUID!, after: String = null, limit: Int! = 50): NvkeWorkloadAccessBindingTypePage!
@@ -12704,6 +12740,18 @@ enum ReachabilityStatus {
   PROVISIONING
   NEEDS_REPROVISION
   NO_MANAGED_DOMAIN
+}
+
+input ReadNvkeNativeHistoryInput {
+  siteId: GUID!
+  expectedSiteVersion: Int!
+  expectedActorId: Int!
+  expectedAuthorityVersion: Int!
+  sourceOperationId: GUID!
+  expectedSourceVersion: Int!
+  workflow: String!
+  after: String = null
+  limit: Int! = 50
 }
 
 input ReapCloudOrphanInput {
