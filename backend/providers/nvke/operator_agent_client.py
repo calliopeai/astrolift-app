@@ -161,6 +161,9 @@ class OperatorAgentClient:
                     "AGENT_INSTANCE_CHANGED": "SOURCE_CHANGED",
                     "TRUSTED_BUNDLE_CHANGED": "SOURCE_CHANGED",
                     "JOB_CONFLICT": "OPERATOR_JOB_CONFLICT",
+                    "ORIGINAL_JOB_FENCED": "OPERATOR_JOB_FENCED",
+                    "LEGACY_ADMISSION_HISTORY_INCOMPLETE": "OPERATOR_HISTORY_INCOMPLETE",
+                    "JOB_ADMISSION_INCOMPLETE": "OPERATOR_ADMISSION_INCOMPLETE",
                     "ARTIFACT_CHANGED": "SOURCE_CHANGED",
                     "SOURCE_ARTIFACT_CHANGED": "SOURCE_CHANGED",
                 }.get(peer, "OPERATOR_REQUEST_REFUSED")
@@ -289,6 +292,54 @@ class OperatorAgentClient:
         return self._receipt(
             self._request("POST", "/v1/jobs/" + job_id + "/cancel", body={}, intent=intent), job_id, command, intent
         )
+
+    def stop_or_fence(self, job_id: str, *, command: str, intent: str, effectful: bool) -> dict[str, Any]:
+        self._bound()
+        try:
+            job_id = identifier(job_id)
+            if (
+                command not in CATALOG
+                or type(effectful) is not bool
+                or not isinstance(intent, str)
+                or not _SHA.fullmatch(intent)
+            ):
+                raise ValueError
+        except (ContractError, TypeError, ValueError):
+            raise NvkeError(
+                "INVALID_INPUT", "Review the original operator job identity and effect classification"
+            ) from None
+        control = self.identity().get("jobControl")
+        if not isinstance(control, dict) or (
+            set(control) != {"format", "stopFence", "completeAdmissionHistory"}
+            or type(control["format"]) is not int
+            or control["format"] != 1
+            or control["stopFence"] is not True
+            or type(control["completeAdmissionHistory"]) is not bool
+        ):
+            raise NvkeError(
+                "OPERATOR_CONTROL_UNSUPPORTED", "The reviewed operator agent does not confirm durable job control"
+            )
+        reviewed = {
+            "format": 1,
+            "revision": REVISION,
+            "siteId": self.site_id,
+            "bundleManifestSha256": self.bundle_digest,
+            "command": command,
+            "effectful": effectful,
+        }
+        result = self._receipt(
+            self._request("POST", "/v1/jobs/" + job_id + "/stop", body=reviewed, intent=intent),
+            job_id,
+            command,
+            intent,
+        )
+        if result["effectful"] != effectful or not result["cancellationRequested"]:
+            raise _invalid_response()
+        if result.get("errorCode") == "ORIGINAL_JOB_FENCED" and (
+            result["state"] != "cancelled" or result["artifacts"] or "nativeExitCode" in result
+        ):
+            raise _invalid_response()
+        return result
 
     def artifact(
         self, job_id: str, *, command: str, intent: str, name: str, offset: str = "0", limit: int = MAX_CHUNK_BYTES

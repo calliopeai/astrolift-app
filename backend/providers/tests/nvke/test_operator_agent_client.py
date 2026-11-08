@@ -207,7 +207,7 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "f102cef0d001cdfded497ac8f423cd15c84b5eff"
+    revision = "ce33b7c646f28272009dd1855405e1a9d8869771"
     for name in ("operator_agent.py", "operator_contract.py"):
         relative = "kubernetes/nvke/" + name
         assert (source / relative).read_bytes() == subprocess.check_output(
@@ -328,3 +328,67 @@ def test_real_agent_refuses_another_intent_on_the_same_job(real_operator_agent):
     with pytest.raises(NvkeError) as observe:
         state.client.observe(job, command="generate.sitespec", intent="c" * 64)
     assert observe.value.code == "OPERATOR_JOB_CONFLICT"
+
+
+def test_real_tls_stop_fences_original_intent_without_native_execution(real_operator_agent, caplog):
+    state = real_operator_agent
+    job = str(uuid4())
+    result = state.client.stop_or_fence(job, command="generate.sitespec", intent=INTENT, effectful=False)
+    assert result["state"] == "cancelled" and result["errorCode"] == "ORIGINAL_JOB_FENCED"
+    assert state.client.observe(job, command="generate.sitespec", intent=INTENT) == result
+    assert state.client.stop_or_fence(job, command="generate.sitespec", intent=INTENT, effectful=False) == result
+    with pytest.raises(NvkeError) as delayed:
+        state.client.submit(job, payload(state.site), intent=INTENT)
+    assert delayed.value.code == "OPERATOR_JOB_FENCED" and not delayed.value.ambiguous
+    with pytest.raises(NvkeError) as changed:
+        state.client.stop_or_fence(job, command="generate.sitespec", intent="c" * 64, effectful=False)
+    assert changed.value.code == "OPERATOR_JOB_CONFLICT"
+    assert not list((state.root / "state/jobs").iterdir())
+    assert not (state.root / "state/workspace/runs").exists()
+    assert job not in caplog.text and INTENT not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "capability",
+    [
+        None,
+        {},
+        {"format": True, "stopFence": True, "completeAdmissionHistory": True},
+        {"format": 1, "stopFence": False, "completeAdmissionHistory": True},
+        {"format": 1, "stopFence": True, "completeAdmissionHistory": 1},
+        {"format": 2, "stopFence": True, "completeAdmissionHistory": True},
+    ],
+)
+def test_stop_requires_explicit_current_capability_before_any_write(capability):
+    calls = []
+
+    def respond(request):
+        calls.append(request.method)
+        assert request.url.path == "/v1/identity"
+        return httpx.Response(
+            200,
+            json={
+                "format": 1,
+                "jobFormat": 2,
+                "revision": REVISION,
+                "siteId": SITE,
+                "instanceId": INSTANCE,
+                "bundleManifestSha256": DIGEST,
+                "commands": CATALOG,
+                "jobControl": capability,
+            },
+        )
+
+    with (
+        OperatorAgentClient(
+            "https://agent.example",
+            site_id=SITE,
+            instance_id=INSTANCE,
+            bundle_manifest_sha256=DIGEST,
+            verify=ssl.create_default_context(),
+            transport=httpx.MockTransport(respond),
+        ) as client,
+        pytest.raises(NvkeError) as error,
+    ):
+        client.stop_or_fence(JOB, command="generate.sitespec", intent=INTENT, effectful=False)
+    assert error.value.code == "OPERATOR_CONTROL_UNSUPPORTED" and calls == ["GET"]
