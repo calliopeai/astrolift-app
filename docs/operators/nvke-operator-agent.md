@@ -803,9 +803,12 @@ All 64 selected native-agent regressions pass. SDK source/codec regressions pass
 pinned verification SDK test passes real agent/Kubernetes mTLS, deliberate reply
 loss, same-endpoint cold restart and historical GET/identical POST recovery with
 one attempt and no recollection, private output, native replay or original source
-mutation. The App model suite passes 20 PostgreSQL cases, and final full frontend
-TypeScript passes. Configured service/GraphQL acceptance and stage-specific
-CLI/UI acceptance remain pending. Evidence:
+mutation. The App model suite passes 20 PostgreSQL cases; all 20 configured
+service/GraphQL cases pass without skips, including durable private recovery,
+source/permission/token/tenant changes, cross-kind reservations and audit
+redaction. Collection RPCs in that suite use controlled adapters. Final full
+frontend TypeScript passes. Actual paired CLI/UI acceptance remains pending.
+Evidence:
 `backend/providers/nvke/qualification/install-plan-render-verification-sdk-local.json`
 and `install-plan-render-verification-app-checkpoint.json` in the same directory.
 

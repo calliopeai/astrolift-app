@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "durable-render-verification-app-intent-and-reviewed-api",
-  "status": "model-static-contract-qualified-configured-api-tests-running",
+  "status": "local-model-service-graphql-and-generated-types-qualified-paired-acceptance-pending",
   "sourceSha256": {
     "backend/astrolift_clusters/models/nvke.py": "bd518a03a95bb62cffcf4f0444015f8aa0015009b3f4479914e85b2ab96e27d4",
     "backend/astrolift_clusters/migrations/0042_nvke_install_plan_verification.py": "b76355cf638bbd192f43692be9df75fcb5e19501a47b95d3311f39c729a3f140",
@@ -31,7 +31,7 @@
       "logSha256": "c3f4fe2a5e723a7846b565e9d75784553ffb805bba22f8aaff5587608168270b"
     },
     "serviceAndGraphQLTests": {
-      "status": "configured-rerun-pending",
+      "status": "passed",
       "sessionId": 23410,
       "logPath": "/tmp/astrolift-nvke-verification-service-tests-configured.log",
       "exitMarker": "/tmp/astrolift-nvke-verification-service-tests-configured.exit",
@@ -40,7 +40,13 @@
         "skipped": 20,
         "qualified": false,
         "reason": "Missing explicit owned Opscode/native bundle opt-ins; configured rerun selects frozen 8ad parent agent fixture with controlled verification RPC adapters. Actual new route is separately qualified against 7c3 by the real SDK mTLS run."
-      }
+      },
+      "passed": 20,
+      "skipped": 0,
+      "exitCode": 0,
+      "seconds": 1533.4,
+      "logSha256": "c7eaf4482f5292fd9a01a2e952f57274037646ce74d6978144649b4624ecb0e8",
+      "scope": "Actual PostgreSQL, encrypted/HMAC intents, prepared context source binding, source drift, lost-reply durable recovery, distinct artifact reservations, typed GraphQL, private audit redaction, admin/token/tenant restrictions; verification collection RPC uses controlled adapters. Parent agent identity/authority fixture is real mTLS on its frozen 8ad runtime; actual new verification endpoint is separately qualified by real SDK mTLS on7c3."
     },
     "frontendTypes": {
       "status": "passed",
@@ -61,7 +67,7 @@
     "Strict metadata projection and generated frontend operations bind context/artifact/verification digests and explicitly keep continuationAuthorized=false."
   ],
   "remaining": [
-    "Inspect configured service/GraphQL results and fix failures; model suite passed20 cases and final full frontend TypeScript passed. Unconfigured all-skipped API invocation is not qualification.",
+    "Configured model20/service+GraphQL20 cases and final generated frontend types passed without skips. Broader parent/context regression checks and real paired acceptance remain required before integration.",
     "Actual pinned native SDK mTLS qualification passed; actual paired App/CLI/browser acceptance remains outstanding.",
     "CLI commands, Storybook controls/journal, eight locales and production UI wiring remain to be implemented for this stage.",
     "Use-time phase/resource/original credential proof, closed schema policy, image closure and exactly-once linked admission remain open; full scope review/PR/merge/deploy remain outstanding."
