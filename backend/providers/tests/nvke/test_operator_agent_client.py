@@ -208,7 +208,7 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "870d1400c0c9986e5787b7b45635baae88785c0a"
+    revision = "20f53eefaa6822673888f536ee14e93bcb3c0762"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -225,11 +225,16 @@ def operator_agent(tmp_path, *, site_id=None):
         "management_execution_tree.py",
         "management_template_rendering.py",
         "management_render_inputs.py",
+        "management_render_discovery.py",
+        "management_render_release.py",
+        "management_render_lookup.py",
+        "management_render_capture.py",
         "management_plan_tree_service.py",
         "qualify_bootstrap.py",
         "tooling.py",
         "chart-helper/main.go",
         "chart-helper/render.go",
+        "chart-helper/release.go",
         "chart-helper/go.mod",
         "chart-helper/go.sum",
     ):
@@ -610,7 +615,7 @@ def test_install_review_requires_capability_original_failure_digest_and_stable_i
 
 def test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "870d1400c0c9986e5787b7b45635baae88785c0a"
+    revision = "20f53eefaa6822673888f536ee14e93bcb3c0762"
     relative = "kubernetes/nvke/test_operator_agent.py"
     assert (source / relative).read_bytes() == subprocess.check_output(
         ["git", "show", revision + ":" + relative], cwd=source
@@ -683,7 +688,7 @@ finally:
 
 def test_real_tls_sdk_chart_stage_lost_reply_recovers_without_refetch_or_native_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "870d1400c0c9986e5787b7b45635baae88785c0a"
+    revision = "20f53eefaa6822673888f536ee14e93bcb3c0762"
     for name in (
         "test_operator_agent.py",
         "test_management_chart_materialization.py",
