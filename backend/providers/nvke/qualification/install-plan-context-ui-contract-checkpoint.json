@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "scope": "browser-render-context-form-and-response-contract-foundation",
+  "status": "contract-qualified-controls-not-yet-implemented",
+  "sourceSha256": {
+    "frontend/lib/nvke/operator-install-plan-context.ts": "235ee76dd5f1600e8fc6c4e5d96ec5fdf225fc05be4e1af6298ac8c08cfe0ef2",
+    "frontend/lib/nvke/operator-install-plan-context.test.ts": "4ebbab11129cedff4f4ae270f6d84c8eaca112cd7077e6cfc4d100a9ef58860e"
+  },
+  "checks": {
+    "vitest": {
+      "passed": 136,
+      "files": 3,
+      "scope": "New context contract plus existing chart/tree contract regressions",
+      "exitCode": 0,
+      "logSha256": "1188b9efe28e1bc95b9d204e00f59b5185e37db3a1f3ccda846a475e6e0b8a7b"
+    },
+    "eslint": "two changed files passed",
+    "prettier": "two changed files formatted"
+  },
+  "implemented": [
+    "Strict source/metadata-only context response parsing binds original operation/site/authority and plan/chart/tree IDs, versions and digests to the reviewed item and ordinal.",
+    "Canonical bounded form values preserve native revision strings above 2^53. Duplicate/cross-kind IDs, unknown private fields, invalid mode/limits, stale metadata, malformed hashes/timestamps and continuation claims refuse.",
+    "Native item names retain uppercase and underscores. Call/iteration/time/ordinal conversion occurs only after small integer bounds; byte/revision values remain decimal strings."
+  ],
+  "continuationAuthorized": false,
+  "remaining": [
+    "Storybook-first pure context panel and typed fixtures, eight locales, visual/interaction review.",
+    "Scoped recovery journal/hook and operation-screen wiring; complete UI static/build/browser checks.",
+    "Actual App/compiled-CLI/agent capture recovery acceptance, phase/schema/image/linked-admission closure, final review/merge and deployment."
+  ]
+}
