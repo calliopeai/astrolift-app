@@ -744,8 +744,13 @@ refusal, explicit metadata-only recovery and an exact-input hash journal. All
 remain), Next and production Storybook builds pass for the controls/wiring source.
 Controlled Chromium loss/recovery and operation-screen permission/pending checks
 pass against the built Storybook artifact. The follow-on owned API peer and driver
-also pass full TypeScript and 30 story/coverage cases; actual browser/API capture
-is still running separately. See the UI checkpoint JSON files in qualification/.
+also pass full TypeScript and 30 story/coverage cases. Actual Chromium -> App ->
+agent -> Kubernetes context capture now passes lost-reply/reload recovery, explicit
+read/private retry and matching App/native context/capture digests, with one capture
+attempt and no page errors. The run passed CLI, context and context-browser cases
+and skipped the unrelated original tree-browser opt-in. A private loopback bearer
+forwarder connects the real API; this does not prove Next login/route acceptance.
+Evidence: `backend/providers/nvke/qualification/install-plan-context-browser-app-agent-local.json`.
 
 All 39 configured App cases pass without skips, including real PostgreSQL,
 RBAC/token changes, typed GraphQL/audits, mTLS authority setup and separate-session

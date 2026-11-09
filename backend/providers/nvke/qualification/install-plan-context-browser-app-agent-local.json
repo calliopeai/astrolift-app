@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "scope": "owned-browser-actual-app-agent-context-capture-recovery",
+  "status": "actual-browser-cli-app-agent-context-qualified-scoped-run",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "eb6fabfbd8d228bc3c872926c2abf8d178b70c3bd6a052496fc50327881ce460",
+    "scripts/integration/context_browser_qualification.py": "50eedf6289072744d41a793d7b312cbe6cc14827fa3a75d5f73db731d401df76"
+  },
+  "frontendDriverSha256": "cc21498abb922a1bf71a6bf089367c194e2d0adf0b4aa9112a8f42e26cccf76a",
+  "checks": {
+    "ruff": "passed",
+    "format": "passed",
+    "diff": "passed",
+    "pairedRun": {
+      "status": "completed",
+      "passed": 3,
+      "skipped": 1,
+      "exitCode": 0,
+      "seconds": 1654.43,
+      "logSha256": "64a5766cf2680f7d4dccf4e0afd5a0c69a6fdd3059e4cbafe1cc8973a3bcb44b",
+      "logPath": "/tmp/astrolift-nvke-context-browser-app-paired-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-browser-app-paired-v1.exit",
+      "coveredClients": [
+        "cli",
+        "context",
+        "context-browser"
+      ],
+      "skip": "The unrelated original tree-browser client lacked its separate tree frontend/Storybook opt-in. The target context-browser client executed and passed.",
+      "selectionNote": "-k context-browser also matched the worktree path, so all four parameter cases were collected. Future single-case launches must use the complete explicit pytest node ID."
+    },
+    "browserReport": {
+      "passed": true,
+      "calls": [
+        "PrepareNvkeInstallPlanContext",
+        "ReviewNvkeInstallPlanContext",
+        "RetryNvkeInstallPlanContext"
+      ],
+      "contextDigest": "9ac8cd46c361fc23e025fe93c4887a8fe71cbae5b5e53edaa7edde6b4020fb1e",
+      "captureDigest": "2cba48556d30b2f42e1d3ac59d705e3aa1f36fb094b361300fc9ce6ca515c9a3",
+      "pageErrors": [],
+      "privateLogSha256": "d2039f280019e0fb384fd52d47026248f71581f64eb51f7051ef076ac73786f3"
+    }
+  },
+  "boundary": "A separate test database and separate owned native/Kubernetes mTLS fixtures preserve the running CLI-only case and original production install. Browser uses the real App API through a loopback-only private bearer forwarder; this is not actual Next login/route acceptance. No RPC result is substituted.",
+  "implemented": [
+    "CLI-created real parent plan/chart/tree and source/profile-bound context capture, lost-reply/cold-agent recovery and metadata-only retry remain in the same case.",
+    "An additional browser context capture through the production hook/panel checks journal-before-POST, lost-reply reload without auto RPC and explicit read/retry; durable App/native rows and one work attempt must match returned digests.",
+    "Final original App row/native receipt/install guard/native run and parent-preservation assertions execute after browser work."
+  ],
+  "continuationAuthorized": false,
+  "remaining": [
+    "Actual scoped browser capture acceptance passed; final integrated release acceptance must select all required clients explicitly and close unrelated opt-ins.",
+    "Next route/login acceptance, native phase/schema/image/linked-admission proof and complete surface/release remain outstanding."
+  ],
+  "agentRuntimeCommit": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
+  "cliBinarySha256": "cb3795abe8cd8faa9e3ac1374cd76e437eb7f340ecb7e2651589b9d05655e975",
+  "evidenceRepository": "calliopeai/astrolift-cli",
+  "evidenceCommit": "ce2815a",
+  "frontendDriverCommit": "65f403c77",
+  "appPythonSourceUnchangedFrom": "8f3a2a9d1"
+}

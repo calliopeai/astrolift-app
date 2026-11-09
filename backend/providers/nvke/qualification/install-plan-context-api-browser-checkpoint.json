@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "browser-to-actual-app-context-capture-driver-foundation",
-  "status": "driver-static-and-stories-qualified-actual-api-acceptance-running",
+  "status": "actual-browser-app-agent-capture-and-recovery-qualified-scoped-run",
   "sourceSha256": {
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanContextPanel.api.stories.tsx": "63b9bb09e8a44737c33a98a53b19352b5551dd1d668a8bef24e3bdc648c04763",
     "frontend/components/screens/nvke/nvke-operator-install-plan-context-stories.test.tsx": "212de018f4dad16bd2d56ba49b2c92ad1e4c7f1809ee5e98b614f0b283df0992",
@@ -35,11 +35,33 @@
       "scope": "Generated Next route types, full TypeScript and targeted ESLint/Prettier on the current API story, coverage test and hardened browser driver."
     },
     "actualBrowserAppAgent": {
-      "status": "pending",
-      "sessionId": 64897,
+      "status": "completed",
+      "passed": 3,
+      "skipped": 1,
+      "exitCode": 0,
+      "seconds": 1654.43,
+      "logSha256": "64a5766cf2680f7d4dccf4e0afd5a0c69a6fdd3059e4cbafe1cc8973a3bcb44b",
       "logPath": "/tmp/astrolift-nvke-context-browser-app-paired-v1.log",
       "exitMarker": "/tmp/astrolift-nvke-context-browser-app-paired-v1.exit",
-      "database": "test_astro_nvke_context_browser_20261109"
+      "coveredClients": [
+        "cli",
+        "context",
+        "context-browser"
+      ],
+      "skip": "The unrelated original tree-browser client lacked its separate tree frontend/Storybook opt-in. The target context-browser client executed and passed.",
+      "selectionNote": "-k context-browser also matched the worktree path, so all four parameter cases were collected. Future single-case launches must use the complete explicit pytest node ID."
+    },
+    "actualBrowserReport": {
+      "passed": true,
+      "calls": [
+        "PrepareNvkeInstallPlanContext",
+        "ReviewNvkeInstallPlanContext",
+        "RetryNvkeInstallPlanContext"
+      ],
+      "contextDigest": "9ac8cd46c361fc23e025fe93c4887a8fe71cbae5b5e53edaa7edde6b4020fb1e",
+      "captureDigest": "2cba48556d30b2f42e1d3ac59d705e3aa1f36fb094b361300fc9ce6ca515c9a3",
+      "pageErrors": [],
+      "privateLogSha256": "d2039f280019e0fb384fd52d47026248f71581f64eb51f7051ef076ac73786f3"
     }
   },
   "implemented": [
@@ -48,8 +70,8 @@
     "Render coverage now includes the three operation-screen context stories; removed the previously unused operation story import by actually exercising those states."
   ],
   "remaining": [
-    "Actual browser/compiled CLI/App/agent case is wired and running in an isolated database; inspect terminal evidence and fix failures.",
-    "Actual browser-to-App-to-agent capture/recovery must pass; controlled/local render tests do not prove this.",
+    "Final integrated release acceptance must explicitly select all required clients and close the unrelated original tree-browser opt-in; the current context-browser case passed.",
+    "Actual Next login/route acceptance, phase/resource/credential/schema/image/linked-admission proof and full management release remain outstanding.",
     "Final integrated static checks/builds, full surface acceptance and release remain outstanding."
   ],
   "continuationAuthorized": false
