@@ -1,0 +1,56 @@
+{
+  "format": 1,
+  "scope": "durable-render-verification-app-intent-and-reviewed-api",
+  "status": "implementation-checkpoint-database-and-type-checks-pending",
+  "sourceSha256": {
+    "backend/astrolift_clusters/models/nvke.py": "bd518a03a95bb62cffcf4f0444015f8aa0015009b3f4479914e85b2ab96e27d4",
+    "backend/astrolift_clusters/migrations/0042_nvke_install_plan_verification.py": "b76355cf638bbd192f43692be9df75fcb5e19501a47b95d3311f39c729a3f140",
+    "backend/astrolift_clusters/nvke_install_plan_verifications.py": "258c292200221c746462524f1206c2edb43bb731ef8261475978c342c71184ff",
+    "backend/astrolift_clusters/schema/nvke_install_plan_verifications.py": "c15154c97ac769f0d71ff91d32009d613ba37a37464bda6e43e4365e02520cb4",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_verification_model.py": "625427e302a98eb39b6fdac325f76a45f36f3146114443c64189e8d6907bedb4",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_verifications.py": "5e8b4c62d9a6ffec2b4371c03861133a393490edff587461f6e469cecd8f33c0",
+    "backend/core/schema/audit.py": "c09096ac18d8d154180f2558fc3488c41f78b7d06bbc8309a5e57bd2a2332b4a",
+    "backend/schema.graphql": "43f4440586e3bedd7eda8884b03f0b4e9893ef6bc44e1204cbbba2d019583d39",
+    "frontend/graphql/nvke/nvke-install-plan-verification.mutations.ts": "ff21bcecc417e1ac13451927cb766392bc5f3df9d72d9726c15da23cd779c2b0",
+    "frontend/graphql/nvke/nvke-install-plan-verification.queries.ts": "4832ebebfd13ce8e925e50d21e0867c1fe2fd32c7db2c28836f5aea2d018f9d0"
+  },
+  "checks": {
+    "migrationGeneration": "passed; actual Django makemigrations generated 0042",
+    "ruff": "passed for changed backend production and test files",
+    "schemaExport": "passed with canonical six feature flags; exactly 90 additions and no removals in both SDL copies; MCP contract unchanged",
+    "codegen": "passed; schema and three operation types generated",
+    "modelTests": {
+      "status": "pending",
+      "sessionId": 60629,
+      "logPath": "/tmp/astrolift-nvke-verification-model-tests.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-model-tests.exit"
+    },
+    "serviceAndGraphQLTests": {
+      "status": "pending",
+      "sessionId": 73262,
+      "logPath": "/tmp/astrolift-nvke-verification-service-tests.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-service-tests.exit"
+    },
+    "frontendTypes": {
+      "status": "pending",
+      "sessionId": 20224,
+      "logPath": "/tmp/astrolift-nvke-verification-api-types.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-api-types.exit",
+      "note": "Prettier subsequently reformatted only new mutation document; final exact-source type check still required."
+    }
+  },
+  "implemented": [
+    "Soft-deletable immutable encrypted verification intent model protects its retained context parent and completed historical summary. Database status check and migration retain UUIDs after deletion.",
+    "Sealed private intent binds reviewed original/plan/chart/tree/context versions and summaries, actor/token, exact Helm item and ordinal. Current authority/source checks surround remote calls and publication.",
+    "Prepare/review/explicit retry GraphQL mutations retain existing admin/tenant gates and mutation envelopes; new requestText input is classified for audit redaction, including rejected text and variable aliases.",
+    "Partial verification IDs are serialized by existing PostgreSQL advisory UUID lock and reserved across plan/chart/tree/context creation.",
+    "Strict metadata projection and generated frontend operations bind context/artifact/verification digests and explicitly keep continuationAuthorized=false."
+  ],
+  "remaining": [
+    "Inspect PostgreSQL model and service/GraphQL results, fix failures and qualify exact-source final checks. No database acceptance is claimed by this checkpoint.",
+    "Finish actual pinned native SDK mTLS qualification on the SDK branch, then actual paired App/CLI/browser acceptance.",
+    "CLI commands, Storybook controls/journal, eight locales and production UI wiring remain to be implemented for this stage.",
+    "Use-time phase/resource/original credential proof, closed schema policy, image closure and exactly-once linked admission remain open; full scope review/PR/merge/deploy remain outstanding."
+  ],
+  "continuationAuthorized": false
+}

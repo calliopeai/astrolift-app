@@ -20,6 +20,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlanCharts,
     NvkeInstallPlanContext,
     NvkeInstallPlanTree,
+    NvkeInstallPlanVerification,
     NvkeOperation,
 )
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
@@ -209,7 +210,13 @@ def prepare(
         else:
             if any(
                 model.all_objects.filter(guid=artifact_id).exists()
-                for model in (NvkeOperation, NvkeInstallPlan, NvkeInstallPlanCharts, NvkeInstallPlanContext)
+                for model in (
+                    NvkeOperation,
+                    NvkeInstallPlan,
+                    NvkeInstallPlanCharts,
+                    NvkeInstallPlanContext,
+                    NvkeInstallPlanVerification,
+                )
             ):
                 raise NvkeError(
                     "CONFLICT", "This identity already identifies an operation, plan or chart publication"
