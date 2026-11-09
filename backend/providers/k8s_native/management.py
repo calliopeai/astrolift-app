@@ -260,6 +260,11 @@ def _cluster_role_manifest() -> dict[str, Any]:
                 "verbs": list(verbs),
             },
             {
+                "apiGroups": ["node.k8s.io"],
+                "resources": ["runtimeclasses"],
+                "verbs": ["get", "list"],
+            },
+            {
                 "apiGroups": ["networking.k8s.io"],
                 "resources": ["ingresses", "networkpolicies"],
                 "verbs": list(verbs),
@@ -1147,6 +1152,15 @@ class LiveManagementBackend:
             for item in (resp.items or [])
         }
         return sorted(a.strip().lower() for a in archs if a and a.strip())
+
+    def list_runtime_classes(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
+        from kubernetes import client as k8s_client
+
+        from k8s_native.observability import build_api_client
+
+        api_client = build_api_client(auth)
+        resp = k8s_client.NodeV1Api(api_client).list_runtime_class(timeout_seconds=10)
+        return [api_client.sanitize_for_serialization(item) for item in (resp.items or [])]
 
     def list_nodes(self, *, auth: ClusterAuth) -> list[dict[str, Any]]:
         """Node objects as plain dicts, for GPU discovery (#2038)."""

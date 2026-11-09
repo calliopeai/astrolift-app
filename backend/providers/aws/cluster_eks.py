@@ -99,6 +99,7 @@ from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
 from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from aws._naming import iam_role_name
+from aws.nitro_sandboxes import discover_runtimes, preflight_manifests
 from aws.session import aws_client, aws_session
 from k8s_native.central_auth import central_auth_component
 from k8s_native.edge_gateway import alb_front, edge_component
@@ -400,6 +401,9 @@ class EKSClusterDriver(ClusterDriver):
         create_only: bool = False,
     ) -> ApplyResult:
         client = self._k8s(cluster)
+        sandbox_errors = preflight_manifests(client, manifests, namespace)
+        if sandbox_errors:
+            return ApplyResult(created=[], updated=[], unchanged=[], errors=sandbox_errors)
         created: list[str] = []
         updated: list[str] = []
         unchanged: list[str] = []
@@ -987,10 +991,23 @@ class EKSClusterDriver(ClusterDriver):
 
     @driver_op(cloud="aws", driver="cluster")
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
-        return probe_cluster_capabilities(
+        capabilities = probe_cluster_capabilities(
             backend=self._management_backend,
             cluster=self._resolve_eks_auth_context(cluster),
         )
+        capabilities["nitro_sandboxes"] = self._probe_nitro_sandboxes(cluster)
+        return capabilities
+
+    def _probe_nitro_sandboxes(self, cluster: ClusterContext) -> dict[str, Any]:
+        try:
+            probe = getattr(self._management_backend, "list_runtime_classes", None)
+            if not callable(probe):
+                return {"status": "unknown", "runtime_classes": []}
+            context = self._resolve_eks_auth_context(cluster)
+            return discover_runtimes(probe(auth=context.to_auth()))
+        except Exception:
+            # RBAC can withhold RuntimeClass reads without invalidating other capabilities.
+            return {"status": "unknown", "runtime_classes": []}
 
     @driver_op(cloud="aws", driver="cluster", audit=True, sensitive_kind="cluster.bring_into_management")
     def bring_into_management(
@@ -999,12 +1016,17 @@ class EKSClusterDriver(ClusterDriver):
         *,
         run_preflight: bool = True,
     ) -> ManagementReport:
-        return run_bring_into_management(
+        report = run_bring_into_management(
             backend=self._management_backend,
             cluster=self._resolve_eks_auth_context(cluster),
             run_preflight=run_preflight,
             cluster_rbac=not cluster_rbac_withheld(),
         )
+        if report.success:
+            return replace(
+                report, capabilities={**report.capabilities, "nitro_sandboxes": self._probe_nitro_sandboxes(cluster)}
+            )
+        return report
 
     @driver_op(cloud="aws", driver="cluster")
     def read_job_status(self, cluster: ClusterContext, *, namespace: str, job_name: str) -> JobStatus:
