@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from nvke import _operator_install_plan as install_plan_protocol
 from nvke._operator_install_review import project as project_install_review
 from nvke._private_http import private_http
 from nvke.client import NvkeError, validate_endpoint_url
@@ -381,6 +382,148 @@ class OperatorAgentClient:
         except (ContractError, KeyError, ValueError, TypeError, OverflowError):
             raise _invalid_response() from None
         self.identity()
+        return result
+
+    def _install_plan_source(self, job_id: str, intent: str) -> dict[str, Any]:
+        self._bound()
+        try:
+            identifier(job_id)
+            if not isinstance(intent, str) or not _SHA.fullmatch(intent):
+                raise ValueError
+        except (ContractError, ValueError, TypeError):
+            raise NvkeError("INVALID_INPUT", "Use the original management-install identity and intent") from None
+        capability = self.identity().get("installPlan")
+        if (
+            not isinstance(capability, dict)
+            or set(capability) != {"format", "prepare", "readOnly", "continuation", "maximumPageSize"}
+            or type(capability["format"]) is not int
+            or capability["format"] != 1
+            or capability["prepare"] is not True
+            or capability["readOnly"] is not True
+            or capability["continuation"] is not False
+            or type(capability["maximumPageSize"]) is not int
+            or capability["maximumPageSize"] != 100
+        ):
+            raise NvkeError("OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm read-only plan preparation")
+        original = self.observe(job_id, command="management.install", intent=intent)
+        if (
+            original["state"] != "uncertain"
+            or original["effectful"] is not True
+            or type(original.get("nativeExitCode")) is not int
+            or original["nativeExitCode"] == 0
+        ):
+            raise NvkeError("PRECONDITION", "Preparation requires the original unsuccessful install receipt")
+        return original
+
+    def _install_plan_summary(
+        self, data: dict[str, Any], job_id: str, plan_id: str, original: dict[str, Any]
+    ) -> dict[str, Any]:
+        try:
+            return install_plan_protocol.summary(
+                data,
+                site=self.site_id,
+                instance=str(self.instance_id),
+                bundle=str(self.bundle_digest),
+                job=job_id,
+                plan_id=plan_id,
+                exit_code=original["nativeExitCode"],
+            )
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+
+    def prepare_install_plan(self, job_id: str, *, intent: str, body: dict[str, Any]) -> dict[str, Any]:
+        from nvke.operator_contract import artifact_name, canonical, effectful
+
+        self._bound()
+        try:
+            if (
+                not isinstance(body, dict)
+                or set(body) - {"format", "planId", "request", "maximumInputBytes", "overrides"}
+                or not {"format", "planId", "request", "maximumInputBytes"} <= set(body)
+                or type(body["format"]) is not int
+                or body["format"] != 1
+            ):
+                raise ValueError
+            plan_id = identifier(body["planId"])
+            if plan_id == job_id or int(install_plan_protocol.decimal(body["maximumInputBytes"])) == 0:
+                raise ValueError
+            if body["request"] is not None:
+                proposed = validate(body["request"], self.site_id)
+                if proposed["command"] != "management.install" or not effectful(proposed):
+                    raise ValueError
+            overrides = body.get("overrides", {})
+            if (
+                not isinstance(overrides, dict)
+                or set(overrides) - {"options", "files"}
+                or any(not isinstance(v, dict) for v in overrides.values())
+            ):
+                raise ValueError
+            for field, updates in overrides.items():
+                for name in updates:
+                    if field == "options" and name not in CATALOG["management.install"]["options"]:
+                        raise ValueError
+                    if field == "files":
+                        artifact_name(name)
+            body = json.loads(canonical(body))
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError("INVALID_INPUT", "Use a bounded reviewed management-install plan request") from None
+        original = self._install_plan_source(job_id, intent)
+        data = self._request("POST", "/v1/jobs/" + job_id + "/install-plan", body=body, intent=intent)
+        result = self._install_plan_summary(data, job_id, plan_id, original)
+        if self._install_plan_source(job_id, intent) != original:
+            raise _invalid_response()
+        return result
+
+    def install_plan(self, job_id: str, *, intent: str, plan_id: str) -> dict[str, Any]:
+        try:
+            identifier(plan_id)
+        except (ContractError, ValueError, TypeError):
+            raise NvkeError("INVALID_INPUT", "Use the retained plan identity") from None
+        original = self._install_plan_source(job_id, intent)
+        data = self._request("GET", "/v1/jobs/" + job_id + "/install-plan", params={"planId": plan_id}, intent=intent)
+        result = self._install_plan_summary(data, job_id, plan_id, original)
+        if self._install_plan_source(job_id, intent) != original:
+            raise _invalid_response()
+        return result
+
+    def install_plan_page(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        plan_id: str,
+        plan_digest: str,
+        view: str,
+        after: str | None = None,
+        limit: int = 25,
+        search: str = "",
+    ) -> dict[str, Any]:
+        if (
+            view not in {"items", "workloads"}
+            or type(limit) is not int
+            or not 1 <= limit <= 100
+            or not isinstance(search, str)
+            or len(search) > 200
+            or (after is not None and (not isinstance(after, str) or not 1 <= len(after) <= 8192))
+            or not isinstance(plan_digest, str)
+            or not _SHA.fullmatch(plan_digest)
+        ):
+            raise NvkeError("INVALID_INPUT", "Use the retained plan digest and a bounded page request")
+        metadata = self.install_plan(job_id, intent=intent, plan_id=plan_id)
+        if metadata["plan"]["planDigest"] != plan_digest:
+            raise NvkeError("SOURCE_CHANGED", "The retained plan no longer matches the reviewed digest")
+        params = {"planId": plan_id, "view": view, "limit": limit, "search": search}
+        if after is not None:
+            params["after"] = after
+        data = self._request("GET", "/v1/jobs/" + job_id + "/install-plan", params=params, intent=intent)
+        try:
+            result = install_plan_protocol.page(
+                data, metadata=metadata, view=view, limit=limit, search=search, initial=after is None
+            )
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+        if self.install_plan(job_id, intent=intent, plan_id=plan_id) != metadata:
+            raise _invalid_response()
         return result
 
     def artifact(

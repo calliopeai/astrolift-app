@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "fe42191aa48791e3550c4713068f11253421dbc5"
+      "revision": "a7c9edafa615e4e84a9b91d65f0523610df11c7a"
     }
   },
   "evidence": {
@@ -493,14 +493,14 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.",
-      "sha256": "27c432f1721147a8c33dd5c1d9fd2c1164ed153f7c86a20ac81f415d8c0534ac"
+      "sha256": "6f163143f63222f7722cb9a8a758b045b935213dd382367493b24a42b6ff7b06"
     },
     "operator-agent-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
       "scope": "Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.",
-      "sha256": "856c10be4fbeba694ee21dfa8f8b5641eb70b9b222653e772f68a68b8573ed4f"
+      "sha256": "9abceba40bc7f29a546f43d2ce0ad4bf7e35dfee3bd5aaa0b2a85360ba798828"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -816,7 +816,7 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Original intent/mTLS/site/instance/bundle and authenticated native-run binding for read-only partial-install review. Executor reservation refuses admissions, source drift is rejected, original uncertainty/guards remain intact; no continuation admitted.",
-      "sha256": "27c432f1721147a8c33dd5c1d9fd2c1164ed153f7c86a20ac81f415d8c0534ac"
+      "sha256": "6f163143f63222f7722cb9a8a758b045b935213dd382367493b24a42b6ff7b06"
     },
     "operator-install-review-sdk": {
       "repository": "app",
@@ -941,6 +941,32 @@
       "kind": "observation",
       "scope": "Direct Linux read-only preparation against authenticated retained job/native receipts produced a sealed 12-item reconstructed plan with seven observed starts and six remaining items; cold authentication, wrong-key/tamper refusal, and unchanged eight original files/five jobs/runs/application UNCERTAIN version 23. 27 compiler/store cases pass; management discovery 50 run/8 opt-in skips. No reservation, hosted preparation or continuation admitted; historical environment/content identity unproven.",
       "sha256": "1a7b32dd9fb51a50a8ede3723299b6d53720f661673a6f701f37b1019f4f1205"
+    },
+    "operator-install-plan-preparation": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/management_plan_preparation.py",
+      "kind": "implementation",
+      "scope": "Authenticated read-only preparation and same-ID recovery over sealed snapshots. Fresh original source, target cluster UID, guarded input copies, explicit reconstruction provenance and source-bound signed item/workload paging. No continuation execution or historical environment identity claim.",
+      "sha256": "e0359b25fd9f405bf48ca820890c163e87b60a35bc654cbb54af480331921d07"
+    },
+    "operator-install-plan-sdk": {
+      "repository": "app",
+      "path": "backend/providers/nvke/_operator_install_plan.py",
+      "kind": "implementation",
+      "scope": "Strict bounded source/header/item/workload projection, exact unsuccessful original receipt and current capability/identity checks. Decimal int64 workload counters preserve precision. Preparation and recovery only; paged header validation does not recompute the full plan digest."
+    },
+    "operator-install-plan-sdk-tests": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_operator_install_plan.py",
+      "kind": "test",
+      "scope": "32 controlled transport cases cover preparation/recovery/paging, source mismatch, malformed metadata/private fields, item action/order, readiness/precision and input/capability/digest refusal. Combined SDK suite: 80 passed, including separate actual agent mutual-TLS plan roundtrip with controlled Kubernetes reads."
+    },
+    "operator-install-plan-sdk-tls": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_operator_agent_client.py",
+      "kind": "test",
+      "symbol": "test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch",
+      "scope": "Pinned actual agent and SDK over mutual TLS: prepare, same-ID recovery, complete 11-item cursor walk, workload integer precision and sealed-plan tamper refusal. Original receipt/guard/run inventory unchanged; no linked reservation or native install. Kubernetes observations use controlled read-only fixtures; Linux RPC and current-admin application plan integration remain pending."
     }
   },
   "rows": {
@@ -3198,9 +3224,13 @@
           "operator-install-plan-core-tests",
           "operator-install-plan-store",
           "operator-install-plan-store-tests",
-          "operator-install-plan-storage-local"
+          "operator-install-plan-storage-local",
+          "operator-install-plan-preparation",
+          "operator-install-plan-sdk",
+          "operator-install-plan-sdk-tests",
+          "operator-install-plan-sdk-tls"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen review is locally qualified with unchanged fences. Bound proposal/storage and a separate read-only Linux preparation prototype are qualified; authenticated agent preparation/source collection, current-admin plan review and linked once-only execution/recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen review is locally qualified with unchanged fences. Bound proposal/storage and a separate read-only Linux preparation prototype are qualified; Linux qualification of the implemented authenticated agent/SDK preparation, current-admin application plan review and linked once-only execution/recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",

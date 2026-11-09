@@ -208,11 +208,14 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "d5990f4a8a6434476423ece1017bccf1ecb07e1f"
+    revision = "a7c9edafa615e4e84a9b91d65f0523610df11c7a"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
         "management_recovery.py",
+        "management_plan.py",
+        "management_plan_store.py",
+        "management_plan_preparation.py",
         "qualify_bootstrap.py",
         "tooling.py",
     ):
@@ -584,3 +587,76 @@ def test_install_review_requires_capability_original_failure_digest_and_stable_i
             assert len(calls) == 1 and failure.value.code == "OPERATOR_CONTROL_UNSUPPORTED"
         if changed == "successful":
             assert len(calls) == 2 and failure.value.code == "PRECONDITION"
+
+
+def test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch(real_operator_agent):
+    source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
+    revision = "a7c9edafa615e4e84a9b91d65f0523610df11c7a"
+    relative = "kubernetes/nvke/test_operator_agent.py"
+    assert (source / relative).read_bytes() == subprocess.check_output(
+        ["git", "show", revision + ":" + relative], cwd=source
+    )
+    driver = r"""
+import ssl
+import sys
+from unittest.mock import patch
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+from nvke.operator_agent_client import OperatorAgentClient
+from nvke.client import NvkeError
+import test_operator_agent as fixture
+fixture.NativeAgentTests.setUpClass()
+case = fixture.NativeAgentTests()
+try:
+    case.setUp()
+    try:
+        job, intent, body = case.plan_fixture()
+        original = (case.engine._job(job) / "state.json").read_bytes()
+        guard = (case.engine.workspace / "management-install-state.json").read_bytes()
+        runs = sorted(p.name for p in (case.engine.workspace / "runs").iterdir())
+        context = ssl.create_default_context(cafile=str(case.certs / "ca.pem"))
+        context.load_cert_chain(case.certs / "client.pem", case.certs / "client.key")
+        with OperatorAgentClient(case.url, site_id=fixture.SITE, instance_id=case.engine.instance_id,
+            bundle_manifest_sha256=case.bundle_digest, verify=context) as sdk:
+            with patch.object(fixture.agent.management_plan_preparation.qualification,
+                "kubectl", side_effect=case.plan_kubectl):
+                prepared = sdk.prepare_install_plan(job, intent=intent, body=body)
+            assert sdk.prepare_install_plan(job, intent=intent, body=body) == prepared
+            assert sdk.install_plan(job, intent=intent, plan_id=body["planId"]) == prepared
+            rows, cursor = [], None
+            while True:
+                page = sdk.install_plan_page(job, intent=intent, plan_id=body["planId"],
+                    plan_digest=prepared["plan"]["planDigest"], view="items", limit=3, after=cursor)
+                rows.extend(page["items"])
+                cursor = page["nextCursor"]
+                if cursor is None:
+                    break
+            assert len(rows) == prepared["itemCount"] == 11
+            assert [r["ordinal"] for r in rows] == list(range(11))
+            workloads = sdk.install_plan_page(job, intent=intent, plan_id=body["planId"],
+                plan_digest=prepared["plan"]["planDigest"], view="workloads")
+            assert workloads["items"][0]["generation"] == "9007199254740993"
+            assert workloads["items"][0]["observation"] == "ready"
+            seal = case.engine.install_plans.root / body["planId"] / "plan.json"
+            seal.write_bytes(seal.read_bytes().replace(b'"apiReady":true', b'"apiReady":false'))
+            try:
+                sdk.install_plan(job, intent=intent, plan_id=body["planId"])
+            except NvkeError:
+                pass
+            else:
+                raise AssertionError("tampered sealed plan was exposed")
+        assert (case.engine._job(job) / "state.json").read_bytes() == original
+        assert (case.engine.workspace / "management-install-state.json").read_bytes() == guard
+        assert sorted(p.name for p in (case.engine.workspace / "runs").iterdir()) == runs
+        assert list(case.engine.install_plans.links.iterdir()) == []
+    finally:
+        case.tearDown()
+finally:
+    fixture.NativeAgentTests.tearDownClass()
+"""
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", driver, str(Path(__file__).resolve().parents[2]), str(source / "kubernetes/nvke")],
+        capture_output=True,
+        timeout=45,
+    )
+    assert result.returncode == 0, "Owned mutual-TLS SDK plan qualification failed"

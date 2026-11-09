@@ -237,3 +237,29 @@ verification, one native generation run, deliberately lost admission reply,
 original recovery without the input file, private output, read-only settlement
 from an explicit uncertain fixture and revoked-token refusal. Other native
 command families and infrastructure effects remain separate qualification work.
+
+## Install plan preparation SDK checkpoint
+
+The agent now exposes read-only `POST /v1/jobs/ORIGINAL/install-plan` and
+`GET /v1/jobs/ORIGINAL/install-plan?planId=UUID`. The SDK provides
+`prepare_install_plan`, `install_plan` and `install_plan_page`. Preparation requires
+the original unsuccessful management-install receipt and intent, a new plan UUID,
+an explicit decimal `maximumInputBytes` budget, and either `request: null` to inherit
+the authenticated original request or a complete proposed install request. Optional
+`overrides.options` and `overrides.files` merge into that request; null deletes a field.
+
+Use the same plan UUID and exact preparation body to recover an unconfirmed reply.
+An incomplete plan is refused explicitly. Reading a saved summary or page does not
+repeat Kubernetes observations or render a new deployment. Item and workload pages
+are separately bound to the immutable plan digest, search, limit and signed cursor.
+SDK workload counters are decimal strings or null. Source or content changes refuse
+recovery; they do not authorize another install.
+
+The local SDK suite has 80 passing tests, including an actual agent mutual-TLS
+preparation/recovery/page/tamper roundtrip with controlled Kubernetes reads. The
+original failed receipt, native guard and run inventory remain unchanged. This
+checkpoint has no current-admin application plan API/UI/CLI or continuation
+executor. Linux agent RPC qualification, frozen dependency closure and skipped
+resource verification, durable linked execution, and deployed acceptance remain
+pending. The paged SDK validates the source-bound header and each page; it does
+not claim to recompute a full-plan digest from a single page.
