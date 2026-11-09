@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
@@ -34,6 +34,8 @@ export interface NvkeOperatorInstallPlanPanelProps extends Pick<
   itemTable: CursorTableController<NvkeInstallPlanItem>;
   workloadTable: CursorTableController<NvkeInstallWorkload>;
   canRetry: boolean;
+  allowOriginalPreparation?: boolean;
+  onChoosePlan?: () => Promise<void>;
   onPrepare: (values: NvkeInstallPlanForm) => Promise<boolean>;
   onReview: (planId: string) => Promise<boolean>;
   onRetryPreparation: (planId: string) => Promise<boolean>;
@@ -85,6 +87,9 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
   const parsed = installPlanSchema.safeParse(props.plan);
   const candidate = parsed.success ? parsed.data : null;
   const savedId = props.retainedPlanId ?? retained ?? candidate?.id ?? null;
+  useEffect(() => {
+    if (savedId) form.setValue("planId", savedId);
+  }, [savedId, form]);
   const plan =
     sourceReady &&
     !props.loading &&
@@ -207,7 +212,9 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
       !enabled ||
       !validNvkeGuid(planId) ||
       planId === operation.id ||
-      (action === "prepare" && (!!savedId || !values || !!props.error || unconfirmed)) ||
+      (action === "prepare" &&
+        (!values ||
+          (!props.allowOriginalPreparation && (!!savedId || !!props.error || unconfirmed)))) ||
       (action === "retry" && !props.canRetry)
     )
       return;
@@ -259,18 +266,22 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
             spellCheck={false}
           />
         </div>
-        {!savedId && (
+        {(!savedId || props.allowOriginalPreparation) && (
           <div className="space-y-2">
             <Label htmlFor={`${id}-request`}>{t("privateRequest")}</Label>
             <Textarea
               id={`${id}-request`}
               {...form.register("requestText")}
-              disabled={!enabled || !!props.error || unconfirmed}
+              disabled={
+                !enabled || (!props.allowOriginalPreparation && (!!props.error || unconfirmed))
+              }
               spellCheck={false}
               autoComplete="off"
               rows={6}
             />
-            <p className="text-muted-foreground text-sm">{t("privateHelp")}</p>
+            <p className="text-muted-foreground text-sm">
+              {t(props.allowOriginalPreparation ? "originalOnly" : "privateHelp")}
+            </p>
           </div>
         )}
         {Object.keys(form.formState.errors).length > 0 && (
@@ -279,7 +290,13 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button type="submit" disabled={!enabled || !!savedId || !!props.error || unconfirmed}>
+          <Button
+            type="submit"
+            disabled={
+              !enabled ||
+              (!props.allowOriginalPreparation && (!!savedId || !!props.error || unconfirmed))
+            }
+          >
             {t("prepare")}
           </Button>
           <Button
@@ -298,6 +315,16 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
           >
             {t("retry")}
           </Button>
+          {props.onChoosePlan && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!enabled}
+              onClick={() => void props.onChoosePlan?.()}
+            >
+              {t("choosePlan")}
+            </Button>
+          )}
         </div>
       </form>
       {props.error && (
@@ -312,7 +339,7 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
       )}
       {!plan && !props.error && !unconfirmed && (
         <p role="status" className="text-muted-foreground text-sm">
-          {props.loading ? j("loading") : props.plan ? j("unavailable") : j("unloaded")}
+          {props.loading ? t("loading") : props.plan ? t("unavailable") : t("unloaded")}
         </p>
       )}
       {plan && (
@@ -368,7 +395,7 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
             label={t("items")}
             loading={itemTable.state === "loading"}
             stale={itemTable.isStale}
-            error={itemTable.state === "error" ? { message: j("pageFailed") } : null}
+            error={itemTable.state === "error" ? { message: t("pageFailed") } : null}
             onRetry={itemTable.retry}
             nextCursor={itemTable.nextCursor}
             totalCount={itemTable.totalCount}
@@ -384,7 +411,7 @@ function PlanControls(props: NvkeOperatorInstallPlanPanelProps) {
             label={j("workloads")}
             loading={workloadTable.state === "loading"}
             stale={workloadTable.isStale}
-            error={workloadTable.state === "error" ? { message: j("pageFailed") } : null}
+            error={workloadTable.state === "error" ? { message: t("pageFailed") } : null}
             onRetry={workloadTable.retry}
             nextCursor={workloadTable.nextCursor}
             totalCount={workloadTable.totalCount}

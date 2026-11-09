@@ -18144,7 +18144,13 @@
       "proposedBytes": "Octets d’entrée proposés",
       "originalExit": "Code de sortie natif initial",
       "emptyItems": "Aucun élément ne correspond à cette recherche",
-      "itemSearch": "Rechercher des éléments de déploiement"
+      "itemSearch": "Rechercher des éléments de déploiement",
+      "choosePlan": "Choisir un autre plan",
+      "originalOnly": "Après examen de l’identité enregistrée, vous pouvez soumettre explicitement la requête privée initiale à nouveau. Son UUID et son texte exact doivent correspondre au hachage de récupération conservé. Gardez la copie privée initiale.",
+      "loading": "Lecture du plan enregistré…",
+      "unloaded": "Préparez une proposition ou saisissez un UUID pour examiner son résultat enregistré.",
+      "unavailable": "Le plan est indisponible ou appartient à une autre source. Vérifiez la source actuelle et l’identité enregistrée.",
+      "pageFailed": "Impossible de lire cette page du plan. Examinez le plan enregistré et réessayez la page."
     }
   }
 }

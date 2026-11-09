@@ -18144,7 +18144,13 @@
       "proposedBytes": "Bytes de entrada propuestos",
       "originalExit": "Código de salida nativo original",
       "emptyItems": "Ningún elemento coincide con esta búsqueda",
-      "itemSearch": "Buscar elementos de despliegue"
+      "itemSearch": "Buscar elementos de despliegue",
+      "choosePlan": "Elegir otro plan",
+      "originalOnly": "Tras revisar la identidad guardada, puede enviar explícitamente la solicitud privada original de nuevo. Su UUID y texto exacto deben coincidir con el hash de recuperación guardado. Conserve la copia privada original.",
+      "loading": "Leyendo el plan guardado…",
+      "unloaded": "Prepare una propuesta o introduzca un UUID para revisar su resultado guardado.",
+      "unavailable": "El plan no está disponible o pertenece a otro origen. Revise el origen actual y la identidad guardada.",
+      "pageFailed": "No se pudo leer esta página del plan. Revise el plan guardado y reintente la página."
     }
   }
 }

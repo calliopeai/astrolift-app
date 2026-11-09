@@ -326,10 +326,13 @@ digests, and independent server-paged item/workload tables. Its private request
 form preserves exact text, clears it after submission, and retains the plan UUID
 for explicit review/retry after an unconfirmed response. Source or permission
 changes hide prior observations and clear the private form. All eight locale
-catalogs include this panel. This is the pure-component checkpoint: the scoped
-Apollo hook, browser recovery journal, operation-screen wiring and connected
-API/agent browser qualification remain pending. It exposes no continuation
-execution action.
+catalogs include this panel. The operation screen now wires the scoped Apollo hook and independent item and
+workload page queries into this panel. Each request bypasses Apollo/browser
+caches, refuses redirects, redacts diagnostics, and pins the expected organization,
+actor, original operation, site and agent versions. Actor/source/visit changes
+discard late replies and hide prior pages. Connected API/agent browser
+qualification is still pending while the host-network incident in #98 remains
+unresolved. There is no continuation execution action.
 
 Local verification of this component checkpoint: 97 focused protocol/panel/story
 checks passed; the Chromium runner
@@ -338,3 +341,28 @@ without page errors and checked page overflow at 768px. The initial runner used
 an incorrect responsive-story ID; it was corrected to the Storybook index's
 `width-768` ID before the passing run. These fixtures do not qualify the connected
 API/agent path.
+
+Browser preparation uses an exclusive operation-scoped Web Lock and verifies a
+metadata-only local-storage journal before submitting the private text. Journals
+are immutable per plan UUID and contain its exact-text SHA-256 plus caller/source
+identities; native request text, credentials and tokens never enter them. The
+selected plan UUID survives reload without an implicit API call. Explicit review
+reads the existing result; explicit retry uses the server-retained intent and
+still requires the original actor/token at the backend.
+
+If an explicit review cannot recover a result, the original caller may paste and
+submit the original private text again under the same UUID. Its exact-text hash
+must match the journal before any API call. This covers a connection loss before
+the backend retained an intent, without silently retrying or accepting changed
+input. After an explicit review attempt, choosing another proposal clears only the
+selection and preserves earlier immutable journals. Read-only inspection works
+without browser locks or writable browser storage; private preparation does not.
+
+The wired recovery checkpoint has 134 focused protocol/journal/hook/panel/story
+checks and 16 pure-panel Chromium states passing. Two additional Chromium
+scenarios use controlled in-browser Apollo fixtures: losing a reply before
+retention requires exactly one explicit original-text resubmission; losing it
+after retention recovers by review alone. Changed text makes no preparation API
+call, the journal exists before preparation, private text stays out of browser
+storage, and both scenarios complete without page errors. These controlled
+fixtures are separate from the pending real backend/Linux-agent qualification.

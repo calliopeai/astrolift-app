@@ -22116,6 +22116,51 @@ export type GetModelSubscriptionMetricsQueryVariables = Exact<{
 
 export type GetModelSubscriptionMetricsQuery = { astroliftModelSubscriptionMetrics?: { serviceId: string, clusterId: string, subscriptionId: string, start: string, end: string, retrievedAt: string, stepSeconds: number, scope: string, metrics: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> } | null };
 
+export type PrepareNvkeInstallPlanMutationVariables = Exact<{
+  input: PrepareNvkeOperatorInstallPlanInput;
+}>;
+
+
+export type PrepareNvkeInstallPlanMutation = { prepareNvkeOperatorInstallPlan: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, itemCount: number, retainedBytes: string, proposedBytes: string, plan: { format: number, scope: string, id: string, preparedAt: string, phaseEvidence: string, requiresOriginalSourceVerification: boolean, requiresExplicitAcknowledgement: boolean, continuationAuthorized: boolean, firstRemainingOrdinal: number, planDigest: string, source: { siteId: string, instanceId: string, jobId: string, nativeRunId: string, nativeRevision: string, nativeExitCode: number, bundleManifestSha256: string, nativeArgumentsSha256: string, retainedInputsSha256: string, proposedInputsSha256: string, proposedExecutionSha256: string, privateSourceSha256: string, reviewDigest: string, stderrSha256: string, originalStartedAt: string, reviewObservedAt: string, originalDeploymentEvidence: string } }, infrastructure: { apiReady: boolean, observedAt: string, clusterUid: string, workloadCount: number } } | null } };
+
+export type ReviewNvkeInstallPlanMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanReviewInput;
+}>;
+
+
+export type ReviewNvkeInstallPlanMutation = { reviewNvkeOperatorInstallPlan: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, itemCount: number, retainedBytes: string, proposedBytes: string, plan: { format: number, scope: string, id: string, preparedAt: string, phaseEvidence: string, requiresOriginalSourceVerification: boolean, requiresExplicitAcknowledgement: boolean, continuationAuthorized: boolean, firstRemainingOrdinal: number, planDigest: string, source: { siteId: string, instanceId: string, jobId: string, nativeRunId: string, nativeRevision: string, nativeExitCode: number, bundleManifestSha256: string, nativeArgumentsSha256: string, retainedInputsSha256: string, proposedInputsSha256: string, proposedExecutionSha256: string, privateSourceSha256: string, reviewDigest: string, stderrSha256: string, originalStartedAt: string, reviewObservedAt: string, originalDeploymentEvidence: string } }, infrastructure: { apiReady: boolean, observedAt: string, clusterUid: string, workloadCount: number } } | null } };
+
+export type RetryNvkeInstallPlanMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanReviewInput;
+}>;
+
+
+export type RetryNvkeInstallPlanMutation = { recoverNvkeOperatorInstallPlanPreparation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, itemCount: number, retainedBytes: string, proposedBytes: string, plan: { format: number, scope: string, id: string, preparedAt: string, phaseEvidence: string, requiresOriginalSourceVerification: boolean, requiresExplicitAcknowledgement: boolean, continuationAuthorized: boolean, firstRemainingOrdinal: number, planDigest: string, source: { siteId: string, instanceId: string, jobId: string, nativeRunId: string, nativeRevision: string, nativeExitCode: number, bundleManifestSha256: string, nativeArgumentsSha256: string, retainedInputsSha256: string, proposedInputsSha256: string, proposedExecutionSha256: string, privateSourceSha256: string, reviewDigest: string, stderrSha256: string, originalStartedAt: string, reviewObservedAt: string, originalDeploymentEvidence: string } }, infrastructure: { apiReady: boolean, observedAt: string, clusterUid: string, workloadCount: number } } | null } };
+
+export type NvkeInstallPlanFieldsFragment = { id: string, version: number, status: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, itemCount: number, retainedBytes: string, proposedBytes: string, plan: { format: number, scope: string, id: string, preparedAt: string, phaseEvidence: string, requiresOriginalSourceVerification: boolean, requiresExplicitAcknowledgement: boolean, continuationAuthorized: boolean, firstRemainingOrdinal: number, planDigest: string, source: { siteId: string, instanceId: string, jobId: string, nativeRunId: string, nativeRevision: string, nativeExitCode: number, bundleManifestSha256: string, nativeArgumentsSha256: string, retainedInputsSha256: string, proposedInputsSha256: string, proposedExecutionSha256: string, privateSourceSha256: string, reviewDigest: string, stderrSha256: string, originalStartedAt: string, reviewObservedAt: string, originalDeploymentEvidence: string } }, infrastructure: { apiReady: boolean, observedAt: string, clusterUid: string, workloadCount: number } };
+
+export type GetNvkeInstallPlanItemPageQueryVariables = Exact<{
+  input: NvkeOperatorInstallPlanReviewInput;
+  planDigest: Scalars['String']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetNvkeInstallPlanItemPageQuery = { astroliftNvkeOperatorInstallPlanItemPage: { ok: boolean, errors: Array<{ code: string }>, data?: { planId: string, planDigest: string, view: string, nextCursor?: string | null, totalCount: number, items: Array<{ name: string, type: string, originalType: string, contentSha256: string, originalContentSha256: string, ordinal: number, originalObservation: string, proposedAction: string }> } | null } };
+
+export type GetNvkeInstallPlanWorkloadPageQueryVariables = Exact<{
+  input: NvkeOperatorInstallPlanReviewInput;
+  planDigest: Scalars['String']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type GetNvkeInstallPlanWorkloadPageQuery = { astroliftNvkeOperatorInstallPlanWorkloadPage: { ok: boolean, errors: Array<{ code: string }>, data?: { planId: string, planDigest: string, view: string, nextCursor?: string | null, totalCount: number, items: Array<{ namespace: string, kind: string, name: string, generation: string, observedGeneration?: string | null, desiredReplicas: string, readyReplicas?: string | null, updatedReplicas?: string | null, observation: string }> } | null } };
+
 export type ConfigureNvkeMetricsAuthorityMutationVariables = Exact<{
   input: ConfigureNvkeMetricsAuthorityInput;
 }>;

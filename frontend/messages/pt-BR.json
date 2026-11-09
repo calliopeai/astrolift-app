@@ -18141,7 +18141,13 @@
       "proposedBytes": "Bytes de entrada propostos",
       "originalExit": "Código de saída nativo original",
       "emptyItems": "Nenhum item corresponde a esta busca",
-      "itemSearch": "Buscar itens de implantação"
+      "itemSearch": "Buscar itens de implantação",
+      "choosePlan": "Escolher outro plano",
+      "originalOnly": "Após revisar a identidade salva, você pode enviar explicitamente a solicitação privada original novamente. O UUID e o texto exato devem corresponder ao hash de recuperação salvo. Guarde a cópia privada original.",
+      "loading": "Lendo o plano salvo…",
+      "unloaded": "Prepare uma proposta ou informe um UUID para revisar o resultado salvo.",
+      "unavailable": "O plano está indisponível ou pertence a outra origem. Revise a origem atual e a identidade salva.",
+      "pageFailed": "Não foi possível ler esta página do plano. Revise o plano salvo e tente a página novamente."
     }
   }
 }

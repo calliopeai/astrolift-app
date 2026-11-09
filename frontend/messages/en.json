@@ -18141,7 +18141,13 @@
       "proposedBytes": "Proposed input bytes",
       "originalExit": "Original native exit code",
       "emptyItems": "No deployment items match this search",
-      "itemSearch": "Search deployment items"
+      "itemSearch": "Search deployment items",
+      "choosePlan": "Choose another plan",
+      "originalOnly": "After reviewing the saved identity, you may explicitly submit the original private request again. Its UUID and exact text must match the saved recovery hash. Keep the original private copy.",
+      "loading": "Reading the saved plan…",
+      "unloaded": "Prepare a proposal or enter a plan UUID to review its saved result.",
+      "unavailable": "The plan is unavailable or belongs to another source. Review the current source and saved identity.",
+      "pageFailed": "Could not read this plan page. Review the saved plan and retry the page."
     }
   }
 }

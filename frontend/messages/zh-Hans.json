@@ -18141,7 +18141,13 @@
       "proposedBytes": "提议的输入字节数",
       "originalExit": "原始原生退出码",
       "emptyItems": "没有匹配此搜索的部署项",
-      "itemSearch": "搜索部署项"
+      "itemSearch": "搜索部署项",
+      "choosePlan": "选择其他计划",
+      "originalOnly": "审查保存的标识后，您可以明确重新提交原始私有请求。UUID 和原始文本必须与保存的恢复哈希完全匹配。请保留原始私有副本。",
+      "loading": "正在读取保存的计划…",
+      "unloaded": "准备提案或输入计划 UUID 以审查保存的结果。",
+      "unavailable": "计划不可用或属于其他来源。请审查当前来源和保存的标识。",
+      "pageFailed": "无法读取此计划页面。请审查保存的计划并重试此页面。"
     }
   }
 }

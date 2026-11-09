@@ -5,6 +5,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { GetNvkeSiteQuery, GetNvkeOperationQuery } from "@/graphql/__generated__/operations";
 import { useNvkeOperatorAgent } from "@/graphql/nvke/use-nvke-operator-agent";
 import { useNvkeOperatorWorkbench } from "@/graphql/nvke/use-nvke-operator-workbench";
+import { useNvkeInstallPlan } from "@/graphql/nvke/use-nvke-install-plan";
 import { useNvkeOperatorInstallReview } from "@/graphql/nvke/use-nvke-operator-install-review";
 import { useNvkeOperatorJob } from "@/graphql/nvke/use-nvke-operator-job";
 import { useNvkeRead } from "@/graphql/nvke/use-scoped-read";
@@ -99,6 +100,11 @@ function ConnectedPanel({
     pending: job?.pending ?? false,
     onRefresh: refreshOperation,
   });
+  const installPlan = useNvkeInstallPlan({
+    context,
+    source: job,
+    pending: Boolean(job?.pending || installReview?.pending),
+  });
   if (mode === "operation")
     return (
       <NvkeOperationScreen
@@ -108,7 +114,7 @@ function ConnectedPanel({
         error={
           site.failed || operation.failed ? "Local qualification source is unavailable." : null
         }
-        pending={Boolean(job?.pending || installReview?.pending)}
+        pending={Boolean(job?.pending || installReview?.pending || installPlan?.pending)}
         canAct={context.access.admin}
         canResume={false}
         onRefresh={refreshOperation}
@@ -117,6 +123,7 @@ function ConnectedPanel({
         onDownload={async () => {}}
         operatorJob={job}
         operatorInstallReview={installReview}
+        operatorInstallPlan={installPlan}
       />
     );
   if (mode === "workbench")

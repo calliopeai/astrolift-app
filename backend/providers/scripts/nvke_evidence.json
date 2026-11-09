@@ -695,7 +695,7 @@
       "repository": "app",
       "path": "frontend/components/screens/nvke/NvkeOperatorJobPanel.tsx",
       "kind": "implementation",
-      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1\u2013256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details. Reviewed original stop/fencing, eligibility/source-change review invalidation and explicit refresh after unconfirmed stop are included."
+      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1–256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details. Reviewed original stop/fencing, eligibility/source-change review invalidation and explicit refresh after unconfirmed stop are included."
     },
     "operator-job-hook": {
       "repository": "app",
@@ -1027,6 +1027,42 @@
       "kind": "observation",
       "scope": "Clean compiled CLI through actual GraphQL/SDK/mTLS Linux agent: prepare/review/retry, complete 12-item/24-workload pages, NKTP search, changed cursor and stale-version refusal. Private journal and unchanged original eight files/five jobs/runs/full UNCERTAIN-version-23 row. Full Go suite: 1032 passing top-level tests/12 packages, two existing native opt-in skips. Later host usernet outage is separately recorded in #98; no guest reboot or native replay.",
       "sha256": "6ed42dc5e3311379e400df81d988982aecfbff9638ffb2bc88fba8daf5e65698"
+    },
+    "operator-install-plan-ui": {
+      "repository": "app",
+      "path": "frontend/components/screens/nvke/NvkeOperatorInstallPlanPanel.tsx",
+      "kind": "implementation",
+      "scope": "Operation-screen plan preparation/review/retry controls, exact private-text recovery after explicit review, provenance and original-failure context, independent server-paged item/workload tables and eight locales. No continuation action."
+    },
+    "operator-install-plan-ui-hook": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-install-plan.ts",
+      "kind": "implementation",
+      "scope": "Scoped no-cache/redacted Apollo plan mutations and validated pages. Exact actor/site/operation/agent pins, late-reply/visit invalidation, explicit saved-result review and server-intent retry. Read-only review remains usable without browser locks or writable storage."
+    },
+    "operator-install-plan-ui-journal": {
+      "repository": "app",
+      "path": "frontend/lib/nvke/install-plan-recovery.ts",
+      "kind": "implementation",
+      "scope": "Exclusive operation-scoped browser locks and immutable per-plan metadata-only journals with exact-text SHA-256, verified before private API submission. Selection can change after review without deleting earlier intent journals; no native parameters or tokens are persisted."
+    },
+    "operator-install-plan-ui-tests": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-install-plan.test.tsx",
+      "kind": "test",
+      "scope": "Controlled Apollo-link checks cover metadata-before-mutation, lost reply before/after retained intent, exact original resubmission after review, changed-text refusal, actor/permission/source/visit invalidation, cross-tab contention, blocked storage, no-cache page validation and preserved earlier journals."
+    },
+    "operator-install-plan-ui-browser": {
+      "repository": "app",
+      "path": "frontend/e2e/nvke-install-plan-recovery-runner.mjs",
+      "kind": "test",
+      "scope": "Real Chromium exercises the wired hook/panel with controlled in-browser Apollo fixtures for lost-before-retention and lost-after-retention. Verifies actual browser journal/lock use, exact digest preservation, no changed-text API submission, and no private text in localStorage. This is not a real backend/Linux-agent qualification."
+    },
+    "operator-install-plan-ui-protocol": {
+      "repository": "app",
+      "path": "frontend/lib/nvke/operator-install-plan.ts",
+      "kind": "implementation",
+      "scope": "Typed metadata/source/phase/action/page validation preserves decimal int64 bytes and workload counters, rejects contradictory continuation claims and source/digest/page swaps, and submits complete private request text without browser reserialization."
     }
   },
   "rows": {
@@ -3297,9 +3333,15 @@
           "operator-install-plan-cli",
           "operator-install-plan-cli-api",
           "operator-install-plan-cli-tests",
-          "operator-install-plan-cli-local"
+          "operator-install-plan-cli-local",
+          "operator-install-plan-ui",
+          "operator-install-plan-ui-hook",
+          "operator-install-plan-ui-journal",
+          "operator-install-plan-ui-tests",
+          "operator-install-plan-ui-browser",
+          "operator-install-plan-ui-protocol"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. Plan UI review, frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",

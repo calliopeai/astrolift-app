@@ -30,6 +30,7 @@ import { useNvkeMaintenance } from "./use-nvke-maintenance";
 import { useNvkeProviders } from "./use-nvke-providers";
 import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
+import { useNvkeInstallPlan } from "./use-nvke-install-plan";
 import { useNvkeOperatorInstallReview } from "./use-nvke-operator-install-review";
 import { useNvkeOperatorJob } from "./use-nvke-operator-job";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
@@ -184,6 +185,15 @@ export const useNvkeOperation = (
     pending: Boolean((mutation?.key === visitKey && mutation.pending) || operatorJob?.pending),
     onRefresh: refresh,
   });
+  const operatorInstallPlan = useNvkeInstallPlan({
+    context,
+    source: operatorJob,
+    pending: Boolean(
+      (mutation?.key === visitKey && mutation.pending) ||
+      operatorJob?.pending ||
+      operatorInstallReview?.pending
+    ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -192,6 +202,7 @@ export const useNvkeOperation = (
       busy.current ||
       operatorJob?.pending ||
       operatorInstallReview?.pending ||
+      operatorInstallPlan?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -239,6 +250,7 @@ export const useNvkeOperation = (
     operation,
     operatorJob,
     operatorInstallReview,
+    operatorInstallPlan,
     diagnostics,
     maintenance,
     credentials,
@@ -251,7 +263,9 @@ export const useNvkeOperation = (
     error: failed ? t("readFailed") : mutation?.key === visitKey ? mutation.error : null,
     pending:
       (mutation?.key === visitKey && mutation.pending) ||
-      Boolean(operatorJob?.pending || operatorInstallReview?.pending),
+      Boolean(
+        operatorJob?.pending || operatorInstallReview?.pending || operatorInstallPlan?.pending
+      ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
     onRefresh: refresh,
@@ -264,6 +278,7 @@ export const useNvkeOperation = (
         busy.current ||
         operatorJob?.pending ||
         operatorInstallReview?.pending ||
+        operatorInstallPlan?.pending ||
         !operation
       )
         return;

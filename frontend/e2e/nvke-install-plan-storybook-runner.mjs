@@ -18,6 +18,8 @@ const cases = [
   "empty-filtered",
   "long-strings",
   "width-768",
+  "original-preparation-recovery",
+  "choose-another-plan",
 ];
 let completed = 0;
 try {
@@ -63,6 +65,24 @@ try {
         await page
           .getByRole("button", { name: "Retry retained preparation", exact: true })
           .isDisabled(),
+        true
+      );
+    }
+    if (name === "original-preparation-recovery") {
+      const requestText = JSON.stringify({
+        format: 1,
+        planId: "123e4567-e89b-12d3-a456-426614174097",
+        request: null,
+        maximumInputBytes: "4096",
+      });
+      assert.equal(await page.getByLabel("Plan UUID").isDisabled(), true);
+      await page.getByLabel("Private plan request JSON").fill(requestText);
+      await page.getByRole("button", { name: "Prepare plan", exact: true }).click();
+      await page.waitForFunction(() => document.querySelector("textarea")?.value === "");
+    }
+    if (name === "choose-another-plan") {
+      assert.equal(
+        await page.getByRole("button", { name: "Choose another plan", exact: true }).isEnabled(),
         true
       );
     }

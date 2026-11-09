@@ -99,3 +99,47 @@ it("lets another reviewer inspect but refuses private retry", () => {
   expect(screen.getByRole("button", { name: t.review })).toBeEnabled();
   expect(screen.getByRole("button", { name: t.retry })).toBeDisabled();
 });
+
+it("supports exact original text recovery with a fixed retained UUID after an explicit failed review", async () => {
+  const onPrepare = vi.fn(async () => true);
+  render(
+    <NvkeOperatorInstallPlanPanel
+      {...p}
+      plan={null}
+      retainedPlanId={p.plan!.id}
+      allowOriginalPreparation
+      onPrepare={onPrepare}
+      error="Unconfirmed"
+    />,
+    { wrapper }
+  );
+  const requestText = JSON.stringify({
+    format: 1,
+    planId: p.plan!.id,
+    request: null,
+    maximumInputBytes: "4096",
+  });
+  expect(screen.getByLabelText(t.planId)).toBeDisabled();
+  expect(screen.getByText(t.originalOnly)).toBeVisible();
+  fireEvent.change(screen.getByLabelText(t.privateRequest), { target: { value: requestText } });
+  fireEvent.click(screen.getByRole("button", { name: t.prepare }));
+  await waitFor(() =>
+    expect(onPrepare).toHaveBeenCalledExactlyOnceWith({ planId: p.plan!.id, requestText })
+  );
+});
+it("shows the saved plan on the operation screen and hides it when permission is lost", async () => {
+  const { NvkeOperationScreen } = await import("./NvkeOperationScreen");
+  const { OPERATION_DETAIL } = await import("./fixtures");
+  const props = {
+    ...OPERATION_DETAIL,
+    operation: p.operation,
+    operatorInstallPlan: p,
+    canAct: true,
+    canResume: false,
+  };
+  const view = render(<NvkeOperationScreen {...props} />, { wrapper });
+  expect(screen.getByText("postgresql")).toBeVisible();
+  view.rerender(<NvkeOperationScreen {...props} canAct={false} />);
+  expect(screen.queryByText("postgresql")).toBeNull();
+  expect(screen.getByRole("button", { name: t.review })).toBeDisabled();
+});

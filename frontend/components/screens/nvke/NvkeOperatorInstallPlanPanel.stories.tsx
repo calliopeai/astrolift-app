@@ -175,3 +175,14 @@ export const Width768: Story = {
     </div>
   ),
 };
+
+export const OriginalPreparationRecovery: Story = {
+  args: {
+    plan: null,
+    retainedPlanId: INSTALL_PLAN_PROPS.plan!.id,
+    allowOriginalPreparation: true,
+    error:
+      "The saved identity could not be read. Only the original private input can be resubmitted.",
+  },
+};
+export const ChooseAnotherPlan: Story = { args: { onChoosePlan: async () => {} } };

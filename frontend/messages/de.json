@@ -18144,7 +18144,13 @@
       "proposedBytes": "Vorgeschlagene Eingabebytes",
       "originalExit": "Ursprünglicher nativer Exitcode",
       "emptyItems": "Keine Elemente entsprechen dieser Suche",
-      "itemSearch": "Bereitstellungselemente suchen"
+      "itemSearch": "Bereitstellungselemente suchen",
+      "choosePlan": "Anderen Plan wählen",
+      "originalOnly": "Nach Prüfung der gespeicherten Identität können Sie die ursprüngliche private Anfrage ausdrücklich erneut senden. UUID und exakter Text müssen dem gespeicherten Wiederherstellungshash entsprechen. Die ursprüngliche private Kopie aufbewahren.",
+      "loading": "Gespeicherter Plan wird gelesen…",
+      "unloaded": "Einen Vorschlag vorbereiten oder eine Plan-UUID eingeben, um das gespeicherte Ergebnis zu prüfen.",
+      "unavailable": "Der Plan ist nicht verfügbar oder gehört zu einer anderen Quelle. Aktuelle Quelle und gespeicherte Identität prüfen.",
+      "pageFailed": "Diese Planseite konnte nicht gelesen werden. Gespeicherten Plan prüfen und die Seite erneut laden."
     }
   }
 }
