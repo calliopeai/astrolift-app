@@ -1,0 +1,48 @@
+{
+  "format": 1,
+  "scope": "source-bound-metadata-only-render-verification-sdk",
+  "status": "unit-and-static-qualified-real-mtls-running",
+  "agentRevision": "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38",
+  "sourceSha256": {
+    "nvke/operator_agent_client.py": "166d333aee955f0bff93c105771dddef2fe34b121cb3b678d33d186107d03666",
+    "nvke/_operator_install_plan_verification.py": "ef9e8489428603a95424e085c526764528849d4c4bcdebc94dde6ce55bb43285",
+    "tests/nvke/test_operator_install_plan.py": "ae4403ba185aa115650c550d20047fa955f5b7fc6fa7d5999dbff361bcc369cd",
+    "tests/nvke/test_operator_install_plan_verification.py": "614464893548fe37fdf977a8b7897bb8b122087951dd4b4c7a2394f36c0651e3",
+    "tests/nvke/test_operator_install_plan_verification_mtls.py": "0115766544097c3712bbc0ca5fd75dcec4c54e337f119fafb96dacfde02787d7",
+    "tests/nvke/fixtures/nvke_operator_verification_driver.py": "a25313694501f9709e9fe2823898347afd360c2dc7b8046fd9e2990cd0a6857f"
+  },
+  "checks": {
+    "focusedInitial": {
+      "passed": 61,
+      "exitCode": 0
+    },
+    "relatedRegressions": {
+      "passed": 312,
+      "skipped": 6,
+      "seconds": 20.93,
+      "exitCode": 0,
+      "skips": "Older opt-in agent-client native tests require their separate explicit source/bundle environment. New verification native mTLS qualification runs separately with every required opt-in selected.",
+      "logSha256": "c266283ea3dc3e1c1857a7b4dd2955c662f349c43d55213653764ea282654509"
+    },
+    "ruff": "passed",
+    "mypy": "passed for both changed production modules, follow-imports=silent",
+    "realVerificationMTLS": {
+      "status": "running",
+      "sessionId": 7088,
+      "logPath": "/tmp/astrolift-nvke-verification-sdk-mtls.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-sdk-mtls.exit"
+    }
+  },
+  "implemented": [
+    "Strict closed request/response codec binds six distinct UUIDs, reviewed parent/capture/chart digests, exact Helm item ordinal and bounded limits. Public historical metadata explicitly cannot authorize continuation.",
+    "Prepare and historical read inspect the complete original receipt/plan/chart/tree/item/context DAG before and after, with bounded direct reads rather than recursive parent getters. Original authority callback remains before/after every request.",
+    "Both source snapshots close with original receipt and capability rechecks. Paged item enumeration rejects changing totals, duplicate names/ordinals, incomplete membership and cursor cycles.",
+    "Lost replies remain ambiguous; explicit reads never replay writes. Incomplete verification maps to a stable redacted error."
+  ],
+  "remaining": [
+    "Inspect actual pinned native SDK mTLS outcome before claiming end-to-end qualification.",
+    "Durable App model/intent/API/RBAC/audit, schema/codegen, CLI and UI verification controls and actual paired acceptance remain outstanding.",
+    "Fresh use-time phase/resource/original credential checks, schema and image closure, exactly-once linked admission, final full surface checks/PR/merge/deployment remain open."
+  ],
+  "continuationAuthorized": false
+}

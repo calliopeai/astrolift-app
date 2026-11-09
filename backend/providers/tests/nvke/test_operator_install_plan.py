@@ -123,6 +123,10 @@ def client(
     lost_context_reply=False,
     context_status=200,
     changed_after_context=False,
+    verification=None,
+    verification_capability=None,
+    lost_verification_reply=False,
+    verification_status=200,
 ):
     calls = []
     original = {
@@ -165,6 +169,9 @@ def client(
                     "installPlanContext": context_capability
                     if context_capability is not None
                     else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
+                    "installPlanRenderVerification": verification_capability
+                    if verification_capability is not None
+                    else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
                     "installPlanTree": tree_capability
                     if tree_capability is not None
                     else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
@@ -179,6 +186,10 @@ def client(
                 },
             )
         assert request.headers["X-Astro-Nvke-Intent"] == INTENT
+        if request.url.path.endswith("/install-plan-verification"):
+            if lost_verification_reply and request.method == "POST":
+                raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
+            return httpx.Response(verification_status, json=verification)
         if request.url.path.endswith("/install-plan-context"):
             if lost_context_reply and request.method == "POST":
                 raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)

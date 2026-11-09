@@ -18,6 +18,7 @@ from nvke import _operator_install_plan as install_plan_protocol
 from nvke import _operator_install_plan_charts as chart_protocol
 from nvke import _operator_install_plan_context as context_protocol
 from nvke import _operator_install_plan_tree as tree_protocol
+from nvke import _operator_install_plan_verification as verification_protocol
 from nvke._operator_install_review import project as project_install_review
 from nvke._private_http import private_http
 from nvke.client import NvkeError, validate_endpoint_url
@@ -183,6 +184,7 @@ class OperatorAgentClient:
                     "EXECUTION_TREE_SOURCE_OR_INPUT_CHANGED": "SOURCE_CHANGED",
                     "EXECUTION_TREE_BUSY": "OPERATOR_BUSY",
                     "INSTALL_PLAN_CONTEXT_INCOMPLETE": "OPERATOR_CONTEXT_INCOMPLETE",
+                    "INSTALL_PLAN_VERIFICATION_INCOMPLETE": "OPERATOR_VERIFICATION_INCOMPLETE",
                 }.get(peer, "OPERATOR_REQUEST_REFUSED")
                 if isinstance(peer, str)
                 else "OPERATOR_REQUEST_REFUSED"
@@ -758,6 +760,208 @@ class OperatorAgentClient:
         self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
     ) -> dict[str, Any]:
         return self._install_plan_context(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=True,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+        )
+
+    def _install_plan_verification_source(
+        self, job_id: str, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        original = self._install_plan_source(job_id, intent)
+        identity = self.identity()
+        for name in ("installPlanCharts", "installPlanTree", "installPlanContext", "installPlanRenderVerification"):
+            verification_protocol.capability(identity.get(name))
+        path = "/v1/jobs/" + job_id
+        metadata = self._install_plan_summary(
+            self._request("GET", path + "/install-plan", params={"planId": body["planId"]}, intent=intent),
+            job_id,
+            body["planId"],
+            original,
+        )
+        if metadata["plan"]["planDigest"] != body["planDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The retained plan no longer matches the reviewed digest")
+        chart_body = {
+            "format": 1,
+            "artifactId": chart_artifact_id,
+            "planId": body["planId"],
+            "planDigest": body["planDigest"],
+        }
+        chart = chart_protocol.summary(
+            self._request(
+                "GET",
+                path + "/install-plan-charts",
+                params={key: value for key, value in chart_body.items() if key != "format"},
+                intent=intent,
+            ),
+            body=chart_body,
+            item_count=metadata["itemCount"],
+        )
+        if chart["artifactDigest"] != chart_artifact_digest:
+            raise NvkeError("SOURCE_CHANGED", "The chart publication no longer matches the reviewed digest")
+        tree_body = {
+            **chart_body,
+            "artifactId": body["treeId"],
+            "chartArtifactId": chart_artifact_id,
+            "chartArtifactDigest": chart_artifact_digest,
+        }
+        tree = tree_protocol.summary(
+            self._request(
+                "GET",
+                path + "/install-plan-tree",
+                params={key: value for key, value in tree_body.items() if key != "format"},
+                intent=intent,
+            ),
+            body=tree_body,
+            chart_bytes=chart["bytes"],
+            chart_count=chart["chartCount"],
+        )
+        if tree["treeDigest"] != body["treeDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The execution tree no longer matches the reviewed digest")
+        selected, pages, names, cursors = [], [], set(), set()
+        after = None
+        total, last_ordinal = None, -1
+        for _ in range(100):
+            params = {"planId": body["planId"], "view": "items", "limit": 100, "search": body["item"]}
+            if after is not None:
+                params["after"] = after
+            page = install_plan_protocol.page(
+                self._request("GET", path + "/install-plan", params=params, intent=intent),
+                metadata=metadata,
+                view="items",
+                limit=100,
+                search=body["item"],
+                initial=after is None,
+            )
+            pages.append(page)
+            if total is not None and page["totalCount"] != total:
+                raise ValueError
+            total = page["totalCount"]
+            for row in page["items"]:
+                if row["name"] in names or row["ordinal"] <= last_ordinal:
+                    raise ValueError
+                last_ordinal = row["ordinal"]
+                names.add(row["name"])
+                if row["name"] == body["item"]:
+                    selected.append(row)
+            after = page["nextCursor"]
+            if after is None:
+                break
+            if after in cursors:
+                raise ValueError
+            cursors.add(after)
+        else:
+            raise ValueError
+        if len(names) != total:
+            raise ValueError
+        if len(selected) != 1 or selected[0]["type"] != "helm":
+            raise NvkeError("SOURCE_CHANGED", "The reviewed Helm item is absent from the retained plan")
+        context_body = {
+            "format": 1,
+            **{key: body[key] for key in ("planId", "planDigest", "treeId", "treeDigest", "item")},
+            "artifactId": body["contextId"],
+        }
+        context = context_protocol.summary(
+            self._request(
+                "GET",
+                path + "/install-plan-context",
+                params={key: value for key, value in context_body.items() if key != "format"},
+                intent=intent,
+            ),
+            body=context_body,
+            item=selected[0],
+        )
+        if context["contextDigest"] != body["contextDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The captured context no longer matches the reviewed digest")
+        if self._install_plan_source(job_id, intent) != original:
+            raise ValueError
+        identity = self.identity()
+        for name in ("installPlanCharts", "installPlanTree", "installPlanContext", "installPlanRenderVerification"):
+            verification_protocol.capability(identity.get(name))
+        return {
+            "original": original,
+            "plan": metadata,
+            "chart": chart,
+            "tree": tree,
+            "pages": pages,
+            "context": context,
+        }
+
+    def _install_plan_verification(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        read_only: bool,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = verification_protocol.request(
+                body, job_id=job_id, chart_artifact_id=chart_artifact_id, read_only=read_only
+            )
+            if (
+                not isinstance(intent, str)
+                or not _SHA.fullmatch(intent)
+                or not isinstance(chart_artifact_digest, str)
+                or not _SHA.fullmatch(chart_artifact_digest)
+            ):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError("INVALID_INPUT", "Use an exact captured context and bounded verification request") from None
+        try:
+            verification_protocol.capability(self.identity().get("installPlanRenderVerification"))
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError("OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm render verification") from None
+        try:
+            source = self._install_plan_verification_source(
+                job_id, intent, body, chart_artifact_id, chart_artifact_digest
+            )
+            path = "/v1/jobs/" + job_id + "/install-plan-verification"
+            data = (
+                self._request(
+                    "GET", path, params={key: value for key, value in body.items() if key != "format"}, intent=intent
+                )
+                if read_only
+                else self._request("POST", path, body=body, intent=intent)
+            )
+            result = verification_protocol.summary(
+                data,
+                body=body,
+                context=source["context"],
+                chart_artifact_id=chart_artifact_id,
+                chart_artifact_digest=chart_artifact_digest,
+            )
+            if (
+                self._install_plan_verification_source(job_id, intent, body, chart_artifact_id, chart_artifact_digest)
+                != source
+            ):
+                raise ValueError
+            return result
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+
+    def prepare_install_plan_verification(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_verification(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=False,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+        )
+
+    def install_plan_verification(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_verification(
             job_id,
             intent=intent,
             body=body,
