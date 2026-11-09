@@ -42,11 +42,12 @@
       "scope": "Panel fixtures and controlled Apollo lost-reply recovery before operation-screen wiring; not live App or agent acceptance"
     },
     "finalStatic": {
-      "status": "pending",
-      "exitCode": null,
+      "status": "completed",
+      "exitCode": 0,
+      "logSha256": "e325edabebff7046f7f8a3028b4056be6c818c10b98e9afcb9662c689d1d3cc0",
       "logPath": "/tmp/astrolift-nvke-context-ui-save-static.log",
       "exitMarker": "/tmp/astrolift-nvke-context-ui-save-static.exit",
-      "sessionId": 42852
+      "scope": "Full TypeScript plus targeted ESLint/Prettier for the saved context controls/wiring. New operation browser driver has its separate passed lint/format/browser proof."
     },
     "nvkeUiRegressions": {
       "passed": 1081,
@@ -79,11 +80,17 @@
       "sessionId": 42336
     },
     "fullFrontendLint": {
-      "status": "pending",
-      "exitCode": null,
+      "status": "completed",
+      "exitCode": 0,
+      "logSha256": "240e00c889f351a51b6374b50f17527f055dc6530fcde5720a1f06c0eeb32016",
       "logPath": "/tmp/astrolift-nvke-context-ui-full-lint.log",
       "exitMarker": "/tmp/astrolift-nvke-context-ui-full-lint.exit",
-      "sessionId": 46284
+      "warnings": {
+        "total": 90,
+        "unchangedPaths": 89,
+        "contextStoryTest": 1,
+        "followOnFix": "feature/nvke-2662-context-api-browser now actually renders the imported operation stories; its targeted ESLint passed."
+      }
     }
   },
   "implemented": [
@@ -94,7 +101,7 @@
   ],
   "continuationAuthorized": false,
   "remaining": [
-    "Final full TypeScript, static checks, full frontend lint and Next production build; see pending terminal markers.",
+    "Next production build is still pending. The follow-on owned App browser driver has separate static and actual-API acceptance work.",
     "Actual Next route/login acceptance and actual App/compiled-CLI/agent capture/recovery acceptance; controlled Storybook tests are not substitutes.",
     "Existing standalone agent local-chart timeout failure remains unresolved.",
     "Native phase, credential, schema, image and linked-admission proof; remaining full management surface and live qualification.",
