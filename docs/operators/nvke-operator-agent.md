@@ -672,3 +672,14 @@ forwarding with owned Storybook metadata. Actual Next.js login/routes/access
 discovery and retained Linux continuation are not qualified by this test. Native
 Kustomize/Helm freezing integration, image closure and fresh resource/credential
 proof remain required before linked execution.
+
+
+SDK operator qualification is now pinned to Opscode
+`3fa6f4fb71bbfed4f4fcb216b53d5e456b2eb1b0`, which checks the native bundle once
+per chart/tree request and validates the same filesystem frame at every source
+checkpoint. All 194 selected operator tests pass, including real TLS/native cold
+recovery and the unchanged template-output/original-source seals. The SDK result
+schema and continuation authorization remain unchanged. Evidence is recorded in
+`backend/providers/nvke/qualification/install-plan-bundle-verification-sdk-local.json`.
+Compiled CLI/API/browser repinning is qualified separately; agent snapshot
+acquisition/freshness, rendering integration and linked continuation remain open.

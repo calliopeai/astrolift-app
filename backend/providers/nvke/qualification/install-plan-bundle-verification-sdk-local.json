@@ -1,0 +1,36 @@
+{
+  "format": 1,
+  "scope": "sdk-operator-recovery-with-operation-scoped-bundle-verification-local-qualification",
+  "applicationBaseRevision": "ae766d675beba3dee26c6a6effb37ffab3fb299b",
+  "opscodeRuntimeRevision": "3fa6f4fb71bbfed4f4fcb216b53d5e456b2eb1b0",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "chartHelperBinarySha256": "8b1fd18f4aa486924a242b0f72f7960411349760a1569296b44a28d9213768e3",
+  "sourceSha256": {
+    "backend/providers/tests/nvke/test_operator_agent_client.py": "c20fc6af652ab0f5b450d496096411f8621e091f3b78cca907590a87084da8b0",
+    "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py": "49d39465b8f6e327e0e6d138cbb67797dc0d21371113ba491aaf9ef47cb6a1ee",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_tree_driver.py": "3d2d1150bcde5fa3138e805b2b0e4d91e78d251bc0312ee1f442c0e3d598dfa8",
+    "backend/providers/nvke/operator_agent_client.py": "b0bb216c613896ed7278ab8969c6414d28025d0acbe18f299db1b0498a7a4759",
+    "backend/providers/nvke/_operator_install_plan_tree.py": "c8199a802e44b3d2c24f56b925b551e26e195f527124a4dc6df84d7610e43c80"
+  },
+  "checks": {
+    "passed": 194,
+    "skipped": 0,
+    "exitCode": 0,
+    "ruff": "passed",
+    "format": "passed",
+    "logSha256": "ca97ef0590225f7b4845be404a5ffeb7ebf53ef19e9d5b841972098e4ebb297c"
+  },
+  "evidence": [
+    "All selected operator SDK/protocol/UI-contract tests pass, including real TLS/native plan/chart/tree fixtures. Source guards include the new renderer source and scoped verification implementation at the exact runtime revision.",
+    "Native tree fixture still seals controlled NICo credential template output and original template sources, then recovers a deliberately lost preparation reply through same-endpoint/instance cold restart and explicit private retry.",
+    "Original complete operation/run content, receipt, guard, parent plan, chart publication and linked reservations remain unchanged. New verification optimization changes neither the SDK result schema nor continuation authorization."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "The compiled CLI/API/browser qualification is separate and still pending at this checkpoint.",
+    "Native receipt/deployment/Kubernetes observations are controlled fixtures, not retained Linux continuation proof.",
+    "Helm rendering/tree integration and phase-sensitive freshness, native values/setFile merging, Kustomize, image closure and linked execution remain open.",
+    "No main merge, deployment, original native replay or retained VM restart."
+  ]
+}
