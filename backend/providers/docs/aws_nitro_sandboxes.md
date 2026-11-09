@@ -122,6 +122,36 @@ outside this EKS provider integration.
 - [ECS limitations](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ict-considerations-and-limitations.html)
 - [EC2 Nitro Sandboxes](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nitro-sandboxes.html)
 
+## Local qualification (2026-11-09)
+
+The manifest implementation in `2591031ca` passed the real PostgreSQL
+persistence suite in dedicated test database `test_astro_aws_nitro_20261109`:
+`test_nitro_sandbox_persist_2668.py` plus the existing `test_persist.py` suite,
+**22 passed**, process exit 0, 1434.77 seconds including initial database setup.
+The new persistence case verifies exact external-policy preservation after DB
+reload and render, changed isolation producing a new manifest hash, and selector
+removal leaving no stale normalized block. The manifest source is unchanged
+between that checkpoint and provider hardening checkpoint `000baeeb2`.
+
+Additional local qualification:
+
+| Surface | Result |
+|---|---|
+| Provider/EKS management/shared Kubernetes adapter regressions | 198 passed |
+| Manifest parser, normalizer and renderer regressions | 199 passed |
+| Latest focused sandbox tests, including terminating runtimes | 52 passed |
+| Provider/manifest Ruff checks and focused strict helper mypy | Passed |
+| Operator readiness probe | 8 passed |
+| Operator overlay | Helm lint passed; rendered API and worker each select the isolated runtime exactly once |
+
+The PostgreSQL run emitted two pytest assertion-rewrite warnings for already
+imported `constance` and `anyio` modules; no tests failed. These are local
+implementation checks, not a complete repository CI run or a live AWS rollout.
+No real EKS sandbox workload, confidential KMS key release/refusal, ECS task or
+EC2 host VM lifecycle has been exercised. Task-family per-workload selectors,
+confidential generation/attestation automation and the other support boundaries
+above remain open.
+
 ## Released Python SDK model evidence (2026-11-09)
 
 The existing providers environment uses boto3/botocore 1.43.72; the backend
