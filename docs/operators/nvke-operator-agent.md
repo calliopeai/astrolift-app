@@ -255,13 +255,16 @@ are separately bound to the immutable plan digest, search, limit and signed curs
 SDK workload counters are decimal strings or null. Source or content changes refuse
 recovery; they do not authorize another install.
 
-The local SDK suite has 80 passing tests, including an actual agent mutual-TLS
+The SDK has 80 focused cases, including an actual agent mutual-TLS
 preparation/recovery/page/tamper roundtrip with controlled Kubernetes reads. The
-original failed receipt, native guard and run inventory remain unchanged. This
-checkpoint has no plan CLI/UI or continuation executor. Linux agent RPC qualification, frozen dependency closure and skipped
-resource verification, durable linked execution, and deployed acceptance remain
-pending. The paged SDK validates the source-bound header and each page; it does
-not claim to recompute a full-plan digest from a single page.
+retained-artifact update's run had 79 passes and one 45-second subprocess timeout;
+that case passed a targeted rerun with a 120-second limit. The original failed
+receipt, native guard and run inventory remain unchanged. Plan CLI/UI and a
+continuation executor remain pending. Actual Linux agent/application RPC
+qualification is recorded below. Frozen dependency closure and skipped resource
+verification, durable linked execution and deployed acceptance remain pending.
+The paged SDK validates the source-bound header and each page; it does not claim
+to recompute a full-plan digest from a single page.
 
 The application service now retains a separate `NvkeInstallPlan` before agent I/O.
 It encrypts the private preparation body and binds recovery to the reviewed
@@ -285,7 +288,18 @@ versions and exact plan digest. Responses expose typed metadata and bounded rows
 private input text is excluded from audit variables even through aliased inputs.
 
 The backend checkpoint passed 21 new PostgreSQL plan/schema cases, with real
-mTLS authority configuration and controlled preparation/page responses. The
-separate SDK suite passed 80 cases, including the actual agent wire roundtrip.
-These establish separate service and transport checks; full application-to-Linux
-plan qualification and continuation are still pending.
+mTLS authority configuration and controlled preparation/page responses. These establish service checks alongside the separately tested SDK wire
+roundtrip; the actual Linux application path is now qualified below.
+Continuation remains pending.
+
+The [actual Linux plan qualification](https://github.com/calliopeai/astrolift-opscode/blob/0a70cf3fe245c67554501cb09662063d3c60e0c8/kubernetes/nvke/qualification/operator-install-plan-api-local-2026-11-09.json)
+prepared and reviewed a 12-item plan and 24 workloads through the current-admin
+GraphQL/SDK/mTLS path. Complete pages and NKTP search, stale version/cursor
+refusal, exact private-intent retry, a deliberately discarded same-identity
+response body and cold agent restart preserved the same plan digest/version.
+The private input is encrypted and audit variables are redacted. Eight native
+source files, five job/run identities and the original operation's entire row,
+UNCERTAIN status and version 23 remain unchanged. The initial staging refusal and
+local test timeout/rerun are recorded explicitly. No linked reservation or native
+continuation was admitted. Reconstructed provenance, closure/live skipped-resource
+verification, plan CLI/UI review, execution and deployed acceptance remain open.
