@@ -1,0 +1,82 @@
+{
+  "format": 1,
+  "scope": "execution-tree-operator-ui-hooks-eight-locales-and-static-storybook-local-qualification",
+  "applicationBaseRevision": "2738945c721d4a89bf3a65b79970554208f2b321",
+  "opscodeRevision": "b0f9d26dd5467d97eef92d6d728dca33e0bf5777",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "e9f2ae319b2065f8b0441d2473ac8135d7fd98f52780339835fa993fd2755cd0",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "81ca7988f2cf22100ea5dca5d686726594d6eebf4140c4a28d126937052d63e1",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.integration.stories.tsx": "4eaf7bc4de3573056f899864eece903e6a1cc57597553f1b98ad0a6f3211d640",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.stories.tsx": "0a7808b66ffaa18ada4818e73e5154612ed2aaf549d5744e62c3ea208921abd7",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.tsx": "e64c4ebdb3a28f7f7707bb51171817dc4f72c3128d15dd28502a35ce0e7d0830",
+    "frontend/components/screens/nvke/nvke-interactions.test.tsx": "c6445832aaaf2173841f51fa55c848df508476b3f86e5c242343ba7482de4a80",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-tree-locales.test.tsx": "4bbcde015cf76677e1e4cacf8f956820b9ff703614c306eb055f50c8c2fb4454",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-tree-stories.test.tsx": "9309fdb222e7dcbea7a27625a76a54c157b4f48c33e254793d5d4c80947f8218",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-tree.test.tsx": "d638b51198738828f50b84a7e149c4629f495bdb57f1c11774050a48b610ecc7",
+    "frontend/components/screens/nvke/types.ts": "022f78a61aef7573e1e279fcdde00cac5c1c48180db7525daa6346c507a2b945",
+    "frontend/e2e/nvke-install-plan-tree-operation-runner.mjs": "9569adc482190e24b3d0ac6fac2563355947ec6d98e432837c856960e172d503",
+    "frontend/e2e/nvke-install-plan-tree-recovery-runner.mjs": "04cb961f836df26d967de7e9239b019d297ebd2193d1224798dc5eb8bd37030d",
+    "frontend/e2e/nvke-install-plan-tree-storybook-runner.mjs": "bc4062062f8d218e82b830eb034c45adf27ff265dce96a3b010a488ef619c851",
+    "frontend/graphql/nvke/use-nvke-install-plan-tree.test.tsx": "04e78d8bd6fb84749aaa5d392f1af1af10a4682fd56861892b99576b6f51354e",
+    "frontend/graphql/nvke/use-nvke-install-plan-tree.ts": "8d3ead1b8a4d1836fb93b11f892e23b766f2b2d6015465c3434aba83f0cad33a",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "feda3d1312d449e5564f989e0ce436c9e9115e380adce1e0d1d3d34598d57464",
+    "frontend/messages/de.json": "af3e058ab1f3bf809cbc5b800d9a637ff741c7de6ceed968d6a68d6057199502",
+    "frontend/messages/en.json": "06638041b98e80756b3ea2c92b4f225520667e4a59c80ce624ddb91e71148cb2",
+    "frontend/messages/es.json": "43bfe172b29145d7d98fdcf9f182952defea7b84df01013e42408ca17b33eeac",
+    "frontend/messages/fr.json": "d580015e44e496c2b96475032edf72bc40e184aec223dcf9e16a3790239378d8",
+    "frontend/messages/ja.json": "ea7e68de25cf2f340f848afca1886c2da6a1fca9b79db0d01bae9566e1a88b34",
+    "frontend/messages/ko.json": "cfa7cafe38d61082f7c9d8c61228260a577694577f59f37d7a1a842c9eda7de4",
+    "frontend/messages/pt-BR.json": "f1dd12354210b53080836a55e9100ed5e42128b02eb375f5f57da1ee5f835c8d",
+    "frontend/messages/zh-Hans.json": "0fccba43ec56bff1993b29ab7bf2bf8e75556209dd5e0d0bd2127bedb7b3fa31"
+  },
+  "checks": {
+    "nvkeFrontend": {
+      "exitCode": 0,
+      "logSha256": "baf36677a3a3002a5251ec37e636889a0706b8acc6f1c49fd5bfaa1d4c35619d",
+      "passed": 945,
+      "files": 57,
+      "skipped": 0,
+      "targetedEslint": "passed",
+      "fullTypecheck": "passed",
+      "prettier": "passed"
+    },
+    "productionStorybook": {
+      "exitCode": 0,
+      "logSha256": "6f2e8be0e4c8e24210d7e5712af401baeaa1bab75691eb645750f8efae422809"
+    },
+    "staticBrowser": {
+      "exitCode": 0,
+      "logSha256": "c0f73aa6a2eff86a71465745269ec630fb326e674e9114c7eaea5012dce94a32",
+      "purePanelStories": 16,
+      "lostReplyRecoveryScenarios": 2,
+      "operationStories": 3,
+      "pageErrors": 0,
+      "widths": [
+        768,
+        1440
+      ]
+    }
+  },
+  "screenshotSha256": {
+    "astrolift-nvke-tree-ui-full.png": "17afb3e5e77b69624183b7fe6085d08617b24ea26debab54a6c3f79e5ea5bfc2",
+    "astrolift-nvke-tree-ui-768.png": "c60ebae0c1c7d2911cf84b15fe6043368f784cabed6330d0953e3ace42f6058e",
+    "astrolift-nvke-tree-operation-full.png": "93c4a113936530e982f525efbab1d552b385f82ecf19ff2b32f8e5709668051c",
+    "astrolift-nvke-tree-operation-768.png": "decc243e2381b3de35d3ab30880110ff9bbf5553f02c98c987ba5afbf8dcd091"
+  },
+  "evidence": [
+    "Pure tree panel and its states were exercised in Storybook before operation-screen wiring. All eight locale catalogs contain the same 28 nonempty tree keys. The panel shows source/publication metadata and exact decimal byte strings without native continuation controls.",
+    "Preparation validates distinct artifact identity, both prepared publications and a budget covering published chart bytes. Hook preparation writes and reads back the metadata-only exact-input journal before its no-cache mutation. Explicit review can recover without browser locks/storage; retained private retry requires the original browser journal.",
+    "Changing actor, source, authority, permission or chart publication hides stale results. In-flight A-to-B-to-A replies cannot revive an earlier epoch. A source-mismatched journal hides its old selected UUID without deleting retained recovery data.",
+    "Operation-level pending/read-only/error states block tree actions. The root hook includes tree work in its pending state and blocks cancellation/resume/result download while tree requests are active.",
+    "Actual Chromium against the production static Storybook catalog covers sixteen panel states, two controlled Apollo lost-reply scenarios and three operation states without page errors. Recovery after retention uses read; recovery before retention requires explicit failed read and exactly matching original settings. No automatic replay, raw request storage or continuation controls.",
+    "Wide and 768px panel/operation screenshots were inspected or checked for horizontal overflow."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "Browser recovery uses a controlled Apollo peer. Actual authenticated Next.js routes and real browser/API/agent tree qualification remain pending; compiled CLI/API/mTLS evidence is recorded separately.",
+    "The retained Linux lab SSH, Kubernetes and agent endpoints remain unreachable. No retained VM reboot, recreation or original native replay was performed.",
+    "Native template/Kustomize rendering, image closure/private registry policy, fresh skipped-resource/credential proof, remaining-only selection and linked once-only execution remain open.",
+    "No main merge or production deployment."
+  ]
+}

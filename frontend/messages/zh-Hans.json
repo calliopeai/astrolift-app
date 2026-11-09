@@ -18179,6 +18179,36 @@
       "archiveBytes": "归档字节数",
       "expandedBytes": "解压后字节数",
       "newId": "新制品 UUID"
+    },
+    "installTree": {
+      "verificationRequired": "继续执行前，仍须完成原生渲染、镜像检查和运行中资源验证。",
+      "planId": "计划 UUID",
+      "planVersion": "计划版本",
+      "planDigest": "计划 SHA-256",
+      "artifactId": "制品 UUID",
+      "choose": "选择其他制品 UUID",
+      "unconfirmed": "结果尚未确认。请保留此制品 UUID，并在重试前查看。",
+      "unloaded": "查看现有制品 UUID，或准备新制品。",
+      "newId": "新制品 UUID",
+      "title": "计划执行树",
+      "help": "准备此计划及其已发布图表的私有副本，然后检查保存的结果。",
+      "treeLimit": "执行树字节上限",
+      "originalOnly": "此制品 UUID 只能重新提交原始执行树设置。",
+      "budgetHelp": "请输入能够容纳已发布图表及复制输入的正十进制字节上限。请保留这些设置以便恢复。",
+      "invalidInput": "请检查独立的制品 UUID 以及能够容纳已发布图表的正十进制字节上限。",
+      "prepare": "准备执行树",
+      "review": "检查执行树",
+      "retry": "重试保留的执行树准备",
+      "failed": "无法确认执行树的准备或检查结果。请刷新来源并检查保存的制品。",
+      "parentRequired": "准备执行树之前，请检查已准备的安装计划和图表发布结果。",
+      "loading": "正在加载保存的执行树…",
+      "unavailable": "保存的执行树与当前计划、图表或来源不匹配。请重新检查。",
+      "treeDigest": "执行树 SHA-256",
+      "fileCount": "文件数",
+      "treeBytes": "执行树字节数",
+      "chartId": "图表发布 UUID",
+      "chartVersion": "图表发布版本",
+      "chartDigest": "图表发布 SHA-256"
     }
   }
 }

@@ -18182,6 +18182,36 @@
       "archiveBytes": "Archivbytes",
       "expandedBytes": "Dekomprimierte Bytes",
       "newId": "Neue Artefakt-UUID"
+    },
+    "installTree": {
+      "verificationRequired": "Vor der Fortsetzung sind natives Rendering, Image-Prüfungen und die Prüfung aktiver Ressourcen erforderlich.",
+      "planId": "Plan-UUID",
+      "planVersion": "Planversion",
+      "planDigest": "Plan-SHA-256",
+      "artifactId": "Artefakt-UUID",
+      "choose": "Andere Artefakt-UUID wählen",
+      "unconfirmed": "Ergebnis unbestätigt. Diese Artefakt-UUID aufbewahren und vor einem erneuten Versuch prüfen.",
+      "unloaded": "Eine vorhandene Artefakt-UUID prüfen oder ein neues Artefakt vorbereiten.",
+      "newId": "Neue Artefakt-UUID",
+      "title": "Ausführungsbaum des Plans",
+      "help": "Erstellen Sie eine private Kopie dieses Plans und seiner veröffentlichten Charts und prüfen Sie das gespeicherte Ergebnis.",
+      "treeLimit": "Byte-Limit des Baums",
+      "originalOnly": "Für diese Artefakt-UUID dürfen nur die ursprünglichen Baumeinstellungen erneut gesendet werden.",
+      "budgetHelp": "Geben Sie ein positives dezimales Byte-Limit für die veröffentlichten Charts und kopierten Eingaben ein. Bewahren Sie diese Einstellungen zur Wiederherstellung auf.",
+      "invalidInput": "Prüfen Sie die eigenständige Artefakt-UUID und ein positives dezimales Byte-Limit für die veröffentlichten Charts.",
+      "prepare": "Ausführungsbaum vorbereiten",
+      "review": "Ausführungsbaum prüfen",
+      "retry": "Gespeicherte Baumvorbereitung wiederholen",
+      "failed": "Die Vorbereitung oder Prüfung des Baums konnte nicht bestätigt werden. Aktualisieren Sie die Quelle und prüfen Sie das gespeicherte Artefakt.",
+      "parentRequired": "Prüfen Sie den vorbereiteten Installationsplan und die Chart-Veröffentlichung, bevor Sie einen Ausführungsbaum vorbereiten.",
+      "loading": "Gespeicherter Ausführungsbaum wird geladen…",
+      "unavailable": "Der gespeicherte Baum stimmt nicht mit dem aktuellen Plan, den Charts oder der Quelle überein. Prüfen Sie ihn erneut.",
+      "treeDigest": "SHA-256 des Baums",
+      "fileCount": "Dateianzahl",
+      "treeBytes": "Bytes des Baums",
+      "chartId": "UUID der Chart-Veröffentlichung",
+      "chartVersion": "Version der Chart-Veröffentlichung",
+      "chartDigest": "SHA-256 der Chart-Veröffentlichung"
     }
   }
 }

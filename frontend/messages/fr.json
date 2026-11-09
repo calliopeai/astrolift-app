@@ -18182,6 +18182,36 @@
       "archiveBytes": "Octets des archives",
       "expandedBytes": "Octets décompressés",
       "newId": "Nouvel UUID d’artefact"
+    },
+    "installTree": {
+      "verificationRequired": "La poursuite exige encore le rendu natif, la vérification des images et des ressources actives.",
+      "planId": "UUID du plan",
+      "planVersion": "Version du plan",
+      "planDigest": "SHA-256 du plan",
+      "artifactId": "UUID de l’artefact",
+      "choose": "Choisir un autre UUID d’artefact",
+      "unconfirmed": "Résultat non confirmé. Conservez cet UUID et consultez-le avant de réessayer.",
+      "unloaded": "Consultez un UUID d’artefact existant ou préparez-en un nouveau.",
+      "newId": "Nouvel UUID d’artefact",
+      "title": "Arbre d’exécution du plan",
+      "help": "Préparez une copie privée de ce plan et de ses charts publiés, puis examinez le résultat enregistré.",
+      "treeLimit": "Limite d’octets de l’arbre",
+      "originalOnly": "Seuls les paramètres d’origine de l’arbre peuvent être renvoyés pour cet UUID d’artefact.",
+      "budgetHelp": "Saisissez une limite décimale positive d’octets couvrant les charts publiés et les entrées copiées. Conservez ces paramètres pour la récupération.",
+      "invalidInput": "Vérifiez l’UUID distinct de l’artefact et une limite décimale positive d’octets couvrant les charts publiés.",
+      "prepare": "Préparer l’arbre d’exécution",
+      "review": "Examiner l’arbre d’exécution",
+      "retry": "Réessayer la préparation enregistrée de l’arbre",
+      "failed": "La préparation ou l’examen de l’arbre n’a pas pu être confirmé. Actualisez la source et examinez l’artefact enregistré.",
+      "parentRequired": "Examinez le plan d’installation préparé et la publication des charts avant de préparer un arbre d’exécution.",
+      "loading": "Chargement de l’arbre d’exécution enregistré…",
+      "unavailable": "L’arbre enregistré ne correspond pas au plan, aux charts ou à la source actuels. Examinez-le à nouveau.",
+      "treeDigest": "SHA-256 de l’arbre",
+      "fileCount": "Nombre de fichiers",
+      "treeBytes": "Octets de l’arbre",
+      "chartId": "UUID de publication des charts",
+      "chartVersion": "Version de publication des charts",
+      "chartDigest": "SHA-256 de publication des charts"
     }
   }
 }

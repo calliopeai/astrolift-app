@@ -18179,6 +18179,36 @@
       "archiveBytes": "아카이브 바이트",
       "expandedBytes": "압축 해제 후 바이트",
       "newId": "새 아티팩트 UUID"
+    },
+    "installTree": {
+      "verificationRequired": "계속하기 전에 네이티브 렌더링, 이미지 검사와 실행 중인 리소스 검증이 필요합니다.",
+      "planId": "계획 UUID",
+      "planVersion": "계획 버전",
+      "planDigest": "계획 SHA-256",
+      "artifactId": "아티팩트 UUID",
+      "choose": "다른 아티팩트 UUID 선택",
+      "unconfirmed": "결과가 확인되지 않았습니다. 이 아티팩트 UUID를 보관하고 재시도 전에 확인하세요.",
+      "unloaded": "기존 아티팩트 UUID를 확인하거나 새 아티팩트를 준비하세요.",
+      "newId": "새 아티팩트 UUID",
+      "title": "계획 실행 트리",
+      "help": "이 계획과 게시된 차트의 비공개 사본을 준비하고 저장된 결과를 검토합니다.",
+      "treeLimit": "트리 바이트 한도",
+      "originalOnly": "이 아티팩트 UUID에는 원래 트리 설정만 다시 제출할 수 있습니다.",
+      "budgetHelp": "게시된 차트와 복사할 입력을 포함할 수 있는 양의 십진수 바이트 한도를 입력하세요. 복구를 위해 설정을 보관하세요.",
+      "invalidInput": "다른 항목과 구별되는 아티팩트 UUID와 게시된 차트를 포함할 수 있는 양의 십진수 바이트 한도를 검토하세요.",
+      "prepare": "실행 트리 준비",
+      "review": "실행 트리 검토",
+      "retry": "저장된 트리 준비 재시도",
+      "failed": "트리 준비 또는 검토를 확인할 수 없습니다. 소스를 새로 고치고 저장된 아티팩트를 검토하세요.",
+      "parentRequired": "실행 트리를 준비하기 전에 준비된 설치 계획과 차트 게시 결과를 검토하세요.",
+      "loading": "저장된 실행 트리 로딩 중…",
+      "unavailable": "저장된 트리가 현재 계획, 차트 또는 소스와 일치하지 않습니다. 다시 검토하세요.",
+      "treeDigest": "트리 SHA-256",
+      "fileCount": "파일 수",
+      "treeBytes": "트리 바이트 수",
+      "chartId": "차트 게시 UUID",
+      "chartVersion": "차트 게시 버전",
+      "chartDigest": "차트 게시 SHA-256"
     }
   }
 }

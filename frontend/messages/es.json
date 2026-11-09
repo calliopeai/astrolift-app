@@ -18182,6 +18182,36 @@
       "archiveBytes": "Bytes comprimidos",
       "expandedBytes": "Bytes expandidos",
       "newId": "Nuevo UUID de artefacto"
+    },
+    "installTree": {
+      "verificationRequired": "La continuación aún requiere renderizado nativo, comprobación de imágenes y verificación de recursos activos.",
+      "planId": "UUID del plan",
+      "planVersion": "Versión del plan",
+      "planDigest": "SHA-256 del plan",
+      "artifactId": "UUID del artefacto",
+      "choose": "Elegir otro UUID de artefacto",
+      "unconfirmed": "Resultado sin confirmar. Conserva este UUID de artefacto y consúltalo antes de reintentar.",
+      "unloaded": "Consulta un UUID de artefacto existente o prepara uno nuevo.",
+      "newId": "Nuevo UUID de artefacto",
+      "title": "Árbol de ejecución del plan",
+      "help": "Prepare una copia privada de este plan y sus gráficos publicados; después revise el resultado guardado.",
+      "treeLimit": "Límite de bytes del árbol",
+      "originalOnly": "Solo se puede volver a enviar la configuración original del árbol para este UUID de artefacto.",
+      "budgetHelp": "Introduzca un límite decimal positivo de bytes que cubra los gráficos publicados y las entradas copiadas. Guarde la configuración para recuperarla.",
+      "invalidInput": "Revise el UUID distinto del artefacto y un límite decimal positivo de bytes que cubra los gráficos publicados.",
+      "prepare": "Preparar árbol de ejecución",
+      "review": "Revisar árbol de ejecución",
+      "retry": "Reintentar preparación guardada del árbol",
+      "failed": "No se pudo confirmar la preparación o revisión del árbol. Actualice el origen y revise el artefacto guardado.",
+      "parentRequired": "Revise el plan de instalación preparado y la publicación de gráficos antes de preparar un árbol de ejecución.",
+      "loading": "Cargando árbol de ejecución guardado…",
+      "unavailable": "El árbol guardado no coincide con el plan, los gráficos o el origen actuales. Revíselo de nuevo.",
+      "treeDigest": "SHA-256 del árbol",
+      "fileCount": "Cantidad de archivos",
+      "treeBytes": "Bytes del árbol",
+      "chartId": "UUID de publicación de gráficos",
+      "chartVersion": "Versión de publicación de gráficos",
+      "chartDigest": "SHA-256 de publicación de gráficos"
     }
   }
 }

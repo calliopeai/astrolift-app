@@ -1,3 +1,4 @@
+import { INSTALL_TREE_PROPS } from "./NvkeOperatorInstallPlanTreePanel.stories";
 import { INSTALL_CHARTS_PROPS } from "./NvkeOperatorInstallPlanChartsPanel.stories";
 import { INSTALL_PLAN_PROPS } from "./NvkeOperatorInstallPlanPanel.stories";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
@@ -260,4 +261,14 @@ export const InstallPlanChartsReadOnly: Story = {
     ...InstallPlanCharts.args,
     canAct: false,
   },
+};
+
+export const InstallPlanTree: Story = {
+  args: { ...InstallPlanCharts.args, operatorInstallPlanTree: INSTALL_TREE_PROPS },
+};
+export const InstallPlanTreeReadOnly: Story = {
+  args: { ...InstallPlanTree.args, canAct: false },
+};
+export const InstallPlanTreePending: Story = {
+  args: { ...InstallPlanTree.args, pending: true },
 };

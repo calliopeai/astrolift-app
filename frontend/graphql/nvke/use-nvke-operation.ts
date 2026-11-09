@@ -31,6 +31,7 @@ import { useNvkeProviders } from "./use-nvke-providers";
 import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
 import { useNvkeInstallPlan } from "./use-nvke-install-plan";
+import { useNvkeInstallPlanTree } from "./use-nvke-install-plan-tree";
 import { useNvkeInstallPlanCharts } from "./use-nvke-install-plan-charts";
 import { useNvkeOperatorInstallReview } from "./use-nvke-operator-install-review";
 import { useNvkeOperatorJob } from "./use-nvke-operator-job";
@@ -204,6 +205,16 @@ export const useNvkeOperation = (
       operatorInstallReview?.pending
     ),
   });
+  const operatorInstallPlanTree = useNvkeInstallPlanTree({
+    context,
+    source: operatorInstallPlanCharts,
+    pending: Boolean(
+      (mutation?.key === visitKey && mutation.pending) ||
+      operatorJob?.pending ||
+      operatorInstallReview?.pending ||
+      operatorInstallPlan?.pending
+    ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -214,6 +225,7 @@ export const useNvkeOperation = (
       operatorInstallReview?.pending ||
       operatorInstallPlan?.pending ||
       operatorInstallPlanCharts?.pending ||
+      operatorInstallPlanTree?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -263,6 +275,7 @@ export const useNvkeOperation = (
     operatorInstallReview,
     operatorInstallPlan,
     operatorInstallPlanCharts,
+    operatorInstallPlanTree,
     diagnostics,
     maintenance,
     credentials,
@@ -279,7 +292,8 @@ export const useNvkeOperation = (
         operatorJob?.pending ||
         operatorInstallReview?.pending ||
         operatorInstallPlan?.pending ||
-        operatorInstallPlanCharts?.pending
+        operatorInstallPlanCharts?.pending ||
+        operatorInstallPlanTree?.pending
       ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
@@ -295,6 +309,7 @@ export const useNvkeOperation = (
         operatorInstallReview?.pending ||
         operatorInstallPlan?.pending ||
         operatorInstallPlanCharts?.pending ||
+        operatorInstallPlanTree?.pending ||
         !operation
       )
         return;

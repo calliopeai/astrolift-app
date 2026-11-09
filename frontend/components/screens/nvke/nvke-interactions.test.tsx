@@ -8,6 +8,7 @@ import { NvkeNativePanel } from "./NvkeNativePanel";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import { NvkeSitesScreen } from "./NvkeSitesScreen";
 import { NvkeResourceScreen } from "./NvkeResourceScreen";
+import { INSTALL_TREE_PROPS } from "./NvkeOperatorInstallPlanTreePanel.stories";
 import { INSTALL_CHARTS_PROPS } from "./NvkeOperatorInstallPlanChartsPanel.stories";
 import {
   ACTIONS,
@@ -251,3 +252,27 @@ it("blocks a creation confirmation after its reviewed site version changes", asy
   fireEvent.click(within(dialog).getByRole("button", { name: messages.nvke.submitRequest }));
   expect(onRequest).not.toHaveBeenCalled();
 });
+
+it.each(["pending", "read-only", "error"])(
+  "blocks tree actions when the operation screen is %s",
+  (mode) => {
+    const onReview = vi.fn().mockResolvedValue(true);
+    render(
+      <NvkeOperationScreen
+        {...OPERATION_DETAIL}
+        operation={INSTALL_TREE_PROPS.operation}
+        operatorInstallPlanTree={{ ...INSTALL_TREE_PROPS, onReview }}
+        pending={mode === "pending"}
+        canAct={mode !== "read-only"}
+        error={mode === "error" ? "Unavailable" : null}
+      />,
+      { wrapper: Context }
+    );
+    const button = screen.getByRole("button", { name: messages.nvke.installTree.review });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onReview).not.toHaveBeenCalled();
+    if (mode !== "pending")
+      expect(screen.queryByText(INSTALL_TREE_PROPS.artifacts!.treeDigest)).not.toBeInTheDocument();
+  }
+);

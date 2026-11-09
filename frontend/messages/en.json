@@ -18179,6 +18179,36 @@
       "archiveBytes": "Archive bytes",
       "expandedBytes": "Expanded bytes",
       "newId": "New artifact UUID"
+    },
+    "installTree": {
+      "verificationRequired": "Native rendering, image checks and live resource verification are still required before continuation.",
+      "planId": "Plan UUID",
+      "planVersion": "Plan version",
+      "planDigest": "Plan SHA-256",
+      "artifactId": "Artifact UUID",
+      "choose": "Choose another artifact UUID",
+      "unconfirmed": "Result unconfirmed. Keep this artifact UUID and review it before retrying.",
+      "unloaded": "Review an existing artifact UUID or prepare a new one.",
+      "newId": "New artifact UUID",
+      "title": "Plan execution tree",
+      "help": "Prepare a private copy of this plan and its published charts, then inspect the saved result.",
+      "treeLimit": "Tree byte limit",
+      "originalOnly": "Only the original tree settings may be submitted again for this artifact UUID.",
+      "budgetHelp": "Enter a positive decimal byte limit that covers the published charts and copied inputs. Keep these settings for recovery.",
+      "invalidInput": "Review the distinct artifact UUID and a positive decimal byte limit covering the published charts.",
+      "prepare": "Prepare execution tree",
+      "review": "Review execution tree",
+      "retry": "Retry retained tree preparation",
+      "failed": "Tree preparation or review could not be confirmed. Refresh the source and review the saved artifact.",
+      "parentRequired": "Review the prepared installation plan and chart publication before preparing an execution tree.",
+      "loading": "Loading saved execution tree…",
+      "unavailable": "The saved tree does not match the current plan, charts or source. Review it again.",
+      "treeDigest": "Tree SHA-256",
+      "fileCount": "File count",
+      "treeBytes": "Tree bytes",
+      "chartId": "Chart publication UUID",
+      "chartVersion": "Chart publication version",
+      "chartDigest": "Chart publication SHA-256"
     }
   }
 }

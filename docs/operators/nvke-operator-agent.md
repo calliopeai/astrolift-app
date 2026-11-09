@@ -588,3 +588,28 @@ evidence live in the CLI repository under
 `scripts/integration/nvke-install-plan-tree-local.json`. The actual browser/API
 tree controls and retained Linux installation remain unqualified. The tree still
 cannot authorize or dispatch native continuation.
+
+
+The operation screen now includes execution-tree preparation, review and explicit
+retained-intent retry, built first as a pure Storybook panel. Review both the plan
+and chart publication before selecting a new tree UUID and positive decimal byte
+budget. A metadata-only browser journal binds the exact input hash and full
+source/publication tuple before submission. Lost replies retain that identity;
+read recovery does not rebuild, and original settings cannot be changed when
+recovering preparation. Source/actor/publication changes hide earlier results.
+A mismatched journal hides its old selection while preserving its recovery data.
+
+All 945 NVKE frontend cases, changed-file ESLint, full TypeScript checking and
+formatting passed. The complete production Storybook build passed. Chromium
+against that static build exercised 16 tree-panel states, two controlled lost-reply
+recovery paths and three operation-screen states with zero page errors, including
+768px overflow checks. Tree copy is present in all eight locale catalogs. Exact
+source/log/screenshot hashes and limits are recorded in
+`backend/providers/nvke/qualification/install-plan-tree-ui-local.json`.
+
+These browser cases use a controlled Apollo peer. Actual authenticated route and
+browser/API/agent tree qualification remain separate from the already qualified
+compiled CLI/API/mTLS path. Native rendering, image closure, fresh resource and
+credential proof, remaining-only selection and linked execution remain open;
+no tree control authorizes continuation. The retained Linux lab remains
+unreachable on its SSH, Kubernetes and operator endpoints.
