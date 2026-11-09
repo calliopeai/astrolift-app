@@ -264,10 +264,15 @@ def operator_agent(tmp_path, *, site_id=None):
     try:
         deadline = time.monotonic() + 10
         identity_path = root / "state/identity.json"
-        while not identity_path.exists() and time.monotonic() < deadline and process.poll() is None:
+        instance = None
+        while time.monotonic() < deadline and process.poll() is None:
+            try:
+                instance = json.loads(identity_path.read_bytes())["instanceId"]
+                break
+            except (FileNotFoundError, json.JSONDecodeError):
+                pass
             time.sleep(0.01)
-        assert process.poll() is None and identity_path.exists(), "owned test agent did not start"
-        instance = json.loads(identity_path.read_bytes())["instanceId"]
+        assert process.poll() is None and instance is not None, "owned test agent did not start"
         context = ssl.create_default_context(cafile=str(root / "ca.pem"))
         context.load_cert_chain(root / "client.pem", root / "client.key")
         client = OperatorAgentClient(
