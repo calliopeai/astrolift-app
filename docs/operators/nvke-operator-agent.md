@@ -547,9 +547,10 @@ another attempt. Original job/run files, guard, frozen plan, chart publication
 and links remain unchanged. The fixture uses a controlled deployment and
 Kubernetes GETs. Source/log identities are recorded in
 `backend/providers/nvke/qualification/install-plan-tree-sdk-local.json`.
-Durable application tree API, compiled CLI and actual browser/API qualification,
-native rendering/image closure, fresh skipped-resource proof and linked native
-execution remain required.
+At that SDK checkpoint the durable application tree API, compiled CLI and actual
+browser/API qualification were still pending. The API and CLI evidence below
+extends that checkpoint; native rendering/image closure, fresh skipped-resource
+proof and linked native execution remain required.
 
 
 The durable tree API now reserves `NvkeInstallPlanTree` with encrypted immutable
@@ -574,5 +575,16 @@ as the plan/source flags and distinct `--artifact` tree UUID. Preparation also
 requires a private `--file` and metadata-only `--request-file` journal. The body
 contains format, the exact source identifiers/digests and `maximumBytes`; see
 the CLI README for its exact seven fields. Local CLI tests, vet, lint and build
-passed. Combined CLI/API/agent tree recovery is a separate pending qualification.
-The tree still cannot authorize or dispatch native continuation.
+passed. Combined CLI/API/agent tree recovery also passed against application
+`532e6e1073c46b5dd6cdb30f3c76e750d32b57ce`, the compiled CLI above and Opscode
+`b0f9d26dd5467d97eef92d6d728dca33e0bf5777`. It deliberately discards a successful
+application reply, restarts the owned operator at the same endpoint/instance,
+and recovers the identical tree through CLI review and original-token private
+retry without a new attempt. Original operation/plan/chart rows, receipt, install
+guard, run membership and linked reservations remain unchanged. Its fixture
+explicitly selects the supported 300-second agent timeout. The test and scoped
+evidence live in the CLI repository under
+`scripts/integration/test_nvke_install_plan_tree.py` and
+`scripts/integration/nvke-install-plan-tree-local.json`. The actual browser/API
+tree controls and retained Linux installation remain unqualified. The tree still
+cannot authorize or dispatch native continuation.

@@ -43,19 +43,30 @@
       "exitCode": 0,
       "logSha256": "e13b4f6dd3ef8c28d1ba2e557b693df1eb2a0a1202fcc1472b69f2649e124283"
     },
-    "cliOperationsAgainstExportedSchema": 3
+    "cliOperationsAgainstExportedSchema": 3,
+    "pairedCompiledCliRecovery": {
+      "passed": 1,
+      "skipped": 0,
+      "exitCode": 0,
+      "cliSourceRevision": "c641f4c010d1cc5783b49d9590d572b9aaddf93c",
+      "applicationRevision": "532e6e1073c46b5dd6cdb30f3c76e750d32b57ce",
+      "cliEvidenceRevision": "79ca5e2",
+      "logSha256": "f81d0630e0cce4de8bb658f1409d79d44cb53c7c4c0641c499a041a580e171a4",
+      "evidence": "astrolift-cli/scripts/integration/nvke-install-plan-tree-local.json"
+    }
   },
   "evidence": [
     "Encrypted immutable tree intent is committed in PostgreSQL before adapter I/O. Typed GraphQL preparation, public read recovery and original-caller/token private retry preserve the exact original, plan, chart and authority binding.",
     "Current permission/source revocation, malformed/private/over-budget/authorizing replies, cross-kind UUID reuse, deleted preparations and changed parent/chart publications are refused. Audit redaction covers aliases and denied callers.",
     "Fresh locked intent validation refuses midflight corruption of digest, ciphertext, encryption backend or creator for chart and tree publication, leaving rows preparing with no public summary (eight regression cases).",
     "Browser contracts preserve int64 decimal strings and validate both publications, complete source tuples, file/byte lower bounds and explicit budgets. Metadata-only journals bind actor/server/tenant and exact input SHA, isolate chart selections, refuse changed source/input and verify durable storage readback.",
-    "Existing real chart GraphQL/PostgreSQL/SDK/mTLS/Helm cases pass, including cold same-endpoint recovery. The lost-reply fixture now proves successful adapter publication before deliberately discarding its result."
+    "Existing real chart GraphQL/PostgreSQL/SDK/mTLS/Helm cases pass, including cold same-endpoint recovery. The lost-reply fixture now proves successful adapter publication before deliberately discarding its result.",
+    "Compiled CLI tree preparation through actual ASGI/PostgreSQL/mTLS survives a deliberately discarded application reply. Cold same-endpoint/instance agent restart, CLI review and explicit original-token private retry recover the identical result with no new attempt and preserve original/plan/chart rows, native receipt, guard, run membership and empty linked reservations."
   ],
   "executionState": "requires-native-rendering-images-and-live-verification",
   "continuationAuthorized": false,
   "limitations": [
-    "Tree database cases use a controlled SDK adapter. Combined compiled CLI/ASGI/PostgreSQL/mTLS tree qualification is a separate pending check; the SDK real-tree wire scenario is recorded separately.",
+    "Tree database cases use a controlled SDK adapter. The separate combined compiled CLI/ASGI/PostgreSQL/mTLS scenario also passes against the recorded revisions; it uses a controlled deployment and Kubernetes GETs, not the retained Linux installation.",
     "Browser tree panel, hooks, eight-locale UI and actual browser/API qualification remain pending. These checks qualify browser protocol/storage utilities only.",
     "Native template/Kustomize rendering, image closure/private registry policy, fresh skipped-resource/credential proof, remaining-only selection and linked once-only execution remain open.",
     "No retained Linux continuation, original native replay, VM restart, main merge or production deployment."
