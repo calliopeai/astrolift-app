@@ -235,3 +235,83 @@ def test_live_runtime_discovery_uses_authenticated_native_kubernetes_http(status
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("spec", "not-an-object"),
+        ("metadata", ["not-an-object"]),
+    ],
+)
+def test_malformed_pod_shapes_are_errors_without_partial_writes(field: str, value: Any) -> None:
+    kube = Kube()
+    invalid = pod()
+    invalid[field] = value
+    result = driver(kube).apply_manifests("test", "team", [pod("runc"), invalid])
+    assert not result.ok
+    assert result.errors[0].exception_type == "ValueError"
+    assert "must be an object" in result.errors[0].exception_message
+    assert kube.writes == []
+
+
+@pytest.mark.parametrize("annotations", [[], "bad", {"sandbox.amazonaws.com/network-isolated": True}])
+def test_malformed_annotations_fail_closed(annotations: Any) -> None:
+    kube = Kube()
+    invalid = pod()
+    invalid["metadata"]["annotations"] = annotations
+    assert not driver(kube).apply_manifests("test", "team", [invalid]).ok
+    assert kube.writes == []
+
+
+@pytest.mark.parametrize("resources", [[], "bad", {"limits": ["bad"]}, {"requests": "bad"}])
+def test_malformed_resource_shapes_fail_closed(resources: Any) -> None:
+    kube = Kube()
+    invalid = pod()
+    invalid["spec"]["containers"][0]["resources"] = resources
+    assert not driver(kube).apply_manifests("test", "team", [invalid]).ok
+    assert kube.writes == []
+
+
+@pytest.mark.parametrize("runtime", [None, "runc", "unsupported-sandbox", ["isolated-sandbox"]])
+def test_explicit_aws_sandbox_intent_cannot_use_an_unrecognized_runtime(runtime: Any) -> None:
+    kube = Kube()
+    invalid = pod()
+    invalid["spec"]["runtimeClassName"] = runtime
+    invalid["metadata"]["annotations"] = {"sandbox.amazonaws.com/network-isolated": "true"}
+    assert not driver(kube).apply_manifests("test", "team", [invalid]).ok
+    assert kube.writes == []
+
+
+def test_controller_annotations_cannot_silently_miss_the_pod() -> None:
+    kube = Kube()
+    invalid = wrap(pod(), "Deployment")
+    invalid["metadata"]["annotations"] = {POLICY_ANNOTATION: "misplaced"}
+    assert not driver(kube).apply_manifests("test", "team", [invalid]).ok
+    assert kube.writes == []
+
+
+def test_nested_list_is_refused_before_other_batch_resources_are_written() -> None:
+    kube = Kube()
+    invalid = {"apiVersion": "v1", "kind": "List", "items": [pod()]}
+    assert not driver(kube).apply_manifests("test", "team", [pod("runc"), invalid]).ok
+    assert kube.writes == []
+
+
+def test_custom_resources_keep_their_native_spec_shape() -> None:
+    kube = Kube()
+    custom = {"apiVersion": "custom.example/v1", "kind": "Custom", "metadata": {"name": "x"}, "spec": ["custom"]}
+    assert driver(kube).apply_manifests("test", "team", [custom]).ok
+    assert kube.reads == []
+
+
+def test_unexpected_runtime_handler_is_refused() -> None:
+    class WrongHandler(Kube):
+        def get(self, **kwargs: Any) -> dict[str, Any]:
+            return {"handler": "runc"}
+
+    kube = WrongHandler()
+    result = driver(kube).apply_manifests("test", "team", [pod()])
+    assert not result.ok
+    assert "unexpected handler" in result.errors[0].exception_message
+    assert kube.writes == []

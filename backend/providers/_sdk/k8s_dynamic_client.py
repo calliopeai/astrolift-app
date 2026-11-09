@@ -99,6 +99,7 @@ DEFAULT_API_VERSION_FOR_KIND: dict[str, str] = {
     "ClusterRoleBinding": "rbac.authorization.k8s.io/v1",
     "HorizontalPodAutoscaler": "autoscaling/v2",
     "PodDisruptionBudget": "policy/v1",
+    "RuntimeClass": "node.k8s.io/v1",
 }
 
 
