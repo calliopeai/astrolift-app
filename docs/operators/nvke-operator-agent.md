@@ -743,7 +743,9 @@ PostgreSQL, RBAC/token changes, typed GraphQL, audit redaction, actual mTLS
 authority setup and separate-session UUID locks. Capture RPC methods use controlled
 adapters here; actual paired context capture remains separate. An earlier
 unconfigured invocation passed three database-lock cases but skipped 36 API cases
-and is retained as historical evidence, not API qualification. The CLI context commands require their separate terminal checks
+and is retained as historical evidence, not API qualification. Nine selected older
+plan/chart/tree durable-intent and ID-reservation regressions also pass; 72 unrelated
+cases were deselected in that focused run. The CLI context commands require their separate terminal checks
 and actual paired App/CLI acceptance. Fresh phase/resource/credential proof,
 external schema policy, image closure and linked native admission remain open.
 The original uncertain install and its fence are unchanged; nothing in this

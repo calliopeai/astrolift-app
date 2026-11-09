@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "app-render-context-api-and-cross-kind-reservations-checkpoint",
-  "status": "local-api-qualified-reservation-regressions-and-paired-acceptance-pending",
+  "status": "local-api-qualified-paired-acceptance-pending",
   "baseRevision": "8af4336199f4332d05786888f1875d1ef8ab9a77",
   "sourceSha256": {
     "backend/astrolift_clusters/nvke_artifact_identity.py": "f7fc4eccb849a257891846a350939f8dafd66586478b04c8b23928af0f9adee1",
@@ -58,10 +58,14 @@
       "logSha256": "99d8b7c91685114bb8028903a5241f8aaae8bd3289a947cf4772e01b75597172"
     },
     "legacyReservationRegressions": {
-      "status": "running",
-      "scope": "Older plan/chart/tree durable intent and ID-conflict paths affected by the shared UUID reservation guard",
-      "completionMarker": "/tmp/astrolift-nvke-context-api-reservation-regressions.exit",
-      "logPath": "/tmp/astrolift-nvke-context-api-reservation-regressions.log"
+      "status": "passed",
+      "passed": 9,
+      "skipped": 0,
+      "deselected": 72,
+      "exitCode": 0,
+      "durationSeconds": 53.26,
+      "logSha256": "34002fedf16930548ae4172e533c5dc5d84aaccc369e1b91eecfa7a7257f9c9d",
+      "scope": "Selected older plan/chart/tree durable intent, deleted/changed intent and cross-kind identity reservation regressions."
     }
   },
   "implemented": [
@@ -72,7 +76,7 @@
   ],
   "continuationAuthorized": false,
   "remaining": [
-    "Record selected older plan/chart/tree reservation regression results; full final release checks remain required.",
+    "Full final release checks remain required; selected older reservation regressions pass.",
     "Implement Storybook-first operation-screen context controls and recovery hook.",
     "Qualify the actual compiled CLI/App/agent context path and preserve exact original state.",
     "Resolve the legacy standalone local-chart timeout; fresh phase/resource/credential/schema/image proof, linked admission and retained live-site acceptance remain open.",
