@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "scope": "browser-to-actual-app-context-capture-driver-foundation",
+  "status": "driver-foundation-qualified-actual-api-acceptance-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanContextPanel.api.stories.tsx": "63b9bb09e8a44737c33a98a53b19352b5551dd1d668a8bef24e3bdc648c04763",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-context-stories.test.tsx": "212de018f4dad16bd2d56ba49b2c92ad1e4c7f1809ee5e98b614f0b283df0992",
+    "frontend/e2e/nvke-install-plan-context-api-runner.mjs": "db1d0ea74c0f2bfccfa57256d88acf7c0f8f00180a03adfef6d45e85c08500b8"
+  },
+  "checks": {
+    "targetedEslint": "passed",
+    "prettier": "formatted",
+    "storyTests": {
+      "passed": 30,
+      "files": 2,
+      "exitCode": 0,
+      "logSha256": "34a73739961e4cc9411a1b52d72dce704935facdcfacc3835a7fa5dd1b5e0cf2"
+    }
+  },
+  "implemented": [
+    "Owned API Storybook peer uses the production context hook and pure panel with actual source metadata supplied by the qualification harness. It performs no RPC without an injected fixture.",
+    "Loopback-only Chromium driver forwards allowed context mutations to the real App with a private bearer held outside the browser. It checks all parent bindings, durable metadata journal before POST, lost-reply reload without automatic RPC, metadata-only explicit review/retry and unchanged public digests.",
+    "Render coverage now includes the three operation-screen context stories; removed the previously unused operation story import by actually exercising those states."
+  ],
+  "remaining": [
+    "Wire the driver into the retained authenticated CLI/App/agent fixture after its current immutable run completes.",
+    "Actual browser-to-App-to-agent capture/recovery must pass; controlled/local render tests do not prove this.",
+    "Final integrated static checks/builds, full surface acceptance and release remain outstanding."
+  ],
+  "continuationAuthorized": false
+}
