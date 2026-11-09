@@ -1,0 +1,61 @@
+{
+  "format": 1,
+  "scope": "current-helper-compiled-cli-api-browser-recovery-local-qualification",
+  "cliBaseRevision": "e79ed66651560b5b7f067c00247a445bac0c752b",
+  "applicationRevision": "7a4490fce651553fad578d94b1408e3ec0418e52",
+  "opscodeRuntimeRevision": "20f53eefaa6822673888f536ee14e93bcb3c0762",
+  "compiledBinarySha256": "26a7529dd572b6d7afb6fb4b96a6a3d73cd4f7748869a0fe007456031ca7f4a8",
+  "chartHelperBinarySha256": "88ddaca3a3da7e10d0ab5d16c68d9d10e8bc8315178305a8dddeb25455aa2d7a",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "3133a1f7f59f4bb623eeb59d1f0fa0411969dff8f3f96c26e58e7c29e19fdf94",
+    "scripts/integration/tree_browser_qualification.py": "4fe138d11e0b9d9244afc7d1c1405bdd8f928ea52c033f410dfbba4dc6119df8"
+  },
+  "checks": {
+    "ruff": "passed",
+    "format": "passed",
+    "unchangedGoChecksReused": {
+      "passed": 1048,
+      "skipped": 2,
+      "exitCode": 0,
+      "vet": "passed",
+      "lint": "passed",
+      "logSha256": "26a3c87df205acb67fdb2f2d67fedf7a037b1eab9c9ec96dbc4258c8c9f01abc",
+      "reason": "Go/module source bytes and compiled binary remain identical to the previously qualified checkpoint; only integration source guards changed."
+    },
+    "pairedCliApiBrowser": {
+      "status": "passed",
+      "passed": 1,
+      "deselected": 1,
+      "skipped": 0,
+      "warnings": 6,
+      "durationSeconds": 1208.92,
+      "exitCode": 0,
+      "variant": "browser, including common compiled CLI preparation/cold-recovery/private-retry journey",
+      "logSha256": "888796e033bc6819c308de5024c682fd156c62800703c10189015feeb232cfd2"
+    }
+  },
+  "continuationAuthorized": false,
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "limitations": [
+    "One selected browser variant passed, including common compiled CLI setup/recovery; the separate CLI-only variant was deselected. This does not qualify the private context pipeline/store.",
+    "This existing public tree recovery scenario does not invoke the private context pipeline, which has no authenticated public route or signed durable artifact store yet.",
+    "Actual Next.js login/routes/access discovery, phase freshness/admission, automatic frozen chart publication, images and linked continuation remain open.",
+    "Prior standalone agent local-chart timeout remains unresolved. No original replay, retained VM restart, main merge or deployment.",
+    "Static Storybook with private driver bearer forwarding supplies source/access metadata. Actual Next.js login/routes/access discovery and retained Linux continuation remain unqualified."
+  ],
+  "evidence": [
+    "Compiled CLI plus actual Chromium panel/hook complete source/helper-bound preparation, deliberate lost-reply recovery, same-endpoint cold agent recovery and explicit private retry through actual Astro/Postgres/mTLS.",
+    "Original complete source operation/plan/chart rows, native receipt/files/guard, run identities and linked reservations remain unchanged according to the paired fixture assertions.",
+    "Source guards pin the selected runtime and helper; compiled CLI is hash-checked before/after. Go and frontend source bytes remain identical to the previously qualified revisions."
+  ],
+  "cliQualificationRevision": "9d63c2a255af40eb44269c7e7126ccc6341307d4",
+  "cliQualificationFile": "scripts/integration/nvke-install-plan-tree-render-context-checkpoint.json",
+  "sdkQualificationFile": "install-plan-render-context-sdk-local.json",
+  "applicationSourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.api.stories.tsx": "2f2310fcf38cb37db8dae41173b7c133a428b83ef9d642cbea1710cfd97beadb",
+    "frontend/e2e/nvke-install-plan-tree-api-runner.mjs": "febc6d7e19002891df182025f885d92c3574c1b8af996ceb309deef06b2ec54f",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_tree_driver.py": "3d2d1150bcde5fa3138e805b2b0e4d91e78d251bc0312ee1f442c0e3d598dfa8",
+    "backend/providers/tests/nvke/test_operator_agent_client.py": "b68d81bc11154de39b2de41db4f4e0e55117f56938f1c6baefb551ebec063b52",
+    "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py": "5d0c0c64826547bd35aa5f1fcc1c883bc540358f4506284f4d05d5d7b5a33b71"
+  }
+}

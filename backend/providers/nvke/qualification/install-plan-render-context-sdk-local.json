@@ -28,7 +28,7 @@
   ],
   "limitations": [
     "Legacy operator recovery only. Authenticated context agent/API routes, original plan/tree/credential/helper binding, signed durable context, phase freshness/admission and automatic frozen chart publication remain open.",
-    "Paired compiled CLI/API/browser verification for this revision is running separately; prior browser evidence remains scoped to its recorded earlier revision.",
+    "Paired compiled CLI/API/browser recovery passed separately; see install-plan-render-context-browser-api-local.json (one selected browser variant including common CLI recovery). The private context pipeline/store is not invoked through these existing public routes.",
     "The prior standalone agent local-chart request-timeout gate remains unresolved. No retained Linux continuation, original replay, VM restart, main merge or deployment."
   ]
 }
