@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "scope": "app-render-context-persistence-foundation",
+  "status": "model-only-qualified",
+  "sourceSha256": {
+    "backend/astrolift_clusters/models/nvke.py": "45f111e3266ce5d5903442b178e93ec6e9adbb5dde8b03382199a270fbf4c1f3",
+    "backend/astrolift_clusters/models/__init__.py": "a8590ca4c59092abc04582357b69fe4557c5187b28695903132a9658939b632c",
+    "backend/astrolift_clusters/migrations/0041_nvke_install_plan_context.py": "195bf011e79602cf69de3d513f357bef4f40da7d8032f0e64e1ae9240a37343f",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_context_model.py": "818aebd98cc03a588f6bcfebaf8e5f5c8b9e4a662c69d8f1aa30f1fa98ab17c5"
+  },
+  "checks": {
+    "realPostgres": {
+      "passed": 32,
+      "newContextModelCases": 10,
+      "durationSeconds": 31.93,
+      "exitCode": 0,
+      "logSha256": "914807d0c003d0757c35c2f4c2ad9b1528e5b0ff6109b48df94ebdaf17f98d4a"
+    },
+    "migrationDrift": "makemigrations astrolift_clusters --check --dry-run passed",
+    "ruff": "four changed Python files passed"
+  },
+  "implemented": [
+    "Render contexts belong to a protected execution-tree parent and retain original actor, source binding, request digest and encrypted intent.",
+    "Identity, parent, actor, binding and ciphertext cannot be rewritten. Prepared summaries/status are immutable. Database constraint rejects unknown states.",
+    "Soft deletion retains history and UUID uniqueness; deleting a referenced parent is protected. Encryption roundtrip uses the real configured secrets backend."
+  ],
+  "remaining": [
+    "Current-admin context API/outbox, cross-kind App reservations, audited GraphQL schema, recovery mutations, CLI and UI are not connected yet.",
+    "This model does not authorize native execution or certify phase/resource/credential/image equivalence."
+  ],
+  "continuationAuthorized": false
+}
