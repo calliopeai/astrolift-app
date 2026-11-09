@@ -26,7 +26,8 @@
     "frontend/messages/ja.json": "b68b5a9dd8754bc05680287fef08b9a4051efe4a5858f435d147c9d8f25371ea",
     "frontend/messages/ko.json": "953e2f95cc9e35ab7d9fe9265d116e6fc4754c0cb7552385539167d6dea36cbe",
     "frontend/messages/pt-BR.json": "c3f0095e6ae8b080f0695cd577aa77a5a6629ce2be30fe1bc71eede65c5afa50",
-    "frontend/messages/zh-Hans.json": "8793ec7858c363a244493740eb93a04571dd1c982420342d736d63fa18b13450"
+    "frontend/messages/zh-Hans.json": "8793ec7858c363a244493740eb93a04571dd1c982420342d736d63fa18b13450",
+    "frontend/scripts/nvke-context-operation-browser-qualification.mjs": "ec0f555f9d7d5c8d0e9af183cb233a79fbd6a3f1e0fce8770927cf822320bd8f"
   },
   "checks": {
     "wiredUiTests": {
@@ -46,6 +47,43 @@
       "logPath": "/tmp/astrolift-nvke-context-ui-save-static.log",
       "exitMarker": "/tmp/astrolift-nvke-context-ui-save-static.exit",
       "sessionId": 42852
+    },
+    "nvkeUiRegressions": {
+      "passed": 1081,
+      "files": 63,
+      "exitCode": 0,
+      "logSha256": "bd120196668b22ee4f3b5c1479abdb811d90e442b023afbe31387ef173671bf7"
+    },
+    "productionStorybookBuild": {
+      "exitCode": 0,
+      "logSha256": "6f1a21ad7845841969c5c0b1a88d8318fa11b6d0208aebe8f16109fbf18f6940",
+      "outputDirectory": "/tmp/astrolift-nvke-context-ui-final-storybook-static"
+    },
+    "productionStorybookPanelBrowser": {
+      "exitCode": 0,
+      "reportSha256": "54b985fbf341a6629d066a44278169bfccdb1cf0ba2e73a6f888810ec360e820",
+      "scope": "Real Chromium against the production Storybook artifact; visual/overflow and controlled Apollo lost-reply recovery, not actual App or agent acceptance."
+    },
+    "productionStorybookOperationBrowser": {
+      "exitCode": 0,
+      "cases": 3,
+      "reportSha256": "a20aa5cd099eb0450da778f58dd122e5fbe356685dd952bcdd43fac83bd8af1a",
+      "driverSha256": "ec0f555f9d7d5c8d0e9af183cb233a79fbd6a3f1e0fce8770927cf822320bd8f",
+      "scope": "Actual operation-screen Storybook composition: saved capture remains disabled; review follows normal, read-only and pending guards. Not Next login/route acceptance."
+    },
+    "nextBuild": {
+      "status": "pending",
+      "exitCode": null,
+      "logPath": "/tmp/astrolift-nvke-context-ui-next-build.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-ui-next-build.exit",
+      "sessionId": 42336
+    },
+    "fullFrontendLint": {
+      "status": "pending",
+      "exitCode": null,
+      "logPath": "/tmp/astrolift-nvke-context-ui-full-lint.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-ui-full-lint.exit",
+      "sessionId": 46284
     }
   },
   "implemented": [
@@ -56,8 +94,8 @@
   ],
   "continuationAuthorized": false,
   "remaining": [
-    "Final complete frontend static checks, production builds and broader UI regressions.",
-    "Integrated operation-screen browser acceptance and actual App/compiled-CLI/agent capture/recovery acceptance.",
+    "Final full TypeScript, static checks, full frontend lint and Next production build; see pending terminal markers.",
+    "Actual Next route/login acceptance and actual App/compiled-CLI/agent capture/recovery acceptance; controlled Storybook tests are not substitutes.",
     "Existing standalone agent local-chart timeout failure remains unresolved.",
     "Native phase, credential, schema, image and linked-admission proof; remaining full management surface and live qualification.",
     "Review, coordinated PRs/merge, CONFLICT deployment and validation."
