@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "app-render-context-api-and-cross-kind-reservations-checkpoint",
-  "status": "configured-integration-and-frontend-static-running",
+  "status": "configured-integration-running",
   "baseRevision": "8af4336199f4332d05786888f1875d1ef8ab9a77",
   "sourceSha256": {
     "backend/astrolift_clusters/nvke_artifact_identity.py": "f7fc4eccb849a257891846a350939f8dafd66586478b04c8b23928af0f9adee1",
@@ -46,10 +46,12 @@
       "logPath": "/tmp/astrolift-nvke-context-api-configured.log"
     },
     "frontendContract": {
-      "status": "running",
+      "status": "passed",
       "scope": "Operation codegen, full TypeScript check and targeted operation-document ESLint",
       "completionMarker": "/tmp/astrolift-nvke-context-api-frontend-contract.exit",
-      "logPath": "/tmp/astrolift-nvke-context-api-frontend-contract.log"
+      "logPath": "/tmp/astrolift-nvke-context-api-frontend-contract.log",
+      "exitCode": 0,
+      "logSha256": "99d8b7c91685114bb8028903a5241f8aaae8bd3289a947cf4772e01b75597172"
     }
   },
   "implemented": [
@@ -61,7 +63,7 @@
   "continuationAuthorized": false,
   "remaining": [
     "Record terminal configured API tests with no unexpected skips; run old plan/chart/tree regressions on these changed reservation paths.",
-    "Finish frontend static checks, Storybook-first operation-screen context controls and recovery hook.",
+    "Implement Storybook-first operation-screen context controls and recovery hook.",
     "Qualify the actual compiled CLI/App/agent context path and preserve exact original state.",
     "Resolve the legacy standalone local-chart timeout; fresh phase/resource/credential/schema/image proof, linked admission and retained live-site acceptance remain open.",
     "Adversarial full review, green final local gates, coordinated PR/main merge, deployment and backlog execution are not complete."
