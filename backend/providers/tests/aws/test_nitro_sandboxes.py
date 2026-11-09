@@ -315,3 +315,21 @@ def test_unexpected_runtime_handler_is_refused() -> None:
     assert not result.ok
     assert "unexpected handler" in result.errors[0].exception_message
     assert kube.writes == []
+
+
+def test_terminating_runtime_is_neither_discovered_nor_used() -> None:
+    resource = {
+        "metadata": {"name": "isolated-sandbox", "deletionTimestamp": "2026-11-09T00:00:00Z"},
+        "handler": "isolated-sandbox",
+    }
+
+    class DeletingRuntime(Kube):
+        def get(self, **kwargs: Any) -> dict[str, Any]:
+            return resource
+
+    kube = DeletingRuntime()
+    assert discover_runtimes([resource])["status"] == "not_detected"
+    result = driver(kube).apply_manifests("test", "team", [pod()])
+    assert not result.ok
+    assert "terminating" in result.errors[0].exception_message
+    assert kube.writes == []

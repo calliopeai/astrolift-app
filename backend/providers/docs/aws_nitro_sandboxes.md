@@ -19,7 +19,7 @@ cluster capabilities JSON:
 ```
 
 `detected` means at least one AWS runtime class is installed with its expected
-handler. `not_detected` means both reads succeeded with no matching classes;
+handler. `not_detected` means runtime inventory succeeded with no matching classes;
 `unknown` means discovery could not complete, including insufficient RBAC.
 Detection describes cluster configuration. It does not verify that a pod ran
 inside Nitro, that nodes can schedule it, or that KMS accepted its attestation.

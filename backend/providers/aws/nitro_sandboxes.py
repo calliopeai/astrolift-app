@@ -14,13 +14,24 @@ RUNTIME_KIND = "node.k8s.io/v1/RuntimeClass"
 
 def discover_runtimes(resources: list[dict[str, Any]]) -> dict[str, Any]:
     """Report installed configuration, without claiming workload attestation."""
-    names = {
-        str((resource.get("metadata") or {}).get("name", ""))
-        for resource in resources
-        if resource.get("handler") == (resource.get("metadata") or {}).get("name")
-    }
-    runtimes = [{"name": name, "mode": mode} for name, mode in RUNTIME_MODES.items() if name in names]
+    runtimes = [
+        {"name": name, "mode": mode}
+        for name, mode in RUNTIME_MODES.items()
+        if any(_runtime_configured(resource, name) for resource in resources)
+    ]
     return {"status": "detected" if runtimes else "not_detected", "runtime_classes": runtimes}
+
+
+def _runtime_configured(resource: Any, name: str) -> bool:
+    if not isinstance(resource, dict):
+        return False
+    metadata = resource.get("metadata")
+    return (
+        isinstance(metadata, dict)
+        and metadata.get("name") == name
+        and resource.get("handler") == name
+        and not metadata.get("deletionTimestamp")
+    )
 
 
 def _object(value: Any, path: str) -> dict[str, Any]:
@@ -130,9 +141,9 @@ def preflight_manifests(client: Any, manifests: list[dict[str, Any]], namespace:
             if runtime not in checked:
                 checked[runtime] = client.get(kind=RUNTIME_KIND, namespace=None, name=runtime)
             resource = checked[runtime]
-            if resource is None or resource.get("handler") != runtime:
+            if not _runtime_configured(resource, runtime):
                 raise ValueError(
-                    f"Nitro Sandbox RuntimeClass {runtime!r} is absent or has an unexpected handler; "
+                    f"Nitro Sandbox RuntimeClass {runtime!r} is absent, terminating or has an unexpected handler; "
                     "use EKS Auto Mode or install the AWS sandbox runtime on supported nodes"
                 )
         except Exception as exc:
