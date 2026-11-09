@@ -16,6 +16,7 @@ from nvke.operator_agent_client import OperatorAgentClient
 from astrolift_clusters import nvke_install_plan_charts as charts
 from astrolift_clusters import nvke_install_plans as plans
 from astrolift_clusters.models import NvkeInstallPlan, NvkeInstallPlanCharts, NvkeOperation
+from astrolift_clusters.nvke_sites import NvkeSiteError
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
 from astrolift_clusters.tests.test_nvke_install_plans import prepared_fixture  # noqa: F401
 from astrolift_clusters.tests.test_nvke_operator import agent, configured, source_review, world  # noqa: F401
@@ -385,8 +386,10 @@ def test_token_revoked_during_remote_prepare_cannot_publish(chart_fixture, monke
     monkeypatch.setattr(OperatorAgentClient, "prepare_install_plan_charts", revoked)
     mark = set_current_api_token(token)
     try:
-        with context(f.state.world), pytest.raises(PermissionDenied):
+        with context(f.state.world), pytest.raises((PermissionDenied, NvkeSiteError)) as error:
             charts.prepare(body=f.body, **f.review)
+        if isinstance(error.value, NvkeSiteError):
+            assert error.value.code == "AUTHORITY_REVOKED"
     finally:
         reset_current_api_token(mark)
     assert NvkeInstallPlanCharts.objects.get(guid=f.body["artifactId"]).summary == {}

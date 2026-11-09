@@ -7,7 +7,7 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "5fdb51ee8fea78a4c4bcfa54f79175763d49aef0"
+      "revision": "bbd9522e43810eeb2ac677a0ce4ee825b11bb432"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
@@ -1005,7 +1005,7 @@
       "path": "cmd/nvke_install_plan.go",
       "kind": "implementation",
       "scope": "Reviewed remote prepare/review/retry-preparation/items/workloads commands. Exact private UTF-8 input, fsynced metadata journal before preparation, original source/authority validation and page/action/readiness checks. No install or continuation admission.",
-      "sha256": "6bec97e2f9061f273198c28fceb3592fb534b41413a42cf5f62e6e832a5ea91a"
+      "sha256": "4d1bb11e32c0cdd3cfd1e210b396d68d2d87cfdf0d9086992323de80d391ebf8"
     },
     "operator-install-plan-cli-api": {
       "repository": "cli",
@@ -1117,6 +1117,34 @@
       "kind": "observation",
       "scope": "Controlled host/temporary-workspace archive, real Helm package/repository/locked-dependency, partial/cold/lost-result recovery and actual mTLS agent tests. Full closure, live skipped-resource proof, linked install execution and retained Linux qualification remain open.",
       "sha256": "f6d0ae2bf759aad26b4ba208670ddef6a0703fcb15e3b84cf0017d9537c3c565"
+    },
+    "operator-chart-artifacts-cli": {
+      "repository": "cli",
+      "path": "cmd/nvke_install_plan_charts.go",
+      "kind": "implementation",
+      "scope": "Explicit charts prepare/review/retry-preparation commands review the exact original/parent source, flush metadata-only exact-text journals before private preparation, preserve int64 byte strings and refuse foreign/truncated/authorizing results. No native install or automatic retry.",
+      "sha256": "e013556bf4891e90c1ddfe975bc3257f005a920709af3dd0929b662256f5f0dd"
+    },
+    "operator-chart-artifacts-cli-tests": {
+      "repository": "cli",
+      "path": "cmd/nvke_install_plan_charts_test.go",
+      "kind": "test",
+      "scope": "Controlled API transport cases cover source/version/digest binding, exact private text and durable journal ordering, changed journal scope, duplicate/case-variant/unknown/null fields, int64 precision/budgets, lost-reply read recovery, incomplete/authorizing replies and refusal before chart RPC on stale parent. Separate from pending combined API/CLI/agent execution.",
+      "sha256": "3251e7ec88dfe6858984ebc33c1829079b86255bc827d5892be90d01c06d6016"
+    },
+    "operator-chart-artifacts-cli-api": {
+      "repository": "cli",
+      "path": "internal/api/nvke_install_plan_charts.go",
+      "kind": "implementation",
+      "scope": "Typed prepare/read/private-retry mutations use the protected operator transport and isolated bounded client. All three documents and selected fields were checked against the exported application schema; this does not establish a successful live call.",
+      "sha256": "410b675a5afbdd3f0575bea855f228fbcc671180ddeaa6c79a3e3b844fa71481"
+    },
+    "operator-chart-artifacts-cli-transport-tests": {
+      "repository": "cli",
+      "path": "internal/api/nvke_install_plan_test.go",
+      "kind": "test",
+      "scope": "Chart prepare/read/retry join the real HTTP redirect-refusal cases, preserving private request/token boundaries and the shared client timeout. Full local Go tests, formatting, vet, lint and build passed; API/CLI/mTLS/native qualification remains open.",
+      "sha256": "7e7e80db94267d245f2fab423e67b883dbdcf10e6d9ec30ab91407f461035922"
     }
   },
   "rows": {
@@ -3401,9 +3429,13 @@
           "operator-chart-artifacts-sdk-tests",
           "operator-chart-artifacts-sdk-tls",
           "operator-chart-artifacts-agent",
-          "operator-chart-artifacts-local"
+          "operator-chart-artifacts-local",
+          "operator-chart-artifacts-cli",
+          "operator-chart-artifacts-cli-tests",
+          "operator-chart-artifacts-cli-api",
+          "operator-chart-artifacts-cli-transport-tests"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately. A chart-only materialization stage has real Helm/mTLS agent and SDK recovery checks; chart API/CLI/UI controls, OCI/private-registry/TLS qualification, complete artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately. A chart-only materialization stage has real Helm/mTLS agent and SDK recovery checks; chart API implementation/combined API-CLI-agent qualification and UI controls, OCI/private-registry/TLS qualification, complete artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",

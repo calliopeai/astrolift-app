@@ -408,7 +408,8 @@ and an explicit exact-ID re-prepare returns it without a second fetch. Original
 operation bytes, native guard, run inventory and linked reservation directory
 remain unchanged. Its dependency inventory is a controlled single-chart fixture;
 it does not qualify every chart in the retained Linux install. The chart stage now has a durable current-admin application API implementation
-under local qualification; CLI and UI controls remain open. OCI and
+under local qualification. CLI controls are implemented with controlled transport
+checks; combined API/CLI qualification and UI controls remain open. OCI and
 private registry/TLS qualification, full frozen execution-tree/render/image
 closure, fresh skipped-resource/credential verification, linked once-only
 continuation and deployed acceptance remain open.
@@ -443,3 +444,21 @@ uncertain operation, parent plan, native guard and native admission remain intac
 
 GraphQL schema files and frontend generated types/documents include the three
 chart operations. No chart operation screen or browser recovery UI is wired yet.
+
+
+The compiled CLI now exposes `agent install-plan charts prepare`, `review` and
+`retry-preparation`. They bind `--plan`, `--plan-version`, `--plan-digest`,
+`--artifact` and the original site/authority/operation versions. Preparation
+requires a private body and metadata-only `--request-file` journal; review/retry
+accept no private text. Exact byte strings survive output, and source changes,
+case-variant/duplicate/unknown/null fields, changed journals and over-budget or
+authorizing replies are refused. A lost response never silently retries.
+
+CLI source `bbd9522e43810eeb2ac677a0ce4ee825b11bb432` passed the full local Go suite
+(1,040 top-level passes; two existing native opt-in skips), targeted new boundary
+and journal cases, formatting, vet, lint and a clean build. All three chart
+documents validate against the exported application schema. These controlled
+transport/source checks do not qualify the combined current-admin API, CLI,
+PostgreSQL, agent and retained Linux install. The chart API PostgreSQL gate is
+still pending fresh-database historical migrations; frontend lint and full
+typecheck passed. Native continuation, merge and deployed acceptance remain unverified.
