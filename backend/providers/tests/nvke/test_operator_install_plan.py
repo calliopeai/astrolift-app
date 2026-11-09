@@ -112,6 +112,12 @@ def client(
     chart_capability=None,
     lost_chart_reply=False,
     changed_after_chart=False,
+    tree=None,
+    tree_capability=None,
+    lost_tree_reply=False,
+    changed_after_tree=False,
+    changed_chart_after_tree=False,
+    tree_status=200,
 ):
     calls = []
     original = {
@@ -151,6 +157,9 @@ def client(
                         "continuation": False,
                         "maximumPageSize": 100,
                     },
+                    "installPlanTree": tree_capability
+                    if tree_capability is not None
+                    else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
                     "installPlanCharts": chart_capability
                     if chart_capability is not None
                     else {
@@ -162,16 +171,25 @@ def client(
                 },
             )
         assert request.headers["X-Astro-Nvke-Intent"] == INTENT
+        if request.url.path.endswith("/install-plan-tree"):
+            if lost_tree_reply and request.method == "POST":
+                raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
+            return httpx.Response(tree_status, json=tree)
         if request.url.path.endswith("/install-plan-charts"):
             if lost_chart_reply and request.method == "POST":
                 raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
-            return httpx.Response(200, json=charts)
+            selected_charts = copy.deepcopy(charts)
+            if changed_chart_after_tree and any(path.endswith("/install-plan-tree") for _, path, _ in calls):
+                selected_charts["expandedBytes"] = "457"
+            return httpx.Response(200, json=selected_charts)
         if request.url.path.endswith("/install-plan"):
             if request.method == "POST":
                 assert json.loads(request.content)["planId"] == PLAN
             value = page if request.url.params.get("view") else summary
             selected = metadata() if value is None else copy.deepcopy(value)
-            if changed_after_chart and any(path.endswith("/install-plan-charts") for _, path, _ in calls):
+            if (changed_after_chart and any(path.endswith("/install-plan-charts") for _, path, _ in calls)) or (
+                changed_after_tree and any(path.endswith("/install-plan-tree") for _, path, _ in calls)
+            ):
                 selected["plan"]["planDigest"] = "c" * 64
             return httpx.Response(200, json=selected)
         return httpx.Response(200, json=original)

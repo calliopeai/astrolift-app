@@ -1,0 +1,36 @@
+{
+  "format": 1,
+  "scope": "sdk-execution-tree-protocol-and-owned-real-mtls-recovery-local-qualification",
+  "applicationBaseRevision": "6062090af626b4e1114513a6deb10bc166b96a8a",
+  "opscodeRevision": "b0f9d26dd5467d97eef92d6d728dca33e0bf5777",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "sourceSha256": {
+    "nvke/_operator_install_plan_tree.py": "c8199a802e44b3d2c24f56b925b551e26e195f527124a4dc6df84d7610e43c80",
+    "nvke/operator_agent_client.py": "b0bb216c613896ed7278ab8969c6414d28025d0acbe18f299db1b0498a7a4759",
+    "tests/nvke/test_operator_install_plan.py": "451c981119113addeb57d43e48d4fb8e710fd8aa7d71c906459ced70b55313e4",
+    "tests/nvke/test_operator_install_plan_tree.py": "599735c75879168136407c59e2b877ee38e08c4a42656ec2b86782e702a0994f",
+    "tests/nvke/test_operator_install_plan_tree_mtls.py": "353d8bebf74a09dcb7f9bf6856844a26b771cdde38bef6022ffa5303e8103333",
+    "tests/nvke/fixtures/nvke_operator_tree_driver.py": "8c90816a99e65ddc0b10c5d12900f8e1a7a7e08e32240524a333464be55d7314",
+    "tests/nvke/test_operator_agent_client.py": "0a3e839333ed05f57aacffda89226216b1b57fade6073dc99cdd0d50f5c8e443"
+  },
+  "checks": {
+    "sdkPlanChartTreeAndTransportCases": 193,
+    "skipped": 0,
+    "logSha256": "cde7293fe8eae381224e00452dbd8c5fe4771d3fa054f64c3cb81e2bbca604c5",
+    "ruff": "passed"
+  },
+  "evidence": [
+    "Strict request/capability/reply validation preserves decimal int64 bytes, rejects private or authorizing replies, and binds the exact original job, plan and chart publication before and after tree I/O.",
+    "Tree sizes/counts cannot understate the chart publication. Malformed/foreign sources, missing features, changed parent/chart metadata or instance, revoked current authority and lost replies do not trigger automatic preparation/replay.",
+    "Actual SDK/mTLS/Helm 4 with a controlled deployment and Kubernetes reads prepares a source-bound tree. Discarding the successful transport response is ambiguous; same-endpoint owned engine/listener restart and explicit GET recover the identical result. Exact-ID private retry creates no new attempt.",
+    "Cold recovery forbids executable selection/spawn. Original job/run files, guard, plan snapshots, chart publication and linked reservations remain unchanged."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "The native failed receipt and generated deployment/Kubernetes observations are controlled fixtures, not retained Linux installation qualification.",
+    "Durable application tree API qualification, compiled CLI and actual browser/API tree controls remain pending.",
+    "Native template/Kustomize rendering, image closure/private registry policy, fresh skipped-resource/credential proof, remaining-only selection and linked once-only execution remain open.",
+    "No original native replay, VM restart, main merge or production deployment."
+  ]
+}

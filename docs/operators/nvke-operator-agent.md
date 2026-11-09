@@ -530,3 +530,23 @@ journal after an ambiguous response, then use explicit review. The test harness
 also needed a process deadline longer than the product's private preparation
 window. These changes do not qualify actual browser/API behavior, all upstream
 charts, private registries, the retained Linux installation or native continuation.
+
+
+Execution-tree SDK support now selects Opscode
+`b0f9d26dd5467d97eef92d6d728dca33e0bf5777`. `prepare_install_plan_tree` and
+`install_plan_tree` bind the original intent, exact plan ID/digest and chart
+publication ID/digest. The SDK checks both publications and the optional tree
+capability before and after the request. Replies contain counts, decimal byte
+strings and hashes; private manifests/arguments and continuation authorization
+are refused. A lost preparation response requires explicit read recovery.
+
+All 193 focused SDK plan/chart/tree/transport cases passed without skips. The
+owned real mTLS/Helm 4 fixture discards a successful tree response, restarts its
+agent/listener at the same endpoint, then recovers and explicitly retries without
+another attempt. Original job/run files, guard, frozen plan, chart publication
+and links remain unchanged. The fixture uses a controlled deployment and
+Kubernetes GETs. Source/log identities are recorded in
+`backend/providers/nvke/qualification/install-plan-tree-sdk-local.json`.
+Durable application tree API, compiled CLI and actual browser/API qualification,
+native rendering/image closure, fresh skipped-resource proof and linked native
+execution remain required.

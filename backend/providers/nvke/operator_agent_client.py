@@ -16,6 +16,7 @@ import httpx
 
 from nvke import _operator_install_plan as install_plan_protocol
 from nvke import _operator_install_plan_charts as chart_protocol
+from nvke import _operator_install_plan_tree as tree_protocol
 from nvke._operator_install_review import project as project_install_review
 from nvke._private_http import private_http
 from nvke.client import NvkeError, validate_endpoint_url
@@ -171,6 +172,15 @@ class OperatorAgentClient:
                     "SOURCE_ARTIFACT_CHANGED": "SOURCE_CHANGED",
                     "INSTALL_PLAN_CHARTS_INCOMPLETE": "OPERATOR_CHARTS_INCOMPLETE",
                     "ARTIFACT_INTENT_CHANGED": "OPERATOR_ARTIFACT_INTENT_CONFLICT",
+                    "INSTALL_PLAN_SOURCE_CHANGED": "SOURCE_CHANGED",
+                    "INSTALL_PLAN_CONTENT_CHANGED": "SOURCE_CHANGED",
+                    "INSTALL_PLAN_TREE_INCOMPLETE": "OPERATOR_TREE_INCOMPLETE",
+                    "EXECUTION_TREE_INCOMPLETE": "OPERATOR_TREE_INCOMPLETE",
+                    "EXECUTION_TREE_INTENT_CHANGED": "OPERATOR_TREE_INTENT_CONFLICT",
+                    "EXECUTION_TREE_CONTENT_CHANGED": "SOURCE_CHANGED",
+                    "EXECUTION_TREE_CHART_SOURCE_CHANGED": "SOURCE_CHANGED",
+                    "EXECUTION_TREE_SOURCE_OR_INPUT_CHANGED": "SOURCE_CHANGED",
+                    "EXECUTION_TREE_BUSY": "OPERATOR_BUSY",
                 }.get(peer, "OPERATOR_REQUEST_REFUSED")
                 if isinstance(peer, str)
                 else "OPERATOR_REQUEST_REFUSED"
@@ -547,6 +557,92 @@ class OperatorAgentClient:
             job_id,
             intent=intent,
             body={"format": 1, "planId": plan_id, "planDigest": plan_digest, "artifactId": artifact_id},
+            read_only=True,
+        )
+
+    def _install_plan_tree_source(
+        self, job_id: str, intent: str, body: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        metadata = self.install_plan(job_id, intent=intent, plan_id=body["planId"])
+        if metadata["plan"]["planDigest"] != body["planDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The retained plan no longer matches the reviewed digest")
+        publication = self.install_plan_charts(
+            job_id,
+            intent=intent,
+            plan_id=body["planId"],
+            plan_digest=body["planDigest"],
+            artifact_id=body["chartArtifactId"],
+        )
+        if publication["artifactDigest"] != body["chartArtifactDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The chart publication no longer matches the reviewed digest")
+        if self.install_plan(job_id, intent=intent, plan_id=body["planId"]) != metadata:
+            raise _invalid_response()
+        return metadata, publication
+
+    def _install_plan_tree(self, job_id: str, *, intent: str, body: dict[str, Any], read_only: bool) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = tree_protocol.request(body, job_id=job_id, read_only=read_only)
+            if not isinstance(intent, str) or not _SHA.fullmatch(intent):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError(
+                "INVALID_INPUT", "Use an exact plan/chart publication and bounded execution-tree request"
+            ) from None
+        try:
+            tree_protocol.capability(self.identity().get("installPlanTree"))
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError(
+                "OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm execution-tree preparation"
+            ) from None
+        source = self._install_plan_tree_source(job_id, intent, body)
+        path = "/v1/jobs/" + job_id + "/install-plan-tree"
+        data = (
+            self._request(
+                "GET", path, params={key: value for key, value in body.items() if key != "format"}, intent=intent
+            )
+            if read_only
+            else self._request("POST", path, body=body, intent=intent)
+        )
+        try:
+            result = tree_protocol.summary(
+                data, body=body, chart_bytes=source[1]["bytes"], chart_count=source[1]["chartCount"]
+            )
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+        if self._install_plan_tree_source(job_id, intent, body) != source:
+            raise _invalid_response()
+        try:
+            tree_protocol.capability(self.identity().get("installPlanTree"))
+        except (KeyError, ValueError, TypeError):
+            raise _invalid_response() from None
+        return result
+
+    def prepare_install_plan_tree(self, job_id: str, *, intent: str, body: dict[str, Any]) -> dict[str, Any]:
+        return self._install_plan_tree(job_id, intent=intent, body=body, read_only=False)
+
+    def install_plan_tree(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        plan_id: str,
+        plan_digest: str,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        artifact_id: str,
+    ) -> dict[str, Any]:
+        return self._install_plan_tree(
+            job_id,
+            intent=intent,
+            body={
+                "format": 1,
+                "artifactId": artifact_id,
+                "planId": plan_id,
+                "planDigest": plan_digest,
+                "chartArtifactId": chart_artifact_id,
+                "chartArtifactDigest": chart_artifact_digest,
+            },
             read_only=True,
         )
 
