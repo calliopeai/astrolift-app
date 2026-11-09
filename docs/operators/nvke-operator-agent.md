@@ -407,8 +407,39 @@ the successful preparation reply; a new SDK client recovers the retained index,
 and an explicit exact-ID re-prepare returns it without a second fetch. Original
 operation bytes, native guard, run inventory and linked reservation directory
 remain unchanged. Its dependency inventory is a controlled single-chart fixture;
-it does not qualify every chart in the retained Linux install. The chart stage
-still needs durable current-admin application API, CLI and UI controls. OCI and
+it does not qualify every chart in the retained Linux install. The chart stage now has a durable current-admin application API implementation
+under local qualification; CLI and UI controls remain open. OCI and
 private registry/TLS qualification, full frozen execution-tree/render/image
 closure, fresh skipped-resource/credential verification, linked once-only
 continuation and deployed acceptance remain open.
+
+
+The chart API checkpoint adds `NvkeInstallPlanCharts` and migration
+`0039_nvke_install_plan_charts`. It reserves an encrypted request before agent I/O,
+binds the original operation/source and the prepared plan's version, digest and
+summary hash, and freezes a successful public summary. This implementation is
+under qualification; the PostgreSQL and combined real Helm/mTLS path must pass
+before treating it as qualified. It does not authorize native continuation.
+
+`prepareNvkeOperatorInstallPlanCharts` accepts
+`PrepareNvkeOperatorInstallPlanChartsInput`: the original operation review fields,
+`planId`, `expectedPlanVersion`, `planDigest` and exact JSON `requestText` for the
+SDK chart request. `reviewNvkeOperatorInstallPlanCharts` and
+`recoverNvkeOperatorInstallPlanChartsPreparation` accept
+`NvkeOperatorInstallPlanChartsReviewInput` with the same review fields and
+`artifactId`. The read recovers a lost result without downloading again; only the
+original caller and token may retry the stored private preparation intent.
+Application identity reuse requires the exact original request, including
+operational options, even though the agent's artifact intent omits the timeout.
+
+Every route checks current admin authority and source versions before and after
+agent I/O. A replacement current administrator/token may inspect the retained
+result after original-caller revocation. Private request retries authenticate the
+retained encrypted body against its keyed digest and exact artifact/plan IDs.
+Responses use typed hashes/counts and decimal byte strings; request text is masked
+in audit records, including rejected requests and renamed GraphQL variables.
+Prepared chart IDs are also reserved against new plan preparation. The original
+uncertain operation, parent plan, native guard and native admission remain intact.
+
+GraphQL schema files and frontend generated types/documents include the three
+chart operations. No chart operation screen or browser recovery UI is wired yet.

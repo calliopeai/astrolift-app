@@ -28,14 +28,16 @@ import astrolift_workflows.schema as AstroliftTemporalWorkflowsSchema  # noqa: E
 # ---------------------------------------------------------------------------
 import core.schema.mutations as CoreMutations
 import organization.schema as OrganizationSchema
-from astrolift_clusters.schema.domain_diagnostics import ManagedDomainDiagnosticQuery
 from astrolift_clusters.schema.dns_provider_connections import (
     DnsProviderConnectionsMutation,
     DnsProviderConnectionsQuery,
 )
+from astrolift_clusters.schema.domain_diagnostics import ManagedDomainDiagnosticQuery
 from astrolift_services.schema.model_reads import ModelReadsQuery
 from astrolift_services.schema.shared_model_prompt import SharedModelPromptMutations, SharedModelPromptQuery
 from config.features import Feature, is_enabled
+from core.schema.audit import MutationAuditExtension, PermissionDeniedExtension, SecretSafeSchema
+from core.schema.subscriptions import Subscription
 from core.schema.types.audit import AuditLogQuery
 from core.schema.types.install_policy import InstallPolicyQuery
 from core.schema.types.permission_analysis import PermissionAnalysisQuery
@@ -92,6 +94,7 @@ _mutation_bases = [
     AstroliftClustersSchema.NvkeMutation,
     AstroliftClustersSchema.NvkeOperatorMutation,
     AstroliftClustersSchema.NvkeInstallPlanMutation,
+    AstroliftClustersSchema.NvkeInstallPlanChartsMutation,
     AstroliftLifecycleSchema.LifecycleMutation,
     AstroliftScmSchema.ScmMutation,
     AstroliftServicesSchema.ServicesMutation,
@@ -151,9 +154,6 @@ Mutation = strawberry.type(
 # ---------------------------------------------------------------------------
 # Schema instance
 # ---------------------------------------------------------------------------
-
-from core.schema.audit import MutationAuditExtension, PermissionDeniedExtension, SecretSafeSchema
-from core.schema.subscriptions import Subscription
 
 schema = SecretSafeSchema(
     query=Query,

@@ -10919,6 +10919,9 @@ type Mutation {
   prepareNvkeOperatorInstallPlan(input: PrepareNvkeOperatorInstallPlanInput!): NvkeOperatorInstallPlanTypeMutationResult!
   reviewNvkeOperatorInstallPlan(input: NvkeOperatorInstallPlanReviewInput!): NvkeOperatorInstallPlanTypeMutationResult!
   recoverNvkeOperatorInstallPlanPreparation(input: NvkeOperatorInstallPlanReviewInput!): NvkeOperatorInstallPlanTypeMutationResult!
+  prepareNvkeOperatorInstallPlanCharts(input: PrepareNvkeOperatorInstallPlanChartsInput!): NvkeOperatorInstallPlanChartsTypeMutationResult!
+  reviewNvkeOperatorInstallPlanCharts(input: NvkeOperatorInstallPlanChartsReviewInput!): NvkeOperatorInstallPlanChartsTypeMutationResult!
+  recoverNvkeOperatorInstallPlanChartsPreparation(input: NvkeOperatorInstallPlanChartsReviewInput!): NvkeOperatorInstallPlanChartsTypeMutationResult!
   prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
@@ -11839,6 +11842,45 @@ type NvkeOperatorInstallEvidenceType {
   stderrSha256: String!
 }
 
+input NvkeOperatorInstallPlanChartsReviewInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+  expectedPlanVersion: Int!
+  planDigest: String!
+  artifactId: GUID!
+}
+
+type NvkeOperatorInstallPlanChartsType {
+  id: GUID!
+  version: Int!
+  status: String!
+  planId: GUID!
+  planVersion: Int!
+  operationId: GUID!
+  operationVersion: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  authorityId: GUID!
+  authorityVersion: Int!
+  planDigest: String!
+  artifactDigest: String!
+  chartCount: Int!
+  bytes: String!
+  expandedBytes: String!
+  executionState: String!
+  continuationAuthorized: Boolean!
+}
+
+type NvkeOperatorInstallPlanChartsTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallPlanChartsType
+}
+
 type NvkeOperatorInstallPlanHeaderType {
   format: Int!
   scope: String!
@@ -12455,6 +12497,18 @@ input PrepareConversationTransferInput {
   envelopeSha256: String!
   envelopeBytes: Int!
   environmentSpecId: GUID = null
+}
+
+input PrepareNvkeOperatorInstallPlanChartsInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+  expectedPlanVersion: Int!
+  planDigest: String!
+  requestText: String!
 }
 
 input PrepareNvkeOperatorInstallPlanInput {

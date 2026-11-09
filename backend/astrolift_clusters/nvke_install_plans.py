@@ -16,7 +16,7 @@ from nvke.operator_contract import ContractError
 from astrolift_clusters import nvke_operations as outbox
 from astrolift_clusters import nvke_operator_authority as authority
 from astrolift_clusters import nvke_operator_jobs as jobs
-from astrolift_clusters.models import NvkeInstallPlan, NvkeOperation
+from astrolift_clusters.models import NvkeInstallPlan, NvkeInstallPlanCharts, NvkeOperation
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
 CURSOR_SALT = "nvke.operator.install-plan.page.v1"
@@ -125,7 +125,10 @@ def prepare(*, body, **review):
                     "CONFLICT", "This plan identity already identifies another preparation intent"
                 )
         else:
-            if NvkeOperation.all_objects.filter(guid=plan_id).exists():
+            if (
+                NvkeOperation.all_objects.filter(guid=plan_id).exists()
+                or NvkeInstallPlanCharts.all_objects.filter(guid=plan_id).exists()
+            ):
                 raise NvkeError("CONFLICT", "This identity already identifies an operator operation")
             sealed = encrypt_at_rest(outbox.canonical(body))
             try:

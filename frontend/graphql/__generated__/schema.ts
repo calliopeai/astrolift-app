@@ -10082,6 +10082,7 @@ export type Mutation = {
   prepareConversationTransfer: AstroliftConversationTransferMutationResult;
   prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   prepareNvkeOperatorInstallPlan: NvkeOperatorInstallPlanTypeMutationResult;
+  prepareNvkeOperatorInstallPlanCharts: NvkeOperatorInstallPlanChartsTypeMutationResult;
   previewManagedServiceMatch: ManagedServiceMatchPlanPayloadMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
@@ -10115,6 +10116,7 @@ export type Mutation = {
   /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
   reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
+  recoverNvkeOperatorInstallPlanChartsPreparation: NvkeOperatorInstallPlanChartsTypeMutationResult;
   recoverNvkeOperatorInstallPlanPreparation: NvkeOperatorInstallPlanTypeMutationResult;
   redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
@@ -10191,6 +10193,7 @@ export type Mutation = {
   revealProjectBundleSecretValue: AstroliftSecretBundleRevealMutationResult;
   reviewNvkeOperatorInstall: NvkeOperatorInstallReviewTypeMutationResult;
   reviewNvkeOperatorInstallPlan: NvkeOperatorInstallPlanTypeMutationResult;
+  reviewNvkeOperatorInstallPlanCharts: NvkeOperatorInstallPlanChartsTypeMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeAstroliftSession: AstroliftRevokeAstroliftSessionPayloadMutationResult;
@@ -11587,6 +11590,11 @@ export type MutationPrepareNvkeOperatorInstallPlanArgs = {
 };
 
 
+export type MutationPrepareNvkeOperatorInstallPlanChartsArgs = {
+  input: PrepareNvkeOperatorInstallPlanChartsInput;
+};
+
+
 export type MutationPreviewManagedServiceMatchArgs = {
   input: MatchManagedServicesInput;
 };
@@ -11723,6 +11731,11 @@ export type MutationReconcileWorkflowScheduleArgs = {
 
 export type MutationRecordClusterBootstrapRunArgs = {
   input: RecordClusterBootstrapRunInput;
+};
+
+
+export type MutationRecoverNvkeOperatorInstallPlanChartsPreparationArgs = {
+  input: NvkeOperatorInstallPlanChartsReviewInput;
 };
 
 
@@ -12096,6 +12109,11 @@ export type MutationReviewNvkeOperatorInstallArgs = {
 
 export type MutationReviewNvkeOperatorInstallPlanArgs = {
   input: NvkeOperatorInstallPlanReviewInput;
+};
+
+
+export type MutationReviewNvkeOperatorInstallPlanChartsArgs = {
+  input: NvkeOperatorInstallPlanChartsReviewInput;
 };
 
 
@@ -13574,6 +13592,45 @@ export type NvkeOperatorInstallEvidenceType = {
   stdoutSha256: Scalars['String']['output'];
 };
 
+export type NvkeOperatorInstallPlanChartsReviewInput = {
+  artifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+};
+
+export type NvkeOperatorInstallPlanChartsType = {
+  artifactDigest: Scalars['String']['output'];
+  authorityId: Scalars['GUID']['output'];
+  authorityVersion: Scalars['Int']['output'];
+  bytes: Scalars['String']['output'];
+  chartCount: Scalars['Int']['output'];
+  continuationAuthorized: Scalars['Boolean']['output'];
+  executionState: Scalars['String']['output'];
+  expandedBytes: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  planDigest: Scalars['String']['output'];
+  planId: Scalars['GUID']['output'];
+  planVersion: Scalars['Int']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorInstallPlanChartsTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanChartsType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeOperatorInstallPlanHeaderType = {
   continuationAuthorized: Scalars['Boolean']['output'];
   firstRemainingOrdinal: Scalars['Int']['output'];
@@ -14169,6 +14226,18 @@ export type PrepareConversationTransferInput = {
   envelopeSha256: Scalars['String']['input'];
   environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
   record: Scalars['JSON']['input'];
+};
+
+export type PrepareNvkeOperatorInstallPlanChartsInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  requestText: Scalars['String']['input'];
 };
 
 export type PrepareNvkeOperatorInstallPlanInput = {
