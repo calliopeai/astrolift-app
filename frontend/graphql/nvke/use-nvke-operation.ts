@@ -31,6 +31,7 @@ import { useNvkeProviders } from "./use-nvke-providers";
 import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
 import { useNvkeInstallPlan } from "./use-nvke-install-plan";
+import { useNvkeInstallPlanCharts } from "./use-nvke-install-plan-charts";
 import { useNvkeOperatorInstallReview } from "./use-nvke-operator-install-review";
 import { useNvkeOperatorJob } from "./use-nvke-operator-job";
 import { useNvkeWorkloadAccess } from "./use-nvke-workload-access";
@@ -194,6 +195,15 @@ export const useNvkeOperation = (
       operatorInstallReview?.pending
     ),
   });
+  const operatorInstallPlanCharts = useNvkeInstallPlanCharts({
+    context,
+    source: operatorInstallPlan,
+    pending: Boolean(
+      (mutation?.key === visitKey && mutation.pending) ||
+      operatorJob?.pending ||
+      operatorInstallReview?.pending
+    ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -203,6 +213,7 @@ export const useNvkeOperation = (
       operatorJob?.pending ||
       operatorInstallReview?.pending ||
       operatorInstallPlan?.pending ||
+      operatorInstallPlanCharts?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -251,6 +262,7 @@ export const useNvkeOperation = (
     operatorJob,
     operatorInstallReview,
     operatorInstallPlan,
+    operatorInstallPlanCharts,
     diagnostics,
     maintenance,
     credentials,
@@ -264,7 +276,10 @@ export const useNvkeOperation = (
     pending:
       (mutation?.key === visitKey && mutation.pending) ||
       Boolean(
-        operatorJob?.pending || operatorInstallReview?.pending || operatorInstallPlan?.pending
+        operatorJob?.pending ||
+        operatorInstallReview?.pending ||
+        operatorInstallPlan?.pending ||
+        operatorInstallPlanCharts?.pending
       ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
@@ -279,6 +294,7 @@ export const useNvkeOperation = (
         operatorJob?.pending ||
         operatorInstallReview?.pending ||
         operatorInstallPlan?.pending ||
+        operatorInstallPlanCharts?.pending ||
         !operation
       )
         return;

@@ -443,7 +443,9 @@ Prepared chart IDs are also reserved against new plan preparation. The original
 uncertain operation, parent plan, native guard and native admission remain intact.
 
 GraphQL schema files and frontend generated types/documents include the three
-chart operations. No chart operation screen or browser recovery UI is wired yet.
+chart operations. The operation screen now wires the chart panel through a
+separate hook and browser recovery journal; live API/browser qualification remains
+open.
 
 
 The compiled CLI now exposes `agent install-plan charts prepare`, `review` and
@@ -475,6 +477,33 @@ precision. It hides stale results, retains the UUID after an ambiguous response
 and exposes explicit review/retry callbacks. It does not fetch data or authorize
 continuation. Local qualification passed 72 focused protocol/panel/story tests
 and all 15 Chromium story scenarios, with desktop and 768px layouts visually
-reviewed. The added locale rendering test and current type/lint gate were pending
-at checkpoint creation. Durable browser recovery journaling, the GraphQL hook,
-operation-screen wiring and browser/API integration remain to be implemented.
+reviewed. The eight locale rendering cases also passed. The panel checkpoint type/lint
+gate passed before the later hook and screen integration changes.
+
+
+Chart recovery now journals the complete current actor/source and parent
+plan ID/version/digest, the artifact UUID and the exact deterministic request
+hash. It stores no request options or private body. Preparation verifies durable
+readback under the same operation-scoped browser lock used by parent plan
+preparation. An explicit failed review permits re-entering the exact original
+settings; changed settings cannot reach the API under the retained UUID. Read-only
+inspection remains available without browser storage or lock support. Selecting
+a different artifact preserves earlier per-ID intent journals.
+
+The hook discards late replies after source, actor, parent or visit changes and
+keeps the new visit busy until an earlier request settles. The operation screen
+includes the panel and gates its controls with current permission and operation
+busy/error state. Two controlled Chromium recovery scenarios passed for reply
+loss before and after server retention, checking journal-before-call, identical
+request hashes, explicit read recovery and no request options in local storage.
+Local checks passed 48 hook/parent-regression/story cases, four journal cases
+and 17 operation-screen interaction cases. Targeted ESLint and fixture Ruff
+checks passed. These controlled Apollo
+peers do not qualify the real browser/API or deployed retained Linux path. The
+current full TypeScript and PostgreSQL/real Helm/mTLS gates remain pending.
+
+The initial database run's single setup failure was a test-agent startup race:
+`identity.json` existed before JSON was completely written. The owned-agent test
+fixture now waits for parseable identity data within the existing startup
+deadline, then still requires successful mTLS identity verification. The final
+API suite is rerunning against the migrated isolated PostgreSQL database.

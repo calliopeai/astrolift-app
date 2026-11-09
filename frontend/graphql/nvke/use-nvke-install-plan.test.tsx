@@ -448,7 +448,7 @@ it("checks selection again after acquiring a contended cross-tab lock", async ()
   expect(h.calls).toHaveLength(0);
 });
 it("keeps read-only inspection available when browser storage is blocked", async () => {
-  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+  vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
     throw new Error("blocked");
   });
   vi.stubGlobal("navigator", {});

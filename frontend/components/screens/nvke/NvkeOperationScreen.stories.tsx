@@ -1,3 +1,4 @@
+import { INSTALL_CHARTS_PROPS } from "./NvkeOperatorInstallPlanChartsPanel.stories";
 import { INSTALL_PLAN_PROPS } from "./NvkeOperatorInstallPlanPanel.stories";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { WORKFLOW_PROPS, WORKFLOW_HISTORY } from "./NvkeWorkflowPanel.stories";
@@ -243,5 +244,20 @@ export const InstallPlanReadOnly: Story = {
     operatorInstallPlan: INSTALL_PLAN_PROPS,
     canAct: false,
     canResume: false,
+  },
+};
+
+export const InstallPlanCharts: Story = {
+  args: {
+    operation: INSTALL_CHARTS_PROPS.operation,
+    operatorInstallPlan: INSTALL_PLAN_PROPS,
+    operatorInstallPlanCharts: INSTALL_CHARTS_PROPS,
+    canResume: false,
+  },
+};
+export const InstallPlanChartsReadOnly: Story = {
+  args: {
+    ...InstallPlanCharts.args,
+    canAct: false,
   },
 };

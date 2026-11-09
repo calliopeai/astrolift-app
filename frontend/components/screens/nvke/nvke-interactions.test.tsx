@@ -8,6 +8,7 @@ import { NvkeNativePanel } from "./NvkeNativePanel";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import { NvkeSitesScreen } from "./NvkeSitesScreen";
 import { NvkeResourceScreen } from "./NvkeResourceScreen";
+import { INSTALL_CHARTS_PROPS } from "./NvkeOperatorInstallPlanChartsPanel.stories";
 import {
   ACTIONS,
   COLLECTION,
@@ -22,6 +23,32 @@ const Context = ({ children }: { children: ReactNode }) => (
   <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
     {children}
   </NextIntlClientProvider>
+);
+
+it.each(["pending", "read-only", "error"])(
+  "blocks chart actions on an operation screen that is %s",
+  (mode) => {
+    const onReview = vi.fn().mockResolvedValue(true);
+    render(
+      <NvkeOperationScreen
+        {...OPERATION_DETAIL}
+        operation={INSTALL_CHARTS_PROPS.operation}
+        operatorInstallPlanCharts={{ ...INSTALL_CHARTS_PROPS, onReview }}
+        pending={mode === "pending"}
+        canAct={mode !== "read-only"}
+        error={mode === "error" ? "Unavailable" : null}
+      />,
+      { wrapper: Context }
+    );
+    const button = screen.getByRole("button", { name: messages.nvke.installCharts.review });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onReview).not.toHaveBeenCalled();
+    if (mode !== "pending")
+      expect(
+        screen.queryByText(INSTALL_CHARTS_PROPS.artifacts!.artifactDigest)
+      ).not.toBeInTheDocument();
+  }
 );
 
 it("shows exact metadata and requires confirmation before downloading a native resource document", async () => {
