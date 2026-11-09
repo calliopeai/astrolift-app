@@ -565,9 +565,11 @@ def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch
             fake = SimpleNamespace(state=state, original=original, body=body, review=args)
             reviewed = graph_review(fake)
             actual = OperatorAgentClient.prepare_install_plan_charts
+            published = threading.Event()
 
             def lose_after_publication(client, *a, **kw):
                 actual(client, *a, **kw)
+                published.set()
                 raise NvkeError(
                     "OPERATOR_UNAVAILABLE", "Deliberately lost application response", ambiguous=True
                 )
@@ -592,6 +594,7 @@ def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch
             )
             response = execute(state.world, query, {"v": {**reviewed, "requestText": json.dumps(body)}})
             assert response.errors is None and not response.data["prepareNvkeOperatorInstallPlanCharts"]["ok"]
+            assert published.is_set(), "Preparation did not reach the deliberate lost-reply boundary"
             assert NvkeInstallPlanCharts.objects.get(guid=artifact_id).status == "preparing"
             assert repository.requests.count("/nktp-1.0.0.tgz") == (1 if chart_source == "http" else 0)
             requests = list(repository.requests)

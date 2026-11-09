@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "scope": "durable-execution-tree-api-and-browser-contracts-local-qualification",
+  "applicationBaseRevision": "05ba21348cf2e6722603b85606e9c3b0433b7fcc",
+  "opscodeRevision": "b0f9d26dd5467d97eef92d6d728dca33e0bf5777",
+  "cliProtocolRevision": "c641f4c010d1cc5783b49d9590d572b9aaddf93c",
+  "sourceSha256": {
+    "backend/astrolift_clusters/models/nvke.py": "410530c1345c710c1418e5f7023b6c0af36462ce1ac8e6b4a509346e90d204d0",
+    "backend/astrolift_clusters/models/__init__.py": "f398d9a24d41a5e84eec12c82511df3eab344364e2e4b0bcba8427dbcccd62b8",
+    "backend/astrolift_clusters/migrations/0040_nvke_install_plan_tree.py": "3bc0fe97a76515fc1ee362a59cdf5ed79e00c70c72f59154bea835d67e9618ca",
+    "backend/astrolift_clusters/nvke_install_plan_trees.py": "8536193f2b1df82f69156b66d1a6d1f653e9dd56cc36512b2829c9a739281294",
+    "backend/astrolift_clusters/nvke_install_plan_charts.py": "8e20163adab048aaa1764b4f11de70d9fa087d4ed5654bb2e7ad903f4ca46d60",
+    "backend/astrolift_clusters/nvke_install_plans.py": "86021f851f05723d96d44948c90fafbb07941c6183d52e2dd989771d85a4bdd0",
+    "backend/astrolift_clusters/schema/nvke_install_plan_trees.py": "3da8cd887a955b561c0281721f057aff27c247505d8ddbf3a41b55303aa96bd1",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_trees.py": "da234da21ef169f44fd58d62437a63bf449d3d4012a036962ad4b0bb4810fc49",
+    "backend/astrolift_clusters/tests/test_nvke_install_artifact_integrity.py": "991bd2c1b53dbd25779385a5ecefbbfe6e549523aa5821375cdf0d298a4b53fe",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_charts.py": "5065b904430132f52df358dafeced03a883a7e55328513ec98636c7e97199397",
+    "backend/core/schema/audit.py": "d029b26d5c9554bd91662896fa7b0760d2870382c3f5cee0b9b4522e9ff616f7",
+    "backend/schema.graphql": "144dea81dde5f0382a5bc2134fd28c2925213b81110e0323068e5c35f8f58520",
+    "frontend/schema.graphql": "144dea81dde5f0382a5bc2134fd28c2925213b81110e0323068e5c35f8f58520",
+    "frontend/graphql/nvke/nvke-install-plan-tree.mutations.ts": "6bb3674a61be7054472982c8ca3adce98b43a145f5066bf8848233bc576c55bf",
+    "frontend/graphql/nvke/nvke-install-plan-tree.queries.ts": "a42a8653d3e4520b2027db07d7866f3796e255c3076f0dac1f0503869bfde0c4",
+    "frontend/lib/nvke/operator-install-plan-tree.ts": "a949d9ad0c3491bbb07881b14353d1829458808368b0b75068c69fd7c349b153",
+    "frontend/lib/nvke/operator-install-plan-tree.test.ts": "5111b95399a5c75923149c99a6c89b8f585643665752a85a02ad44e3d512ed80",
+    "frontend/lib/nvke/install-plan-tree-recovery.ts": "55193d42b7dd05e7261a976ff7eae0e412ff5021eaec3f9296322c23d5de9b46",
+    "frontend/lib/nvke/install-plan-tree-recovery.test.ts": "00d4adda2afb49ccf8099eae3ed69aa2f86c6c97f5e7680ed2ceae2d3f242127"
+  },
+  "checks": {
+    "postgres": {
+      "exitCode": 0,
+      "logSha256": "e1a9a48431c936e028a661850174ce8cc1febf657dcf9118cc86a1b15a9f4a80",
+      "passed": 89,
+      "skipped": 0
+    },
+    "browser": {
+      "exitCode": 0,
+      "logSha256": "0a8c027bf72e04834da3216a641e146096d0567e907eb74223cd970e696726db",
+      "passed": 91,
+      "eslint": "passed",
+      "fullTypecheck": "passed"
+    },
+    "schemaAndMigrations": {
+      "exitCode": 0,
+      "logSha256": "e13b4f6dd3ef8c28d1ba2e557b693df1eb2a0a1202fcc1472b69f2649e124283"
+    },
+    "cliOperationsAgainstExportedSchema": 3
+  },
+  "evidence": [
+    "Encrypted immutable tree intent is committed in PostgreSQL before adapter I/O. Typed GraphQL preparation, public read recovery and original-caller/token private retry preserve the exact original, plan, chart and authority binding.",
+    "Current permission/source revocation, malformed/private/over-budget/authorizing replies, cross-kind UUID reuse, deleted preparations and changed parent/chart publications are refused. Audit redaction covers aliases and denied callers.",
+    "Fresh locked intent validation refuses midflight corruption of digest, ciphertext, encryption backend or creator for chart and tree publication, leaving rows preparing with no public summary (eight regression cases).",
+    "Browser contracts preserve int64 decimal strings and validate both publications, complete source tuples, file/byte lower bounds and explicit budgets. Metadata-only journals bind actor/server/tenant and exact input SHA, isolate chart selections, refuse changed source/input and verify durable storage readback.",
+    "Existing real chart GraphQL/PostgreSQL/SDK/mTLS/Helm cases pass, including cold same-endpoint recovery. The lost-reply fixture now proves successful adapter publication before deliberately discarding its result."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "Tree database cases use a controlled SDK adapter. Combined compiled CLI/ASGI/PostgreSQL/mTLS tree qualification is a separate pending check; the SDK real-tree wire scenario is recorded separately.",
+    "Browser tree panel, hooks, eight-locale UI and actual browser/API qualification remain pending. These checks qualify browser protocol/storage utilities only.",
+    "Native template/Kustomize rendering, image closure/private registry policy, fresh skipped-resource/credential proof, remaining-only selection and linked once-only execution remain open.",
+    "No retained Linux continuation, original native replay, VM restart, main merge or production deployment."
+  ]
+}

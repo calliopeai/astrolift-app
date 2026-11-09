@@ -95,6 +95,7 @@ _mutation_bases = [
     AstroliftClustersSchema.NvkeOperatorMutation,
     AstroliftClustersSchema.NvkeInstallPlanMutation,
     AstroliftClustersSchema.NvkeInstallPlanChartsMutation,
+    AstroliftClustersSchema.NvkeInstallPlanTreeMutation,
     AstroliftLifecycleSchema.LifecycleMutation,
     AstroliftScmSchema.ScmMutation,
     AstroliftServicesSchema.ServicesMutation,

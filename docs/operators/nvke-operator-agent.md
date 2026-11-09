@@ -550,3 +550,29 @@ Kubernetes GETs. Source/log identities are recorded in
 Durable application tree API, compiled CLI and actual browser/API qualification,
 native rendering/image closure, fresh skipped-resource proof and linked native
 execution remain required.
+
+
+The durable tree API now reserves `NvkeInstallPlanTree` with encrypted immutable
+intent before agent I/O. Its prepare, review and explicit recovery mutations bind
+the exact prepared chart UUID/version/digest in addition to the plan and original
+source. Public recovery rechecks current administrative authority; private retry
+requires the original caller/token. Fresh locked chart/tree rows must still decrypt
+and match their retained intent and creator before a reply can publish metadata.
+
+The local PostgreSQL suite passed 89 cases without skips, including eight cases
+that corrupt a retained intent during adapter I/O. Schema/migration drift checks
+passed. Browser contract/storage utilities passed 91 cases, ESLint and full
+TypeScript checking. They preserve decimal byte strings and metadata-only journals
+bound to both publications. These are utility checks; the tree panel and actual
+browser/API behavior remain pending. Source/log hashes and scope are recorded in
+`backend/providers/nvke/qualification/install-plan-tree-api-local.json`.
+
+CLI `c641f4c010d1cc5783b49d9590d572b9aaddf93c` adds
+`agent install-plan tree prepare|review|retry-preparation`. Supply the exact
+`--chart-artifact`, `--chart-artifact-version` and `--chart-artifact-digest` as well
+as the plan/source flags and distinct `--artifact` tree UUID. Preparation also
+requires a private `--file` and metadata-only `--request-file` journal. The body
+contains format, the exact source identifiers/digests and `maximumBytes`; see
+the CLI README for its exact seven fields. Local CLI tests, vet, lint and build
+passed. Combined CLI/API/agent tree recovery is a separate pending qualification.
+The tree still cannot authorize or dispatch native continuation.

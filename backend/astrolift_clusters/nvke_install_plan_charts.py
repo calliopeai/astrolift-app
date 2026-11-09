@@ -14,7 +14,12 @@ from nvke.operator_contract import ContractError
 from astrolift_clusters import nvke_install_plans as plans
 from astrolift_clusters import nvke_operations as outbox
 from astrolift_clusters import nvke_operator_authority as authority
-from astrolift_clusters.models import NvkeInstallPlan, NvkeInstallPlanCharts, NvkeOperation
+from astrolift_clusters.models import (
+    NvkeInstallPlan,
+    NvkeInstallPlanCharts,
+    NvkeInstallPlanTree,
+    NvkeOperation,
+)
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 
 
@@ -83,7 +88,8 @@ def _body(row, parent):
         body = json.loads(decrypt(EncryptedSecret(row.input_backend_kind, bytes(row.input_ciphertext))))
         body = protocol.request(body, job_id=str(parent.original_operation.guid), read_only=False)
         if (
-            body["artifactId"] != str(row.guid)
+            row.actor_id != row.source_binding["actor"]
+            or body["artifactId"] != str(row.guid)
             or body["planId"] != str(parent.guid)
             or body["planDigest"] != row.source_binding["plan_digest"]
             or not hmac.compare_digest(_digest(row.source_binding, body), row.request_digest)
@@ -156,6 +162,7 @@ def prepare(*, body, plan_id, expected_plan_version, plan_digest, **review):
             if (
                 NvkeOperation.all_objects.filter(guid=artifact_id).exists()
                 or NvkeInstallPlan.all_objects.filter(guid=artifact_id).exists()
+                or NvkeInstallPlanTree.all_objects.filter(guid=artifact_id).exists()
             ):
                 raise NvkeError("CONFLICT", "This identity already identifies another operation or plan")
             sealed = encrypt_at_rest(outbox.canonical(body))
@@ -195,6 +202,7 @@ def _publish(artifact_id, result, plan_id, expected_plan_version, plan_digest, r
         NvkeInstallPlan.objects.select_for_update().get(pk=parent.pk)
         checkpoint()
         row = _retained(artifact_id, parent, binding, locked=True)
+        _body(row, parent)
         if row.status == "prepared":
             if row.summary != result:
                 raise NvkeError("SOURCE_CHANGED", "The immutable chart-artifact summary changed")
