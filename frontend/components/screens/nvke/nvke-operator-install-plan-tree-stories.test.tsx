@@ -5,6 +5,7 @@ import * as preview from "@/.storybook/preview";
 import * as module from "./NvkeOperatorInstallPlanTreePanel.stories";
 
 import * as operation from "./NvkeOperationScreen.stories";
+import * as api from "./NvkeOperatorInstallPlanTreePanel.api.stories";
 import * as recovery from "./NvkeOperatorInstallPlanTreePanel.integration.stories";
 setProjectAnnotations(preview);
 const stories = [
@@ -13,6 +14,7 @@ const stories = [
     name.startsWith("InstallPlanTree")
   ),
   ...Object.entries(composeStories(recovery)),
+  ...Object.entries(composeStories(api)),
 ];
 describe("chart artifact stories", () => {
   it.each(stories)("%s renders", async (_name, Story) => {

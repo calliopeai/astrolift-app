@@ -613,3 +613,33 @@ compiled CLI/API/mTLS path. Native rendering, image closure, fresh resource and
 credential proof, remaining-only selection and linked execution remain open;
 no tree control authorizes continuation. The retained Linux lab remains
 unreachable on its SSH, Kubernetes and operator endpoints.
+
+
+The tree panel/hook now also has actual browser/API/agent recovery evidence.
+Chromium runs the production-built static Storybook catalog against the owned
+ASGI/PostgreSQL API and mTLS native agent. A private forwarding driver supplies
+its scoped bearer token without injecting it into the page. Deliberately dropping
+a successful preparation response leaves one prepared tree; UI review and
+original-token private retry recover identical digest/decimal bytes without a
+new attempt. The browser journal is persisted before the mutation and stores
+neither raw request options nor authentication. Original operation/plan/chart
+rows, native receipt, install guard, runs and linked reservations remain unchanged.
+The selected CLI binary is hash-checked before and after the qualified case.
+
+The actual static-browser case passed without skips/page errors, alongside 43
+targeted story/hook cases, full typechecking, lint/format checks and the production
+Storybook build. Evidence and exact source/catalog hashes are recorded in
+`backend/providers/nvke/qualification/install-plan-tree-browser-api-local.json`;
+the cross-repository driver is published at CLI
+`4de57628c32d92952ea4b2d587cfd30fb02bd45b`. This proves the panel’s real API
+mutations with owned metadata and private bearer forwarding, not authenticated
+Next.js route/login or automatic source/access discovery. The retained Linux lab
+and complete native closure/continuation remain unqualified.
+
+Opscode `7a087fded94bce88026afb18f66ba4a085a7dd03` separately adds a bounded
+pinned native BootstrapConfig template-rendering primitive. Ten cases include
+direct native parity, UTF-8/static-copy output budgets and changed-and-restored
+input refusal. It is not yet wired into sealed tree publication; runtime tree
+capabilities/state remain unchanged. Kustomize/Helm manifest freezing, verified
+images/private registry policy, fresh resource/credential proof, remaining-only
+selection and linked native execution are still required.

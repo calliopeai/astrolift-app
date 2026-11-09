@@ -1,0 +1,62 @@
+{
+  "format": 1,
+  "scope": "actual-browser-static-storybook-graphql-postgresql-mtls-tree-recovery-local-qualification",
+  "applicationBaseRevision": "6bc559f65e0c9d06a70424357e2d2394dfa9141e",
+  "cliQualificationRevision": "4de57628c32d92952ea4b2d587cfd30fb02bd45b",
+  "opscodeRuntimeSourceRevision": "b0f9d26dd5467d97eef92d6d728dca33e0bf5777",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.api.stories.tsx": "2f2310fcf38cb37db8dae41173b7c133a428b83ef9d642cbea1710cfd97beadb",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-tree-stories.test.tsx": "241b9da8377bf97dad47f9bf93e711c1954fcf9006ba1c116957bbf1ce30cb5f",
+    "frontend/e2e/nvke-install-plan-tree-api-runner.mjs": "febc6d7e19002891df182025f885d92c3574c1b8af996ceb309deef06b2ec54f"
+  },
+  "cliQualificationSourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "e05439a0e98a6a6ae7e3fad811a7d98ed2459fa7d4890c9ebda669e52ad7c269",
+    "scripts/integration/tree_browser_qualification.py": "4fe138d11e0b9d9244afc7d1c1405bdd8f928ea52c033f410dfbba4dc6119df8"
+  },
+  "checks": {
+    "actualBrowserApi": {
+      "exitCode": 0,
+      "logSha256": "81262358b7894816a2c7d39e1213c58a5fea15d84e146f482cde1f127026898c",
+      "passed": 1,
+      "skipped": 0,
+      "deselected": 1,
+      "pageErrors": 0
+    },
+    "frontendStoriesAndBuild": {
+      "exitCode": 0,
+      "logSha256": "c9dade6c19b09321a79d73bce1f0e279a8b100e5070ca6d80bd7eed214069cba",
+      "passed": 43,
+      "files": 2,
+      "storybookBuild": "passed",
+      "eslint": "passed"
+    },
+    "fullTypesAndFormat": {
+      "exitCode": 0,
+      "logSha256": "f9163dcd42d032582daea2e724d32bf84f09451a707d3654dad0500df6e6159b"
+    },
+    "lintAndInitialTypes": {
+      "exitCode": 0,
+      "logSha256": "f9163dcd42d032582daea2e724d32bf84f09451a707d3654dad0500df6e6159b"
+    }
+  },
+  "staticCatalog": {
+    "files": 1421,
+    "treeSha256": "241ab54963481ec7e5931a91321c37ba17ec541370c27715cdb45696a82a3c81",
+    "algorithm": "sha256 of canonical sorted relative-path to file-sha256 JSON map"
+  },
+  "evidence": [
+    "Actual Chromium runs the production-built tree panel/hook and forwards real GraphQL requests to the owned ASGI/PostgreSQL API and mTLS operator with actual Helm 4. Source/access metadata is supplied by the owned fixture, not a mocked GraphQL result.",
+    "The driver discards a successful preparation response. UI review and explicit original-token private retry recover the same prepared tree digest/decimal bytes, with one native tree attempt and no automatic replay.",
+    "The browser journal is durable before preparation and binds the exact private input hash. Review/retry send no new private body. Neither raw options/request text nor the bearer token reach browser storage; authentication stays in the private forwarding driver.",
+    "The common native fixture preserves original operation/plan/chart rows, native receipt, install guard, run membership and linked reservations. It also covers compiled CLI cold same-endpoint/instance recovery. The binary hash remains unchanged throughout the qualified browser case.",
+    "Full TypeScript checking, changed-file ESLint/formatting, 43 targeted story/hook cases and the complete production Storybook build pass."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "Owned Storybook metadata injection and private bearer forwarding do not qualify authenticated Next.js login/routes or automatic access/source discovery.",
+    "Native failed receipt/deployment and Kubernetes GETs are controlled fixtures, not retained Linux installation proof. This scenario explicitly configures the supported 300-second agent timeout.",
+    "Native template-rendering primitive integration, Kustomize/Helm manifest freezing, image/private registry closure, fresh skipped-resource/credential proof, remaining-only selection and linked execution remain open.",
+    "No retained VM restart, original native replay, main merge or production deployment."
+  ]
+}
