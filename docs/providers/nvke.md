@@ -213,7 +213,7 @@ Each family retains the complete required behavior. Local tooling is distinct fr
 | Site specs | Generate, inspect, validate and dry-run the complete spec; report field errors without secrets | Pinned generate/inspect/validate/dry-run tooling with Astro API/outbox and remote CLI envelope/recovery/private artifacts | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [native-linux-utilities](#evidence-native-linux-utilities), [operator-agent-contract](#evidence-operator-agent-contract), [operator-agent](#evidence-operator-agent), [operator-agent-tests](#evidence-operator-agent-tests), [operator-agent-local](#evidence-operator-agent-local), [operator-sdk](#evidence-operator-sdk), [operator-sdk-tests](#evidence-operator-sdk-tests), [operator-authority](#evidence-operator-authority), [operator-runtime](#evidence-operator-runtime), [operator-api](#evidence-operator-api), [operator-api-tests](#evidence-operator-api-tests), [operator-api-local](#evidence-operator-api-local), [operator-cli-authority](#evidence-operator-cli-authority), [operator-cli-request](#evidence-operator-cli-request), [operator-cli-artifact](#evidence-operator-cli-artifact), [operator-cli-tests](#evidence-operator-cli-tests), [operator-cli-redirect-tests](#evidence-operator-cli-redirect-tests), [operator-cli-paired](#evidence-operator-cli-paired), [operator-cli-local](#evidence-operator-cli-local), [operator-workbench-ui](#evidence-operator-workbench-ui), [operator-workbench-hook](#evidence-operator-workbench-hook), [operator-workbench-ui-tests](#evidence-operator-workbench-ui-tests), [operator-workbench-hook-tests](#evidence-operator-workbench-hook-tests), [operator-workbench-contract](#evidence-operator-workbench-contract), [operator-workbench-browser](#evidence-operator-workbench-browser), [operator-workbench-local](#evidence-operator-workbench-local), [operator-job-page](#evidence-operator-job-page), [operator-job-absence-fence](#evidence-operator-job-absence-fence), [operator-job-ui](#evidence-operator-job-ui), [operator-job-hook](#evidence-operator-job-hook), [operator-job-hook-tests](#evidence-operator-job-hook-tests), [operator-artifact-browser](#evidence-operator-artifact-browser), [operator-artifact-browser-tests](#evidence-operator-artifact-browser-tests), [operator-job-browser](#evidence-operator-job-browser), [operator-job-ui-local](#evidence-operator-job-ui-local), [operator-stop-sdk-tests](#evidence-operator-stop-sdk-tests), [operator-stop-browser](#evidence-operator-stop-browser), [operator-stop-ui-local](#evidence-operator-stop-ui-local), [operator-agent-linux-prerequisites](#evidence-operator-agent-linux-prerequisites), [operator-agent-bootstrap-native](#evidence-operator-agent-bootstrap-native), [operator-agent-bootstrap-local](#evidence-operator-agent-bootstrap-local). Remaining: Actual native generation/private export and original recovery are locally qualified through compiled CLI/browser; the generated site spec also drove one successful agent-mediated Linux bootstrap. Remaining command-family effects, management install/access and deployed acceptance remain pending (#96). |
 | Deployment rendering | Inspect Helm values and stack config; render pinned deploy path and release inputs | Pinned native deploy-path, stack/values inspection and management install planning | **partial** — [tooling-source](#evidence-tooling-source), [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [native-management-base](#evidence-native-management-base), [management-api-profile](#evidence-management-api-profile), [management-api-profile-tests](#evidence-management-api-profile-tests), [cli-management-api-profile](#evidence-cli-management-api-profile), [cli-management-api-profile-test](#evidence-cli-management-api-profile-test), [cli-management-api-qualified](#evidence-cli-management-api-qualified), [management-controller-profile](#evidence-management-controller-profile), [management-controller-profile-tests](#evidence-management-controller-profile-tests), [cli-management-controller-profile](#evidence-cli-management-controller-profile), [cli-management-controller-test](#evidence-cli-management-controller-test), [cli-management-controller-qualified](#evidence-cli-management-controller-qualified), [operator-agent-contract](#evidence-operator-agent-contract), [operator-agent](#evidence-operator-agent), [operator-agent-tests](#evidence-operator-agent-tests), [operator-agent-local](#evidence-operator-agent-local), [operator-sdk](#evidence-operator-sdk), [operator-sdk-tests](#evidence-operator-sdk-tests), [operator-authority](#evidence-operator-authority), [operator-runtime](#evidence-operator-runtime), [operator-api](#evidence-operator-api), [operator-api-tests](#evidence-operator-api-tests), [operator-api-local](#evidence-operator-api-local), [operator-cli-authority](#evidence-operator-cli-authority), [operator-cli-request](#evidence-operator-cli-request), [operator-cli-artifact](#evidence-operator-cli-artifact), [operator-cli-tests](#evidence-operator-cli-tests), [operator-cli-redirect-tests](#evidence-operator-cli-redirect-tests), [operator-cli-paired](#evidence-operator-cli-paired), [operator-cli-local](#evidence-operator-cli-local), [operator-workbench-ui](#evidence-operator-workbench-ui), [operator-workbench-hook](#evidence-operator-workbench-hook), [operator-workbench-ui-tests](#evidence-operator-workbench-ui-tests), [operator-workbench-hook-tests](#evidence-operator-workbench-hook-tests), [operator-workbench-contract](#evidence-operator-workbench-contract), [operator-workbench-browser](#evidence-operator-workbench-browser), [operator-workbench-local](#evidence-operator-workbench-local), [operator-job-page](#evidence-operator-job-page), [operator-job-absence-fence](#evidence-operator-job-absence-fence), [operator-job-ui](#evidence-operator-job-ui), [operator-job-hook](#evidence-operator-job-hook), [operator-job-hook-tests](#evidence-operator-job-hook-tests), [operator-artifact-browser](#evidence-operator-artifact-browser), [operator-artifact-browser-tests](#evidence-operator-artifact-browser-tests), [operator-job-browser](#evidence-operator-job-browser), [operator-job-ui-local](#evidence-operator-job-ui-local). Remaining: Native option forwarding exists; per-render-family and release supply-chain qualification remains incomplete. |
 | Bootstrap | Ephemeral seed, pre-provisioned/NICo path, timeout/progress/diagnostics, kubeconfig and encryption-key outputs | Pinned bootstrap/attempt guard with site-bound mTLS agent and reviewed Astro API/outbox/remote CLI admission | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [native-bootstrap-local](#evidence-native-bootstrap-local), [native-bootstrap-checker](#evidence-native-bootstrap-checker), [native-bootstrap-checker-tests](#evidence-native-bootstrap-checker-tests), [operator-agent-contract](#evidence-operator-agent-contract), [operator-agent](#evidence-operator-agent), [operator-agent-tests](#evidence-operator-agent-tests), [operator-agent-local](#evidence-operator-agent-local), [operator-sdk](#evidence-operator-sdk), [operator-sdk-tests](#evidence-operator-sdk-tests), [operator-authority](#evidence-operator-authority), [operator-runtime](#evidence-operator-runtime), [operator-api](#evidence-operator-api), [operator-api-tests](#evidence-operator-api-tests), [operator-api-local](#evidence-operator-api-local), [operator-cli-authority](#evidence-operator-cli-authority), [operator-cli-request](#evidence-operator-cli-request), [operator-cli-artifact](#evidence-operator-cli-artifact), [operator-cli-tests](#evidence-operator-cli-tests), [operator-cli-redirect-tests](#evidence-operator-cli-redirect-tests), [operator-cli-paired](#evidence-operator-cli-paired), [operator-cli-local](#evidence-operator-cli-local), [operator-workbench-ui](#evidence-operator-workbench-ui), [operator-workbench-hook](#evidence-operator-workbench-hook), [operator-workbench-ui-tests](#evidence-operator-workbench-ui-tests), [operator-workbench-hook-tests](#evidence-operator-workbench-hook-tests), [operator-workbench-contract](#evidence-operator-workbench-contract), [operator-workbench-browser](#evidence-operator-workbench-browser), [operator-workbench-local](#evidence-operator-workbench-local), [operator-job-page](#evidence-operator-job-page), [operator-job-absence-fence](#evidence-operator-job-absence-fence), [operator-job-ui](#evidence-operator-job-ui), [operator-job-hook](#evidence-operator-job-hook), [operator-job-hook-tests](#evidence-operator-job-hook-tests), [operator-artifact-browser](#evidence-operator-artifact-browser), [operator-artifact-browser-tests](#evidence-operator-artifact-browser-tests), [operator-job-browser](#evidence-operator-job-browser), [operator-job-ui-local](#evidence-operator-job-ui-local), [operator-stop-sdk-tests](#evidence-operator-stop-sdk-tests), [operator-stop-browser](#evidence-operator-stop-browser), [operator-stop-ui-local](#evidence-operator-stop-ui-local), [operator-agent-linux-prerequisites](#evidence-operator-agent-linux-prerequisites), [operator-agent-bootstrap-native](#evidence-operator-agent-bootstrap-native), [operator-agent-bootstrap-local](#evidence-operator-agent-bootstrap-local), [operator-watch-recovery](#evidence-operator-watch-recovery), [operator-watch-tests](#evidence-operator-watch-tests). Remaining: Direct-runner and actual agent-driven Linux bootstrap/readiness are locally qualified, with one original hosted admission and private output export. The original watcher failed generically and was recovered read-only. Agent-driven management install/access, production artifact verification, physical providers and deployed acceptance remain pending (#96; CLI #212). |
-| Installation | Ordered CAPI/provider/management-plane install; validate pinned images, versions, storage and network | Pinned management install/check/access with guarded actual local default-stack installation | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [nktp-kind](#evidence-nktp-kind), [native-management-base](#evidence-native-management-base), [management-apis-native](#evidence-management-apis-native), [management-controller-startup-native](#evidence-management-controller-startup-native), [management-engine-declarative-native](#evidence-management-engine-declarative-native), [management-engine-worker-lifecycle-native](#evidence-management-engine-worker-lifecycle-native), [management-engine-cluster-deletion-native](#evidence-management-engine-cluster-deletion-native), [operator-agent-contract](#evidence-operator-agent-contract), [operator-agent](#evidence-operator-agent), [operator-agent-tests](#evidence-operator-agent-tests), [operator-agent-local](#evidence-operator-agent-local), [operator-sdk](#evidence-operator-sdk), [operator-sdk-tests](#evidence-operator-sdk-tests), [operator-authority](#evidence-operator-authority), [operator-runtime](#evidence-operator-runtime), [operator-api](#evidence-operator-api), [operator-api-tests](#evidence-operator-api-tests), [operator-api-local](#evidence-operator-api-local), [operator-cli-authority](#evidence-operator-cli-authority), [operator-cli-request](#evidence-operator-cli-request), [operator-cli-artifact](#evidence-operator-cli-artifact), [operator-cli-tests](#evidence-operator-cli-tests), [operator-cli-redirect-tests](#evidence-operator-cli-redirect-tests), [operator-cli-paired](#evidence-operator-cli-paired), [operator-cli-local](#evidence-operator-cli-local), [operator-workbench-ui](#evidence-operator-workbench-ui), [operator-workbench-hook](#evidence-operator-workbench-hook), [operator-workbench-ui-tests](#evidence-operator-workbench-ui-tests), [operator-workbench-hook-tests](#evidence-operator-workbench-hook-tests), [operator-workbench-contract](#evidence-operator-workbench-contract), [operator-workbench-browser](#evidence-operator-workbench-browser), [operator-workbench-local](#evidence-operator-workbench-local), [operator-job-page](#evidence-operator-job-page), [operator-job-absence-fence](#evidence-operator-job-absence-fence), [operator-job-ui](#evidence-operator-job-ui), [operator-job-hook](#evidence-operator-job-hook), [operator-job-hook-tests](#evidence-operator-job-hook-tests), [operator-artifact-browser](#evidence-operator-artifact-browser), [operator-artifact-browser-tests](#evidence-operator-artifact-browser-tests), [operator-job-browser](#evidence-operator-job-browser), [operator-job-ui-local](#evidence-operator-job-ui-local), [operator-stop-sdk-tests](#evidence-operator-stop-sdk-tests), [operator-stop-browser](#evidence-operator-stop-browser), [operator-stop-ui-local](#evidence-operator-stop-ui-local), [operator-watch-recovery](#evidence-operator-watch-recovery), [operator-watch-tests](#evidence-operator-watch-tests), [operator-partial-install-review](#evidence-operator-partial-install-review), [operator-partial-install-tests](#evidence-operator-partial-install-tests), [operator-partial-install-local](#evidence-operator-partial-install-local), [operator-install-review-agent](#evidence-operator-install-review-agent), [operator-install-review-sdk](#evidence-operator-install-review-sdk), [operator-install-review-sdk-tests](#evidence-operator-install-review-sdk-tests), [operator-install-review-local](#evidence-operator-install-review-local), [operator-install-review-api](#evidence-operator-install-review-api), [operator-install-review-api-tests](#evidence-operator-install-review-api-tests), [operator-install-review-cli](#evidence-operator-install-review-cli), [operator-install-review-cli-tests](#evidence-operator-install-review-cli-tests), [operator-install-review-api-cli-local](#evidence-operator-install-review-api-cli-local), [operator-install-review-ui](#evidence-operator-install-review-ui), [operator-install-review-ui-hook](#evidence-operator-install-review-ui-hook), [operator-install-review-ui-tests](#evidence-operator-install-review-ui-tests), [operator-install-review-ui-hook-tests](#evidence-operator-install-review-ui-hook-tests), [operator-install-review-ui-browser](#evidence-operator-install-review-ui-browser), [operator-install-review-ui-local](#evidence-operator-install-review-ui-local), [operator-install-plan-core](#evidence-operator-install-plan-core), [operator-install-plan-core-tests](#evidence-operator-install-plan-core-tests), [operator-install-plan-store](#evidence-operator-install-plan-store), [operator-install-plan-store-tests](#evidence-operator-install-plan-store-tests), [operator-install-plan-storage-local](#evidence-operator-install-plan-storage-local), [operator-install-plan-preparation](#evidence-operator-install-plan-preparation), [operator-install-plan-sdk](#evidence-operator-install-plan-sdk), [operator-install-plan-sdk-tests](#evidence-operator-install-plan-sdk-tests), [operator-install-plan-sdk-tls](#evidence-operator-install-plan-sdk-tls), [operator-install-plan-backend](#evidence-operator-install-plan-backend), [operator-install-plan-model](#evidence-operator-install-plan-model), [operator-install-plan-backend-tests](#evidence-operator-install-plan-backend-tests), [operator-install-plan-api](#evidence-operator-install-plan-api), [operator-install-plan-api-local](#evidence-operator-install-plan-api-local), [operator-install-plan-cli](#evidence-operator-install-plan-cli), [operator-install-plan-cli-api](#evidence-operator-install-plan-cli-api), [operator-install-plan-cli-tests](#evidence-operator-install-plan-cli-tests), [operator-install-plan-cli-local](#evidence-operator-install-plan-cli-local), [operator-install-plan-ui](#evidence-operator-install-plan-ui), [operator-install-plan-ui-hook](#evidence-operator-install-plan-ui-hook), [operator-install-plan-ui-journal](#evidence-operator-install-plan-ui-journal), [operator-install-plan-ui-tests](#evidence-operator-install-plan-ui-tests), [operator-install-plan-ui-browser](#evidence-operator-install-plan-ui-browser), [operator-install-plan-ui-protocol](#evidence-operator-install-plan-ui-protocol), [operator-install-plan-dependencies](#evidence-operator-install-plan-dependencies), [operator-install-plan-dependency-tests](#evidence-operator-install-plan-dependency-tests), [operator-install-plan-dependency-local](#evidence-operator-install-plan-dependency-local), [operator-chart-artifacts-sdk](#evidence-operator-chart-artifacts-sdk), [operator-chart-artifacts-sdk-tests](#evidence-operator-chart-artifacts-sdk-tests), [operator-chart-artifacts-sdk-tls](#evidence-operator-chart-artifacts-sdk-tls), [operator-chart-artifacts-agent](#evidence-operator-chart-artifacts-agent), [operator-chart-artifacts-local](#evidence-operator-chart-artifacts-local), [operator-chart-artifacts-cli](#evidence-operator-chart-artifacts-cli), [operator-chart-artifacts-cli-tests](#evidence-operator-chart-artifacts-cli-tests), [operator-chart-artifacts-cli-api](#evidence-operator-chart-artifacts-cli-api), [operator-chart-artifacts-cli-transport-tests](#evidence-operator-chart-artifacts-cli-transport-tests), [operator-chart-artifacts-api](#evidence-operator-chart-artifacts-api), [operator-chart-artifacts-api-tests](#evidence-operator-chart-artifacts-api-tests), [operator-chart-artifacts-api-local](#evidence-operator-chart-artifacts-api-local), [operator-chart-artifacts-ui](#evidence-operator-chart-artifacts-ui), [operator-chart-artifacts-ui-hook](#evidence-operator-chart-artifacts-ui-hook), [operator-chart-artifacts-ui-journal](#evidence-operator-chart-artifacts-ui-journal), [operator-chart-artifacts-ui-tests](#evidence-operator-chart-artifacts-ui-tests), [operator-chart-artifacts-ui-browser](#evidence-operator-chart-artifacts-ui-browser). Remaining: The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately. A chart-only materialization stage has real Helm/mTLS agent and SDK recovery checks; a durable chart API and real PostgreSQL/GraphQL/SDK/mTLS/Helm recovery are locally qualified and the chart UI has controlled browser recovery checks; combined API-CLI-agent and real browser/API qualification, OCI/private-registry/TLS qualification, complete artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open. |
+| Installation | Ordered CAPI/provider/management-plane install; validate pinned images, versions, storage and network | Pinned management install/check/access with guarded actual local default-stack installation | **partial** — [native-tooling](#evidence-native-tooling), [cli-tooling](#evidence-cli-tooling), [nktp-kind](#evidence-nktp-kind), [native-management-base](#evidence-native-management-base), [management-apis-native](#evidence-management-apis-native), [management-controller-startup-native](#evidence-management-controller-startup-native), [management-engine-declarative-native](#evidence-management-engine-declarative-native), [management-engine-worker-lifecycle-native](#evidence-management-engine-worker-lifecycle-native), [management-engine-cluster-deletion-native](#evidence-management-engine-cluster-deletion-native), [operator-agent-contract](#evidence-operator-agent-contract), [operator-agent](#evidence-operator-agent), [operator-agent-tests](#evidence-operator-agent-tests), [operator-agent-local](#evidence-operator-agent-local), [operator-sdk](#evidence-operator-sdk), [operator-sdk-tests](#evidence-operator-sdk-tests), [operator-authority](#evidence-operator-authority), [operator-runtime](#evidence-operator-runtime), [operator-api](#evidence-operator-api), [operator-api-tests](#evidence-operator-api-tests), [operator-api-local](#evidence-operator-api-local), [operator-cli-authority](#evidence-operator-cli-authority), [operator-cli-request](#evidence-operator-cli-request), [operator-cli-artifact](#evidence-operator-cli-artifact), [operator-cli-tests](#evidence-operator-cli-tests), [operator-cli-redirect-tests](#evidence-operator-cli-redirect-tests), [operator-cli-paired](#evidence-operator-cli-paired), [operator-cli-local](#evidence-operator-cli-local), [operator-workbench-ui](#evidence-operator-workbench-ui), [operator-workbench-hook](#evidence-operator-workbench-hook), [operator-workbench-ui-tests](#evidence-operator-workbench-ui-tests), [operator-workbench-hook-tests](#evidence-operator-workbench-hook-tests), [operator-workbench-contract](#evidence-operator-workbench-contract), [operator-workbench-browser](#evidence-operator-workbench-browser), [operator-workbench-local](#evidence-operator-workbench-local), [operator-job-page](#evidence-operator-job-page), [operator-job-absence-fence](#evidence-operator-job-absence-fence), [operator-job-ui](#evidence-operator-job-ui), [operator-job-hook](#evidence-operator-job-hook), [operator-job-hook-tests](#evidence-operator-job-hook-tests), [operator-artifact-browser](#evidence-operator-artifact-browser), [operator-artifact-browser-tests](#evidence-operator-artifact-browser-tests), [operator-job-browser](#evidence-operator-job-browser), [operator-job-ui-local](#evidence-operator-job-ui-local), [operator-stop-sdk-tests](#evidence-operator-stop-sdk-tests), [operator-stop-browser](#evidence-operator-stop-browser), [operator-stop-ui-local](#evidence-operator-stop-ui-local), [operator-watch-recovery](#evidence-operator-watch-recovery), [operator-watch-tests](#evidence-operator-watch-tests), [operator-partial-install-review](#evidence-operator-partial-install-review), [operator-partial-install-tests](#evidence-operator-partial-install-tests), [operator-partial-install-local](#evidence-operator-partial-install-local), [operator-install-review-agent](#evidence-operator-install-review-agent), [operator-install-review-sdk](#evidence-operator-install-review-sdk), [operator-install-review-sdk-tests](#evidence-operator-install-review-sdk-tests), [operator-install-review-local](#evidence-operator-install-review-local), [operator-install-review-api](#evidence-operator-install-review-api), [operator-install-review-api-tests](#evidence-operator-install-review-api-tests), [operator-install-review-cli](#evidence-operator-install-review-cli), [operator-install-review-cli-tests](#evidence-operator-install-review-cli-tests), [operator-install-review-api-cli-local](#evidence-operator-install-review-api-cli-local), [operator-install-review-ui](#evidence-operator-install-review-ui), [operator-install-review-ui-hook](#evidence-operator-install-review-ui-hook), [operator-install-review-ui-tests](#evidence-operator-install-review-ui-tests), [operator-install-review-ui-hook-tests](#evidence-operator-install-review-ui-hook-tests), [operator-install-review-ui-browser](#evidence-operator-install-review-ui-browser), [operator-install-review-ui-local](#evidence-operator-install-review-ui-local), [operator-install-plan-core](#evidence-operator-install-plan-core), [operator-install-plan-core-tests](#evidence-operator-install-plan-core-tests), [operator-install-plan-store](#evidence-operator-install-plan-store), [operator-install-plan-store-tests](#evidence-operator-install-plan-store-tests), [operator-install-plan-storage-local](#evidence-operator-install-plan-storage-local), [operator-install-plan-preparation](#evidence-operator-install-plan-preparation), [operator-install-plan-sdk](#evidence-operator-install-plan-sdk), [operator-install-plan-sdk-tests](#evidence-operator-install-plan-sdk-tests), [operator-install-plan-sdk-tls](#evidence-operator-install-plan-sdk-tls), [operator-install-plan-backend](#evidence-operator-install-plan-backend), [operator-install-plan-model](#evidence-operator-install-plan-model), [operator-install-plan-backend-tests](#evidence-operator-install-plan-backend-tests), [operator-install-plan-api](#evidence-operator-install-plan-api), [operator-install-plan-api-local](#evidence-operator-install-plan-api-local), [operator-install-plan-cli](#evidence-operator-install-plan-cli), [operator-install-plan-cli-api](#evidence-operator-install-plan-cli-api), [operator-install-plan-cli-tests](#evidence-operator-install-plan-cli-tests), [operator-install-plan-cli-local](#evidence-operator-install-plan-cli-local), [operator-install-plan-ui](#evidence-operator-install-plan-ui), [operator-install-plan-ui-hook](#evidence-operator-install-plan-ui-hook), [operator-install-plan-ui-journal](#evidence-operator-install-plan-ui-journal), [operator-install-plan-ui-tests](#evidence-operator-install-plan-ui-tests), [operator-install-plan-ui-browser](#evidence-operator-install-plan-ui-browser), [operator-install-plan-ui-protocol](#evidence-operator-install-plan-ui-protocol), [operator-install-plan-dependencies](#evidence-operator-install-plan-dependencies), [operator-install-plan-dependency-tests](#evidence-operator-install-plan-dependency-tests), [operator-install-plan-dependency-local](#evidence-operator-install-plan-dependency-local), [operator-chart-artifacts-sdk](#evidence-operator-chart-artifacts-sdk), [operator-chart-artifacts-sdk-tests](#evidence-operator-chart-artifacts-sdk-tests), [operator-chart-artifacts-sdk-tls](#evidence-operator-chart-artifacts-sdk-tls), [operator-chart-artifacts-agent](#evidence-operator-chart-artifacts-agent), [operator-chart-artifacts-local](#evidence-operator-chart-artifacts-local), [operator-chart-artifacts-cli](#evidence-operator-chart-artifacts-cli), [operator-chart-artifacts-cli-tests](#evidence-operator-chart-artifacts-cli-tests), [operator-chart-artifacts-cli-api](#evidence-operator-chart-artifacts-cli-api), [operator-chart-artifacts-cli-transport-tests](#evidence-operator-chart-artifacts-cli-transport-tests), [operator-chart-artifacts-api](#evidence-operator-chart-artifacts-api), [operator-chart-artifacts-api-tests](#evidence-operator-chart-artifacts-api-tests), [operator-chart-artifacts-api-local](#evidence-operator-chart-artifacts-api-local), [operator-chart-artifacts-ui](#evidence-operator-chart-artifacts-ui), [operator-chart-artifacts-ui-hook](#evidence-operator-chart-artifacts-ui-hook), [operator-chart-artifacts-ui-journal](#evidence-operator-chart-artifacts-ui-journal), [operator-chart-artifacts-ui-tests](#evidence-operator-chart-artifacts-ui-tests), [operator-chart-artifacts-ui-browser](#evidence-operator-chart-artifacts-ui-browser), [operator-chart-artifacts-helm4-local](#evidence-operator-chart-artifacts-helm4-local), [operator-chart-artifacts-helm4-api-local](#evidence-operator-chart-artifacts-helm4-api-local), [operator-chart-artifacts-cli-native-test](#evidence-operator-chart-artifacts-cli-native-test), [operator-chart-artifacts-cli-local](#evidence-operator-chart-artifacts-cli-local). Remaining: The original agent install remains UNCERTAIN/exit 1 after an LGTM readiness failure; its rows, receipts and fences remain intact. Linux API/CLI install review and plan preparation/paging are locally qualified, but preserved-VM host forwarding is unavailable after the usernet outage (#98). Controlled Helm 4 local-file chart preparation/recovery is qualified through SDK, GraphQL/PostgreSQL and compiled CLI; browser recovery has controlled-peer checks only. Remaining work includes actual browser/API plan/chart qualification, private OCI/registry/TLS policy, the complete frozen execution tree and render/image closure, fresh skipped-resource/credential proof, linked once-only execution and interruption recovery (#97), completed retained agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, final production builds and deployed login/acceptance. |
 | Infrastructure providers | NICo and enabled LaunchLayer; CRDs, credentials and manager state; credential-health freshness | Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI | **partial** — [action-validation](#evidence-action-validation), [limits](#evidence-limits), [provider-classifier](#evidence-provider-classifier), [provider-reader](#evidence-provider-reader), [provider-reader-kube](#evidence-provider-reader-kube), [provider-api](#evidence-provider-api), [provider-api-kube](#evidence-provider-api-kube), [provider-ui](#evidence-provider-ui), [provider-hooks](#evidence-provider-hooks), [provider-journal](#evidence-provider-journal), [provider-collection-ui](#evidence-provider-collection-ui), [provider-browser](#evidence-provider-browser), [provider-cli](#evidence-provider-cli), [provider-cli-paired](#evidence-provider-cli-paired), [provider-observation-native](#evidence-provider-observation-native). Remaining: Native NICo and enabled LaunchLayer credential/controller/hardware qualification remains pending; local transport/admission evidence does not establish physical provider effects. |
 | Artifacts | Machine images, cluster releases, node-pool releases, release channels and control-plane classes | All six management CRDs plus public operator APIs | **local** — [crd-admission](#evidence-crd-admission), [release-deprecation](#evidence-release-deprecation), [http-fixture](#evidence-http-fixture), [resource-admission](#evidence-resource-admission), [cli-wiring](#evidence-cli-wiring). Remaining: Image/release/channel/profile supply chain and native reconciliation remain pending. |
 | Access | Kubeconfig retrieval and OIDC config generation, narrow automation identity, private route validation | Ownership-guarded kubeconfig retrieval, imported grants and NVKE-only token scopes | **local** — [access-api](#evidence-access-api), [kubeconfig-ownership](#evidence-kubeconfig-ownership), [paired-cli](#evidence-paired-cli), [hosted-native-cli-test](#evidence-hosted-native-cli-test), [hosted-native-cli-local](#evidence-hosted-native-cli-local). Remaining: Native simulator imported enrollment/download/revocation and actual TLS workload access through Astro are locally qualified. Site setup was fixture-service configuration; deployed OIDC/private-route and physical workload access remain pending. |
@@ -303,7 +303,7 @@ Selector: `test_complete_execution_catalog_is_available_through_real_schema`.
 
 ### Evidence cli-wiring
 
-[cmd/nvke_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_test.go) — test. All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.
+[cmd/nvke_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_test.go) — test. All 88 catalog command paths are reachable offline; shared request/recovery tests use controlled server responses.
 
 Selector: `TestNVKEFullCatalogCommandsAreReachableWithoutNetwork`.
 
@@ -311,11 +311,11 @@ Paired source SHA-256: `90744212b02cf237ee9621c47edd685110181208b53583c5ddea40a7
 
 ### Evidence paired-cli
 
-[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.
+[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.
 
 Selector: `test_pinned_cli_vocabulary_matches_every_paired_server_action`.
 
-Paired source SHA-256: `8d86416edf53e6e35287c1de1c3a37d27169d4f8c556cdff4d147c8a39c4be46`.
+Paired source SHA-256: `1a5ec4e6061e6ffdb6fb8e57d8e894d590f3c45631c5eba73470f92fe6f38b17`.
 
 ### Evidence crd-admission
 
@@ -391,31 +391,31 @@ Selector: `test_real_database_and_kubernetes_operation_dry_run_and_observed_crea
 
 ### Evidence native-tooling
 
-[kubernetes/nvke/test_tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_tooling.py) — test. Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.
+[kubernetes/nvke/test_tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_tooling.py) — test. Pinned native binary generation/validation/inspection/bootstrap dry-run and management install planning through a mutation-rejecting Kubernetes proxy. No host provisioning.
 
 Paired source SHA-256: `e1e8062c87ab21275e7a4e2b7b697b5a4789579ada9218af589313a80ea6148a`.
 
 ### Evidence cli-tooling
 
-[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/scripts/integration/test_nvke_tooling.py) — test. Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.
+[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_tooling.py) — test. Compiled local native tooling, private artifacts, interruption/recovery and source-pinned NKTP profiles; native scenarios are opt-in.
 
 Paired source SHA-256: `c5672cc90aed317d3efab69c0ed50a687e859660659d4e0dc809e52f8b6e8f78`.
 
 ### Evidence tooling-source
 
-[kubernetes/nvke/tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/tooling.py) — implementation. Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.
+[kubernetes/nvke/tooling.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/tooling.py) — implementation. Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.
 
-Paired source SHA-256: `0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd`.
+Paired source SHA-256: `15c6060f42ce225d1d15c2af74ad621ed12ec5e41f232a1646949f6a20f43ed1`.
 
 ### Evidence nktp-runtime
 
-[kubernetes/nvke/test_nktp_runtime.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_nktp_runtime.py) — test. Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.
+[kubernetes/nvke/test_nktp_runtime.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_nktp_runtime.py) — test. Pinned Collector validates all ten full configurations; both protocols exercise all five outbound roles with synthetic input, mTLS/auth, outage recovery, label/redaction assertions.
 
 Paired source SHA-256: `41aaaa374b5a943f821b30f2e110960e36fad3b4142b630e66ed43c3d3dcd0b6`.
 
 ### Evidence nktp-kind
 
-[kubernetes/nvke/qualification/nktp-kind-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/nktp-kind-2026-11-08.json) — observation. Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.
+[kubernetes/nvke/qualification/nktp-kind-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/nktp-kind-2026-11-08.json) — observation. Point-in-time isolated Kind installation: actual readiness and authenticated HTTP metrics/logs/traces ingestion. No NVKE controller/hardware installation.
 
 Paired source SHA-256: `568410bd0c9a66742cd542cf5c293c03067f82051dd45788e4856308cb5a6857`.
 
@@ -471,81 +471,81 @@ Selector: `test_browser_collects_once_recovers_read_only_and_reads_history_after
 
 ### Evidence provider-cli
 
-[cmd/nvke_providers_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_providers_test.go) — test. Controlled API peers for durable provider admission, frozen receipt provenance and wait fencing, private recovery records, exact timestamp/count strings and malformed history/identity-page refusal.
+[cmd/nvke_providers_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_providers_test.go) — test. Controlled API peers for durable provider admission, frozen receipt provenance and wait fencing, private recovery records, exact timestamp/count strings and malformed history/identity-page refusal.
 
 Paired source SHA-256: `722dc771aa2e6c617ab62aa478de0967d37326cb82983ffb26f62dba59c9021e`.
 
 ### Evidence provider-cli-paired
 
-[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.
+[scripts/integration/test_nvke_contracts.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_contracts.py) — test. Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.
 
 Selector: `test_compiled_cli_provider_collection_recovery_history_and_identity_pages`.
 
-Paired source SHA-256: `8d86416edf53e6e35287c1de1c3a37d27169d4f8c556cdff4d147c8a39c4be46`.
+Paired source SHA-256: `1a5ec4e6061e6ffdb6fb8e57d8e894d590f3c45631c5eba73470f92fe6f38b17`.
 
 ### Evidence native-linux-utilities
 
-[kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json) — observation. Prepared source-pinned ARM64 Linux CLI and working virtual TPM proxy; fourteen tooling tests passed, one Kubernetes-proxy case skipped. Actual bootstrap, installation, hardware and API/UI controls remain unqualified.
+[kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/local-site-linux-prerequisites-2026-11-08.json) — observation. Prepared source-pinned ARM64 Linux CLI and working virtual TPM proxy; fourteen tooling tests passed, one Kubernetes-proxy case skipped. Actual bootstrap, installation, hardware and API/UI controls remain unqualified.
 
 Paired source SHA-256: `86490f9d2bfec8916a3ffd5b143be4a7b8c551cfa57c707602af3dbd90e66826`.
 
 ### Evidence native-bootstrap-local
 
-[kubernetes/nvke/qualification/native-bootstrap-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/native-bootstrap-local-2026-11-08.json) — observation. One actual source-pinned seed/node bootstrap through Astro runner on an isolated ARM64 Linux host. Completed receipt plus live API readiness and the expected Ready node at Kubernetes 1.36.4. Not full management-stack installation, tenant provisioning, physical provider or API/UI control qualification.
+[kubernetes/nvke/qualification/native-bootstrap-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/native-bootstrap-local-2026-11-08.json) — observation. One actual source-pinned seed/node bootstrap through Astro runner on an isolated ARM64 Linux host. Completed receipt plus live API readiness and the expected Ready node at Kubernetes 1.36.4. Not full management-stack installation, tenant provisioning, physical provider or API/UI control qualification.
 
 Paired source SHA-256: `ea1a2a06b5ab755c80e3b950112592846db5b806391181abab6aa6c961a33b58`.
 
 ### Evidence native-bootstrap-checker
 
-[kubernetes/nvke/qualify_bootstrap.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualify_bootstrap.py) — implementation. Read-only source-bound bootstrap qualification: exact successful retained attempt, pinned binary/source, private embedded-TLS kubeconfig, live readyz and complete expected node set/version. No credential or raw native output export.
+[kubernetes/nvke/qualify_bootstrap.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualify_bootstrap.py) — implementation. Read-only source-bound bootstrap qualification: exact successful retained attempt, pinned binary/source, private embedded-TLS kubeconfig, live readyz and complete expected node set/version. No credential or raw native output export.
 
 Paired source SHA-256: `3dd6e779185ed8484e823e80e7fd1660e391ea3ee1657cea4505b0aa243f8159`.
 
 ### Evidence native-bootstrap-checker-tests
 
-[kubernetes/nvke/test_qualify_bootstrap.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_qualify_bootstrap.py) — test. Refuses torn/uncertain/mismatched receipts, modified bundles, shared/symlinked inputs, incomplete/unready/deleting/version-mismatched nodes and unsafe kubeconfig credential plugins or TLS overrides. Controlled qualification inputs; live bootstrap evidence is separate.
+[kubernetes/nvke/test_qualify_bootstrap.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_qualify_bootstrap.py) — test. Refuses torn/uncertain/mismatched receipts, modified bundles, shared/symlinked inputs, incomplete/unready/deleting/version-mismatched nodes and unsafe kubeconfig credential plugins or TLS overrides. Controlled qualification inputs; live bootstrap evidence is separate.
 
 Paired source SHA-256: `5e393a7691f2fa95ab6925a242801c7c43228f87d66de0a132b51fc63230c833`.
 
 ### Evidence native-management-base
 
-[kubernetes/nvke/qualification/native-management-base-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/native-management-base-local-2026-11-08.json) — observation. Actual guarded default NICo stack install, SPIFFE access setup and native site diagnostics. Six deployed stack Helm releases, active workload/certificate readiness, source-built controller identity, healthy database/Temporal, and SDK GETs for the three installed CRDs over certificate-validated private SSH transport. Optional management-engine/public APIs, tenant provisioning, production telemetry delivery and API/UI install controls are not qualified.
+[kubernetes/nvke/qualification/native-management-base-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/native-management-base-local-2026-11-08.json) — observation. Actual guarded default NICo stack install, SPIFFE access setup and native site diagnostics. Six deployed stack Helm releases, active workload/certificate readiness, source-built controller identity, healthy database/Temporal, and SDK GETs for the three installed CRDs over certificate-validated private SSH transport. Optional management-engine/public APIs, tenant provisioning, production telemetry delivery and API/UI install controls are not qualified.
 
 Paired source SHA-256: `5af9b8ba1edbf003912412f4a47e5866f0b4b50bfde05dc000c369c1306f9bfc`.
 
 ### Evidence management-api-profile
 
-[kubernetes/nvke/management_api.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_api.py) — implementation. Pinned native operator/tenant API manifests, immutable image references, fixed tenant namespace/RBAC, private ClusterIP services and default-deny or namespace-and-pod-scoped ingress. Pure renderer; no upstream caller authentication or controller-manager installation.
+[kubernetes/nvke/management_api.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_api.py) — implementation. Pinned native operator/tenant API manifests, immutable image references, fixed tenant namespace/RBAC, private ClusterIP services and default-deny or namespace-and-pod-scoped ingress. Pure renderer; no upstream caller authentication or controller-manager installation.
 
 Paired source SHA-256: `d16b7ed50a5c03d1ba6e972aa06fab04ea4dc8942109f32ae5212c7769ef7b18`.
 
 ### Evidence management-api-profile-tests
 
-[kubernetes/nvke/test_management_api.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_management_api.py) — test. Eight profile and pinned-source rendering tests: field/image validation, caller selector scope, tenant RBAC/pod security preservation, default/scoped ingress, source drift and private exclusive CLI output.
+[kubernetes/nvke/test_management_api.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_management_api.py) — test. Eight profile and pinned-source rendering tests: field/image validation, caller selector scope, tenant RBAC/pod security preservation, default/scoped ingress, source drift and private exclusive CLI output.
 
 Paired source SHA-256: `5d71c67a9c11b4f74aeeb460f815d828eb1c76459141ff4e8ab069cd8941e3f7`.
 
 ### Evidence management-apis-native
 
-[kubernetes/nvke/qualification/management-apis-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-apis-local-2026-11-08.json) — observation. Renderer output applied to native local site: source-build-bound runtime image IDs, Ready private APIs, all six established/readable CRDs, ten SDK public health/list checks and actual untrusted-pod ingress denial after removing the temporary policy. Caller authentication remains deferred upstream; no management-engine reconciliation or hosted installation-control claim.
+[kubernetes/nvke/qualification/management-apis-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-apis-local-2026-11-08.json) — observation. Renderer output applied to native local site: source-build-bound runtime image IDs, Ready private APIs, all six established/readable CRDs, ten SDK public health/list checks and actual untrusted-pod ingress denial after removing the temporary policy. Caller authentication remains deferred upstream; no management-engine reconciliation or hosted installation-control claim.
 
 Paired source SHA-256: `b5aff8693318c81b6f94f67874453a9141d9f43c97846f6f989981c98a0406a1`.
 
 ### Evidence sdk-tenant-native
 
-[kubernetes/nvke/qualification/sdk-tenant-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/sdk-tenant-local-2026-11-08.json) — observation. SDK-driven local legacy-controller NICo simulator: MachineImage public create/read, complete ClusterRelease/NodePoolRelease datastore publication with native annotations, controller create request, two Ready workload nodes and ownership-checked private kubeconfig export. Not hosted Astro API/UI/CLI admission/recovery/access enrollment, physical hardware or declarative NVKECluster reconciliation.
+[kubernetes/nvke/qualification/sdk-tenant-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/sdk-tenant-local-2026-11-08.json) — observation. SDK-driven local legacy-controller NICo simulator: MachineImage public create/read, complete ClusterRelease/NodePoolRelease datastore publication with native annotations, controller create request, two Ready workload nodes and ownership-checked private kubeconfig export. Not hosted Astro API/UI/CLI admission/recovery/access enrollment, physical hardware or declarative NVKECluster reconciliation.
 
 Paired source SHA-256: `80718a3fa4b3800e89eb85c82b31669bd59349bf60435ae7b32b96aa5b799ca1`.
 
 ### Evidence cli-management-api-profile
 
-[internal/nvketooling/tooling.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/internal/nvketooling/tooling.go) — implementation. CLI bridge verifies embedded renderer provenance, selects Python 3.12+ with PyYAML, retains process/privacy boundaries and validates source-revision/digest metadata. Rendering only, no hosted/effectful installation.
+[internal/nvketooling/tooling.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/internal/nvketooling/tooling.go) — implementation. CLI bridge verifies embedded renderer provenance, selects Python 3.12+ with PyYAML, retains process/privacy boundaries and validates source-revision/digest metadata. Rendering only, no hosted/effectful installation.
 
 Paired source SHA-256: `fd541ed8dd637fbb91b6c27a2ebef66840f27df3e9e875d87f858d8cb2f4c0d6`.
 
 ### Evidence cli-management-api-profile-test
 
-[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/scripts/integration/test_nvke_tooling.py) — test. Compiled CLI with actual pinned source: private digest-matched output, tenant RBAC/ClusterIP/default ingress, overwrite refusal, empty pod-selector rejection and inline-credential redaction. No native provisioning in this case.
+[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_tooling.py) — test. Compiled CLI with actual pinned source: private digest-matched output, tenant RBAC/ClusterIP/default ingress, overwrite refusal, empty pod-selector rejection and inline-credential redaction. No native provisioning in this case.
 
 Selector: `test_compiled_management_apis_keep_scope_private_and_output_exclusive`.
 
@@ -553,31 +553,31 @@ Paired source SHA-256: `c5672cc90aed317d3efab69c0ed50a687e859660659d4e0dc809e52f
 
 ### Evidence cli-management-api-qualified
 
-[kubernetes/nvke/qualification/cli-management-apis-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/cli-management-apis-local-2026-11-08.json) — observation. Committed CLI build and binary digest reproduced the already-qualified native deployment manifest byte for byte. Full local Go tests/vet/lint and immutable-vendor checks passed. Pure profile rendering, not hosted admission or effectful CLI installation.
+[kubernetes/nvke/qualification/cli-management-apis-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/cli-management-apis-local-2026-11-08.json) — observation. Committed CLI build and binary digest reproduced the already-qualified native deployment manifest byte for byte. Full local Go tests/vet/lint and immutable-vendor checks passed. Pure profile rendering, not hosted admission or effectful CLI installation.
 
 Paired source SHA-256: `0b150a5df9e6f5d150d98adf54bf6fd1ab2d0ab5f8240484228f5180acc2e797`.
 
 ### Evidence management-controller-profile
 
-[kubernetes/nvke/management_controller.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_controller.py) — implementation. Source-pinned native controller renderer, immutable image, explicit private service endpoint/authentication mode, tenant-scoped watches and mutation authority, cluster-scoped release reads, leader-election RBAC and denied ingress. References an existing provider ConfigMap; no declarative reconciliation claim.
+[kubernetes/nvke/management_controller.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_controller.py) — implementation. Source-pinned native controller renderer, immutable image, explicit private service endpoint/authentication mode, tenant-scoped watches and mutation authority, cluster-scoped release reads, leader-election RBAC and denied ingress. References an existing provider ConfigMap; no declarative reconciliation claim.
 
 Paired source SHA-256: `eb6fcead76f25afc5a42e0cafde315ea365114f07cf7a209047c28e3602de216`.
 
 ### Evidence management-controller-profile-tests
 
-[kubernetes/nvke/test_management_controller.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_management_controller.py) — test. Six profile/pinned-source tests: inactive/external endpoints and credential fields refused, namespace-scoped native RBAC, pod security, explicit projected audience, source drift, exclusive private output and redacted failures.
+[kubernetes/nvke/test_management_controller.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_management_controller.py) — test. Six profile/pinned-source tests: inactive/external endpoints and credential fields refused, namespace-scoped native RBAC, pod security, explicit projected audience, source drift, exclusive private output and redacted failures.
 
 Paired source SHA-256: `230203ce1f36e15f0bed52ebe70ca25995bef06bb067782262cee1684eca8deb`.
 
 ### Evidence management-controller-startup-native
 
-[kubernetes/nvke/qualification/management-controller-startup-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-controller-startup-local-2026-11-08.json) — observation. Isolated ARM64 native manager Ready with exact image match, zero restarts, held leader Lease and eight live authorization checks including cross-tenant and Secret-read denial. Startup only; no NVKECluster submitted. Declarative reconciliation, hosted controls and production qualification remain pending.
+[kubernetes/nvke/qualification/management-controller-startup-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-controller-startup-local-2026-11-08.json) — observation. Isolated ARM64 native manager Ready with exact image match, zero restarts, held leader Lease and eight live authorization checks including cross-tenant and Secret-read denial. Startup only; no NVKECluster submitted. Declarative reconciliation, hosted controls and production qualification remain pending.
 
 Paired source SHA-256: `a6a1deb3b58fb376877885444040a6948c2071cca30f6dc3de6365b31116731a`.
 
 ### Evidence provider-observation-native
 
-[kubernetes/nvke/qualification/provider-observation-native-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/provider-observation-native-local-2026-11-08.json) — observation. Actual isolated native management API through CA/client-certificate-verified private SSH transport. Eight GET-only requests; credential Secret metadata only. NICo CONFIGURED and available, credential health NO-IDENTITY, LaunchLayer NOT-INSTALLED. No physical provisioning or hosted provider observation/recovery claim.
+[kubernetes/nvke/qualification/provider-observation-native-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/provider-observation-native-local-2026-11-08.json) — observation. Actual isolated native management API through CA/client-certificate-verified private SSH transport. Eight GET-only requests; credential Secret metadata only. NICo CONFIGURED and available, credential health NO-IDENTITY, LaunchLayer NOT-INSTALLED. No physical provisioning or hosted provider observation/recovery claim.
 
 Paired source SHA-256: `b7dddf55701431d69e7be0b2d4de3a9081590f60707dc4d8e18a523ad99e4491`.
 
@@ -599,19 +599,19 @@ Selector: `test_replace_keeps_the_server_version_fence_after_metadata_read`.
 
 ### Evidence management-engine-declarative-native
 
-[kubernetes/nvke/qualification/management-engine-declarative-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-engine-declarative-local-2026-11-08.json) — observation. Actual isolated native manager: one admitted NVKECluster resolves release channel/control-plane class and worker pool, reaches two Ready workload nodes, and exports mode-0600 admin access through native ownership checks without externally trusted ID override. Explicit server/kubelet version scope, native transient retries and upstream nodeProfile limitation retained. No hosted admission or production/physical-provider claim.
+[kubernetes/nvke/qualification/management-engine-declarative-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-engine-declarative-local-2026-11-08.json) — observation. Actual isolated native manager: one admitted NVKECluster resolves release channel/control-plane class and worker pool, reaches two Ready workload nodes, and exports mode-0600 admin access through native ownership checks without externally trusted ID override. Explicit server/kubelet version scope, native transient retries and upstream nodeProfile limitation retained. No hosted admission or production/physical-provider claim.
 
 Paired source SHA-256: `343ca5ea4452613d3822553a286d276bd78f19ca028bc8f32dd03cb17876fd82`.
 
 ### Evidence cli-management-controller-profile
 
-[internal/nvketooling/tooling.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/internal/nvketooling/tooling.go) — implementation. Pinned native controller and API helper run in a private directory with isolated Python and provenance validation; source-bound tenant permissions and explicit private controller access, digest-only metadata. Pure rendering, no effectful hosted installation.
+[internal/nvketooling/tooling.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/internal/nvketooling/tooling.go) — implementation. Pinned native controller and API helper run in a private directory with isolated Python and provenance validation; source-bound tenant permissions and explicit private controller access, digest-only metadata. Pure rendering, no effectful hosted installation.
 
 Paired source SHA-256: `fd541ed8dd637fbb91b6c27a2ebef66840f27df3e9e875d87f858d8cb2f4c0d6`.
 
 ### Evidence cli-management-controller-test
 
-[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/scripts/integration/test_nvke_tooling.py) — test. Compiled native controller rendering: both authentication modes, native private RBAC/security, output digest/privacy/exclusivity, external endpoint and credential refusal; malicious ambient helper in CWD/PYTHONPATH cannot run.
+[scripts/integration/test_nvke_tooling.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_tooling.py) — test. Compiled native controller rendering: both authentication modes, native private RBAC/security, output digest/privacy/exclusivity, external endpoint and credential refusal; malicious ambient helper in CWD/PYTHONPATH cannot run.
 
 Selector: `test_compiled_controller_profile_keeps_native_scope_and_isolates_imports`.
 
@@ -619,19 +619,19 @@ Paired source SHA-256: `c5672cc90aed317d3efab69c0ed50a687e859660659d4e0dc809e52f
 
 ### Evidence cli-management-controller-qualified
 
-[kubernetes/nvke/qualification/cli-management-controller-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/cli-management-controller-local-2026-11-08.json) — observation. Committed CLI rebuild reproduced the already-qualified native manager manifest byte for byte. Full Go tests/fmt/vet/lint, nine vendor tests and six compiled tests passed; two opt-in cases skipped. Pure rendering only.
+[kubernetes/nvke/qualification/cli-management-controller-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/cli-management-controller-local-2026-11-08.json) — observation. Committed CLI rebuild reproduced the already-qualified native manager manifest byte for byte. Full Go tests/fmt/vet/lint, nine vendor tests and six compiled tests passed; two opt-in cases skipped. Pure rendering only.
 
 Paired source SHA-256: `8d4e586a909cbcae8320468e221123381406a2f80d09aca30ecca3cc79c49808`.
 
 ### Evidence management-engine-worker-lifecycle-native
 
-[kubernetes/nvke/qualification/management-engine-worker-lifecycle-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-engine-worker-lifecycle-local-2026-11-08.json) — observation. Actual isolated native worker growth via explicit datastore: one to two workers, three Ready workload nodes; desired-count reduction preserved native cleanup finalizer; separately reviewed deleteNode removed only the added worker, CAPI/NICo machine and simulator container. Original two-node workload retained readiness. Public update field ownership conflict and upstream lack of automatic provisioned-worker shrink are explicit. No cluster deletion/upgrade, hosted admission or production claim.
+[kubernetes/nvke/qualification/management-engine-worker-lifecycle-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-engine-worker-lifecycle-local-2026-11-08.json) — observation. Actual isolated native worker growth via explicit datastore: one to two workers, three Ready workload nodes; desired-count reduction preserved native cleanup finalizer; separately reviewed deleteNode removed only the added worker, CAPI/NICo machine and simulator container. Original two-node workload retained readiness. Public update field ownership conflict and upstream lack of automatic provisioned-worker shrink are explicit. No cluster deletion/upgrade, hosted admission or production claim.
 
 Paired source SHA-256: `7355a694b43ddcb5a0f963607e86196a3b349e7741ee31984929a3559ba76240`.
 
 ### Evidence hosted-native-cli-test
 
-[scripts/integration/test_nvke_native_site.py](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/scripts/integration/test_nvke_native_site.py) — test. Compiled CLI through real Astro API, Postgres, Temporal and source-pinned isolated native APIs; lost reply/read-only recovery, imported access, exported workload TLS/readiness, guarded MachineImage create/delete, revoke-before-Secret-read and history privacy. Only transport is routed; fixture configures site connections.
+[scripts/integration/test_nvke_native_site.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_native_site.py) — test. Compiled CLI through real Astro API, Postgres, Temporal and source-pinned isolated native APIs; lost reply/read-only recovery, imported access, exported workload TLS/readiness, guarded MachineImage create/delete, revoke-before-Secret-read and history privacy. Only transport is routed; fixture configures site connections.
 
 Selector: `test_compiled_cli_native_site_receipt_recovery_enrollment_access_and_image_lifecycle`.
 
@@ -639,43 +639,43 @@ Paired source SHA-256: `764533589946ae27fa0469bacc5c2489f5ff8b87ac237d3485dc5533
 
 ### Evidence hosted-native-cli-local
 
-[kubernetes/nvke/qualification/hosted-native-cli-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/hosted-native-cli-local-2026-11-08.json) — observation. Actual hosted native test passed: one native MachineImage POST/DELETE, two Ready workload nodes reached using Astro-exported kubeconfig with CA/client TLS, read-only lost-reply recovery and revocation refusal before Secret read. Prior SPIFFE/read failure and isolated VM CPU/collector caps retained. No hosted tenant provisioning, installation, deletion/upgrade or physical-provider claim.
+[kubernetes/nvke/qualification/hosted-native-cli-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/hosted-native-cli-local-2026-11-08.json) — observation. Actual hosted native test passed: one native MachineImage POST/DELETE, two Ready workload nodes reached using Astro-exported kubeconfig with CA/client TLS, read-only lost-reply recovery and revocation refusal before Secret read. Prior SPIFFE/read failure and isolated VM CPU/collector caps retained. No hosted tenant provisioning, installation, deletion/upgrade or physical-provider claim.
 
 Paired source SHA-256: `2bf2d0f82e73f70a0341de0d678ecfd4f7e6e9a4ac8dd4bbe4f1b77b24891769`.
 
 ### Evidence cli-reset-recovery-local
 
-[kubernetes/nvke/qualification/cli-reset-recovery-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/cli-reset-recovery-local-2026-11-08.json) — observation. Ten passing compiled CLI/API/Postgres/Temporal/envtest scenarios; in-flight wait expiry preserves remote operation, original reset receipt survives lost reply with one actual Temporal reset RPC on a fixture workflow. Supported 120s native review timeout independent of 1ms local CLI wait. No actual native etcd/certificate convergence claim.
+[kubernetes/nvke/qualification/cli-reset-recovery-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/cli-reset-recovery-local-2026-11-08.json) — observation. Ten passing compiled CLI/API/Postgres/Temporal/envtest scenarios; in-flight wait expiry preserves remote operation, original reset receipt survives lost reply with one actual Temporal reset RPC on a fixture workflow. Supported 120s native review timeout independent of 1ms local CLI wait. No actual native etcd/certificate convergence claim.
 
 Paired source SHA-256: `84f35fa8081f65d873da37850a56c66848efdfae6efb4fc7a19fdbaf420c239d`.
 
 ### Evidence management-engine-cluster-deletion-native
 
-[kubernetes/nvke/qualification/management-engine-cluster-deletion-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-engine-cluster-deletion-local-2026-11-08.json) — observation. One actual native UID/version-bound NVKECluster deletion completed naturally after isolated VM/SPIFFE recovery. Native resource/controller/CAPI/NICo/simulator objects absent; original tenant healthy with two Ready nodes and native TLS. No forced finalizer removal, repeated delete, hosted admission, latency/production or physical-provider claim.
+[kubernetes/nvke/qualification/management-engine-cluster-deletion-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-engine-cluster-deletion-local-2026-11-08.json) — observation. One actual native UID/version-bound NVKECluster deletion completed naturally after isolated VM/SPIFFE recovery. Native resource/controller/CAPI/NICo/simulator objects absent; original tenant healthy with two Ready nodes and native TLS. No forced finalizer removal, repeated delete, hosted admission, latency/production or physical-provider claim.
 
 Paired source SHA-256: `0d819a125e7db746c6e033a97c0000e332709ec935d17b4e9e4b86d5ef7c84e9`.
 
 ### Evidence operator-agent-contract
 
-[kubernetes/nvke/operator_contract.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/operator_contract.py) — implementation. Typed pinned descriptors for 17 runner commands, bounded JSON, explicit artifacts and fixed choices. No host paths, shell or arbitrary Helm passthrough. Strict mypy-clean shared contract is consumed byte-identically by the Astro SDK.
+[kubernetes/nvke/operator_contract.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/operator_contract.py) — implementation. Typed pinned descriptors for 17 runner commands, bounded JSON, explicit artifacts and fixed choices. No host paths, shell or arbitrary Helm passthrough. Strict mypy-clean shared contract is consumed byte-identically by the Astro SDK.
 
 Paired source SHA-256: `96a0e1b932890bd094e9fa0ad32b081761b57aa8d099e7fbc13001dd2ab72f5f`.
 
 ### Evidence operator-agent
 
-[kubernetes/nvke/operator_agent.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/operator_agent.py) — implementation. Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.
+[kubernetes/nvke/operator_agent.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/operator_agent.py) — implementation. Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.
 
 Paired source SHA-256: `f3c916ed04fff2fc7210cc27bfff4f0f1bfef617c42d130a22ade4b466e887d6`.
 
 ### Evidence operator-agent-tests
 
-[kubernetes/nvke/test_operator_agent.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_operator_agent.py) — test. Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.
+[kubernetes/nvke/test_operator_agent.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_operator_agent.py) — test. Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.
 
-Paired source SHA-256: `f2dd368bd103274f81b4aad8ead51e869cd8b642ee79468939359f635c55bc34`.
+Paired source SHA-256: `7e6094df53bf4c8f70c1e29d9a0bf4015839077a038230e68d9827dcf55a1ab5`.
 
 ### Evidence operator-agent-local
 
-[kubernetes/nvke/qualification/operator-agent-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-agent-local-2026-11-08.json) — observation. Standalone foundation: 64 tooling tests run, 61 passed/3 opt-in skipped; strict shared-contract mypy, ruff/format and isolated entrypoint passed. Agent-driven Linux bootstrap/install, standalone NKTP deployment/health and production qualification remain open. Astro utility transport has separate evidence.
+[kubernetes/nvke/qualification/operator-agent-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-agent-local-2026-11-08.json) — observation. Standalone foundation: 64 tooling tests run, 61 passed/3 opt-in skipped; strict shared-contract mypy, ruff/format and isolated entrypoint passed. Agent-driven Linux bootstrap/install, standalone NKTP deployment/health and production qualification remain open. Astro utility transport has separate evidence.
 
 Paired source SHA-256: `ba0eb5a45caf71d1e7eddcbfa583a6281692b6c6c4dfa3d0cbe8f81754998ed6`.
 
@@ -709,37 +709,37 @@ Selector: `test_real_temporal_postgres_and_tls_agent_complete_one_private_native
 
 ### Evidence operator-api-local
 
-[kubernetes/nvke/qualification/operator-api-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-api-local-2026-11-08.json) — observation. Committed source-bound local Astro adapter proof: 415 backend regression tests passed/3 skipped, five additional malformed-authority cases, 525 SDK tests passed/18 skipped, 22 evidence checks. Real TLS/native utility through Postgres/Temporal, lost PUT reply with one process, current-admin read-only recovery after original-role revocation, private history/artifacts and audit masking. No hosted CLI/UI or live agent-driven bootstrap/install qualification.
+[kubernetes/nvke/qualification/operator-api-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-api-local-2026-11-08.json) — observation. Committed source-bound local Astro adapter proof: 415 backend regression tests passed/3 skipped, five additional malformed-authority cases, 525 SDK tests passed/18 skipped, 22 evidence checks. Real TLS/native utility through Postgres/Temporal, lost PUT reply with one process, current-admin read-only recovery after original-role revocation, private history/artifacts and audit masking. No hosted CLI/UI or live agent-driven bootstrap/install qualification.
 
 Paired source SHA-256: `784c516bb5b82871264b42fac588f93d388d0adedd36711e27a2b06cfc5953fd`.
 
 ### Evidence operator-cli-authority
 
-[cmd/nvke_agent.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_agent.go) — implementation. astro nvke agent exposes connected command catalog plus reviewed, private mTLS configure/get/verify/enable/disable/remove controls.
+[cmd/nvke_agent.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_agent.go) — implementation. astro nvke agent exposes connected command catalog plus reviewed, private mTLS configure/get/verify/enable/disable/remove controls.
 
 Paired source SHA-256: `25c7a1dcfcbe9b21278bd1a4edfaf273cf25e07b921827c1e13ea81e12d60c91`.
 
 ### Evidence operator-cli-request
 
-[cmd/nvke_agent_request.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_agent_request.go) — implementation. Full native envelope remains text; private recovery identity/digest/version/acknowledgement is flushed before admission. Original receipt lookup precedes input/current-source reads; recover never submits. Server owns complete native validation.
+[cmd/nvke_agent_request.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_agent_request.go) — implementation. Full native envelope remains text; private recovery identity/digest/version/acknowledgement is flushed before admission. Original receipt lookup precedes input/current-source reads; recover never submits. Server owns complete native validation.
 
 Paired source SHA-256: `70772d9c7ae73241cb7d16fb0a106a9f1dd2db5b6d27e4231e84beebaa26aaad`.
 
 ### Evidence operator-cli-artifact
 
-[cmd/nvke_agent_artifact.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_agent_artifact.go) — implementation. Current reviewed admin can reconcile the original uncertain job read-only; artifact downloader streams protected exclusive files, binds chunks and source identity, validates final size/hash and retains partial downloads on failure. Reviewed stop/fence binds the original uncertain operation and exact current versions, without replacement admission.
+[cmd/nvke_agent_artifact.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_agent_artifact.go) — implementation. Current reviewed admin can reconcile the original uncertain job read-only; artifact downloader streams protected exclusive files, binds chunks and source identity, validates final size/hash and retains partial downloads on failure. Reviewed stop/fence binds the original uncertain operation and exact current versions, without replacement admission.
 
 Paired source SHA-256: `a290eb134fddb3b0603d5d708cf0e8217f057f545179f1b1d1c7a8dc39aca734`.
 
 ### Evidence operator-cli-tests
 
-[cmd/nvke_agent_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_agent_test.go) — test. Controlled HTTP cases preserve private credentials and original request; refuse malformed authority, changed input/site/authority/deadline/acknowledgement, missing original receipt, bad artifact identity/range/hash/source, no progress, oversize and output replacement.
+[cmd/nvke_agent_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_agent_test.go) — test. Controlled HTTP cases preserve private credentials and original request; refuse malformed authority, changed input/site/authority/deadline/acknowledgement, missing original receipt, bad artifact identity/range/hash/source, no progress, oversize and output replacement.
 
 Paired source SHA-256: `b04c8f3291e922740af77f17a1c06065191ceccc7c679617353ce445417cb8e1`.
 
 ### Evidence operator-cli-redirect-tests
 
-[internal/api/nvke_agent_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/internal/api/nvke_agent_test.go) — test. Three concrete HTTP 307 cases reproduced private configure/request/artifact body forwarding before the dedicated transport refused redirects. Agent API calls now never follow that destination.
+[internal/api/nvke_agent_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/internal/api/nvke_agent_test.go) — test. Three concrete HTTP 307 cases reproduced private configure/request/artifact body forwarding before the dedicated transport refused redirects. Agent API calls now never follow that destination.
 
 Selector: `TestNVKEAgentPrivateRequestsNeverFollowRedirects`.
 
@@ -747,7 +747,7 @@ Paired source SHA-256: `4d8250b4581f226c1b2b0d06009ebe607f591e63966797d811dc12ec
 
 ### Evidence operator-cli-paired
 
-[scripts/integration/test_nvke_agent.py](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/scripts/integration/test_nvke_agent.py) — test. Compiled CLI creates an actual Astro site, configures/verifies actual mTLS agent, recovers lost Astro admission reply after deleting native input, waits for one native generation process, exports private hash-checked bytes, reconciles an explicit uncertain fixture without replay and refuses revoked-token download. Confirmed and deliberately lost stop replies on two never-dispatched uncertain fixtures recover original cancelled operations and reject delayed PUTs without another native run.
+[scripts/integration/test_nvke_agent.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_agent.py) — test. Compiled CLI creates an actual Astro site, configures/verifies actual mTLS agent, recovers lost Astro admission reply after deleting native input, waits for one native generation process, exports private hash-checked bytes, reconciles an explicit uncertain fixture without replay and refuses revoked-token download. Confirmed and deliberately lost stop replies on two never-dispatched uncertain fixtures recover original cancelled operations and reject delayed PUTs without another native run.
 
 Selector: `test_compiled_cli_agent_configuration_original_recovery_and_private_export`.
 
@@ -755,7 +755,7 @@ Paired source SHA-256: `20890ace3e13b143d289dc51364bbbc71f0afc357e54eb9a5b54bca4
 
 ### Evidence operator-cli-local
 
-[kubernetes/nvke/qualification/operator-cli-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-cli-local-2026-11-08.json) — observation. Clean committed 515e068 compiled CLI and real Astro/Postgres/Temporal/mTLS/native generation qualification passed in 39.11s; full Go suite/vet/lint/build passed. Supplemental 0527b2f tests refuse changed original versions/deadline/acknowledgement. No Storybook UI or agent-driven live bootstrap/install claim. Protected cross-platform input fixtures and Windows test-executable compilation are additionally bound at b0b8514; no Windows runtime qualification.
+[kubernetes/nvke/qualification/operator-cli-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-cli-local-2026-11-08.json) — observation. Clean committed 515e068 compiled CLI and real Astro/Postgres/Temporal/mTLS/native generation qualification passed in 39.11s; full Go suite/vet/lint/build passed. Supplemental 0527b2f tests refuse changed original versions/deadline/acknowledgement. No Storybook UI or agent-driven live bootstrap/install claim. Protected cross-platform input fixtures and Windows test-executable compilation are additionally bound at b0b8514; no Windows runtime qualification.
 
 Paired source SHA-256: `fef09ecc767ed65f6b038685bbaf1214962c66c392f6277b0cc78d83c8b8b740`.
 
@@ -777,7 +777,7 @@ Paired source SHA-256: `fef09ecc767ed65f6b038685bbaf1214962c66c392f6277b0cc78d83
 
 ### Evidence operator-authority-ui-local
 
-[kubernetes/nvke/qualification/operator-authority-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-authority-ui-local-2026-11-08.json) — observation. Committed application sources and safe log digests bind 397 scoped frontend tests, 13 composed stories, 27 Chromium accessibility/interaction checks, two real browser lifecycle/redirect cases and lint/types/production build. Connection management only; command/job/recovery/artifact UI and live infrastructure remain open.
+[kubernetes/nvke/qualification/operator-authority-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-authority-ui-local-2026-11-08.json) — observation. Committed application sources and safe log digests bind 397 scoped frontend tests, 13 composed stories, 27 Chromium accessibility/interaction checks, two real browser lifecycle/redirect cases and lint/types/production build. Connection management only; command/job/recovery/artifact UI and live infrastructure remain open.
 
 Paired source SHA-256: `8fdb3e164d1fdb133a53f4b1f00621e601911cc0f9e1b7ef0e5c1cab21d3f912`.
 
@@ -807,7 +807,7 @@ Paired source SHA-256: `8fdb3e164d1fdb133a53f4b1f00621e601911cc0f9e1b7ef0e5c1cab
 
 ### Evidence operator-workbench-local
 
-[kubernetes/nvke/qualification/operator-workbench-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-workbench-ui-local-2026-11-08.json) — observation. Immutable app sources and safe log digests bind 463 scoped frontend cases, 13 selected story renders, 29 final Chromium checks, real authority/browser generation recovery plus audit follow-up, canonical vocabulary fidelity and lint/types/production build. Private browser artifact downloads, reviewed reconciliation UI and other infrastructure effects remain open.
+[kubernetes/nvke/qualification/operator-workbench-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-workbench-ui-local-2026-11-08.json) — observation. Immutable app sources and safe log digests bind 463 scoped frontend cases, 13 selected story renders, 29 final Chromium checks, real authority/browser generation recovery plus audit follow-up, canonical vocabulary fidelity and lint/types/production build. Private browser artifact downloads, reviewed reconciliation UI and other infrastructure effects remain open.
 
 Paired source SHA-256: `7babcf36fd7cb8a2055f721acf5388e1e9c921cee781154f53dfb5fe8ba535a1`.
 
@@ -845,7 +845,7 @@ Paired source SHA-256: `7babcf36fd7cb8a2055f721acf5388e1e9c921cee781154f53dfb5fe
 
 ### Evidence operator-job-ui-local
 
-[kubernetes/nvke/qualification/operator-job-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-job-ui-local-2026-11-08.json) — observation. Committed sources and safe log digests bind 34 API/real-browser cases, 523 scoped frontend cases, 17 selected story renders, 31 browser checks, private native export, one-run reconciliation, absence-fence and null-search fixes and frontend build/contracts/lint gates. Backend mypy remains at the documented 830-error baseline. Native stop/fencing and infrastructure qualification stay open.
+[kubernetes/nvke/qualification/operator-job-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-job-ui-local-2026-11-08.json) — observation. Committed sources and safe log digests bind 34 API/real-browser cases, 523 scoped frontend cases, 17 selected story renders, 31 browser checks, private native export, one-run reconciliation, absence-fence and null-search fixes and frontend build/contracts/lint gates. Backend mypy remains at the documented 830-error baseline. Native stop/fencing and infrastructure qualification stay open.
 
 Paired source SHA-256: `3ae06ce1d859449cbc2786f243175a2e65fef5f631fed9ae9114d505d4ac7c61`.
 
@@ -863,61 +863,61 @@ Selector: `test_browser_reviews_original_infrastructure_fence_without_native_dis
 
 ### Evidence operator-stop-ui-local
 
-[kubernetes/nvke/qualification/operator-stop-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-stop-ui-local-2026-11-08.json) — observation. Source/log-bound 74 API/SDK/browser cases, 549 frontend cases, 37 story renders, 38 Chromium checks and compiled CLI confirmed/lost stop recovery; production build/lint/contracts gates pass. Combined ASGI teardown cancellation diagnostic is explicit; no clean backend mypy or live-infrastructure-stop claim. Agent-driven Linux bootstrap/install/access remains open in #96.
+[kubernetes/nvke/qualification/operator-stop-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-stop-ui-local-2026-11-08.json) — observation. Source/log-bound 74 API/SDK/browser cases, 549 frontend cases, 37 story renders, 38 Chromium checks and compiled CLI confirmed/lost stop recovery; production build/lint/contracts gates pass. Combined ASGI teardown cancellation diagnostic is explicit; no clean backend mypy or live-infrastructure-stop claim. Agent-driven Linux bootstrap/install/access remains open in #96.
 
 Paired source SHA-256: `4213e98a0a80e1dcd9f26121ad3d9372d559e57dbe8a4d769a42ff888f55a3ab`.
 
 ### Evidence operator-agent-linux-prerequisites
 
-[kubernetes/nvke/qualification/operator-agent-linux-prerequisites-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-agent-linux-prerequisites-2026-11-08.json) — observation. Fresh isolated ARM64 Linux executor preparation for actual agent bootstrap: pinned source/binary, independent site/CA/credentials and runtime container starts. Existing qualification VM/tenant preserved. This record alone proves no native infrastructure effect.
+[kubernetes/nvke/qualification/operator-agent-linux-prerequisites-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-agent-linux-prerequisites-2026-11-08.json) — observation. Fresh isolated ARM64 Linux executor preparation for actual agent bootstrap: pinned source/binary, independent site/CA/credentials and runtime container starts. Existing qualification VM/tenant preserved. This record alone proves no native infrastructure effect.
 
 Paired source SHA-256: `b5327f6c2b1350670bdc5b9e5edc07890ffb29cc379a6dfed77a5777ba8420be`.
 
 ### Evidence operator-agent-bootstrap-native
 
-[kubernetes/nvke/qualification/operator-agent-bootstrap-native-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-agent-bootstrap-native-2026-11-08.json) — observation. Original native agent bootstrap retained attempt completed with exit zero; pinned bundle/source, private embedded-TLS kubeconfig, live API and complete expected Ready v1.36.4 node checked. This checker alone does not establish hosted admission.
+[kubernetes/nvke/qualification/operator-agent-bootstrap-native-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-agent-bootstrap-native-2026-11-08.json) — observation. Original native agent bootstrap retained attempt completed with exit zero; pinned bundle/source, private embedded-TLS kubeconfig, live API and complete expected Ready v1.36.4 node checked. This checker alone does not establish hosted admission.
 
 Paired source SHA-256: `ebc1aa6ef7453882ef55255730199f5832719923f85cdbda0dbe71f97cbe548d`.
 
 ### Evidence operator-agent-bootstrap-local
 
-[kubernetes/nvke/qualification/operator-agent-bootstrap-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-agent-bootstrap-local-2026-11-08.json) — observation. One actual compiled CLI/API/PostgreSQL/production-registry Temporal/mTLS Linux agent bootstrap admission, original SUCCEEDED receipt, checked private artifact export and host live node access. Original watcher failed generically; read-only recovery did not replay bootstrap. Management install/access and deployed/physical qualification remain open.
+[kubernetes/nvke/qualification/operator-agent-bootstrap-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-agent-bootstrap-local-2026-11-08.json) — observation. One actual compiled CLI/API/PostgreSQL/production-registry Temporal/mTLS Linux agent bootstrap admission, original SUCCEEDED receipt, checked private artifact export and host live node access. Original watcher failed generically; read-only recovery did not replay bootstrap. Management install/access and deployed/physical qualification remain open.
 
 Paired source SHA-256: `afb842d1f0aa885a1ebbc839256b6ed77ca3bf93c342d24c3094552b56f18273`.
 
 ### Evidence operator-watch-recovery
 
-[kubernetes/nvke/qualification/operator-watch-recovery-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-watch-recovery-local-2026-11-08.json) — observation. Signed CLI source plus full Go/fmt/vet/lint proof: safe watch failure categories, no automatic retry or mutation, original ID/recovery command and explicit read-only recovery. Original live watch failure cause remains unproven.
+[kubernetes/nvke/qualification/operator-watch-recovery-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-watch-recovery-local-2026-11-08.json) — observation. Signed CLI source plus full Go/fmt/vet/lint proof: safe watch failure categories, no automatic retry or mutation, original ID/recovery command and explicit read-only recovery. Original live watch failure cause remains unproven.
 
 Paired source SHA-256: `50339de6d128fbd1f0d833b10fe007ad80f3b6bd11d6b01935a03c46376f6d99`.
 
 ### Evidence operator-watch-tests
 
-[cmd/nvke_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_test.go) — test. HTTP/GraphQL refusal, invisible and mismatched receipts stop initial/subsequent watches after one read; recovery preserves the original operation and never re-admits work.
+[cmd/nvke_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_test.go) — test. HTTP/GraphQL refusal, invisible and mismatched receipts stop initial/subsequent watches after one read; recovery preserves the original operation and never re-admits work.
 
 Paired source SHA-256: `90744212b02cf237ee9621c47edd685110181208b53583c5ddea40a749d14714`.
 
 ### Evidence operator-partial-install-review
 
-[kubernetes/nvke/management_recovery.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_recovery.py) — implementation. Read-only partial-install review verifies the exact failed native guard/start/finish, current pinned bundle, private TLS kubeconfig and free native lock. Reports current generations/replicas; never clears a guard or authorizes continuation.
+[kubernetes/nvke/management_recovery.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_recovery.py) — implementation. Read-only partial-install review verifies the exact failed native guard/start/finish, current pinned bundle, private TLS kubeconfig and free native lock. Reports current generations/replicas; never clears a guard or authorizes continuation.
 
 Paired source SHA-256: `31cb3e382afa0c2c63211ec451b47e9b8af1eb889fa4c07777c690f4eab2c509`.
 
 ### Evidence operator-partial-install-tests
 
-[kubernetes/nvke/test_management_recovery.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_management_recovery.py) — test. Nine cases cover original failure/privacy, missing/mismatched/successful receipts, symlinks, stale/deleting/scaled-down workloads, active locks, read-only behavior, receipt/bundle drift and output overwrite refusal.
+[kubernetes/nvke/test_management_recovery.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_management_recovery.py) — test. Nine cases cover original failure/privacy, missing/mismatched/successful receipts, symlinks, stale/deleting/scaled-down workloads, active locks, read-only behavior, receipt/bundle drift and output overwrite refusal.
 
 Paired source SHA-256: `cf39d98c62c6881a5721fdce7c60934f6d68f46d6983111a60a923b503fdca6c`.
 
 ### Evidence operator-partial-install-local
 
-[kubernetes/nvke/qualification/operator-agent-partial-install-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-agent-partial-install-local-2026-11-08.json) — observation. One actual agent install failed its LGTM readiness deadline with native exit 1; original UNCERTAIN effects/fence/guard retained without replay. Live source-bound review and 83 tooling tests (80 passed/3 opt-in skipped). Inotify prerequisite corrected. Reviewed agent/API/UI/CLI continuation remains open in #97.
+[kubernetes/nvke/qualification/operator-agent-partial-install-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-agent-partial-install-local-2026-11-08.json) — observation. One actual agent install failed its LGTM readiness deadline with native exit 1; original UNCERTAIN effects/fence/guard retained without replay. Live source-bound review and 83 tooling tests (80 passed/3 opt-in skipped). Inotify prerequisite corrected. Reviewed agent/API/UI/CLI continuation remains open in #97.
 
 Paired source SHA-256: `fbad1dcc08c2d9fad724c7238f4cec0e56ca3068a49cf56328ba099591f0c369`.
 
 ### Evidence operator-install-review-agent
 
-[kubernetes/nvke/operator_agent.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/operator_agent.py) — implementation. Original intent/mTLS/site/instance/bundle and authenticated native-run binding for read-only partial-install review. Executor reservation refuses admissions, source drift is rejected, original uncertainty/guards remain intact; no continuation admitted.
+[kubernetes/nvke/operator_agent.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/operator_agent.py) — implementation. Original intent/mTLS/site/instance/bundle and authenticated native-run binding for read-only partial-install review. Executor reservation refuses admissions, source drift is rejected, original uncertainty/guards remain intact; no continuation admitted.
 
 Paired source SHA-256: `f3c916ed04fff2fc7210cc27bfff4f0f1bfef617c42d130a22ade4b466e887d6`.
 
@@ -931,7 +931,7 @@ Paired source SHA-256: `f3c916ed04fff2fc7210cc27bfff4f0f1bfef617c42d130a22ade4b4
 
 ### Evidence operator-install-review-local
 
-[kubernetes/nvke/qualification/operator-install-review-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-install-review-local-2026-11-08.json) — observation. Actual original failed install reviewed through SDK/mTLS after an identity-preserving agent restart. Six original files unchanged, original effect fence retained, LGTM later Ready, bounded local evaluation sizing rendered. 89 tooling tests/3 opt-in skips, 47 SDK tests and clean typed projection. Application permission/version review and continuation remain open in #97.
+[kubernetes/nvke/qualification/operator-install-review-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-install-review-local-2026-11-08.json) — observation. Actual original failed install reviewed through SDK/mTLS after an identity-preserving agent restart. Six original files unchanged, original effect fence retained, LGTM later Ready, bounded local evaluation sizing rendered. 89 tooling tests/3 opt-in skips, 47 SDK tests and clean typed projection. Application permission/version review and continuation remain open in #97.
 
 Paired source SHA-256: `0e4c23be46a38a20215d3cfe740c29fab4ae96a80261c5cc0a59a57a47cb3bfe`.
 
@@ -945,19 +945,19 @@ Paired source SHA-256: `0e4c23be46a38a20215d3cfe740c29fab4ae96a80261c5cc0a59a57a
 
 ### Evidence operator-install-review-cli
 
-[cmd/nvke_install_review.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_install_review.go) — implementation. Compiled astro nvke agent install-review binds exact original operation/version and current verified agent identity/bundle, validates non-authorization and complete typed readiness facts, preserves decimal strings/nulls, and never admits or stops work.
+[cmd/nvke_install_review.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_install_review.go) — implementation. Compiled astro nvke agent install-review binds exact original operation/version and current verified agent identity/bundle, validates non-authorization and complete typed readiness facts, preserves decimal strings/nulls, and never admits or stops work.
 
 Paired source SHA-256: `a93f08e37e002dad30d4ad28109e5092c74512f055c246c65765f0e38e69a38e`.
 
 ### Evidence operator-install-review-cli-tests
 
-[cmd/nvke_install_review_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_install_review_test.go) — test. 22 command cases cover source/authority changes, missing readiness and continuation fields, malformed counts/evidence, duplicate/false-ready workloads, guarded native failure and sanitized refusal. One bookkeeping review action at most; no native admission mutation.
+[cmd/nvke_install_review_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_install_review_test.go) — test. 22 command cases cover source/authority changes, missing readiness and continuation fields, malformed counts/evidence, duplicate/false-ready workloads, guarded native failure and sanitized refusal. One bookkeeping review action at most; no native admission mutation.
 
 Paired source SHA-256: `f560ef9351d5ae9dc7006ba5199b074cf6305204ea5f7a7b2326f3eb88478fa8`.
 
 ### Evidence operator-install-review-api-cli-local
 
-[kubernetes/nvke/qualification/operator-install-review-api-cli-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-install-review-api-cli-local-2026-11-08.json) — observation. Actual compiled CLI/API/PostgreSQL/SDK/mTLS review of the original Linux partial install, 24 workloads across four snapshot pages, search cursor rebinding refusal and persistent private-safe audit. Original UNCERTAIN/version 23 retained. 62 backend tests, full Go suite, vet/lint, frontend types/codegen/contracts passed. UI and once-only continuation remain pending.
+[kubernetes/nvke/qualification/operator-install-review-api-cli-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-install-review-api-cli-local-2026-11-08.json) — observation. Actual compiled CLI/API/PostgreSQL/SDK/mTLS review of the original Linux partial install, 24 workloads across four snapshot pages, search cursor rebinding refusal and persistent private-safe audit. Original UNCERTAIN/version 23 retained. 62 backend tests, full Go suite, vet/lint, frontend types/codegen/contracts passed. UI and once-only continuation remain pending.
 
 Paired source SHA-256: `e9a07492a32343c7c0e0fc4d8b8a73068386009e75f04a508644bb6b19673b6d`.
 
@@ -983,43 +983,43 @@ Paired source SHA-256: `e9a07492a32343c7c0e0fc4d8b8a73068386009e75f04a508644bb6b
 
 ### Evidence operator-install-review-ui-local
 
-[kubernetes/nvke/qualification/operator-install-review-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-install-review-ui-local-2026-11-08.json) — observation. Two real retained-install Chromium/API/mTLS cases each walked 24 workloads and searched LGTM. Stale version refused; original UNCERTAIN/version 23 and eight native files/five jobs/runs unchanged. 31 release Chromium checks passed. Connected Storybook only; deployed login/routes, production-build/deployed-route gates and continuation remain separate.
+[kubernetes/nvke/qualification/operator-install-review-ui-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-install-review-ui-local-2026-11-08.json) — observation. Two real retained-install Chromium/API/mTLS cases each walked 24 workloads and searched LGTM. Stale version refused; original UNCERTAIN/version 23 and eight native files/five jobs/runs unchanged. 31 release Chromium checks passed. Connected Storybook only; deployed login/routes, production-build/deployed-route gates and continuation remain separate.
 
 Paired source SHA-256: `553d60ea5c6b750987cd6a941cfe9ce03e7a950d45d6d29177f019b4934b5c81`.
 
 ### Evidence operator-install-plan-core
 
-[kubernetes/nvke/management_plan.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_plan.py) — implementation. Pure input/execution/review-bound remaining-install proposal compiler. It distinguishes exact native starts from Helm progress, preserves original prepared and proposed item types/content, and declares retained versus reconstructed provenance. Log order remains unattested; no administrator authority or native admission.
+[kubernetes/nvke/management_plan.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_plan.py) — implementation. Pure input/execution/review-bound remaining-install proposal compiler. It distinguishes exact native starts from Helm progress, preserves original prepared and proposed item types/content, and declares retained versus reconstructed provenance. Log order remains unattested; no administrator authority or native admission.
 
 Paired source SHA-256: `c9c05a4ac95a079bba8c147cfb6bac050efec3df9afd1b37784317288a5e8f40`.
 
 ### Evidence operator-install-plan-core-tests
 
-[kubernetes/nvke/test_management_plan.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_management_plan.py) — test. Ten unit cases cover native Helm progress, original/rendered type differences, inventory/prefix ambiguity, source/tamper/privacy refusal, custom inventories and 10,000-item proposals. No native execution or hosted continuation claim.
+[kubernetes/nvke/test_management_plan.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_management_plan.py) — test. Ten unit cases cover native Helm progress, original/rendered type differences, inventory/prefix ambiguity, source/tamper/privacy refusal, custom inventories and 10,000-item proposals. No native execution or hosted continuation claim.
 
 Paired source SHA-256: `38aad13a3a6f7c951c03963cb7e379431e11d75fb20d6a719b7b38ed7e202366`.
 
 ### Evidence operator-install-plan-store
 
-[kubernetes/nvke/management_plan_store.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_plan_store.py) — implementation. Private bounded snapshots and fsynced non-overwriting HMAC-sealed proposals/linkage. Actual original/proposed frozen inventories, item content and private execution payload must match reviewed digests. One original-job reservation across replanning, same-link recovery after lost reply and different child/intent refusal. Storage/reservation only; fresh source/current-admin checks and dispatch remain external.
+[kubernetes/nvke/management_plan_store.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_plan_store.py) — implementation. Private bounded snapshots and fsynced non-overwriting HMAC-sealed proposals/linkage. Actual original/proposed frozen inventories, item content and private execution payload must match reviewed digests. One original-job reservation across replanning, same-link recovery after lost reply and different child/intent refusal. Storage/reservation only; fresh source/current-admin checks and dispatch remain external.
 
 Paired source SHA-256: `44070b7e32c9e5b6bbcc5240064a8f2af0a339c5f005b8be7b9235d153828967`.
 
 ### Evidence operator-install-plan-store-tests
 
-[kubernetes/nvke/test_management_plan_store.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_management_plan_store.py) — test. Seventeen real-filesystem cases cover source changes, frozen content/flags/tampering, symlinks/hardlinks/budgets, incomplete or overwritten publication, site/instance/key separation, original/rendered inventory pairing, cold same-link recovery and concurrent one-winner reservation.
+[kubernetes/nvke/test_management_plan_store.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_management_plan_store.py) — test. Seventeen real-filesystem cases cover source changes, frozen content/flags/tampering, symlinks/hardlinks/budgets, incomplete or overwritten publication, site/instance/key separation, original/rendered inventory pairing, cold same-link recovery and concurrent one-winner reservation.
 
 Paired source SHA-256: `3c86015383d567adf6342647bbe41bfdab22e991acc567a9353839d5c9b48206`.
 
 ### Evidence operator-install-plan-storage-local
 
-[kubernetes/nvke/qualification/management-plan-storage-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-plan-storage-local-2026-11-08.json) — observation. Direct Linux read-only preparation against authenticated retained job/native receipts produced a sealed 12-item reconstructed plan with seven observed starts and six remaining items; cold authentication, wrong-key/tamper refusal, and unchanged eight original files/five jobs/runs/application UNCERTAIN version 23. 27 compiler/store cases pass; management discovery 50 run/8 opt-in skips. No reservation, hosted preparation or continuation admitted; historical environment/content identity unproven.
+[kubernetes/nvke/qualification/management-plan-storage-local-2026-11-08.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-plan-storage-local-2026-11-08.json) — observation. Direct Linux read-only preparation against authenticated retained job/native receipts produced a sealed 12-item reconstructed plan with seven observed starts and six remaining items; cold authentication, wrong-key/tamper refusal, and unchanged eight original files/five jobs/runs/application UNCERTAIN version 23. 27 compiler/store cases pass; management discovery 50 run/8 opt-in skips. No reservation, hosted preparation or continuation admitted; historical environment/content identity unproven.
 
 Paired source SHA-256: `1a7b32dd9fb51a50a8ede3723299b6d53720f661673a6f701f37b1019f4f1205`.
 
 ### Evidence operator-install-plan-preparation
 
-[kubernetes/nvke/management_plan_preparation.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_plan_preparation.py) — implementation. Authenticated read-only preparation and same-ID recovery over sealed snapshots. Fresh original source, target cluster UID, guarded input copies, explicit reconstruction provenance and source-bound signed item/workload paging. No continuation execution or historical environment identity claim.
+[kubernetes/nvke/management_plan_preparation.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_plan_preparation.py) — implementation. Authenticated read-only preparation and same-ID recovery over sealed snapshots. Fresh original source, target cluster UID, guarded input copies, explicit reconstruction provenance and source-bound signed item/workload paging. No continuation execution or historical environment identity claim.
 
 Paired source SHA-256: `2c6dcf63663795bf5e3338a0b29425b17442b217d16fa8ef96e5fb8f33072388`.
 
@@ -1057,31 +1057,31 @@ Selector: `NvkeInstallPlan`.
 
 ### Evidence operator-install-plan-api-local
 
-[kubernetes/nvke/qualification/operator-install-plan-api-local-2026-11-09.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-install-plan-api-local-2026-11-09.json) — observation. Actual retained-install Linux SDK and current-admin GraphQL preparation/recovery: 12 items, 24 workloads, complete pages/search, stale version/cursor refusal, encrypted private intent, redacted audits and cold agent restart. Eight native files, five jobs/runs and original UNCERTAIN/version-23 full row remain unchanged; no linked reservation. Initial staging refusal, fixture/SDK timeout corrections and host tenant probe limits are preserved. CLI/UI plan review, closure attestation and execution remain open.
+[kubernetes/nvke/qualification/operator-install-plan-api-local-2026-11-09.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-install-plan-api-local-2026-11-09.json) — observation. Actual retained-install Linux SDK and current-admin GraphQL preparation/recovery: 12 items, 24 workloads, complete pages/search, stale version/cursor refusal, encrypted private intent, redacted audits and cold agent restart. Eight native files, five jobs/runs and original UNCERTAIN/version-23 full row remain unchanged; no linked reservation. Initial staging refusal, fixture/SDK timeout corrections and host tenant probe limits are preserved. CLI/UI plan review, closure attestation and execution remain open.
 
 Paired source SHA-256: `3eb3908f63d6c0bb05009aa0aa19b2863628d5b24dbfae979e90f80010ede2e5`.
 
 ### Evidence operator-install-plan-cli
 
-[cmd/nvke_install_plan.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_install_plan.go) — implementation. Reviewed remote prepare/review/retry-preparation/items/workloads commands. Exact private UTF-8 input, fsynced metadata journal before preparation, original source/authority validation and page/action/readiness checks. No install or continuation admission.
+[cmd/nvke_install_plan.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_install_plan.go) — implementation. Reviewed remote prepare/review/retry-preparation/items/workloads commands. Exact private UTF-8 input, fsynced metadata journal before preparation, original source/authority validation and page/action/readiness checks. No install or continuation admission.
 
 Paired source SHA-256: `4d1bb11e32c0cdd3cfd1e210b396d68d2d87cfdf0d9086992323de80d391ebf8`.
 
 ### Evidence operator-install-plan-cli-api
 
-[internal/api/nvke_install_plan.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/internal/api/nvke_install_plan.go) — implementation. Typed GraphQL plan/header/source/item/workload transport; private mutation/query redirects refused, six-minute plan HTTP deadline preserves the shared client deadline. Full proposed request fields remain in private request text.
+[internal/api/nvke_install_plan.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/internal/api/nvke_install_plan.go) — implementation. Typed GraphQL plan/header/source/item/workload transport; private mutation/query redirects refused, six-minute plan HTTP deadline preserves the shared client deadline. Full proposed request fields remain in private request text.
 
 Paired source SHA-256: `bf4670881e4d2c33b236e3f7984fc8dd5293e66a1ebd33620e3d01875768c5da`.
 
 ### Evidence operator-install-plan-cli-tests
 
-[cmd/nvke_install_plan_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_install_plan_test.go) — test. Real controlled HTTP command tests cover source/authority/header refusal, journal-before-mutation, changed input, lost reply without resubmission, exact retained-intent retry, item/cursor/action checks, decimal precision and null readiness. Separate API transport tests cover all five redirect paths and client deadline isolation.
+[cmd/nvke_install_plan_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_install_plan_test.go) — test. Real controlled HTTP command tests cover source/authority/header refusal, journal-before-mutation, changed input, lost reply without resubmission, exact retained-intent retry, item/cursor/action checks, decimal precision and null readiness. Separate API transport tests cover all five redirect paths and client deadline isolation.
 
 Paired source SHA-256: `f7007bc88b4b6cbd63f013113d39bd1485aefae73450c8c779f609f44737964d`.
 
 ### Evidence operator-install-plan-cli-local
 
-[kubernetes/nvke/qualification/operator-install-plan-cli-local-2026-11-09.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/operator-install-plan-cli-local-2026-11-09.json) — observation. Clean compiled CLI through actual GraphQL/SDK/mTLS Linux agent: prepare/review/retry, complete 12-item/24-workload pages, NKTP search, changed cursor and stale-version refusal. Private journal and unchanged original eight files/five jobs/runs/full UNCERTAIN-version-23 row. Full Go suite: 1032 passing top-level tests/12 packages, two existing native opt-in skips. Later host usernet outage is separately recorded in #98; no guest reboot or native replay.
+[kubernetes/nvke/qualification/operator-install-plan-cli-local-2026-11-09.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/operator-install-plan-cli-local-2026-11-09.json) — observation. Clean compiled CLI through actual GraphQL/SDK/mTLS Linux agent: prepare/review/retry, complete 12-item/24-workload pages, NKTP search, changed cursor and stale-version refusal. Private journal and unchanged original eight files/five jobs/runs/full UNCERTAIN-version-23 row. Full Go suite: 1032 passing top-level tests/12 packages, two existing native opt-in skips. Later host usernet outage is separately recorded in #98; no guest reboot or native replay.
 
 Paired source SHA-256: `6ed42dc5e3311379e400df81d988982aecfbff9638ffb2bc88fba8daf5e65698`.
 
@@ -1111,19 +1111,19 @@ Paired source SHA-256: `6ed42dc5e3311379e400df81d988982aecfbff9638ffb2bc88fba8da
 
 ### Evidence operator-install-plan-dependencies
 
-[kubernetes/nvke/management_dependencies.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_dependencies.py) — implementation. Private source-bound native file dependency discovery: guarded inputs, source chart trees/archives, values/set-file references and image layouts; pinned parser consumes verified snapshot bytes. Explicit materialization/live-verification state and false continuation authorization.
+[kubernetes/nvke/management_dependencies.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_dependencies.py) — implementation. Private source-bound native file dependency discovery: guarded inputs, source chart trees/archives, values/set-file references and image layouts; pinned parser consumes verified snapshot bytes. Explicit materialization/live-verification state and false continuation authorization.
 
-Paired source SHA-256: `f15bd0e13aece58ebaca138d22958c028e5c63e53f32ce1d54b70b00348f4510`.
+Paired source SHA-256: `9e242ad2dba2d52c06e06b5c21068136cf61861e7f3f6b283a3cf0aeb3428b4c`.
 
 ### Evidence operator-install-plan-dependency-tests
 
-[kubernetes/nvke/test_management_dependencies.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/test_management_dependencies.py) — test. Thirteen actual filesystem/pinned native parser cases cover vanished staging, changed/restored metadata and item inventories, unsafe aliases, byte budgets with overlap deduplication, external charts/values/set-file/image references and private diagnostics. No Kubernetes or Helm execution.
+[kubernetes/nvke/test_management_dependencies.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/test_management_dependencies.py) — test. Twenty-three filesystem/pinned native parser cases cover recursive local dependencies, alias indices, legacy requirements, cycles, removed staging, parser/metadata races, unsafe links and byte budgets. Inventory does not authorize execution.
 
-Paired source SHA-256: `f4bc600e6da692c6a266fec95ec969c8e27a7474ce351fc6730ed47630c225d2`.
+Paired source SHA-256: `698e2dbeeb986742c9389a92c5f4745254fc76b2c026d11625a911da59d7fd73`.
 
 ### Evidence operator-install-plan-dependency-local
 
-[kubernetes/nvke/qualification/management-dependency-inventory-local-2026-11-09.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-dependency-inventory-local-2026-11-09.json) — observation. Host-owned temporary workspace: 40 compiler/store/dependency cases and all 53 native-bundle agent cases pass, including actual mTLS with controlled Kubernetes reads and unchanged original temporary job/linkage. Source hashes, initial assertion correction and parser-race fix are recorded. Artifact materialization, skipped-resource evidence and actual retained Linux/browser continuation remain pending.
+[kubernetes/nvke/qualification/management-dependency-inventory-local-2026-11-09.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-dependency-inventory-local-2026-11-09.json) — observation. Host-owned temporary workspace: 40 compiler/store/dependency cases and all 53 native-bundle agent cases pass, including actual mTLS with controlled Kubernetes reads and unchanged original temporary job/linkage. Source hashes, initial assertion correction and parser-race fix are recorded. Artifact materialization, skipped-resource evidence and actual retained Linux/browser continuation remain pending.
 
 Paired source SHA-256: `a83190be2a56c85ede81634442a57064a6a00e9a5c8227ea113092a32986a5ba`.
 
@@ -1143,37 +1143,37 @@ Selector: `test_real_tls_sdk_chart_stage_lost_reply_recovers_without_refetch_or_
 
 ### Evidence operator-chart-artifacts-agent
 
-[kubernetes/nvke/management_plan_chart_service.py](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/management_plan_chart_service.py) — implementation. Native lock/executor reservation and source-bound chart preparation/read routes return only public hashes/counts and continuation false. Artifact IDs cannot be admitted or stop-fenced as native jobs. Trusted mTLS caller remains responsible for current application authorization.
+[kubernetes/nvke/management_plan_chart_service.py](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/management_plan_chart_service.py) — implementation. Native lock/executor reservation and source-bound chart preparation/read routes return only public hashes/counts and continuation false. Artifact IDs cannot be admitted or stop-fenced as native jobs. Trusted mTLS caller remains responsible for current application authorization.
 
-Paired source SHA-256: `e41ac93b37a2079499538d6a0b88991cf76d415e64f622f9e36f9469b9e5f395`.
+Paired source SHA-256: `beb7bfbd652d0f5848f4478ec6316f86ee05ee5b5d98ae4bbcfee409c5ab975e`.
 
 ### Evidence operator-chart-artifacts-local
 
-[kubernetes/nvke/qualification/management-chart-artifacts-local.json](https://github.com/calliopeai/astrolift-opscode/blob/166aaafa9448bf9b62260104061200c55dc54d65/kubernetes/nvke/qualification/management-chart-artifacts-local.json) — observation. Controlled host/temporary-workspace archive, real Helm package/repository/locked-dependency, partial/cold/lost-result recovery and actual mTLS agent tests. Full closure, live skipped-resource proof, linked install execution and retained Linux qualification remain open.
+[kubernetes/nvke/qualification/management-chart-artifacts-local.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-chart-artifacts-local.json) — observation. Controlled host/temporary-workspace archive, real Helm package/repository/locked-dependency, partial/cold/lost-result recovery and actual mTLS agent tests. Full closure, live skipped-resource proof, linked install execution and retained Linux qualification remain open.
 
 Paired source SHA-256: `f6d0ae2bf759aad26b4ba208670ddef6a0703fcb15e3b84cf0017d9537c3c565`.
 
 ### Evidence operator-chart-artifacts-cli
 
-[cmd/nvke_install_plan_charts.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_install_plan_charts.go) — implementation. Explicit charts prepare/review/retry-preparation commands review the exact original/parent source, flush metadata-only exact-text journals before private preparation, preserve int64 byte strings and refuse foreign/truncated/authorizing results. No native install or automatic retry.
+[cmd/nvke_install_plan_charts.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_install_plan_charts.go) — implementation. Explicit charts prepare/review/retry-preparation commands review the exact original/parent source, flush metadata-only exact-text journals before private preparation, preserve int64 byte strings and refuse foreign/truncated/authorizing results. No native install or automatic retry.
 
 Paired source SHA-256: `e013556bf4891e90c1ddfe975bc3257f005a920709af3dd0929b662256f5f0dd`.
 
 ### Evidence operator-chart-artifacts-cli-tests
 
-[cmd/nvke_install_plan_charts_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/cmd/nvke_install_plan_charts_test.go) — test. Controlled API transport cases cover source/version/digest binding, exact private text and durable journal ordering, changed journal scope, duplicate/case-variant/unknown/null fields, int64 precision/budgets, lost-reply read recovery, incomplete/authorizing replies and refusal before chart RPC on stale parent. Separate from pending combined API/CLI/agent execution.
+[cmd/nvke_install_plan_charts_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/cmd/nvke_install_plan_charts_test.go) — test. Controlled API transport cases cover source/version/digest binding, exact private text and durable journal ordering, changed journal scope, duplicate/case-variant/unknown/null fields, int64 precision/budgets, lost-reply read recovery, incomplete/authorizing replies and refusal before chart RPC on stale parent. Combined controlled CLI/API/agent execution has separate evidence.
 
 Paired source SHA-256: `3251e7ec88dfe6858984ebc33c1829079b86255bc827d5892be90d01c06d6016`.
 
 ### Evidence operator-chart-artifacts-cli-api
 
-[internal/api/nvke_install_plan_charts.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/internal/api/nvke_install_plan_charts.go) — implementation. Typed prepare/read/private-retry mutations use the protected operator transport and isolated bounded client. All three documents and selected fields were checked against the exported application schema; this does not establish a successful live call.
+[internal/api/nvke_install_plan_charts.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/internal/api/nvke_install_plan_charts.go) — implementation. Typed prepare/read/private-retry mutations use the protected operator transport and isolated bounded client. All three documents and selected fields were checked against the exported application schema; this does not establish a successful live call.
 
 Paired source SHA-256: `410b675a5afbdd3f0575bea855f228fbcc671180ddeaa6c79a3e3b844fa71481`.
 
 ### Evidence operator-chart-artifacts-cli-transport-tests
 
-[internal/api/nvke_install_plan_test.go](https://github.com/calliopeai/astrolift-cli/blob/bbd9522e43810eeb2ac677a0ce4ee825b11bb432/internal/api/nvke_install_plan_test.go) — test. Chart prepare/read/retry join the real HTTP redirect-refusal cases, preserving private request/token boundaries and the shared client timeout. Full local Go tests, formatting, vet, lint and build passed; API/CLI/mTLS/native qualification remains open.
+[internal/api/nvke_install_plan_test.go](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/internal/api/nvke_install_plan_test.go) — test. Chart prepare/read/retry join the real HTTP redirect-refusal cases, preserving private request/token boundaries and the shared client timeout. Full local Go tests, formatting, vet, lint and build passed; combined controlled CLI/API/mTLS/Helm 4 execution has separate evidence.
 
 Paired source SHA-256: `7e7e80db94267d245f2fab423e67b883dbdcf10e6d9ec30ab91407f461035922`.
 
@@ -1208,6 +1208,28 @@ Paired source SHA-256: `7e7e80db94267d245f2fab423e67b883dbdcf10e6d9ec30ab91407f4
 ### Evidence operator-chart-artifacts-ui-browser
 
 [frontend/e2e/nvke-install-plan-charts-recovery-runner.mjs](../../frontend/e2e/nvke-install-plan-charts-recovery-runner.mjs) — test. Two controlled Chromium hook/panel scenarios verify replies lost before/after retention, identical original request hashes, durable journal ordering, explicit reads and no private request options in browser storage; not actual API/browser qualification.
+
+### Evidence operator-chart-artifacts-helm4-local
+
+[kubernetes/nvke/qualification/management-local-chart-materialization-local.json](https://github.com/calliopeai/astrolift-opscode/blob/5200851616150efb6d121923f9e5dd2185f23474/kubernetes/nvke/qualification/management-local-chart-materialization-local.json) — observation. Controlled Helm 4 parent/child closure, lock rebasing, aliases, stale/missing/helper refusal, cold reads and agent restart: 22 chart cases, 23 inventory cases and 56 native-bundle agent cases. No full rendering, private OCI or continuation claim.
+
+Paired source SHA-256: `1736e68eb99e4d5b473d8f28b7a624b897e8f3ccd9b3df359d7a0e08e9d54c11`.
+
+### Evidence operator-chart-artifacts-helm4-api-local
+
+[backend/providers/nvke/qualification/install-plan-chart-helm4-paired-local.json](../../backend/providers/nvke/qualification/install-plan-chart-helm4-paired-local.json) — observation. Current-runtime paired qualification: 47 PostgreSQL plan/chart and 128 SDK plan/chart/transport cases. Real GraphQL/mTLS/Helm 4 local-file preparation survives a lost reply and same-endpoint owned agent restart with unchanged originals.
+
+### Evidence operator-chart-artifacts-cli-native-test
+
+[scripts/integration/test_nvke_install_plan_charts.py](https://github.com/calliopeai/astrolift-cli/blob/f1c1247f77fbb13ac36b5d5e832ff858b408e1ac/scripts/integration/test_nvke_install_plan_charts.py) — test. Compiled CLI/actual GraphQL/PostgreSQL/SDK/mTLS/Helm 4 with controlled failed receipt, chart inventory and Kubernetes GETs: lost reply, durable input-hash journal, explicit read/private retry and unchanged original rows/state/guard/runs/links.
+
+Selector: `test_compiled_cli_chart_prepare_lost_reply_review_and_private_retry`.
+
+Paired source SHA-256: `a4f38d91d6d0b9d8e5f452a4f55b1fab36cc8045245165f6e73a9bd2d95d3b99`.
+
+### Evidence operator-chart-artifacts-cli-local
+
+[backend/providers/nvke/qualification/install-plan-chart-cli-local.json](../../backend/providers/nvke/qualification/install-plan-chart-cli-local.json) — observation. One controlled compiled CLI/API/agent chart recovery case passes with an explicitly reviewed 300-second connection timeout. Records source/binary identity, full Go lint/vet/tests and earlier deadline failures. Retained Linux and actual browser/API qualification remain open.
 
 
 ## Verification

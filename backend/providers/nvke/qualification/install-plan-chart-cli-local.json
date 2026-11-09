@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "scope": "compiled-cli-graphql-postgres-mtls-helm4-controlled-local-chart-recovery",
+  "applicationRevision": "6a0cead94acea89786ba34387a7e5cfa9038ad23",
+  "opscodeRevision": "5200851616150efb6d121923f9e5dd2185f23474",
+  "cliTestRevision": "f1c1247f77fbb13ac36b5d5e832ff858b408e1ac",
+  "cliBinarySourceRevision": "bbd9522e43810eeb2ac677a0ce4ee825b11bb432",
+  "cliBinarySha256": "275174322d97faf16ce833dd61ce493e8466163ac5874a85d017e418733f69bd",
+  "cliGoSourceMatchesTestRevision": true,
+  "checks": {
+    "astrolift-nvke-cli-chart-helm4-paired-authority": {
+      "exitStatus": 0,
+      "logSha256": "6178881d9a799924e9ac83c284af0fb82d8758f9ea2ec9de16d0c44bd796f1db"
+    },
+    "astrolift-nvke-cli-checkpoint-checks-final": {
+      "exitStatus": 0,
+      "logSha256": "ec5ad22526f566630f349cec94b186e0b4ad9669e5fad4f53a12f741e00797cd"
+    }
+  },
+  "topLevelGoPasses": 1040,
+  "compiledCliCasesPassed": 1,
+  "evidence": [
+    "Compiled CLI site creation and actual mTLS authority configuration/verification with an explicit 300-second connection timeout.",
+    "Actual GraphQL/PostgreSQL/SDK/agent/Helm 4 prepares a controlled local parent/child chart. A lost HTTP preparation response is recovered by explicit CLI review and original-caller private retry without another attempt.",
+    "A metadata-only durable journal binds the exact private input hash; private chart options/content are absent. Original full database rows, native state/guard, runs and linked reservations remain unchanged."
+  ],
+  "corrections": [
+    "The shared test process deadline was 40 seconds, shorter than the chart/API operation window. This test explicitly allows 380 seconds; other integration invocations retain 40 seconds.",
+    "The configured default agent connection timeout of 30 seconds expired during preparation. The passing scenario explicitly selects the supported 300-second timeout; production defaults remain unchanged."
+  ],
+  "continuationAuthorized": false,
+  "limitations": [
+    "Failed-receipt setup, chart inputs/inventory and Kubernetes GETs are controlled fixtures. This does not qualify the retained Linux install.",
+    "Actual browser/API qualification, frozen execution-tree/render/image closure, registry/TLS policy, skipped-resource credential proof and linked once-only execution remain open.",
+    "No original operation replay, VM restart, infrastructure mutation, main merge or production deployment."
+  ]
+}

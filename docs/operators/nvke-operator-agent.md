@@ -504,3 +504,29 @@ deadline, then still requires successful mTLS identity verification. The final
 API suite passed all 46 cases against the migrated isolated PostgreSQL database.
 The formerly failing setup case and actual Helm/mTLS recovery case both passed
 without skips.
+
+
+The paired Helm 4 checkpoint now selects Opscode
+`5200851616150efb6d121923f9e5dd2185f23474`. All 47 PostgreSQL plan/chart cases
+and 128 SDK plan/chart/transport cases passed. An owned local parent/child chart
+survives a deliberately lost preparation result and an agent/TLS-listener restart
+at the same endpoint; explicit GraphQL recovery and private retry leave the
+original operation, parent, native state, guard, runs and linked reservations
+unchanged. This fixture controls the dependency inventory and Kubernetes reads.
+
+CLI test revision `f1c1247f77fbb13ac36b5d5e832ff858b408e1ac` also passed one
+compiled CLI/actual API/PostgreSQL/SDK/mTLS/Helm 4 local-chart scenario, with a lost
+HTTP preparation response, durable exact-input-hash journal, explicit review and
+private retry without another attempt. Its binary is the earlier `bbd9522` build;
+the Go sources/modules/Makefile are identical at both revisions. Formatting, vet,
+lint and all 1,040 top-level Go tests passed. Exact binary/log identities and
+corrections are recorded in
+`backend/providers/nvke/qualification/install-plan-chart-cli-local.json`.
+
+This scenario explicitly configures `--connection-timeout 300`. The default
+30-second agent connection expired while preparation was still running; that
+failure did not prove native work stopped. Preserve the artifact/plan IDs and
+journal after an ambiguous response, then use explicit review. The test harness
+also needed a process deadline longer than the product's private preparation
+window. These changes do not qualify actual browser/API behavior, all upstream
+charts, private registries, the retained Linux installation or native continuation.

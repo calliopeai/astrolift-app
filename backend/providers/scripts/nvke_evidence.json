@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "bbd9522e43810eeb2ac677a0ce4ee825b11bb432"
+      "revision": "f1c1247f77fbb13ac36b5d5e832ff858b408e1ac"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "166aaafa9448bf9b62260104061200c55dc54d65"
+      "revision": "5200851616150efb6d121923f9e5dd2185f23474"
     }
   },
   "evidence": {
@@ -62,7 +62,7 @@
       "kind": "test",
       "scope": "Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.",
       "symbol": "test_pinned_cli_vocabulary_matches_every_paired_server_action",
-      "sha256": "8d86416edf53e6e35287c1de1c3a37d27169d4f8c556cdff4d147c8a39c4be46"
+      "sha256": "1a5ec4e6061e6ffdb6fb8e57d8e894d590f3c45631c5eba73470f92fe6f38b17"
     },
     "crd-admission": {
       "repository": "app",
@@ -183,7 +183,7 @@
       "path": "kubernetes/nvke/tooling.py",
       "kind": "implementation",
       "scope": "Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.",
-      "sha256": "0c186724f46886aa20f9fd5772492142d6b59ef8965be5902b40fb700e8b00dd"
+      "sha256": "15c6060f42ce225d1d15c2af74ad621ed12ec5e41f232a1646949f6a20f43ed1"
     },
     "nktp-runtime": {
       "repository": "opscode",
@@ -281,7 +281,7 @@
       "kind": "test",
       "symbol": "test_compiled_cli_provider_collection_recovery_history_and_identity_pages",
       "scope": "Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.",
-      "sha256": "8d86416edf53e6e35287c1de1c3a37d27169d4f8c556cdff4d147c8a39c4be46"
+      "sha256": "1a5ec4e6061e6ffdb6fb8e57d8e894d590f3c45631c5eba73470f92fe6f38b17"
     },
     "native-linux-utilities": {
       "repository": "opscode",
@@ -500,7 +500,7 @@
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
       "scope": "Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.",
-      "sha256": "f2dd368bd103274f81b4aad8ead51e869cd8b642ee79468939359f635c55bc34"
+      "sha256": "7e6094df53bf4c8f70c1e29d9a0bf4015839077a038230e68d9827dcf55a1ab5"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -1069,14 +1069,14 @@
       "path": "kubernetes/nvke/management_dependencies.py",
       "kind": "implementation",
       "scope": "Private source-bound native file dependency discovery: guarded inputs, source chart trees/archives, values/set-file references and image layouts; pinned parser consumes verified snapshot bytes. Explicit materialization/live-verification state and false continuation authorization.",
-      "sha256": "f15bd0e13aece58ebaca138d22958c028e5c63e53f32ce1d54b70b00348f4510"
+      "sha256": "9e242ad2dba2d52c06e06b5c21068136cf61861e7f3f6b283a3cf0aeb3428b4c"
     },
     "operator-install-plan-dependency-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_management_dependencies.py",
       "kind": "test",
-      "scope": "Thirteen actual filesystem/pinned native parser cases cover vanished staging, changed/restored metadata and item inventories, unsafe aliases, byte budgets with overlap deduplication, external charts/values/set-file/image references and private diagnostics. No Kubernetes or Helm execution.",
-      "sha256": "f4bc600e6da692c6a266fec95ec969c8e27a7474ce351fc6730ed47630c225d2"
+      "scope": "Twenty-three filesystem/pinned native parser cases cover recursive local dependencies, alias indices, legacy requirements, cycles, removed staging, parser/metadata races, unsafe links and byte budgets. Inventory does not authorize execution.",
+      "sha256": "698e2dbeeb986742c9389a92c5f4745254fc76b2c026d11625a911da59d7fd73"
     },
     "operator-install-plan-dependency-local": {
       "repository": "opscode",
@@ -1109,7 +1109,7 @@
       "path": "kubernetes/nvke/management_plan_chart_service.py",
       "kind": "implementation",
       "scope": "Native lock/executor reservation and source-bound chart preparation/read routes return only public hashes/counts and continuation false. Artifact IDs cannot be admitted or stop-fenced as native jobs. Trusted mTLS caller remains responsible for current application authorization.",
-      "sha256": "e41ac93b37a2079499538d6a0b88991cf76d415e64f622f9e36f9469b9e5f395"
+      "sha256": "beb7bfbd652d0f5848f4478ec6316f86ee05ee5b5d98ae4bbcfee409c5ab975e"
     },
     "operator-chart-artifacts-local": {
       "repository": "opscode",
@@ -1129,7 +1129,7 @@
       "repository": "cli",
       "path": "cmd/nvke_install_plan_charts_test.go",
       "kind": "test",
-      "scope": "Controlled API transport cases cover source/version/digest binding, exact private text and durable journal ordering, changed journal scope, duplicate/case-variant/unknown/null fields, int64 precision/budgets, lost-reply read recovery, incomplete/authorizing replies and refusal before chart RPC on stale parent. Separate from pending combined API/CLI/agent execution.",
+      "scope": "Controlled API transport cases cover source/version/digest binding, exact private text and durable journal ordering, changed journal scope, duplicate/case-variant/unknown/null fields, int64 precision/budgets, lost-reply read recovery, incomplete/authorizing replies and refusal before chart RPC on stale parent. Combined controlled CLI/API/agent execution has separate evidence.",
       "sha256": "3251e7ec88dfe6858984ebc33c1829079b86255bc827d5892be90d01c06d6016"
     },
     "operator-chart-artifacts-cli-api": {
@@ -1143,7 +1143,7 @@
       "repository": "cli",
       "path": "internal/api/nvke_install_plan_test.go",
       "kind": "test",
-      "scope": "Chart prepare/read/retry join the real HTTP redirect-refusal cases, preserving private request/token boundaries and the shared client timeout. Full local Go tests, formatting, vet, lint and build passed; API/CLI/mTLS/native qualification remains open.",
+      "scope": "Chart prepare/read/retry join the real HTTP redirect-refusal cases, preserving private request/token boundaries and the shared client timeout. Full local Go tests, formatting, vet, lint and build passed; combined controlled CLI/API/mTLS/Helm 4 execution has separate evidence.",
       "sha256": "7e7e80db94267d245f2fab423e67b883dbdcf10e6d9ec30ab91407f461035922"
     },
     "operator-chart-artifacts-api": {
@@ -1193,6 +1193,33 @@
       "path": "frontend/e2e/nvke-install-plan-charts-recovery-runner.mjs",
       "kind": "test",
       "scope": "Two controlled Chromium hook/panel scenarios verify replies lost before/after retention, identical original request hashes, durable journal ordering, explicit reads and no private request options in browser storage; not actual API/browser qualification."
+    },
+    "operator-chart-artifacts-helm4-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-local-chart-materialization-local.json",
+      "kind": "observation",
+      "scope": "Controlled Helm 4 parent/child closure, lock rebasing, aliases, stale/missing/helper refusal, cold reads and agent restart: 22 chart cases, 23 inventory cases and 56 native-bundle agent cases. No full rendering, private OCI or continuation claim.",
+      "sha256": "1736e68eb99e4d5b473d8f28b7a624b897e8f3ccd9b3df359d7a0e08e9d54c11"
+    },
+    "operator-chart-artifacts-helm4-api-local": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/install-plan-chart-helm4-paired-local.json",
+      "kind": "observation",
+      "scope": "Current-runtime paired qualification: 47 PostgreSQL plan/chart and 128 SDK plan/chart/transport cases. Real GraphQL/mTLS/Helm 4 local-file preparation survives a lost reply and same-endpoint owned agent restart with unchanged originals."
+    },
+    "operator-chart-artifacts-cli-native-test": {
+      "repository": "cli",
+      "path": "scripts/integration/test_nvke_install_plan_charts.py",
+      "kind": "test",
+      "symbol": "test_compiled_cli_chart_prepare_lost_reply_review_and_private_retry",
+      "scope": "Compiled CLI/actual GraphQL/PostgreSQL/SDK/mTLS/Helm 4 with controlled failed receipt, chart inventory and Kubernetes GETs: lost reply, durable input-hash journal, explicit read/private retry and unchanged original rows/state/guard/runs/links.",
+      "sha256": "a4f38d91d6d0b9d8e5f452a4f55b1fab36cc8045245165f6e73a9bd2d95d3b99"
+    },
+    "operator-chart-artifacts-cli-local": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/install-plan-chart-cli-local.json",
+      "kind": "observation",
+      "scope": "One controlled compiled CLI/API/agent chart recovery case passes with an explicitly reviewed 300-second connection timeout. Records source/binary identity, full Go lint/vet/tests and earlier deadline failures. Retained Linux and actual browser/API qualification remain open."
     }
   },
   "rows": {
@@ -3489,9 +3516,13 @@
           "operator-chart-artifacts-ui-hook",
           "operator-chart-artifacts-ui-journal",
           "operator-chart-artifacts-ui-tests",
-          "operator-chart-artifacts-ui-browser"
+          "operator-chart-artifacts-ui-browser",
+          "operator-chart-artifacts-helm4-local",
+          "operator-chart-artifacts-helm4-api-local",
+          "operator-chart-artifacts-cli-native-test",
+          "operator-chart-artifacts-cli-local"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately. A chart-only materialization stage has real Helm/mTLS agent and SDK recovery checks; a durable chart API and real PostgreSQL/GraphQL/SDK/mTLS/Helm recovery are locally qualified and the chart UI has controlled browser recovery checks; combined API-CLI-agent and real browser/API qualification, OCI/private-registry/TLS qualification, complete artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The original agent install remains UNCERTAIN/exit 1 after an LGTM readiness failure; its rows, receipts and fences remain intact. Linux API/CLI install review and plan preparation/paging are locally qualified, but preserved-VM host forwarding is unavailable after the usernet outage (#98). Controlled Helm 4 local-file chart preparation/recovery is qualified through SDK, GraphQL/PostgreSQL and compiled CLI; browser recovery has controlled-peer checks only. Remaining work includes actual browser/API plan/chart qualification, private OCI/registry/TLS policy, the complete frozen execution tree and render/image closure, fresh skipped-resource/credential proof, linked once-only execution and interruption recovery (#97), completed retained agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, final production builds and deployed login/acceptance."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
