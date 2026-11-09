@@ -28,7 +28,7 @@
   "executionState": "requires-native-rendering-images-and-live-verification",
   "continuationAuthorized": false,
   "limitations": [
-    "The compiled CLI/API/browser qualification is separate and still pending at this checkpoint.",
+    "Compiled CLI/API/browser qualification at this runtime is recorded separately in install-plan-bundle-verification-browser-api-local.json.",
     "Native receipt/deployment/Kubernetes observations are controlled fixtures, not retained Linux continuation proof.",
     "Helm rendering/tree integration and phase-sensitive freshness, native values/setFile merging, Kustomize, image closure and linked execution remain open.",
     "No main merge, deployment, original native replay or retained VM restart."

@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "scope": "scoped-bundle-proof-api-browser-tree-recovery-local-qualification",
+  "cliBaseRevision": "f9afe229e4951f0b44d459d3c00550e50f3e634a",
+  "applicationRevision": "7bbfefb5fa15058f4469e37b2ebec954f316666d",
+  "opscodeRuntimeRevision": "3fa6f4fb71bbfed4f4fcb216b53d5e456b2eb1b0",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "compiledBinarySha256": "26a7529dd572b6d7afb6fb4b96a6a3d73cd4f7748869a0fe007456031ca7f4a8",
+  "chartHelperBinarySha256": "8b1fd18f4aa486924a242b0f72f7960411349760a1569296b44a28d9213768e3",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "c4659b6b79b8cc079fdc19c9e218eba5d10a2b1cf73e8b5882e11cf0cd85bd02",
+    "scripts/integration/tree_browser_qualification.py": "4fe138d11e0b9d9244afc7d1c1405bdd8f928ea52c033f410dfbba4dc6119df8"
+  },
+  "applicationBrowserSourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.api.stories.tsx": "2f2310fcf38cb37db8dae41173b7c133a428b83ef9d642cbea1710cfd97beadb",
+    "frontend/e2e/nvke-install-plan-tree-api-runner.mjs": "febc6d7e19002891df182025f885d92c3574c1b8af996ceb309deef06b2ec54f"
+  },
+  "checks": {
+    "pairedCliApiBrowser": {
+      "passed": 1,
+      "deselected": 1,
+      "skipped": 0,
+      "warnings": 6,
+      "exitCode": 0,
+      "durationSeconds": 160.46,
+      "variant": "browser, including common compiled CLI preparation/cold-recovery/private-retry journey",
+      "logSha256": "657092956d71b46fbc3fe639ffba5fa1d8b5ff9b6587fa4a108d388256980204"
+    },
+    "ruff": "passed",
+    "format": "passed",
+    "unchangedGoChecksReused": {
+      "passed": 1048,
+      "skipped": 2,
+      "exitCode": 0,
+      "vet": "passed",
+      "lint": "passed",
+      "logSha256": "26a3c87df205acb67fdb2f2d67fedf7a037b1eab9c9ec96dbc4258c8c9f01abc",
+      "reason": "Tracked cmd/internal/main and Go module source bytes remain identical to f9afe22; this change only updates the integration fixture and qualification record."
+    }
+  },
+  "evidence": [
+    "Expanded source guard authenticates all selected operator/contract/qualification/tooling/plan/chart/tree/runtime modules and renderer/helper sources against the exact Opscode revision.",
+    "Compiled CLI prepare loses its successful API reply, then a same-endpoint/instance cold restart supports review and explicit original-token private retry without another tree attempt.",
+    "Actual Chromium drives the production-built static Storybook panel/hook through private bearer forwarding to real ASGI/PostgreSQL and mTLS native operator. Browser preparation also loses its successful reply and recovers one tree through explicit review/private retry.",
+    "Sealed native NICo template output and retained source templates remain authenticated. Full original operation/plan/chart rows, receipt, guard, run membership and linked reservations remain unchanged.",
+    "Binary hash is checked before/after the case. Browser journals/storage and public responses do not expose private request/credential data. The unchanged static catalog is reused; no frontend source changed."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "Browser source/access metadata is an owned Storybook fixture and bearer forwarding is private driver functionality. Actual Next.js login/routes/access discovery remains unqualified.",
+    "Native failed receipt/configuration/deployment and Kubernetes reads are controlled fixtures, not retained Linux installation/continuation proof. Supported 300-second agent timeout is selected.",
+    "Helm snapshot acquisition/freshness, native values/setFile merging, rendering/tree integration, Kustomize, image closure and linked execution remain open.",
+    "No original native replay, retained VM restart, main merge or deployment."
+  ],
+  "cliQualificationRevision": "c25b30c24c2413bafa4d1c2a2ea126baa8b42aa0",
+  "cliQualificationFile": "scripts/integration/nvke-install-plan-tree-bundle-proof-local.json",
+  "sdkQualificationFile": "install-plan-bundle-verification-sdk-local.json"
+}

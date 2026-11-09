@@ -683,3 +683,12 @@ schema and continuation authorization remain unchanged. Evidence is recorded in
 `backend/providers/nvke/qualification/install-plan-bundle-verification-sdk-local.json`.
 Compiled CLI/API/browser repinning is qualified separately; agent snapshot
 acquisition/freshness, rendering integration and linked continuation remain open.
+
+The compiled CLI/API/browser journey also passes at the scoped-verification
+checkpoint. It checks actual native template output/source seals, deliberately
+lost preparation replies, same-endpoint cold recovery and explicit private retry
+while preserving complete original rows, receipt, guard, runs and linked
+reservations. Chromium uses the unchanged production-built Storybook catalog,
+owned metadata and private bearer forwarding, so this does not qualify actual
+Next.js login/access discovery. Current evidence is in
+`backend/providers/nvke/qualification/install-plan-bundle-verification-browser-api-local.json`.
