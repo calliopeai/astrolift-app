@@ -368,10 +368,47 @@ storage, and both scenarios complete without page errors. These controlled
 fixtures are separate from the pending real backend/Linux-agent qualification.
 
 The dependency-inventory runtime is pinned in the SDK transport fixture at
-`fb0513edcbf4f5b07da8732fd319836ec3d32a9c`, including the new helper source. All 48 client/transport
+`166aaafa9448bf9b62260104061200c55dc54d65`, including the dependency and chart-artifact helpers. All 48 client/transport
 cases pass against that source and the explicit native bundle, including the
 actual mTLS SDK plan prepare/recover/page path with controlled Kubernetes reads.
 The regenerated coverage ledger and its 22 checks also pass. The application’s
 full frontend typecheck passed after separating each generated plan mutation
 input; its 15 focused hook cases and lint passed as well. These checks do not
 replace the pending retained Linux-site qualification and native continuation.
+
+
+The SDK also exposes a separate chart-artifact stage. After preparing and reviewing
+a remaining-install plan, call `prepare_install_plan_charts(original_job_id,
+intent=original_intent, body=reviewed_body)` with a new `artifactId`, the exact
+`planId`/`planDigest`, `format: 1`, and positive int64-string `maximumBytes` and
+`maximumExpandedBytes`. Optional `timeoutSeconds` is 1–3600 (default 300);
+`allowPlainHttp` defaults to false. Select the SDK HTTP timeout for the reviewed
+agent/tool deadline; a lost response remains ambiguous and is never replayed
+automatically.
+
+Recover through `install_plan_charts(original_job_id, intent=original_intent,
+plan_id=plan_id, plan_digest=plan_digest, artifact_id=artifact_id)`. This GET never
+downloads charts. An unpublished index returns `OPERATOR_CHARTS_INCOMPLETE`; an
+explicit same-ID preparation retry must retain the exact immutable artifact
+intent. Changing byte budgets or chart source requires a new artifact UUID.
+The operational timeout is not part of artifact intent.
+
+Both SDK methods require the chart-stage capability and validate the retained
+parent before and after the call. They return only source IDs/digest, artifact
+digest, chart count, exact byte strings, the remaining-verification state and
+`continuationAuthorized: false`. Unexpected private fields, foreign identities,
+invalid types, budget overruns, authorizing state, changed source/capability and
+revoked client checkpoints are refused. Native install is never dispatched by
+these methods.
+
+The controlled SDK qualification uses an actual pinned agent and real Helm
+download over an owned local HTTP repository. A transport deliberately discards
+the successful preparation reply; a new SDK client recovers the retained index,
+and an explicit exact-ID re-prepare returns it without a second fetch. Original
+operation bytes, native guard, run inventory and linked reservation directory
+remain unchanged. Its dependency inventory is a controlled single-chart fixture;
+it does not qualify every chart in the retained Linux install. The chart stage
+still needs durable current-admin application API, CLI and UI controls. OCI and
+private registry/TLS qualification, full frozen execution-tree/render/image
+closure, fresh skipped-resource/credential verification, linked once-only
+continuation and deployed acceptance remain open.

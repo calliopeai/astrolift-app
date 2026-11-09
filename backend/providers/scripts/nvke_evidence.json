@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "aeb0e1b88abe2f1c51c4e16cd7cac34ecf346fee"
+      "revision": "166aaafa9448bf9b62260104061200c55dc54d65"
     }
   },
   "evidence": {
@@ -1084,6 +1084,39 @@
       "kind": "observation",
       "scope": "Host-owned temporary workspace: 40 compiler/store/dependency cases and all 53 native-bundle agent cases pass, including actual mTLS with controlled Kubernetes reads and unchanged original temporary job/linkage. Source hashes, initial assertion correction and parser-race fix are recorded. Artifact materialization, skipped-resource evidence and actual retained Linux/browser continuation remain pending.",
       "sha256": "a83190be2a56c85ede81634442a57064a6a00e9a5c8227ea113092a32986a5ba"
+    },
+    "operator-chart-artifacts-sdk": {
+      "repository": "app",
+      "path": "backend/providers/nvke/_operator_install_plan_charts.py",
+      "kind": "implementation",
+      "scope": "Strict bounded chart-stage request and redacted summary validation, decimal int64 byte strings, exact source IDs/digest and non-authorizing state. Agent capability and parent plan are checked around explicit prepare/read SDK calls; no native dispatch or automatic retry."
+    },
+    "operator-chart-artifacts-sdk-tests": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_operator_install_plan_charts.py",
+      "kind": "test",
+      "scope": "Controlled transport checks for exact original intent, bounded requests, foreign/private/malformed summaries, unsafe capabilities, changed parent/capability/authority, byte precision and budgets, explicit incomplete/empty state, and lost-reply GET recovery without automatic POST replay."
+    },
+    "operator-chart-artifacts-sdk-tls": {
+      "repository": "app",
+      "path": "backend/providers/tests/nvke/test_operator_agent_client.py",
+      "kind": "test",
+      "symbol": "test_real_tls_sdk_chart_stage_lost_reply_recovers_without_refetch_or_native_dispatch",
+      "scope": "Actual pinned agent/SDK/mTLS with a controlled single-chart inventory and owned HTTP repository: real Helm download, deliberately lost HTTP response after publication, new SDK client GET recovery and exact-ID explicit re-prepare with no second fetch. Source drift refused; original row/guard/run inventory and linked reservations unchanged. Does not qualify the retained Linux install or private OCI/TLS policies."
+    },
+    "operator-chart-artifacts-agent": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/management_plan_chart_service.py",
+      "kind": "implementation",
+      "scope": "Native lock/executor reservation and source-bound chart preparation/read routes return only public hashes/counts and continuation false. Artifact IDs cannot be admitted or stop-fenced as native jobs. Trusted mTLS caller remains responsible for current application authorization.",
+      "sha256": "e41ac93b37a2079499538d6a0b88991cf76d415e64f622f9e36f9469b9e5f395"
+    },
+    "operator-chart-artifacts-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-chart-artifacts-local.json",
+      "kind": "observation",
+      "scope": "Controlled host/temporary-workspace archive, real Helm package/repository/locked-dependency, partial/cold/lost-result recovery and actual mTLS agent tests. Full closure, live skipped-resource proof, linked install execution and retained Linux qualification remain open.",
+      "sha256": "f6d0ae2bf759aad26b4ba208670ddef6a0703fcb15e3b84cf0017d9537c3c565"
     }
   },
   "rows": {
@@ -3363,9 +3396,14 @@
           "operator-install-plan-ui-protocol",
           "operator-install-plan-dependencies",
           "operator-install-plan-dependency-tests",
-          "operator-install-plan-dependency-local"
+          "operator-install-plan-dependency-local",
+          "operator-chart-artifacts-sdk",
+          "operator-chart-artifacts-sdk-tests",
+          "operator-chart-artifacts-sdk-tls",
+          "operator-chart-artifacts-agent",
+          "operator-chart-artifacts-local"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately; artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately. A chart-only materialization stage has real Helm/mTLS agent and SDK recovery checks; chart API/CLI/UI controls, OCI/private-registry/TLS qualification, complete artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",

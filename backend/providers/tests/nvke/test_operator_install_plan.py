@@ -102,7 +102,17 @@ def workloads_page():
     }
 
 
-def client(summary=None, page=None, *, capability=None, replacement=False):
+def client(
+    summary=None,
+    page=None,
+    *,
+    capability=None,
+    replacement=False,
+    charts=None,
+    chart_capability=None,
+    lost_chart_reply=False,
+    changed_after_chart=False,
+):
     calls = []
     original = {
         "format": 2,
@@ -141,14 +151,29 @@ def client(summary=None, page=None, *, capability=None, replacement=False):
                         "continuation": False,
                         "maximumPageSize": 100,
                     },
+                    "installPlanCharts": chart_capability
+                    if chart_capability is not None
+                    else {
+                        "format": 1,
+                        "prepare": True,
+                        "readOnly": True,
+                        "continuation": False,
+                    },
                 },
             )
         assert request.headers["X-Astro-Nvke-Intent"] == INTENT
+        if request.url.path.endswith("/install-plan-charts"):
+            if lost_chart_reply and request.method == "POST":
+                raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
+            return httpx.Response(200, json=charts)
         if request.url.path.endswith("/install-plan"):
             if request.method == "POST":
                 assert json.loads(request.content)["planId"] == PLAN
             value = page if request.url.params.get("view") else summary
-            return httpx.Response(200, json=metadata() if value is None else value)
+            selected = metadata() if value is None else copy.deepcopy(value)
+            if changed_after_chart and any(path.endswith("/install-plan-charts") for _, path, _ in calls):
+                selected["plan"]["planDigest"] = "c" * 64
+            return httpx.Response(200, json=selected)
         return httpx.Response(200, json=original)
 
     return OperatorAgentClient(

@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from nvke import _operator_install_plan as install_plan_protocol
+from nvke import _operator_install_plan_charts as chart_protocol
 from nvke._operator_install_review import project as project_install_review
 from nvke._private_http import private_http
 from nvke.client import NvkeError, validate_endpoint_url
@@ -168,6 +169,8 @@ class OperatorAgentClient:
                     "JOB_ADMISSION_INCOMPLETE": "OPERATOR_ADMISSION_INCOMPLETE",
                     "ARTIFACT_CHANGED": "SOURCE_CHANGED",
                     "SOURCE_ARTIFACT_CHANGED": "SOURCE_CHANGED",
+                    "INSTALL_PLAN_CHARTS_INCOMPLETE": "OPERATOR_CHARTS_INCOMPLETE",
+                    "ARTIFACT_INTENT_CHANGED": "OPERATOR_ARTIFACT_INTENT_CONFLICT",
                 }.get(peer, "OPERATOR_REQUEST_REFUSED")
                 if isinstance(peer, str)
                 else "OPERATOR_REQUEST_REFUSED"
@@ -496,6 +499,56 @@ class OperatorAgentClient:
         if self.install_plan(job_id, intent=intent, plan_id=plan_id) != metadata:
             raise _invalid_response()
         return result
+
+    def _install_plan_charts(
+        self, job_id: str, *, intent: str, body: dict[str, Any], read_only: bool
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = chart_protocol.request(body, job_id=job_id, read_only=read_only)
+            if not isinstance(intent, str) or not _SHA.fullmatch(intent):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError("INVALID_INPUT", "Use a retained plan and bounded chart-artifact request") from None
+        try:
+            chart_protocol.capability(self.identity().get("installPlanCharts"))
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError("OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm chart preparation") from None
+        metadata = self.install_plan(job_id, intent=intent, plan_id=body["planId"])
+        if metadata["plan"]["planDigest"] != body["planDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The retained plan no longer matches the reviewed digest")
+        path = "/v1/jobs/" + job_id + "/install-plan-charts"
+        data = (
+            self._request(
+                "GET", path, params={key: value for key, value in body.items() if key != "format"}, intent=intent
+            )
+            if read_only
+            else self._request("POST", path, body=body, intent=intent)
+        )
+        try:
+            result = chart_protocol.summary(data, body=body, item_count=metadata["itemCount"])
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+        if self.install_plan(job_id, intent=intent, plan_id=body["planId"]) != metadata:
+            raise _invalid_response()
+        try:
+            chart_protocol.capability(self.identity().get("installPlanCharts"))
+        except (KeyError, ValueError, TypeError):
+            raise _invalid_response() from None
+        return result
+
+    def prepare_install_plan_charts(self, job_id: str, *, intent: str, body: dict[str, Any]) -> dict[str, Any]:
+        return self._install_plan_charts(job_id, intent=intent, body=body, read_only=False)
+
+    def install_plan_charts(
+        self, job_id: str, *, intent: str, plan_id: str, plan_digest: str, artifact_id: str
+    ) -> dict[str, Any]:
+        return self._install_plan_charts(
+            job_id,
+            intent=intent,
+            body={"format": 1, "planId": plan_id, "planDigest": plan_digest, "artifactId": artifact_id},
+            read_only=True,
+        )
 
     def artifact(
         self, job_id: str, *, command: str, intent: str, name: str, offset: str = "0", limit: int = MAX_CHUNK_BYTES

@@ -208,7 +208,7 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "aeb0e1b88abe2f1c51c4e16cd7cac34ecf346fee"
+    revision = "166aaafa9448bf9b62260104061200c55dc54d65"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -595,7 +595,7 @@ def test_install_review_requires_capability_original_failure_digest_and_stable_i
 
 def test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "aeb0e1b88abe2f1c51c4e16cd7cac34ecf346fee"
+    revision = "166aaafa9448bf9b62260104061200c55dc54d65"
     relative = "kubernetes/nvke/test_operator_agent.py"
     assert (source / relative).read_bytes() == subprocess.check_output(
         ["git", "show", revision + ":" + relative], cwd=source
@@ -664,3 +664,111 @@ finally:
         timeout=120,
     )
     assert result.returncode == 0, "Owned mutual-TLS SDK plan qualification failed"
+
+
+def test_real_tls_sdk_chart_stage_lost_reply_recovers_without_refetch_or_native_dispatch(real_operator_agent):
+    source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
+    revision = "166aaafa9448bf9b62260104061200c55dc54d65"
+    for name in (
+        "test_operator_agent.py",
+        "test_management_chart_materialization.py",
+        "test_management_chart_archive.py",
+        "test_management_plan_store.py",
+    ):
+        relative = "kubernetes/nvke/" + name
+        assert (source / relative).read_bytes() == subprocess.check_output(
+            ["git", "show", revision + ":" + relative], cwd=source
+        )
+    driver = r"""
+import ssl
+import sys
+from unittest.mock import patch
+from uuid import uuid4
+import httpx
+sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+from nvke.operator_agent_client import OperatorAgentClient
+from nvke.client import NvkeError
+import test_operator_agent as fixture
+import test_management_chart_materialization as charts
+fixture.NativeAgentTests.setUpClass()
+case = fixture.NativeAgentTests()
+repository = charts.ChartMaterializationTests()
+try:
+    case.setUp()
+    repository.setUp()
+    try:
+        repository.serve("nktp")
+        graph = {"charts": [repository.remote()], "inputs": [], "continuationAuthorized": False}
+        graph["inventoryDigest"] = fixture.agent.management_plan_chart_service.artifacts._hash(graph)
+        job, intent, body = case.plan_fixture()
+        original = (case.engine._job(job) / "state.json").read_bytes()
+        guard = (case.engine.workspace / "management-install-state.json").read_bytes()
+        runs = sorted(p.name for p in (case.engine.workspace / "runs").iterdir())
+        context = ssl.create_default_context(cafile=str(case.certs / "ca.pem"))
+        context.load_cert_chain(case.certs / "client.pem", case.certs / "client.key")
+        config = dict(site_id=fixture.SITE, instance_id=case.engine.instance_id,
+            bundle_manifest_sha256=case.bundle_digest, verify=context)
+        class LostReply(httpx.HTTPTransport):
+            def handle_request(self, request):
+                response = super().handle_request(request)
+                if request.method == "POST" and request.url.path.endswith("/install-plan-charts"):
+                    assert response.status_code == 200
+                    response.read()
+                    response.close()
+                    raise httpx.ReadError("Deliberately lost private response", request=request)
+                return response
+        with OperatorAgentClient(case.url, **config, transport=LostReply(verify=context)) as sdk:
+            with patch.object(fixture.agent.management_plan_preparation.qualification,
+                "kubectl", side_effect=case.plan_kubectl), patch.object(
+                fixture.agent.management_plan_preparation.dependencies, "inventory", return_value=graph):
+                prepared = sdk.prepare_install_plan(job, intent=intent, body=body)
+            artifact_id = str(uuid4())
+            selected = dict(intent=intent, plan_id=body["planId"],
+                plan_digest=prepared["plan"]["planDigest"], artifact_id=artifact_id)
+            try:
+                sdk.install_plan_charts(job, **selected)
+            except NvkeError as error:
+                assert error.code == "OPERATOR_CHARTS_INCOMPLETE" and not error.ambiguous
+            else:
+                raise AssertionError("Missing publication must remain incomplete")
+            request_body = dict(format=1, artifactId=artifact_id, planId=body["planId"],
+                planDigest=selected["plan_digest"],
+                maximumBytes="1048576", maximumExpandedBytes="1048576", allowPlainHttp=True)
+            try:
+                sdk.prepare_install_plan_charts(job, intent=intent, body=request_body)
+            except NvkeError as error:
+                assert error.ambiguous and not error.retryable
+            else:
+                raise AssertionError("Deliberately lost reply was silently replayed")
+        before = list(repository.requests)
+        assert before.count("/nktp-1.0.0.tgz") == 1
+        repository.responses.clear()
+        with OperatorAgentClient(case.url, **config) as sdk:
+            recovered = sdk.install_plan_charts(job, **selected)
+            assert recovered["chartCount"] == 1 and recovered["continuationAuthorized"] is False
+            assert sdk.prepare_install_plan_charts(job, intent=intent, body=request_body) == recovered
+            assert repository.requests == before
+            with patch.dict(fixture.os.environ, {"NVKECTL_CHART_SDK_DRIFT": "changed"}):
+                try:
+                    sdk.install_plan_charts(job, **selected)
+                except NvkeError:
+                    pass
+                else:
+                    raise AssertionError("Changed original source was accepted")
+        assert (case.engine._job(job) / "state.json").read_bytes() == original
+        assert (case.engine.workspace / "management-install-state.json").read_bytes() == guard
+        assert sorted(p.name for p in (case.engine.workspace / "runs").iterdir()) == runs
+        assert list(case.engine.install_plans.links.iterdir()) == []
+    finally:
+        repository.doCleanups()
+        case.tearDown()
+finally:
+    fixture.NativeAgentTests.tearDownClass()
+"""
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", driver, str(Path(__file__).resolve().parents[2]), str(source / "kubernetes/nvke")],
+        capture_output=True,
+        timeout=180,
+    )
+    assert result.returncode == 0, "Owned mutual-TLS/real-Helm SDK chart qualification failed"
