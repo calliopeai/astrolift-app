@@ -692,3 +692,14 @@ reservations. Chromium uses the unchanged production-built Storybook catalog,
 owned metadata and private bearer forwarding, so this does not qualify actual
 Next.js login/access discovery. Current evidence is in
 `backend/providers/nvke/qualification/install-plan-bundle-verification-browser-api-local.json`.
+
+
+The SDK is now pinned to Opscode `870d1400c0c9986e5787b7b45635baae88785c0a`.
+All 194 operator tests pass with the native render-input helper included in source
+guards and tree intent. The private tree manager can capture ordered values and
+setFile bytes against authenticated plan/chart/tree/helper seals; no public agent
+or SDK capture endpoint is exposed. SDK qualification covers the existing tree
+preparation/cold-recovery/private-retry contract, not public Helm-render routing.
+Evidence: `backend/providers/nvke/qualification/install-plan-native-render-inputs-sdk-local.json`.
+Live phase-sensitive context acquisition/freshness is tracked in Opscode #100;
+frozen-chart publication, Kustomize, image closure and linked admission remain open.

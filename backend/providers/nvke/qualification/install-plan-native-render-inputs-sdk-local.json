@@ -1,0 +1,36 @@
+{
+  "format": 1,
+  "scope": "sdk-recovery-with-native-render-input-bound-tree-intent-local-qualification",
+  "applicationBaseRevision": "5904725145cad3c9252610a90bd02d139dcbe61f",
+  "opscodeRuntimeRevision": "870d1400c0c9986e5787b7b45635baae88785c0a",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "chartHelperBinarySha256": "a51f6258c905d414e56a9b24ef66d381b7e46dde0ea564aac3cd35b6af6b4600",
+  "sourceSha256": {
+    "backend/providers/tests/nvke/test_operator_agent_client.py": "5b64135fffb3b07d6ef10ab98e93d3fd6ca5564ec1240d32af44b357039ece61",
+    "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py": "1b9068ce8a8ace8286ff15c31d0241421a77126c69813d3964685ec9e57fd554",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_tree_driver.py": "3d2d1150bcde5fa3138e805b2b0e4d91e78d251bc0312ee1f442c0e3d598dfa8",
+    "backend/providers/nvke/operator_agent_client.py": "b0bb216c613896ed7278ab8969c6414d28025d0acbe18f299db1b0498a7a4759",
+    "backend/providers/nvke/_operator_install_plan_tree.py": "c8199a802e44b3d2c24f56b925b551e26e195f527124a4dc6df84d7610e43c80"
+  },
+  "checks": {
+    "passed": 194,
+    "skipped": 0,
+    "exitCode": 0,
+    "ruff": "passed",
+    "format": "passed",
+    "logSha256": "1e4e062d95683c329ef0f3ef61eec1c23ca6fd906fbc26512f111e064aba7c7b"
+  },
+  "evidence": [
+    "Source guards include management_render_inputs.py and the extended native rendering helper at the exact Opscode revision. All selected operator SDK/protocol/UI-contract tests pass, including real TLS/native plan/chart/tree recovery fixtures.",
+    "Tree preparation binds the new capture helper into source frames and immutable tree intent while preserving the existing public result schema and continuation=false state. Deliberately lost replies recover across same-endpoint/instance cold restart and explicit original-token private retry without another attempt.",
+    "Controlled NICo template output and retained original template sources remain sealed; original complete operation/run data, receipt, guard, parent plan, chart publication and linked reservations remain unchanged."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "The SDK fixture qualifies the new source/helper-bound tree intent and recovery. It does not invoke the private capture/render path through an agent route; no such public route is exposed.",
+    "Compiled CLI/API/browser repinning is a separate pending check at this checkpoint.",
+    "Live phase-specific context acquisition/freshness is tracked in Opscode #100. Automatic frozen-chart publication, Kustomize, image/private registry closure, fresh resource/credential proof and linked execution remain open.",
+    "Controlled native receipt/deployment/Kubernetes observations are not retained Linux continuation proof. No original replay, retained VM restart, main merge or deployment."
+  ]
+}
