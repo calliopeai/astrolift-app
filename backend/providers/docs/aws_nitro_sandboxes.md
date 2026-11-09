@@ -1,7 +1,8 @@
 # AWS Nitro Sandboxes on EKS
 
 The AWS EKS provider supports discovery and preflight of explicitly sandboxed
-Kubernetes manifests. It uses Kubernetes APIs, with the normal EKS authentication
+Kubernetes manifests. The manifest parser and renderer also support an explicit
+per-workload `nitro_sandbox` block. It uses Kubernetes APIs, with the normal EKS authentication
 flow. It does not create a new AWS cloud resource or call a sandbox lifecycle
 API. Ordinary manifests retain their existing apply behavior.
 
@@ -24,6 +25,41 @@ Detection describes cluster configuration. It does not verify that a pod ran
 inside Nitro, that nodes can schedule it, or that KMS accepted its attestation.
 The managed platform ClusterRole grants only `get` and `list` on runtime classes;
 operators managing their own RBAC must grant these reads separately.
+
+## Selecting a sandbox in astrolift.toml
+
+```toml
+[[workloads]]
+name = "worker"
+kind = "deployment"
+nitro_sandbox = { mode = "isolated" }
+
+[[workloads.containers]]
+name = "worker"
+image_ref = "registry.example/worker@sha256:..."
+```
+
+The block accepts `mode` (`isolated` or `confidential`), `network_isolated`
+(boolean, default false), and `policy` (an external generated policy string).
+Confidential mode requires a nonempty policy. These values survive normalization,
+persist in the registered app's manifest, participate in its hash, and render
+onto the workload's pod template without changing other workloads. Omission
+preserves the existing normalized shape and Kubernetes output. Normal deploy and
+rollback renderers consume the stored raw manifest.
+
+Supported workload kinds are deployment, statefulset, cronjob, task, workflow,
+and service-family agent. Task-family agent dispatch, Knative functions, static
+sites, provider FaaS and the unimplemented `job` workload kind reject the block.
+Legacy `[[jobs]]` and `[[tasks]]` aliases must use `[[workloads]]` for sandbox
+selection. GPU requests are rejected. Network-isolated workloads cannot expose
+public services or scrape metrics, and port-serving containers must declare exec
+healthchecks explicitly so normalization does not add network probes.
+
+The renderer attaches the supplied confidential policy after its own pod
+construction. Later deploy-time injections or admission webhooks can change
+policy-pinned fields. The caller remains responsible for generating the policy
+from the exact final admitted pod spec and matching the KMS policy; this feature
+does not claim to automate confidential policy generation or verify attestation.
 
 ## Applying an explicitly sandboxed workload
 
@@ -58,9 +94,9 @@ resource resize and device passthrough have additional AWS limitations.
 
 ## Support boundary
 
-This provider checkpoint accepts explicit Kubernetes manifests. It does not
-add `astrolift.toml` sandbox selectors, console controls, CLI commands, automatic
-runtime/AMI installation, Cedar generation, encrypted-image tooling, KMS policy
+The provider accepts explicit Kubernetes manifests and the manifest pipeline
+accepts the `nitro_sandbox` block above. This checkpoint does not add dedicated
+console controls, CLI commands, automatic runtime/AMI installation, Cedar generation, encrypted-image tooling, KMS policy
 management, attestation verification or a cloud execution smoke test.
 
 ECS Nitro Sandboxes are a separate integration: Managed Instances only, capacity
@@ -85,3 +121,21 @@ outside this EKS provider integration.
 - [ECS overview](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ict-overview.html)
 - [ECS limitations](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ict-considerations-and-limitations.html)
 - [EC2 Nitro Sandboxes](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nitro-sandboxes.html)
+
+## Released Python SDK model evidence (2026-11-09)
+
+The existing providers environment uses boto3/botocore 1.43.72; the backend
+Pipfile pins boto3 1.43.71. Both predate the launch. The latest released
+[botocore 1.43.126](https://pypi.org/project/botocore/1.43.126/) wheel was inspected
+directly through its embedded `botocore/data/ecs/2014-11-13/service-2.json.gz`.
+Its `RegisterTaskDefinitionRequest` lacks `trustedExecutionConfiguration`, and
+no shape contains `nitroEnclavesEnabled`. The release therefore cannot yet drive
+the new ECS contract through the supported boto3 API. No dependency upgrade or
+custom injected AWS service model is included merely to bypass validation.
+
+Artifact: `botocore-1.43.126-py3-none-any.whl`, uploaded 2026-11-06T20:48:04Z,
+SHA-256 `2f2239a47025a2fa173cd145ab8803ac02b76114864bf5b66475ff1cb88e6b0a`.
+[Released wheel](https://files.pythonhosted.org/packages/ad/e2/c51360cea33895b187f50603f1abcababe76a68f05de273d47f0293c6f42/botocore-1.43.126-py3-none-any.whl).
+The [official ECS API reference](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_TrustedExecutionConfiguration.html)
+documents the contract. ECS implementation must wait for a released supported
+SDK model or another officially supported client that exposes these fields.

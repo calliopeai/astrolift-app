@@ -113,6 +113,7 @@ _WORKLOAD_KEYS = frozenset(
         "mig_profile",
         "min_scale",
         "name",
+        "nitro_sandbox",
         "replicas",
         "result_ttl_hours",
         "run_cron_expression",
@@ -523,7 +524,7 @@ def _parse_edge(value: Any, path: str) -> EdgeIdentityConfig | None:
     unknown = sorted(set(value) - _EDGE_KEYS)
     if unknown:
         raise ManifestError(
-            f"unknown edge key(s): {', '.join(unknown)}; valid keys are " f"{', '.join(sorted(_EDGE_KEYS))}",
+            f"unknown edge key(s): {', '.join(unknown)}; valid keys are {', '.join(sorted(_EDGE_KEYS))}",
             path=path,
         )
 
@@ -842,7 +843,7 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     if run_mode or run_cron_expression:
         if kind != "agent":
             raise ManifestError(
-                "run_mode / run_cron_expression apply to agent workloads only, " f"got kind={kind!r}",
+                f"run_mode / run_cron_expression apply to agent workloads only, got kind={kind!r}",
                 path=f"{path}.run_mode",
             )
         if run_mode and run_mode not in _VALID_RUN_MODES:
@@ -948,8 +949,11 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
     fs_group = _parse_fs_group(d, path)
     gpu, gpu_type, mig_profile = _parse_gpu(d, path)
 
+    nitro_sandbox = _parse_nitro_sandbox(d, path, kind=kind, gpu=gpu, containers=containers)
+
     return WorkloadManifest(
         name=name,
+        nitro_sandbox=nitro_sandbox,
         gpu=gpu,
         gpu_type=gpu_type,
         mig_profile=mig_profile,
@@ -1108,6 +1112,9 @@ def _desugar_job(d: dict[str, Any], path: str) -> WorkloadManifest:
     rejects jobs without a schedule (same rule as bare cronjob
     workloads) to avoid silent never-runs.
     """
+    if "nitro_sandbox" in d:
+        raise ManifestError("declare sandboxed jobs/tasks under [[workloads]]", path=f"{path}.nitro_sandbox")
+
     name = _require_str(d, "name", f"{path}.name")
     schedule = d.get("schedule")
     if not schedule:
@@ -1174,6 +1181,9 @@ def _desugar_task(d: dict[str, Any], path: str) -> WorkloadManifest:
     no concurrency policy: ``schedule`` stays ``None`` and the renderer
     emits a bare ``batch/v1 Job``.
     """
+    if "nitro_sandbox" in d:
+        raise ManifestError("declare sandboxed jobs/tasks under [[workloads]]", path=f"{path}.nitro_sandbox")
+
     name = _require_str(d, "name", f"{path}.name")
 
     env_pairs = tuple((str(k), str(v)) for k, v in (d.get("env", {}) or {}).items())
@@ -1225,6 +1235,50 @@ def _desugar_task(d: dict[str, Any], path: str) -> WorkloadManifest:
 _GPU_TYPE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,62}")
 _MIG_PROFILE_RE = re.compile(r"[1-7]g\.[0-9]+gb")
 _MAX_GPUS = 16
+
+
+def _parse_nitro_sandbox(
+    workload: dict[str, Any], path: str, *, kind: str, gpu: int, containers: tuple[ContainerManifest, ...]
+) -> dict[str, Any] | None:
+    if "nitro_sandbox" not in workload:
+        return None
+    path = f"{path}.nitro_sandbox"
+    block = workload["nitro_sandbox"]
+    if not isinstance(block, dict) or set(block) - {"mode", "network_isolated", "policy"}:
+        raise ManifestError("expected a table with mode, network_isolated and optional policy", path=path)
+    if kind not in {"deployment", "statefulset", "cronjob", "task", "workflow", "agent"} or (
+        kind == "agent" and workload.get("run_family", "task") != "service"
+    ):
+        raise ManifestError("Nitro Sandbox selection is not supported for this workload family", path=path)
+    mode = block.get("mode")
+    if not isinstance(mode, str) or mode not in {"isolated", "confidential"}:
+        raise ManifestError("mode must be isolated or confidential", path=f"{path}.mode")
+    network_isolated = block.get("network_isolated", False)
+    if not isinstance(network_isolated, bool):
+        raise ManifestError("network_isolated must be a boolean", path=f"{path}.network_isolated")
+    policy = block.get("policy", "")
+    if not isinstance(policy, str):
+        raise ManifestError("policy must be a string", path=f"{path}.policy")
+    if mode == "confidential" and not policy.strip():
+        raise ManifestError(
+            "confidential mode requires a policy generated from the final pod spec", path=f"{path}.policy"
+        )
+    if gpu:
+        raise ManifestError("Nitro Sandboxes do not support GPU passthrough", path=path)
+    if network_isolated:
+        if workload.get("is_public") or (workload.get("metrics") or {}).get("enabled"):
+            raise ManifestError(
+                "network-isolated sandboxes cannot expose a public service or metrics", path=path
+            )
+        for container in containers:
+            if container.healthcheck_kind not in {"none", "exec"} or (
+                container.port > 0 and container.healthcheck_kind == "none"
+            ):
+                raise ManifestError(
+                    "network-isolated sandboxes require explicit exec healthchecks for port-serving containers",
+                    path=path,
+                )
+    return {"mode": mode, "network_isolated": network_isolated, "policy": policy}
 
 
 def _parse_gpu(d: dict, path: str) -> tuple[int, str | None, str | None]:

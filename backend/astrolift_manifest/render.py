@@ -120,6 +120,7 @@ def render_manifests(
 
     out: list[dict[str, Any]] = []
     for w in manifest.workloads:
+        first_resource = len(out)
         env_from = [*common_env_from, *workload_env_from.get(w.name, [])]
         wl_labels = {
             **base_labels,
@@ -258,8 +259,30 @@ def render_manifests(
             # services provisioned by the faas deploy activities, not pods.
             continue
         # job lands in a follow-up render module.
+        _apply_nitro_sandbox(w, out[first_resource:])
 
     return sorted(out, key=lambda d: (d.get("kind", ""), d["metadata"]["name"]))
+
+
+def _apply_nitro_sandbox(workload: WorkloadManifest, resources: list[dict[str, Any]]) -> None:
+    sandbox = workload.nitro_sandbox
+    if sandbox is None:
+        return
+    for resource in resources:
+        if resource["kind"] == "CronJob":
+            pod = resource["spec"]["jobTemplate"]["spec"]["template"]
+        elif resource["kind"] in {"Deployment", "StatefulSet", "Job"}:
+            pod = resource["spec"]["template"]
+        else:
+            continue
+        pod["spec"]["runtimeClassName"] = f"{sandbox['mode']}-sandbox"
+        annotations = {}
+        if sandbox["policy"]:
+            annotations["sandbox.amazonaws.com/policy"] = sandbox["policy"]
+        if sandbox["network_isolated"]:
+            annotations["sandbox.amazonaws.com/network-isolated"] = "true"
+        if annotations:
+            pod.setdefault("metadata", {}).setdefault("annotations", {}).update(annotations)
 
 
 # ---------------------------------------------------------------------------
