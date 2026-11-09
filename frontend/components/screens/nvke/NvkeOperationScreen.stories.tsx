@@ -1,3 +1,4 @@
+import { INSTALL_CONTEXT_PROPS } from "./NvkeOperatorInstallPlanContextPanel.stories";
 import { INSTALL_TREE_PROPS } from "./NvkeOperatorInstallPlanTreePanel.stories";
 import { INSTALL_CHARTS_PROPS } from "./NvkeOperatorInstallPlanChartsPanel.stories";
 import { INSTALL_PLAN_PROPS } from "./NvkeOperatorInstallPlanPanel.stories";
@@ -271,4 +272,14 @@ export const InstallPlanTreeReadOnly: Story = {
 };
 export const InstallPlanTreePending: Story = {
   args: { ...InstallPlanTree.args, pending: true },
+};
+
+export const InstallPlanContext: Story = {
+  args: { ...InstallPlanTree.args, operatorInstallPlanContext: INSTALL_CONTEXT_PROPS },
+};
+export const InstallPlanContextReadOnly: Story = {
+  args: { ...InstallPlanContext.args, canAct: false },
+};
+export const InstallPlanContextPending: Story = {
+  args: { ...InstallPlanContext.args, pending: true },
 };

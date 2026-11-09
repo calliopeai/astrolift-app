@@ -1,0 +1,56 @@
+{
+  "format": 1,
+  "scope": "browser-to-actual-app-context-capture-driver-foundation",
+  "status": "driver-static-and-stories-qualified-actual-api-acceptance-running",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanContextPanel.api.stories.tsx": "63b9bb09e8a44737c33a98a53b19352b5551dd1d668a8bef24e3bdc648c04763",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-context-stories.test.tsx": "212de018f4dad16bd2d56ba49b2c92ad1e4c7f1809ee5e98b614f0b283df0992",
+    "frontend/e2e/nvke-install-plan-context-api-runner.mjs": "cc21498abb922a1bf71a6bf089367c194e2d0adf0b4aa9112a8f42e26cccf76a"
+  },
+  "checks": {
+    "targetedEslint": "passed",
+    "prettier": "formatted",
+    "storyTests": {
+      "passed": 30,
+      "files": 2,
+      "exitCode": 0,
+      "logSha256": "34a73739961e4cc9411a1b52d72dce704935facdcfacc3835a7fa5dd1b5e0cf2"
+    },
+    "driverSyntaxAndLint": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-context-api-driver-syntax.exit",
+      "scope": "Current browser driver: ESLint, Prettier check and node --check; full App integration remains pending."
+    },
+    "ownedPeerVisualReview": {
+      "exitCode": 0,
+      "reportSha256": "6aae8506d9a6afa6007ce447afe1257383422051ae62c6982a7dcc22d15e97f0",
+      "scope": "Actual Chromium fixture renders a ready panel with zero automatic RPCs; screenshot inspected. No actual API acceptance claimed."
+    },
+    "fullTypeScriptAndStatic": {
+      "status": "completed",
+      "exitCode": 0,
+      "logSha256": "7a8fff6de16b1235537b06f072bec67ebd26c4195de1f0fc4ae324a2d70cbbf1",
+      "logPath": "/tmp/astrolift-nvke-context-api-browser-static.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-api-browser-static.exit",
+      "scope": "Generated Next route types, full TypeScript and targeted ESLint/Prettier on the current API story, coverage test and hardened browser driver."
+    },
+    "actualBrowserAppAgent": {
+      "status": "pending",
+      "sessionId": 64897,
+      "logPath": "/tmp/astrolift-nvke-context-browser-app-paired-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-browser-app-paired-v1.exit",
+      "database": "test_astro_nvke_context_browser_20261109"
+    }
+  },
+  "implemented": [
+    "Owned API Storybook peer uses the production context hook and pure panel with actual source metadata supplied by the qualification harness. It performs no RPC without an injected fixture.",
+    "Loopback-only Chromium driver forwards allowed context mutations to the real App with a private bearer held outside the browser. It checks every original actor/site/operation/authority and parent version/digest binding, durable journal before POST, lost-reply reload without automatic RPC, metadata-only review/retry and unchanged public digests.",
+    "Render coverage now includes the three operation-screen context stories; removed the previously unused operation story import by actually exercising those states."
+  ],
+  "remaining": [
+    "Actual browser/compiled CLI/App/agent case is wired and running in an isolated database; inspect terminal evidence and fix failures.",
+    "Actual browser-to-App-to-agent capture/recovery must pass; controlled/local render tests do not prove this.",
+    "Final integrated static checks/builds, full surface acceptance and release remain outstanding."
+  ],
+  "continuationAuthorized": false
+}

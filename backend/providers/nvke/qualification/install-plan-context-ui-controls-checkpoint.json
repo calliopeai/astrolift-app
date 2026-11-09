@@ -1,0 +1,111 @@
+{
+  "format": 1,
+  "scope": "render-context-browser-controls-and-operation-screen-checkpoint",
+  "status": "work-in-progress-not-release-qualified",
+  "baseCommit": "82c25bfeeaec6543b542c1f1c44db0bb373d58bf",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanContextPanel.integration.stories.tsx": "9fa309cb935c71c6274fe5575ebd013ef5163ebf47c5b634eb7ea9eb5f52c1e1",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanContextPanel.stories.tsx": "b67f5b1ea65dc3411445032bc12ae81001e97d9bdcca5b865e411b894ca17750",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanContextPanel.tsx": "fbee8de0aff48e872600c9ebfd659b3f04ee937825c9a90a6dedbcb8f5b72ed0",
+    "frontend/components/screens/nvke/nvke-context-interactions.test.tsx": "e06b14a2e59ef9417fa3b8de03feccf3cef83258fe89ff0434327d91ed33a8c8",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-context-stories.test.tsx": "dc4b8db4d50245a58bc3683bcfc858cbf4428767fdb15e56c609a1cfa56473b5",
+    "frontend/graphql/nvke/use-nvke-install-plan-context.test.tsx": "536cffb402dff7732f794423c031065e9d4d6086255e4eb228720fc2965ccf8c",
+    "frontend/graphql/nvke/use-nvke-install-plan-context.ts": "e25cf2c06354d66a6bed1bba561928796c95b1f0de2061e590f0db75b09ac17f",
+    "frontend/lib/nvke/install-plan-context-recovery.test.ts": "d8767412251b8e286ec3147d2b46f82a9814e96ff1621f6d22a6f8b8d3ebcf78",
+    "frontend/lib/nvke/install-plan-context-recovery.ts": "1a729ea4a39158ff9dd76cda7545d64dfc642a2fb009fbcde73b817856e08f01",
+    "frontend/scripts/nvke-context-browser-qualification.mjs": "6146418a4ca93fa20fa6e208032d265f0aa75a6ca1e97572e448df3b19686e28",
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "b18a00cb697e0bb1cdf52e12faee58c53511441ca0ebebf981517a61031e12c5",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "e6f6bc99e061dd49095e00509a5e7a1359a87a25fcd4877bcda40215a9c6cba0",
+    "frontend/components/screens/nvke/nvke-interactions.test.tsx": "5720dd60273151157f1e5dd916a125fa517662d1ae22fc2dfde01e93baca3304",
+    "frontend/components/screens/nvke/types.ts": "b791ee36992fc2459eeba5594dfbf4e6198870869675ac1810738354a41a53da",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "8c9eef5f1900e5bfe31c68c02829e8b5daaf9644381a364176d2c2bb021b5aa7",
+    "frontend/messages/de.json": "081ca8e5a3d6888657a66ab9607c1026804a7ac55f59be3948e3d79e7bb1918e",
+    "frontend/messages/en.json": "ce89c6743c59d10f0720f29189c66ccee31e54bf363d8f3a8cc16669cf828351",
+    "frontend/messages/es.json": "3d2f1cc6891fa79c96baa5c71710dcb695ef7c16b132fe94d65974e0686ce142",
+    "frontend/messages/fr.json": "ba34c617f531ff3a4dafd5003b47864d1d6220d97091ecfa91bf09a8801d5ff5",
+    "frontend/messages/ja.json": "b68b5a9dd8754bc05680287fef08b9a4051efe4a5858f435d147c9d8f25371ea",
+    "frontend/messages/ko.json": "953e2f95cc9e35ab7d9fe9265d116e6fc4754c0cb7552385539167d6dea36cbe",
+    "frontend/messages/pt-BR.json": "c3f0095e6ae8b080f0695cd577aa77a5a6629ce2be30fe1bc71eede65c5afa50",
+    "frontend/messages/zh-Hans.json": "8793ec7858c363a244493740eb93a04571dd1c982420342d736d63fa18b13450",
+    "frontend/scripts/nvke-context-operation-browser-qualification.mjs": "ec0f555f9d7d5c8d0e9af183cb233a79fbd6a3f1e0fce8770927cf822320bd8f"
+  },
+  "checks": {
+    "wiredUiTests": {
+      "passed": 152,
+      "files": 7,
+      "exitCode": 0,
+      "logSha256": "d6c725a629e1f6f58a5941a634c3215c316294f39177f146665238fd1deaeab7"
+    },
+    "controlledStorybookBrowser": {
+      "exitCode": 0,
+      "reportSha256": "0c27f5834e9cca6fb1f8e5fc92915cda862dad76738de8fb037c2d94e171234b",
+      "scope": "Panel fixtures and controlled Apollo lost-reply recovery before operation-screen wiring; not live App or agent acceptance"
+    },
+    "finalStatic": {
+      "status": "completed",
+      "exitCode": 0,
+      "logSha256": "e325edabebff7046f7f8a3028b4056be6c818c10b98e9afcb9662c689d1d3cc0",
+      "logPath": "/tmp/astrolift-nvke-context-ui-save-static.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-ui-save-static.exit",
+      "scope": "Full TypeScript plus targeted ESLint/Prettier for the saved context controls/wiring. New operation browser driver has its separate passed lint/format/browser proof."
+    },
+    "nvkeUiRegressions": {
+      "passed": 1081,
+      "files": 63,
+      "exitCode": 0,
+      "logSha256": "bd120196668b22ee4f3b5c1479abdb811d90e442b023afbe31387ef173671bf7"
+    },
+    "productionStorybookBuild": {
+      "exitCode": 0,
+      "logSha256": "6f1a21ad7845841969c5c0b1a88d8318fa11b6d0208aebe8f16109fbf18f6940",
+      "outputDirectory": "/tmp/astrolift-nvke-context-ui-final-storybook-static"
+    },
+    "productionStorybookPanelBrowser": {
+      "exitCode": 0,
+      "reportSha256": "54b985fbf341a6629d066a44278169bfccdb1cf0ba2e73a6f888810ec360e820",
+      "scope": "Real Chromium against the production Storybook artifact; visual/overflow and controlled Apollo lost-reply recovery, not actual App or agent acceptance."
+    },
+    "productionStorybookOperationBrowser": {
+      "exitCode": 0,
+      "cases": 3,
+      "reportSha256": "a20aa5cd099eb0450da778f58dd122e5fbe356685dd952bcdd43fac83bd8af1a",
+      "driverSha256": "ec0f555f9d7d5c8d0e9af183cb233a79fbd6a3f1e0fce8770927cf822320bd8f",
+      "scope": "Actual operation-screen Storybook composition: saved capture remains disabled; review follows normal, read-only and pending guards. Not Next login/route acceptance."
+    },
+    "nextBuild": {
+      "status": "pending",
+      "exitCode": null,
+      "logPath": "/tmp/astrolift-nvke-context-ui-next-build.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-ui-next-build.exit",
+      "sessionId": 42336
+    },
+    "fullFrontendLint": {
+      "status": "completed",
+      "exitCode": 0,
+      "logSha256": "240e00c889f351a51b6374b50f17527f055dc6530fcde5720a1f06c0eeb32016",
+      "logPath": "/tmp/astrolift-nvke-context-ui-full-lint.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-ui-full-lint.exit",
+      "warnings": {
+        "total": 90,
+        "unchangedPaths": 89,
+        "contextStoryTest": 1,
+        "followOnFix": "feature/nvke-2662-context-api-browser now actually renders the imported operation stories; its targeted ESLint passed."
+      }
+    }
+  },
+  "implemented": [
+    "Pure context panel and typed Storybook fixtures in all eight locales.",
+    "Metadata-only scoped recovery journal and explicit review/retry; exact original input hash guards re-entry after a lost reply.",
+    "Operation-screen wiring with permission and pending guards; no native continuation.",
+    "Browser qualification driver and UI recovery/source-drift regression tests."
+  ],
+  "continuationAuthorized": false,
+  "remaining": [
+    "Next production build is still pending. The follow-on owned App browser driver has separate static and actual-API acceptance work.",
+    "Actual Next route/login acceptance and actual App/compiled-CLI/agent capture/recovery acceptance; controlled Storybook tests are not substitutes.",
+    "Existing standalone agent local-chart timeout failure remains unresolved.",
+    "Native phase, credential, schema, image and linked-admission proof; remaining full management surface and live qualification.",
+    "Review, coordinated PRs/merge, CONFLICT deployment and validation."
+  ],
+  "preservation": "Original UNCERTAIN install and its guard remain unchanged; this checkpoint does not authorize replay or continuation."
+}
