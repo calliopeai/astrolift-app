@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "scope": "native-template-tree-api-browser-local-qualification",
+  "opscodeRuntimeSourceRevision": "0d17f53ec998698df88b2ab86f3d0359fbedbbfc",
+  "applicationRevision": "e90caaadd23ea14d3a55433ffcb8502db257926c",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "9a8fa0c6a3e23fa69b99e7aa36f0b51bab31d2f4d533a247f4824ec08aecf486"
+  },
+  "checks": {
+    "cli": {
+      "exitCode": 0,
+      "topLevelPassed": 1048,
+      "topLevelSkipped": 2,
+      "format": "passed",
+      "vet": "passed",
+      "lint": "passed",
+      "logSha256": "26a3c87df205acb67fdb2f2d67fedf7a037b1eab9c9ec96dbc4258c8c9f01abc"
+    },
+    "pairedCliApiBrowser": {
+      "status": "passed",
+      "exitCode": 0,
+      "passed": 1,
+      "deselected": 1,
+      "skipped": 0,
+      "durationSeconds": 636.4,
+      "logSha256": "13163f7708d789ed6867bd7cf6e2a2b196dbc0bcf1173021ca4ac0c1b988b7b5",
+      "variant": "browser (includes common compiled CLI cold-recovery/private-retry journey)"
+    }
+  },
+  "assertionsAdded": [
+    "Actual native NICo template output sealed in execution tree",
+    "Original template sources retained",
+    "Template item converted to manifest",
+    "Runtime source guard includes native renderer"
+  ],
+  "limitations": [
+    "Browser metadata is supplied by an owned Storybook fixture; authentication uses private driver forwarding. Actual Next.js login/routes/access discovery remains unqualified.",
+    "Native failed receipt/configuration/deployment and Kubernetes reads are controlled fixtures, not retained Linux installation proof. The supported 300-second agent timeout is selected.",
+    "Kustomize/Helm manifest freezing integration, images/private registries, fresh skipped-resource/credential proof, remaining-only selection and linked once-only dispatch remain open.",
+    "No original native replay, retained VM restart, main merge or deployment."
+  ],
+  "compiledBinarySha256": "26a7529dd572b6d7afb6fb4b96a6a3d73cd4f7748869a0fe007456031ca7f4a8",
+  "evidence": [
+    "Controlled BootstrapConfig renders actual pinned NICo templates. Sealed tree retains authenticated original template sources, rendered private credential YAML and manifest inventory types.",
+    "Compiled CLI prepare loses its successful reply, then cold agent restart at the same endpoint/instance supports review and explicit original-token private retry without a second attempt.",
+    "Actual Chromium drives the real panel/hook from production-built static Storybook through private bearer forwarding to ASGI/PostgreSQL and actual mTLS native agent. Browser prepare discards its successful reply, then review/private retry recover one published tree.",
+    "Original operation/plan/chart full rows, native receipt, guard, run membership and linked reservations remain unchanged; journal/storage and public output expose no private request or credential content.",
+    "Selected compiled binary hash is checked before and after the test."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "cliQualificationRevision": "f9afe229e4951f0b44d459d3c00550e50f3e634a",
+  "cliQualificationFile": "scripts/integration/nvke-install-plan-tree-templates-checkpoint.json",
+  "sdkQualificationFile": "install-plan-tree-templates-sdk-local.json",
+  "applicationBrowserSourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.api.stories.tsx": "2f2310fcf38cb37db8dae41173b7c133a428b83ef9d642cbea1710cfd97beadb",
+    "frontend/e2e/nvke-install-plan-tree-api-runner.mjs": "febc6d7e19002891df182025f885d92c3574c1b8af996ceb309deef06b2ec54f"
+  }
+}

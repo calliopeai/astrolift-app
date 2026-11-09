@@ -656,3 +656,19 @@ original receipts/guards remain protected; source/log hashes and scope are in
 Paired compiled CLI/API/browser qualification is checked separately. Kustomize/Helm
 manifest freezing, verified images and fresh resource/credential proof remain
 required before remaining-only selection and linked execution.
+
+
+The native-template tree qualification now includes the compiled CLI and actual
+Chromium panel/hook through the production-built Storybook, real ASGI/PostgreSQL
+and mTLS agent. A controlled BootstrapConfig renders the pinned NICo credential
+templates; sealed output and retained template sources are checked before cold
+recovery. Deliberately lost CLI and browser preparation replies recover through
+review and explicit private retry without a second tree attempt. Full original
+rows, native receipt, guard, run membership and linked reservations are unchanged.
+Evidence: `backend/providers/nvke/qualification/install-plan-tree-templates-browser-api-local.json`.
+The selected browser variant also runs the common compiled CLI journey; the
+standalone CLI-only variant was deselected. Authentication remains private driver
+forwarding with owned Storybook metadata. Actual Next.js login/routes/access
+discovery and retained Linux continuation are not qualified by this test. Native
+Kustomize/Helm freezing integration, image closure and fresh resource/credential
+proof remain required before linked execution.

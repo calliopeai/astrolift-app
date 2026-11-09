@@ -28,7 +28,7 @@
   "continuationAuthorized": false,
   "limitations": [
     "This is a controlled native failed receipt/configuration/deployment and Kubernetes GET fixture, not retained Linux installation qualification.",
-    "Compiled CLI/API/browser qualification against this runtime is a separate pending check. No application schema or runtime SDK protocol changed in this checkpoint.",
+    "Compiled CLI/API/browser qualification against this runtime is recorded separately in install-plan-tree-templates-browser-api-local.json. No application schema or runtime SDK protocol changed in this checkpoint.",
     "Kustomize/Helm manifest freezing, image/private registry closure, fresh skipped-resource/credential proof, remaining-only selection and linked execution remain open.",
     "No original native replay, retained VM restart, main merge or production deployment."
   ]
