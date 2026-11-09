@@ -28,9 +28,10 @@
     "mypy": "passed for both changed production modules, follow-imports=silent",
     "realVerificationMTLS": {
       "status": "running",
-      "sessionId": 7088,
-      "logPath": "/tmp/astrolift-nvke-verification-sdk-mtls.log",
-      "exitMarker": "/tmp/astrolift-nvke-verification-sdk-mtls.exit"
+      "sessionId": 67414,
+      "logPath": "/tmp/astrolift-nvke-verification-sdk-mtls-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-sdk-mtls-v2.exit",
+      "launcherCorrection": "Initial system-Python run exited before fixture setup because isolated mode could not import httpx. Relaunched using the existing backend virtual environment; no product or test source changed."
     }
   },
   "implemented": [
