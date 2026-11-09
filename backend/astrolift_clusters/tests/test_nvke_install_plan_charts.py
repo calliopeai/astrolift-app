@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import shutil
+import ssl
+import threading
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -408,7 +411,12 @@ def test_other_tenant_cannot_read_retained_artifacts(chart_fixture):
 
 
 @pytest.mark.skipif(not shutil.which("helm"), reason="Real Helm is required")
-def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch(configured, monkeypatch):  # noqa: F811
+@pytest.mark.parametrize("chart_source", ["http", "local"])
+def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch(
+    configured,  # noqa: F811
+    monkeypatch,
+    chart_source,
+):
     from astrolift_clusters import nvke_operator_authority as authority
     from astrolift_clusters.tests.test_nvke_operator import partial_install, review
     from astrolift_clusters.tests.test_nvke_schema import execute
@@ -416,6 +424,18 @@ def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch
     monkeypatch.syspath_prepend(os.path.join(os.environ["NVKE_TEST_AGENT_OPSCODE"], "kubernetes/nvke"))
     import test_management_chart_materialization as chart_lab
     import test_operator_agent as native_lab
+
+    if chart_source == "local":
+        if not os.environ.get("NVKE_TEST_HELM4") or not os.environ.get("NVKE_TEST_CHART_HELPER"):
+            pytest.skip("Pinned Helm 4 and snapshot-built chart helper are required")
+        from pathlib import Path
+
+        helper = Path(os.environ["NVKE_TEST_CHART_HELPER"])
+        manifest = json.loads((helper.parent / "chart-helper.json").read_bytes())
+        assert manifest["binarySha256"] == hashlib.sha256(helper.read_bytes()).hexdigest()
+        for name, digest in manifest["sourceSha256"].items():
+            source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]) / "kubernetes/nvke/chart-helper" / name
+            assert hashlib.sha256(source.read_bytes()).hexdigest() == digest
 
     state = configured
     monkeypatch.setattr(native_lab, "SITE", str(state.site.guid))
@@ -456,6 +476,58 @@ def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch
             repository.serve("nktp")
             graph = {"charts": [repository.remote()], "inputs": [], "continuationAuthorized": False}
             graph["inventoryDigest"] = native_lab.agent.management_plan_chart_service.artifacts._hash(graph)
+            native_deployment = native_lab.agent.management_plan_preparation._deployment
+
+            def owned_charts(engine, argv, inputs, destination, budget):
+                result = native_deployment(engine, argv, inputs, destination, budget)
+                for name in ("local-parent", "local-child"):
+                    folder = destination / name
+                    folder.mkdir(mode=0o700)
+                    text = "apiVersion: v2\nname: " + name + "\nversion: 1.0.0\n"
+                    if name == "local-parent":
+                        text += "dependencies:\n- {name: local-child, version: '>=1.0.0', repository: 'file://../local-child'}\n"
+                    native_lab.agent.private_write(folder / "Chart.yaml", text.encode())
+                return result
+
+            def bound_local_inventory(**values):
+                store = native_lab.agent.management_plan_preparation.storage
+                materializer = native_lab.agent.management_plan_chart_service.artifacts
+                inputs = [
+                    {
+                        "id": name,
+                        "root": "deployment",
+                        "path": name,
+                        "contentSha256": materializer._hash(
+                            store._content(store._scan(values["deployment"] / name, 1048576, private=True))
+                        ),
+                    }
+                    for name in ("local-parent", "local-child")
+                ]
+                data = {
+                    "charts": [
+                        {
+                            "item": "nktp",
+                            "name": "local-parent",
+                            "version": "1.0.0",
+                            "repository": "",
+                            "reference": "local-parent",
+                        }
+                    ],
+                    "inputs": inputs,
+                    "localChartDependencies": [
+                        {
+                            "chart": "local-parent",
+                            "dependencyIndex": 0,
+                            "repository": "file://../local-child",
+                            "reference": "local-child",
+                            "item": "nktp",
+                        }
+                    ],
+                    "continuationAuthorized": False,
+                }
+                data["inventoryDigest"] = materializer._hash(data)
+                return data
+
             with context(state.world), monkeypatch.context() as native_patch:
                 native_patch.setattr(
                     native_lab.agent.management_plan_preparation.qualification, "kubectl", case.plan_kubectl
@@ -463,6 +535,15 @@ def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch
                 native_patch.setattr(
                     native_lab.agent.management_plan_preparation.dependencies, "inventory", lambda **_k: graph
                 )
+                if chart_source == "local":
+                    native_patch.setattr(
+                        native_lab.agent.management_plan_preparation, "_deployment", owned_charts
+                    )
+                    native_patch.setattr(
+                        native_lab.agent.management_plan_preparation.dependencies,
+                        "inventory",
+                        bound_local_inventory,
+                    )
                 parent = plans.prepare(body=plan_body, **source_review(state, original))
             prepared_parent = NvkeInstallPlan.objects.filter(guid=plan_body["planId"]).values().get()
             artifact_id = str(uuid4())
@@ -492,6 +573,18 @@ def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch
                 )
 
             monkeypatch.setattr(OperatorAgentClient, "prepare_install_plan_charts", lose_after_publication)
+            if chart_source == "local":
+                original_which = shutil.which
+
+                def selected_tool(name):
+                    return {
+                        "helm": os.environ["NVKE_TEST_HELM4"],
+                        "astro-nvke-chart-helper": os.environ["NVKE_TEST_CHART_HELPER"],
+                    }.get(name) or original_which(name)
+
+                monkeypatch.setattr(
+                    native_lab.agent.management_plan_chart_service.shutil, "which", selected_tool
+                )
             query = (
                 "mutation($v:PrepareNvkeOperatorInstallPlanChartsInput!){prepareNvkeOperatorInstallPlanCharts(input:$v){"
                 + FIELDS
@@ -500,9 +593,33 @@ def test_real_graphql_postgres_sdk_mtls_helm_lost_reply_recovers_without_refetch
             response = execute(state.world, query, {"v": {**reviewed, "requestText": json.dumps(body)}})
             assert response.errors is None and not response.data["prepareNvkeOperatorInstallPlanCharts"]["ok"]
             assert NvkeInstallPlanCharts.objects.get(guid=artifact_id).status == "preparing"
-            assert repository.requests.count("/nktp-1.0.0.tgz") == 1
+            assert repository.requests.count("/nktp-1.0.0.tgz") == (1 if chart_source == "http" else 0)
             requests = list(repository.requests)
             repository.responses.clear()
+            if chart_source == "local":
+                # Keep the authority endpoint unchanged across the owned agent restart.
+                port = case.server.server_port
+                case.server.shutdown()
+                case.server.server_close()
+                case.thread.join(timeout=5)
+                case.engine.close()
+                case.engine = case.make_engine()
+                fingerprint = hashlib.sha256(
+                    ssl.PEM_cert_to_DER_cert((case.certs / "client.pem").read_text())
+                ).hexdigest()
+                case.server = native_lab.agent.serve(
+                    case.engine,
+                    host="127.0.0.1",
+                    port=port,
+                    certificate=str(case.certs / "server.pem"),
+                    key=str(case.certs / "server.key"),
+                    client_ca=str(case.certs / "ca.pem"),
+                    client_fingerprints=[fingerprint],
+                )
+                case.thread = threading.Thread(
+                    target=case.server.serve_forever, kwargs={"poll_interval": 0.02}, daemon=True
+                )
+                case.thread.start()
             recover = (
                 "mutation($v:NvkeOperatorInstallPlanChartsReviewInput!){reviewNvkeOperatorInstallPlanCharts(input:$v){"
                 + FIELDS
