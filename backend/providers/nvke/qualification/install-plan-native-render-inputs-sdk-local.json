@@ -29,7 +29,7 @@
   "continuationAuthorized": false,
   "limitations": [
     "The SDK fixture qualifies the new source/helper-bound tree intent and recovery. It does not invoke the private capture/render path through an agent route; no such public route is exposed.",
-    "Compiled CLI/API/browser repinning is a separate pending check at this checkpoint.",
+    "Compiled CLI/API/browser recovery with this source/helper-bound intent is recorded separately in install-plan-native-render-inputs-browser-api-local.json.",
     "Live phase-specific context acquisition/freshness is tracked in Opscode #100. Automatic frozen-chart publication, Kustomize, image/private registry closure, fresh resource/credential proof and linked execution remain open.",
     "Controlled native receipt/deployment/Kubernetes observations are not retained Linux continuation proof. No original replay, retained VM restart, main merge or deployment."
   ]

@@ -703,3 +703,11 @@ preparation/cold-recovery/private-retry contract, not public Helm-render routing
 Evidence: `backend/providers/nvke/qualification/install-plan-native-render-inputs-sdk-local.json`.
 Live phase-sensitive context acquisition/freshness is tracked in Opscode #100;
 frozen-chart publication, Kustomize, image closure and linked admission remain open.
+
+The compiled CLI/API/browser journey also passes with the native render-input
+helper bound to tree intent. Deliberately lost preparation replies recover by
+explicit review/private retry and same-endpoint cold restart, while original
+full rows, receipt, guard, runs and linked reservations remain unchanged.
+Evidence: `backend/providers/nvke/qualification/install-plan-native-render-inputs-browser-api-local.json`.
+This verifies the existing preparation/recovery contract; private Helm input
+capture/rendering is not routed through the browser or public agent API.

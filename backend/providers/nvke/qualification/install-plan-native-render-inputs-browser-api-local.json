@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "scope": "native-render-input-bound-tree-api-browser-recovery-local-qualification",
+  "cliBaseRevision": "c25b30c24c2413bafa4d1c2a2ea126baa8b42aa0",
+  "applicationRevision": "a7ae6434739dcd2bb2e0eba8dffdf3cf74459dd1",
+  "opscodeRuntimeRevision": "870d1400c0c9986e5787b7b45635baae88785c0a",
+  "compiledBinarySha256": "26a7529dd572b6d7afb6fb4b96a6a3d73cd4f7748869a0fe007456031ca7f4a8",
+  "chartHelperBinarySha256": "a51f6258c905d414e56a9b24ef66d381b7e46dde0ea564aac3cd35b6af6b4600",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "4aae4acba9d2fa4a182f99e54f4fd4533a14d82e3a6a290ec91a76f7e42f901e",
+    "scripts/integration/tree_browser_qualification.py": "4fe138d11e0b9d9244afc7d1c1405bdd8f928ea52c033f410dfbba4dc6119df8"
+  },
+  "checks": {
+    "ruff": "passed",
+    "format": "passed",
+    "pairedCliApiBrowser": {
+      "status": "passed",
+      "passed": 1,
+      "deselected": 1,
+      "skipped": 0,
+      "warnings": 6,
+      "exitCode": 0,
+      "durationSeconds": 797.79,
+      "variant": "browser, including common compiled CLI preparation/cold-recovery/private-retry journey",
+      "logSha256": "5b91ffb72f7fb99c5aee1ecc003e420922c541c2a70a55005d8ded91acea8ee1"
+    },
+    "unchangedGoChecksReused": {
+      "passed": 1048,
+      "skipped": 2,
+      "exitCode": 0,
+      "vet": "passed",
+      "lint": "passed",
+      "logSha256": "26a3c87df205acb67fdb2f2d67fedf7a037b1eab9c9ec96dbc4258c8c9f01abc",
+      "reason": "Tracked Go command/internal/module/main bytes remain identical to c25b30c; only integration fixture source guards change."
+    }
+  },
+  "continuationAuthorized": false,
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "limitations": [
+    "This qualifies source/helper-bound tree intent and existing recovery. The private capture/render method is not exposed by a public agent route and is not invoked through this browser scenario.",
+    "Browser source/access metadata is an owned Storybook fixture and authentication uses private driver forwarding. Actual Next.js login/routes/access discovery remains unqualified.",
+    "Native receipt/configuration/deployment and Kubernetes reads are controlled fixtures, not retained Linux continuation proof. Supported 300-second agent timeout is selected.",
+    "Phase-specific context acquisition/freshness is tracked in https://github.com/calliopeai/astrolift-opscode/issues/100. Frozen-chart publication, Kustomize, image closure, fresh resource/credential proof and linked admission remain open.",
+    "No original replay, retained VM restart, main merge or deployment."
+  ],
+  "applicationBrowserSourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.api.stories.tsx": "2f2310fcf38cb37db8dae41173b7c133a428b83ef9d642cbea1710cfd97beadb",
+    "frontend/e2e/nvke-install-plan-tree-api-runner.mjs": "febc6d7e19002891df182025f885d92c3574c1b8af996ceb309deef06b2ec54f"
+  },
+  "evidence": [
+    "Exact runtime source guards include the native input-capture adapter, execution-tree helper binding and compiled helper source at Opscode 870d1400c0c9986e5787b7b45635baae88785c0a.",
+    "Compiled CLI and actual Chromium panel/hook recover deliberately lost successful tree-preparation replies using explicit review/private retry, including same-endpoint/instance cold agent restart. One published tree/attempt is retained for each owned journey.",
+    "Production-built static Storybook uses private bearer forwarding to real ASGI/PostgreSQL and actual mTLS native agent. Native NICo template output/source seals, full original operation/plan/chart rows, receipt, guard, runs and linked reservations remain unchanged.",
+    "Selected binary is hash-checked before and after. No Go or frontend runtime sources changed; prior Go checks and static catalog remain reusable. Browser storage/journals and public metadata expose no private request or credential bodies."
+  ],
+  "cliQualificationRevision": "e79ed66651560b5b7f067c00247a445bac0c752b",
+  "cliQualificationFile": "scripts/integration/nvke-install-plan-tree-native-inputs-checkpoint.json",
+  "sdkQualificationFile": "install-plan-native-render-inputs-sdk-local.json"
+}
