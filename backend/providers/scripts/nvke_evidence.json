@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "53cfc4eb3ac51988dab84937072a51e10df93f28"
+      "revision": "fb0513edcbf4f5b07da8732fd319836ec3d32a9c"
     }
   },
   "evidence": {
@@ -500,7 +500,7 @@
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
       "scope": "Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.",
-      "sha256": "56521f829e9118c5dc4f4507883673520befad589428a0567018707f00c74da4"
+      "sha256": "70be197960ef6b179bb48a8c70be1c4b14c2fdd7d8b2aa5561095fb1bd98b23a"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -947,7 +947,7 @@
       "path": "kubernetes/nvke/management_plan_preparation.py",
       "kind": "implementation",
       "scope": "Authenticated read-only preparation and same-ID recovery over sealed snapshots. Fresh original source, target cluster UID, guarded input copies, explicit reconstruction provenance and source-bound signed item/workload paging. No continuation execution or historical environment identity claim.",
-      "sha256": "e0359b25fd9f405bf48ca820890c163e87b60a35bc654cbb54af480331921d07"
+      "sha256": "df731c1dd9a46b2f90db92914b62e480534a2fb37cfa6207c73ca937ca6f024a"
     },
     "operator-install-plan-sdk": {
       "repository": "app",
@@ -1063,6 +1063,27 @@
       "path": "frontend/lib/nvke/operator-install-plan.ts",
       "kind": "implementation",
       "scope": "Typed metadata/source/phase/action/page validation preserves decimal int64 bytes and workload counters, rejects contradictory continuation claims and source/digest/page swaps, and submits complete private request text without browser reserialization."
+    },
+    "operator-install-plan-dependencies": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/management_dependencies.py",
+      "kind": "implementation",
+      "scope": "Private source-bound native file dependency discovery: guarded inputs, source chart trees/archives, values/set-file references and image layouts; pinned parser consumes verified snapshot bytes. Explicit materialization/live-verification state and false continuation authorization.",
+      "sha256": "f15bd0e13aece58ebaca138d22958c028e5c63e53f32ce1d54b70b00348f4510"
+    },
+    "operator-install-plan-dependency-tests": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/test_management_dependencies.py",
+      "kind": "test",
+      "scope": "Thirteen actual filesystem/pinned native parser cases cover vanished staging, changed/restored metadata and item inventories, unsafe aliases, byte budgets with overlap deduplication, external charts/values/set-file/image references and private diagnostics. No Kubernetes or Helm execution.",
+      "sha256": "f4bc600e6da692c6a266fec95ec969c8e27a7474ce351fc6730ed47630c225d2"
+    },
+    "operator-install-plan-dependency-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-dependency-inventory-local-2026-11-09.json",
+      "kind": "observation",
+      "scope": "Host-owned temporary workspace: 40 compiler/store/dependency cases and all 53 native-bundle agent cases pass, including actual mTLS with controlled Kubernetes reads and unchanged original temporary job/linkage. Source hashes, initial assertion correction and parser-race fix are recorded. Artifact materialization, skipped-resource evidence and actual retained Linux/browser continuation remain pending.",
+      "sha256": "a83190be2a56c85ede81634442a57064a6a00e9a5c8227ea113092a32986a5ba"
     }
   },
   "rows": {
@@ -3339,9 +3360,12 @@
           "operator-install-plan-ui-journal",
           "operator-install-plan-ui-tests",
           "operator-install-plan-ui-browser",
-          "operator-install-plan-ui-protocol"
+          "operator-install-plan-ui-protocol",
+          "operator-install-plan-dependencies",
+          "operator-install-plan-dependency-tests",
+          "operator-install-plan-dependency-local"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately; artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",

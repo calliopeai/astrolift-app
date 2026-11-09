@@ -366,3 +366,12 @@ after retention recovers by review alone. Changed text makes no preparation API
 call, the journal exists before preparation, private text stays out of browser
 storage, and both scenarios complete without page errors. These controlled
 fixtures are separate from the pending real backend/Linux-agent qualification.
+
+The dependency-inventory runtime is pinned in the SDK transport fixture at
+`fb0513edcbf4f5b07da8732fd319836ec3d32a9c`, including the new helper source. All 48 client/transport
+cases pass against that source and the explicit native bundle, including the
+actual mTLS SDK plan prepare/recover/page path with controlled Kubernetes reads.
+The regenerated coverage ledger and its 22 checks also pass. The application’s
+full frontend typecheck passed after separating each generated plan mutation
+input; its 15 focused hook cases and lint passed as well. These checks do not
+replace the pending retained Linux-site qualification and native continuation.
