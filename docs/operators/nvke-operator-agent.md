@@ -259,8 +259,7 @@ The SDK has 80 focused cases, including an actual agent mutual-TLS
 preparation/recovery/page/tamper roundtrip with controlled Kubernetes reads. The
 retained-artifact update's run had 79 passes and one 45-second subprocess timeout;
 that case passed a targeted rerun with a 120-second limit. The original failed
-receipt, native guard and run inventory remain unchanged. Plan CLI/UI and a
-continuation executor remain pending. Actual Linux agent/application RPC
+receipt, native guard and run inventory remain unchanged. Plan UI and a continuation executor remain pending. Actual Linux agent/application RPC
 qualification is recorded below. Frozen dependency closure and skipped resource
 verification, durable linked execution and deployed acceptance remain pending.
 The paged SDK validates the source-bound header and each page; it does not claim
@@ -275,7 +274,7 @@ inspect an existing plan after the original caller loses access. Every operation
 rechecks current admin/read authority and source versions. Public page cursors bind
 the current caller/token/source as a hash, view, search and limit. The original
 operation's status and effect fence remain intact. This service/model checkpoint
-is exposed through typed GraphQL; CLI and operation-screen integration remain pending.
+is exposed through typed GraphQL; CLI commands are available; operation-screen plan integration remains pending.
 
 `prepareNvkeOperatorInstallPlan` accepts the reviewed original versions plus a
 private `requestText` JSON body. `reviewNvkeOperatorInstallPlan` reads the saved
@@ -302,4 +301,19 @@ source files, five job/run identities and the original operation's entire row,
 UNCERTAIN status and version 23 remain unchanged. The initial staging refusal and
 local test timeout/rerun are recorded explicitly. No linked reservation or native
 continuation was admitted. Reconstructed provenance, closure/live skipped-resource
-verification, plan CLI/UI review, execution and deployed acceptance remain open.
+verification, plan UI review, execution and deployed acceptance remain open.
+
+The remote CLI now provides `agent install-plan prepare`, `review`,
+`retry-preparation`, `items` and `workloads`. Preparation takes private `--file`
+text and flushes a metadata-only `--request-file` before the API mutation. Every
+action requires the original operation and current site/authority versions plus
+`--plan`. Pages additionally require the reviewed `--plan-digest`; search, limit
+and cursor scope cannot change silently. Explicit retry uses only the server's
+retained private intent, and requires its original actor/API token.
+
+The compiled CLI qualification walked 12 items and 24 workloads and refused
+changed-cursor and stale-version requests while preserving the original source
+and uncertain operation. A later shared Lima network-service outage is tracked
+in #98: both VMs are preserved without reboot or native replay, but current host
+guest forwarding is unavailable. Completed CLI checks do not claim post-incident
+environment availability. The full integration and plan UI/execution remain open.

@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "4e7b473c0cd548cd92519c6dea4e98ab479a2879"
+      "revision": "5fdb51ee8fea78a4c4bcfa54f79175763d49aef0"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "0a70cf3fe245c67554501cb09662063d3c60e0c8"
+      "revision": "53cfc4eb3ac51988dab84937072a51e10df93f28"
     }
   },
   "evidence": {
@@ -559,7 +559,7 @@
       "path": "cmd/nvke_agent.go",
       "kind": "implementation",
       "scope": "astro nvke agent exposes connected command catalog plus reviewed, private mTLS configure/get/verify/enable/disable/remove controls.",
-      "sha256": "f74d6b1203c93d36cd01a1ac9ed2b11943758256a84b76e77bff2905f10e3eb5"
+      "sha256": "25c7a1dcfcbe9b21278bd1a4edfaf273cf25e07b921827c1e13ea81e12d60c91"
     },
     "operator-cli-request": {
       "repository": "cli",
@@ -854,7 +854,7 @@
       "path": "cmd/nvke_install_review.go",
       "kind": "implementation",
       "scope": "Compiled astro nvke agent install-review binds exact original operation/version and current verified agent identity/bundle, validates non-authorization and complete typed readiness facts, preserves decimal strings/nulls, and never admits or stops work.",
-      "sha256": "196973e19786bc5009f6ca9638f6705e0c4d1f9290ce8e14b0ee01a57f374a0d"
+      "sha256": "a93f08e37e002dad30d4ad28109e5092c74512f055c246c65765f0e38e69a38e"
     },
     "operator-install-review-cli-tests": {
       "repository": "cli",
@@ -999,6 +999,34 @@
       "kind": "observation",
       "sha256": "3eb3908f63d6c0bb05009aa0aa19b2863628d5b24dbfae979e90f80010ede2e5",
       "scope": "Actual retained-install Linux SDK and current-admin GraphQL preparation/recovery: 12 items, 24 workloads, complete pages/search, stale version/cursor refusal, encrypted private intent, redacted audits and cold agent restart. Eight native files, five jobs/runs and original UNCERTAIN/version-23 full row remain unchanged; no linked reservation. Initial staging refusal, fixture/SDK timeout corrections and host tenant probe limits are preserved. CLI/UI plan review, closure attestation and execution remain open."
+    },
+    "operator-install-plan-cli": {
+      "repository": "cli",
+      "path": "cmd/nvke_install_plan.go",
+      "kind": "implementation",
+      "scope": "Reviewed remote prepare/review/retry-preparation/items/workloads commands. Exact private UTF-8 input, fsynced metadata journal before preparation, original source/authority validation and page/action/readiness checks. No install or continuation admission.",
+      "sha256": "6bec97e2f9061f273198c28fceb3592fb534b41413a42cf5f62e6e832a5ea91a"
+    },
+    "operator-install-plan-cli-api": {
+      "repository": "cli",
+      "path": "internal/api/nvke_install_plan.go",
+      "kind": "implementation",
+      "scope": "Typed GraphQL plan/header/source/item/workload transport; private mutation/query redirects refused, six-minute plan HTTP deadline preserves the shared client deadline. Full proposed request fields remain in private request text.",
+      "sha256": "bf4670881e4d2c33b236e3f7984fc8dd5293e66a1ebd33620e3d01875768c5da"
+    },
+    "operator-install-plan-cli-tests": {
+      "repository": "cli",
+      "path": "cmd/nvke_install_plan_test.go",
+      "kind": "test",
+      "scope": "Real controlled HTTP command tests cover source/authority/header refusal, journal-before-mutation, changed input, lost reply without resubmission, exact retained-intent retry, item/cursor/action checks, decimal precision and null readiness. Separate API transport tests cover all five redirect paths and client deadline isolation.",
+      "sha256": "f7007bc88b4b6cbd63f013113d39bd1485aefae73450c8c779f609f44737964d"
+    },
+    "operator-install-plan-cli-local": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/operator-install-plan-cli-local-2026-11-09.json",
+      "kind": "observation",
+      "scope": "Clean compiled CLI through actual GraphQL/SDK/mTLS Linux agent: prepare/review/retry, complete 12-item/24-workload pages, NKTP search, changed cursor and stale-version refusal. Private journal and unchanged original eight files/five jobs/runs/full UNCERTAIN-version-23 row. Full Go suite: 1032 passing top-level tests/12 packages, two existing native opt-in skips. Later host usernet outage is separately recorded in #98; no guest reboot or native replay.",
+      "sha256": "6ed42dc5e3311379e400df81d988982aecfbff9638ffb2bc88fba8daf5e65698"
     }
   },
   "rows": {
@@ -3265,9 +3293,13 @@
           "operator-install-plan-model",
           "operator-install-plan-backend-tests",
           "operator-install-plan-api",
-          "operator-install-plan-api-local"
+          "operator-install-plan-api-local",
+          "operator-install-plan-cli",
+          "operator-install-plan-cli-api",
+          "operator-install-plan-cli-tests",
+          "operator-install-plan-cli-local"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL sealed plan preparation/recovery are locally qualified with unchanged original files, row and fences. Plan CLI/UI review, frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. Plan UI review, frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
