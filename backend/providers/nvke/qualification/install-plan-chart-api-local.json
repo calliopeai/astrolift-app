@@ -26,7 +26,7 @@
     "chromiumPanelStories": 15,
     "chromiumControlledRecoveryScenarios": 2,
     "targetedEslintAndRuff": "passed",
-    "typescript": "prior hook pass; final current-tree follow-up pending"
+    "typescript": "passed: full current-tree tsc --noEmit after all chart hook, recovery and operation-screen changes"
   },
   "evidence": [
     "The application reserves encrypted immutable chart intent before actual agent I/O and masks private GraphQL request text in audits.",

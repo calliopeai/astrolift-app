@@ -495,8 +495,7 @@ request hashes, explicit read recovery and no request options in local storage.
 Local checks passed 48 hook/parent-regression/story cases, four journal cases
 and 17 operation-screen interaction cases. Targeted ESLint and fixture Ruff
 checks passed. These controlled Apollo peers do not qualify the real browser/API or deployed retained Linux path. The
-PostgreSQL/real Helm/mTLS gate passed; the final current-tree TypeScript
-follow-up remains pending.
+PostgreSQL/real Helm/mTLS and full current-tree TypeScript gates passed.
 
 The initial database run's single setup failure was a test-agent startup race:
 `identity.json` existed before JSON was completely written. The owned-agent test
