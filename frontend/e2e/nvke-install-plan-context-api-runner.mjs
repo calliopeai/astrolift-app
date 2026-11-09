@@ -39,16 +39,27 @@ try {
           "RetryNvkeInstallPlanContext",
         ].includes(payload.operationName)
       );
-      assert.equal(payload.variables.input.chartArtifactId, cfg.fixture.source.charts.id);
-      assert.equal(
-        payload.variables.input.chartArtifactDigest,
-        cfg.fixture.source.charts.artifactDigest
-      );
-      assert.equal(payload.variables.input.planId, cfg.fixture.source.plan.id);
-      assert.equal(payload.variables.input.treeId, cfg.fixture.source.artifacts.id);
-      assert.equal(payload.variables.input.treeDigest, cfg.fixture.source.artifacts.treeDigest);
-      assert.equal(payload.variables.input.item, cfg.item);
-      assert.equal(payload.variables.input.ordinal, cfg.ordinal);
+      const source = cfg.fixture.source;
+      const expected = {
+        operationId: source.operation.id,
+        expectedActorId: cfg.fixture.scope.actorId,
+        expectedSiteVersion: source.site.version,
+        expectedOperationVersion: source.operation.version,
+        expectedAuthorityVersion: source.authority.version,
+        planId: source.plan.id,
+        expectedPlanVersion: source.plan.version,
+        planDigest: source.plan.plan.planDigest,
+        chartArtifactId: source.charts.id,
+        expectedChartArtifactVersion: source.charts.version,
+        chartArtifactDigest: source.charts.artifactDigest,
+        treeId: source.artifacts.id,
+        expectedTreeVersion: source.artifacts.version,
+        treeDigest: source.artifacts.treeDigest,
+        item: cfg.item,
+        ordinal: cfg.ordinal,
+      };
+      for (const [key, value] of Object.entries(expected))
+        assert.equal(payload.variables.input[key], value);
       const text = payload.variables.input.requestText;
       const journalBeforeCall = await page.evaluate(
         (artifactId) =>
