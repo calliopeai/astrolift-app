@@ -643,3 +643,16 @@ input refusal. It is not yet wired into sealed tree publication; runtime tree
 capabilities/state remain unchanged. Kustomize/Helm manifest freezing, verified
 images/private registry policy, fresh resource/credential proof, remaining-only
 selection and linked native execution are still required.
+
+
+SDK fixtures now select Opscode `0d17f53ec998698df88b2ab86f3d0359fbedbbfc`, which
+integrates native BootstrapConfig template rendering into sealed trees and rejects
+copied inventory changes before canonicalizing item types. All 193 focused SDK
+plan/chart/tree/transport cases pass without skips. The real mTLS fixture verifies
+rendered NICo credentials and retained templates before losing a response,
+restarting the owned agent and recovering without rerendering. Private output and
+original receipts/guards remain protected; source/log hashes and scope are in
+`backend/providers/nvke/qualification/install-plan-tree-templates-sdk-local.json`.
+Paired compiled CLI/API/browser qualification is checked separately. Kustomize/Helm
+manifest freezing, verified images and fresh resource/credential proof remain
+required before remaining-only selection and linked execution.

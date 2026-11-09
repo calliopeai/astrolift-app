@@ -4,6 +4,7 @@ import shutil
 import ssl
 import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -25,7 +26,21 @@ try:
         job, intent, body = case.plan_fixture()
         body["overrides"] = {
             "options": {"config": "input:config.json"},
-            "files": {"config.json": "{}", "secret.txt": "PRIVATE_TREE_SDK_CONTENT"},
+            "files": {
+                "config.json": json.dumps(
+                    {
+                        "Nico": {
+                            "Endpoint": "https://nico.example.test",
+                            "OrgID": "owned",
+                            "APIName": "owned",
+                            "Token": "PRIVATE_TREE_SDK_CONTENT",
+                        },
+                        "Tenant": {"User": "owned", "Password": "PRIVATE_TREE_SDK_CONTENT"},
+                        "ClusterName": "owned-sdk-tree",
+                    }
+                ),
+                "secret.txt": "PRIVATE_TREE_SDK_CONTENT",
+            },
         }
         original = storage._content(storage._scan(case.engine._job(job), 67108864, private=True))
         guard = (case.engine.workspace / "management-install-state.json").read_bytes()
@@ -146,6 +161,19 @@ try:
         assert requests == ["POST"]
         artifact = case.engine.install_execution_trees / tree_id
         assert (artifact / "index.json").is_file()
+        sealed = native.agent.management_plan_tree_service.trees.ExecutionTrees(
+            case.engine.install_execution_trees, plans=case.engine.install_plans
+        ).load(tree_id)
+        assert len(sealed["templateRendering"]) == 1
+        assert sealed["templateRendering"][0]["item"] == "nvke-base-config"
+
+        frozen = Path(sealed["treeLocation"])
+        assert "type: template" not in (frozen / "deployment/nvke-deploy.yaml").read_text()
+        assert (
+            "PRIVATE_TREE_SDK_CONTENT" in (frozen / "deployment/nvke-base-config/20-nico-credentials.yaml").read_text()
+        )
+        assert (frozen / "template-sources/nvke-base-config/20-nico-credentials.yaml.tmpl").is_file()
+
         attempts = sorted(path.name for path in (artifact / "work").iterdir())
         endpoint, port = case.url, case.server.server_port
         case.server.shutdown()

@@ -1,0 +1,35 @@
+{
+  "format": 1,
+  "scope": "sdk-native-template-sealed-tree-mtls-recovery-local-qualification",
+  "applicationBaseRevision": "0473843350b06af77eb3b45fd55f8c6b836b6dc8",
+  "opscodeRuntimeRevision": "0d17f53ec998698df88b2ab86f3d0359fbedbbfc",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "sourceSha256": {
+    "backend/providers/tests/nvke/test_operator_agent_client.py": "a001a4abca8db0f91c4cb621f3538256e017a705d7807a232597c59f2992b804",
+    "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py": "09d1d84b81d224109557337a3494ce0c85eeca6c13315d761a44503f08d50f29",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_tree_driver.py": "3d2d1150bcde5fa3138e805b2b0e4d91e78d251bc0312ee1f442c0e3d598dfa8",
+    "backend/providers/nvke/operator_agent_client.py": "b0bb216c613896ed7278ab8969c6414d28025d0acbe18f299db1b0498a7a4759",
+    "backend/providers/nvke/_operator_install_plan_tree.py": "c8199a802e44b3d2c24f56b925b551e26e195f527124a4dc6df84d7610e43c80"
+  },
+  "checks": {
+    "passed": 193,
+    "skipped": 0,
+    "logSha256": "873d494e7c3aea794f60c5ef52407e2abd0e96b64a25815ce31af1187b6fb05b",
+    "ruff": "passed",
+    "format": "passed"
+  },
+  "evidence": [
+    "SDK source guards select the corrected template-rendering runtime and authenticate its renderer helper as well as the existing agent/plan/chart/tree modules.",
+    "Actual SDK/mTLS/Helm 4 fixture supplies a controlled BootstrapConfig to the pinned NICo templates. It verifies retained template sources, frozen rendered NICo credential YAML, unchanged native item names/order and manifest types in the sealed private tree before cold recovery.",
+    "Deliberately discarding a successful preparation response does not replay preparation. Same-endpoint/instance cold restart, read and explicit private retry recover the same metadata without another renderer/tool lookup or attempt.",
+    "Original full job/run content, guard, frozen parent plan, chart publication and linked reservations remain unchanged. Public replies preserve decimal bytes and never expose the rendered private credential fixture."
+  ],
+  "executionState": "requires-native-rendering-images-and-live-verification",
+  "continuationAuthorized": false,
+  "limitations": [
+    "This is a controlled native failed receipt/configuration/deployment and Kubernetes GET fixture, not retained Linux installation qualification.",
+    "Compiled CLI/API/browser qualification against this runtime is a separate pending check. No application schema or runtime SDK protocol changed in this checkpoint.",
+    "Kustomize/Helm manifest freezing, image/private registry closure, fresh skipped-resource/credential proof, remaining-only selection and linked execution remain open.",
+    "No original native replay, retained VM restart, main merge or production deployment."
+  ]
+}

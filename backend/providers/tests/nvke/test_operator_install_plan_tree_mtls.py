@@ -19,7 +19,7 @@ import pytest
 )
 def test_real_sdk_mtls_tree_lost_reply_cold_agent_recovery_and_private_retry(tmp_path):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "b0f9d26dd5467d97eef92d6d728dca33e0bf5777"
+    revision = "0d17f53ec998698df88b2ab86f3d0359fbedbbfc"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -34,6 +34,7 @@ def test_real_sdk_mtls_tree_lost_reply_cold_agent_recovery_and_private_retry(tmp
         "management_execution_release.py",
         "management_execution_arguments.py",
         "management_execution_tree.py",
+        "management_template_rendering.py",
         "management_plan_tree_service.py",
         "qualify_bootstrap.py",
         "tooling.py",
