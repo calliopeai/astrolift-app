@@ -37,7 +37,8 @@
       "logPath": "/tmp/astrolift-nvke-verification-api-types.log",
       "exitMarker": "/tmp/astrolift-nvke-verification-api-types.exit",
       "note": "Prettier subsequently reformatted only new mutation document; final exact-source type check still required."
-    }
+    },
+    "sdkNativeMTLS": "Qualified SDK evidence merged without production source changes; see install-plan-render-verification-sdk-local.json: actual mTLS/lost-reply/cold/offline recovery passed 1 case, no skips."
   },
   "implemented": [
     "Soft-deletable immutable encrypted verification intent model protects its retained context parent and completed historical summary. Database status check and migration retain UUIDs after deletion.",
@@ -48,7 +49,7 @@
   ],
   "remaining": [
     "Inspect PostgreSQL model and service/GraphQL results, fix failures and qualify exact-source final checks. No database acceptance is claimed by this checkpoint.",
-    "Finish actual pinned native SDK mTLS qualification on the SDK branch, then actual paired App/CLI/browser acceptance.",
+    "Actual pinned native SDK mTLS qualification passed; actual paired App/CLI/browser acceptance remains outstanding.",
     "CLI commands, Storybook controls/journal, eight locales and production UI wiring remain to be implemented for this stage.",
     "Use-time phase/resource/original credential proof, closed schema policy, image closure and exactly-once linked admission remain open; full scope review/PR/merge/deploy remain outstanding."
   ],

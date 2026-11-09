@@ -769,3 +769,48 @@ selected older durable-intent/ID-reservation regressions also pass, with 72 case
 deselected. Fresh phase/resource/credential proof, external schema policy, image
 closure and linked native admission remain open. The original uncertain install
 and its fence are unchanged; this contract never authorizes native continuation.
+
+### Signed render verification (#2656, #100, work in progress)
+
+The optional agent render profile now advertises `installPlanRenderVerification`
+with `prepare` and `readOnly` true and `continuation` false. Its pinned mTLS
+`GET`/`POST /v1/jobs/{originalJobId}/install-plan-verification` route verifies the
+original unsuccessful install, retained context and all parent publications.
+The agent selects the original frozen credentials. Requests cannot supply a
+kubeconfig, helper, response callback, policy override or native command.
+
+Preparation records a signed intent before revalidation. Two complete fresh
+read passes must match the original discovery, Helm release state and reached
+Kubernetes lookup observations within the reviewed capture age, byte, call and
+time budgets. A signed observation and index retain the result. Recovery of a
+completed UUID reads that historical result without recollecting, including after
+a cold restart. A new observation requires a distinct UUID. Historical
+`observedAt` is preserved; reading it does not renew freshness for phase use.
+
+The App implementation adds `prepareNvkeOperatorInstallPlanVerification`,
+`reviewNvkeOperatorInstallPlanVerification` and
+`recoverNvkeOperatorInstallPlanVerificationPreparation`. Their reviewed source
+extends the context contract with `contextId`, `expectedContextVersion` and
+`contextDigest`; preparation additionally accepts private bounded `requestText`.
+The intent is encrypted and bound to the original caller/token before remote I/O.
+Public replies contain source IDs/versions/digests, verification/index hashes,
+observation time and bounded request/byte counts. Partial and soft-deleted IDs
+remain reserved across all artifact preparation paths. The new input's private
+text is classified for audit redaction even when rejected or aliased.
+
+All 64 selected native-agent regressions pass. SDK source/codec regressions pass
+312 cases with six older opt-in agent tests unselected. Separately, the exact
+pinned verification SDK test passes real agent/Kubernetes mTLS, deliberate reply
+loss, same-endpoint cold restart and historical GET/identical POST recovery with
+one attempt and no recollection, private output, native replay or original source
+mutation. The App database/API acceptance and stage-specific CLI/UI controls are
+still pending. Evidence:
+`backend/providers/nvke/qualification/install-plan-render-verification-sdk-local.json`
+and `install-plan-render-verification-app-checkpoint.json` in the same directory.
+
+Verification retains
+`requires-phase-use-resource-credential-schema-images-and-linked-admission` and
+`continuationAuthorized: false`. Fresh phase-use/skipped-resource/original
+credential checks, closed external schema policy, image closure and exactly-once
+linked admission remain required. The original uncertain install and fence stay
+in place. No main merge or CONFLICT deployment is qualified by these checkpoints.
