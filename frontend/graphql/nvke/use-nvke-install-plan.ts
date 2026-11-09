@@ -350,24 +350,34 @@ export const useNvkeInstallPlan = (args: {
       };
       const reviewInput = { ...jobInput, planId };
       contacted = true;
-      const response = await client.mutate<
-        | PrepareNvkeInstallPlanMutation
-        | ReviewNvkeInstallPlanMutation
-        | RetryNvkeInstallPlanMutation,
-        PrepareNvkeInstallPlanMutationVariables | ReviewNvkeInstallPlanMutationVariables
-      >({
-        mutation:
-          action === "prepare"
-            ? PREPARE_NVKE_INSTALL_PLAN
-            : action === "review"
-              ? REVIEW_NVKE_INSTALL_PLAN
-              : RETRY_NVKE_INSTALL_PLAN,
-        variables: {
-          input: action === "prepare" ? { ...jobInput, requestText: privateText! } : reviewInput,
-        },
-        fetchPolicy: "no-cache",
-        context: requestContext,
-      });
+      const requestOptions = { fetchPolicy: "no-cache" as const, context: requestContext };
+      const response =
+        action === "prepare"
+          ? await client.mutate<
+              PrepareNvkeInstallPlanMutation,
+              PrepareNvkeInstallPlanMutationVariables
+            >({
+              mutation: PREPARE_NVKE_INSTALL_PLAN,
+              variables: { input: { ...jobInput, requestText: privateText! } },
+              ...requestOptions,
+            })
+          : action === "review"
+            ? await client.mutate<
+                ReviewNvkeInstallPlanMutation,
+                ReviewNvkeInstallPlanMutationVariables
+              >({
+                mutation: REVIEW_NVKE_INSTALL_PLAN,
+                variables: { input: reviewInput },
+                ...requestOptions,
+              })
+            : await client.mutate<
+                RetryNvkeInstallPlanMutation,
+                ReviewNvkeInstallPlanMutationVariables
+              >({
+                mutation: RETRY_NVKE_INSTALL_PLAN,
+                variables: { input: reviewInput },
+                ...requestOptions,
+              });
       if (!current()) throw new Error("SOURCE_CHANGED");
       const data = response.data;
       const envelope =

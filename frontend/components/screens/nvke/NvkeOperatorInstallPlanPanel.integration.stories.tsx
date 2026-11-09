@@ -59,7 +59,7 @@ function createControlledClient(retainBeforeLoss: boolean) {
             const input = request.variables.input ?? {};
             const text = typeof input.requestText === "string" ? input.requestText : null;
             const record = {
-              name: request.operationName,
+              name: request.operationName ?? "ANONYMOUS",
               hasPrivateText: text !== null,
               ...(text
                 ? {

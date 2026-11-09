@@ -97,9 +97,9 @@ function reply(h: ReturnType<typeof harness>, action: keyof typeof fields, value
 }
 function pages(h: ReturnType<typeof harness>) {
   for (const call of h.calls.filter((c) =>
-    c.request.operationName.startsWith("GetNvkeInstallPlan")
+    (c.request.operationName ?? "").startsWith("GetNvkeInstallPlan")
   )) {
-    const items = call.request.operationName.includes("Item");
+    const items = (call.request.operationName ?? "").includes("Item");
     call.reply({
       [items
         ? "astroliftNvkeOperatorInstallPlanItemPage"
@@ -292,7 +292,7 @@ it.each(["actor", "permission", "source", "visit"])(
     });
     expect(r.result.current?.plan).toBeNull();
     expect(
-      h.calls.filter((c) => c.request.operationName.startsWith("GetNvkeInstallPlan"))
+      h.calls.filter((c) => (c.request.operationName ?? "").startsWith("GetNvkeInstallPlan"))
     ).toHaveLength(0);
   }
 );
