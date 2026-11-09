@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "browser-to-actual-app-context-capture-driver-foundation",
-  "status": "driver-foundation-qualified-actual-api-acceptance-pending",
+  "status": "driver-static-and-stories-qualified-actual-api-acceptance-running",
   "sourceSha256": {
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanContextPanel.api.stories.tsx": "63b9bb09e8a44737c33a98a53b19352b5551dd1d668a8bef24e3bdc648c04763",
     "frontend/components/screens/nvke/nvke-operator-install-plan-context-stories.test.tsx": "212de018f4dad16bd2d56ba49b2c92ad1e4c7f1809ee5e98b614f0b283df0992",
@@ -27,10 +27,12 @@
       "scope": "Actual Chromium fixture renders a ready panel with zero automatic RPCs; screenshot inspected. No actual API acceptance claimed."
     },
     "fullTypeScriptAndStatic": {
-      "status": "pending",
-      "sessionId": 79705,
+      "status": "completed",
+      "exitCode": 0,
+      "logSha256": "7a8fff6de16b1235537b06f072bec67ebd26c4195de1f0fc4ae324a2d70cbbf1",
       "logPath": "/tmp/astrolift-nvke-context-api-browser-static.log",
-      "exitMarker": "/tmp/astrolift-nvke-context-api-browser-static.exit"
+      "exitMarker": "/tmp/astrolift-nvke-context-api-browser-static.exit",
+      "scope": "Generated Next route types, full TypeScript and targeted ESLint/Prettier on the current API story, coverage test and hardened browser driver."
     },
     "actualBrowserAppAgent": {
       "status": "pending",
