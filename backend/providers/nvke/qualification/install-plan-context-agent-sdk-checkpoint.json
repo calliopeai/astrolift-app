@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "sdk-agent-render-context-checkpoint",
-  "status": "final-source-broad-qualification-running",
+  "status": "sdk-qualified-local",
   "opscodeRuntimeRevision": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
   "sourceSha256": {
     "nvke/_operator_install_plan_context.py": "a8fe2df3f129e72966e2112fca6ccece35aa0e8646bba271810e10126422ec5e",
@@ -36,9 +36,13 @@
       "scope": "Actual double mTLS, native helper, lost POST reply and cold offline recovery before the final native item-name validator correction; nktp was the exercised item. This is historical evidence, not exact-final-source qualification."
     },
     "finalBroad": {
-      "status": "running",
-      "completionMarker": "/tmp/astrolift-nvke-context-sdk-qualified.exit",
-      "logPath": "/tmp/astrolift-nvke-context-sdk-qualified.log"
+      "status": "passed",
+      "passed": 251,
+      "skipped": 0,
+      "exitCode": 0,
+      "durationSeconds": 693.19,
+      "logSha256": "267258885082e496cc3351a0e2e51b392c629b95b6da30d8ecdf32f1531c6e82",
+      "scope": "All selected agent-client, plan/chart/tree/context contract tests, actual native utility mTLS, public tree mTLS recovery, and authenticated context double-mTLS/frozen-helper recovery on the final SDK source."
     }
   },
   "continuationAuthorized": false,
@@ -49,7 +53,6 @@
     "The new real SDK driver verifies separate actual agent and Kubernetes mTLS, native helper, one capture attempt, same-endpoint/instance restart, exact retained capture/chart hashes and unchanged original/parent files."
   ],
   "remaining": [
-    "Record terminal exact-final-source broad SDK results.",
     "Durable model foundation is separate from pending current-admin App context API/outbox/schema/CLI/UI wiring.",
     "Earlier public tree browser/API/compiled-CLI case must rerun against the new runtime pin.",
     "Legacy standalone local-chart timeout, phase freshness, schema/image closure, linked admission, retained live-site tests, review/main merge and deployment remain open."
