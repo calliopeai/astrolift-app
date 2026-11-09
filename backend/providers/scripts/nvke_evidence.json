@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "a7c9edafa615e4e84a9b91d65f0523610df11c7a"
+      "revision": "80a75a144a029947a6e564cd2f92eb78ec1307a5"
     }
   },
   "evidence": {
@@ -493,14 +493,14 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.",
-      "sha256": "6f163143f63222f7722cb9a8a758b045b935213dd382367493b24a42b6ff7b06"
+      "sha256": "21809b94e37c0df57ee3570e4284c0c1e3c85f1db852796dd1eb49502b99d444"
     },
     "operator-agent-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
       "scope": "Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.",
-      "sha256": "9abceba40bc7f29a546f43d2ce0ad4bf7e35dfee3bd5aaa0b2a85360ba798828"
+      "sha256": "56521f829e9118c5dc4f4507883673520befad589428a0567018707f00c74da4"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -816,7 +816,7 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Original intent/mTLS/site/instance/bundle and authenticated native-run binding for read-only partial-install review. Executor reservation refuses admissions, source drift is rejected, original uncertainty/guards remain intact; no continuation admitted.",
-      "sha256": "6f163143f63222f7722cb9a8a758b045b935213dd382367493b24a42b6ff7b06"
+      "sha256": "21809b94e37c0df57ee3570e4284c0c1e3c85f1db852796dd1eb49502b99d444"
     },
     "operator-install-review-sdk": {
       "repository": "app",

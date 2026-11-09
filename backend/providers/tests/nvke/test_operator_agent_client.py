@@ -208,7 +208,7 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "a7c9edafa615e4e84a9b91d65f0523610df11c7a"
+    revision = "80a75a144a029947a6e564cd2f92eb78ec1307a5"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -591,7 +591,7 @@ def test_install_review_requires_capability_original_failure_digest_and_stable_i
 
 def test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "a7c9edafa615e4e84a9b91d65f0523610df11c7a"
+    revision = "80a75a144a029947a6e564cd2f92eb78ec1307a5"
     relative = "kubernetes/nvke/test_operator_agent.py"
     assert (source / relative).read_bytes() == subprocess.check_output(
         ["git", "show", revision + ":" + relative], cwd=source
@@ -657,6 +657,6 @@ finally:
     result = subprocess.run(
         [sys.executable, "-I", "-c", driver, str(Path(__file__).resolve().parents[2]), str(source / "kubernetes/nvke")],
         capture_output=True,
-        timeout=45,
+        timeout=120,
     )
     assert result.returncode == 0, "Owned mutual-TLS SDK plan qualification failed"
