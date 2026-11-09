@@ -432,39 +432,10 @@ class OperatorAgentClient:
             raise _invalid_response() from None
 
     def prepare_install_plan(self, job_id: str, *, intent: str, body: dict[str, Any]) -> dict[str, Any]:
-        from nvke.operator_contract import artifact_name, canonical, effectful
-
         self._bound()
         try:
-            if (
-                not isinstance(body, dict)
-                or set(body) - {"format", "planId", "request", "maximumInputBytes", "overrides"}
-                or not {"format", "planId", "request", "maximumInputBytes"} <= set(body)
-                or type(body["format"]) is not int
-                or body["format"] != 1
-            ):
-                raise ValueError
-            plan_id = identifier(body["planId"])
-            if plan_id == job_id or int(install_plan_protocol.decimal(body["maximumInputBytes"])) == 0:
-                raise ValueError
-            if body["request"] is not None:
-                proposed = validate(body["request"], self.site_id)
-                if proposed["command"] != "management.install" or not effectful(proposed):
-                    raise ValueError
-            overrides = body.get("overrides", {})
-            if (
-                not isinstance(overrides, dict)
-                or set(overrides) - {"options", "files"}
-                or any(not isinstance(v, dict) for v in overrides.values())
-            ):
-                raise ValueError
-            for field, updates in overrides.items():
-                for name in updates:
-                    if field == "options" and name not in CATALOG["management.install"]["options"]:
-                        raise ValueError
-                    if field == "files":
-                        artifact_name(name)
-            body = json.loads(canonical(body))
+            body = install_plan_protocol.preparation_request(body, site=self.site_id, job_id=job_id)
+            plan_id = body["planId"]
         except (ContractError, KeyError, ValueError, TypeError, OverflowError):
             raise NvkeError("INVALID_INPUT", "Use a bounded reviewed management-install plan request") from None
         original = self._install_plan_source(job_id, intent)

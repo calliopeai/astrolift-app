@@ -10916,6 +10916,9 @@ type Mutation {
   reconcileNvkeOperatorJob(input: NvkeOperatorJobReviewInput!): NvkeOperationTypeMutationResult!
   stopNvkeOperatorJob(input: NvkeOperatorJobReviewInput!): NvkeOperationTypeMutationResult!
   reviewNvkeOperatorInstall(input: NvkeOperatorJobReviewInput!): NvkeOperatorInstallReviewTypeMutationResult!
+  prepareNvkeOperatorInstallPlan(input: PrepareNvkeOperatorInstallPlanInput!): NvkeOperatorInstallPlanTypeMutationResult!
+  reviewNvkeOperatorInstallPlan(input: NvkeOperatorInstallPlanReviewInput!): NvkeOperatorInstallPlanTypeMutationResult!
+  recoverNvkeOperatorInstallPlanPreparation(input: NvkeOperatorInstallPlanReviewInput!): NvkeOperatorInstallPlanTypeMutationResult!
   prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
@@ -11836,6 +11839,120 @@ type NvkeOperatorInstallEvidenceType {
   stderrSha256: String!
 }
 
+type NvkeOperatorInstallPlanHeaderType {
+  format: Int!
+  scope: String!
+  id: GUID!
+  preparedAt: DateTime!
+  source: NvkeOperatorInstallPlanSourceType!
+  phaseEvidence: String!
+  requiresOriginalSourceVerification: Boolean!
+  requiresExplicitAcknowledgement: Boolean!
+  continuationAuthorized: Boolean!
+  firstRemainingOrdinal: Int!
+  planDigest: String!
+}
+
+type NvkeOperatorInstallPlanInfrastructureType {
+  apiReady: Boolean!
+  observedAt: DateTime!
+  clusterUid: GUID!
+  workloadCount: Int!
+}
+
+type NvkeOperatorInstallPlanItemPageType {
+  planId: GUID!
+  planDigest: String!
+  view: String!
+  items: [NvkeOperatorInstallPlanItemType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeOperatorInstallPlanItemPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallPlanItemPageType
+}
+
+type NvkeOperatorInstallPlanItemType {
+  name: String!
+  type: String!
+  originalType: String!
+  contentSha256: String!
+  originalContentSha256: String!
+  ordinal: Int!
+  originalObservation: String!
+  proposedAction: String!
+}
+
+input NvkeOperatorInstallPlanReviewInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+}
+
+type NvkeOperatorInstallPlanSourceType {
+  siteId: GUID!
+  instanceId: GUID!
+  jobId: GUID!
+  nativeRunId: GUID!
+  nativeRevision: String!
+  nativeExitCode: Int!
+  bundleManifestSha256: String!
+  nativeArgumentsSha256: String!
+  retainedInputsSha256: String!
+  proposedInputsSha256: String!
+  proposedExecutionSha256: String!
+  privateSourceSha256: String!
+  reviewDigest: String!
+  stderrSha256: String!
+  originalStartedAt: DateTime!
+  reviewObservedAt: DateTime!
+  originalDeploymentEvidence: String!
+}
+
+type NvkeOperatorInstallPlanType {
+  id: GUID!
+  version: Int!
+  status: String!
+  operationId: GUID!
+  operationVersion: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  authorityId: GUID!
+  authorityVersion: Int!
+  itemCount: Int!
+  retainedBytes: String!
+  proposedBytes: String!
+  plan: NvkeOperatorInstallPlanHeaderType!
+  infrastructure: NvkeOperatorInstallPlanInfrastructureType!
+}
+
+type NvkeOperatorInstallPlanTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallPlanType
+}
+
+type NvkeOperatorInstallPlanWorkloadPageType {
+  planId: GUID!
+  planDigest: String!
+  view: String!
+  items: [NvkeOperatorInstallWorkloadType!]!
+  nextCursor: String
+  totalCount: Int!
+}
+
+type NvkeOperatorInstallPlanWorkloadPageTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallPlanWorkloadPageType
+}
+
 type NvkeOperatorInstallReviewType {
   snapshotId: GUID!
   snapshotExpiresAt: DateTime!
@@ -12338,6 +12455,15 @@ input PrepareConversationTransferInput {
   envelopeSha256: String!
   envelopeBytes: Int!
   environmentSpecId: GUID = null
+}
+
+input PrepareNvkeOperatorInstallPlanInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  requestText: String!
 }
 
 type ProcessFileResult {
@@ -12851,6 +12977,8 @@ type Query {
   astroliftNvkeOperatorAuthority(siteId: GUID!): NvkeOperatorAuthorityType
   astroliftNvkeOperatorContract: NvkeOperatorContractType!
   astroliftNvkeOperatorArtifactText(input: ReadNvkeOperatorArtifactInput!): StrMutationResult!
+  astroliftNvkeOperatorInstallPlanItemPage(input: NvkeOperatorInstallPlanReviewInput!, planDigest: String!, after: String = null, limit: Int! = 25, search: String = null): NvkeOperatorInstallPlanItemPageTypeMutationResult!
+  astroliftNvkeOperatorInstallPlanWorkloadPage(input: NvkeOperatorInstallPlanReviewInput!, planDigest: String!, after: String = null, limit: Int! = 25, search: String = null): NvkeOperatorInstallPlanWorkloadPageTypeMutationResult!
   astroliftQuotas: [AstroliftQuota!]!
   astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!
   astroliftSourceConnections: [AstroliftSourceConnection!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftSourceConnectionsPage.")

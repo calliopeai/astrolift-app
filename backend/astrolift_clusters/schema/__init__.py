@@ -3,6 +3,7 @@ from astrolift_clusters.schema.auth_users import ClusterAuthUsersMutation, Clust
 from astrolift_clusters.schema.log_collector import ClusterLogCollectorMutation, ClusterLogCollectorQuery
 from astrolift_clusters.schema.mutations import ClustersMutation
 from astrolift_clusters.schema.nvke import NvkeMutation, NvkeQuery
+from astrolift_clusters.schema.nvke_install_plans import NvkeInstallPlanMutation, NvkeInstallPlanQuery
 from astrolift_clusters.schema.nvke_operator import NvkeOperatorMutation, NvkeOperatorQuery
 from astrolift_clusters.schema.queries import ClustersQuery
 
@@ -16,6 +17,8 @@ __all__ = [
     "ClustersMutation",
     "ClustersQuery",
     "NvkeOperatorQuery",
+    "NvkeInstallPlanQuery",
+    "NvkeInstallPlanMutation",
     "NvkeOperatorMutation",
     "NvkeQuery",
     "NvkeMutation",

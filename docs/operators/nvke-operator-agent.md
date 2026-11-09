@@ -258,8 +258,34 @@ recovery; they do not authorize another install.
 The local SDK suite has 80 passing tests, including an actual agent mutual-TLS
 preparation/recovery/page/tamper roundtrip with controlled Kubernetes reads. The
 original failed receipt, native guard and run inventory remain unchanged. This
-checkpoint has no current-admin application plan API/UI/CLI or continuation
-executor. Linux agent RPC qualification, frozen dependency closure and skipped
+checkpoint has no plan CLI/UI or continuation executor. Linux agent RPC qualification, frozen dependency closure and skipped
 resource verification, durable linked execution, and deployed acceptance remain
 pending. The paged SDK validates the source-bound header and each page; it does
 not claim to recompute a full-plan digest from a single page.
+
+The application service now retains a separate `NvkeInstallPlan` before agent I/O.
+It encrypts the private preparation body and binds recovery to the reviewed
+operation/site/authority versions. A read can recover the sealed result after a
+lost reply without preparing again. Repeating the retained private body requires
+the original preparation actor and API token; another current administrator can
+inspect an existing plan after the original caller loses access. Every operation
+rechecks current admin/read authority and source versions. Public page cursors bind
+the current caller/token/source as a hash, view, search and limit. The original
+operation's status and effect fence remain intact. This service/model checkpoint
+is exposed through typed GraphQL; CLI and operation-screen integration remain pending.
+
+`prepareNvkeOperatorInstallPlan` accepts the reviewed original versions plus a
+private `requestText` JSON body. `reviewNvkeOperatorInstallPlan` reads the saved
+agent plan and can recover its result after a lost reply.
+`recoverNvkeOperatorInstallPlanPreparation` repeats only the retained original
+preparation intent; it does not admit an install. Item and workload queries are
+`astroliftNvkeOperatorInstallPlanItemPage` and
+`astroliftNvkeOperatorInstallPlanWorkloadPage`. Each requires the reviewed source
+versions and exact plan digest. Responses expose typed metadata and bounded rows;
+private input text is excluded from audit variables even through aliased inputs.
+
+The backend checkpoint passed 21 new PostgreSQL plan/schema cases, with real
+mTLS authority configuration and controlled preparation/page responses. The
+separate SDK suite passed 80 cases, including the actual agent wire roundtrip.
+These establish separate service and transport checks; full application-to-Linux
+plan qualification and continuation are still pending.

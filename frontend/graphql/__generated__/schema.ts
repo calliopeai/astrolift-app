@@ -10081,6 +10081,7 @@ export type Mutation = {
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
   prepareConversationTransfer: AstroliftConversationTransferMutationResult;
   prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
+  prepareNvkeOperatorInstallPlan: NvkeOperatorInstallPlanTypeMutationResult;
   previewManagedServiceMatch: ManagedServiceMatchPlanPayloadMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
@@ -10114,6 +10115,7 @@ export type Mutation = {
   /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
   reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
+  recoverNvkeOperatorInstallPlanPreparation: NvkeOperatorInstallPlanTypeMutationResult;
   redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
   refreshCiWorkflowSyncStatus: AstroliftCiWorkflowSyncStatusMutationResult;
@@ -10188,6 +10190,7 @@ export type Mutation = {
   revealManagedServiceConnection: AstroliftManagedServiceConnectionMutationResult;
   revealProjectBundleSecretValue: AstroliftSecretBundleRevealMutationResult;
   reviewNvkeOperatorInstall: NvkeOperatorInstallReviewTypeMutationResult;
+  reviewNvkeOperatorInstallPlan: NvkeOperatorInstallPlanTypeMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeAstroliftSession: AstroliftRevokeAstroliftSessionPayloadMutationResult;
@@ -11579,6 +11582,11 @@ export type MutationPrepareManagedDomainAppRouteArgs = {
 };
 
 
+export type MutationPrepareNvkeOperatorInstallPlanArgs = {
+  input: PrepareNvkeOperatorInstallPlanInput;
+};
+
+
 export type MutationPreviewManagedServiceMatchArgs = {
   input: MatchManagedServicesInput;
 };
@@ -11715,6 +11723,11 @@ export type MutationReconcileWorkflowScheduleArgs = {
 
 export type MutationRecordClusterBootstrapRunArgs = {
   input: RecordClusterBootstrapRunInput;
+};
+
+
+export type MutationRecoverNvkeOperatorInstallPlanPreparationArgs = {
+  input: NvkeOperatorInstallPlanReviewInput;
 };
 
 
@@ -12078,6 +12091,11 @@ export type MutationRevealProjectBundleSecretValueArgs = {
 
 export type MutationReviewNvkeOperatorInstallArgs = {
   input: NvkeOperatorJobReviewInput;
+};
+
+
+export type MutationReviewNvkeOperatorInstallPlanArgs = {
+  input: NvkeOperatorInstallPlanReviewInput;
 };
 
 
@@ -13556,6 +13574,120 @@ export type NvkeOperatorInstallEvidenceType = {
   stdoutSha256: Scalars['String']['output'];
 };
 
+export type NvkeOperatorInstallPlanHeaderType = {
+  continuationAuthorized: Scalars['Boolean']['output'];
+  firstRemainingOrdinal: Scalars['Int']['output'];
+  format: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  phaseEvidence: Scalars['String']['output'];
+  planDigest: Scalars['String']['output'];
+  preparedAt: Scalars['DateTime']['output'];
+  requiresExplicitAcknowledgement: Scalars['Boolean']['output'];
+  requiresOriginalSourceVerification: Scalars['Boolean']['output'];
+  scope: Scalars['String']['output'];
+  source: NvkeOperatorInstallPlanSourceType;
+};
+
+export type NvkeOperatorInstallPlanInfrastructureType = {
+  apiReady: Scalars['Boolean']['output'];
+  clusterUid: Scalars['GUID']['output'];
+  observedAt: Scalars['DateTime']['output'];
+  workloadCount: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorInstallPlanItemPageType = {
+  items: Array<NvkeOperatorInstallPlanItemType>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  planDigest: Scalars['String']['output'];
+  planId: Scalars['GUID']['output'];
+  totalCount: Scalars['Int']['output'];
+  view: Scalars['String']['output'];
+};
+
+export type NvkeOperatorInstallPlanItemPageTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanItemPageType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeOperatorInstallPlanItemType = {
+  contentSha256: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  ordinal: Scalars['Int']['output'];
+  originalContentSha256: Scalars['String']['output'];
+  originalObservation: Scalars['String']['output'];
+  originalType: Scalars['String']['output'];
+  proposedAction: Scalars['String']['output'];
+  type: Scalars['String']['output'];
+};
+
+export type NvkeOperatorInstallPlanReviewInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  planId: Scalars['GUID']['input'];
+};
+
+export type NvkeOperatorInstallPlanSourceType = {
+  bundleManifestSha256: Scalars['String']['output'];
+  instanceId: Scalars['GUID']['output'];
+  jobId: Scalars['GUID']['output'];
+  nativeArgumentsSha256: Scalars['String']['output'];
+  nativeExitCode: Scalars['Int']['output'];
+  nativeRevision: Scalars['String']['output'];
+  nativeRunId: Scalars['GUID']['output'];
+  originalDeploymentEvidence: Scalars['String']['output'];
+  originalStartedAt: Scalars['DateTime']['output'];
+  privateSourceSha256: Scalars['String']['output'];
+  proposedExecutionSha256: Scalars['String']['output'];
+  proposedInputsSha256: Scalars['String']['output'];
+  retainedInputsSha256: Scalars['String']['output'];
+  reviewDigest: Scalars['String']['output'];
+  reviewObservedAt: Scalars['DateTime']['output'];
+  siteId: Scalars['GUID']['output'];
+  stderrSha256: Scalars['String']['output'];
+};
+
+export type NvkeOperatorInstallPlanType = {
+  authorityId: Scalars['GUID']['output'];
+  authorityVersion: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  infrastructure: NvkeOperatorInstallPlanInfrastructureType;
+  itemCount: Scalars['Int']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  plan: NvkeOperatorInstallPlanHeaderType;
+  proposedBytes: Scalars['String']['output'];
+  retainedBytes: Scalars['String']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorInstallPlanTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeOperatorInstallPlanWorkloadPageType = {
+  items: Array<NvkeOperatorInstallWorkloadType>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  planDigest: Scalars['String']['output'];
+  planId: Scalars['GUID']['output'];
+  totalCount: Scalars['Int']['output'];
+  view: Scalars['String']['output'];
+};
+
+export type NvkeOperatorInstallPlanWorkloadPageTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanWorkloadPageType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeOperatorInstallReviewType = {
   apiReady: Scalars['Boolean']['output'];
   authorityId: Scalars['GUID']['output'];
@@ -14039,6 +14171,15 @@ export type PrepareConversationTransferInput = {
   record: Scalars['JSON']['input'];
 };
 
+export type PrepareNvkeOperatorInstallPlanInput = {
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  requestText: Scalars['String']['input'];
+};
+
 export type ProcessFileResult = {
   errors?: Maybe<Scalars['Int']['output']>;
   processId?: Maybe<Scalars['ID']['output']>;
@@ -14446,6 +14587,8 @@ export type Query = {
   astroliftNvkeOperatorArtifactText: StrMutationResult;
   astroliftNvkeOperatorAuthority?: Maybe<NvkeOperatorAuthorityType>;
   astroliftNvkeOperatorContract: NvkeOperatorContractType;
+  astroliftNvkeOperatorInstallPlanItemPage: NvkeOperatorInstallPlanItemPageTypeMutationResult;
+  astroliftNvkeOperatorInstallPlanWorkloadPage: NvkeOperatorInstallPlanWorkloadPageTypeMutationResult;
   astroliftNvkeOperatorInstallWorkloadPage: NvkeOperatorInstallWorkloadPageTypeMutationResult;
   astroliftNvkeOperatorJobPage: NvkeOperatorJobPageTypeMutationResult;
   astroliftNvkeProviderIdentitiesPage: NvkeProviderIdentitiesPageTypeMutationResult;
@@ -16129,6 +16272,24 @@ export type QueryAstroliftNvkeOperatorArtifactTextArgs = {
 
 export type QueryAstroliftNvkeOperatorAuthorityArgs = {
   siteId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftNvkeOperatorInstallPlanItemPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  input: NvkeOperatorInstallPlanReviewInput;
+  limit?: Scalars['Int']['input'];
+  planDigest: Scalars['String']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftNvkeOperatorInstallPlanWorkloadPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  input: NvkeOperatorInstallPlanReviewInput;
+  limit?: Scalars['Int']['input'];
+  planDigest: Scalars['String']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 

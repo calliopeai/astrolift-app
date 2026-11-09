@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime
 from typing import Any
 
 from nvke._operator_install_review import NAME, SHA, timestamp
-from nvke.operator_contract import REVISION, identifier
+from nvke.operator_contract import CATALOG, REVISION, artifact_name, canonical, effectful, identifier, validate
 
 DIGEST_FIELDS = {
     "bundleManifestSha256",
@@ -223,3 +224,38 @@ def page(
         seen.add(identity)
         projected.append(row)
     return {**data, "items": projected}
+
+
+def preparation_request(body: Any, *, site: str, job_id: str) -> dict[str, Any]:
+    if (
+        not isinstance(body, dict)
+        or set(body) - {"format", "planId", "request", "maximumInputBytes", "overrides"}
+        or not {"format", "planId", "request", "maximumInputBytes"} <= set(body)
+        or type(body["format"]) is not int
+        or body["format"] != 1
+    ):
+        raise ValueError
+    plan_id = identifier(body["planId"])
+    if plan_id == job_id or int(decimal(body["maximumInputBytes"])) == 0:
+        raise ValueError
+    if body["request"] is not None:
+        proposed = validate(body["request"], site)
+        if proposed["command"] != "management.install" or not effectful(proposed):
+            raise ValueError
+    overrides = body.get("overrides", {})
+    if (
+        not isinstance(overrides, dict)
+        or set(overrides) - {"options", "files"}
+        or any(not isinstance(v, dict) for v in overrides.values())
+    ):
+        raise ValueError
+    for field, updates in overrides.items():
+        for name in updates:
+            if field == "options" and name not in CATALOG["management.install"]["options"]:
+                raise ValueError
+            if field == "files":
+                artifact_name(name)
+    frozen = json.loads(canonical({**body, "overrides": overrides}))
+    if not isinstance(frozen, dict):
+        raise ValueError
+    return frozen

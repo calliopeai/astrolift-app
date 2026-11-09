@@ -967,6 +967,31 @@
       "kind": "test",
       "symbol": "test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch",
       "scope": "Pinned actual agent and SDK over mutual TLS: prepare, same-ID recovery, complete 11-item cursor walk, workload integer precision and sealed-plan tamper refusal. Original receipt/guard/run inventory unchanged; no linked reservation or native install. Kubernetes observations use controlled read-only fixtures; Linux RPC and current-admin application plan integration remain pending."
+    },
+    "operator-install-plan-backend": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/nvke_install_plans.py",
+      "kind": "implementation",
+      "scope": "Durable encrypted preparation intent before agent I/O, exact caller/token/source-bound private retry and GET recovery after an unconfirmed reply. Current-admin/version checks before and after I/O; other current administrators can inspect a saved plan. Immutable prepared summary and caller/source/view/search/limit-bound paging. Typed GraphQL preparation/review/recovery and pages use this service; CLI/UI, Linux application RPC qualification and execution remain pending."
+    },
+    "operator-install-plan-model": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/models/nvke.py",
+      "kind": "implementation",
+      "symbol": "NvkeInstallPlan",
+      "scope": "Soft-deleted, versioned plan record linked to the original operation without changing its outcome. Immutable preparation identity/source/encrypted request; prepared summary/status cannot be rewritten through model save. Separate preparing/prepared status, no execution admission."
+    },
+    "operator-install-plan-backend-tests": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_install_plans.py",
+      "kind": "test",
+      "scope": "21 new PostgreSQL cases passed. Real PostgreSQL and actual mTLS authority configuration, with controlled plan-method responses. Durable encrypted intent, same-ID recovery, lost reply, source/role revocation, immutable summary/identity, another current administrator, cursor binding, private-field refusal and decimal precision. Does not claim an end-to-end application plan RPC or execution. Typed schema tests cover audited prepare/review/recovery, private aliases, revoked access, duplicate JSON refusal and int64 workload projection."
+    },
+    "operator-install-plan-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/schema/nvke_install_plans.py",
+      "kind": "implementation",
+      "scope": "Typed current-admin preparation, saved-plan review, exact private-intent retry and separate item/workload page fields. Each mutation has a distinct audit action; private text is redacted by typed input-field identity, including aliased variables. No native execution admission."
     }
   },
   "rows": {
@@ -3228,9 +3253,13 @@
           "operator-install-plan-preparation",
           "operator-install-plan-sdk",
           "operator-install-plan-sdk-tests",
-          "operator-install-plan-sdk-tls"
+          "operator-install-plan-sdk-tls",
+          "operator-install-plan-backend",
+          "operator-install-plan-model",
+          "operator-install-plan-backend-tests",
+          "operator-install-plan-api"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen review is locally qualified with unchanged fences. Bound proposal/storage and a separate read-only Linux preparation prototype are qualified; Linux qualification of the implemented authenticated agent/SDK preparation, current-admin application plan review and linked once-only execution/recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen review is locally qualified with unchanged fences. Bound proposal/storage and a separate read-only Linux preparation prototype are qualified; Linux qualification of the implemented authenticated agent/SDK preparation, CLI/UI plan review and Linux application RPC qualification over the implemented durable current-admin GraphQL service and linked once-only execution/recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
