@@ -738,10 +738,12 @@ Public output includes only source metadata, capture/chart/index hashes, counts,
 observation time and the non-authorizing execution state.
 
 The schema, frontend operation documents and generated types are present; the
-operation-screen context controls remain pending. Configured App integration
-checks are still running at this checkpoint. An earlier unconfigured invocation
-passed three database-lock cases but skipped 36 API cases and is not API
-qualification. The CLI context commands require their separate terminal checks
+operation-screen context controls remain pending. All 39 configured App integration cases pass without skips, including real
+PostgreSQL, RBAC/token changes, typed GraphQL, audit redaction, actual mTLS
+authority setup and separate-session UUID locks. Capture RPC methods use controlled
+adapters here; actual paired context capture remains separate. An earlier
+unconfigured invocation passed three database-lock cases but skipped 36 API cases
+and is retained as historical evidence, not API qualification. The CLI context commands require their separate terminal checks
 and actual paired App/CLI acceptance. Fresh phase/resource/credential proof,
 external schema policy, image closure and linked native admission remain open.
 The original uncertain install and its fence are unchanged; nothing in this
