@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "source-bound-metadata-only-render-verification-sdk",
-  "status": "unit-and-static-qualified-real-mtls-running",
+  "status": "local-unit-static-and-pinned-real-mtls-qualified-app-cli-ui-pending",
   "agentRevision": "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38",
   "sourceSha256": {
     "nvke/operator_agent_client.py": "166d333aee955f0bff93c105771dddef2fe34b121cb3b678d33d186107d03666",
@@ -27,10 +27,17 @@
     "ruff": "passed",
     "mypy": "passed for both changed production modules, follow-imports=silent",
     "realVerificationMTLS": {
-      "status": "running",
-      "sessionId": 7088,
-      "logPath": "/tmp/astrolift-nvke-verification-sdk-mtls.log",
-      "exitMarker": "/tmp/astrolift-nvke-verification-sdk-mtls.exit"
+      "status": "passed",
+      "sessionId": 67414,
+      "logPath": "/tmp/astrolift-nvke-verification-sdk-mtls-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-sdk-mtls-v2.exit",
+      "launcherCorrection": "Initial system-Python run exited before fixture setup because isolated mode could not import httpx. Relaunched using the existing backend virtual environment; no product or test source changed.",
+      "passed": 1,
+      "skipped": 0,
+      "exitCode": 0,
+      "seconds": 915.65,
+      "logSha256": "f04733e989fc1a37087bbcab4139efc3dfd6a161e69e25d7b5c678a7a18afd09",
+      "scope": "Actual SDK to reviewed agent/Kubernetes mTLS, closed missing-observation response, deliberate lost POST reply, same-endpoint cold recovery, historical GET and identical POST without recollection, matching signed index digest, one attempt, no private output and unchanged original receipt/guard/native run/plan/chart/tree/context sources."
     }
   },
   "implemented": [
@@ -40,7 +47,6 @@
     "Lost replies remain ambiguous; explicit reads never replay writes. Incomplete verification maps to a stable redacted error."
   ],
   "remaining": [
-    "Inspect actual pinned native SDK mTLS outcome before claiming end-to-end qualification.",
     "Durable App model/intent/API/RBAC/audit, schema/codegen, CLI and UI verification controls and actual paired acceptance remain outstanding.",
     "Fresh use-time phase/resource/original credential checks, schema and image closure, exactly-once linked admission, final full surface checks/PR/merge/deployment remain open."
   ],
