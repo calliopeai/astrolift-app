@@ -31,6 +31,7 @@ import { useNvkeProviders } from "./use-nvke-providers";
 import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
 import { useNvkeInstallPlan } from "./use-nvke-install-plan";
+import { useNvkeInstallPlanContext } from "./use-nvke-install-plan-context";
 import { useNvkeInstallPlanTree } from "./use-nvke-install-plan-tree";
 import { useNvkeInstallPlanCharts } from "./use-nvke-install-plan-charts";
 import { useNvkeOperatorInstallReview } from "./use-nvke-operator-install-review";
@@ -215,6 +216,17 @@ export const useNvkeOperation = (
       operatorInstallPlan?.pending
     ),
   });
+  const operatorInstallPlanContext = useNvkeInstallPlanContext({
+    context,
+    source: operatorInstallPlanTree,
+    pending: Boolean(
+      (mutation?.key === visitKey && mutation.pending) ||
+      operatorJob?.pending ||
+      operatorInstallReview?.pending ||
+      operatorInstallPlan?.pending ||
+      operatorInstallPlanCharts?.pending
+    ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -226,6 +238,7 @@ export const useNvkeOperation = (
       operatorInstallPlan?.pending ||
       operatorInstallPlanCharts?.pending ||
       operatorInstallPlanTree?.pending ||
+      operatorInstallPlanContext?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -276,6 +289,7 @@ export const useNvkeOperation = (
     operatorInstallPlan,
     operatorInstallPlanCharts,
     operatorInstallPlanTree,
+    operatorInstallPlanContext,
     diagnostics,
     maintenance,
     credentials,
@@ -293,7 +307,8 @@ export const useNvkeOperation = (
         operatorInstallReview?.pending ||
         operatorInstallPlan?.pending ||
         operatorInstallPlanCharts?.pending ||
-        operatorInstallPlanTree?.pending
+        operatorInstallPlanTree?.pending ||
+        operatorInstallPlanContext?.pending
       ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
@@ -310,6 +325,7 @@ export const useNvkeOperation = (
         operatorInstallPlan?.pending ||
         operatorInstallPlanCharts?.pending ||
         operatorInstallPlanTree?.pending ||
+        operatorInstallPlanContext?.pending ||
         !operation
       )
         return;

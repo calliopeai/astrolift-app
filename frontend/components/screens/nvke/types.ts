@@ -181,6 +181,9 @@ export interface NvkeOperationScreenProps {
   operatorInstallPlanTree?:
     | import("./NvkeOperatorInstallPlanTreePanel").NvkeOperatorInstallPlanTreePanelProps
     | null;
+  operatorInstallPlanContext?:
+    | import("./NvkeOperatorInstallPlanContextPanel").NvkeOperatorInstallPlanContextPanelProps
+    | null;
   operatorInstallPlanCharts?:
     | import("./NvkeOperatorInstallPlanChartsPanel").NvkeOperatorInstallPlanChartsPanelProps
     | null;

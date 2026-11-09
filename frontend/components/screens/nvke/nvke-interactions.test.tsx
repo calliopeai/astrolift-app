@@ -1,3 +1,4 @@
+import { INSTALL_CONTEXT_PROPS } from "./NvkeOperatorInstallPlanContextPanel.stories";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
@@ -274,5 +275,31 @@ it.each(["pending", "read-only", "error"])(
     expect(onReview).not.toHaveBeenCalled();
     if (mode !== "pending")
       expect(screen.queryByText(INSTALL_TREE_PROPS.artifacts!.treeDigest)).not.toBeInTheDocument();
+  }
+);
+
+it.each(["pending", "read-only", "error"])(
+  "blocks context actions when the operation screen is %s",
+  (mode) => {
+    const onReview = vi.fn().mockResolvedValue(true);
+    render(
+      <NvkeOperationScreen
+        {...OPERATION_DETAIL}
+        operation={INSTALL_CONTEXT_PROPS.operation}
+        operatorInstallPlanContext={{ ...INSTALL_CONTEXT_PROPS, onReview }}
+        pending={mode === "pending"}
+        canAct={mode !== "read-only"}
+        error={mode === "error" ? "Unavailable" : null}
+      />,
+      { wrapper: Context }
+    );
+    const button = screen.getByRole("button", { name: messages.nvke.installContext.review });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(onReview).not.toHaveBeenCalled();
+    if (mode !== "pending")
+      expect(
+        screen.queryByText(INSTALL_CONTEXT_PROPS.artifacts!.contextDigest)
+      ).not.toBeInTheDocument();
   }
 );
