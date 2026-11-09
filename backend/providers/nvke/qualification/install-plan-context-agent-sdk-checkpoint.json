@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "scope": "sdk-agent-render-context-checkpoint",
+  "status": "final-source-broad-qualification-running",
+  "opscodeRuntimeRevision": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
+  "sourceSha256": {
+    "nvke/_operator_install_plan_context.py": "a8fe2df3f129e72966e2112fca6ccece35aa0e8646bba271810e10126422ec5e",
+    "nvke/operator_agent_client.py": "8f94eaa9582ae5d9d2dde279bfbf18390dcc7b65bbf28c86854bbba249753550",
+    "tests/nvke/test_operator_install_plan_context.py": "58b37c76ca1384f9865b53af1d486c9c4028d0ab7f76a228044d865a40aec927",
+    "tests/nvke/test_operator_install_plan_context_mtls.py": "0443be2ccb8f20526fd3c0b3d30a618398418f6fcd2a5c7a81f0465720d38ed6",
+    "tests/nvke/fixtures/nvke_operator_context_driver.py": "ee74a3118e1d8ea631853e7f53c008c01290b17904f3dfd39ddac5fc600c191b",
+    "tests/nvke/test_operator_install_plan.py": "2ac58f3fe6e2b172edcd3225d9d3795a76c23bc6fb478fa97279b4329915788a",
+    "tests/nvke/test_operator_agent_client.py": "2be054bf0bf1694a8512800ab69ec599fd0cdd1d03e7b906b73bbacaccea683f",
+    "tests/nvke/test_operator_install_plan_tree_mtls.py": "eed27229f53010cabf18c0e945eb3e3a2b507accfe1d8409703b96aab92f4124"
+  },
+  "checks": {
+    "contract": {
+      "passed": 200,
+      "skipped": 0,
+      "durationSeconds": 13.81,
+      "exitCode": 0,
+      "logSha256": "18a7eb11468be1d3cfc35009a568c5f865986055e88941089a307a598d235f59"
+    },
+    "static": {
+      "strictMypy": "two changed SDK source files passed",
+      "ruff": "nvke and tests/nvke passed",
+      "format": "eight changed Python files passed",
+      "exitCode": 0,
+      "logSha256": "ec88c4749cac6b78cea5ec50d1ea3b8fccc17f6e70cc550085fa7675b05b50f4"
+    },
+    "historicalActualMtlS": {
+      "passed": 1,
+      "durationSeconds": 497.7,
+      "exitCode": 0,
+      "logSha256": "1681a9a3f6b73e0b210698ef873cb7fada89a45fa62e75dca281af1738535a1d",
+      "scope": "Actual double mTLS, native helper, lost POST reply and cold offline recovery before the final native item-name validator correction; nktp was the exercised item. This is historical evidence, not exact-final-source qualification."
+    },
+    "finalBroad": {
+      "status": "running",
+      "completionMarker": "/tmp/astrolift-nvke-context-sdk-qualified.exit",
+      "logPath": "/tmp/astrolift-nvke-context-sdk-qualified.log"
+    }
+  },
+  "continuationAuthorized": false,
+  "implemented": [
+    "Strict prepare/read methods bind original job/intent, pinned instance, signed plan/chart/tree, exact Helm item and original ordinal before and after capture.",
+    "No arbitrary peer fields, credential bodies, helper paths, callback/profile overrides or continuation claims are accepted. Canonical decimal revision and budgets retain precision above 2^53.",
+    "Lost POST remains ambiguous and is never automatically replayed; incomplete context has a stable redacted error. Explicit same-source GET can recover.",
+    "The new real SDK driver verifies separate actual agent and Kubernetes mTLS, native helper, one capture attempt, same-endpoint/instance restart, exact retained capture/chart hashes and unchanged original/parent files."
+  ],
+  "remaining": [
+    "Record terminal exact-final-source broad SDK results.",
+    "Durable model foundation is separate from pending current-admin App context API/outbox/schema/CLI/UI wiring.",
+    "Earlier public tree browser/API/compiled-CLI case must rerun against the new runtime pin.",
+    "Legacy standalone local-chart timeout, phase freshness, schema/image closure, linked admission, retained live-site tests, review/main merge and deployment remain open."
+  ]
+}

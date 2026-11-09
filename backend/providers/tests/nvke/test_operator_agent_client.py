@@ -208,7 +208,7 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "20f53eefaa6822673888f536ee14e93bcb3c0762"
+    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -229,6 +229,12 @@ def operator_agent(tmp_path, *, site_id=None):
         "management_render_release.py",
         "management_render_lookup.py",
         "management_render_capture.py",
+        "management_render_context_store.py",
+        "management_render_authenticated.py",
+        "management_render_transport.py",
+        "management_render_executor.py",
+        "management_plan_context_service.py",
+        "management_frozen_chart.py",
         "management_plan_tree_service.py",
         "qualify_bootstrap.py",
         "tooling.py",
@@ -615,7 +621,7 @@ def test_install_review_requires_capability_original_failure_digest_and_stable_i
 
 def test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "20f53eefaa6822673888f536ee14e93bcb3c0762"
+    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
     relative = "kubernetes/nvke/test_operator_agent.py"
     assert (source / relative).read_bytes() == subprocess.check_output(
         ["git", "show", revision + ":" + relative], cwd=source
@@ -688,7 +694,7 @@ finally:
 
 def test_real_tls_sdk_chart_stage_lost_reply_recovers_without_refetch_or_native_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "20f53eefaa6822673888f536ee14e93bcb3c0762"
+    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
     for name in (
         "test_operator_agent.py",
         "test_management_chart_materialization.py",

@@ -118,6 +118,11 @@ def client(
     changed_after_tree=False,
     changed_chart_after_tree=False,
     tree_status=200,
+    context=None,
+    context_capability=None,
+    lost_context_reply=False,
+    context_status=200,
+    changed_after_context=False,
 ):
     calls = []
     original = {
@@ -157,6 +162,9 @@ def client(
                         "continuation": False,
                         "maximumPageSize": 100,
                     },
+                    "installPlanContext": context_capability
+                    if context_capability is not None
+                    else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
                     "installPlanTree": tree_capability
                     if tree_capability is not None
                     else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
@@ -171,6 +179,10 @@ def client(
                 },
             )
         assert request.headers["X-Astro-Nvke-Intent"] == INTENT
+        if request.url.path.endswith("/install-plan-context"):
+            if lost_context_reply and request.method == "POST":
+                raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
+            return httpx.Response(context_status, json=context)
         if request.url.path.endswith("/install-plan-tree"):
             if lost_tree_reply and request.method == "POST":
                 raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
@@ -187,8 +199,10 @@ def client(
                 assert json.loads(request.content)["planId"] == PLAN
             value = page if request.url.params.get("view") else summary
             selected = metadata() if value is None else copy.deepcopy(value)
-            if (changed_after_chart and any(path.endswith("/install-plan-charts") for _, path, _ in calls)) or (
-                changed_after_tree and any(path.endswith("/install-plan-tree") for _, path, _ in calls)
+            if (
+                (changed_after_context and any(path.endswith("/install-plan-context") for _, path, _ in calls))
+                or (changed_after_chart and any(path.endswith("/install-plan-charts") for _, path, _ in calls))
+                or (changed_after_tree and any(path.endswith("/install-plan-tree") for _, path, _ in calls))
             ):
                 selected["plan"]["planDigest"] = "c" * 64
             return httpx.Response(200, json=selected)
