@@ -1,0 +1,37 @@
+{
+  "format": 1,
+  "scope": "helm4-local-chart-paired-application-sdk-recovery-local-qualification",
+  "date": "2026-11-09",
+  "applicationRevision": "6f14cf96383ed00f98318d292ce59250ba3f1097",
+  "opscodeRevision": "5200851616150efb6d121923f9e5dd2185f23474",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "sourceSha256": {
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_charts.py": "3e5dc4a249d400324149b42d49b568cdcdce55e6039422629d5e71638397c85e",
+    "backend/providers/tests/nvke/test_operator_agent_client.py": "d028a68a938a7879db993ee86de2d885ab74b58d51e6535d0f7691fc41c8af03",
+    "backend/astrolift_clusters/nvke_install_plan_charts.py": "27f69ca92465f084ecb5f6b2ebe4449eeccd9845f159edc717cfd89fa05b0537"
+  },
+  "checks": {
+    "postgresPlanAndChartCases": {
+      "passed": 47,
+      "exitStatus": 0,
+      "logSha256": "f65ccfb35ddf4d5211e1b1ad82a62b1c8a1cbbba66cfadc7c4256c90608f3f83"
+    },
+    "sdkPlanChartAndTransportCases": {
+      "passed": 128,
+      "exitStatus": 0,
+      "logSha256": "1326914bb8697ec305e19619f8a5b1915399e334172c740fc5565b4757247e99"
+    }
+  },
+  "evidence": [
+    "Real GraphQL/PostgreSQL/SDK/mTLS prepares an owned local parent chart and file dependency using Helm 4 and the snapshot-built metadata helper.",
+    "The application loses the preparation reply; an owned agent/server restart at the same endpoint preserves publication for explicit GraphQL recovery and exact-ID private retry without new fetches.",
+    "Original operation and parent full database rows, native state and guard, run inventory and linked reservations remain unchanged."
+  ],
+  "continuationAuthorized": false,
+  "limitations": [
+    "Dependency inventory, chart inputs and Kubernetes GET responses are controlled test fixtures; this does not qualify the retained Linux installation or complete upstream chart semantics.",
+    "Compiled CLI and actual browser/API chart qualification are separate and are not claimed by this record.",
+    "Full execution tree, rendering, image closure, private registry/TLS policy, fresh skipped-resource/credential verification and linked once-only execution remain open.",
+    "No original operation replay, VM restart, infrastructure mutation, main merge or production deployment."
+  ]
+}
