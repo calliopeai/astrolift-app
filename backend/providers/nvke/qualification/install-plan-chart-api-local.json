@@ -1,0 +1,45 @@
+{
+  "format": 1,
+  "scope": "chart-stage-application-api-and-controlled-browser-recovery-local-qualification",
+  "applicationRevision": "fbc1ced8d79579eb5783cbe4ec5f68942cb5a572",
+  "opscodeRevision": "166aaafa9448bf9b62260104061200c55dc54d65",
+  "nativeRevision": "92c39b8ad563ebe5ef705f781b3038b901aba10f",
+  "sourceSha256": {
+    "backend/astrolift_clusters/nvke_install_plan_charts.py": "27f69ca92465f084ecb5f6b2ebe4449eeccd9845f159edc717cfd89fa05b0537",
+    "backend/astrolift_clusters/models/nvke.py": "c954684eea92ac8c5656bc02062849c8eafb763aa064a116538acac446520346",
+    "backend/astrolift_clusters/migrations/0039_nvke_install_plan_charts.py": "4633184d75d81add75d189fe6603ebb03b6b0459b70a0d8265743dc3e8799032",
+    "backend/astrolift_clusters/schema/nvke_install_plan_charts.py": "859cbe7700139a47041680b9ef5a57e098c9d02152d7b4374efa4a0fc9838dfb",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_charts.py": "4e8b56fc56c1b2de417558436f4b5458e55c9ee68692c5cd1a71b46947a5ba62",
+    "backend/providers/tests/nvke/test_operator_agent_client.py": "483f54f0124e0123a4f20d56b5a98874a27bd5567ed90e3d7382289771a1deca",
+    "frontend/graphql/nvke/use-nvke-install-plan-charts.ts": "6f3ae8e1bf9aae0fc9a17a6c0f6226b126b97b5b90d17a3d18f10bd91f811e2f",
+    "frontend/graphql/nvke/use-nvke-install-plan-charts.test.tsx": "83543c26e2feca244f53d08ce76981a2212935d24d088ae2ef4480547d20d7d9",
+    "frontend/lib/nvke/install-plan-charts-recovery.ts": "225af2a0e89e2ee33b9dde7d6fcb990a55849174d530277446ae4ca7b73dfafa",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "fa24a77d38868940f57547fad7d73260399b11ee0c331c16424ad776fc1e896d"
+  },
+  "checks": {
+    "postgresPlanAndChartCases": 46,
+    "realGraphqlPostgresSdkMtlsHelmLostReply": "passed without skip; one owned repository fetch followed by explicit GET recovery and private retry without refetch",
+    "focusedHookParentAndStoryCases": 48,
+    "journalCases": 4,
+    "operationScreenInteractionCases": 17,
+    "localeCases": 8,
+    "chromiumPanelStories": 15,
+    "chromiumControlledRecoveryScenarios": 2,
+    "targetedEslintAndRuff": "passed",
+    "typescript": "prior hook pass; final current-tree follow-up pending"
+  },
+  "evidence": [
+    "The application reserves encrypted immutable chart intent before actual agent I/O and masks private GraphQL request text in audits.",
+    "A deliberately discarded real Helm/mTLS preparation result leaves a preparing row; actual GraphQL review recovers publication and exact-ID retry does not fetch again.",
+    "Original operation and parent full database rows, original native state/guard, run inventory and linked reservations remain unchanged.",
+    "Controlled browser peers exercise pre/post-retention lost replies, durable journal-before-call, exact original options and no request body/options in local storage."
+  ],
+  "continuationAuthorized": false,
+  "limitations": [
+    "The dependency inventory and Kubernetes GET responses are controlled single-chart fixtures; this does not qualify the retained Linux install.",
+    "Combined compiled CLI/application/agent chart preparation and actual browser/API qualification remain open.",
+    "Later Ops local-file dependency inventory work is not part of this pinned runtime or evidence.",
+    "Full frozen execution-tree/render/image closure, private registry/TLS policies, fresh skipped-resource/credential verification and linked once-only native execution remain open.",
+    "No original receipt reset/replay, VM restart, infrastructure mutation, merge or production deployment."
+  ]
+}

@@ -407,20 +407,20 @@ the successful preparation reply; a new SDK client recovers the retained index,
 and an explicit exact-ID re-prepare returns it without a second fetch. Original
 operation bytes, native guard, run inventory and linked reservation directory
 remain unchanged. Its dependency inventory is a controlled single-chart fixture;
-it does not qualify every chart in the retained Linux install. The chart stage now has a durable current-admin application API implementation
-under local qualification. CLI controls are implemented with controlled transport
-checks; combined API/CLI qualification and UI controls remain open. OCI and
-private registry/TLS qualification, full frozen execution-tree/render/image
-closure, fresh skipped-resource/credential verification, linked once-only
+it does not qualify every chart in the retained Linux install. The chart stage
+now has a durable current-admin API qualified through real PostgreSQL/GraphQL/
+SDK/mTLS/Helm recovery. The CLI has controlled transport checks and the UI has
+controlled browser recovery checks. Combined API/CLI and actual browser/API
+qualification, OCI/private registry/TLS policy, full frozen execution-tree/render/
+image closure, fresh skipped-resource/credential verification, linked once-only
 continuation and deployed acceptance remain open.
 
-
-The chart API checkpoint adds `NvkeInstallPlanCharts` and migration
+The chart API adds `NvkeInstallPlanCharts` and migration
 `0039_nvke_install_plan_charts`. It reserves an encrypted request before agent I/O,
-binds the original operation/source and the prepared plan's version, digest and
-summary hash, and freezes a successful public summary. This implementation is
-under qualification; the PostgreSQL and combined real Helm/mTLS path must pass
-before treating it as qualified. It does not authorize native continuation.
+binds the original operation/source and prepared plan version/digest/summary hash,
+and freezes a successful public summary. The plan/chart API suite passed 46
+PostgreSQL cases, including actual GraphQL/SDK/mTLS/Helm lost-result recovery from
+an owned single-chart repository. It does not authorize native continuation.
 
 `prepareNvkeOperatorInstallPlanCharts` accepts
 `PrepareNvkeOperatorInstallPlanChartsInput`: the original operation review fields,
@@ -461,13 +461,9 @@ CLI source `bbd9522e43810eeb2ac677a0ce4ee825b11bb432` passed the full local Go s
 and journal cases, formatting, vet, lint and a clean build. All three chart
 documents validate against the exported application schema. These controlled
 transport/source checks do not qualify the combined current-admin API, CLI,
-PostgreSQL, agent and retained Linux install. The initial chart/plan PostgreSQL run completed fresh historical migrations and
-reported 41 passing tests plus one existing-plan setup error in
-`test_pages_bind_current_caller_source_search_view_and_limit` (JSON decoding).
-The later real-wire chart case still needs execution, so the API gate remains
-unqualified. Frontend lint and full typecheck passed before the chart panel
-changes; checks for this panel are tracked separately below. Native continuation,
-merge and deployed acceptance remain unverified.
+PostgreSQL, agent and retained Linux install. The plan/chart API suite now passes
+all 46 cases against the migrated isolated PostgreSQL database. Native
+continuation, merge and deployed acceptance remain unverified.
 
 
 The chart UI checkpoint adds a pure Storybook panel, strict request/result
@@ -477,8 +473,8 @@ precision. It hides stale results, retains the UUID after an ambiguous response
 and exposes explicit review/retry callbacks. It does not fetch data or authorize
 continuation. Local qualification passed 72 focused protocol/panel/story tests
 and all 15 Chromium story scenarios, with desktop and 768px layouts visually
-reviewed. The eight locale rendering cases also passed. The panel checkpoint type/lint
-gate passed before the later hook and screen integration changes.
+reviewed. The eight locale rendering cases also passed. The panel checkpoint
+type/lint gate passed before the later hook and screen integration changes.
 
 
 Chart recovery now journals the complete current actor/source and parent
@@ -498,12 +494,14 @@ loss before and after server retention, checking journal-before-call, identical
 request hashes, explicit read recovery and no request options in local storage.
 Local checks passed 48 hook/parent-regression/story cases, four journal cases
 and 17 operation-screen interaction cases. Targeted ESLint and fixture Ruff
-checks passed. These controlled Apollo
-peers do not qualify the real browser/API or deployed retained Linux path. The
-current full TypeScript and PostgreSQL/real Helm/mTLS gates remain pending.
+checks passed. These controlled Apollo peers do not qualify the real browser/API or deployed retained Linux path. The
+PostgreSQL/real Helm/mTLS gate passed; the final current-tree TypeScript
+follow-up remains pending.
 
 The initial database run's single setup failure was a test-agent startup race:
 `identity.json` existed before JSON was completely written. The owned-agent test
 fixture now waits for parseable identity data within the existing startup
 deadline, then still requires successful mTLS identity verification. The final
-API suite is rerunning against the migrated isolated PostgreSQL database.
+API suite passed all 46 cases against the migrated isolated PostgreSQL database.
+The formerly failing setup case and actual Helm/mTLS recovery case both passed
+without skips.

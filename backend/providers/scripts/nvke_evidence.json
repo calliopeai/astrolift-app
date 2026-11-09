@@ -1145,6 +1145,54 @@
       "kind": "test",
       "scope": "Chart prepare/read/retry join the real HTTP redirect-refusal cases, preserving private request/token boundaries and the shared client timeout. Full local Go tests, formatting, vet, lint and build passed; API/CLI/mTLS/native qualification remains open.",
       "sha256": "7e7e80db94267d245f2fab423e67b883dbdcf10e6d9ec30ab91407f461035922"
+    },
+    "operator-chart-artifacts-api": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/nvke_install_plan_charts.py",
+      "kind": "implementation",
+      "scope": "Current-admin version/source-bound durable encrypted chart intent, immutable public summaries, explicit read recovery and original-caller private retry; no native admission."
+    },
+    "operator-chart-artifacts-api-tests": {
+      "repository": "app",
+      "path": "backend/astrolift_clusters/tests/test_nvke_install_plan_charts.py",
+      "kind": "test",
+      "scope": "Real PostgreSQL/schema/audit/source/permission/immutability cases, plus actual GraphQL/SDK/mTLS/Helm lost-result recovery from an owned single-chart repository without a second fetch or changed original/parent/native guard."
+    },
+    "operator-chart-artifacts-api-local": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/install-plan-chart-api-local.json",
+      "kind": "observation",
+      "scope": "Source-pinned local qualification: 46 plan/chart PostgreSQL cases, real Helm/mTLS lost-result recovery and controlled browser recovery; combined CLI/API and retained Linux/deployed qualification remain open."
+    },
+    "operator-chart-artifacts-ui": {
+      "repository": "app",
+      "path": "frontend/components/screens/nvke/NvkeOperatorInstallPlanChartsPanel.tsx",
+      "kind": "implementation",
+      "scope": "Pure Storybook chart review panel with all current options, exact decimal byte strings, invalidation/privacy gates and explicit review/retry; wired into the operation screen."
+    },
+    "operator-chart-artifacts-ui-hook": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-install-plan-charts.ts",
+      "kind": "implementation",
+      "scope": "No-cache, redacted expected-tenant mutations bind current actor/source/parent, discard late replies and retain pending state across source changes."
+    },
+    "operator-chart-artifacts-ui-journal": {
+      "repository": "app",
+      "path": "frontend/lib/nvke/install-plan-charts-recovery.ts",
+      "kind": "implementation",
+      "scope": "Scoped metadata-only immutable per-artifact request hashes and durable readback; shared parent operation lock serializes private preparation across tabs; read works without storage/locks."
+    },
+    "operator-chart-artifacts-ui-tests": {
+      "repository": "app",
+      "path": "frontend/graphql/nvke/use-nvke-install-plan-charts.test.tsx",
+      "kind": "test",
+      "scope": "Controlled Apollo peers cover journal-before-call, lost-result/reload recovery, exact original options, refused changed hashes, unavailable storage/locks, foreign/overbudget/authorizing results and actor/parent/permission/visit invalidation."
+    },
+    "operator-chart-artifacts-ui-browser": {
+      "repository": "app",
+      "path": "frontend/e2e/nvke-install-plan-charts-recovery-runner.mjs",
+      "kind": "test",
+      "scope": "Two controlled Chromium hook/panel scenarios verify replies lost before/after retention, identical original request hashes, durable journal ordering, explicit reads and no private request options in browser storage; not actual API/browser qualification."
     }
   },
   "rows": {
@@ -3433,9 +3481,17 @@
           "operator-chart-artifacts-cli",
           "operator-chart-artifacts-cli-tests",
           "operator-chart-artifacts-cli-api",
-          "operator-chart-artifacts-cli-transport-tests"
+          "operator-chart-artifacts-cli-transport-tests",
+          "operator-chart-artifacts-api",
+          "operator-chart-artifacts-api-tests",
+          "operator-chart-artifacts-api-local",
+          "operator-chart-artifacts-ui",
+          "operator-chart-artifacts-ui-hook",
+          "operator-chart-artifacts-ui-journal",
+          "operator-chart-artifacts-ui-tests",
+          "operator-chart-artifacts-ui-browser"
         ],
-        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately. A chart-only materialization stage has real Helm/mTLS agent and SDK recovery checks; chart API implementation/combined API-CLI-agent qualification and UI controls, OCI/private-registry/TLS qualification, complete artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
+        "remaining": "The first agent install remains UNCERTAIN after a native LGTM readiness failure. Current-admin API/CLI/connected operation-screen install review and actual Linux agent/SDK/GraphQL/compiled-CLI plan preparation/recovery/paging are locally qualified with unchanged original files, row and fences. A later host usernet outage leaves qualification guest forwarding unavailable (#98), without VM reboot or replay. The plan UI is wired and controlled-browser recovery is locally checked; real API/agent plan-browser qualification remains pending. Native file dependencies are inventoried privately. A chart-only materialization stage has real Helm/mTLS agent and SDK recovery checks; a durable chart API and real PostgreSQL/GraphQL/SDK/mTLS/Helm recovery are locally qualified and the chart UI has controlled browser recovery checks; combined API-CLI-agent and real browser/API qualification, OCI/private-registry/TLS qualification, complete artifact materialization and frozen closure/skipped-resource credential verification and linked once-only execution/interruption recovery (#97), completed agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, production builds and deployed login/acceptance remain open."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
