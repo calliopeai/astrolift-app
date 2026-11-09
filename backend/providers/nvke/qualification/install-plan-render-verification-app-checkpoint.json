@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "durable-render-verification-app-intent-and-reviewed-api",
-  "status": "implementation-checkpoint-database-and-type-checks-pending",
+  "status": "model-static-contract-qualified-configured-api-tests-running",
   "sourceSha256": {
     "backend/astrolift_clusters/models/nvke.py": "bd518a03a95bb62cffcf4f0444015f8aa0015009b3f4479914e85b2ab96e27d4",
     "backend/astrolift_clusters/migrations/0042_nvke_install_plan_verification.py": "b76355cf638bbd192f43692be9df75fcb5e19501a47b95d3311f39c729a3f140",
@@ -20,23 +20,36 @@
     "schemaExport": "passed with canonical six feature flags; exactly 90 additions and no removals in both SDL copies; MCP contract unchanged",
     "codegen": "passed; schema and three operation types generated",
     "modelTests": {
-      "status": "pending",
+      "status": "passed",
       "sessionId": 60629,
       "logPath": "/tmp/astrolift-nvke-verification-model-tests.log",
-      "exitMarker": "/tmp/astrolift-nvke-verification-model-tests.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-model-tests.exit",
+      "passed": 20,
+      "skipped": 0,
+      "exitCode": 0,
+      "seconds": 1364.44,
+      "logSha256": "c3f4fe2a5e723a7846b565e9d75784553ffb805bba22f8aaff5587608168270b"
     },
     "serviceAndGraphQLTests": {
-      "status": "pending",
-      "sessionId": 73262,
-      "logPath": "/tmp/astrolift-nvke-verification-service-tests.log",
-      "exitMarker": "/tmp/astrolift-nvke-verification-service-tests.exit"
+      "status": "configured-rerun-pending",
+      "sessionId": 23410,
+      "logPath": "/tmp/astrolift-nvke-verification-service-tests-configured.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-service-tests-configured.exit",
+      "initialUnconfiguredRun": {
+        "exitCode": 0,
+        "skipped": 20,
+        "qualified": false,
+        "reason": "Missing explicit owned Opscode/native bundle opt-ins; configured rerun selects frozen 8ad parent agent fixture with controlled verification RPC adapters. Actual new route is separately qualified against 7c3 by the real SDK mTLS run."
+      }
     },
     "frontendTypes": {
-      "status": "pending",
-      "sessionId": 20224,
-      "logPath": "/tmp/astrolift-nvke-verification-api-types.log",
-      "exitMarker": "/tmp/astrolift-nvke-verification-api-types.exit",
-      "note": "Prettier subsequently reformatted only new mutation document; final exact-source type check still required."
+      "status": "passed",
+      "sessionId": 85561,
+      "logPath": "/tmp/astrolift-nvke-verification-api-final-types.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-api-final-types.exit",
+      "note": "Final exact-source full TypeScript check after formatting completed successfully.",
+      "exitCode": 0,
+      "logSha256": "0258b5926b8941e1e8150423f37ced703fed0cea3bc0ffc1d4d9b22d4f7b691f"
     },
     "sdkNativeMTLS": "Qualified SDK evidence merged without production source changes; see install-plan-render-verification-sdk-local.json: actual mTLS/lost-reply/cold/offline recovery passed 1 case, no skips."
   },
@@ -48,7 +61,7 @@
     "Strict metadata projection and generated frontend operations bind context/artifact/verification digests and explicitly keep continuationAuthorized=false."
   ],
   "remaining": [
-    "Inspect PostgreSQL model and service/GraphQL results, fix failures and qualify exact-source final checks. No database acceptance is claimed by this checkpoint.",
+    "Inspect configured service/GraphQL results and fix failures; model suite passed20 cases and final full frontend TypeScript passed. Unconfigured all-skipped API invocation is not qualification.",
     "Actual pinned native SDK mTLS qualification passed; actual paired App/CLI/browser acceptance remains outstanding.",
     "CLI commands, Storybook controls/journal, eight locales and production UI wiring remain to be implemented for this stage.",
     "Use-time phase/resource/original credential proof, closed schema policy, image closure and exactly-once linked admission remain open; full scope review/PR/merge/deploy remain outstanding."
