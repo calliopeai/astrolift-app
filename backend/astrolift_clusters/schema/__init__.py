@@ -4,6 +4,7 @@ from astrolift_clusters.schema.log_collector import ClusterLogCollectorMutation,
 from astrolift_clusters.schema.mutations import ClustersMutation
 from astrolift_clusters.schema.nvke import NvkeMutation, NvkeQuery
 from astrolift_clusters.schema.nvke_install_plan_charts import NvkeInstallPlanChartsMutation
+from astrolift_clusters.schema.nvke_install_plan_contexts import NvkeInstallPlanContextMutation
 from astrolift_clusters.schema.nvke_install_plan_trees import NvkeInstallPlanTreeMutation
 from astrolift_clusters.schema.nvke_install_plans import NvkeInstallPlanMutation, NvkeInstallPlanQuery
 from astrolift_clusters.schema.nvke_operator import NvkeOperatorMutation, NvkeOperatorQuery
@@ -23,6 +24,7 @@ __all__ = [
     "NvkeInstallPlanMutation",
     "NvkeInstallPlanChartsMutation",
     "NvkeInstallPlanTreeMutation",
+    "NvkeInstallPlanContextMutation",
     "NvkeOperatorMutation",
     "NvkeQuery",
     "NvkeMutation",

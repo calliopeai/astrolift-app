@@ -711,3 +711,38 @@ full rows, receipt, guard, runs and linked reservations remain unchanged.
 Evidence: `backend/providers/nvke/qualification/install-plan-native-render-inputs-browser-api-local.json`.
 This verifies the existing preparation/recovery contract; private Helm input
 capture/rendering is not routed through the browser or public agent API.
+
+### Authenticated render-context App contract (#2656, work in progress)
+
+The SDK exposes source-bound context prepare/read methods against the optional
+agent render profile. Final SDK qualification passes all 251 selected tests,
+including real agent/Kubernetes mTLS, the frozen native helper, a discarded
+successful reply and cold recovery without another capture. Exact source and log
+hashes are in `backend/providers/nvke/qualification/install-plan-context-agent-sdk-checkpoint.json`.
+
+The App adds `prepareNvkeOperatorInstallPlanContext`,
+`reviewNvkeOperatorInstallPlanContext` and
+`recoverNvkeOperatorInstallPlanContextPreparation`. Each requires current NVKE
+admin authority and reviewed operation/site/authority, plan/chart/tree versions
+and digests, plus the exact Helm item and original ordinal. Preparation additionally
+accepts bounded private `requestText`; read and private retry accept the retained
+artifact UUID. Private input is encrypted and HMAC-bound before network I/O.
+Current admins may read; repeating retained private intent requires its original
+caller and API token. Publication rechecks authority and all parents after I/O.
+
+Completed summaries are immutable. Partial and soft-deleted context UUIDs remain
+reserved across plan, chart and tree preparation. PostgreSQL transaction advisory
+locks serialize a selected UUID across artifact tables and different original
+jobs. The GraphQL audit redactor covers aliased and rejected private request text.
+Public output includes only source metadata, capture/chart/index hashes, counts,
+observation time and the non-authorizing execution state.
+
+The schema, frontend operation documents and generated types are present; the
+operation-screen context controls remain pending. Configured App integration
+checks are still running at this checkpoint. An earlier unconfigured invocation
+passed three database-lock cases but skipped 36 API cases and is not API
+qualification. The CLI context commands require their separate terminal checks
+and actual paired App/CLI acceptance. Fresh phase/resource/credential proof,
+external schema policy, image closure and linked native admission remain open.
+The original uncertain install and its fence are unchanged; nothing in this
+contract authorizes native continuation.

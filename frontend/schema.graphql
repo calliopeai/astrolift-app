@@ -10925,6 +10925,9 @@ type Mutation {
   prepareNvkeOperatorInstallPlanTree(input: PrepareNvkeOperatorInstallPlanTreeInput!): NvkeOperatorInstallPlanTreeTypeMutationResult!
   reviewNvkeOperatorInstallPlanTree(input: NvkeOperatorInstallPlanTreeReviewInput!): NvkeOperatorInstallPlanTreeTypeMutationResult!
   recoverNvkeOperatorInstallPlanTreePreparation(input: NvkeOperatorInstallPlanTreeReviewInput!): NvkeOperatorInstallPlanTreeTypeMutationResult!
+  prepareNvkeOperatorInstallPlanContext(input: PrepareNvkeOperatorInstallPlanContextInput!): NvkeOperatorInstallPlanContextTypeMutationResult!
+  reviewNvkeOperatorInstallPlanContext(input: NvkeOperatorInstallPlanContextReviewInput!): NvkeOperatorInstallPlanContextTypeMutationResult!
+  recoverNvkeOperatorInstallPlanContextPreparation(input: NvkeOperatorInstallPlanContextReviewInput!): NvkeOperatorInstallPlanContextTypeMutationResult!
   prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
   reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
@@ -11884,6 +11887,63 @@ type NvkeOperatorInstallPlanChartsTypeMutationResult {
   data: NvkeOperatorInstallPlanChartsType
 }
 
+input NvkeOperatorInstallPlanContextReviewInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+  expectedPlanVersion: Int!
+  planDigest: String!
+  chartArtifactId: GUID!
+  expectedChartArtifactVersion: Int!
+  chartArtifactDigest: String!
+  treeId: GUID!
+  expectedTreeVersion: Int!
+  treeDigest: String!
+  item: String!
+  ordinal: Int!
+  artifactId: GUID!
+}
+
+type NvkeOperatorInstallPlanContextType {
+  id: GUID!
+  version: Int!
+  status: String!
+  planId: GUID!
+  planVersion: Int!
+  operationId: GUID!
+  operationVersion: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  authorityId: GUID!
+  authorityVersion: Int!
+  planDigest: String!
+  chartArtifactId: GUID!
+  chartArtifactVersion: Int!
+  chartArtifactDigest: String!
+  treeDigest: String!
+  treeId: GUID!
+  treeVersion: Int!
+  item: String!
+  ordinal: Int!
+  captureDigest: String!
+  frozenChartSha256: String!
+  contextDigest: String!
+  documentCount: Int!
+  lookupCount: Int!
+  observedAt: String!
+  executionState: String!
+  continuationAuthorized: Boolean!
+}
+
+type NvkeOperatorInstallPlanContextTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallPlanContextType
+}
+
 type NvkeOperatorInstallPlanHeaderType {
   format: Int!
   scope: String!
@@ -12555,6 +12615,26 @@ input PrepareNvkeOperatorInstallPlanChartsInput {
   planId: GUID!
   expectedPlanVersion: Int!
   planDigest: String!
+  requestText: String!
+}
+
+input PrepareNvkeOperatorInstallPlanContextInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+  expectedPlanVersion: Int!
+  planDigest: String!
+  chartArtifactId: GUID!
+  expectedChartArtifactVersion: Int!
+  chartArtifactDigest: String!
+  treeId: GUID!
+  expectedTreeVersion: Int!
+  treeDigest: String!
+  item: String!
+  ordinal: Int!
   requestText: String!
 }
 

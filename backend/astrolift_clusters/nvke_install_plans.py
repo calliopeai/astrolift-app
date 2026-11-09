@@ -13,12 +13,14 @@ from nvke import _operator_install_plan as protocol
 from nvke.client import NvkeError
 from nvke.operator_contract import ContractError
 
+from astrolift_clusters import nvke_artifact_identity as artifact_identity
 from astrolift_clusters import nvke_operations as outbox
 from astrolift_clusters import nvke_operator_authority as authority
 from astrolift_clusters import nvke_operator_jobs as jobs
 from astrolift_clusters.models import (
     NvkeInstallPlan,
     NvkeInstallPlanCharts,
+    NvkeInstallPlanContext,
     NvkeInstallPlanTree,
     NvkeOperation,
 )
@@ -117,6 +119,8 @@ def prepare(*, body, **review):
         # Serializing on the original also prevents a competing operation transition at reservation.
         NvkeOperation.objects.select_for_update().get(pk=original.pk)
         checkpoint()
+        artifact_identity.lock(plan_id)
+        checkpoint()
         row = NvkeInstallPlan.all_objects.select_for_update().filter(guid=plan_id).first()
         if row is not None:
             if (
@@ -134,6 +138,7 @@ def prepare(*, body, **review):
                 NvkeOperation.all_objects.filter(guid=plan_id).exists()
                 or NvkeInstallPlanCharts.all_objects.filter(guid=plan_id).exists()
                 or NvkeInstallPlanTree.all_objects.filter(guid=plan_id).exists()
+                or NvkeInstallPlanContext.all_objects.filter(guid=plan_id).exists()
             ):
                 raise NvkeError("CONFLICT", "This identity already identifies an operator operation")
             sealed = encrypt_at_rest(outbox.canonical(body))

@@ -11,12 +11,14 @@ from nvke import _operator_install_plan_charts as protocol
 from nvke.client import NvkeError
 from nvke.operator_contract import ContractError
 
+from astrolift_clusters import nvke_artifact_identity as artifact_identity
 from astrolift_clusters import nvke_install_plans as plans
 from astrolift_clusters import nvke_operations as outbox
 from astrolift_clusters import nvke_operator_authority as authority
 from astrolift_clusters.models import (
     NvkeInstallPlan,
     NvkeInstallPlanCharts,
+    NvkeInstallPlanContext,
     NvkeInstallPlanTree,
     NvkeOperation,
 )
@@ -146,6 +148,8 @@ def prepare(*, body, plan_id, expected_plan_version, plan_digest, **review):
         NvkeOperation.objects.select_for_update().get(pk=original.pk)
         NvkeInstallPlan.objects.select_for_update().get(pk=parent.pk)
         checkpoint()
+        artifact_identity.lock(artifact_id)
+        checkpoint()
         row = NvkeInstallPlanCharts.all_objects.select_for_update().filter(guid=artifact_id).first()
         if row is not None:
             if (
@@ -163,6 +167,7 @@ def prepare(*, body, plan_id, expected_plan_version, plan_digest, **review):
                 NvkeOperation.all_objects.filter(guid=artifact_id).exists()
                 or NvkeInstallPlan.all_objects.filter(guid=artifact_id).exists()
                 or NvkeInstallPlanTree.all_objects.filter(guid=artifact_id).exists()
+                or NvkeInstallPlanContext.all_objects.filter(guid=artifact_id).exists()
             ):
                 raise NvkeError("CONFLICT", "This identity already identifies another operation or plan")
             sealed = encrypt_at_rest(outbox.canonical(body))

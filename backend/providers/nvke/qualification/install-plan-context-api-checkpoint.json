@@ -1,0 +1,69 @@
+{
+  "format": 1,
+  "scope": "app-render-context-api-and-cross-kind-reservations-checkpoint",
+  "status": "configured-integration-and-frontend-static-running",
+  "baseRevision": "8af4336199f4332d05786888f1875d1ef8ab9a77",
+  "sourceSha256": {
+    "backend/astrolift_clusters/nvke_artifact_identity.py": "f7fc4eccb849a257891846a350939f8dafd66586478b04c8b23928af0f9adee1",
+    "backend/astrolift_clusters/nvke_install_plan_contexts.py": "1f02c96118e7aaf6945fd7dfa6533531587edfed83d561e65b162a6682c1b8db",
+    "backend/astrolift_clusters/nvke_install_plans.py": "44ad46d025e6a30d1841894972ccdaebae47a672cb67dbe1262271cf81e0129f",
+    "backend/astrolift_clusters/nvke_install_plan_charts.py": "a31e9145fa4f95fe744b79230df6fd08f85a7ff61ad490a3fb80c1b082f4ca1f",
+    "backend/astrolift_clusters/nvke_install_plan_trees.py": "3f660d57e8bcb9330d7c61727b48be124cabd44b35532085718806de70d9699c",
+    "backend/astrolift_clusters/schema/nvke_install_plan_contexts.py": "53909ed072f28870163c36f20a6a143c3a698164caf71eb4a77a65c24d3c7eec",
+    "backend/astrolift_clusters/schema/__init__.py": "98b6ab6c68aa99b373656bb92314ad463aae0962a0fe282bb5fe2d73afa9e866",
+    "backend/config/schema.py": "23ff9cde180630ff93304f032cd2e719fdc03a3c2a0df8c5bb598c0836b41342",
+    "backend/core/schema/audit.py": "6d513f68d98413a05dee27f3efdd612fb7188c1e3b80f5802c8ed126441f76ce",
+    "backend/astrolift_clusters/tests/test_nvke_artifact_identity.py": "33ead4a2748926778277aaf33abd698b95c76098a7f68c664c38c3857c963a72",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_contexts.py": "9049f3a760cef9b4c58328d67ac87482003686fa58f092fedb8cfe8593e959b1",
+    "backend/schema.graphql": "43479753bd123c4a62bd8a446686b9099a1d313c676837157a996bc763a4cbdb",
+    "frontend/schema.graphql": "43479753bd123c4a62bd8a446686b9099a1d313c676837157a996bc763a4cbdb",
+    "frontend/graphql/nvke/nvke-install-plan-context.queries.ts": "377b37d3df63d796a71c37f96e545b31642a310747b8cd55c15e0cf37f79fb40",
+    "frontend/graphql/nvke/nvke-install-plan-context.mutations.ts": "5af26eed09b9c34d1112a23062e2a6e2a52aa4593be1b0a7a6f9704943bc286c",
+    "frontend/graphql/__generated__/schema.ts": "ff1e6b8e49a5da290feae7fb56d126cc8ecdcaa952e54c36cad14cf7ff3b96d1",
+    "frontend/graphql/__generated__/operations.ts": "5031f224f246e87fd1c6815368f88b9a318507e156f490def06ce08050da9f51"
+  },
+  "checks": {
+    "pythonStatic": {
+      "status": "passed",
+      "ruff": true,
+      "format": true,
+      "diffCheck": true,
+      "logSha256": "5c3832e8ce84adc96f95268d227f841d60136483f01dd60eecf663deb30329c2"
+    },
+    "schemaExport": {
+      "status": "passed",
+      "logSha256": "1d1b6e236d8c89c285ccd5b42ec05953743606f7a392e7df261e702f2143b2e5"
+    },
+    "initialUnconfigured": {
+      "passed": 3,
+      "skipped": 36,
+      "durationSeconds": 72.31,
+      "scope": "Separate PostgreSQL sessions prove UUID lock exclusion, unrelated UUID access, and commit/rollback release; API fixtures lacked explicit runtime environment and were skipped. This is not API qualification."
+    },
+    "configuredIntegration": {
+      "status": "running",
+      "completionMarker": "/tmp/astrolift-nvke-context-api-configured.exit",
+      "logPath": "/tmp/astrolift-nvke-context-api-configured.log"
+    },
+    "frontendContract": {
+      "status": "running",
+      "scope": "Operation codegen, full TypeScript check and targeted operation-document ESLint",
+      "completionMarker": "/tmp/astrolift-nvke-context-api-frontend-contract.exit",
+      "logPath": "/tmp/astrolift-nvke-context-api-frontend-contract.log"
+    }
+  },
+  "implemented": [
+    "Current-admin source/parent/version/digest/item/ordinal-bound prepare/read/private-retry mutations. Encrypted signed intent precedes private RPC; authority and all parent metadata recheck before publication.",
+    "Read may recover an unconfirmed response without repeating preparation. Private retries require original actor and API token. Prepared context summaries stay immutable and public responses contain metadata only.",
+    "Partial and deleted IDs reserve across plan/chart/tree/context tables; PostgreSQL transaction advisory locks prevent same-UUID creation races across different original operations.",
+    "Private requestText audit redaction, exported schema, typed frontend operation documents and generated types are present."
+  ],
+  "continuationAuthorized": false,
+  "remaining": [
+    "Record terminal configured API tests with no unexpected skips; run old plan/chart/tree regressions on these changed reservation paths.",
+    "Finish frontend static checks, Storybook-first operation-screen context controls and recovery hook.",
+    "Qualify the actual compiled CLI/App/agent context path and preserve exact original state.",
+    "Resolve the legacy standalone local-chart timeout; fresh phase/resource/credential/schema/image proof, linked admission and retained live-site acceptance remain open.",
+    "Adversarial full review, green final local gates, coordinated PR/main merge, deployment and backlog execution are not complete."
+  ]
+}
