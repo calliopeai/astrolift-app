@@ -208,7 +208,7 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "fb0513edcbf4f5b07da8732fd319836ec3d32a9c"
+    revision = "aeb0e1b88abe2f1c51c4e16cd7cac34ecf346fee"
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -217,6 +217,9 @@ def operator_agent(tmp_path, *, site_id=None):
         "management_plan_store.py",
         "management_plan_preparation.py",
         "management_dependencies.py",
+        "management_chart_archive.py",
+        "management_chart_materialization.py",
+        "management_plan_chart_service.py",
         "qualify_bootstrap.py",
         "tooling.py",
     ):
@@ -592,7 +595,7 @@ def test_install_review_requires_capability_original_failure_digest_and_stable_i
 
 def test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "fb0513edcbf4f5b07da8732fd319836ec3d32a9c"
+    revision = "aeb0e1b88abe2f1c51c4e16cd7cac34ecf346fee"
     relative = "kubernetes/nvke/test_operator_agent.py"
     assert (source / relative).read_bytes() == subprocess.check_output(
         ["git", "show", revision + ":" + relative], cwd=source

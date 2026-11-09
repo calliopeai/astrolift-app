@@ -11,7 +11,7 @@
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "fb0513edcbf4f5b07da8732fd319836ec3d32a9c"
+      "revision": "aeb0e1b88abe2f1c51c4e16cd7cac34ecf346fee"
     }
   },
   "evidence": {
@@ -493,14 +493,14 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.",
-      "sha256": "21809b94e37c0df57ee3570e4284c0c1e3c85f1db852796dd1eb49502b99d444"
+      "sha256": "f3c916ed04fff2fc7210cc27bfff4f0f1bfef617c42d130a22ade4b466e887d6"
     },
     "operator-agent-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
       "scope": "Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.",
-      "sha256": "70be197960ef6b179bb48a8c70be1c4b14c2fdd7d8b2aa5561095fb1bd98b23a"
+      "sha256": "f2dd368bd103274f81b4aad8ead51e869cd8b642ee79468939359f635c55bc34"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -695,7 +695,7 @@
       "repository": "app",
       "path": "frontend/components/screens/nvke/NvkeOperatorJobPanel.tsx",
       "kind": "implementation",
-      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1–256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details. Reviewed original stop/fencing, eligibility/source-change review invalidation and explicit refresh after unconfirmed stop are included."
+      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1\u2013256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details. Reviewed original stop/fencing, eligibility/source-change review invalidation and explicit refresh after unconfirmed stop are included."
     },
     "operator-job-hook": {
       "repository": "app",
@@ -816,7 +816,7 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Original intent/mTLS/site/instance/bundle and authenticated native-run binding for read-only partial-install review. Executor reservation refuses admissions, source drift is rejected, original uncertainty/guards remain intact; no continuation admitted.",
-      "sha256": "21809b94e37c0df57ee3570e4284c0c1e3c85f1db852796dd1eb49502b99d444"
+      "sha256": "f3c916ed04fff2fc7210cc27bfff4f0f1bfef617c42d130a22ade4b466e887d6"
     },
     "operator-install-review-sdk": {
       "repository": "app",
@@ -947,7 +947,7 @@
       "path": "kubernetes/nvke/management_plan_preparation.py",
       "kind": "implementation",
       "scope": "Authenticated read-only preparation and same-ID recovery over sealed snapshots. Fresh original source, target cluster UID, guarded input copies, explicit reconstruction provenance and source-bound signed item/workload paging. No continuation execution or historical environment identity claim.",
-      "sha256": "df731c1dd9a46b2f90db92914b62e480534a2fb37cfa6207c73ca937ca6f024a"
+      "sha256": "2c6dcf63663795bf5e3338a0b29425b17442b217d16fa8ef96e5fb8f33072388"
     },
     "operator-install-plan-sdk": {
       "repository": "app",
