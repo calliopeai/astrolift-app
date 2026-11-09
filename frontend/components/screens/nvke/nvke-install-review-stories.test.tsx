@@ -17,7 +17,11 @@ vi.mock("next/navigation", async (importOriginal) => ({
 import * as preview from "../../../.storybook/preview";
 setProjectAnnotations(preview);
 const modules = import.meta.glob<Record<string, unknown>>(
-  ["./NvkeOperatorInstallReviewPanel.stories.tsx", "./NvkeOperationScreen.stories.tsx"],
+  [
+    "./NvkeOperatorInstallReviewPanel.stories.tsx",
+    "./NvkeOperatorInstallPlanPanel.stories.tsx",
+    "./NvkeOperationScreen.stories.tsx",
+  ],
   { eager: true }
 );
 describe.each(Object.entries(modules))("Install review story %s", (_file, module) => {

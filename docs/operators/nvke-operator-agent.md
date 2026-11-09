@@ -317,3 +317,24 @@ and uncertain operation. A later shared Lima network-service outage is tracked
 in #98: both VMs are preserved without reboot or native replay, but current host
 guest forwarding is unavailable. Completed CLI checks do not claim post-incident
 environment availability. The full integration and plan UI/execution remain open.
+
+
+The remaining-install plan panel is also available in Storybook under
+`Screens/NVKE/Install plan`. It shows retained versus reconstructed inventory,
+original failure and log-order evidence, proposed skip/execute actions, content
+digests, and independent server-paged item/workload tables. Its private request
+form preserves exact text, clears it after submission, and retains the plan UUID
+for explicit review/retry after an unconfirmed response. Source or permission
+changes hide prior observations and clear the private form. All eight locale
+catalogs include this panel. This is the pure-component checkpoint: the scoped
+Apollo hook, browser recovery journal, operation-screen wiring and connected
+API/agent browser qualification remain pending. It exposes no continuation
+execution action.
+
+Local verification of this component checkpoint: 97 focused protocol/panel/story
+checks passed; the Chromium runner
+`frontend/e2e/nvke-install-plan-storybook-runner.mjs` passed all 14 panel states
+without page errors and checked page overflow at 768px. The initial runner used
+an incorrect responsive-story ID; it was corrected to the Storybook index's
+`width-768` ID before the passing run. These fixtures do not qualify the connected
+API/agent path.
