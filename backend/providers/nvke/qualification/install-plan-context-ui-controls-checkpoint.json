@@ -73,11 +73,12 @@
       "scope": "Actual operation-screen Storybook composition: saved capture remains disabled; review follows normal, read-only and pending guards. Not Next login/route acceptance."
     },
     "nextBuild": {
-      "status": "pending",
-      "exitCode": null,
+      "status": "completed",
+      "exitCode": 0,
+      "logSha256": "7efca409e72d0e5237f8a28a3ea36518a8a1ee13ca1c75b945513f18e91fb4ac",
       "logPath": "/tmp/astrolift-nvke-context-ui-next-build.log",
       "exitMarker": "/tmp/astrolift-nvke-context-ui-next-build.exit",
-      "sessionId": 42336
+      "scope": "Full Next production build of feature/nvke-2656-context-ui; its production App/hook/panel/library code matches the merged feature branch. Later owned-API story/test/driver additions have separate full TypeScript checks. Final release revision build remains required."
     },
     "fullFrontendLint": {
       "status": "completed",
@@ -101,7 +102,7 @@
   ],
   "continuationAuthorized": false,
   "remaining": [
-    "Next production build is still pending. The follow-on owned App browser driver has separate static and actual-API acceptance work.",
+    "Current controls/wiring Next build, full TypeScript, lint, Storybook build and scoped browser checks pass. Final integrated release build/checks remain required after the remaining native stages.",
     "Actual Next route/login acceptance and actual App/compiled-CLI/agent capture/recovery acceptance; controlled Storybook tests are not substitutes.",
     "Existing standalone agent local-chart timeout failure remains unresolved.",
     "Native phase, credential, schema, image and linked-admission proof; remaining full management surface and live qualification.",

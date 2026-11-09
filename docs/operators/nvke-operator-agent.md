@@ -737,16 +737,30 @@ jobs. The GraphQL audit redactor covers aliased and rejected private request tex
 Public output includes only source metadata, capture/chart/index hashes, counts,
 observation time and the non-authorizing execution state.
 
-The schema, frontend operation documents and generated types are present; the
-operation-screen context controls remain pending. All 39 configured App integration cases pass without skips, including real
-PostgreSQL, RBAC/token changes, typed GraphQL, audit redaction, actual mTLS
-authority setup and separate-session UUID locks. Capture RPC methods use controlled
-adapters here; actual paired context capture remains separate. An earlier
-unconfigured invocation passed three database-lock cases but skipped 36 API cases
-and is retained as historical evidence, not API qualification. Nine selected older
-plan/chart/tree durable-intent and ID-reservation regressions also pass; 72 unrelated
-cases were deselected in that focused run. The CLI context commands require their separate terminal checks
-and actual paired App/CLI acceptance. Fresh phase/resource/credential proof,
-external schema policy, image closure and linked native admission remain open.
-The original uncertain install and its fence are unchanged; nothing in this
-contract authorizes native continuation.
+The schema, generated operations and operation-screen controls are implemented.
+The pure panel has eight localized Storybook variants, source/pending/permission
+refusal, explicit metadata-only recovery and an exact-input hash journal. All
+1,081 selected NVKE UI regression tests pass; full TypeScript, full lint (warnings
+remain), Next and production Storybook builds pass for the controls/wiring source.
+Controlled Chromium loss/recovery and operation-screen permission/pending checks
+pass against the built Storybook artifact. The follow-on owned API peer and driver
+also pass full TypeScript and 30 story/coverage cases; actual browser/API capture
+is still running separately. See the UI checkpoint JSON files in qualification/.
+
+All 39 configured App cases pass without skips, including real PostgreSQL,
+RBAC/token changes, typed GraphQL/audits, mTLS authority setup and separate-session
+UUID locks. Their capture RPCs use controlled adapters. Separately, actual compiled
+CLI -> App/PostgreSQL -> agent mTLS -> Kubernetes mTLS -> frozen native helper
+capture/recovery now passes: one case, zero skips, 1586.95s. It prepares real parent
+plan/chart/tree artifacts, discards the context reply after persistence, restarts
+the agent at the same endpoint and recovers/retries without a new helper/transport
+or work attempt. Original full App rows, native receipt, guard, parents and runs
+remain unchanged. This owned fixture does not prove retained Linux connectivity,
+actual Next login/route acceptance, or completion of the uncertain install.
+Evidence: `backend/providers/nvke/qualification/install-plan-context-app-cli-agent-local.json`.
+
+The earlier unconfigured API invocation is historical, not qualification. Nine
+selected older durable-intent/ID-reservation regressions also pass, with 72 cases
+deselected. Fresh phase/resource/credential proof, external schema policy, image
+closure and linked native admission remain open. The original uncertain install
+and its fence are unchanged; this contract never authorizes native continuation.

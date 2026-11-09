@@ -1,0 +1,46 @@
+{
+  "format": 1,
+  "status": "actual-cli-app-agent-capture-and-cold-recovery-qualified",
+  "scope": "actual-compiled-cli-app-agent-kubernetes-context-capture-and-cold-recovery",
+  "appCommit": "8f3a2a9d1",
+  "agentRuntimeCommit": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
+  "cliBinarySha256": "cb3795abe8cd8faa9e3ac1374cd76e437eb7f340ecb7e2651589b9d05655e975",
+  "sourceSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "3aa3c3320b41e3ca65ee1657b79dc702426f4ef7a0a7ec65c86466d7ab30a93a",
+    "scripts/integration/context_cli_qualification.py": "6aa6ead768ae1755ef6ddc3c9125716cb6e23d8b875114ced2f76662eb279309"
+  },
+  "implemented": [
+    "Actual CLI-created site and verified mTLS authority, App-persisted parent plan/charts/tree, original frozen Kubernetes mTLS config and agent-owned render profile before plan creation.",
+    "Actual context prepare through compiled CLI and App; deliberate lost response after persistence; metadata-only journal verification; same endpoint cold agent recovery and original actor retry.",
+    "Checks no new helper/transport or capture attempt on completed recovery, immutable parent snapshots/App rows and original UNCERTAIN receipt/guard/native runs."
+  ],
+  "verification": {
+    "ruff": "passed",
+    "diffCheck": "passed",
+    "firstRun": {
+      "exitCode": 1,
+      "logSha256": "c255eb7787cd0ee3d0f3ee17da0135c3a86eff3f93bbdc59612ae7a094415989",
+      "failure": "First site-create request exceeded the unchanged 30s CLI API timeout before any agent setup. Harness now makes a read-only anonymous readiness request to load lazy URL/schema routing before CLI acceptance."
+    },
+    "currentRun": {
+      "status": "completed",
+      "passed": 1,
+      "deselected": 2,
+      "skipped": 0,
+      "seconds": 1586.95,
+      "exitCode": 0,
+      "logSha256": "5d9f80b3c1f4ef5a73800fa7cb4a788f1cffb740b3ceefc9124e6fb482531e72",
+      "logPath": "/tmp/astrolift-nvke-context-cli-app-paired-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-context-cli-app-paired-v2.exit"
+    }
+  },
+  "continuationAuthorized": false,
+  "remaining": [
+    "Browser actual API/agent capture/recovery has a separate running case; CLI-only acceptance here is complete for the pinned runtime and selected reviewed configuration.",
+    "Actual browser App/native capture acceptance, native phase/schema/image/linked-admission proof and full management surface release qualification."
+  ],
+  "evidenceRepository": "calliopeai/astrolift-cli",
+  "evidenceCommit": "a62df28",
+  "appPythonSourceUnchangedFrom": "8f3a2a9d1",
+  "mergedUiCommit": "6e0a9c177"
+}
