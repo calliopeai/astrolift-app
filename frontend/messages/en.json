@@ -18148,6 +18148,37 @@
       "unloaded": "Prepare a proposal or enter a plan UUID to review its saved result.",
       "unavailable": "The plan is unavailable or belongs to another source. Review the current source and saved identity.",
       "pageFailed": "Could not read this plan page. Review the saved plan and retry the page."
+    },
+    "installCharts": {
+      "title": "Plan chart artifacts",
+      "help": "Freeze the charts for this reviewed plan and inspect the saved result.",
+      "verificationRequired": "Native rendering, image checks and live resource verification are still required before continuation.",
+      "planId": "Plan UUID",
+      "planVersion": "Plan version",
+      "planDigest": "Plan SHA-256",
+      "artifactId": "Artifact UUID",
+      "archiveLimit": "Archive byte limit",
+      "expandedLimit": "Expanded byte limit",
+      "timeout": "Timeout (seconds)",
+      "allowHttp": "Allow HTTP chart repositories",
+      "originalOnly": "Only the original chart settings may be submitted again for this artifact UUID.",
+      "budgetHelp": "Enter decimal byte limits and a timeout from 1 to 3600 seconds. Enable HTTP only for repositories reviewed in this plan. Keep a copy of these settings for recovery.",
+      "invalidInput": "Review the artifact UUID, positive decimal byte limits and a timeout from 1 to 3600 seconds.",
+      "prepare": "Prepare chart artifacts",
+      "review": "Review chart artifacts",
+      "retry": "Retry retained chart preparation",
+      "choose": "Choose another artifact UUID",
+      "failed": "Chart preparation or review could not be confirmed. Refresh the source and review the saved artifact.",
+      "unconfirmed": "Result unconfirmed. Keep this artifact UUID and review it before retrying.",
+      "parentRequired": "Review the prepared installation plan before preparing chart artifacts.",
+      "loading": "Loading saved chart artifacts…",
+      "unavailable": "The saved chart result does not match the current source. Review it again.",
+      "unloaded": "Review an existing artifact UUID or prepare a new one.",
+      "artifactDigest": "Artifact SHA-256",
+      "chartCount": "Chart count",
+      "archiveBytes": "Archive bytes",
+      "expandedBytes": "Expanded bytes",
+      "newId": "New artifact UUID"
     }
   }
 }

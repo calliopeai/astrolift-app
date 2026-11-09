@@ -18151,6 +18151,37 @@
       "unloaded": "Einen Vorschlag vorbereiten oder eine Plan-UUID eingeben, um das gespeicherte Ergebnis zu prüfen.",
       "unavailable": "Der Plan ist nicht verfügbar oder gehört zu einer anderen Quelle. Aktuelle Quelle und gespeicherte Identität prüfen.",
       "pageFailed": "Diese Planseite konnte nicht gelesen werden. Gespeicherten Plan prüfen und die Seite erneut laden."
+    },
+    "installCharts": {
+      "title": "Chart-Artefakte des Plans",
+      "help": "Charts für diesen geprüften Plan festschreiben und das gespeicherte Ergebnis prüfen.",
+      "verificationRequired": "Vor der Fortsetzung sind natives Rendering, Image-Prüfungen und die Prüfung aktiver Ressourcen erforderlich.",
+      "planId": "Plan-UUID",
+      "planVersion": "Planversion",
+      "planDigest": "Plan-SHA-256",
+      "artifactId": "Artefakt-UUID",
+      "archiveLimit": "Byte-Grenze für Archive",
+      "expandedLimit": "Byte-Grenze nach Dekomprimierung",
+      "timeout": "Zeitlimit (Sekunden)",
+      "allowHttp": "HTTP-Chart-Repositories zulassen",
+      "originalOnly": "Für diese Artefakt-UUID dürfen nur die ursprünglichen Chart-Einstellungen erneut gesendet werden.",
+      "budgetHelp": "Dezimale Byte-Grenzen und ein Zeitlimit von 1 bis 3600 Sekunden eingeben. HTTP nur für in diesem Plan geprüfte Repositories aktivieren. Eine Kopie der Einstellungen zur Wiederherstellung aufbewahren.",
+      "invalidInput": "Artefakt-UUID, positive dezimale Byte-Grenzen und ein Zeitlimit von 1 bis 3600 Sekunden prüfen.",
+      "prepare": "Chart-Artefakte vorbereiten",
+      "review": "Chart-Artefakte prüfen",
+      "retry": "Gespeicherte Chart-Vorbereitung erneut versuchen",
+      "choose": "Andere Artefakt-UUID wählen",
+      "failed": "Vorbereitung oder Prüfung konnte nicht bestätigt werden. Quelle aktualisieren und das gespeicherte Artefakt prüfen.",
+      "unconfirmed": "Ergebnis unbestätigt. Diese Artefakt-UUID aufbewahren und vor einem erneuten Versuch prüfen.",
+      "parentRequired": "Vor der Chart-Vorbereitung den vorbereiteten Installationsplan prüfen.",
+      "loading": "Gespeicherte Chart-Artefakte werden geladen…",
+      "unavailable": "Das gespeicherte Ergebnis passt nicht zur aktuellen Quelle. Erneut prüfen.",
+      "unloaded": "Eine vorhandene Artefakt-UUID prüfen oder ein neues Artefakt vorbereiten.",
+      "artifactDigest": "Artefakt-SHA-256",
+      "chartCount": "Chart-Anzahl",
+      "archiveBytes": "Archivbytes",
+      "expandedBytes": "Dekomprimierte Bytes",
+      "newId": "Neue Artefakt-UUID"
     }
   }
 }

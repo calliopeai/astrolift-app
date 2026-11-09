@@ -18148,6 +18148,37 @@
       "unloaded": "Prepare uma proposta ou informe um UUID para revisar o resultado salvo.",
       "unavailable": "O plano está indisponível ou pertence a outra origem. Revise a origem atual e a identidade salva.",
       "pageFailed": "Não foi possível ler esta página do plano. Revise o plano salvo e tente a página novamente."
+    },
+    "installCharts": {
+      "title": "Artefatos de charts do plano",
+      "help": "Fixe os charts deste plano revisado e consulte o resultado salvo.",
+      "verificationRequired": "A continuação ainda exige renderização nativa, verificação de imagens e de recursos ativos.",
+      "planId": "UUID do plano",
+      "planVersion": "Versão do plano",
+      "planDigest": "SHA-256 do plano",
+      "artifactId": "UUID do artefato",
+      "archiveLimit": "Limite de bytes dos arquivos",
+      "expandedLimit": "Limite de bytes descompactados",
+      "timeout": "Tempo limite (segundos)",
+      "allowHttp": "Permitir repositórios de charts por HTTP",
+      "originalOnly": "Somente as configurações originais podem ser reenviadas para este UUID de artefato.",
+      "budgetHelp": "Informe limites decimais de bytes e um tempo de 1 a 3600 segundos. Ative HTTP apenas para repositórios revisados neste plano. Guarde uma cópia das configurações para recuperação.",
+      "invalidInput": "Revise o UUID do artefato, os limites decimais positivos de bytes e um tempo de 1 a 3600 segundos.",
+      "prepare": "Preparar artefatos de charts",
+      "review": "Consultar artefatos de charts",
+      "retry": "Repetir a preparação de charts salva",
+      "choose": "Escolher outro UUID de artefato",
+      "failed": "Não foi possível confirmar a preparação ou consulta. Atualize a origem e consulte o artefato salvo.",
+      "unconfirmed": "Resultado não confirmado. Guarde este UUID e consulte-o antes de tentar novamente.",
+      "parentRequired": "Consulte o plano de instalação preparado antes de preparar os artefatos de charts.",
+      "loading": "Carregando artefatos de charts salvos…",
+      "unavailable": "O resultado salvo não corresponde à origem atual. Consulte novamente.",
+      "unloaded": "Consulte um UUID de artefato existente ou prepare um novo.",
+      "artifactDigest": "SHA-256 do artefato",
+      "chartCount": "Quantidade de charts",
+      "archiveBytes": "Bytes dos arquivos",
+      "expandedBytes": "Bytes descompactados",
+      "newId": "Novo UUID de artefato"
     }
   }
 }

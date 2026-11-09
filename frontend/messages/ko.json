@@ -18148,6 +18148,37 @@
       "unloaded": "제안을 준비하거나 계획 UUID를 입력하여 저장된 결과를 검토하세요.",
       "unavailable": "계획을 사용할 수 없거나 다른 원본에 속합니다. 현재 원본과 저장된 식별자를 검토하세요.",
       "pageFailed": "계획 페이지를 읽을 수 없습니다. 저장된 계획을 검토하고 페이지를 다시 시도하세요."
+    },
+    "installCharts": {
+      "title": "계획 차트 아티팩트",
+      "help": "검토한 계획의 차트를 고정하고 저장된 결과를 확인합니다.",
+      "verificationRequired": "계속하기 전에 네이티브 렌더링, 이미지 검사와 실행 중인 리소스 검증이 필요합니다.",
+      "planId": "계획 UUID",
+      "planVersion": "계획 버전",
+      "planDigest": "계획 SHA-256",
+      "artifactId": "아티팩트 UUID",
+      "archiveLimit": "아카이브 바이트 한도",
+      "expandedLimit": "압축 해제 후 바이트 한도",
+      "timeout": "제한 시간(초)",
+      "allowHttp": "HTTP 차트 저장소 허용",
+      "originalOnly": "이 아티팩트 UUID에는 원래 차트 설정만 다시 제출할 수 있습니다.",
+      "budgetHelp": "10진수 바이트 한도와 1~3600초의 제한 시간을 입력하세요. 이 계획에서 검토한 저장소에만 HTTP를 사용하고, 복구를 위해 설정 사본을 보관하세요.",
+      "invalidInput": "아티팩트 UUID, 양의 10진수 바이트 한도와 1~3600초의 제한 시간을 확인하세요.",
+      "prepare": "차트 아티팩트 준비",
+      "review": "차트 아티팩트 확인",
+      "retry": "저장된 차트 준비 재시도",
+      "choose": "다른 아티팩트 UUID 선택",
+      "failed": "준비 또는 확인 결과를 확정할 수 없습니다. 소스를 새로 고치고 저장된 아티팩트를 확인하세요.",
+      "unconfirmed": "결과가 확인되지 않았습니다. 이 아티팩트 UUID를 보관하고 재시도 전에 확인하세요.",
+      "parentRequired": "차트 아티팩트를 준비하기 전에 준비된 설치 계획을 확인하세요.",
+      "loading": "저장된 차트 아티팩트 로딩 중…",
+      "unavailable": "저장된 결과가 현재 소스와 일치하지 않습니다. 다시 확인하세요.",
+      "unloaded": "기존 아티팩트 UUID를 확인하거나 새 아티팩트를 준비하세요.",
+      "artifactDigest": "아티팩트 SHA-256",
+      "chartCount": "차트 수",
+      "archiveBytes": "아카이브 바이트",
+      "expandedBytes": "압축 해제 후 바이트",
+      "newId": "새 아티팩트 UUID"
     }
   }
 }

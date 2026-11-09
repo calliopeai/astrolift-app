@@ -459,6 +459,22 @@ CLI source `bbd9522e43810eeb2ac677a0ce4ee825b11bb432` passed the full local Go s
 and journal cases, formatting, vet, lint and a clean build. All three chart
 documents validate against the exported application schema. These controlled
 transport/source checks do not qualify the combined current-admin API, CLI,
-PostgreSQL, agent and retained Linux install. The chart API PostgreSQL gate is
-still pending fresh-database historical migrations; frontend lint and full
-typecheck passed. Native continuation, merge and deployed acceptance remain unverified.
+PostgreSQL, agent and retained Linux install. The initial chart/plan PostgreSQL run completed fresh historical migrations and
+reported 41 passing tests plus one existing-plan setup error in
+`test_pages_bind_current_caller_source_search_view_and_limit` (JSON decoding).
+The later real-wire chart case still needs execution, so the API gate remains
+unqualified. Frontend lint and full typecheck passed before the chart panel
+changes; checks for this panel are tracked separately below. Native continuation,
+merge and deployed acceptance remain unverified.
+
+
+The chart UI checkpoint adds a pure Storybook panel, strict request/result
+validation and copy in all eight locales. It exposes the artifact UUID, archive
+and expanded byte budgets, timeout and plain-HTTP policy, preserving decimal
+precision. It hides stale results, retains the UUID after an ambiguous response
+and exposes explicit review/retry callbacks. It does not fetch data or authorize
+continuation. Local qualification passed 72 focused protocol/panel/story tests
+and all 15 Chromium story scenarios, with desktop and 768px layouts visually
+reviewed. The added locale rendering test and current type/lint gate were pending
+at checkpoint creation. Durable browser recovery journaling, the GraphQL hook,
+operation-screen wiring and browser/API integration remain to be implemented.

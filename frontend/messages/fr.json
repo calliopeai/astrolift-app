@@ -18151,6 +18151,37 @@
       "unloaded": "Préparez une proposition ou saisissez un UUID pour examiner son résultat enregistré.",
       "unavailable": "Le plan est indisponible ou appartient à une autre source. Vérifiez la source actuelle et l’identité enregistrée.",
       "pageFailed": "Impossible de lire cette page du plan. Examinez le plan enregistré et réessayez la page."
+    },
+    "installCharts": {
+      "title": "Artefacts de charts du plan",
+      "help": "Figez les charts de ce plan vérifié et consultez le résultat enregistré.",
+      "verificationRequired": "La poursuite exige encore le rendu natif, la vérification des images et des ressources actives.",
+      "planId": "UUID du plan",
+      "planVersion": "Version du plan",
+      "planDigest": "SHA-256 du plan",
+      "artifactId": "UUID de l’artefact",
+      "archiveLimit": "Limite des archives en octets",
+      "expandedLimit": "Limite après décompression en octets",
+      "timeout": "Délai (secondes)",
+      "allowHttp": "Autoriser les dépôts de charts HTTP",
+      "originalOnly": "Seuls les paramètres de charts initiaux peuvent être renvoyés pour cet UUID d’artefact.",
+      "budgetHelp": "Saisissez des limites décimales en octets et un délai de 1 à 3600 secondes. Activez HTTP uniquement pour les dépôts vérifiés dans ce plan. Conservez une copie des paramètres pour la récupération.",
+      "invalidInput": "Vérifiez l’UUID de l’artefact, les limites décimales positives en octets et un délai de 1 à 3600 secondes.",
+      "prepare": "Préparer les artefacts de charts",
+      "review": "Consulter les artefacts de charts",
+      "retry": "Réessayer la préparation de charts enregistrée",
+      "choose": "Choisir un autre UUID d’artefact",
+      "failed": "La préparation ou la consultation n’a pas pu être confirmée. Actualisez la source et consultez l’artefact enregistré.",
+      "unconfirmed": "Résultat non confirmé. Conservez cet UUID et consultez-le avant de réessayer.",
+      "parentRequired": "Consultez le plan d’installation préparé avant de préparer les artefacts de charts.",
+      "loading": "Chargement des artefacts de charts enregistrés…",
+      "unavailable": "Le résultat enregistré ne correspond pas à la source actuelle. Consultez-le à nouveau.",
+      "unloaded": "Consultez un UUID d’artefact existant ou préparez-en un nouveau.",
+      "artifactDigest": "SHA-256 de l’artefact",
+      "chartCount": "Nombre de charts",
+      "archiveBytes": "Octets des archives",
+      "expandedBytes": "Octets décompressés",
+      "newId": "Nouvel UUID d’artefact"
     }
   }
 }

@@ -18148,6 +18148,37 @@
       "unloaded": "准备提案或输入计划 UUID 以审查保存的结果。",
       "unavailable": "计划不可用或属于其他来源。请审查当前来源和保存的标识。",
       "pageFailed": "无法读取此计划页面。请审查保存的计划并重试此页面。"
+    },
+    "installCharts": {
+      "title": "计划 Chart 制品",
+      "help": "固定此已审核计划的 Chart，并查看已保存的结果。",
+      "verificationRequired": "继续执行前，仍须完成原生渲染、镜像检查和运行中资源验证。",
+      "planId": "计划 UUID",
+      "planVersion": "计划版本",
+      "planDigest": "计划 SHA-256",
+      "artifactId": "制品 UUID",
+      "archiveLimit": "归档字节上限",
+      "expandedLimit": "解压后字节上限",
+      "timeout": "超时时间（秒）",
+      "allowHttp": "允许 HTTP Chart 仓库",
+      "originalOnly": "此制品 UUID 只能重新提交原始 Chart 设置。",
+      "budgetHelp": "请输入十进制字节上限和 1–3600 秒的超时时间。仅为此计划中已审核的仓库启用 HTTP，并保留设置副本以便恢复。",
+      "invalidInput": "请检查制品 UUID、正十进制字节上限和 1–3600 秒的超时时间。",
+      "prepare": "准备 Chart 制品",
+      "review": "查看 Chart 制品",
+      "retry": "重试已保留的 Chart 准备",
+      "choose": "选择其他制品 UUID",
+      "failed": "无法确认准备或查看结果。请刷新来源并查看已保存的制品。",
+      "unconfirmed": "结果尚未确认。请保留此制品 UUID，并在重试前查看。",
+      "parentRequired": "请先查看已准备的安装计划，再准备 Chart 制品。",
+      "loading": "正在加载已保存的 Chart 制品…",
+      "unavailable": "已保存的结果与当前来源不匹配。请重新查看。",
+      "unloaded": "查看现有制品 UUID，或准备新制品。",
+      "artifactDigest": "制品 SHA-256",
+      "chartCount": "Chart 数量",
+      "archiveBytes": "归档字节数",
+      "expandedBytes": "解压后字节数",
+      "newId": "新制品 UUID"
     }
   }
 }
