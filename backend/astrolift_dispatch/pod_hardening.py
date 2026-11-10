@@ -99,7 +99,7 @@ class AgentRuntimeClassError(RuntimeError):
     pass
 
 
-def validate_agent_runtime(runtime_class: str) -> None:
+def validate_agent_runtime(runtime_class: str | None) -> None:
     if runtime_class == "confidential-sandbox":
         raise AgentRuntimeClassError(
             "Confidential agent tasks require final admitted per-run policy generation and attested "

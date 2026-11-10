@@ -1,6 +1,7 @@
 """Read-only Nitro evidence and explicit, version-bound per-cluster task opt-in."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING, NewType
 
 import strawberry
 from django.db import transaction
@@ -12,11 +13,17 @@ from astrolift_clusters import nitro
 from astrolift_clusters.models import TenantCluster
 from astrolift_clusters.schema.mutations import _require_operator_for_shared
 from astrolift_clusters.scopes import cluster_org_scope
-from astrolift_graphql import GUID, MutationResultType, failure, success
+from astrolift_graphql import MutationResultType, failure, success
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+if TYPE_CHECKING:
+    GUID = NewType("GUID", str)
+else:
+    from astrolift_graphql import GUID
 
 
 @strawberry.type
@@ -52,6 +59,13 @@ class ConfigureNitroTasksInput:
     expected_version: int
     expected_source: str
     task_modes: list[str]
+
+
+def rejection(
+    code: str, message: str, *, field: str | None = None
+) -> MutationResultType[AstroliftNitroTaskReadiness]:
+    result = failure(code, message, field=field)
+    return MutationResultType(ok=False, errors=result.errors, data=None)
 
 
 def visible_cluster(info, cluster_id, *, lock=False):
@@ -100,7 +114,7 @@ class NitroTasksQuery:
     ) -> MutationResultType[AstroliftNitroTaskReadiness]:
         cluster = visible_cluster(info, cluster_id)
         if cluster is None:
-            return failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+            return rejection(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         return success(readiness_type(nitro.review(cluster)))
 
 
@@ -117,23 +131,25 @@ class NitroTasksMutation:
     ) -> MutationResultType[AstroliftNitroTaskReadiness]:
         cluster = visible_cluster(info, input.cluster_id)
         if cluster is None:
-            return failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+            return rejection(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
         if cluster.version != input.expected_version:
-            return failure(ErrorCode.VERSION_MISMATCH.value, "Cluster changed; review Nitro readiness again.")
+            return rejection(
+                ErrorCode.VERSION_MISMATCH.value, "Cluster changed; review Nitro readiness again."
+            )
         if len(set(input.task_modes)) != len(input.task_modes) or set(input.task_modes) - nitro.MODES:
-            return failure(
+            return rejection(
                 ErrorCode.VALIDATION.value,
                 "Task modes must be unique isolated/confidential selections.",
                 field="taskModes",
             )
         report = nitro.review(cluster)
         if report["source_token"] != input.expected_source:
-            return failure(
+            return rejection(
                 ErrorCode.PRECONDITION.value, "Nitro configuration changed; refresh readiness before saving."
             )
         added = set(input.task_modes) - set(nitro.task_modes(cluster))
         if any(report["modes"].get(mode, {}).get("state") != "ready" for mode in added):
-            return failure(
+            return rejection(
                 ErrorCode.PRECONDITION.value,
                 "The selected Nitro task prerequisites are not ready. No infrastructure was changed.",
                 field="taskModes",
@@ -141,7 +157,7 @@ class NitroTasksMutation:
         with transaction.atomic():
             current = visible_cluster(info, input.cluster_id, lock=True)
             if current is None or current.version != input.expected_version:
-                return failure(
+                return rejection(
                     ErrorCode.VERSION_MISMATCH.value, "Cluster changed; review Nitro readiness again."
                 )
             from astrolift_services.cluster_retirement import recheck_cluster_authority

@@ -1034,7 +1034,7 @@ def _render_agent_job(
     command = list(primary_container.command or []) if primary_container else []
     args = list(primary_container.args or []) if primary_container else []
 
-    job = {
+    job: dict = {
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": {
