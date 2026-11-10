@@ -42,7 +42,7 @@ User = get_user_model()
 @pytest.fixture(autouse=True)
 def _no_external_side_effects(monkeypatch):
     """``Profile.anonymize_user`` indirectly triggers profile-save
-    signals that try to talk to OpenSearch / Auth0 / RocketChat in
+    signals that try to talk to OpenSearch / Auth0 in
     full-stack runs. Stub them out so the test container doesn't have
     to host those side-services."""
     # Auth0 register hook on User post_save.

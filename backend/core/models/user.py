@@ -462,7 +462,6 @@ class ProfileManager(models.Manager.from_queryset(ProfileQuerySet)):
         profile.parent_id = parent_gid
         profile.pk = None
         profile.user_id = None
-        profile.rocket_id = None
         profile.document_option = Profile.DocumentOptions.DRAFTED
         profile.save()
         original = self.filter(gid=parent_gid).get()
@@ -495,7 +494,6 @@ class ProfileManager(models.Manager.from_queryset(ProfileQuerySet)):
         draft.pk = original.pk
         draft.parent_id = None
         draft.user_id = original.user_id
-        draft.rocket_id = original.rocket_id
         draft.document_option = Profile.DocumentOptions.PUBLISHED
         draft.save()
         original = self.filter(gid=parent_gid).get()
@@ -509,7 +507,6 @@ class ProfileManager(models.Manager.from_queryset(ProfileQuerySet)):
         original.parent_id = original.gid
         original.pk = draft.pk
         original.user_id = None
-        original.rocket_id = None
         original.document_option = Profile.DocumentOptions.REJECTED
         original.save()
         original = self.filter(gid=parent_gid).get()
@@ -525,12 +522,9 @@ class ProfileManager(models.Manager.from_queryset(ProfileQuerySet)):
         ):
             update_user = True
         if update_user:
-            from core.utils.api.rocketchat_rest_client import RocketchatRestClient
             user.first_name = profile.first_name
             user.last_name = profile.last_name
             user.save()
-            client = RocketchatRestClient()
-            client.update_user(user)
 
 
 class Profile(RequiresApproveMixin, Tracking):
@@ -592,8 +586,6 @@ class Profile(RequiresApproveMixin, Tracking):
         blank=True,
         related_name='signature_profiles'
     )
-
-    rocket_id = models.CharField(max_length=50, blank=True, null=True, unique=True)
 
     active_organization = models.ForeignKey(
         'organization.Organization',
