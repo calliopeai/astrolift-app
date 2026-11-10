@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a reproducible confidential EKS qualification script with guarded positive/negative runs, private checkpoints, explicit cleanup and safety tests (#2668). A negative-only resume preserves the original image, key and grant; an explicitly hashed observation can replace a naturally removed positive Pod only after an API 404. KMS audit evidence remains required.
+
 - Confidential Pod recovery and cleanup tolerate the two region/zone labels Kubernetes adds during scheduling (#2668). Task labels, all other labels, image, policy and other Pod fields remain bound to the prepared hash.
 
 - Confidential policy generation supplies private ECR credentials through an ephemeral `HOME/.docker/config.json`, the path read by the signed AWS tool (#2668). The generator retains normal image and layer fetching, and the controller's existing home configuration is untouched.

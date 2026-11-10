@@ -318,3 +318,32 @@ baseline after accounting for line shifts. A Docker API health timeout blocked
 the container build, so neither a backend image build nor container `run.sh`
 verification is claimed here. Live EKS key release/refusal and EC2 lifecycle
 qualification are tracked separately in the operator repository.
+
+
+## Reproducing the bounded live qualification
+
+`backend/scripts/qualify_nitro_confidential.py` runs only against the tagged,
+private qualification EKS cluster and configured helper role. Its helper source
+hashes pin checkpoint `374066149`; its own script revision is independent.
+Provide `--config <JSON> --state-directory <private-directory>` and kubeconfig.
+The JSON keys are `region`, `cluster`, `run_id`, `repository`, `key_admin_arn`
+and `runtime_role_arn`; namespace/service account are fixed to
+`qualification/confidential-runner`. Run it as a background job on the owned
+Linux helper, preserving its exit marker and private state/diagnostics.
+
+The positive workload asserts a random secret delivered only inside encrypted
+layers. The negative workload uses the same image/key, a regenerated policy
+with a different PCR17, and the unchanged original key grant. Pod observations
+alone never qualify KMS refusal: correlate the unique key and runtime role with
+authoritative KMS audit events. No image fetch or policy pins are disabled.
+
+`--resume-negative` reuses the existing positive state without creating a new
+positive Pod, image or key. If and only if the Kubernetes API returns 404 for
+the positive Pod, `--positive-snapshot-sha256 <operator-verified-SHA256>` permits
+the fixed private `positive-observation-private.json` snapshot; the same UID,
+task, image, policy, prepared-hash and success guards still apply. A present
+replacement Pod or another API error cannot use this fallback. Preserve the
+original positive source revision and audit provenance. After collecting the
+negative audit evidence, explicit `--cleanup` verifies Pod ownership, removes
+the run image and confirms the key is PendingDeletion. Keep its admin role
+until every tagged test key is retired.
