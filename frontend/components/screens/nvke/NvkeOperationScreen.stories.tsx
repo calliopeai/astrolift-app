@@ -1,3 +1,4 @@
+import { INSTALL_IMAGE_PROPS } from "./NvkeOperatorInstallPlanImagePanel.stories";
 import { INSTALL_VERIFICATION_PROPS } from "./NvkeOperatorInstallPlanVerificationPanel.stories";
 import { INSTALL_CONTEXT_PROPS } from "./NvkeOperatorInstallPlanContextPanel.stories";
 import { INSTALL_TREE_PROPS } from "./NvkeOperatorInstallPlanTreePanel.stories";
@@ -294,3 +295,11 @@ export const InstallPlanVerificationReadOnly: Story = {
 export const InstallPlanVerificationPending: Story = {
   args: { ...InstallPlanVerification.args, pending: true },
 };
+
+export const InstallPlanImage: Story = {
+  args: { ...InstallPlanVerification.args, operatorInstallPlanImage: INSTALL_IMAGE_PROPS },
+};
+export const InstallPlanImageReadOnly: Story = {
+  args: { ...InstallPlanImage.args, canAct: false },
+};
+export const InstallPlanImagePending: Story = { args: { ...InstallPlanImage.args, pending: true } };

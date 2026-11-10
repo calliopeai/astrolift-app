@@ -22,6 +22,7 @@ import { NvkeCredentialPanel } from "./NvkeCredentialPanel";
 import { NvkeCredentialRequestPanel } from "./NvkeCredentialRequestPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { NvkeOperatorInstallPlanContextPanel } from "./NvkeOperatorInstallPlanContextPanel";
+import { NvkeOperatorInstallPlanImagePanel } from "./NvkeOperatorInstallPlanImagePanel";
 import { NvkeOperatorInstallPlanVerificationPanel } from "./NvkeOperatorInstallPlanVerificationPanel";
 import { NvkeOperatorInstallPlanTreePanel } from "./NvkeOperatorInstallPlanTreePanel";
 import { NvkeOperatorInstallPlanChartsPanel } from "./NvkeOperatorInstallPlanChartsPanel";
@@ -56,6 +57,7 @@ export function NvkeOperationScreen({
   operatorInstallPlanTree,
   operatorInstallPlanContext,
   operatorInstallPlanVerification,
+  operatorInstallPlanImage,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
   const [confirm, setConfirm] = useState<"cancel" | "resume" | "download" | null>(null);
@@ -229,6 +231,13 @@ export function NvkeOperationScreen({
           {...operatorInstallPlanVerification}
           canReview={operatorInstallPlanVerification.canReview && canAct && !error}
           pending={pending || operatorInstallPlanVerification.pending}
+        />
+      )}
+      {operatorInstallPlanImage && (
+        <NvkeOperatorInstallPlanImagePanel
+          {...operatorInstallPlanImage}
+          canReview={operatorInstallPlanImage.canReview && canAct && !error}
+          pending={pending || operatorInstallPlanImage.pending}
         />
       )}
       {diagnostics && <NvkeDiagnosticsPanel {...diagnostics} />}

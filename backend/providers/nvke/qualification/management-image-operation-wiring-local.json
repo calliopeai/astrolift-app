@@ -1,0 +1,69 @@
+{
+  "format": 1,
+  "scope": "registry-image-controls-in-operation-screen-and-central-controller",
+  "status": "1385-frontend-regressions-and-composed-browser-states-qualified-production-builds-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "95c1a1c61e8c169b1ea2c496780a41194707ed041fc513d88e183ec507a36805",
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "9da39d9efeb384b304a40d877b7e4adaa8ef8b58943e44aeac5929022e631a2f",
+    "frontend/components/screens/nvke/types.ts": "5cccf24b3e0cbaf948d717acf9a50d7c19d030d59b24852ea3e3936469ccc17e",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-image-stories.test.tsx": "6702abab228759cf07ef6b9e8d7da422ac66ed34c352594812f78ba18538036a",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "90ac29ca2900c78799854d55647e1e8ec0a1c1df90d21202596ef504c3391d74",
+    "frontend/e2e/nvke-install-plan-image-operation-runner.mjs": "dbaeb2b6921df0921e71e8ad3f4b0217458b7f3a63cf5121e794fd4e8d898222"
+  },
+  "checks": {
+    "targeted": {
+      "sessionId": 62926,
+      "logPath": "/tmp/astrolift-nvke-image-operation-wiring-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-operation-wiring-v2.exit",
+      "logSha256": "2112e500a81594ca67d270642e7a04d2d9f01cb1df2fa75a1139822a0dac5a9c",
+      "exitCode": 0,
+      "tests": 106,
+      "skipped": 0,
+      "eslint": "passed",
+      "fullTypeScript": "passed"
+    },
+    "composedBrowser": {
+      "sessionId": 67172,
+      "logPath": "/tmp/astrolift-nvke-image-operation-browser.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-operation-browser.exit",
+      "logSha256": "1946d228ce81ebbaae0dbf1efa1ae52280a3fbdc40733428260818715df8c9bc",
+      "exitCode": 0,
+      "stories": 3,
+      "pageErrors": 0,
+      "states": [
+        "normal",
+        "read-only",
+        "pending"
+      ]
+    },
+    "allNvkeFrontend": {
+      "sessionId": 45122,
+      "logPath": "/tmp/astrolift-nvke-image-full-ui-regressions.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-full-ui-regressions.exit",
+      "logSha256": "f84072f709030fe3db4ff76f5228763674216a20a56a682388733ce0191486db",
+      "exitCode": 0,
+      "tests": 1385,
+      "files": 74,
+      "skipped": 0
+    },
+    "productionBuilds": {
+      "sessionId": 45122,
+      "status": "pending",
+      "nextLogPath": "/tmp/astrolift-nvke-image-next-build.log",
+      "nextExitMarker": "/tmp/astrolift-nvke-image-next-build.exit",
+      "storybookLogPath": "/tmp/astrolift-nvke-image-storybook-build.log",
+      "storybookExitMarker": "/tmp/astrolift-nvke-image-storybook-build.exit",
+      "combinedExitMarker": "/tmp/astrolift-nvke-image-integration-builds.exit"
+    }
+  },
+  "implemented": [
+    "Operation screen renders the reviewed image panel and combines canAct/error/pending guards with its scoped source checks.",
+    "Central controller returns image state and includes image work in cancellation, download and aggregate pending guards.",
+    "Image capture requires the original uncertain installation and current reviewed plan/chart/tree; historical metadata grants no execution authority."
+  ],
+  "limits": [
+    "Real browser -> App/Postgres -> final native agent/registry recovery qualification remains pending.",
+    "Final production builds and complete release gates remain pending.",
+    "Full image/platform/credential closure, use-time proof and linked native admission remain open; no main merge or deployment."
+  ]
+}
