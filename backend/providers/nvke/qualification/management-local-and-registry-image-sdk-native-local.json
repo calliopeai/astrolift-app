@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "scope": "actual-sdk-registry-and-local-image-agent-mtls-recovery",
+  "status": "two-real-sdk-native-cases-qualified",
+  "nativeRevision": "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22",
+  "sourceSha256": {
+    "backend/providers/tests/nvke/test_operator_install_plan_image_mtls.py": "ff33872bc69de2d3af1c0663a68cbe400f0512c0a020ba0346039ac1b7b2ee4f",
+    "backend/providers/tests/nvke/test_operator_install_plan_local_image_mtls.py": "85a7126b6808b45277f285a44f0b9e71e62b89e3c30f857ea350e40f1677eadc",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_local_image_driver.py": "9b80f1c57f099ead2781b9beea121a02673e26d78ca7a184bf457931b7b115cf",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_image_driver.py": "b9616bbe5fe5944033e8a18286234f993bc41cc4e9fd2bf2df89c651d05294c7",
+    "backend/providers/nvke/_operator_install_plan_image.py": "504cb338f5d28679909364dde9c25ca9133beadc218696153dba5170511a222f",
+    "backend/providers/nvke/operator_agent_client.py": "730c819ef2b0e5c142d4bdadbef56a5038dfb4e9b22f6716585093ccf40abab4"
+  },
+  "checks": {
+    "sessionId": 38484,
+    "logPath": "/tmp/astrolift-nvke-local-registry-sdk-native-v3.log",
+    "logSha256": "9c6a1a6bae2c64004fdc0805b847db6fada8b5c95190a03f7e645a2f13c1e0bc",
+    "exitMarker": "/tmp/astrolift-nvke-local-registry-sdk-native-v3.exit",
+    "exitCode": 0,
+    "passed": 2,
+    "skipped": 0,
+    "seconds": 768.99,
+    "lintAndFormat": true
+  },
+  "coverage": [
+    "Both current registry and local SDK paths against the exact committed native source, real mTLS, native plan/chart/tree authority and frozen helpers.",
+    "Local capability works without registry image capability/profile or transport.",
+    "Lost POST reply remains ambiguous and is not automatically replayed.",
+    "Cold historical GET and same-intent explicit prepare recover the original metadata with one work attempt.",
+    "Local rootDigest matches the requested pin; original operation, parents, receipt and guards remain unchanged."
+  ],
+  "initialLauncherFailures": [
+    "First run selected the Helm directory rather than its executable, failing fixture setup with ARTIFACT_TOOL_INVALID.",
+    "Second run resolved an older Ruff without the repository TC selectors. Final run pins /opt/homebrew/bin/ruff 0.15.0 and the owned Helm executable."
+  ],
+  "limits": [
+    "Actual local App/API/Postgres/CLI integration is a separate pending qualification.",
+    "Local UI/browser qualification, workload/platform/credential closure, use-time proof and linked admission remain pending.",
+    "No main merge or deployment."
+  ]
+}
