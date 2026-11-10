@@ -1,13 +1,14 @@
 {
   "format": 1,
   "scope": "reviewed-registry-image-sdk-contracts-and-original-bound-parent-checks",
-  "status": "contracts-and-strict-types-pass-final-runtime-requalification-pending",
+  "status": "sdk-contracts-strict-types-and-committed-runtime-native-recovery-qualified-public-api-and-linux-qualification-pending",
   "sourceSha256": {
     "nvke/_operator_install_plan_image.py": "ea009082ca7b69e9a7ddf5a014170f9ff10e183b26332ba6687009a5e9459ac8",
     "nvke/operator_agent_client.py": "d7a6e4822630176493a0a527238f68e855a619cf56f4766f6605fe80cd748d74",
     "tests/nvke/test_operator_install_plan_image.py": "5781ea68984b0a3e1d6d38a1f2f626fc8b7195043360f3786d07d152a2ad71c1",
     "tests/nvke/test_operator_install_plan.py": "1a9fe4078976adfbf2496093b8aeea3d6b0e7d53494cdaa47740a488ed2e0de4",
-    "tests/nvke/fixtures/nvke_operator_image_driver.py": "b9616bbe5fe5944033e8a18286234f993bc41cc4e9fd2bf2df89c651d05294c7"
+    "tests/nvke/fixtures/nvke_operator_image_driver.py": "b9616bbe5fe5944033e8a18286234f993bc41cc4e9fd2bf2df89c651d05294c7",
+    "tests/nvke/test_operator_install_plan_image_mtls.py": "a9a24717552d4a9fbcb61bac668521f87cf278bb7596e16b046f127ada76605b"
   },
   "checks": {
     "contracts": {
@@ -36,10 +37,22 @@
       "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "scope": "Actual native agent -> authenticated TLS registry, original receipt/plan/chart/tree binding, ambiguous lost POST, no automatic replay, cold GET and same-intent retry, original/parent preservation.",
       "qualification": "Agent runtime changed after this passing run for bundle-checkpoint performance; repeat against the final committed runtime before release."
+    },
+    "pinnedNativeSDK": {
+      "sessionId": 60738,
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 199.32,
+      "sourceRevision": "1c641137f05bdfffae658d2583fc5dd4d8647e84",
+      "logPath": "/tmp/astrolift-nvke-sdk-images-final-native.log",
+      "exitMarker": "/tmp/astrolift-nvke-sdk-images-final-native.exit",
+      "logSha256": "20761d7808a4139c5c28032264231a7432c024a3bec22247a5bc7ca4b51b6c76",
+      "scope": "Every Python/Go runtime source is compared to the committed archive before actual SDK -> mTLS agent -> authenticated TLS registry capture, ambiguous lost POST, cold GET and same-intent retry with unchanged original/parent records."
     }
   },
   "remaining": [
-    "Final source-pinned native SDK qualification after agent performance fixes.",
+    "Repeat the pinned runtime qualification after any further agent/runtime changes, including Linux notification support.",
     "Durable application preparation model, REST/GraphQL/API contracts, operator Storybook/UI, CLI surface and real database/browser recovery.",
     "Local-image handling, exact rendered workload closure, selected-node platforms, credential equivalence, use-time import/availability proof, linked native admission and live deployment."
   ],

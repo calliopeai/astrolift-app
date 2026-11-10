@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "scope": "encrypted-source-bound-image-preparation-service-read-and-explicit-private-retry",
+  "status": "postgres-service-contracts-qualified-public-api-and-ui-pending",
+  "sourceSha256": {
+    "astrolift_clusters/nvke_install_plan_images.py": "c8716dfb7992797f1ee4d4c593472d4bf5174fe9bbf8a38c9762deb54291aaa5",
+    "astrolift_clusters/tests/test_nvke_install_plan_images.py": "9f953d22fd4e6dac0aa13c51b0b3b1a5c92f8d9f1de40e64771b2deafac77494",
+    "astrolift_clusters/models/nvke.py": "119a76b1ef476b4167109b46f02b0edd40aeaa271685f32ad41452c3e56011a2",
+    "providers/nvke/_operator_install_plan_image.py": "ea009082ca7b69e9a7ddf5a014170f9ff10e183b26332ba6687009a5e9459ac8",
+    "providers/nvke/operator_agent_client.py": "d7a6e4822630176493a0a527238f68e855a619cf56f4766f6605fe80cd748d74"
+  },
+  "checks": {
+    "postgresService": {
+      "sessionId": 77648,
+      "exitCode": 0,
+      "passed": 12,
+      "skipped": 0,
+      "seconds": 90.09,
+      "logPath": "/tmp/astrolift-nvke-app-images-service.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-service.exit",
+      "logSha256": "7da00f8881c61a868118b7998923cc5b71aaa80e00fd076a497731bcfab7624f",
+      "scope": "Real Postgres and original-agent TLS identity; image SDK calls use controlled responses for durable intent, lost POST, exact read/retry, changed intent, invalid/private peer evidence, parent drift and encrypted-intent tampering. This does not claim an end-to-end application -> image registry request."
+    }
+  },
+  "nativeSDKQualification": "management-registry-image-sdk-local.json",
+  "modelAndIdentityQualification": "management-image-model-local.json",
+  "remaining": [
+    "REST/GraphQL contracts and authorization/audit, CLI and pure Storybook operator controls in all supported locales.",
+    "Current-runtime physical application/browser registry capture and recovery, plus Linux runtime qualification.",
+    "Local images, actual rendered workload/platform/credential/import/use-time proofs, linked native admission and live deployment."
+  ],
+  "continuationAuthorized": false
+}
