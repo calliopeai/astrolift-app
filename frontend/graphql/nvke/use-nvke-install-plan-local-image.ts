@@ -295,6 +295,9 @@ export const useNvkeInstallPlanLocalImage = (args: {
         treeId: binding.treeId,
         expectedTreeVersion: binding.treeVersion,
         treeDigest: binding.treeDigest,
+        workloadId: null,
+        expectedWorkloadVersion: null,
+        workloadDigest: null,
       };
       const options = {
         fetchPolicy: "no-cache" as const,

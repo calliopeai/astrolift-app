@@ -18295,6 +18295,11 @@
       "blobCount": "검증된 Blob"
     },
     "installImage": {
+      "workloadTitle": "워크로드 레지스트리 이미지",
+      "workloadHelp": "검토된 워크로드 목록에서 봉인된 정책으로 레지스트리 참조를 가져옵니다.",
+      "workloadId": "워크로드 목록 UUID",
+      "workloadVersion": "워크로드 목록 버전",
+      "workloadDigest": "워크로드 다이제스트",
       "maximumBytes": "읽기 바이트 제한",
       "maximumCalls": "읽기 호출 제한",
       "timeoutSeconds": "제한 시간(초)",

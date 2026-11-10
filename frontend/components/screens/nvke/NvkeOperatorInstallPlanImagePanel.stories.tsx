@@ -1,3 +1,4 @@
+import { INSTALL_WORKLOAD_PROPS } from "./NvkeOperatorInstallPlanWorkloadPanel.stories";
 import { NextIntlClientProvider, type AbstractIntlMessages } from "next-intl";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import de from "@/messages/de.json";
@@ -122,3 +123,43 @@ export const Korean: Story = { render: (args) => localized("ko", ko, args) };
 export const Chinese: Story = { render: (args) => localized("zh-Hans", zh, args) };
 
 export const ChooseAnotherArtifact: Story = { args: { onChooseArtifact: async () => {} } };
+
+export const WorkloadBound: Story = {
+  args: {
+    ...INSTALL_IMAGE_PROPS,
+    workload: INSTALL_WORKLOAD_PROPS.artifacts,
+    artifacts: {
+      ...INSTALL_IMAGE_PROPS.artifacts!,
+      workloadId: INSTALL_WORKLOAD_PROPS.artifacts!.id,
+      workloadVersion: INSTALL_WORKLOAD_PROPS.artifacts!.version,
+      workloadDigest: INSTALL_WORKLOAD_PROPS.artifacts!.workloadDigest,
+    },
+  },
+};
+export const WorkloadRequired: Story = {
+  args: { ...INSTALL_IMAGE_PROPS, workload: null, artifacts: null },
+};
+export const WorkloadUnloaded: Story = {
+  args: {
+    ...INSTALL_IMAGE_PROPS,
+    workload: INSTALL_WORKLOAD_PROPS.artifacts,
+    artifacts: null,
+    retainedArtifactId: null,
+  },
+};
+
+export const WorkloadPending: Story = { args: { ...WorkloadBound.args, pending: true } };
+export const WorkloadReadOnly: Story = { args: { ...WorkloadBound.args, canReview: false } };
+export const WorkloadStale: Story = {
+  args: {
+    ...WorkloadBound.args,
+    workload: { ...INSTALL_WORKLOAD_PROPS.artifacts!, treeDigest: "9".repeat(64) },
+  },
+};
+export const WorkloadGerman: Story = { args: WorkloadBound.args, render: German.render };
+export const WorkloadSpanish: Story = { args: WorkloadBound.args, render: Spanish.render };
+export const WorkloadFrench: Story = { args: WorkloadBound.args, render: French.render };
+export const WorkloadPortuguese: Story = { args: WorkloadBound.args, render: Portuguese.render };
+export const WorkloadJapanese: Story = { args: WorkloadBound.args, render: Japanese.render };
+export const WorkloadKorean: Story = { args: WorkloadBound.args, render: Korean.render };
+export const WorkloadChinese: Story = { args: WorkloadBound.args, render: Chinese.render };

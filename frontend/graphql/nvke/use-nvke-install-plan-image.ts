@@ -19,6 +19,10 @@ import type {
   ReviewNvkeInstallPlanImageMutationVariables,
   RetryNvkeInstallPlanImageMutation,
 } from "@/graphql/__generated__/operations";
+import {
+  validateInstallPlanWorkload,
+  type NvkeInstallPlanWorkload,
+} from "@/lib/nvke/operator-install-plan-workload";
 import { installPlanSchema, installPlanMatches } from "@/lib/nvke/operator-install-plan";
 import {
   installPlanImageRequest,
@@ -59,6 +63,7 @@ export const useNvkeInstallPlanImage = (args: {
   context: ReturnType<typeof useNvkeContext>;
   source: NvkeOperatorInstallPlanTreePanelProps | null;
   pending: boolean;
+  workload?: NvkeInstallPlanWorkload | null;
 }): NvkeOperatorInstallPlanImagePanelProps | null => {
   const { context, source } = args;
   const client = useApolloClient(),
@@ -82,7 +87,16 @@ export const useNvkeInstallPlanImage = (args: {
       /* Invalidated tree. */
     }
   }
+  let workload: NvkeInstallPlanWorkload | undefined;
+  if (parent && charts && tree && args.workload) {
+    try {
+      workload = validateInstallPlanWorkload(args.workload, parent, charts, tree, args.workload.id);
+    } catch {
+      /* Source must be reviewed again. */
+    }
+  }
   const ready = !!(
+    (args.workload === undefined || workload) &&
     source?.canReview &&
     !source.loading &&
     !source.error &&
@@ -143,6 +157,13 @@ export const useNvkeInstallPlanImage = (args: {
           treeId: tree.id,
           treeVersion: tree.version,
           treeDigest: tree.treeDigest,
+          ...(workload
+            ? {
+                workloadId: workload.id,
+                workloadVersion: workload.version,
+                workloadDigest: workload.workloadDigest,
+              }
+            : {}),
         })
       : "";
   const binding = useMemo(
@@ -220,6 +241,7 @@ export const useNvkeInstallPlanImage = (args: {
       artifactId === binding.planId ||
       artifactId === binding.chartArtifactId ||
       artifactId === binding.treeId ||
+      artifactId === binding.workloadId ||
       (visible.selection && visible.selection.artifactId !== artifactId)
     )
       return false;
@@ -231,7 +253,13 @@ export const useNvkeInstallPlanImage = (args: {
       if (action === "prepare") {
         const form = installPlanImageFormSchema.parse(values);
         if (form.artifactId !== artifactId) return false;
-        body = installPlanImageRequest(form, parent, charts, tree);
+        body = installPlanImageRequest(
+          form,
+          parent,
+          charts,
+          tree,
+          args.workload === undefined ? undefined : (workload ?? null)
+        );
       }
     } catch {
       return false;
@@ -294,6 +322,9 @@ export const useNvkeInstallPlanImage = (args: {
         treeId: binding.treeId,
         expectedTreeVersion: binding.treeVersion,
         treeDigest: binding.treeDigest,
+        workloadId: binding.workloadId ?? null,
+        expectedWorkloadVersion: binding.workloadVersion ?? null,
+        workloadDigest: binding.workloadDigest ?? null,
       };
       const options = {
         fetchPolicy: "no-cache" as const,
@@ -350,7 +381,8 @@ export const useNvkeInstallPlanImage = (args: {
         charts,
         tree,
         artifactId,
-        action === "prepare" ? body : undefined
+        action === "prepare" ? body : undefined,
+        args.workload === undefined ? undefined : (workload ?? null)
       );
       setState({
         key,
@@ -419,6 +451,7 @@ export const useNvkeInstallPlanImage = (args: {
   };
   if (!source) return null;
   return {
+    workload: args.workload === undefined ? undefined : (workload ?? null),
     scopeKey: key,
     site: source.site,
     operation: source.operation,

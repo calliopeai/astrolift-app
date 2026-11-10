@@ -19,6 +19,10 @@ import {
   type NvkeInstallPlanImage,
   type NvkeInstallPlanImageForm,
 } from "@/lib/nvke/operator-install-plan-image";
+import {
+  validateInstallPlanWorkload,
+  type NvkeInstallPlanWorkload,
+} from "@/lib/nvke/operator-install-plan-workload";
 import { validNvkeGuid } from "@/lib/nvke/recovery";
 import type { NvkeOperatorInstallPlanContextPanelProps } from "./NvkeOperatorInstallPlanContextPanel";
 
@@ -36,6 +40,7 @@ export interface NvkeOperatorInstallPlanImagePanelProps extends Pick<
   | "charts"
   | "tree"
 > {
+  workload?: NvkeInstallPlanWorkload | null;
   artifacts: NvkeInstallPlanImage | null;
   retainedArtifactId: string | null;
   canRetry: boolean;
@@ -68,6 +73,7 @@ export function NvkeOperatorInstallPlanImagePanel(props: NvkeOperatorInstallPlan
         props.plan,
         props.charts,
         props.tree,
+        props.workload,
       ])}
       {...props}
     />
@@ -124,6 +130,10 @@ function ImageControls(props: NvkeOperatorInstallPlanImagePanelProps) {
     try {
       const charts = validateInstallPlanCharts(props.charts, plan, props.charts.id),
         tree = validateInstallPlanTree(props.tree, plan, charts, props.tree.id);
+      if (props.workload !== undefined) {
+        if (!props.workload) throw new Error("WORKLOAD_REQUIRED");
+        validateInstallPlanWorkload(props.workload, plan, charts, tree, props.workload.id);
+      }
       reviewedTree = !!tree;
     } catch {
       /* The tree no longer belongs to this reviewed source. */
@@ -137,7 +147,9 @@ function ImageControls(props: NvkeOperatorInstallPlanImagePanelProps) {
         plan,
         props.charts,
         props.tree,
-        props.artifacts.id
+        props.artifacts.id,
+        undefined,
+        props.workload
       );
     } catch {
       /* A stale observation cannot confirm this source. */
@@ -171,7 +183,7 @@ function ImageControls(props: NvkeOperatorInstallPlanImagePanelProps) {
         throw new Error("INVALID_SOURCE");
       if (action === "prepare") {
         if (!values || values.artifactId !== artifactId) throw new Error("INVALID_INPUT");
-        installPlanImageRequest(values, plan, props.charts, props.tree);
+        installPlanImageRequest(values, plan, props.charts, props.tree, props.workload);
       }
     } catch {
       form.setError("artifactId", { type: "source" });
@@ -210,7 +222,19 @@ function ImageControls(props: NvkeOperatorInstallPlanImagePanelProps) {
 
   const code = (value: string) => <code className="text-xs [overflow-wrap:anywhere]">{value}</code>;
   return (
-    <Section title={t("title")} description={t("help")}>
+    <Section
+      title={t(props.workload !== undefined ? "workloadTitle" : "title")}
+      description={t(props.workload !== undefined ? "workloadHelp" : "help")}
+    >
+      {reviewedTree && props.workload && (
+        <DefinitionList
+          items={[
+            { term: t("workloadId"), description: code(props.workload.id) },
+            { term: t("workloadVersion"), description: props.workload.version },
+            { term: t("workloadDigest"), description: code(props.workload.workloadDigest) },
+          ]}
+        />
+      )}
       <p className="text-warning-fg text-sm">{review("originalUncertain")}</p>
       <p className="text-muted-foreground text-sm">{t("closureRequired")}</p>
       <form

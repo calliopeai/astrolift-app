@@ -18295,6 +18295,11 @@
       "blobCount": "Verified blobs"
     },
     "installImage": {
+      "workloadTitle": "Workload registry image",
+      "workloadHelp": "Acquire a registry reference from the reviewed workload inventory using its sealed policy.",
+      "workloadId": "Workload inventory UUID",
+      "workloadVersion": "Workload inventory version",
+      "workloadDigest": "Workload digest",
       "maximumBytes": "Read byte limit",
       "maximumCalls": "Read call limit",
       "timeoutSeconds": "Timeout in seconds",

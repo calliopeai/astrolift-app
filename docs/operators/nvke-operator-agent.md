@@ -844,3 +844,26 @@ a dropped preparation reply and agent restart. See
 source hashes, checks and retained limitations. Full live NVKE install acceptance,
 operator-managed image discovery, signed image closure and linked continuation
 remain required.
+
+### Workload-bound registry acquisition
+
+After **Review saved inventory**, **Workload registry image** binds acquisition
+to that inventory's UUID, version and digest. Supply a new image artifact UUID,
+reference and sealed policy alias. The native agent admits only a reference
+present in that signed inventory for the reviewed plan/tree, including references
+absent from `images.txt`. This panel maintains a separate recovery selection from
+**Registry image**, which retains graph-only behavior. Reload first requires
+reviewing the same workload inventory; image review and retained private retry
+then keep its exact source.
+
+The typed image API accepts the optional complete `workloadId`,
+`expectedWorkloadVersion` and `workloadDigest` tuple. Preparation's encrypted
+`requestText` must carry matching `workloadId` and `workloadDigest`. Returned
+image metadata identifies that workload and version. The App checks its retained
+prepared record, context sources and digest before acquisition and publication;
+deleted, changed or incomplete sources refuse. Local OCI acquisition remains
+graph-bound and rejects the tuple.
+
+This acquires individual image evidence. It does not establish complete image
+closure, node-platform matching, original pull-credential equivalence, immutable
+workload rewrites/imports or admission to continue the original install.

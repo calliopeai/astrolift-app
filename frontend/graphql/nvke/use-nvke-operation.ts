@@ -288,6 +288,24 @@ export const useNvkeOperation = (
       operatorInstallPlanLocalImage?.pending
     ),
   });
+  const operatorInstallPlanWorkloadImage = useNvkeInstallPlanImage({
+    context,
+    source: operatorInstallPlanTree,
+    workload: operatorInstallPlanWorkload?.artifacts ?? null,
+    pending: Boolean(
+      (mutation?.key === visitKey && mutation.pending) ||
+      operatorJob?.pending ||
+      operatorInstallReview?.pending ||
+      operatorInstallPlan?.pending ||
+      operatorInstallPlanCharts?.pending ||
+      operatorInstallPlanTree?.pending ||
+      operatorInstallPlanContext?.pending ||
+      operatorInstallPlanVerification?.pending ||
+      operatorInstallPlanImage?.pending ||
+      operatorInstallPlanLocalImage?.pending ||
+      operatorInstallPlanWorkload?.pending
+    ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -304,6 +322,7 @@ export const useNvkeOperation = (
       operatorInstallPlanImage?.pending ||
       operatorInstallPlanLocalImage?.pending ||
       operatorInstallPlanWorkload?.pending ||
+      operatorInstallPlanWorkloadImage?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -359,6 +378,7 @@ export const useNvkeOperation = (
     operatorInstallPlanImage,
     operatorInstallPlanLocalImage,
     operatorInstallPlanWorkload,
+    operatorInstallPlanWorkloadImage,
     diagnostics,
     maintenance,
     credentials,
@@ -381,7 +401,8 @@ export const useNvkeOperation = (
         operatorInstallPlanVerification?.pending ||
         operatorInstallPlanImage?.pending ||
         operatorInstallPlanLocalImage?.pending ||
-        operatorInstallPlanWorkload?.pending
+        operatorInstallPlanWorkload?.pending ||
+        operatorInstallPlanWorkloadImage?.pending
       ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
@@ -403,6 +424,7 @@ export const useNvkeOperation = (
         operatorInstallPlanImage?.pending ||
         operatorInstallPlanLocalImage?.pending ||
         operatorInstallPlanWorkload?.pending ||
+        operatorInstallPlanWorkloadImage?.pending ||
         !operation
       )
         return;

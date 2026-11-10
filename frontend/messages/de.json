@@ -18298,6 +18298,11 @@
       "blobCount": "Geprüfte Blobs"
     },
     "installImage": {
+      "workloadTitle": "Registry-Image der Workloads",
+      "workloadHelp": "Eine Registry-Referenz aus dem geprüften Workload-Inventar mit seiner versiegelten Richtlinie abrufen.",
+      "workloadId": "UUID des Workload-Inventars",
+      "workloadVersion": "Version des Workload-Inventars",
+      "workloadDigest": "Workload-Prüfsumme",
       "maximumBytes": "Lesebyte-Limit",
       "maximumCalls": "Limit der Leseaufrufe",
       "timeoutSeconds": "Zeitlimit in Sekunden",

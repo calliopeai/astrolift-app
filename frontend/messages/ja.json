@@ -18295,6 +18295,11 @@
       "blobCount": "検証済みBlob"
     },
     "installImage": {
+      "workloadTitle": "ワークロードのレジストリイメージ",
+      "workloadHelp": "確認済みのワークロード一覧から、封印されたポリシーでレジストリ参照を取得します。",
+      "workloadId": "ワークロード一覧の UUID",
+      "workloadVersion": "ワークロード一覧のバージョン",
+      "workloadDigest": "ワークロードのダイジェスト",
       "maximumBytes": "読み取りバイト数の上限",
       "maximumCalls": "読み取り呼び出しの上限",
       "timeoutSeconds": "タイムアウト（秒）",

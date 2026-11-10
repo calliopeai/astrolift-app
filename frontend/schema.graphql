@@ -11982,6 +11982,9 @@ input NvkeOperatorInstallPlanImageReviewInput {
   treeId: GUID!
   expectedTreeVersion: Int!
   treeDigest: String!
+  workloadId: GUID = null
+  expectedWorkloadVersion: Int = null
+  workloadDigest: String = null
   artifactId: GUID!
 }
 
@@ -12014,6 +12017,9 @@ type NvkeOperatorInstallPlanImageType {
   observedAt: String!
   executionState: String!
   continuationAuthorized: Boolean!
+  workloadId: GUID
+  workloadVersion: Int
+  workloadDigest: String
 }
 
 type NvkeOperatorInstallPlanImageTypeMutationResult {
@@ -12838,6 +12844,9 @@ input PrepareNvkeOperatorInstallPlanImageInput {
   treeId: GUID!
   expectedTreeVersion: Int!
   treeDigest: String!
+  workloadId: GUID = null
+  expectedWorkloadVersion: Int = null
+  workloadDigest: String = null
   requestText: String!
 }
 

@@ -164,6 +164,9 @@ it("durably binds every image option before sending and avoids cache/diagnostic 
     treeId: tree.id,
     expectedTreeVersion: tree.version,
     treeDigest: tree.treeDigest,
+    workloadId: null,
+    expectedWorkloadVersion: null,
+    workloadDigest: null,
     requestText: body,
   });
   expect(h.calls[0].request.getContext()).toMatchObject({

@@ -18298,6 +18298,11 @@
       "blobCount": "Blobs verificados"
     },
     "installImage": {
+      "workloadTitle": "Imagen de registro de la carga",
+      "workloadHelp": "Obtenga una referencia del registro a partir del inventario revisado con su política sellada.",
+      "workloadId": "UUID del inventario de cargas",
+      "workloadVersion": "Versión del inventario de cargas",
+      "workloadDigest": "Resumen de la carga",
       "maximumBytes": "Límite de bytes leídos",
       "maximumCalls": "Límite de llamadas de lectura",
       "timeoutSeconds": "Tiempo límite en segundos",

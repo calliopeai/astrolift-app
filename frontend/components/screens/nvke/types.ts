@@ -184,6 +184,9 @@ export interface NvkeOperationScreenProps {
   operatorInstallPlanLocalImage?:
     | import("./NvkeOperatorInstallPlanLocalImagePanel").NvkeOperatorInstallPlanLocalImagePanelProps
     | null;
+  operatorInstallPlanWorkloadImage?:
+    | import("./NvkeOperatorInstallPlanImagePanel").NvkeOperatorInstallPlanImagePanelProps
+    | null;
   operatorInstallPlanImage?:
     | import("./NvkeOperatorInstallPlanImagePanel").NvkeOperatorInstallPlanImagePanelProps
     | null;

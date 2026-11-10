@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bind NVKE registry image acquisition and recovery to an explicitly reviewed workload inventory across the App API and browser controls. Validate the retained UUID/version/digest before acquisition and publication, retain it in image metadata and recovery journals, and refuse graph-only downgrades. Local image mode remains graph-bound (#2669).
+
 - Add source-bound NVKE workload inventory controls in all eight browser locales, with private context bindings, bounded collection and explicit saved-artifact recovery. Compiled CLI and Chromium qualification cover the real API, Postgres and authenticated native agent across lost replies and cold restart. Signed image closure and linked install continuation remain pending (#2669).
 
 - Add lossless NVKE JSON text admission/results for browser native editors, with the reviewed actor bound at admission and original UUID receipt lookup scoped to that actor and organization. Sensitive text inputs use schema-position audit redaction; structured API clients remain compatible (#2659, #2662).

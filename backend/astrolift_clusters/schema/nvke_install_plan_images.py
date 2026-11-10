@@ -21,6 +21,9 @@ class NvkeOperatorInstallPlanImageSourceInput(NvkeOperatorInstallPlanTreeSourceI
     tree_id: GUID
     expected_tree_version: int
     tree_digest: str
+    workload_id: GUID | None = None
+    expected_workload_version: int | None = None
+    workload_digest: str | None = None
 
 
 @strawberry.input
@@ -63,6 +66,9 @@ class NvkeOperatorInstallPlanImageType:
     observed_at: str
     execution_state: str
     continuation_authorized: bool
+    workload_id: GUID | None
+    workload_version: int | None
+    workload_digest: str | None
 
 
 def image_type(data):

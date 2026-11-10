@@ -60,6 +60,7 @@ export function NvkeOperationScreen({
   operatorInstallPlanContext,
   operatorInstallPlanVerification,
   operatorInstallPlanImage,
+  operatorInstallPlanWorkloadImage,
   operatorInstallPlanWorkload,
   operatorInstallPlanLocalImage,
 }: NvkeOperationScreenProps) {
@@ -242,6 +243,13 @@ export function NvkeOperationScreen({
           {...operatorInstallPlanWorkload}
           canReview={operatorInstallPlanWorkload.canReview && canAct && !error}
           pending={pending || operatorInstallPlanWorkload.pending}
+        />
+      )}
+      {operatorInstallPlanWorkloadImage && (
+        <NvkeOperatorInstallPlanImagePanel
+          {...operatorInstallPlanWorkloadImage}
+          canReview={operatorInstallPlanWorkloadImage.canReview && canAct && !error}
+          pending={pending || operatorInstallPlanWorkloadImage.pending}
         />
       )}
       {operatorInstallPlanImage && (

@@ -33,12 +33,22 @@ const sourceShape = {
   treeId: guid,
   treeVersion: version,
   treeDigest: digest,
+  workloadId: guid.optional(),
+  workloadVersion: version.optional(),
+  workloadDigest: digest.optional(),
 };
 const sourceSchema = z
   .object(sourceShape)
   .strict()
   .refine(
     (row) => new Set([row.operationId, row.planId, row.chartArtifactId, row.treeId]).size === 4
+  )
+  .refine((row) =>
+    row.workloadId === undefined
+      ? row.workloadVersion === undefined && row.workloadDigest === undefined
+      : row.workloadVersion !== undefined &&
+        row.workloadDigest !== undefined &&
+        ![row.operationId, row.planId, row.chartArtifactId, row.treeId].includes(row.workloadId)
   );
 const selectionSchema = z.object({ artifactId: guid }).strict();
 const selectorSchema = selectionSchema.extend({ format: z.literal(1) }).strict();
@@ -55,6 +65,9 @@ export type NvkeInstallPlanImageJournalSource = NvkeInstallPlanTreeJournalSource
   treeId: string;
   treeVersion: number;
   treeDigest: string;
+  workloadId?: string;
+  workloadVersion?: number;
+  workloadDigest?: string;
 };
 export type NvkeInstallPlanImageChoice = z.infer<typeof selectionSchema>;
 export type NvkeInstallPlanImageJournal = z.infer<typeof schema>;
@@ -68,6 +81,7 @@ export const installPlanImageRecoveryKey = (source: NvkeInstallPlanImageJournalS
     source.planId,
     source.chartArtifactId,
     source.treeId,
+    ...(source.workloadId ? [source.workloadId] : []),
   ]);
 const intentKey = (source: NvkeInstallPlanImageJournalSource, artifactId: string) =>
   installPlanImageRecoveryKey(source) + ":intent:" + artifactId;
@@ -90,7 +104,8 @@ function choice(source: NvkeInstallPlanImageJournalSource, value: unknown) {
       source.planId,
       source.chartArtifactId,
       source.treeId,
-    ]).size !== 5
+      ...(source.workloadId ? [source.workloadId] : []),
+    ]).size !== (source.workloadId ? 6 : 5)
   )
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   return selected;
@@ -135,6 +150,12 @@ export function readInstallPlanImageJournal(
     if (raw === null) return null;
     if (raw.length > 16384) throw new NvkeRecoveryError("INVALID_RECOVERY");
     const result = schema.parse(JSON.parse(raw));
+    if (
+      Object.keys(sourceShape).some(
+        (key) => result[key as keyof typeof result] !== expected[key as keyof typeof expected]
+      )
+    )
+      throw new NvkeRecoveryError("RECOVERY_MISMATCH");
     if (
       Object.entries({ ...expected, ...selected }).some(
         ([key, value]) => result[key as keyof NvkeInstallPlanImageJournal] !== value

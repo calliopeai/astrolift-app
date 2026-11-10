@@ -5,6 +5,10 @@ import {
   type NvkeInstallPlanCharts,
 } from "./operator-install-plan-charts";
 import { validateInstallPlanTree, type NvkeInstallPlanTree } from "./operator-install-plan-tree";
+import {
+  validateInstallPlanWorkload,
+  type NvkeInstallPlanWorkload,
+} from "./operator-install-plan-workload";
 import { validNvkeGuid } from "./recovery";
 
 const guid = z.string().refine(validNvkeGuid);
@@ -65,6 +69,9 @@ export const installPlanImageMetadataSchema = z
     siteVersion: version,
     authorityId: guid,
     authorityVersion: version,
+    workloadId: guid.nullable().optional(),
+    workloadVersion: version.nullable().optional(),
+    workloadDigest: digest.nullable().optional(),
     artifactDigest: digest,
     sourceDigest: digest,
     captureDigest: digest,
@@ -109,13 +116,16 @@ export function installPlanImageRequest(
   values: unknown,
   parent: NvkeInstallPlan,
   publication: NvkeInstallPlanCharts,
-  execution: NvkeInstallPlanTree
+  execution: NvkeInstallPlanTree,
+  workload?: NvkeInstallPlanWorkload | null
 ) {
   const form = installPlanImageFormSchema.parse(values);
   const { plan, charts, tree } = installPlanImageSource(parent, publication, execution);
   if (new Set([form.artifactId, tree.id, charts.id, plan.id, plan.operationId]).size !== 5)
     throw new Error("INVALID_IMAGE_IDENTITY");
+  const selected = imageWorkloadSource(workload, plan, charts, tree, form.artifactId);
   return {
+    ...(selected ? { workloadId: selected.id, workloadDigest: selected.workloadDigest } : {}),
     format: 1 as const,
     artifactId: form.artifactId,
     planId: plan.id,
@@ -136,10 +146,11 @@ export function validateInstallPlanImage(
   publication: NvkeInstallPlanCharts,
   execution: NvkeInstallPlanTree,
   artifactId: string,
-  limits?: Pick<NvkeInstallPlanImageForm, "maximumBytes">
+  limits?: Pick<NvkeInstallPlanImageForm, "maximumBytes">,
+  workload?: NvkeInstallPlanWorkload | null
 ) {
   const row = installPlanImageSchema.parse(value);
-  validateInstallPlanImageSource(row, parent, publication, execution, artifactId);
+  validateInstallPlanImageSource(row, parent, publication, execution, artifactId, workload);
   if (limits && BigInt(row.bytes) > BigInt(bytes.parse(limits.maximumBytes)))
     throw new Error("IMAGE_BUDGET_EXCEEDED");
   return row;
@@ -150,10 +161,15 @@ export function validateInstallPlanImageSource(
   parent: NvkeInstallPlan,
   publication: NvkeInstallPlanCharts,
   execution: NvkeInstallPlanTree,
-  artifactId: string
+  artifactId: string,
+  workload?: NvkeInstallPlanWorkload | null
 ) {
   const { plan, charts, tree } = installPlanImageSource(parent, publication, execution);
+  const selected = imageWorkloadSource(workload, plan, charts, tree, artifactId);
   if (
+    (row.workloadId ?? undefined) !== selected?.id ||
+    (row.workloadVersion ?? undefined) !== selected?.version ||
+    (row.workloadDigest ?? undefined) !== selected?.workloadDigest ||
     row.id !== artifactId ||
     row.planId !== plan.id ||
     row.planVersion !== plan.version ||
@@ -172,4 +188,16 @@ export function validateInstallPlanImageSource(
     row.authorityVersion !== plan.authorityVersion
   )
     throw new Error("IMAGE_SOURCE_CHANGED");
+}
+
+function imageWorkloadSource(
+  workload: NvkeInstallPlanWorkload | null | undefined,
+  plan: NvkeInstallPlan,
+  charts: NvkeInstallPlanCharts,
+  tree: NvkeInstallPlanTree,
+  artifactId: string
+) {
+  if (workload === undefined) return undefined;
+  if (!workload || workload.id === artifactId) throw new Error("INVALID_WORKLOAD_SOURCE");
+  return validateInstallPlanWorkload(workload, plan, charts, tree, workload.id);
 }

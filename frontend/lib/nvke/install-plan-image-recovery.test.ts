@@ -137,3 +137,48 @@ it("detects silent writes, corrupt records and private extra fields", () => {
   );
   expect(() => readSelectedInstallPlanImage(s, source)).toThrow();
 });
+
+const linkedSource = {
+  ...source,
+  workloadId: "c098fc8d-3f48-45fd-b9b0-7d670261e9ef",
+  workloadVersion: 2,
+  workloadDigest: "4".repeat(64),
+};
+it("keeps graph and workload image recovery selections separate", () => {
+  const s = storage();
+  saveInstallPlanImageJournal(s, linkedSource, chosen, "e".repeat(64));
+  expect(readSelectedInstallPlanImage(s, source)).toBeNull();
+  expect(readSelectedInstallPlanImage(s, linkedSource)).toEqual(chosen);
+  expect(() =>
+    readInstallPlanImageJournal(s, { ...linkedSource, workloadVersion: 3 }, chosen)
+  ).toThrow();
+  expect(() =>
+    readInstallPlanImageJournal(s, { ...linkedSource, workloadDigest: "9".repeat(64) }, chosen)
+  ).toThrow();
+});
+it.each([
+  { workloadId: undefined },
+  { workloadVersion: undefined },
+  { workloadDigest: undefined },
+  { workloadId: source.treeId },
+])("refuses incomplete or aliasing workload journal source %#", (change) => {
+  expect(() =>
+    saveInstallPlanImageJournal(storage(), { ...linkedSource, ...change }, chosen, "e".repeat(64))
+  ).toThrow();
+});
+it("rejects workload fields injected into a graph-only journal", () => {
+  const s = storage();
+  saveInstallPlanImageJournal(s, source, chosen, "e".repeat(64));
+  for (const [key, value] of s.items)
+    if (key.includes(":intent:"))
+      s.items.set(
+        key,
+        JSON.stringify({
+          ...JSON.parse(value),
+          workloadId: linkedSource.workloadId,
+          workloadVersion: 2,
+          workloadDigest: linkedSource.workloadDigest,
+        })
+      );
+  expect(() => readInstallPlanImageJournal(s, source, chosen)).toThrow();
+});

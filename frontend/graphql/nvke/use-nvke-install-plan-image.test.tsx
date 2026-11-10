@@ -1,3 +1,4 @@
+import { INSTALL_WORKLOAD_PROPS } from "@/components/screens/nvke/NvkeOperatorInstallPlanWorkloadPanel.stories";
 import {
   ApolloClient,
   ApolloLink,
@@ -165,6 +166,9 @@ it("durably binds every image option before sending and avoids cache/diagnostic 
     treeId: tree.id,
     expectedTreeVersion: tree.version,
     treeDigest: tree.treeDigest,
+    workloadId: null,
+    expectedWorkloadVersion: null,
+    workloadDigest: null,
     requestText: body,
   });
   expect(h.calls[0].request.getContext()).toMatchObject({
@@ -523,3 +527,62 @@ it.each([false, true])(
     expect(r.result.current?.artifacts).toBeNull();
   }
 );
+
+it("retains the workload source through a lost reply, reload and explicit read", async () => {
+  const h = harness(),
+    workload = INSTALL_WORKLOAD_PROPS.artifacts!,
+    a = { ...args(), workload };
+  const linkedArtifact = {
+    ...artifact,
+    workloadId: workload.id,
+    workloadVersion: workload.version,
+    workloadDigest: workload.workloadDigest,
+  };
+  const r = renderHook(() => useNvkeInstallPlanImage(a), { wrapper: h.wrapper });
+  await ready(r);
+  let pending!: Promise<boolean>;
+  act(() => {
+    pending = r.result.current!.onPrepare(values);
+  });
+  await waitFor(() => expect(h.calls).toHaveLength(1));
+  expect(h.calls[0].request.variables.input).toMatchObject({
+    workloadId: workload.id,
+    expectedWorkloadVersion: workload.version,
+    workloadDigest: workload.workloadDigest,
+  });
+  expect(JSON.parse(h.calls[0].request.variables.input.requestText)).toMatchObject({
+    workloadId: workload.id,
+    workloadDigest: workload.workloadDigest,
+  });
+  await act(async () => {
+    h.calls[0].fail();
+    expect(await pending).toBe(false);
+  });
+  r.unmount();
+  const r2 = renderHook(() => useNvkeInstallPlanImage(a), { wrapper: h.wrapper });
+  await ready(r2);
+  expect(h.calls).toHaveLength(1);
+  expect(r2.result.current?.retainedArtifactId).toBe(artifact.id);
+  act(() => {
+    pending = r2.result.current!.onReview(artifact.id);
+  });
+  await waitFor(() => expect(h.calls).toHaveLength(2));
+  expect(h.calls[1].request.variables.input.requestText).toBeUndefined();
+  await act(async () => {
+    reply(h, "ReviewNvkeInstallPlanImage", linkedArtifact);
+    expect(await pending).toBe(true);
+  });
+  expect(r2.result.current?.artifacts?.workloadId).toBe(workload.id);
+  const graph = renderHook(() => useNvkeInstallPlanImage(args()), { wrapper: h.wrapper });
+  await ready(graph);
+  expect(graph.result.current?.retainedArtifactId).toBeNull();
+});
+it("does not acquire without a reviewed workload in workload mode", async () => {
+  const h = harness(),
+    r = renderHook(() => useNvkeInstallPlanImage({ ...args(), workload: null }), {
+      wrapper: h.wrapper,
+    });
+  expect(r.result.current?.canReview).toBe(false);
+  await act(async () => expect(await r.result.current!.onPrepare(values)).toBe(false));
+  expect(h.calls).toHaveLength(0);
+});

@@ -18298,6 +18298,11 @@
       "blobCount": "Blobs vérifiés"
     },
     "installImage": {
+      "workloadTitle": "Image de registre de la charge",
+      "workloadHelp": "Acquérir une référence de registre depuis l’inventaire vérifié avec sa politique scellée.",
+      "workloadId": "UUID de l’inventaire des charges",
+      "workloadVersion": "Version de l’inventaire des charges",
+      "workloadDigest": "Empreinte de la charge",
       "maximumBytes": "Limite d’octets lus",
       "maximumCalls": "Limite d’appels de lecture",
       "timeoutSeconds": "Délai en secondes",

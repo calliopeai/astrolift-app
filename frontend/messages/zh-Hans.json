@@ -18295,6 +18295,11 @@
       "blobCount": "已验证的 Blob"
     },
     "installImage": {
+      "workloadTitle": "工作负载注册表镜像",
+      "workloadHelp": "使用封存的策略，从已审核的工作负载清单获取注册表引用。",
+      "workloadId": "工作负载清单 UUID",
+      "workloadVersion": "工作负载清单版本",
+      "workloadDigest": "工作负载摘要",
       "maximumBytes": "读取字节数上限",
       "maximumCalls": "读取调用次数上限",
       "timeoutSeconds": "超时（秒）",

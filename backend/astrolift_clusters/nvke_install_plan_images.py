@@ -37,6 +37,9 @@ SOURCE_FIELDS = (
     "tree_id",
     "expected_tree_version",
     "tree_digest",
+    "workload_id",
+    "expected_workload_version",
+    "workload_digest",
 )
 
 
@@ -75,7 +78,50 @@ def _source(values):
             raise NvkeError("SOURCE_CHANGED", "The reviewed execution tree changed")
 
     current()
-    return caller, original, selected, parent, publication, tree, binding, current
+    workload_values = [values.get(key) for key in SOURCE_FIELDS[-3:]]
+    if not any(value is not None for value in workload_values):
+        return caller, original, selected, parent, publication, tree, binding, current
+    workload_id, workload_version, workload_digest = workload_values
+    if (
+        workload_id is None
+        or type(workload_version) is not int
+        or workload_version < 1
+        or not isinstance(workload_digest, str)
+        or not protocol.SHA.fullmatch(workload_digest)
+    ):
+        raise NvkeError("INVALID_INPUT", "Review the exact workload inventory UUID, version and digest")
+    from astrolift_clusters import nvke_install_plan_workloads as workloads
+
+    base_binding = binding
+
+    def workload_source():
+        row = workloads._retained(workload_id, tree, base_binding)
+        if (
+            row.version != workload_version
+            or row.status != "prepared"
+            or row.summary.get("workloadDigest") != workload_digest
+        ):
+            raise NvkeError("SOURCE_CHANGED", "The reviewed workload inventory changed")
+        workloads._summary(row.summary, row, parent, publication, tree)
+        return row
+
+    workload = workload_source()
+    binding = {
+        **base_binding,
+        "workload": str(workload.guid),
+        "workload_version": workload.version,
+        "workload_digest": workload_digest,
+        "workload_summary_sha256": hashlib.sha256(outbox.canonical(workload.summary)).hexdigest(),
+    }
+
+    def workload_current():
+        current()
+        row = workload_source()
+        if hashlib.sha256(outbox.canonical(row.summary)).hexdigest() != binding["workload_summary_sha256"]:
+            raise NvkeError("SOURCE_CHANGED", "The reviewed workload inventory summary changed")
+
+    workload_current()
+    return caller, original, selected, parent, publication, tree, binding, workload_current
 
 
 def _retained(artifact_id, tree, binding, *, locked=False):
@@ -100,6 +146,16 @@ def _digest(binding, body):
     ).hexdigest()
 
 
+def _workload_body(body, binding):
+    linked = "workload" in binding
+    if ("workloadId" in body) != linked or ("workloadDigest" in body) != linked:
+        raise NvkeError("INVALID_INPUT", "Image intent must retain its reviewed workload source")
+    if linked and (
+        body["workloadId"] != binding["workload"] or body["workloadDigest"] != binding["workload_digest"]
+    ):
+        raise NvkeError("INVALID_INPUT", "Image intent must match the reviewed workload inventory")
+
+
 def _body(row, parent, publication, tree):
     try:
         body = protocol.request(
@@ -118,6 +174,7 @@ def _body(row, parent, publication, tree):
             or not hmac.compare_digest(_digest(row.source_binding, body), row.request_digest)
         ):
             raise ValueError
+        _workload_body(body, row.source_binding)
         return body
     except Exception:
         raise NvkeError(
@@ -152,6 +209,9 @@ def _public(row, parent, publication, tree, original, selected):
         "site_version": original.site.version,
         "authority_id": str(selected.guid),
         "authority_version": selected.version,
+        "workload_id": row.source_binding.get("workload"),
+        "workload_version": row.source_binding.get("workload_version"),
+        "workload_digest": row.source_binding.get("workload_digest"),
         "metadata": row.summary,
     }
 
@@ -200,6 +260,7 @@ def prepare(*, body, **values):
         raise NvkeError(
             "INVALID_INPUT", "Use a reviewed policy alias and bounded image request for this exact tree"
         ) from None
+    _workload_body(body, binding)
     artifact_id, digest = UUID(body["artifactId"]), _digest(binding, body)
     with transaction.atomic():
         _lock(original, parent, publication, tree)

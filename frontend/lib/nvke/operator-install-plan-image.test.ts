@@ -1,3 +1,4 @@
+import { INSTALL_WORKLOAD_PROPS } from "@/components/screens/nvke/NvkeOperatorInstallPlanWorkloadPanel.stories";
 import { expect, it } from "vitest";
 import { INSTALL_TREE_PROPS } from "@/components/screens/nvke/NvkeOperatorInstallPlanTreePanel.stories";
 import {
@@ -169,5 +170,50 @@ it("keeps registry evidence distinct from local-layout evidence", () => {
   ).toBe("registry");
   expect(() =>
     validateInstallPlanImage({ ...row, sourceKind: "local" }, plan, charts, tree, id)
+  ).toThrow();
+});
+
+const workload = INSTALL_WORKLOAD_PROPS.artifacts!;
+const linkedRow = {
+  ...row,
+  workloadId: workload.id,
+  workloadVersion: workload.version,
+  workloadDigest: workload.workloadDigest,
+};
+it("binds registry acquisition and response to the exact reviewed workload", () => {
+  expect(installPlanImageRequest(form, plan, charts, tree, workload)).toMatchObject({
+    workloadId: workload.id,
+    workloadDigest: workload.workloadDigest,
+  });
+  expect(validateInstallPlanImage(linkedRow, plan, charts, tree, id, form, workload)).toEqual(
+    linkedRow
+  );
+  expect(() => validateInstallPlanImage(linkedRow, plan, charts, tree, id)).toThrow();
+  expect(() => validateInstallPlanImage(row, plan, charts, tree, id, form, workload)).toThrow();
+  expect(() => installPlanImageRequest(form, plan, charts, tree, null)).toThrow();
+  expect(() =>
+    installPlanImageRequest({ ...form, artifactId: workload.id }, plan, charts, tree, workload)
+  ).toThrow();
+});
+it.each([
+  { workloadId: tree.id },
+  { workloadVersion: workload.version + 1 },
+  { workloadDigest: "9".repeat(64) },
+  { workloadId: null },
+  { workloadVersion: null },
+  { workloadDigest: null },
+])("refuses changed or incomplete workload evidence %#", (change) => {
+  expect(() =>
+    validateInstallPlanImage({ ...linkedRow, ...change }, plan, charts, tree, id, form, workload)
+  ).toThrow();
+});
+it.each([
+  { treeDigest: "9".repeat(64) },
+  { version: 0 },
+  { continuationAuthorized: true },
+  { status: "preparing" },
+])("refuses stale workload source %#", (change) => {
+  expect(() =>
+    installPlanImageRequest(form, plan, charts, tree, { ...workload, ...change } as typeof workload)
   ).toThrow();
 });

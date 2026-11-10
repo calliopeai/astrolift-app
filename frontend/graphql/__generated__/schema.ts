@@ -13803,11 +13803,14 @@ export type NvkeOperatorInstallPlanImageReviewInput = {
   expectedPlanVersion: Scalars['Int']['input'];
   expectedSiteVersion: Scalars['Int']['input'];
   expectedTreeVersion: Scalars['Int']['input'];
+  expectedWorkloadVersion: InputMaybe<Scalars['Int']['input']>;
   operationId: Scalars['GUID']['input'];
   planDigest: Scalars['String']['input'];
   planId: Scalars['GUID']['input'];
   treeDigest: Scalars['String']['input'];
   treeId: Scalars['GUID']['input'];
+  workloadDigest: InputMaybe<Scalars['String']['input']>;
+  workloadId: InputMaybe<Scalars['GUID']['input']>;
 };
 
 export type NvkeOperatorInstallPlanImageType = {
@@ -13839,6 +13842,9 @@ export type NvkeOperatorInstallPlanImageType = {
   treeId: Scalars['GUID']['output'];
   treeVersion: Scalars['Int']['output'];
   version: Scalars['Int']['output'];
+  workloadDigest?: Maybe<Scalars['String']['output']>;
+  workloadId?: Maybe<Scalars['GUID']['output']>;
+  workloadVersion?: Maybe<Scalars['Int']['output']>;
 };
 
 export type NvkeOperatorInstallPlanImageTypeMutationResult = {
@@ -14637,12 +14643,15 @@ export type PrepareNvkeOperatorInstallPlanImageInput = {
   expectedPlanVersion: Scalars['Int']['input'];
   expectedSiteVersion: Scalars['Int']['input'];
   expectedTreeVersion: Scalars['Int']['input'];
+  expectedWorkloadVersion: InputMaybe<Scalars['Int']['input']>;
   operationId: Scalars['GUID']['input'];
   planDigest: Scalars['String']['input'];
   planId: Scalars['GUID']['input'];
   requestText: Scalars['String']['input'];
   treeDigest: Scalars['String']['input'];
   treeId: Scalars['GUID']['input'];
+  workloadDigest: InputMaybe<Scalars['String']['input']>;
+  workloadId: InputMaybe<Scalars['GUID']['input']>;
 };
 
 export type PrepareNvkeOperatorInstallPlanInput = {
