@@ -119,6 +119,7 @@ TYPED_METHODS = {
     "read_namespaced_job_status": ("get", "batch", "jobs/status"),
     "list_node": ("list", "", "nodes"),
     "list_storage_class": ("list", "storage.k8s.io", "storageclasses"),
+    "list_runtime_class": ("list", "node.k8s.io", "runtimeclasses"),
     "list_custom_resource_definition": ("list", "apiextensions.k8s.io", "customresourcedefinitions"),
     # Driver methods share these names with the typed client; both mean the same request.
     "create_namespace": ("create", "", "namespaces"),
