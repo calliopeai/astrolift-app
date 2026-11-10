@@ -650,46 +650,123 @@ class OperatorAgentClient:
             read_only=True,
         )
 
-    def _install_plan_context_source(
+    def _install_plan_context_capabilities(self) -> None:
+        identity = self.identity()
+        for name in ("installPlanCharts", "installPlanTree", "installPlanContext"):
+            context_protocol.capability(identity.get(name))
+
+    def _install_plan_context_snapshot(
         self, job_id: str, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
-    ) -> tuple[dict[str, Any], dict[str, Any]]:
-        tree = self.install_plan_tree(
+    ) -> dict[str, Any]:
+        original = self._install_plan_source(job_id, intent)
+        path = "/v1/jobs/" + job_id
+        metadata = self._install_plan_summary(
+            self._request("GET", path + "/install-plan", params={"planId": body["planId"]}, intent=intent),
             job_id,
-            intent=intent,
-            plan_id=body["planId"],
-            plan_digest=body["planDigest"],
-            chart_artifact_id=chart_artifact_id,
-            chart_artifact_digest=chart_artifact_digest,
-            artifact_id=body["treeId"],
+            body["planId"],
+            original,
+        )
+        if metadata["plan"]["planDigest"] != body["planDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The retained plan no longer matches the reviewed digest")
+        chart_body = {
+            "format": 1,
+            "artifactId": chart_artifact_id,
+            "planId": body["planId"],
+            "planDigest": body["planDigest"],
+        }
+        chart = chart_protocol.summary(
+            self._request(
+                "GET",
+                path + "/install-plan-charts",
+                params={k: v for k, v in chart_body.items() if k != "format"},
+                intent=intent,
+            ),
+            body=chart_body,
+            item_count=metadata["itemCount"],
+        )
+        if chart["artifactDigest"] != chart_artifact_digest:
+            raise NvkeError("SOURCE_CHANGED", "The chart publication no longer matches the reviewed digest")
+        tree_body = {
+            **chart_body,
+            "artifactId": body["treeId"],
+            "chartArtifactId": chart_artifact_id,
+            "chartArtifactDigest": chart_artifact_digest,
+        }
+        tree = tree_protocol.summary(
+            self._request(
+                "GET",
+                path + "/install-plan-tree",
+                params={k: v for k, v in tree_body.items() if k != "format"},
+                intent=intent,
+            ),
+            body=tree_body,
+            chart_bytes=chart["bytes"],
+            chart_count=chart["chartCount"],
         )
         if tree["treeDigest"] != body["treeDigest"]:
             raise NvkeError("SOURCE_CHANGED", "The execution tree no longer matches the reviewed digest")
-        selected, after, seen = [], None, set()
+        selected, pages, names, cursors = [], [], set(), set()
+        after, total, previous = None, None, -1
         for _ in range(100):
-            page = self.install_plan_page(
-                job_id,
-                intent=intent,
-                plan_id=body["planId"],
-                plan_digest=body["planDigest"],
+            params = {"planId": body["planId"], "view": "items", "limit": 100, "search": body["item"]}
+            if after is not None:
+                params["after"] = after
+            page = install_plan_protocol.page(
+                self._request("GET", path + "/install-plan", params=params, intent=intent),
+                metadata=metadata,
                 view="items",
                 limit=100,
                 search=body["item"],
-                after=after,
+                initial=after is None,
             )
+            pages.append(page)
+            if total is not None and page["totalCount"] != total:
+                raise ValueError
+            total = page["totalCount"]
             for row in page["items"]:
-                if row["name"] in seen:
-                    raise _invalid_response()
-                seen.add(row["name"])
+                if row["name"] in names or row["ordinal"] <= previous:
+                    raise ValueError
+                names.add(row["name"])
+                previous = row["ordinal"]
                 if row["name"] == body["item"]:
                     selected.append(row)
             after = page["nextCursor"]
             if after is None:
                 break
+            if after in cursors:
+                raise ValueError
+            cursors.add(after)
         else:
-            raise _invalid_response()
+            raise ValueError
+        if len(names) != total:
+            raise ValueError
         if len(selected) != 1 or selected[0]["type"] != "helm":
             raise NvkeError("SOURCE_CHANGED", "The reviewed Helm item is absent from the retained plan")
-        return tree, selected[0]
+        if self._install_plan_source(job_id, intent) != original:
+            raise ValueError
+        self._install_plan_context_capabilities()
+        return {
+            "original": original,
+            "plan": metadata,
+            "chart": chart,
+            "tree": tree,
+            "pages": pages,
+            "item": selected[0],
+        }
+
+    def _install_plan_context_source(
+        self, job_id: str, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        try:
+            first = self._install_plan_context_snapshot(job_id, intent, body, chart_artifact_id, chart_artifact_digest)
+            if (
+                self._install_plan_context_snapshot(job_id, intent, body, chart_artifact_id, chart_artifact_digest)
+                != first
+            ):
+                raise ValueError
+            return first
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
 
     def _install_plan_context(
         self,
@@ -718,7 +795,7 @@ class OperatorAgentClient:
                 "INVALID_INPUT", "Use a reviewed tree, Helm item and bounded render-context request"
             ) from None
         try:
-            context_protocol.capability(self.identity().get("installPlanContext"))
+            self._install_plan_context_capabilities()
         except (KeyError, ValueError, TypeError):
             raise NvkeError(
                 "OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm render-context capture"
@@ -733,13 +810,13 @@ class OperatorAgentClient:
             else self._request("POST", path, body=body, intent=intent)
         )
         try:
-            result = context_protocol.summary(data, body=body, item=source[1])
+            result = context_protocol.summary(data, body=body, item=source["item"])
         except (ContractError, KeyError, ValueError, TypeError, OverflowError):
             raise _invalid_response() from None
         if self._install_plan_context_source(job_id, intent, body, chart_artifact_id, chart_artifact_digest) != source:
             raise _invalid_response()
         try:
-            context_protocol.capability(self.identity().get("installPlanContext"))
+            self._install_plan_context_capabilities()
         except (KeyError, ValueError, TypeError):
             raise _invalid_response() from None
         return result

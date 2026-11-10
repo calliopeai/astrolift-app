@@ -1,0 +1,57 @@
+{
+  "format": 1,
+  "scope": "bounded-complete-render-context-source-snapshots",
+  "status": "unit-and-static-qualified-native-and-paired-acceptance-pending",
+  "sourceSha256": {
+    "nvke/operator_agent_client.py": "00b0c3700c392febfa141b22885f539a2c460554e9028002de1f2ce17a1dfb8b",
+    "tests/nvke/test_operator_install_plan_context_snapshots.py": "5742575abfab8258865dcfa6969a2cf53e88224f7fe419d15b1ef2ab48760187"
+  },
+  "checks": {
+    "sourceRegressions": {
+      "passed": 142,
+      "skipped": 0,
+      "exitCode": 0
+    },
+    "sdkRegressions": {
+      "passed": 328,
+      "skipped": 6,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-render-dag-sdk-regressions.log",
+      "skips": "Existing separately gated native opt-ins; context and verification run separately."
+    },
+    "ruff": {
+      "exitCode": 0
+    },
+    "strictMypy": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-render-dag-mypy-v4.log"
+    },
+    "nativeContext": {
+      "status": "running",
+      "sessionId": 29322,
+      "exitMarker": "/tmp/astrolift-nvke-render-dag-native-context-v2.exit",
+      "launcherCorrection": "Initial source selection did not match old pinned agent; rejected before runtime. Corrected to owned execution worktree without source or timeout changes."
+    },
+    "nativeVerification": {
+      "status": "running",
+      "sessionId": 54292,
+      "exitMarker": "/tmp/astrolift-nvke-render-dag-native-verification.exit"
+    }
+  },
+  "requestComparison": {
+    "before": 123,
+    "after": 39,
+    "scope": "One context preparation with existing complete source fixture; no HTTP, CLI harness or authority timeout increases."
+  },
+  "implemented": [
+    "Replace recursive source getters with direct validated original receipt, plan, chart, tree and complete selected-item page snapshots.",
+    "Require two identical complete snapshots before and after context collection, close original receipt and capabilities, preserve per-request authority callbacks.",
+    "Reject page membership, ordering, totals, cursors and parent drift before publishing a result."
+  ],
+  "remaining": [
+    "Pinned actual context and verification native mTLS results.",
+    "Actual compiled CLI/App acceptance with unchanged 380-second harness timeout and metadata-only timing diagnostics.",
+    "Full NVKE lifecycle, admission, live qualification and release remain open."
+  ],
+  "continuationAuthorized": false
+}
