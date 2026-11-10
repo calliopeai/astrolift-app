@@ -5,11 +5,13 @@ import * as preview from "@/.storybook/preview";
 import * as stories from "./NvkeOperatorInstallPlanVerificationPanel.stories";
 import * as recovery from "./NvkeOperatorInstallPlanVerificationPanel.integration.stories";
 import * as operation from "./NvkeOperationScreen.stories";
+import * as api from "./NvkeOperatorInstallPlanVerificationPanel.api.stories";
 
 setProjectAnnotations(preview);
 it.each([
   ...Object.entries(composeStories(stories)),
   ...Object.entries(composeStories(recovery)),
+  ...Object.entries(composeStories(api)),
   ...Object.entries(composeStories(operation)).filter(([name]) =>
     name.startsWith("InstallPlanVerification")
   ),

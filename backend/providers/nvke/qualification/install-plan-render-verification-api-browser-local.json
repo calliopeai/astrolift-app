@@ -1,0 +1,34 @@
+{
+  "format": 1,
+  "scope": "actual-api-verification-browser-qualification-harness",
+  "status": "portable-stories-and-static-pass-actual-acceptance-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanVerificationPanel.api.stories.tsx": "9cdf810e34c33d01efb711071386f1c6b2f98df060d0d1c370e48f0f3f502813",
+    "frontend/e2e/nvke-install-plan-verification-api-runner.mjs": "f16916ade4d61af24b2b783f9db3f6c237a54679c4b50e1a2c741752ae5dbf03",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-verification-stories.test.tsx": "13ca111e926151c0e07a831b9521aaa40304b0bb4075e75f005e3a41c473b868"
+  },
+  "checks": {
+    "portableStories": {
+      "passed": 29,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-verification-api-browser-stories.log"
+    },
+    "changedSourceLint": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-verification-api-browser-lint.log"
+    },
+    "nodeSyntax": {
+      "exitCode": 0
+    }
+  },
+  "implemented": [
+    "Owned API Storybook fixture wires actual verification hook through HTTP transport with redirects refused and cache disabled.",
+    "Chromium driver forwards only three allowlisted operations to the owned loopback App endpoint, keeping bearer configuration owner-only.",
+    "Requires journal before preparation, lost reply followed by reload with no automatic RPC, explicit historical review/private retry without request text, stable verification/capture hashes and no plaintext input retained in browser storage."
+  ],
+  "remaining": [
+    "Build this Storybook revision and run actual owned App/Postgres/native-agent browser scenario after native context failure diagnosis.",
+    "Full TypeScript, Next production build, live surface qualification and coordinated release remain pending."
+  ],
+  "continuationAuthorized": false
+}
