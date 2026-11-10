@@ -190,19 +190,13 @@ def test_self_analysis_needs_no_role_but_requires_active_account(world):
             PermissionAnalysisQuery().effective_permissions(info(world.user), str(world.user.pk))
 
 
-@pytest.mark.parametrize("action", ["pin", "notification", "rocket"])
+@pytest.mark.parametrize("action", ["pin", "notification"])
 @pytest.mark.parametrize("state", ["anonymous", "inactive", "read-token"])
-def test_own_account_writes_refuse_bad_credentials_before_side_effects(world, action, state, monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        "core.utils.api.rocketchat_rest_client.RocketchatRestClient.create_auth_token",
-        lambda *args: calls.append(True),
-    )
+def test_own_account_writes_refuse_bad_credentials_before_side_effects(world, action, state):
     own = Notification.objects.create(user=world.user, subject="2110", message="before")
     operations = {
         "pin": 'mutation { pinUpdate(pin: "1234") }',
         "notification": f'mutation {{ notificationRead(gid: "{own.pk}") }}',
-        "rocket": "mutation { generateRocketChatToken }",
     }
     actor = world.user
     if state == "anonymous":
@@ -219,7 +213,6 @@ def test_own_account_writes_refuse_bad_credentials_before_side_effects(world, ac
     own.refresh_from_db()
     assert own.status == "UNREAD"
     assert not PinTransaction.objects.exists()
-    assert not calls
 
 
 def test_bearer_never_switches_the_browser_session_even_with_admin(world):

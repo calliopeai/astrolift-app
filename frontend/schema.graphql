@@ -10540,11 +10540,6 @@ type Mutation {
   librarySetIcon(directory: ID!, file: ID!): LibrarySetIconResult!
 
   """
-  Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server.
-  """
-  generateRocketChatToken: String!
-
-  """
   Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property.
   """
   preSignedUrlImageUpload(globalId: ID!, mimetype: String!, uuid: UUID = null, metadata: JSON = null, location: UploadLocation = null, description: String = null, name: String = null, ownerContainerProperty: String = null): PreSignedUrlUploadResult!

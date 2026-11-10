@@ -99,7 +99,6 @@ ALLOWED: dict[str, str] = {
     "Mutation.pinTransaction": "self-service: own active account only, proxy user refused before lookup; generic bearer writes require admin (#2110)",
     "Mutation.notification": "self-service: active caller creates own notification; another recipient requires active operator; updates always refused and generic bearer writes require admin (#2110)",
     "Mutation.notificationRead": "self-service: own notification selected by recipient in the query; active account and admin bearer for legacy writes (#2110)",
-    "Mutation.generateRocketChatToken": "self-service: token for the active caller only, generic bearer writes require admin (#2110)",
     "Mutation.preSignedUrlImageUpload": "self-service: live legacy org and owned/global or GUID-matched legacy target; modern targets additionally need operator, foreign targets refused; admin bearer pinned by GUID and caller-owned retries (#2110)",
     "Mutation.processFile": "self-service: upload in active live legacy org, data process belongs to caller and same org; generic bearer writes require admin and matching GUID (#2110)",
     "Mutation.fileUpload": "self-service: live active legacy org and caller-owned wrapper; existing upload must be live in same org; admin bearer pinned by GUID (#2110)",
