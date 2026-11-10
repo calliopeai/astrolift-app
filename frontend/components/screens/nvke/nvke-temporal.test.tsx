@@ -26,12 +26,13 @@ it("submits replacement credentials once while keeping them out of review and cl
   const p = props();
   render(<NvkeTemporalPanel {...p} />, { wrapper });
   fireEvent.click(screen.getByRole("button", { name: messages.nvke.configure }));
-  fireEvent.click(screen.getByRole("combobox"));
+  const form = within(screen.getByLabelText(messages.nvke.temporalAddress).closest("form")!);
+  fireEvent.click(form.getByRole("combobox"));
   fireEvent.click(await screen.findByRole("option", { name: messages.nvke.replace }));
-  fireEvent.change(screen.getByLabelText(messages.nvke.temporalApiKey), {
+  fireEvent.change(form.getByLabelText(messages.nvke.temporalApiKey), {
     target: { value: "PRIVATE_NATIVE_KEY" },
   });
-  fireEvent.click(screen.getByRole("button", { name: messages.nvke.reviewRequest }));
+  fireEvent.click(form.getByRole("button", { name: messages.nvke.reviewRequest }));
   const review = await screen.findByRole("alertdialog");
   expect(review).not.toHaveTextContent("PRIVATE_NATIVE_KEY");
   fireEvent.click(

@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { expect, it, vi } from "vitest";
 import {
   downloadNvkeOperatorArtifact,
@@ -42,7 +43,7 @@ const contents = (blob: Blob) =>
 it("downloads binary chunks only after continuity, identity and the complete SHA-256 agree", async () => {
   const { bytes, options } = await setup();
   const blob = await downloadNvkeOperatorArtifact(options);
-  expect(await contents(blob)).toEqual(bytes);
+  expect(Buffer.compare(await contents(blob), bytes)).toBe(0);
   expect(options.readChunk.mock.calls).toEqual([
     ["0", 262144],
     ["262144", 5],

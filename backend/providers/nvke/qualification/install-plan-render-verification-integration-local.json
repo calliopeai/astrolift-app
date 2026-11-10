@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "combined-verification-api-client-browser-and-recovery",
-  "status": "sources-combined-integrated-ui-suite-running",
+  "status": "integrated-suite-timeouts-diagnosed-focused-fixes-pass-full-rerun-pending",
   "sourceRevisionBeforeReceipt": "ddad914c974ecc0a14d0b74de00e2e9562c25f12",
   "includes": [
     "Source-bound verification App API and generated contracts",
@@ -12,11 +12,26 @@
   ],
   "checks": {
     "nvkeUi": {
-      "status": "running",
+      "status": "failed",
       "sessionId": 8919,
       "exitMarker": "/tmp/astrolift-nvke-verification-integrated-ui.exit",
       "logPath": "/tmp/astrolift-nvke-verification-integrated-ui.log",
-      "workers": 2
+      "workers": 2,
+      "exitCode": 1,
+      "passed": 1226,
+      "failed": 2,
+      "failure": "Two five-second test timeouts: binary byte-array deep equality and Temporal configuration form queries."
+    },
+    "focusedTimeoutFixes": {
+      "exitCode": 0,
+      "passed": 31,
+      "logPath": "/tmp/astrolift-nvke-verification-integrated-timeout-fixes.log",
+      "lintExitCode": 0,
+      "sourceSha256": {
+        "frontend/lib/nvke/operator-artifact.test.ts": "7f7bfc8fef71a04db259f44c0f5218d21bdcba1e3c87bd76715beec86a178188",
+        "frontend/components/screens/nvke/nvke-temporal.test.tsx": "ea67e00081111dbac85ecb9d2ba62b687ceacf5c7e0f647b4eb7c1bba90f6273"
+      },
+      "scope": "Use native exact byte comparison instead of per-element deep assertion and scope Temporal controls to the form. Keep every request/privacy/cleanup assertion and unchanged five-second timeout."
     }
   },
   "remaining": [
