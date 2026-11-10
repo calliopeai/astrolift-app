@@ -17,6 +17,7 @@ import httpx
 from nvke import _operator_install_plan as install_plan_protocol
 from nvke import _operator_install_plan_charts as chart_protocol
 from nvke import _operator_install_plan_context as context_protocol
+from nvke import _operator_install_plan_image as image_protocol
 from nvke import _operator_install_plan_tree as tree_protocol
 from nvke import _operator_install_plan_verification as verification_protocol
 from nvke._operator_install_review import project as project_install_review
@@ -185,6 +186,7 @@ class OperatorAgentClient:
                     "EXECUTION_TREE_BUSY": "OPERATOR_BUSY",
                     "INSTALL_PLAN_CONTEXT_INCOMPLETE": "OPERATOR_CONTEXT_INCOMPLETE",
                     "INSTALL_PLAN_VERIFICATION_INCOMPLETE": "OPERATOR_VERIFICATION_INCOMPLETE",
+                    "INSTALL_PLAN_IMAGE_INCOMPLETE": "OPERATOR_IMAGE_INCOMPLETE",
                 }.get(peer, "OPERATOR_REQUEST_REFUSED")
                 if isinstance(peer, str)
                 else "OPERATOR_REQUEST_REFUSED"
@@ -648,6 +650,100 @@ class OperatorAgentClient:
                 "chartArtifactDigest": chart_artifact_digest,
             },
             read_only=True,
+        )
+
+    def _install_plan_image_source(
+        self, job_id: str, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        original = self._install_plan_source(job_id, intent)
+        identity = self.identity()
+        for name in ("installPlanCharts", "installPlanTree", "installPlanImage"):
+            image_protocol.capability(identity.get(name))
+        parents = {**body, "chartArtifactId": chart_artifact_id, "chartArtifactDigest": chart_artifact_digest}
+        metadata, publication = self._install_plan_tree_source(job_id, intent, parents)
+        tree = self.install_plan_tree(
+            job_id,
+            intent=intent,
+            plan_id=body["planId"],
+            plan_digest=body["planDigest"],
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            artifact_id=body["treeId"],
+        )
+        if tree["treeDigest"] != body["treeDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The execution tree no longer matches the reviewed digest")
+        return {"original": original, "identity": identity, "metadata": metadata, "charts": publication, "tree": tree}
+
+    def _install_plan_image(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        read_only: bool,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = image_protocol.request(body, job_id=job_id, chart_artifact_id=chart_artifact_id, read_only=read_only)
+            if (
+                not isinstance(intent, str)
+                or not _SHA.fullmatch(intent)
+                or not isinstance(chart_artifact_digest, str)
+                or not _SHA.fullmatch(chart_artifact_digest)
+            ):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError(
+                "INVALID_INPUT", "Use a reviewed tree, registry policy alias and bounded image request"
+            ) from None
+        try:
+            image_protocol.capability(self.identity().get("installPlanImage"))
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError("OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm image acquisition") from None
+        try:
+            source = self._install_plan_image_source(job_id, intent, body, chart_artifact_id, chart_artifact_digest)
+            path = "/v1/jobs/" + job_id + "/install-plan-image"
+            data = (
+                self._request(
+                    "GET", path, params={key: value for key, value in body.items() if key != "format"}, intent=intent
+                )
+                if read_only
+                else self._request("POST", path, body=body, intent=intent)
+            )
+            result = image_protocol.summary(data, body=body)
+            if (
+                self._install_plan_image_source(job_id, intent, body, chart_artifact_id, chart_artifact_digest)
+                != source
+            ):
+                raise ValueError
+            return result
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+
+    def prepare_install_plan_image(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_image(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=False,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+        )
+
+    def install_plan_image(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_image(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=True,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
         )
 
     def _install_plan_context_capabilities(self) -> None:

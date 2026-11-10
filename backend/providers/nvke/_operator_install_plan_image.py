@@ -1,0 +1,80 @@
+"""Closed registry-image acquisition requests and non-authorizing summaries."""
+
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from nvke._operator_install_plan import ITEM_NAME, decimal, integer
+from nvke._operator_install_plan_charts import capability as capability
+from nvke._operator_install_review import SHA, timestamp
+from nvke.operator_contract import identifier
+
+STATE = "requires-workload-platform-credential-phase-use-and-linked-admission"
+BASE = {"format", "artifactId", "planId", "planDigest", "treeId", "treeDigest", "reference", "policy"}
+WRITE_FIELDS = {"maximumBytes", "maximumCalls", "timeoutSeconds"}
+DIGEST = re.compile(r"(?:sha256:[0-9a-f]{64}|sha512:[0-9a-f]{128})\Z")
+
+
+def request(body: Any, *, job_id: str, chart_artifact_id: str, read_only: bool) -> dict[str, Any]:
+    if not isinstance(body, dict) or set(body) != BASE | (set() if read_only else WRITE_FIELDS):
+        raise ValueError
+    integer(body["format"], 1, 1)
+    ids = [
+        identifier(value) for value in (job_id, chart_artifact_id, body["artifactId"], body["planId"], body["treeId"])
+    ]
+    if len(set(ids)) != 5:
+        raise ValueError
+    if any(not isinstance(body[key], str) or not SHA.fullmatch(body[key]) for key in ("planDigest", "treeDigest")):
+        raise ValueError
+    if not isinstance(body["policy"], str) or not ITEM_NAME.fullmatch(body["policy"]):
+        raise ValueError
+    reference = body["reference"]
+    if (
+        not isinstance(reference, str)
+        or not 1 <= len(reference) <= 4096
+        or "://" in reference
+        or any(ord(char) <= 32 or ord(char) >= 127 or char in "?#\\" for char in reference)
+    ):
+        raise ValueError
+    if not read_only:
+        if not 1 <= int(decimal(body["maximumBytes"])) < 2**63:
+            raise ValueError
+        integer(body["maximumCalls"], 1, 4096)
+        integer(body["timeoutSeconds"], 1, 300)
+    return dict(body)
+
+
+def summary(data: Any, *, body: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(data, dict) or set(data) != {
+        "format",
+        "artifactId",
+        "artifactDigest",
+        "sourceDigest",
+        "captureDigest",
+        "observedAt",
+        "rootDigest",
+        "bytes",
+        "blobCount",
+        "executionState",
+        "continuationAuthorized",
+    }:
+        raise ValueError
+    integer(data["format"], 1, 1)
+    integer(data["blobCount"], 1, 100000)
+    size = int(decimal(data["bytes"]))
+    if (
+        not 1 <= size < 2**63
+        or ("maximumBytes" in body and size > int(body["maximumBytes"]))
+        or data["artifactId"] != body["artifactId"]
+        or data["executionState"] != STATE
+        or data["continuationAuthorized"] is not False
+    ):
+        raise ValueError
+    for key in ("artifactDigest", "sourceDigest", "captureDigest"):
+        if not isinstance(data[key], str) or not SHA.fullmatch(data[key]):
+            raise ValueError
+    if not isinstance(data["rootDigest"], str) or not DIGEST.fullmatch(data["rootDigest"]):
+        raise ValueError
+    timestamp(data["observedAt"])
+    return dict(data)
