@@ -9970,8 +9970,6 @@ export type Mutation = {
   finalizeModelConnectionRequest: ModelConnectionRequestMutationResult;
   forceAstroliftRedeploy: AstroliftForceRedeployPayloadMutationResult;
   generateInstallEnrollmentQr: AstroliftEnrollmentQrPayloadMutationResult;
-  /** Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server. */
-  generateRocketChatToken: Scalars['String']['output'];
   generateSshDeployKey: AstroliftSshDeployKeyCreatedMutationResult;
   grantCloudflareDelegation: DnsProviderConnectionTypeMutationResult;
   grantRole: AstroliftRoleBindingMutationResult;
