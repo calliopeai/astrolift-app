@@ -149,6 +149,29 @@ def test_spawn_conflict_refuses_before_any_provider_lookup(monkeypatch):
     assert "operator AGENT_RUNTIME_CLASS" in result.error
 
 
+@override_settings(AGENT_RUNTIME_CLASS="confidential-sandbox")
+@pytest.mark.parametrize("selected", [True, False])
+def test_operator_confidential_runtime_refuses_before_any_credentials_or_provider(monkeypatch, selected):
+    def forbidden(*args, **kwargs):
+        pytest.fail("confidential refusal must precede provider access")
+
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", forbidden)
+    task = _FakeTask(guid="task1", vnc_enabled=False)
+    task.agent_definition = workload(selected=selected)
+    result = K8sJobSpawner(object(), "team").spawn(task)
+    assert not result.ok
+    assert "attested secret delivery" in result.error
+
+
+def test_confidential_preflight_refuses_even_with_policy_before_runtime_lookup(monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("a supplied policy does not establish attested credential delivery")
+
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", forbidden)
+    with pytest.raises(AgentRuntimeClassError, match="attested secret delivery"):
+        preflight_agent_runtime(None, {"runtimeClassName": "confidential-sandbox"})
+
+
 @override_settings(AGENT_RUNTIME_CLASS="")
 def test_missing_runtime_refuses_before_managed_model_provisioning(monkeypatch):
     provider = SimpleNamespace(get_manifest=lambda *args: None)

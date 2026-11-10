@@ -35,6 +35,7 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False, spec=None) -> di
     affinity a manifest workload gets (#2039).
     """
     runtime_class = str(settings.AGENT_RUNTIME_CLASS or "").strip()
+    validate_agent_runtime(runtime_class)
     if runtime_class:
         pod_spec["runtimeClassName"] = runtime_class
     pod_spec["automountServiceAccountToken"] = False
@@ -82,8 +83,17 @@ class AgentRuntimeClassError(RuntimeError):
     pass
 
 
+def validate_agent_runtime(runtime_class: str) -> None:
+    if runtime_class == "confidential-sandbox":
+        raise AgentRuntimeClassError(
+            "Confidential agent tasks require final admitted per-run policy generation and attested "
+            "secret delivery; AGENT_RUNTIME_CLASS alone cannot enable confidential tasks"
+        )
+
+
 def preflight_agent_runtime(cluster, pod_spec: dict) -> None:
     runtime_class = pod_spec.get("runtimeClassName")
+    validate_agent_runtime(runtime_class)
     if not runtime_class:
         return
     from core.cluster_management import _context_for_cluster, _driver_for_cluster

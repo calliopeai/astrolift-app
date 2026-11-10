@@ -79,6 +79,15 @@ Job retains `runtimeClassName: isolated-sandbox` after pod hardening. Recovery
 refuses to adopt an existing Job using a different runtime.
 
 Confidential mode, nonempty custom policies and network-isolated task agents
+remain unsupported. Operator-wide `AGENT_RUNTIME_CLASS=confidential-sandbox`
+also refuses during task selection and shared task/box hardening, including
+imported agents and workloads without a selector. A runtime class alone cannot
+establish final-policy generation or attested secret delivery. The guard
+checkpoint passed 72 serial persistence/dispatch/runtime/render checks against
+dedicated Nitro PostgreSQL and Redis services (exit 0; 420.21 seconds), with
+dependencies installed in a separate Nitro virtual environment.
+
+Confidential mode, nonempty custom policies and network-isolated task agents
 remain rejected at parse and dispatch. Per-run task IDs, Brief/secret/model
 bindings and admission changes require a final-spec policy workflow; static
 precursor policies must not be treated as complete confidential-task support.

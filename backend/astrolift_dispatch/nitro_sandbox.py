@@ -5,10 +5,11 @@ from __future__ import annotations
 from django.conf import settings
 
 from astrolift_agents.services.agent_package import PACKAGE_SCHEMA
-from astrolift_dispatch.pod_hardening import AgentRuntimeClassError
+from astrolift_dispatch.pod_hardening import AgentRuntimeClassError, validate_agent_runtime
 
 
 def selected_task_runtime(workload, environment_spec=None) -> str:
+    validate_agent_runtime(str(settings.AGENT_RUNTIME_CLASS or "").strip())
     app = getattr(workload, "registered_app", None)
     if app is None:
         return ""
