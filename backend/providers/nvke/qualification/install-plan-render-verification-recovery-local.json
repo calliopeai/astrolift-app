@@ -1,0 +1,69 @@
+{
+  "format": 1,
+  "scope": "source-bound-verification-browser-recovery-and-operation-screen-wiring",
+  "status": "focused-checks-pass-broad-ui-timeouts-and-build-native-acceptance-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanVerificationPanel.integration.stories.tsx": "bd8a010df02fd9008085d249e9cef398be14ae152cd32da460897daef04765a4",
+    "frontend/graphql/nvke/use-nvke-install-plan-verification.test.tsx": "35243ea4a1b18509390979ce7f42915d110a4700d681584f44e7328103acd805",
+    "frontend/graphql/nvke/use-nvke-install-plan-verification.ts": "48d56d6d18c4d7c26916e282ce12bf415fc3c5c852f8f43a7652edce004b1ebb",
+    "frontend/lib/nvke/install-plan-verification-recovery.test.ts": "efb6a58dd2c85cffac39a898506372f75744aa38121fc08010803f07551bebf8",
+    "frontend/lib/nvke/install-plan-verification-recovery.ts": "b56be856932347ae6c07720dffa86c86d4eff5cf6dbece3b881e7b119f251729",
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "41191a3b197d2f28ccc2f9e6c319d97e3c6c0d324f75c42296f173fd6bc5c4c8",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "56323cbe2ce678645da1cd213556f974932502de3d7298686ba14880edbc7a80",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-verification-stories.test.tsx": "ee028219b702d18a5398bc9d68a5b65f70eab24202cf50b79fab478a666dd603",
+    "frontend/components/screens/nvke/types.ts": "7cf0580f7647a2c48e5bb17ccbe441cd0d82a498f16e7fe8ce70a16463d0982a",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "e1fb245b4cef9d8240b539096653cd6135c417035258e02a5279dfd109ad6ccb"
+  },
+  "checks": {
+    "focusedStorageAndHook": {
+      "passed": 53,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-verification-recovery-focused.log"
+    },
+    "pureControlledAndScreenStories": {
+      "passed": 28,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-verification-recovery-screen-stories.log"
+    },
+    "finalChangedSourceLint": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-verification-recovery-final-lint.log"
+    },
+    "broadNvkeUi": {
+      "passed": 1221,
+      "failed": 6,
+      "exitCode": 1,
+      "logPath": "/tmp/astrolift-nvke-verification-recovery-all-ui.log",
+      "failure": "Six existing five-second test timeouts in artifact, metrics, Temporal and workflow tests; no semantic assertion failures reported."
+    },
+    "targetedTimeoutDiagnosis": {
+      "passed": 53,
+      "failed": 3,
+      "exitCode": 1,
+      "logPath": "/tmp/astrolift-nvke-verification-recovery-targeted-timeouts.log",
+      "scope": "Two workers removed three timeouts; metrics, Temporal and one workflow timeout remain. Diagnose after concurrent builds complete; no timeout increases."
+    },
+    "fullTypeScript": {
+      "status": "running",
+      "sessionId": 2138,
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-types.exit"
+    },
+    "productionStorybook": {
+      "status": "running",
+      "sessionId": 38082,
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-storybook.exit"
+    }
+  },
+  "implemented": [
+    "Persist exact metadata-only verification intent before requests; recover retained selection after reload without automatic RPC or replay.",
+    "Bind all ancestor versions/digests, context and selected Helm item, tenant, actor and server; refuse stale source, permissions, ABA responses and unjournaled private retry.",
+    "Wire verification hook into the operation screen with pending guards for control and download.",
+    "Storybook pure screen and controlled Apollo loss-before/after-retention scenarios precede route wiring."
+  ],
+  "remaining": [
+    "Resolve broader UI timeout failures and finish full TypeScript and production Storybook checks.",
+    "Run Chromium controlled persistence/reload checks and actual App/agent browser acceptance.",
+    "Production Next build, full surface/live qualification and coordinated release remain open."
+  ],
+  "continuationAuthorized": false
+}
