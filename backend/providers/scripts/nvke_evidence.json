@@ -7,11 +7,11 @@
     },
     "cli": {
       "name": "calliopeai/astrolift-cli",
-      "revision": "f1c1247f77fbb13ac36b5d5e832ff858b408e1ac"
+      "revision": "e7fc0facaef339de04057fc0c7c58f1752e9ac26"
     },
     "opscode": {
       "name": "calliopeai/astrolift-opscode",
-      "revision": "5200851616150efb6d121923f9e5dd2185f23474"
+      "revision": "f98e59a355ff464396d0db4e8e9fc7461c061b20"
     }
   },
   "evidence": {
@@ -62,7 +62,7 @@
       "kind": "test",
       "scope": "Compiled CLI against real Astro API, PostgreSQL, Temporal and Kubernetes; selected scenarios, not every operation or physical node.",
       "symbol": "test_pinned_cli_vocabulary_matches_every_paired_server_action",
-      "sha256": "1a5ec4e6061e6ffdb6fb8e57d8e894d590f3c45631c5eba73470f92fe6f38b17"
+      "sha256": "0e484ecab149ba46825ab9161179255ce42a67206c1d748b7fbfc5690fd79198"
     },
     "crd-admission": {
       "repository": "app",
@@ -183,7 +183,7 @@
       "path": "kubernetes/nvke/tooling.py",
       "kind": "implementation",
       "scope": "Executable allowlist for pinned local bootstrap/utilities/install/check/access; no Astro API/UI installation workflow.",
-      "sha256": "15c6060f42ce225d1d15c2af74ad621ed12ec5e41f232a1646949f6a20f43ed1"
+      "sha256": "19fce025b7a9d79c9e5cebd655ebf893778a5ecd371f420550d71a456390fa9b"
     },
     "nktp-runtime": {
       "repository": "opscode",
@@ -281,7 +281,7 @@
       "kind": "test",
       "symbol": "test_compiled_cli_provider_collection_recovery_history_and_identity_pages",
       "scope": "Compiled CLI through real Astro API/PostgreSQL/Temporal with controlled Kubernetes HTTP responses: lost reply, one collection, READ-only recovery after connection removal, admin-only history, exact values, server paging/search/cursor binding and no extra native reads. No native provider controller/hardware effects.",
-      "sha256": "1a5ec4e6061e6ffdb6fb8e57d8e894d590f3c45631c5eba73470f92fe6f38b17"
+      "sha256": "0e484ecab149ba46825ab9161179255ce42a67206c1d748b7fbfc5690fd79198"
     },
     "native-linux-utilities": {
       "repository": "opscode",
@@ -302,7 +302,7 @@
       "path": "kubernetes/nvke/qualify_bootstrap.py",
       "kind": "implementation",
       "scope": "Read-only source-bound bootstrap qualification: exact successful retained attempt, pinned binary/source, private embedded-TLS kubeconfig, live readyz and complete expected node set/version. No credential or raw native output export.",
-      "sha256": "3dd6e779185ed8484e823e80e7fd1660e391ea3ee1657cea4505b0aa243f8159"
+      "sha256": "503778540c936899e82fd246db2ca5424550048c61421aff5b4d6be161f7d616"
     },
     "native-bootstrap-checker-tests": {
       "repository": "opscode",
@@ -493,14 +493,14 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Dedicated one-site mTLS/leaf-pinned agent, persistent instance/bundle and opaque intent binding, private durable HMAC receipts, read-only recovery, guarded artifacts and owned process-group termination. Astro uses a separate mTLS transport; shared backend processes never launch native tools. Authenticated fsynced admission history precedes dispatch; durable original UUID/intent closure shares the admission lock. Legacy/incomplete history stays conservative.",
-      "sha256": "f3c916ed04fff2fc7210cc27bfff4f0f1bfef617c42d130a22ade4b466e887d6"
+      "sha256": "71bbee6163fde767f8ed95af004b8da3fdcb661c4403a72cf9349a5371186a0c"
     },
     "operator-agent-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_operator_agent.py",
       "kind": "test",
       "scope": "Thirty-eight real TLS/native-utility and filesystem cases cover original receipt recovery, stop/fencing, admission-history integrity, restart/delayed PUT, secret-safe source-bound partial-install review, executor reservation, source drift and close-lock refusal. Effectful install fixtures are synthetic; actual infrastructure evidence is separate.",
-      "sha256": "7e6094df53bf4c8f70c1e29d9a0bf4015839077a038230e68d9827dcf55a1ab5"
+      "sha256": "ccae9564ca2436b95a0d4f709aa294bcd2ccda9683d9df87308008baec431532"
     },
     "operator-agent-local": {
       "repository": "opscode",
@@ -695,7 +695,7 @@
       "repository": "app",
       "path": "frontend/components/screens/nvke/NvkeOperatorJobPanel.tsx",
       "kind": "implementation",
-      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1\u2013256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details. Reviewed original stop/fencing, eligibility/source-change review invalidation and explicit refresh after unconfirmed stop are included."
+      "scope": "Storybook-first explicit original receipt inspection, server-paginated artifact metadata, reviewed private file export with a 1–256 MiB browser limit, native flags/provenance and reviewed observation-only reconciliation in operation details. Reviewed original stop/fencing, eligibility/source-change review invalidation and explicit refresh after unconfirmed stop are included."
     },
     "operator-job-hook": {
       "repository": "app",
@@ -816,7 +816,7 @@
       "path": "kubernetes/nvke/operator_agent.py",
       "kind": "implementation",
       "scope": "Original intent/mTLS/site/instance/bundle and authenticated native-run binding for read-only partial-install review. Executor reservation refuses admissions, source drift is rejected, original uncertainty/guards remain intact; no continuation admitted.",
-      "sha256": "f3c916ed04fff2fc7210cc27bfff4f0f1bfef617c42d130a22ade4b466e887d6"
+      "sha256": "71bbee6163fde767f8ed95af004b8da3fdcb661c4403a72cf9349a5371186a0c"
     },
     "operator-install-review-sdk": {
       "repository": "app",
@@ -947,7 +947,7 @@
       "path": "kubernetes/nvke/management_plan_preparation.py",
       "kind": "implementation",
       "scope": "Authenticated read-only preparation and same-ID recovery over sealed snapshots. Fresh original source, target cluster UID, guarded input copies, explicit reconstruction provenance and source-bound signed item/workload paging. No continuation execution or historical environment identity claim.",
-      "sha256": "2c6dcf63663795bf5e3338a0b29425b17442b217d16fa8ef96e5fb8f33072388"
+      "sha256": "cc874540c50f3c5326409950ce9403fea8929ad60027323321593ee822e747ad"
     },
     "operator-install-plan-sdk": {
       "repository": "app",
@@ -1005,7 +1005,7 @@
       "path": "cmd/nvke_install_plan.go",
       "kind": "implementation",
       "scope": "Reviewed remote prepare/review/retry-preparation/items/workloads commands. Exact private UTF-8 input, fsynced metadata journal before preparation, original source/authority validation and page/action/readiness checks. No install or continuation admission.",
-      "sha256": "4d1bb11e32c0cdd3cfd1e210b396d68d2d87cfdf0d9086992323de80d391ebf8"
+      "sha256": "2dab6207bc623c8f0d49bcdd227eb6344b8768d5dfc41e0820513195b137ca6b"
     },
     "operator-install-plan-cli-api": {
       "repository": "cli",
@@ -1069,14 +1069,14 @@
       "path": "kubernetes/nvke/management_dependencies.py",
       "kind": "implementation",
       "scope": "Private source-bound native file dependency discovery: guarded inputs, source chart trees/archives, values/set-file references and image layouts; pinned parser consumes verified snapshot bytes. Explicit materialization/live-verification state and false continuation authorization.",
-      "sha256": "9e242ad2dba2d52c06e06b5c21068136cf61861e7f3f6b283a3cf0aeb3428b4c"
+      "sha256": "44530fe963b87076c6f83e1376e33a249fa24479e14d53cadfea1af30a2e5bd7"
     },
     "operator-install-plan-dependency-tests": {
       "repository": "opscode",
       "path": "kubernetes/nvke/test_management_dependencies.py",
       "kind": "test",
       "scope": "Twenty-three filesystem/pinned native parser cases cover recursive local dependencies, alias indices, legacy requirements, cycles, removed staging, parser/metadata races, unsafe links and byte budgets. Inventory does not authorize execution.",
-      "sha256": "698e2dbeeb986742c9389a92c5f4745254fc76b2c026d11625a911da59d7fd73"
+      "sha256": "1d17e829565c07c968a6170e2175dc9e2875c83fdf60513e6e74bf37af67eee0"
     },
     "operator-install-plan-dependency-local": {
       "repository": "opscode",
@@ -1109,7 +1109,7 @@
       "path": "kubernetes/nvke/management_plan_chart_service.py",
       "kind": "implementation",
       "scope": "Native lock/executor reservation and source-bound chart preparation/read routes return only public hashes/counts and continuation false. Artifact IDs cannot be admitted or stop-fenced as native jobs. Trusted mTLS caller remains responsible for current application authorization.",
-      "sha256": "beb7bfbd652d0f5848f4478ec6316f86ee05ee5b5d98ae4bbcfee409c5ab975e"
+      "sha256": "557e279a3086952ccf35e39c5c467bd6ae320dd063b34e64065b45d2939a68ce"
     },
     "operator-chart-artifacts-local": {
       "repository": "opscode",
@@ -1144,7 +1144,7 @@
       "path": "internal/api/nvke_install_plan_test.go",
       "kind": "test",
       "scope": "Chart prepare/read/retry join the real HTTP redirect-refusal cases, preserving private request/token boundaries and the shared client timeout. Full local Go tests, formatting, vet, lint and build passed; combined controlled CLI/API/mTLS/Helm 4 execution has separate evidence.",
-      "sha256": "7e7e80db94267d245f2fab423e67b883dbdcf10e6d9ec30ab91407f461035922"
+      "sha256": "7150d1bb55692cb6b4e1c813226556abe6a653b9ea2e72103503cf5fdf913ba1"
     },
     "operator-chart-artifacts-api": {
       "repository": "app",
@@ -1220,6 +1220,85 @@
       "path": "backend/providers/nvke/qualification/install-plan-chart-cli-local.json",
       "kind": "observation",
       "scope": "One controlled compiled CLI/API/agent chart recovery case passes with an explicitly reviewed 300-second connection timeout. Records source/binary identity, full Go lint/vet/tests and earlier deadline failures. Retained Linux and actual browser/API qualification remain open."
+    },
+    "operator-tree-agent-proof": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-execution-tree-agent-local.json",
+      "kind": "observation",
+      "scope": "Signed source-bound tree agent preparation/read and preserved original authority; rendering, image closure and execution remain separate.",
+      "sha256": "a8c7097573f30fb1f38a697401660306a2f11360da6147445edfebeccce829d1"
+    },
+    "operator-render-context-agent-proof": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-render-context-agent-local.json",
+      "kind": "observation",
+      "scope": "Authenticated native context capture and source-bound recovery; not use-time phase or image closure.",
+      "sha256": "e9cc223f27b40bb01e434b8fa46adf3bc38a8c53c18c378df0010398a5a14e41"
+    },
+    "operator-render-verification-agent-proof": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-render-verification-agent-local.json",
+      "kind": "observation",
+      "scope": "Source-bound render verification agent preparation/read with retained uncertainty and no continuation authority.",
+      "sha256": "f08e38925a4ab55cdfcfaf0d612cfc973ff58ef9d909c487eb559d9b6d501ce9"
+    },
+    "operator-image-source-events-proof": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-source-events-local.json",
+      "kind": "observation",
+      "scope": "macOS/Linux source-event and cryptographic verification; Linux registry capture under the unchanged native deadline.",
+      "sha256": "260be5c22b906e6a5a17990c2443281dec7a0559e64e7a960f9d41416296a7b3"
+    },
+    "operator-local-image-agent-proof": {
+      "repository": "opscode",
+      "path": "kubernetes/nvke/qualification/management-local-image-agent-local.json",
+      "kind": "observation",
+      "scope": "Closed local image route independent of registry profiles, signed domain and original-source lock; native macOS/Linux and large layer cases.",
+      "sha256": "873cfe65d881cc46b85750d8277121c4e6bca4b32e53e99f7db3211ae161c19c"
+    },
+    "operator-tree-browser-api-proof": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/install-plan-tree-templates-browser-api-local.json",
+      "kind": "observation",
+      "scope": "Actual API/browser/native tree and template recovery with original-state preservation; no linked admission."
+    },
+    "operator-context-browser-api-proof": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/install-plan-context-api-browser-checkpoint.json",
+      "kind": "observation",
+      "scope": "Scoped actual browser/App/agent context capture and recovery; not production login/route validation."
+    },
+    "operator-verification-client-native-proof": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/install-plan-render-verification-runtime-pin-local.json",
+      "kind": "observation",
+      "scope": "Current-runtime native SDK, compiled CLI and real browser render-verification recovery; phase-use and original credential closure remain open."
+    },
+    "operator-image-sdk-native-proof": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/management-local-and-registry-image-sdk-native-local.json",
+      "kind": "observation",
+      "scope": "Actual registry and local SDK/mTLS recovery against native revision a0f0d0d with one attempt, unchanged original and no admission."
+    },
+    "operator-local-image-browser-release-proof": {
+      "repository": "app",
+      "path": "backend/providers/nvke/qualification/management-local-image-release-ui-local.json",
+      "kind": "observation",
+      "scope": "1,562 NVKE UI regressions, production Next/Storybook builds and actual local browser/App/Postgres/agent recovery; not completed installation or deployed acceptance."
+    },
+    "operator-local-image-cli-native-proof": {
+      "repository": "cli",
+      "path": "scripts/integration/nvke-install-plan-local-image-app-agent-local.json",
+      "kind": "observation",
+      "scope": "Actual compiled local image CLI/App/Postgres/agent lost-reply, cold-read and retained retry with one attempt and preserved original.",
+      "sha256": "c79af8190827748cc984938f5f7156e5c1b15ed4831b7905ab5f8e1c225be7aa"
+    },
+    "operator-local-image-browser-native-proof": {
+      "repository": "cli",
+      "path": "scripts/integration/nvke-install-plan-local-image-browser-app-agent-local.json",
+      "kind": "observation",
+      "scope": "Actual local browser and CLI/App/Postgres/native image recovery; three browser RPCs, no registry transport and unchanged parent stores.",
+      "sha256": "f6686d428f5b0f29b262b76478a77a6a8769fac2b4c97e2ce94b7ccaec8cae0a"
     }
   },
   "rows": {
@@ -3520,9 +3599,21 @@
           "operator-chart-artifacts-helm4-local",
           "operator-chart-artifacts-helm4-api-local",
           "operator-chart-artifacts-cli-native-test",
-          "operator-chart-artifacts-cli-local"
+          "operator-chart-artifacts-cli-local",
+          "operator-tree-agent-proof",
+          "operator-render-context-agent-proof",
+          "operator-render-verification-agent-proof",
+          "operator-image-source-events-proof",
+          "operator-local-image-agent-proof",
+          "operator-tree-browser-api-proof",
+          "operator-context-browser-api-proof",
+          "operator-verification-client-native-proof",
+          "operator-image-sdk-native-proof",
+          "operator-local-image-browser-release-proof",
+          "operator-local-image-cli-native-proof",
+          "operator-local-image-browser-native-proof"
         ],
-        "remaining": "The original agent install remains UNCERTAIN/exit 1 after an LGTM readiness failure; its rows, receipts and fences remain intact. Linux API/CLI install review and plan preparation/paging are locally qualified, but preserved-VM host forwarding is unavailable after the usernet outage (#98). Controlled Helm 4 local-file chart preparation/recovery is qualified through SDK, GraphQL/PostgreSQL and compiled CLI; browser recovery has controlled-peer checks only. Remaining work includes actual browser/API plan/chart qualification, private OCI/registry/TLS policy, the complete frozen execution tree and render/image closure, fresh skipped-resource/credential proof, linked once-only execution and interruption recovery (#97), completed retained agent install/access (#96), hosted tenant lifecycle/upgrades, production supply chain/physical providers, final production builds and deployed login/acceptance."
+        "remaining": "The original agent installation remains UNCERTAIN/exit 1 and its rows, receipts, guards and VMs remain intact. Plan/chart/tree/template/context/render-verification and registry/local-image controls now have scoped native SDK/API/CLI/browser recovery evidence; local-image UI regressions and both production builds pass. Release blockers are authenticated all-input workload image inventory and operator-resource mappings, platform and original credential equivalence, native rewrite/import, fresh skipped-resource/phase-use verification and exactly-once linked admission (#97/#102), completed retained install/access (#96), remaining hosted lifecycle/upgrade scenarios and final coordinated release/deployed login validation. Original preserved-VM host forwarding recovery (#98) remains separate from isolated qualification."
       },
       "infrastructure-providers": {
         "mapping": "Pinned provider registry, metadata-only Kubernetes reader, durable observation API, collection/recovery/history UI and astro nvke providers CLI",
