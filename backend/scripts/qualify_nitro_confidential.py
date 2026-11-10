@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Explicit live qualification runner. Run only on the owned private EKS helper.
 
-PYTHONPATH must point to the extracted 374066149 backend/providers source.
+PYTHONPATH must point to the extracted 2be74d5f4 backend/providers source.
 Config JSON: region, cluster, run_id, repository, key_admin_arn, runtime_role_arn.
 The caller supplies kubeconfig and runs this process in the background. No log/exec
 access is needed. Pod outcomes are observations; root correlates unique-key KMS
@@ -27,9 +27,9 @@ from pathlib import Path
 BASE_IMAGE = "docker.io/calliopeai/astrolift-agent-base@sha256:80b2aaccda598f7d33c5fb996e92c033a044c4b1547490d08a17df5b5dd4434b"
 NAMESPACE = "qualification"
 SERVICE_ACCOUNT = "confidential-runner"
-SOURCE_REVISION = "374066149"
+SOURCE_REVISION = "2be74d5f4"
 SOURCE_HASHES = {
-    "nitro_confidential.py": "0a32175aa07d3749e7f5675efcbb462b4fb6bd6c3c91c6ea636eb803ff04a41e",
+    "nitro_confidential.py": "c0a9fd64ca936c7d5c8632eb83aa1bb0fbe4dfc533dcea6c6b381167ed245d21",
     "nitro_confidential_image.py": "2d5dd02b21ee4b086f7ae2626599dc864884e9327d016da7411e78765a7a5cdb",
 }
 
@@ -109,7 +109,7 @@ def preflight(settings, session, dynamic):
         hashlib.sha256((source / name).read_bytes()).hexdigest() != digest
         for name, digest in SOURCE_HASHES.items()
     ):
-        raise ValueError("probe source does not match the reviewed 374066149 helpers")
+        raise ValueError("probe source does not match the reviewed 2be74d5f4 helpers")
     identity = session.client("sts").get_caller_identity()
     account = settings["repository"].split(".")[0]
     role_name = settings["key_admin_arn"].rsplit("/", 1)[-1]
@@ -167,15 +167,21 @@ def regenerate_negative(candidate, config, ecr, env, admit):
 
     first = clean_pod(admit(candidate))
     validate_admitted(first, candidate, 42042, 42042)
-    with tempfile.TemporaryDirectory(prefix="nitro-negative-", dir=config.temporary_root) as work:
+    with (
+        tempfile.TemporaryDirectory(prefix="nitro-negative-", dir=config.temporary_root) as work,
+        tempfile.TemporaryDirectory(prefix="nitro-negative-public-tools-", dir="/tmp") as public_tools,
+    ):
         root = Path(work)
-        generator, _ = verified_tools(config.runtime_directory, root, env)
+        env = {**env, "TMPDIR": str(root), "TMP": str(root), "TEMP": str(root)}
+        generator, _ = verified_tools(config.runtime_directory, Path(public_tools), env)
         auth = root / "auth.json"
         for item in ecr.get_authorization_token()["authorizationData"]:
             password = base64.b64decode(item["authorizationToken"]).split(b":", 1)[1]
             command(
                 [
                     config.skopeo,
+                    "--tmpdir",
+                    str(root),
                     "login",
                     "--authfile",
                     str(auth),
@@ -482,7 +488,9 @@ def resume_negative(
 ):
     from aws.nitro_confidential import POLICY, ConfidentialConfig, prepared_pod_hash
 
-    if state.get("source_revision") not in {SOURCE_REVISION, "f30257f54"} or state.get("negative"):
+    if state.get("source_revision") not in {SOURCE_REVISION, "374066149", "f30257f54"} or state.get(
+        "negative"
+    ):
         raise ValueError("resume requires this source checkpoint and no prior negative attempt")
     preflight(settings, session, dynamic)
     saved, checkpoint = state["positive"], state["checkpoint"]

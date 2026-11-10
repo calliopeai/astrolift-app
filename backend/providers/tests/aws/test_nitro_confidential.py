@@ -2,6 +2,7 @@
 
 import base64
 import hashlib
+import importlib.util
 import json
 import shutil
 import subprocess
@@ -278,6 +279,53 @@ def test_public_tool_snapshot_executes_when_private_tmpfs_is_noexec(pipeline, mo
     monkeypatch.setattr(confidential, "verified_tools", public_tools)
     confidential.prepare_run(**pipeline.arguments)
     assert snapshots and all(not root.exists() for root in snapshots)
+
+
+@pytest.mark.parametrize("fail_generator", [False, True])
+def test_negative_policy_keeps_private_scratch_separate_and_cleans_up(pipeline, monkeypatch, fail_generator):
+    script = Path(__file__).resolve().parents[3] / "scripts" / "qualify_nitro_confidential.py"
+    spec = importlib.util.spec_from_file_location("negative_workspace_probe", script)
+    probe = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(probe)
+    candidate, _ = confidential.prepare_run(**pipeline.arguments)
+    snapshots, workspaces = [], []
+
+    def public_tools(directory, temporary, env):
+        workspace = Path(env["TMPDIR"])
+        assert workspace.is_relative_to(Path(pipeline.arguments["config"].temporary_root))
+        assert not temporary.is_relative_to(workspace)
+        assert temporary.stat().st_mode & 0o777 == 0o700
+        for name in ("genpolicy", "keyprovider", "aws-runtime.pub"):
+            (temporary / name).write_text("public verified tool material")
+        snapshots.append(temporary)
+        workspaces.append(workspace)
+        return temporary / "genpolicy", temporary / "keyprovider"
+
+    monkeypatch.setattr(confidential, "verified_tools", public_tools)
+    original_command = confidential.command
+
+    def confined_command(argv, *, env, input_data=None):
+        assert env["TMPDIR"] == env["TMP"] == env["TEMP"] == str(workspaces[0])
+        assert sorted(row.name for row in snapshots[0].iterdir()) == ["aws-runtime.pub", "genpolicy", "keyprovider"]
+        if argv[1] == "--profile" and fail_generator:
+            raise RuntimeError("generator failed")
+        return original_command(argv, env=env, input_data=input_data)
+
+    monkeypatch.setattr(confidential, "command", confined_command)
+    args = pipeline.arguments
+
+    def invoke():
+        return probe.regenerate_negative(candidate, args["config"], args["ecr"], {}, args["admit"])
+
+    if fail_generator:
+        with pytest.raises(RuntimeError, match="generator failed"):
+            invoke()
+    else:
+        pod, measurement = invoke()
+        assert measurement == PCR
+        assert pod["metadata"]["annotations"][confidential.POLICY]
+    assert snapshots and workspaces
+    assert all(not root.exists() for root in snapshots + workspaces)
 
 
 def test_only_encrypted_image_and_final_policy_reach_kubernetes(pipeline):
