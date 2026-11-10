@@ -1,0 +1,60 @@
+{
+  "format": 1,
+  "scope": "local-image-chromium-storybook-and-composed-operation-controls",
+  "status": "chromium-23-panel-and-three-operation-states-qualified",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanLocalImagePanel.tsx": "e7cf51c1e5c0e5d509ec253131c2e2e60b3507cbc5c216e185616d738a79b247",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanLocalImagePanel.stories.tsx": "4c51529345a3acedbb2b4669b8792df98a06f991a588d976093a471a0d42211b",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "e044cd66930c088d01f00e40d0793219309b07678eb9b9c88a348dfd16a496eb",
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "b054a493aebd2bee3e82fcb4ec74eb2e6cee5f95b8ee93edc8ab01c7e3fe3067",
+    "frontend/e2e/nvke-install-plan-local-image-storybook-runner.mjs": "88e24dcde0bd773e0394644e6ce50a96bf55b4829ffa91bf863edce7748babd9",
+    "frontend/e2e/nvke-install-plan-local-image-operation-runner.mjs": "df3853132eda605d9d9690afd780e4c0d68f288d110abeedfb05b39f518ebe6a"
+  },
+  "checks": {
+    "sessionId": 83441,
+    "logPath": "/tmp/astrolift-nvke-local-image-browser-ui-check.log",
+    "logSha256": "f0ec59a990719446d81ae1f446f028dc3f68cdcc83b9f1306a5394b191588f0c",
+    "exitMarker": "/tmp/astrolift-nvke-local-image-browser-ui-check.exit",
+    "exitCode": 0,
+    "panelStates": 23,
+    "operationStates": 3,
+    "pageErrors": 0,
+    "locales": 8,
+    "responsiveWidths": [
+      1440,
+      768
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ]
+  },
+  "screenshots": {
+    "full": {
+      "path": "/tmp/astrolift-nvke-local-image-ui-full.png",
+      "sha256": "bbf8f61d0567224885fa604efb344119d5538ddb7dc39a74293a46f1b3474847",
+      "visuallyInspected": true
+    },
+    "768": {
+      "path": "/tmp/astrolift-nvke-local-image-ui-768.png",
+      "sha256": "281c20fbd737c3fcb4c65acfb2f81be7e59a6a1a74074d315ac8d6e5cfd839c2",
+      "visuallyInspected": true
+    },
+    "dark": {
+      "path": "/tmp/astrolift-nvke-local-image-ui-dark.png",
+      "sha256": "83766410a64598fb9c22d42789f72c781716d4d457e79ba98fd33238672a12a3",
+      "visuallyInspected": true
+    }
+  },
+  "coverage": [
+    "Valid pinned local preparation clears private inputs and retains the artifact UUID.",
+    "Historical review/retry controls, current authority and stale parent/source refusal.",
+    "Operation composition propagates read-only and pending guards.",
+    "No horizontal overflow at 768 pixels, including long SHA-512 digest."
+  ],
+  "limits": [
+    "Controlled Storybook props; this is not the real browser/API/Postgres/agent proof.",
+    "Operation recovery hook unit/lint/full TypeScript results are tracked separately.",
+    "No native continuation, main merge or deployment."
+  ]
+}

@@ -32,6 +32,7 @@ import { useNvkeCredentials } from "./use-nvke-credentials";
 import { useNvkeCredentialRequest } from "./use-nvke-credential-request";
 import { useNvkeInstallPlan } from "./use-nvke-install-plan";
 import { useNvkeInstallPlanContext } from "./use-nvke-install-plan-context";
+import { useNvkeInstallPlanLocalImage } from "./use-nvke-install-plan-local-image";
 import { useNvkeInstallPlanImage } from "./use-nvke-install-plan-image";
 import { useNvkeInstallPlanVerification } from "./use-nvke-install-plan-verification";
 import { useNvkeInstallPlanTree } from "./use-nvke-install-plan-tree";
@@ -255,6 +256,21 @@ export const useNvkeOperation = (
       operatorInstallPlanVerification?.pending
     ),
   });
+  const operatorInstallPlanLocalImage = useNvkeInstallPlanLocalImage({
+    context,
+    source: operatorInstallPlanTree,
+    pending: Boolean(
+      (mutation?.key === visitKey && mutation.pending) ||
+      operatorJob?.pending ||
+      operatorInstallReview?.pending ||
+      operatorInstallPlan?.pending ||
+      operatorInstallPlanCharts?.pending ||
+      operatorInstallPlanTree?.pending ||
+      operatorInstallPlanContext?.pending ||
+      operatorInstallPlanVerification?.pending ||
+      operatorInstallPlanImage?.pending
+    ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -269,6 +285,7 @@ export const useNvkeOperation = (
       operatorInstallPlanContext?.pending ||
       operatorInstallPlanVerification?.pending ||
       operatorInstallPlanImage?.pending ||
+      operatorInstallPlanLocalImage?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -322,6 +339,7 @@ export const useNvkeOperation = (
     operatorInstallPlanContext,
     operatorInstallPlanVerification,
     operatorInstallPlanImage,
+    operatorInstallPlanLocalImage,
     diagnostics,
     maintenance,
     credentials,
@@ -342,7 +360,8 @@ export const useNvkeOperation = (
         operatorInstallPlanTree?.pending ||
         operatorInstallPlanContext?.pending ||
         operatorInstallPlanVerification?.pending ||
-        operatorInstallPlanImage?.pending
+        operatorInstallPlanImage?.pending ||
+        operatorInstallPlanLocalImage?.pending
       ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
@@ -362,6 +381,7 @@ export const useNvkeOperation = (
         operatorInstallPlanContext?.pending ||
         operatorInstallPlanVerification?.pending ||
         operatorInstallPlanImage?.pending ||
+        operatorInstallPlanLocalImage?.pending ||
         !operation
       )
         return;

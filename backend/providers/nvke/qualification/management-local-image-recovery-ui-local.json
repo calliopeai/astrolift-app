@@ -1,0 +1,44 @@
+{
+  "format": 1,
+  "scope": "local-image-durable-browser-recovery-and-operation-screen-composition",
+  "status": "210-cases-eslint-full-typescript-and-chromium-qualified-real-api-native-browser-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "b054a493aebd2bee3e82fcb4ec74eb2e6cee5f95b8ee93edc8ab01c7e3fe3067",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "e044cd66930c088d01f00e40d0793219309b07678eb9b9c88a348dfd16a496eb",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-local-image-stories.test.tsx": "25d1888d6043093e8f51ce9cbc6d6c5440dd5f3a6ac66d4a3241d0a7a9d6257a",
+    "frontend/components/screens/nvke/types.ts": "a409653083ca639936d9e9baf312ce89da8c3edaec6c4fecfeba41aaa6d1f49d",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "fde4bc0e59aab3baea61b99807473a87cf87d9e161217ec573df7eed5a4c0570",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanLocalImagePanel.api.stories.tsx": "eda5ea8556b91eef90dfd0fb3dd00736b73b9bfb45397345e81d2fc7248662c1",
+    "frontend/e2e/nvke-install-plan-local-image-api-runner.mjs": "cf3e696d8b98c3e5daaff1cc19a6fece5eadc885626f0bee364f01faaa7214cf",
+    "frontend/e2e/nvke-install-plan-local-image-operation-runner.mjs": "df3853132eda605d9d9690afd780e4c0d68f288d110abeedfb05b39f518ebe6a",
+    "frontend/e2e/nvke-install-plan-local-image-storybook-runner.mjs": "88e24dcde0bd773e0394644e6ce50a96bf55b4829ffa91bf863edce7748babd9",
+    "frontend/graphql/nvke/use-nvke-install-plan-local-image.test.tsx": "d19ea4cc22bf02ff7ab4253d84c802edce27c04a4b76d6a9dfcb5f0d1b31c28f",
+    "frontend/graphql/nvke/use-nvke-install-plan-local-image.ts": "e7682b42c38d9e6cbebddd41ccc93ff556dfd2f27da383a1846f95d4aacdce3b",
+    "frontend/lib/nvke/install-plan-local-image-recovery.test.ts": "b43d52241407ebfe81e7a1185a1297127fd4f8f75aa48b89df6fe025172ab252",
+    "frontend/lib/nvke/install-plan-local-image-recovery.ts": "5f39aa1204598b2cdbc61603afa24a54f7d2c4c9d05a09ca42771e4ad25f5d26"
+  },
+  "checks": {
+    "sessionId": 52472,
+    "logPath": "/tmp/astrolift-nvke-local-image-operation-ui-check.log",
+    "logSha256": "f620c8f86eefb17f863b58d577e7b57a344ece634099ca2e844eb6f4d6203652",
+    "exitMarker": "/tmp/astrolift-nvke-local-image-operation-ui-check.exit",
+    "exitCode": 0,
+    "tests": 210,
+    "skipped": 0,
+    "changedFileEslint": true,
+    "fullTypeScript": true
+  },
+  "chromiumEvidence": "management-local-image-browser-ui-local.json",
+  "behavior": [
+    "Separate local journal domain/selection key binds current server, actor, organization, source versions, tree and exact private input hash.",
+    "Reload restores metadata without RPC; lost response requires explicit historical review or retained retry.",
+    "Private reference, limits, credentials and API diagnostics are not stored in the journal or Apollo cache.",
+    "Local validation refuses registry metadata, wrong sources, excess bytes or a changed requested digest.",
+    "Operation screen renders local controls and propagates permission, error and pending guards; control/download paths include local busy state."
+  ],
+  "limits": [
+    "Actual local browser/App/Postgres/agent proof remains pending; controlled hook/Storybook cases do not substitute for it.",
+    "Full frontend regression/build release gates remain pending.",
+    "No workload/platform/credential closure, linked admission, main merge or deployment."
+  ]
+}

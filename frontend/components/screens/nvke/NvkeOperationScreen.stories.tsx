@@ -1,3 +1,4 @@
+import { INSTALL_LOCAL_IMAGE_PROPS } from "./NvkeOperatorInstallPlanLocalImagePanel.stories";
 import { INSTALL_IMAGE_PROPS } from "./NvkeOperatorInstallPlanImagePanel.stories";
 import { INSTALL_VERIFICATION_PROPS } from "./NvkeOperatorInstallPlanVerificationPanel.stories";
 import { INSTALL_CONTEXT_PROPS } from "./NvkeOperatorInstallPlanContextPanel.stories";
@@ -303,3 +304,16 @@ export const InstallPlanImageReadOnly: Story = {
   args: { ...InstallPlanImage.args, canAct: false },
 };
 export const InstallPlanImagePending: Story = { args: { ...InstallPlanImage.args, pending: true } };
+
+export const InstallPlanLocalImage: Story = {
+  args: {
+    ...InstallPlanVerification.args,
+    operatorInstallPlanLocalImage: INSTALL_LOCAL_IMAGE_PROPS,
+  },
+};
+export const InstallPlanLocalImageReadOnly: Story = {
+  args: { ...InstallPlanLocalImage.args, canAct: false },
+};
+export const InstallPlanLocalImagePending: Story = {
+  args: { ...InstallPlanLocalImage.args, pending: true },
+};
