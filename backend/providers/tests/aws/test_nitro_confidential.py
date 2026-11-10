@@ -52,7 +52,9 @@ def pipeline(tmp_path, monkeypatch):
             "layers": [
                 {
                     "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip+encrypted",
-                    "annotations": {"org.opencontainers.image.enc.keys.provider.awskms": "wrapped-synthetic-key"},
+                    "annotations": {
+                        "org.opencontainers.image.enc.keys.provider.awskms": "d3JhcHBlZC1zeW50aGV0aWMta2V5"
+                    },
                 }
             ],
         }

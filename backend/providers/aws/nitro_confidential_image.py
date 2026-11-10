@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import gzip
 import hashlib
 import io
@@ -207,3 +208,11 @@ def verify_encrypted_manifest(manifest: dict[str, Any]) -> None:
             or not (layer.get("annotations") or {}).get("org.opencontainers.image.enc.keys.provider.awskms")
         ):
             raise ConfidentialImageError("every run image layer must be encrypted with the AWS KMS provider")
+        # ocicrypt wraps each provider's opaque packet in standard base64, comma-separated.
+        # Validate that framing without guessing the AWS provider's private packet schema.
+        annotation = layer["annotations"]["org.opencontainers.image.enc.keys.provider.awskms"]
+        try:
+            if any(not base64.b64decode(packet, validate=True) for packet in annotation.split(",")):
+                raise ValueError("empty provider packet")
+        except ValueError as exc:
+            raise ConfidentialImageError("encrypted layer has malformed AWS KMS provider packets") from exc

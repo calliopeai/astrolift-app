@@ -120,7 +120,7 @@ def test_unencrypted_or_wrong_keyprovider_layer_is_refused(media_type, annotatio
 def test_all_layers_must_use_kms_encryption():
     encrypted = {
         "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip+encrypted",
-        "annotations": {"org.opencontainers.image.enc.keys.provider.awskms": "wrapped-key"},
+        "annotations": {"org.opencontainers.image.enc.keys.provider.awskms": "d3JhcHBlZC1rZXk="},
     }
     verify_encrypted_manifest({"layers": [encrypted, encrypted]})
     with pytest.raises(ConfidentialImageError):
@@ -153,3 +153,31 @@ def test_guest_bootstrap_restores_private_environment_before_exec_and_refuses_wr
     assert result.returncode == (0 if matching else 125)
     assert result.stdout == (b"bootstrap-exec-ok\n" if matching else b"")
     assert b"synthetic-secret" not in result.stderr
+
+
+@pytest.mark.parametrize("packet", ["not-base64!", "d3JhcHBlZA==,", ",d3JhcHBlZA==", "===="])
+def test_encrypted_manifest_rejects_malformed_provider_packets(packet):
+    with pytest.raises(ConfidentialImageError, match="provider packets"):
+        verify_encrypted_manifest(
+            {
+                "layers": [
+                    {
+                        "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip+encrypted",
+                        "annotations": {"org.opencontainers.image.enc.keys.provider.awskms": packet},
+                    }
+                ]
+            }
+        )
+
+
+def test_encrypted_manifest_accepts_multiple_opaque_provider_packets():
+    verify_encrypted_manifest(
+        {
+            "layers": [
+                {
+                    "mediaType": "application/vnd.oci.image.layer.v1.tar+gzip+encrypted",
+                    "annotations": {"org.opencontainers.image.enc.keys.provider.awskms": "d3JhcHBlZA==,b3BhcXVl"},
+                }
+            ]
+        }
+    )

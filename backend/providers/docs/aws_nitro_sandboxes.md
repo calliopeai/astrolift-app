@@ -296,3 +296,25 @@ SHA-256 `2f2239a47025a2fa173cd145ab8803ac02b76114864bf5b66475ff1cb88e6b0a`.
 The [official ECS API reference](https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_TrustedExecutionConfiguration.html)
 documents the contract. ECS implementation must wait for a released supported
 SDK model or another officially supported client that exposes these fields.
+
+
+## Confidential task local qualification (2026-11-10)
+
+Signed checkpoint `77f3309d8` passed 113 dispatch, hardening, manifest and real
+PostgreSQL persistence tests against dedicated Nitro services; 58 focused
+provider/transport tests; and 131 EKS/Kubernetes regression tests. These sets
+overlap and must not be added into a single total. Backend Ruff 0.6 lint and
+format checks, provider Ruff and strict typing for the two new helpers passed.
+Both real pinned architecture archives passed checksum, AWS signature,
+extraction and binary verification. A later framing follow-up passed 25 helper
+and pipeline tests, including malformed ocicrypt packet refusal.
+
+The full backend suite remains separate verification. Its first run stopped
+after 756 passes because no local Temporal server was listening; the exact
+failed recovery test passed after starting a dedicated Nitro server. A corrected
+full run was started in the background. The broad informational core/config
+mypy check still reports existing errors; changed-file diagnostics match the
+baseline after accounting for line shifts. A Docker API health timeout blocked
+the container build, so neither a backend image build nor container `run.sh`
+verification is claimed here. Live EKS key release/refusal and EC2 lifecycle
+qualification are tracked separately in the operator repository.
