@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "browser-verification-request-and-historical-metadata-validation",
-  "status": "unit-and-eslint-qualified-full-types-running-controls-not-implemented",
+  "status": "local-browser-codecs-unit-lint-and-full-types-qualified-controls-and-acceptance-pending",
   "sourceSha256": {
     "frontend/lib/nvke/operator-install-plan-verification.ts": "96695902d337a595c201bce3eb85ee91987e2d9367ca71aefe6f7fc59b87b8bf",
     "frontend/lib/nvke/operator-install-plan-verification.test.ts": "2eade6cdea8e282643cae5d207f8d926ed81aa971ab53dbe9550a8ac2cda240b"
@@ -17,10 +17,12 @@
     "eslint": "targeted new modules passed",
     "prettier": "both modules formatted",
     "fullTypeScript": {
-      "status": "pending",
+      "status": "passed",
       "sessionId": 98273,
       "logPath": "/tmp/astrolift-nvke-verification-ui-helper-types.log",
-      "exitMarker": "/tmp/astrolift-nvke-verification-ui-helper-types.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-ui-helper-types.exit",
+      "exitCode": 0,
+      "logSha256": "0258b5926b8941e1e8150423f37ced703fed0cea3bc0ffc1d4d9b22d4f7b691f"
     }
   },
   "implemented": [
@@ -28,7 +30,6 @@
     "Strict metadata validation binds context/capture/frozen chart, original job/authority/site and parent publications, exact item/ordinal, observation hashes/counts and non-authorizing state; malformed, private or authorizing replies refuse."
   ],
   "remaining": [
-    "Inspect final exact-source full TypeScript result before qualifying the helper checkpoint.",
     "Build pure Storybook panel, recovery journal and current-authority hook, eight locales, production wiring, broad UI/build checks and actual browser acceptance.",
     "Actual compiled CLI/App/new-agent acceptance and full phase-use/resource/credential/schema/image/admission closure remain outstanding."
   ],
