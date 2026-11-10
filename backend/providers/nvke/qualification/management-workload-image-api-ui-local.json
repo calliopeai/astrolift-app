@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "reviewed-workload-registry-image-api-and-browser",
-  "status": "local-app-api-and-ui-qualified-actual-linked-native-client-proof-pending",
+  "status": "local-api-ui-and-actual-linked-cli-native-recovery-qualified-release-incomplete",
   "sourceSha256": {
     "CHANGELOG.md": "a9379049f4736c94a3b673811bc8bd7d4f3f460fbe79018b37e608bcf09326a8",
     "backend/astrolift_clusters/nvke_install_plan_images.py": "25c877cac018d41cdb91b61524f45852bf47ad7537a217b11974ec1a273682f9",
@@ -169,11 +169,15 @@
       "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
     },
     "actualCompiledCliApiNative": {
-      "status": "pending",
-      "sessionId": 28520,
-      "exitCode": null,
-      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.exit",
-      "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v2.log"
+      "sessionId": 42016,
+      "status": "complete",
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-linked-image-app-agent-v4.log",
+      "logSha256": "12b74444c0dfb57f93e90e8d8e7aab2de519d8bd4aafe49476186eac4be27ed7",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 605.12
     }
   },
   "retainedFailures": [
@@ -228,9 +232,15 @@
   "limits": [
     "Nullable generated TypeScript inputs require explicit nulls; the retained type-v1 failure was corrected and type-v2 passed",
     "Final v3 production and Storybook builds plus the post-review focused check passed after the display guard was tightened",
-    "The initial combined-profile actual client fixture was refused during plan preparation before image acquisition. Its failed run is retained; a code-only diagnostic run is pending. Browser/API/native workload-image linkage remains pending.",
+    "Actual workload-bound CLI/API/PostgreSQL/native controlled-registry proof now passed; earlier combined-fixture failure was an exclusive duplicate template write, corrected without weakening the private-file guard. Browser API/native linkage remains pending.",
     "Broad backend lint/format/types remain red as recorded in management-workload-api-local.json; no baseline gates were bypassed",
     "Individual image acquisition is not signed aggregate image closure, operator-managed image discovery, platform/credential correspondence, rewritten import/use proof or linked admission",
     "No main merge or deployment occurred"
-  ]
+  ],
+  "runtimePins": {
+    "app": "66983d1d7",
+    "cliCommands": "201ed23",
+    "cliFixture": "f8a2394",
+    "opscode": "58b643a0a50f71d822deade7fb633b98acded4f9"
+  }
 }
