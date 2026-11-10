@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "pure-verification-storybook-controls-eight-locales-and-recovery-actions",
-  "status": "unit-lint-production-storybook-and-chromium-qualified-full-types-running-hook-and-route-pending",
+  "status": "local-pure-controls-unit-static-production-storybook-and-chromium-qualified-hook-and-route-pending",
   "sourceSha256": {
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanVerificationPanel.tsx": "49ae310791884e0da50c133772e369f29062a1c155a1a9cfabb7d4b88c5190e8",
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanVerificationPanel.stories.tsx": "32fde34e101bcf43e6127629c89e84b805e7a25f59c47a5f79d544e73da121a3",
@@ -46,10 +46,12 @@
       "scope": "Built pure Storybook fixtures with controlled callbacks; not actual App/browser/auth acceptance. Owned loopback static server stopped after inspection."
     },
     "fullTypeScript": {
-      "status": "pending",
+      "status": "passed",
       "sessionId": 7377,
       "logPath": "/tmp/astrolift-nvke-verification-controls-types.log",
-      "exitMarker": "/tmp/astrolift-nvke-verification-controls-types.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-controls-types.exit",
+      "exitCode": 0,
+      "logSha256": "0258b5926b8941e1e8150423f37ced703fed0cea3bc0ffc1d4d9b22d4f7b691f"
     }
   },
   "implemented": [
@@ -59,7 +61,6 @@
     "Full,unloaded,missing context,loading,pending,lost reply,restricted reviewer,stale parents/context/source,wrong selection,unverified authority,original-input recovery,new selection and768px stories; all eight locale catalogs include the complete new copy."
   ],
   "remaining": [
-    "Inspect final full TypeScript before final controls qualification.",
     "Implement private metadata-only recovery journal and current-authority/epoch hook, then actual operation-screen wiring.",
     "Actual compiled CLI/App/new-agent and browser acceptance, broad UI regressions, Next build and final full-surface gates remain outstanding."
   ],
