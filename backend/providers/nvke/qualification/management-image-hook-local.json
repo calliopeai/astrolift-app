@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "scope": "registry-image-apollo-hook-journal-and-source-epochs",
+  "status": "27-hook-contracts-eslint-and-full-typescript-qualified-app-wiring-pending",
+  "sourceSha256": {
+    "frontend/graphql/nvke/use-nvke-install-plan-image.ts": "bb01ed1918464f55791ef695cbabd20440fa28e33e7b92c6bc0595d27a2c8f49",
+    "frontend/graphql/nvke/use-nvke-install-plan-image.test.tsx": "09ae3c08a6ef6b917c97de89e5f21817f8c78bca4cf365eceb3daa8499c38e31"
+  },
+  "checks": {
+    "sessionId": 73469,
+    "logPath": "/tmp/astrolift-nvke-image-hook-contracts-v2.log",
+    "exitMarker": "/tmp/astrolift-nvke-image-hook-contracts-v2.exit",
+    "logSha256": "2f0090dbd60c9d5fc7f6984a15f5b785e6c47f3b1e5137ef22593f1a1aafd2fd",
+    "exitCode": 0,
+    "tests": 27,
+    "skipped": 0,
+    "eslint": "passed",
+    "fullTypeScript": "passed"
+  },
+  "invariants": [
+    "Flush exact-input hash and immutable source metadata before any preparation RPC.",
+    "No automatic prepare/read/retry on reload; explicit retry uses retained private intent only.",
+    "No Apollo cache retention; diagnostic redaction and organization scope are explicit.",
+    "Source changes and A-to-B-to-A replies invalidate stale observations.",
+    "Response bytes are checked against the owned serialized request budget, even if caller values mutate while the response is pending."
+  ],
+  "limits": [
+    "Controlled Apollo transport contracts; real browser -> API -> agent qualification remains pending.",
+    "Operation screen wiring remains pending.",
+    "No native continuation authorization, main merge or deployment."
+  ]
+}
