@@ -1,0 +1,64 @@
+{
+  "format": 1,
+  "scope": "local-image-operation-ui-production-builds-and-real-browser-api-native-recovery",
+  "status": "nvke-ui-regressions-both-production-builds-and-real-browser-api-native-proof-qualified",
+  "frontendSourceRevision": "3a9e35e52",
+  "nativeRevision": "a0f0d0dd0df6aea24e1698e7ccc3ce4491fc2f22",
+  "checks": {
+    "nvkeRegressions": {
+      "logPath": "/tmp/astrolift-nvke-local-image-ui-regressions.log",
+      "logSha256": "255bc3baf8b5210602bf3d1cef128526f143c276896e3a2ed617d4d7048e88a2",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-ui-regressions.exit",
+      "exitCode": 0,
+      "tests": 1562,
+      "skipped": 0
+    },
+    "nextProductionBuild": {
+      "logPath": "/tmp/astrolift-nvke-local-image-ui-next-build.log",
+      "logSha256": "168a013dbee5ee485a12f2450c4218876e40f34bea528ea3606905029e8474a6",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-ui-next-build.exit",
+      "exitCode": 0
+    },
+    "storybookProductionBuild": {
+      "logPath": "/tmp/astrolift-nvke-local-image-ui-storybook-build.log",
+      "logSha256": "2fb11a81f9eaa1ad98a96305b978b2b49f74dfbebc08deb249698c14eb21cd05",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-ui-storybook-build.exit",
+      "exitCode": 0
+    },
+    "actualBrowserApiAgent": {
+      "logPath": "/tmp/astrolift-nvke-local-image-browser-app-agent.log",
+      "logSha256": "989f89149471d65f7d4bbbf17e4083b1d317f6d82d71300dadc9ffd1f7f464b1",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-browser-app-agent.exit",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 1589.37,
+      "sessionId": 61055
+    }
+  },
+  "browserReport": {
+    "passed": true,
+    "sourceKind": "local",
+    "calls": [
+      "PrepareNvkeInstallPlanImage",
+      "ReviewNvkeInstallPlanImage",
+      "RetryNvkeInstallPlanImage"
+    ],
+    "artifactDigest": "621f2c5a126c481c2772c8920156ed4f4d31c046fc56687e05e8355cd68bf730",
+    "captureDigest": "56d5dd57b8535b9f73efe581dd293eb4ff3c91311c4cdf15d452394e170528c1",
+    "rootDigest": "sha256:87b21c12b6f6cb90b8d2a60827387e2b0ddccc1a7de631465970fb61ed41bf0b",
+    "observedAt": "2026-11-10T11:30:33.994948+00:00",
+    "pageErrors": [],
+    "privateLogSha256": "49b243f539a4837584c35d38fe3ada85d66e708cab691ccc39ebff12259b38db"
+  },
+  "coverage": [
+    "Current local-image operation controls through actual API/Postgres/SDK/native agent, lost reply, reload with no RPC, explicit review and retained retry.",
+    "Three browser RPCs, one work attempt, exact digest/time recovery, no registry transport and preserved original/parent authority.",
+    "1,562 NVKE frontend regressions and full production Next/Storybook builds."
+  ],
+  "limits": [
+    "Storybook hook/panel API forwarding; production Next authentication/route acceptance remains part of live release validation.",
+    "Complete workload/image/platform/credential closure and linked native admission remain pending.",
+    "Final cross-repository gates, adversarial review, PRs/main and CONFLICT deployment remain pending."
+  ]
+}
