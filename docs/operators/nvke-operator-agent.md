@@ -818,3 +818,29 @@ Verification retains
 credential checks, closed external schema policy, image closure and exactly-once
 linked admission remain required. The original uncertain install and fence stay
 in place. No main merge or CONFLICT deployment is qualified by these checkpoints.
+
+### Workload inventory browser controls (#2669)
+
+After reviewing the original install plan, chart publication and execution tree,
+the operation screen exposes **Workload inventory**. Supply a new artifact UUID
+and a private JSON map from each Helm item name to its reviewed `contextId` and
+`contextDigest`; use `{}` when the plan contains no Helm items. Collection is
+bounded by bytes, resources and elapsed time. The panel shows counts, joining
+issues and digests; it does not expose rendered documents or image references.
+
+A source-scoped recovery journal is saved before collection. It contains the
+artifact UUID and exact input hash, without context bindings or collection limits.
+A lost reply or reload performs no automatic RPC: use **Review saved inventory**,
+then **Retry retained collection** when necessary. Retry uses the original
+encrypted server intent. Changing the actor, organization or reviewed parent
+source invalidates the selection. The original unsuccessful install remains
+fenced; collecting or reviewing inventory does not authorize continuation.
+
+The 24 panel cases cover eight locales, narrow layouts and both themes. The
+compiled CLI and Chromium also pass through the real App API, PostgreSQL and
+authenticated pinned native agent with owned Helm/Kubernetes fixtures, including
+a dropped preparation reply and agent restart. See
+`backend/providers/nvke/qualification/management-workload-ui-local.json` for exact
+source hashes, checks and retained limitations. Full live NVKE install acceptance,
+operator-managed image discovery, signed image closure and linked continuation
+remain required.

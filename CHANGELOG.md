@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add source-bound NVKE workload inventory controls in all eight browser locales, with private context bindings, bounded collection and explicit saved-artifact recovery. Compiled CLI and Chromium qualification cover the real API, Postgres and authenticated native agent across lost replies and cold restart. Signed image closure and linked install continuation remain pending (#2669).
+
 - Add lossless NVKE JSON text admission/results for browser native editors, with the reviewed actor bound at admission and original UUID receipt lookup scoped to that actor and organization. Sensitive text inputs use schema-position audit redaction; structured API clients remain compatible (#2659, #2662).
 
 - Add the NVKE encrypted operation outbox, 88-action execution catalog and permission-gated operation API. Temporal carries IDs only; original caller/site/connection authority is rechecked before I/O, accepted writes are never blindly replayed, readiness is observed separately, and uncertain outcomes require explicit reconciliation. Add bounded dispatch recovery and real Postgres/Kubernetes/Temporal qualification, including lost replies and workflow-history secret checks. UI/CLI/bootstrap and live management-plane validation remain under #2656 (#2660).

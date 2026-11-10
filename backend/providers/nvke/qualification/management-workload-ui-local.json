@@ -1,0 +1,185 @@
+{
+  "format": 1,
+  "scope": "workload-inventory-ui-and-actual-client-api-native-recovery",
+  "status": "local-workload-slice-qualified-full-nvke-release-incomplete",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "b9c74f564ce9ecd39cef1ea252c3fae159012a4ad62211c3def5f29f926cef25",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "9beee6442c43779c2c0970857ce4b47d11e6b15f4b3044998fd24703fff6c410",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanWorkloadPanel.api.stories.tsx": "6f7f8ba2b084e583632158fae729c881448870b6443984ac115f0ed85228bfa0",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanWorkloadPanel.stories.tsx": "a7f0dfefa3bcf18fc084bc9cfb61d056d3ab0dbb6efa4ff6d28d30d5b084e541",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanWorkloadPanel.tsx": "0a8d2972f9b6893135ff26a8574ea9e76ca7a95ae5ca37e4ed0928bb958ace1d",
+    "frontend/components/screens/nvke/types.ts": "b0a5c2fe0edd9f16638c8c606c96e6e456f6da7c452c38849f7b4e786964fe70",
+    "frontend/e2e/nvke-install-plan-workload-api-runner.mjs": "797d9c5757ae641b3ceeb71c35b3578b64a2f714700a27b09333cc714f6edbf7",
+    "frontend/e2e/nvke-install-plan-workload-operation-runner.mjs": "e3b095085a3387dd6e3cad93575d6a8f679f2cb78d1cec6232b1f69de2125468",
+    "frontend/e2e/nvke-install-plan-workload-storybook-runner.mjs": "97025e703d923672dfa0c9b49163ba37ee850071c05724882d1e4b87bcf06641",
+    "frontend/graphql/__generated__/operations.ts": "43f1987bfdc05bf1b42163618aea8858b096301176f94b2f699986e20c510546",
+    "frontend/graphql/nvke/nvke-install-plan-workload.mutations.ts": "f73d97099e8b7581707c45ca4eb5208982651074da00195c793695107a805d76",
+    "frontend/graphql/nvke/nvke-install-plan-workload.queries.ts": "eeb0c7d9eb968fe16aaaa8a6a8b8d334c20f9dfd64cd9e204ec4ca66105f4f08",
+    "frontend/graphql/nvke/use-nvke-install-plan-workload.test.tsx": "d23183b06939805b7088b60d2eccd23aaaea95d92f9dfb072994fd4cb5a2c282",
+    "frontend/graphql/nvke/use-nvke-install-plan-workload.ts": "1d11200a4137ee774af96e53fa420088b495aff45f9c4a029f0b30c5841cf5e0",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "0fca8e69f82124b0a617b0eed2fe71c35430c7a8071461763bf2286ac004cb5e",
+    "frontend/lib/nvke/install-plan-workload-recovery.test.ts": "5f115ea882fe257d5a440352fe7af43fc75c1c35b40466dcfb06dd26c2cbd610",
+    "frontend/lib/nvke/install-plan-workload-recovery.ts": "42ed32f48fa29603ed56ea25803f176633e94302b5eea0a5aeb75ad5f1c62605",
+    "frontend/lib/nvke/operator-install-plan-workload.test.ts": "ef0fb42ae978535ddbec4eb68777931e8f28752c40188bb516f1827b5118d352",
+    "frontend/lib/nvke/operator-install-plan-workload.ts": "5e4afa0db6d83003d6907e7053adb6a6426871c36866f50fc2b23e67ecb26307",
+    "frontend/messages/de.json": "a7ad7bbe47ce19d1c9967ec85d5ffd5f57611bc0b3fa22986063c39528ed5616",
+    "frontend/messages/en.json": "c0a9da61b9cdaecaf4f57c987eb75f8fcb2975d5aa54e6d1790b45bce5c932f0",
+    "frontend/messages/es.json": "cf30b0d6b073ac2f074879edda7b3f0d524072beced717f6b5189341977ebdaf",
+    "frontend/messages/fr.json": "9f797791d18451b783cec32721889039e07594c6dcd2a7e56e26641b16695e6b",
+    "frontend/messages/ja.json": "2aef921a489a43b461e21128ec0500cd0c1968c4961efffbc65dcbf3ab275ad3",
+    "frontend/messages/ko.json": "f7a34d35ddc8f67f72bbb3c3a618a46300252b3034810d233307e53449410316",
+    "frontend/messages/pt-BR.json": "a5db1c85267aaaf0d0523ff27c28e4409d154da921f408a004fa65de5251ddfe",
+    "frontend/messages/zh-Hans.json": "b8e892421067680d8cea0b1658d8c5c943674e46c7eea3255216a92542294ac0"
+  },
+  "checks": {
+    "unit": {
+      "sessionId": 69751,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-ui-unit-v3.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-ui-unit-v3.log",
+      "logSha256": "2b96ebb1e3de904ecaa94ae7b8655a5abd0aee09e641deeeb7ea466a0605357a",
+      "passed": 1631,
+      "files": 83
+    },
+    "types": {
+      "sessionId": 69751,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-ui-types-v3.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-ui-types-v3.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "lint": {
+      "sessionId": 69751,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-ui-lint-v3.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-ui-lint-v3.log",
+      "logSha256": "47a41dbdc55adf75dbb704e8ef18a974dea4d64d81b073e603c89bdecbca889c",
+      "errors": 0,
+      "warnings": 89
+    },
+    "storybookBuild": {
+      "sessionId": 69751,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-ui-storybook-v3.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-ui-storybook-v3.log",
+      "logSha256": "19a14dabcce0c19c7337930a090b407c2a3815bc064f04d842f3039798625982"
+    },
+    "productionBuild": {
+      "sessionId": 69751,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-ui-next-v3.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-ui-next-v3.log",
+      "logSha256": "92deac69938b569db902ac6cd133d3bd245218eda542a51b8516450d02b95fc1"
+    },
+    "codegen": {
+      "sessionId": 43594,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-ui-codegen-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-ui-codegen-v1.log",
+      "logSha256": "88c5199bf8d00d42362ac5da2c4b149ce023b8105433ef1780553ecea9a783c8"
+    },
+    "format": {
+      "sessionId": 30454,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-ui-format-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-ui-format-v2.log",
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    "panelBrowser": {
+      "sessionId": 23817,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-storybook-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-storybook-v1.log",
+      "logSha256": "4ab82e3ff57ba9ac52342bc8ee7d97a91498aa4795ac12b30c70c9f823533821",
+      "cases": 24,
+      "locales": 8,
+      "widths": [
+        1440,
+        768
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ]
+    },
+    "composedBrowser": {
+      "sessionId": 70988,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-operation-ui-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-operation-ui-v2.log",
+      "logSha256": "b33ed5836df31309813ffbb06b45945ce35bacff03d6c0d041c7a6b959fb2f76"
+    },
+    "actualCliApiNative": {
+      "sessionId": 4799,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-cli-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-cli-app-agent-v1.log",
+      "logSha256": "01eeaca65450c72d4f982c140cb5dd81435f031746830986cd5a4557d14b4d5b",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 278.95
+    },
+    "actualBrowserApiNative": {
+      "sessionId": 79886,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-browser-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-browser-app-agent-v1.log",
+      "logSha256": "889d91b1bc6af7674b307f48cc641f67ab450da09743477b91bd054cda61665b",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 431.9
+    }
+  },
+  "sourcePins": {
+    "appBase": "3dff73116",
+    "cli": "a55746c",
+    "opscode": "58b643a0a50f71d822deade7fb633b98acded4f9"
+  },
+  "coverage": [
+    "Storybook-first pure form and composed operation panel with permission, source, pending and reload guards in eight locales",
+    "Bounded strict context JSON including decoded duplicate keys, exact source identities, canonical map ordering and count/digest budgets",
+    "Before-mutation source-scoped recovery journal contains metadata and input hash; private bindings are cleared and excluded from browser storage and public metadata",
+    "Actual compiled CLI and Chromium use the App API, real PostgreSQL and pinned authenticated native agent with the owned Kubernetes context fixture",
+    "Lost preparation replies after durable publication, native agent cold restart, reload without RPC, explicit historical review and retained-intent retry preserve digests and observation time",
+    "One native collection attempt per artifact; parent artifacts, original uncertain operation and native guards remain unchanged; continuation stays unauthorized"
+  ],
+  "screenshots": [
+    {
+      "path": "/tmp/astrolift-nvke-workload-ui-full.png",
+      "sha256": "e40cbfef5d6ac8d2acfc009af85d92156b956ddaf692189dd7cf9c89c4ac4fa2",
+      "visuallyInspected": true
+    },
+    {
+      "path": "/tmp/astrolift-nvke-workload-ui-768.png",
+      "sha256": "5986478401645036cd2137751f64ccac01634146638cd11d3863a21f9e44640f",
+      "visuallyInspected": true
+    },
+    {
+      "path": "/tmp/astrolift-nvke-workload-ui-dark.png",
+      "sha256": "956903b65ee6cf782c0ff7a281579ef1212230fb774760a80352ea45d2d12e47",
+      "visuallyInspected": true
+    },
+    {
+      "path": "/tmp/astrolift-nvke-workload-operation-install-plan-workload.png",
+      "sha256": "f38aba98d2f14ffa19b79774935459c6d6ee6954b486f1ab595be4d3ff4f33c6",
+      "visuallyInspected": true
+    }
+  ],
+  "retainedFailures": [
+    {
+      "logPath": "/tmp/astrolift-nvke-workload-operation-ui-v1.log",
+      "reason": "Harness digest locator matched both workload and verification sections; scoped to workload section before successful composed run"
+    },
+    {
+      "logPath": "/tmp/astrolift-nvke-workload-ui-format-v1.log",
+      "reason": "Two browser driver files needed Prettier formatting; format v2 passed after whitespace-only formatting"
+    }
+  ],
+  "limits": [
+    "Owned native fixture has three plan items and a controlled Helm chart, not a full live NVKE installation",
+    "Actual workload CLI/browser evidence supersedes the pending-client statements in management-workload-api-local.json and nvke-workload-cli-local.json for this slice only",
+    "Broad backend lint/format/types remain red as recorded in management-workload-api-local.json; final stable-resource persistence regression and release gates remain required",
+    "Operator-managed image discovery, signed image closure, original credential/platform correspondence and linked exactly-once continuation remain incomplete",
+    "No main merge or deployment occurred"
+  ]
+}

@@ -18322,6 +18322,35 @@
       "sourceDigest": "Quell-SHA-256",
       "rootDigest": "OCI-Wurzeldigest",
       "blobCount": "Erfasste Blobs"
+    },
+    "installWorkload": {
+      "maximumBytes": "Lesebyte-Limit",
+      "timeoutSeconds": "Zeitlimit in Sekunden",
+      "originalOnly": "Verwenden Sie die ursprünglichen Einstellungen für diese UUID. Die gespeicherte private Absicht kann nicht ersetzt werden.",
+      "loading": "Gespeichertes Inventar wird geladen…",
+      "artifactDigest": "Datensatz-SHA-256",
+      "title": "Workload-Inventar",
+      "help": "Erfasst alle Elemente des geprüften Baums und bewahrt ihre ursprünglichen Beobachtungszeitpunkte.",
+      "closureRequired": "Die Fortsetzung erfordert vollständige Workload- und Plattformprüfung, gleichwertige ursprüngliche Zugangsdaten, aktuelle Phasenprüfungen und verknüpfte Zulassung.",
+      "settingsHelp": "Prüfen Sie alle Helm-Kontexte und begrenzen Sie das gesamte Inventar. Bewahren Sie die ursprünglichen Einstellungen zur Wiederherstellung auf.",
+      "invalidInput": "Prüfen Sie die eindeutige UUID, die exakten Kontextbindungen und die Erfassungsgrenzen.",
+      "prepare": "Inventar erfassen",
+      "review": "Gespeichertes Inventar prüfen",
+      "retry": "Gespeicherte Erfassung wiederholen",
+      "failed": "Die Erfassung konnte nicht bestätigt werden. Bewahren Sie die UUID auf und prüfen Sie den gespeicherten Datensatz.",
+      "parentRequired": "Prüfen Sie zuerst den genauen vorbereiteten Plan, die Chart-Veröffentlichung und den Ausführungsbaum.",
+      "unavailable": "Das gespeicherte Inventar stimmt nicht mit dieser geprüften Quelle überein.",
+      "unloaded": "Prüfen Sie eine vorhandene Inventar-UUID oder erfassen Sie ein neues Inventar.",
+      "sourceDigest": "Quell-SHA-256",
+      "contextBindings": "Geprüfte Helm-Kontexte (JSON)",
+      "bindingsHelp": "Ordnen Sie jedem Helm-Element die exakten Werte contextId und contextDigest zu. Verwenden Sie '{}' nur, wenn der Baum keine Helm-Elemente enthält.",
+      "maximumResources": "Ressourcenlimit",
+      "workloadDigest": "Inventar-Prüfsumme",
+      "itemCount": "Planelemente",
+      "resourceCount": "Ressourcen",
+      "imageUseCount": "Image-Verwendungen",
+      "imageReferenceCount": "Unterschiedliche Image-Referenzen",
+      "issueCount": "Zuordnungsprobleme"
     }
   }
 }

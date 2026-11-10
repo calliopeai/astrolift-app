@@ -18319,6 +18319,35 @@
       "sourceDigest": "Source SHA-256",
       "rootDigest": "OCI root digest",
       "blobCount": "Captured blobs"
+    },
+    "installWorkload": {
+      "maximumBytes": "Read byte limit",
+      "timeoutSeconds": "Timeout in seconds",
+      "originalOnly": "Use the original settings for this UUID. Its retained private intent cannot be replaced.",
+      "loading": "Loading saved inventory…",
+      "artifactDigest": "Record SHA-256",
+      "title": "Workload inventory",
+      "help": "Collect all items from the reviewed tree and retain their original observation times.",
+      "closureRequired": "Continuation requires workload and platform closure, original credential equivalence, fresh phase-use checks and linked admission.",
+      "settingsHelp": "Review every Helm context binding and set limits for the complete inventory. Keep the original settings for recovery.",
+      "invalidInput": "Review the distinct UUID, exact context bindings and bounded collection limits.",
+      "prepare": "Collect inventory",
+      "review": "Review saved inventory",
+      "retry": "Retry retained collection",
+      "failed": "Inventory collection could not be confirmed. Preserve its UUID and review the saved record.",
+      "parentRequired": "Review the exact prepared plan, chart publication and execution tree first.",
+      "unavailable": "The saved inventory does not match this reviewed source.",
+      "unloaded": "Review an existing inventory UUID or collect a new inventory.",
+      "sourceDigest": "Source SHA-256",
+      "contextBindings": "Reviewed Helm contexts (JSON)",
+      "bindingsHelp": "Map every Helm item to its exact contextId and contextDigest. Use '{}' only when the tree has no Helm items.",
+      "maximumResources": "Resource limit",
+      "workloadDigest": "Inventory digest",
+      "itemCount": "Plan items",
+      "resourceCount": "Resources",
+      "imageUseCount": "Image uses",
+      "imageReferenceCount": "Distinct image references",
+      "issueCount": "Joining issues"
     }
   }
 }

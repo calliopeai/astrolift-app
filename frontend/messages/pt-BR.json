@@ -18319,6 +18319,35 @@
       "sourceDigest": "SHA-256 da origem",
       "rootDigest": "Resumo raiz OCI",
       "blobCount": "Blobs capturados"
+    },
+    "installWorkload": {
+      "maximumBytes": "Limite de bytes lidos",
+      "timeoutSeconds": "Tempo limite em segundos",
+      "originalOnly": "Use as configurações originais deste UUID. Sua intenção privada retida não pode ser substituída.",
+      "loading": "Carregando inventário salvo…",
+      "artifactDigest": "SHA-256 do registro",
+      "title": "Inventário de cargas",
+      "help": "Coleta todos os itens da árvore revisada e preserva os horários originais de observação.",
+      "closureRequired": "A continuação exige verificação completa de cargas e plataformas, equivalência das credenciais originais, verificações recentes da fase e admissão vinculada.",
+      "settingsHelp": "Revise todos os contextos Helm e defina limites para o inventário completo. Preserve as configurações originais para recuperação.",
+      "invalidInput": "Revise o UUID distinto, os contextos exatos e os limites de coleta.",
+      "prepare": "Coletar inventário",
+      "review": "Revisar inventário salvo",
+      "retry": "Repetir coleta retida",
+      "failed": "Não foi possível confirmar a coleta. Preserve seu UUID e revise o registro salvo.",
+      "parentRequired": "Revise primeiro o plano preparado, a publicação de charts e a árvore de execução exatos.",
+      "unavailable": "O inventário salvo não corresponde a esta origem revisada.",
+      "unloaded": "Revise um UUID de inventário existente ou colete um novo inventário.",
+      "sourceDigest": "SHA-256 da origem",
+      "contextBindings": "Contextos Helm revisados (JSON)",
+      "bindingsHelp": "Associe cada item Helm aos valores exatos de contextId e contextDigest. Use '{}' apenas quando a árvore não tiver itens Helm.",
+      "maximumResources": "Limite de recursos",
+      "workloadDigest": "Resumo do inventário",
+      "itemCount": "Itens do plano",
+      "resourceCount": "Recursos",
+      "imageUseCount": "Usos de imagens",
+      "imageReferenceCount": "Referências de imagens distintas",
+      "issueCount": "Problemas de vinculação"
     }
   }
 }

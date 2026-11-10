@@ -18322,6 +18322,35 @@
       "sourceDigest": "SHA-256 de la source",
       "rootDigest": "Empreinte racine OCI",
       "blobCount": "Blobs capturés"
+    },
+    "installWorkload": {
+      "maximumBytes": "Limite d’octets lus",
+      "timeoutSeconds": "Délai en secondes",
+      "originalOnly": "Utilisez les paramètres d’origine pour cet UUID. Son intention privée conservée ne peut pas être remplacée.",
+      "loading": "Chargement de l’inventaire enregistré…",
+      "artifactDigest": "SHA-256 de l’enregistrement",
+      "title": "Inventaire des charges",
+      "help": "Collecte tous les éléments de l’arborescence vérifiée et conserve leurs dates d’observation initiales.",
+      "closureRequired": "La poursuite exige une vérification complète des charges et plateformes, l’équivalence des identifiants d’origine, des contrôles de phase récents et une admission liée.",
+      "settingsHelp": "Vérifiez tous les contextes Helm et définissez les limites de l’inventaire complet. Conservez les paramètres initiaux pour la récupération.",
+      "invalidInput": "Vérifiez l’UUID distinct, les contextes exacts et les limites de collecte.",
+      "prepare": "Collecter l’inventaire",
+      "review": "Vérifier l’inventaire enregistré",
+      "retry": "Réessayer la collecte conservée",
+      "failed": "La collecte n’a pas pu être confirmée. Conservez son UUID et vérifiez l’enregistrement.",
+      "parentRequired": "Vérifiez d’abord le plan préparé, la publication des charts et l’arbre d’exécution exacts.",
+      "unavailable": "L’inventaire enregistré ne correspond pas à cette source vérifiée.",
+      "unloaded": "Vérifiez un UUID d’inventaire existant ou collectez un nouvel inventaire.",
+      "sourceDigest": "SHA-256 de la source",
+      "contextBindings": "Contextes Helm vérifiés (JSON)",
+      "bindingsHelp": "Associez chaque élément Helm à ses valeurs exactes contextId et contextDigest. Utilisez '{}' uniquement si l’arborescence ne contient aucun élément Helm.",
+      "maximumResources": "Limite de ressources",
+      "workloadDigest": "Empreinte de l’inventaire",
+      "itemCount": "Éléments du plan",
+      "resourceCount": "Ressources",
+      "imageUseCount": "Utilisations d’images",
+      "imageReferenceCount": "Références d’images distinctes",
+      "issueCount": "Problèmes de rapprochement"
     }
   }
 }

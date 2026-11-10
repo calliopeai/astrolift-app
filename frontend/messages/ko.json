@@ -18319,6 +18319,35 @@
       "sourceDigest": "소스 SHA-256",
       "rootDigest": "OCI 루트 다이제스트",
       "blobCount": "캡처된 Blob 수"
+    },
+    "installWorkload": {
+      "maximumBytes": "읽기 바이트 제한",
+      "timeoutSeconds": "제한 시간(초)",
+      "originalOnly": "이 UUID의 원래 설정을 사용하세요. 저장된 비공개 의도는 교체할 수 없습니다.",
+      "loading": "저장된 인벤토리 로드 중…",
+      "artifactDigest": "레코드 SHA-256",
+      "title": "워크로드 인벤토리",
+      "help": "검토한 트리의 모든 항목을 수집하고 원래 관측 시간을 보존합니다.",
+      "closureRequired": "계속하려면 워크로드와 플랫폼의 완전한 검증, 원래 자격 증명의 동등성, 단계 사용 시 최신 확인 및 연결된 실행 승인이 필요합니다.",
+      "settingsHelp": "모든 Helm 컨텍스트와 전체 인벤토리 수집 제한을 검토하세요. 복구를 위해 원래 설정을 보존하세요.",
+      "invalidInput": "고유 UUID, 정확한 컨텍스트 바인딩과 수집 제한을 확인하세요.",
+      "prepare": "인벤토리 수집",
+      "review": "저장된 인벤토리 검토",
+      "retry": "보존된 수집 재시도",
+      "failed": "수집을 확인할 수 없습니다. UUID를 보존하고 저장된 기록을 검토하세요.",
+      "parentRequired": "먼저 정확한 준비된 계획, 차트 게시 및 실행 트리를 검토하세요.",
+      "unavailable": "저장된 인벤토리가 검토한 소스와 일치하지 않습니다.",
+      "unloaded": "기존 인벤토리 UUID를 검토하거나 새 인벤토리를 수집하세요.",
+      "sourceDigest": "소스 SHA-256",
+      "contextBindings": "검토한 Helm 컨텍스트(JSON)",
+      "bindingsHelp": "각 Helm 항목에 정확한 contextId와 contextDigest를 지정하세요. 트리에 Helm 항목이 없을 때만 '{}'를 사용하세요.",
+      "maximumResources": "리소스 수 제한",
+      "workloadDigest": "인벤토리 다이제스트",
+      "itemCount": "계획 항목 수",
+      "resourceCount": "리소스 수",
+      "imageUseCount": "이미지 사용 수",
+      "imageReferenceCount": "고유 이미지 참조 수",
+      "issueCount": "연결 문제 수"
     }
   }
 }

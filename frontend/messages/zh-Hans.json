@@ -18319,6 +18319,35 @@
       "sourceDigest": "来源 SHA-256",
       "rootDigest": "OCI 根摘要",
       "blobCount": "捕获的 Blob 数"
+    },
+    "installWorkload": {
+      "maximumBytes": "读取字节数上限",
+      "timeoutSeconds": "超时（秒）",
+      "originalOnly": "请使用此 UUID 的原始设置。已保留的私有意图不可替换。",
+      "loading": "正在加载已保存的清单…",
+      "artifactDigest": "记录 SHA-256",
+      "title": "工作负载清单",
+      "help": "收集已审核树中的所有项目，并保留原始观测时间。",
+      "closureRequired": "继续执行需要完整验证工作负载和平台、原始凭据等效性、阶段使用时的最新检查以及关联的执行许可。",
+      "settingsHelp": "审核所有 Helm 上下文并设置整个清单的收集限制。保留原始设置以便恢复。",
+      "invalidInput": "请检查唯一的 UUID、准确的上下文绑定和收集限制。",
+      "prepare": "收集清单",
+      "review": "审核已保存的清单",
+      "retry": "重试保留的收集操作",
+      "failed": "无法确认收集结果。请保留其 UUID 并审核已保存的记录。",
+      "parentRequired": "请先检查准确的已准备计划、图表发布和执行树。",
+      "unavailable": "已保存的清单与此已审核来源不匹配。",
+      "unloaded": "审核现有清单 UUID，或收集新清单。",
+      "sourceDigest": "来源 SHA-256",
+      "contextBindings": "已审核的 Helm 上下文（JSON）",
+      "bindingsHelp": "为每个 Helm 项目指定准确的 contextId 和 contextDigest。仅在树中没有 Helm 项目时使用 '{}'。",
+      "maximumResources": "资源数量上限",
+      "workloadDigest": "清单摘要",
+      "itemCount": "计划项目数",
+      "resourceCount": "资源数",
+      "imageUseCount": "镜像使用次数",
+      "imageReferenceCount": "不同镜像引用数",
+      "issueCount": "关联问题数"
     }
   }
 }

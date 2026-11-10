@@ -18322,6 +18322,35 @@
       "sourceDigest": "SHA-256 del origen",
       "rootDigest": "Resumen raíz OCI",
       "blobCount": "Blobs capturados"
+    },
+    "installWorkload": {
+      "maximumBytes": "Límite de bytes leídos",
+      "timeoutSeconds": "Tiempo límite en segundos",
+      "originalOnly": "Usa los ajustes originales de este UUID. Su intención privada guardada no se puede sustituir.",
+      "loading": "Cargando inventario guardado…",
+      "artifactDigest": "SHA-256 del registro",
+      "title": "Inventario de cargas",
+      "help": "Recopila todos los elementos del árbol revisado y conserva sus fechas de observación originales.",
+      "closureRequired": "Continuar requiere verificar las cargas y plataformas, la equivalencia de credenciales originales, comprobaciones recientes de fase y admisión vinculada.",
+      "settingsHelp": "Revisa todos los contextos de Helm y fija los límites del inventario completo. Conserva la configuración original para recuperarlo.",
+      "invalidInput": "Revisa el UUID único, los contextos exactos y los límites de recopilación.",
+      "prepare": "Recopilar inventario",
+      "review": "Revisar inventario guardado",
+      "retry": "Reintentar recopilación retenida",
+      "failed": "No se pudo confirmar la recopilación. Conserva su UUID y revisa el registro guardado.",
+      "parentRequired": "Revise primero el plan preparado, la publicación de gráficos y el árbol de ejecución exactos.",
+      "unavailable": "El inventario guardado no coincide con este origen revisado.",
+      "unloaded": "Revisa un UUID de inventario existente o recopila uno nuevo.",
+      "sourceDigest": "SHA-256 del origen",
+      "contextBindings": "Contextos de Helm revisados (JSON)",
+      "bindingsHelp": "Asocia cada elemento de Helm con sus valores exactos de contextId y contextDigest. Usa '{}' solo si el árbol no contiene elementos de Helm.",
+      "maximumResources": "Límite de recursos",
+      "workloadDigest": "Resumen del inventario",
+      "itemCount": "Elementos del plan",
+      "resourceCount": "Recursos",
+      "imageUseCount": "Usos de imágenes",
+      "imageReferenceCount": "Referencias de imágenes distintas",
+      "issueCount": "Problemas de vinculación"
     }
   }
 }

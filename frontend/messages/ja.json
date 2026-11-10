@@ -18319,6 +18319,35 @@
       "sourceDigest": "ソース SHA-256",
       "rootDigest": "OCI ルートダイジェスト",
       "blobCount": "取得した Blob 数"
+    },
+    "installWorkload": {
+      "maximumBytes": "読み取りバイト数の上限",
+      "timeoutSeconds": "タイムアウト（秒）",
+      "originalOnly": "この UUID の元の設定を使用してください。保存された非公開の意図は置き換えられません。",
+      "loading": "保存済みインベントリを読み込み中…",
+      "artifactDigest": "レコード SHA-256",
+      "title": "ワークロードのインベントリ",
+      "help": "確認済みツリーの全項目を収集し、元の観測日時を保持します。",
+      "closureRequired": "続行にはワークロードとプラットフォームの完全な検証、元の認証情報の同等性、フェーズ使用時の新しい検証、および関連付けられた実行許可が必要です。",
+      "settingsHelp": "すべての Helm コンテキストとインベントリ全体の収集上限を確認してください。復旧用に元の設定を保持してください。",
+      "invalidInput": "重複しない UUID、正確なコンテキスト、収集上限を確認してください。",
+      "prepare": "インベントリを収集",
+      "review": "保存済みインベントリを確認",
+      "retry": "保持された収集を再試行",
+      "failed": "収集を確認できませんでした。UUID を保持し、保存済みレコードを確認してください。",
+      "parentRequired": "先に、準備済みプラン、チャート公開、実行ツリーが正確に一致することを確認してください。",
+      "unavailable": "保存済みインベントリが確認済みのソースと一致しません。",
+      "unloaded": "既存のインベントリ UUID を確認するか、新しく収集してください。",
+      "sourceDigest": "ソース SHA-256",
+      "contextBindings": "確認済み Helm コンテキスト（JSON）",
+      "bindingsHelp": "各 Helm 項目に正確な contextId と contextDigest を指定してください。Helm 項目がないツリーに限り '{}' を使用できます。",
+      "maximumResources": "リソース数の上限",
+      "workloadDigest": "インベントリのダイジェスト",
+      "itemCount": "計画項目数",
+      "resourceCount": "リソース数",
+      "imageUseCount": "イメージ使用数",
+      "imageReferenceCount": "一意のイメージ参照数",
+      "issueCount": "関連付けの問題数"
     }
   }
 }
