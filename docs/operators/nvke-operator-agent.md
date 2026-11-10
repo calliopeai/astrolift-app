@@ -892,3 +892,12 @@ references and selections stay private. Continuation remains unauthorized.
 CLI/browser pairing and complete operator/platform/credential/rewrite/import/
 fresh-use closure remain open. See the provider qualification records for the
 actual SDK/native proof and application verification state.
+
+The operation screen's **Image bindings** panel uses the reviewed workload
+inventory. Supply a distinct artifact UUID, the private JSON image-proof map
+and the image/output/time limits. The panel records only source metadata and an
+input hash in browser recovery storage, then clears the private fields after an
+attempt. Reload never starts a request: **Review saved bindings** reads the
+original artifact; **Retry retained bindings** explicitly uses the server's saved
+private intent. Changing the workload, actor or reviewed source invalidates the
+displayed evidence. Permission and pending states follow the operation screen.

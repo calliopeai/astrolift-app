@@ -205,7 +205,25 @@ export function validateInstallPlanWorkload(
 }
 
 export function validateInstallPlanWorkloadSource(
-  row: z.infer<typeof installPlanWorkloadMetadataSchema>,
+  row: Pick<
+    z.infer<typeof installPlanWorkloadMetadataSchema>,
+    | "id"
+    | "planId"
+    | "planVersion"
+    | "planDigest"
+    | "chartArtifactId"
+    | "chartArtifactVersion"
+    | "chartArtifactDigest"
+    | "treeId"
+    | "treeVersion"
+    | "treeDigest"
+    | "operationId"
+    | "operationVersion"
+    | "siteId"
+    | "siteVersion"
+    | "authorityId"
+    | "authorityVersion"
+  >,
   parent: NvkeInstallPlan,
   publication: NvkeInstallPlanCharts,
   execution: NvkeInstallPlanTree,

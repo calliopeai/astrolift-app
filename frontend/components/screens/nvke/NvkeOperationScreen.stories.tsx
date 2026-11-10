@@ -1,3 +1,4 @@
+import { INSTALL_IMAGE_BINDING_PROPS } from "./NvkeOperatorInstallPlanImageBindingPanel.stories";
 import { WorkloadBound as WORKLOAD_IMAGE_STORY } from "./NvkeOperatorInstallPlanImagePanel.stories";
 import { INSTALL_WORKLOAD_PROPS } from "./NvkeOperatorInstallPlanWorkloadPanel.stories";
 import { INSTALL_LOCAL_IMAGE_PROPS } from "./NvkeOperatorInstallPlanLocalImagePanel.stories";
@@ -335,4 +336,17 @@ export const InstallPlanWorkloadImage: Story = {
     ...InstallPlanWorkload.args,
     operatorInstallPlanWorkloadImage: WORKLOAD_IMAGE_STORY.args as typeof INSTALL_IMAGE_PROPS,
   },
+};
+
+export const InstallPlanImageBinding: Story = {
+  args: {
+    ...InstallPlanWorkloadImage.args,
+    operatorInstallPlanImageBinding: INSTALL_IMAGE_BINDING_PROPS,
+  },
+};
+export const InstallPlanImageBindingReadOnly: Story = {
+  args: { ...InstallPlanImageBinding.args, canAct: false },
+};
+export const InstallPlanImageBindingPending: Story = {
+  args: { ...InstallPlanImageBinding.args, pending: true },
 };

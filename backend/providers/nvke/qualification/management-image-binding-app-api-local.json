@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "encrypted-signed-image-binding-intent-and-typed-graphql",
-  "status": "postgres-baseline-43-pass-final-focused-qualification-running-release-incomplete",
+  "status": "postgres-api-and-final-reviewed-source-qualified-cli-browser-release-incomplete",
   "sourceBaseRevision": "56482a046",
   "sourceSha256": {
     "backend/astrolift_clusters/migrations/0045_nvke_install_plan_image_binding.py": "487d42bc586618051e5ae3e25c2bd316485af147a445f80c3eb5429b66dea111",
@@ -40,10 +40,15 @@
     },
     "finalFocusedPostgresApi": {
       "sessionId": 32441,
-      "status": "running-after-successful-predecessor",
+      "status": "complete",
       "logPath": "/tmp/astrolift-nvke-image-binding-app-api-v3.log",
       "exitMarker": "/tmp/astrolift-nvke-image-binding-app-api-v3.exit",
-      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-app-api-queue-v3.exit"
+      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-app-api-queue-v3.exit",
+      "exitCode": 0,
+      "tests": 12,
+      "skipped": 0,
+      "seconds": 207.43,
+      "logSha256": "fcdb158d3e11d9a5d602bbf84b437c46e941adacf31bf7663382901195197ad3"
     },
     "contractsAndMigration": {
       "sessionId": 90580,
@@ -99,10 +104,10 @@
     "Cross-artifact UUID reservations prevent reuse of signed image-binding IDs by existing preparation paths"
   ],
   "limits": [
-    "The final PostgreSQL cases are still pending; no application qualification pass is claimed",
     "SDK/native mTLS proof is qualified separately in management-image-binding-sdk-local.json",
     "CLI/browser pairing and operator/platform/credential/rewrite/import/fresh-use/linked-admission closure remain open",
-    "Linux common regression after runtime clock repair is pending in the Opscode evidence",
-    "No main merge or deployment"
-  ]
+    "No main merge or deployment",
+    "The final focused API proof qualifies backend source at 87039b49b. CLI/browser pairing and combined full client/native proof remain required."
+  ],
+  "sourceRevision": "87039b49b"
 }

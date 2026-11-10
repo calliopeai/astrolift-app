@@ -46,7 +46,7 @@
   "limits": [
     "App encrypted intent and typed GraphQL controls are still under qualification; CLI/browser pairing remains required",
     "Image binding does not establish operator/node-platform/credential/rewrite/import/fresh-use or execution admission closure",
-    "Linux common qualification remains failed on the separate clock issue; this SDK native proof ran on macOS",
-    "No main merge or deployment"
+    "No main merge or deployment",
+    "The paired agent common suite now passes 106 cases on each runtime after the documented Linux qualification VM clock repair. This SDK native proof ran on macOS."
   ]
 }

@@ -18353,6 +18353,37 @@
       "imageUseCount": "Usos de imagens",
       "imageReferenceCount": "Referências de imagens distintas",
       "issueCount": "Problemas de vinculação"
+    },
+    "installImageBinding": {
+      "maximumBytes": "Limite de bytes lidos",
+      "timeoutSeconds": "Tempo limite em segundos",
+      "originalOnly": "Use as configurações originais deste UUID. Sua intenção privada retida não pode ser substituída.",
+      "loading": "Carregando vínculos…",
+      "artifactDigest": "SHA-256 do registro",
+      "title": "Vínculos de imagens",
+      "help": "Vincule provas retidas a cada uso no inventário revisado.",
+      "closureRequired": "A continuação exige verificação completa de cargas e plataformas, equivalência das credenciais originais, verificações recentes da fase e admissão vinculada.",
+      "settingsHelp": "Selecione cada prova e revise os limites. Guarde os valores exatos para recuperação.",
+      "invalidInput": "Revise o UUID distinto, as seleções exatas e os limites.",
+      "prepare": "Vincular provas",
+      "review": "Revisar vínculos",
+      "retry": "Tentar vínculos novamente",
+      "failed": "Os vínculos não foram confirmados. Preserve o UUID e revise o registro.",
+      "parentRequired": "Revise primeiro o plano, chart, árvore e inventário exatos.",
+      "unavailable": "Os vínculos não correspondem a esta origem.",
+      "unloaded": "Revise um UUID existente ou prepare novos vínculos.",
+      "sourceDigest": "SHA-256 da origem",
+      "bindingsHelp": "Associe cada referência a sourceKind (local ou registry), artifactId e artifactDigest. Use {} somente se nenhuma imagem for necessária.",
+      "workloadDigest": "Resumo do inventário",
+      "imageUseCount": "Usos de imagens",
+      "imageBindings": "Provas de imagens retidas (JSON)",
+      "maximumImageBytes": "Limite de bytes de imagens",
+      "bindingDigest": "Resumo do vínculo",
+      "imageCount": "Imagens vinculadas",
+      "importCount": "Importações",
+      "rewriteCount": "Reescritas propostas",
+      "verifiedImageBytes": "Bytes de imagens verificados",
+      "workloadIssueCount": "Problemas das cargas"
     }
   }
 }

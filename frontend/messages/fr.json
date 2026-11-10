@@ -18356,6 +18356,37 @@
       "imageUseCount": "Utilisations d’images",
       "imageReferenceCount": "Références d’images distinctes",
       "issueCount": "Problèmes de rapprochement"
+    },
+    "installImageBinding": {
+      "maximumBytes": "Limite d’octets lus",
+      "timeoutSeconds": "Délai en secondes",
+      "originalOnly": "Utilisez les paramètres d’origine pour cet UUID. Son intention privée conservée ne peut pas être remplacée.",
+      "loading": "Chargement des associations…",
+      "artifactDigest": "SHA-256 de l’enregistrement",
+      "title": "Associations d’images",
+      "help": "Associez les preuves conservées à chaque utilisation de l’inventaire vérifié.",
+      "closureRequired": "La poursuite exige une vérification complète des charges et plateformes, l’équivalence des identifiants d’origine, des contrôles de phase récents et une admission liée.",
+      "settingsHelp": "Sélectionnez chaque preuve et vérifiez les limites. Conservez les réglages exacts pour la récupération.",
+      "invalidInput": "Vérifiez l’UUID distinct, les sélections exactes et les limites.",
+      "prepare": "Associer les preuves",
+      "review": "Vérifier les associations",
+      "retry": "Réessayer les associations",
+      "failed": "Les associations ne sont pas confirmées. Conservez l’UUID et vérifiez l’enregistrement.",
+      "parentRequired": "Vérifiez d’abord le plan, le chart, l’arbre et l’inventaire exacts.",
+      "unavailable": "Les associations ne correspondent pas à cette source.",
+      "unloaded": "Vérifiez un UUID existant ou préparez des associations.",
+      "sourceDigest": "SHA-256 de la source",
+      "bindingsHelp": "Associez à chaque référence sourceKind (local ou registry), artifactId et artifactDigest. Utilisez {} uniquement si aucune image n’est requise.",
+      "workloadDigest": "Empreinte de l’inventaire",
+      "imageUseCount": "Utilisations d’images",
+      "imageBindings": "Preuves d’images conservées (JSON)",
+      "maximumImageBytes": "Limite d’octets des images",
+      "bindingDigest": "Empreinte de l’association",
+      "imageCount": "Images associées",
+      "importCount": "Importations",
+      "rewriteCount": "Réécritures proposées",
+      "verifiedImageBytes": "Octets d’images vérifiés",
+      "workloadIssueCount": "Problèmes des charges"
     }
   }
 }

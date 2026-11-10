@@ -18353,6 +18353,37 @@
       "imageUseCount": "Image uses",
       "imageReferenceCount": "Distinct image references",
       "issueCount": "Joining issues"
+    },
+    "installImageBinding": {
+      "maximumBytes": "Read byte limit",
+      "timeoutSeconds": "Timeout in seconds",
+      "originalOnly": "Use the original settings for this UUID. Its retained private intent cannot be replaced.",
+      "loading": "Loading saved bindings…",
+      "artifactDigest": "Record SHA-256",
+      "title": "Image bindings",
+      "help": "Bind retained image proofs to every use in the reviewed workload inventory.",
+      "closureRequired": "Continuation requires workload and platform closure, original credential equivalence, fresh phase-use checks and linked admission.",
+      "settingsHelp": "Select each image proof and review the limits. Keep the exact settings for recovery.",
+      "invalidInput": "Review the distinct UUID, exact image selections and bounded limits.",
+      "prepare": "Bind image proofs",
+      "review": "Review saved bindings",
+      "retry": "Retry retained bindings",
+      "failed": "Image bindings could not be confirmed. Preserve the UUID and review the saved record.",
+      "parentRequired": "Review the exact plan, chart, tree and workload inventory first.",
+      "unavailable": "The saved bindings do not match this reviewed source.",
+      "unloaded": "Review an existing binding UUID or prepare new bindings.",
+      "sourceDigest": "Source SHA-256",
+      "bindingsHelp": "Map each image reference to sourceKind (local or registry), artifactId and artifactDigest. Use {} only when no images are required.",
+      "workloadDigest": "Inventory digest",
+      "imageUseCount": "Image uses",
+      "imageBindings": "Retained image proofs (JSON)",
+      "maximumImageBytes": "Image byte limit",
+      "bindingDigest": "Binding digest",
+      "imageCount": "Bound images",
+      "importCount": "Imports",
+      "rewriteCount": "Proposed rewrites",
+      "verifiedImageBytes": "Verified image bytes",
+      "workloadIssueCount": "Workload issues"
     }
   }
 }

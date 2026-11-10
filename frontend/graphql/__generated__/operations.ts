@@ -22804,6 +22804,29 @@ export type RetryNvkeInstallPlanContextMutation = { recoverNvkeOperatorInstallPl
 
 export type NvkeInstallPlanContextFieldsFragment = { id: string, version: number, status: string, planId: string, planVersion: number, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, planDigest: string, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, item: string, ordinal: number, captureDigest: string, frozenChartSha256: string, contextDigest: string, documentCount: number, lookupCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean };
 
+export type PrepareNvkeInstallPlanImageBindingMutationVariables = Exact<{
+  input: PrepareNvkeOperatorInstallPlanImageBindingInput;
+}>;
+
+
+export type PrepareNvkeInstallPlanImageBindingMutation = { prepareNvkeOperatorInstallPlanImageBinding: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingDigest: string, imageCount: number, imageUseCount: number, importCount: number, rewriteCount: number, verifiedImageBytes: string, workloadIssueCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean } | null } };
+
+export type ReviewNvkeInstallPlanImageBindingMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanImageBindingReviewInput;
+}>;
+
+
+export type ReviewNvkeInstallPlanImageBindingMutation = { reviewNvkeOperatorInstallPlanImageBinding: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingDigest: string, imageCount: number, imageUseCount: number, importCount: number, rewriteCount: number, verifiedImageBytes: string, workloadIssueCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean } | null } };
+
+export type RetryNvkeInstallPlanImageBindingMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanImageBindingReviewInput;
+}>;
+
+
+export type RetryNvkeInstallPlanImageBindingMutation = { recoverNvkeOperatorInstallPlanImageBindingPreparation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingDigest: string, imageCount: number, imageUseCount: number, importCount: number, rewriteCount: number, verifiedImageBytes: string, workloadIssueCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean } | null } };
+
+export type NvkeInstallPlanImageBindingFieldsFragment = { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingDigest: string, imageCount: number, imageUseCount: number, importCount: number, rewriteCount: number, verifiedImageBytes: string, workloadIssueCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean };
+
 export type PrepareNvkeInstallPlanImageMutationVariables = Exact<{
   input: PrepareNvkeOperatorInstallPlanImageInput;
 }>;

@@ -18356,6 +18356,37 @@
       "imageUseCount": "Usos de imágenes",
       "imageReferenceCount": "Referencias de imágenes distintas",
       "issueCount": "Problemas de vinculación"
+    },
+    "installImageBinding": {
+      "maximumBytes": "Límite de bytes leídos",
+      "timeoutSeconds": "Tiempo límite en segundos",
+      "originalOnly": "Usa los ajustes originales de este UUID. Su intención privada guardada no se puede sustituir.",
+      "loading": "Cargando vinculaciones…",
+      "artifactDigest": "SHA-256 del registro",
+      "title": "Vinculaciones de imágenes",
+      "help": "Vincula pruebas guardadas con cada uso del inventario revisado.",
+      "closureRequired": "Continuar requiere verificar las cargas y plataformas, la equivalencia de credenciales originales, comprobaciones recientes de fase y admisión vinculada.",
+      "settingsHelp": "Selecciona cada prueba y revisa los límites. Conserva los valores exactos para recuperar.",
+      "invalidInput": "Revisa el UUID distinto, las selecciones exactas y los límites.",
+      "prepare": "Vincular pruebas",
+      "review": "Revisar vinculaciones",
+      "retry": "Reintentar vinculaciones",
+      "failed": "No se confirmaron las vinculaciones. Conserva el UUID y revisa el registro.",
+      "parentRequired": "Revisa primero el plan, el chart, el árbol y el inventario exactos.",
+      "unavailable": "Las vinculaciones no coinciden con este origen.",
+      "unloaded": "Revisa un UUID existente o prepara nuevas vinculaciones.",
+      "sourceDigest": "SHA-256 del origen",
+      "bindingsHelp": "Asocia cada referencia con sourceKind (local o registry), artifactId y artifactDigest. Usa {} solo si no se requieren imágenes.",
+      "workloadDigest": "Resumen del inventario",
+      "imageUseCount": "Usos de imágenes",
+      "imageBindings": "Pruebas de imágenes guardadas (JSON)",
+      "maximumImageBytes": "Límite de bytes de imágenes",
+      "bindingDigest": "Resumen de vinculación",
+      "imageCount": "Imágenes vinculadas",
+      "importCount": "Importaciones",
+      "rewriteCount": "Reescrituras propuestas",
+      "verifiedImageBytes": "Bytes de imágenes verificados",
+      "workloadIssueCount": "Problemas de cargas"
     }
   }
 }

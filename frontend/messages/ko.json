@@ -18353,6 +18353,37 @@
       "imageUseCount": "이미지 사용 수",
       "imageReferenceCount": "고유 이미지 참조 수",
       "issueCount": "연결 문제 수"
+    },
+    "installImageBinding": {
+      "maximumBytes": "읽기 바이트 제한",
+      "timeoutSeconds": "제한 시간(초)",
+      "originalOnly": "이 UUID의 원래 설정을 사용하세요. 저장된 비공개 의도는 교체할 수 없습니다.",
+      "loading": "연결 불러오는 중…",
+      "artifactDigest": "레코드 SHA-256",
+      "title": "이미지 연결",
+      "help": "검토한 인벤토리의 각 사용에 보관된 이미지 증거를 연결합니다.",
+      "closureRequired": "계속하려면 워크로드와 플랫폼의 완전한 검증, 원래 자격 증명의 동등성, 단계 사용 시 최신 확인 및 연결된 실행 승인이 필요합니다.",
+      "settingsHelp": "각 증거와 한도를 검토하세요. 복구를 위해 정확한 설정을 보관하세요.",
+      "invalidInput": "서로 다른 UUID, 정확한 이미지 선택과 한도를 검토하세요.",
+      "prepare": "증거 연결",
+      "review": "저장된 연결 검토",
+      "retry": "보관된 연결 재시도",
+      "failed": "연결을 확인하지 못했습니다. UUID를 보관하고 저장된 기록을 검토하세요.",
+      "parentRequired": "먼저 정확한 계획, 차트, 트리 및 인벤토리를 검토하세요.",
+      "unavailable": "저장된 연결이 이 소스와 일치하지 않습니다.",
+      "unloaded": "기존 UUID를 검토하거나 새 연결을 준비하세요.",
+      "sourceDigest": "소스 SHA-256",
+      "bindingsHelp": "각 참조를 sourceKind(local 또는 registry), artifactId, artifactDigest에 연결하세요. 이미지가 필요 없을 때만 {}를 사용하세요.",
+      "workloadDigest": "인벤토리 다이제스트",
+      "imageUseCount": "이미지 사용 수",
+      "imageBindings": "보관된 이미지 증거(JSON)",
+      "maximumImageBytes": "이미지 바이트 한도",
+      "bindingDigest": "연결 다이제스트",
+      "imageCount": "연결된 이미지",
+      "importCount": "가져오기",
+      "rewriteCount": "제안된 다시 쓰기",
+      "verifiedImageBytes": "검증된 이미지 바이트",
+      "workloadIssueCount": "워크로드 문제"
     }
   }
 }

@@ -18356,6 +18356,37 @@
       "imageUseCount": "Image-Verwendungen",
       "imageReferenceCount": "Unterschiedliche Image-Referenzen",
       "issueCount": "Zuordnungsprobleme"
+    },
+    "installImageBinding": {
+      "maximumBytes": "Lesebyte-Limit",
+      "timeoutSeconds": "Zeitlimit in Sekunden",
+      "originalOnly": "Verwenden Sie die ursprünglichen Einstellungen für diese UUID. Die gespeicherte private Absicht kann nicht ersetzt werden.",
+      "loading": "Zuordnungen werden geladen…",
+      "artifactDigest": "Datensatz-SHA-256",
+      "title": "Image-Zuordnungen",
+      "help": "Ordnen Sie gespeicherte Image-Nachweise jeder Verwendung im geprüften Inventar zu.",
+      "closureRequired": "Die Fortsetzung erfordert vollständige Workload- und Plattformprüfung, gleichwertige ursprüngliche Zugangsdaten, aktuelle Phasenprüfungen und verknüpfte Zulassung.",
+      "settingsHelp": "Wählen Sie die Nachweise und prüfen Sie die Grenzen. Bewahren Sie die genauen Einstellungen auf.",
+      "invalidInput": "Prüfen Sie die eindeutige UUID, genaue Auswahl und Grenzen.",
+      "prepare": "Nachweise zuordnen",
+      "review": "Zuordnungen prüfen",
+      "retry": "Zuordnungen erneut versuchen",
+      "failed": "Die Zuordnungen wurden nicht bestätigt. Bewahren Sie die UUID auf und prüfen Sie den Datensatz.",
+      "parentRequired": "Prüfen Sie zuerst den genauen Plan, das Chart, den Baum und das Inventar.",
+      "unavailable": "Die Zuordnungen passen nicht zu dieser Quelle.",
+      "unloaded": "Prüfen Sie eine vorhandene UUID oder erstellen Sie Zuordnungen.",
+      "sourceDigest": "Quell-SHA-256",
+      "bindingsHelp": "Ordnen Sie jeder Referenz sourceKind (local oder registry), artifactId und artifactDigest zu. Verwenden Sie {} nur ohne benötigte Images.",
+      "workloadDigest": "Inventar-Prüfsumme",
+      "imageUseCount": "Image-Verwendungen",
+      "imageBindings": "Gespeicherte Image-Nachweise (JSON)",
+      "maximumImageBytes": "Byte-Limit für Images",
+      "bindingDigest": "Zuordnungs-Hash",
+      "imageCount": "Zugeordnete Images",
+      "importCount": "Importe",
+      "rewriteCount": "Vorgeschlagene Umschreibungen",
+      "verifiedImageBytes": "Verifizierte Image-Bytes",
+      "workloadIssueCount": "Workload-Probleme"
     }
   }
 }

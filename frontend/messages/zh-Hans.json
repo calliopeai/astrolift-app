@@ -18353,6 +18353,37 @@
       "imageUseCount": "镜像使用次数",
       "imageReferenceCount": "不同镜像引用数",
       "issueCount": "关联问题数"
+    },
+    "installImageBinding": {
+      "maximumBytes": "读取字节数上限",
+      "timeoutSeconds": "超时（秒）",
+      "originalOnly": "请使用此 UUID 的原始设置。已保留的私有意图不可替换。",
+      "loading": "正在加载绑定…",
+      "artifactDigest": "记录 SHA-256",
+      "title": "镜像绑定",
+      "help": "将保留的镜像证据绑定到已审核清单中的每次使用。",
+      "closureRequired": "继续执行需要完整验证工作负载和平台、原始凭据等效性、阶段使用时的最新检查以及关联的执行许可。",
+      "settingsHelp": "选择各项证据并审核限制。保留准确设置以便恢复。",
+      "invalidInput": "请审核独立 UUID、准确的镜像选择和限制。",
+      "prepare": "绑定镜像证据",
+      "review": "审核已保存的绑定",
+      "retry": "重试保留的绑定",
+      "failed": "无法确认镜像绑定。请保留 UUID 并审核已保存记录。",
+      "parentRequired": "请先审核准确的计划、图表、执行树和工作负载清单。",
+      "unavailable": "已保存的绑定与当前来源不符。",
+      "unloaded": "审核现有 UUID 或准备新绑定。",
+      "sourceDigest": "来源 SHA-256",
+      "bindingsHelp": "为每个引用指定 sourceKind（local 或 registry）、artifactId 和 artifactDigest。仅在无需镜像时使用 {}。",
+      "workloadDigest": "清单摘要",
+      "imageUseCount": "镜像使用次数",
+      "imageBindings": "保留的镜像证据（JSON）",
+      "maximumImageBytes": "镜像字节限制",
+      "bindingDigest": "绑定摘要",
+      "imageCount": "已绑定镜像",
+      "importCount": "导入",
+      "rewriteCount": "建议重写",
+      "verifiedImageBytes": "已验证镜像字节数",
+      "workloadIssueCount": "工作负载问题"
     }
   }
 }

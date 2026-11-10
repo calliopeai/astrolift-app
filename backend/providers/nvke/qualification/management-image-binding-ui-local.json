@@ -1,0 +1,190 @@
+{
+  "format": 1,
+  "scope": "signed-image-binding-browser-controls",
+  "status": "local-ui-gates-qualified-actual-api-native-proof-pending-release-incomplete",
+  "sourceBaseRevision": "87039b49b",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "a240dfeb90eb914cc520c4bb5b485c7189c1f62b8983b72c961791e079b671be",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "bfb99591e90a1607e24eda25db25b7c8ce5b6ed388509d248ee42ac9ace3c4c9",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImageBindingPanel.api.stories.tsx": "6eadc6d42a02fa7a9ffbdf7754bf300d988fbf4ca6254663b22cc2f64b7d9019",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImageBindingPanel.stories.tsx": "25915c44b9a6a5700aa92da0d3401f0f084617b2d55711ffa589abbd773249d7",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImageBindingPanel.tsx": "9b6b354b6745ad699dc6f8bbdac305d4ab9d25a80951ccc59c379f677cca8974",
+    "frontend/components/screens/nvke/types.ts": "90f17d51ddfc804bc12ec569bf714a3838ec2d3168579adee276bfc5ae5151d9",
+    "frontend/e2e/nvke-install-plan-image-binding-api-runner.mjs": "c575c46fd679f06e9b91585195127eb1824f597fb8af3d697881a8523c7f9dce",
+    "frontend/graphql/__generated__/operations.ts": "3244712417bef2252f9cc353ac35e76a278f17063dd4d6f6f27cb3b2eff00848",
+    "frontend/graphql/nvke/nvke-install-plan-image-binding.mutations.ts": "32bafa083bd6011041793bb99f7ebbd08f1ff937a483afc1da533bed67a3286a",
+    "frontend/graphql/nvke/nvke-install-plan-image-binding.queries.ts": "e441558769a80da37a40021addd5ca303ef13d8d79e3f5d802aa3463cef8c928",
+    "frontend/graphql/nvke/use-nvke-install-plan-image-binding.test.tsx": "87a9d3aa9ea3b9931915cb0c0fbf5f8f0028f6f520d10cc432902157f3ac6aa9",
+    "frontend/graphql/nvke/use-nvke-install-plan-image-binding.ts": "5431c2a106ad43ee6fcfaa00489eff2c66bbf79db7ebfc35836e1ab2732de638",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "08db99906336d470fc19c1ede00e62b5722940f7113933d4bf2f0b9891e5aee8",
+    "frontend/lib/nvke/install-plan-image-binding-recovery.test.ts": "dd383ba37d4cdf3c3e7eaa6eb6ec574208563f7a53458d3b2f26e90f36854f91",
+    "frontend/lib/nvke/install-plan-image-binding-recovery.ts": "954ddc69a18437a3cdf40a6a45c35e44bb170bc925c5315a69d148fbef432d8c",
+    "frontend/lib/nvke/operator-install-plan-image-binding.test.ts": "4000d1768a673b3ad2fed7f5e8bdcbe68ccdc399ce26696744741bb6f52d75bb",
+    "frontend/lib/nvke/operator-install-plan-image-binding.ts": "c3bd17a6470ca32fe8f7e9f6b54653a9c2f444e5aea421b15736854c8ae9298b",
+    "frontend/lib/nvke/operator-install-plan-workload.ts": "ac3393ac7725b8eb53fc3c5506247067e7891f7f7886419bf05dd5e132988abf",
+    "frontend/messages/de.json": "b8b6b7f06dfd98d8aa6ae727a0657842f0f28301c1c3b5b23a3b32f13a790df7",
+    "frontend/messages/en.json": "0163b46707f6b24f25ca4f47b397567b87ac7fb79881466a41cfa67adbf85c1f",
+    "frontend/messages/es.json": "33346b57ea45bd69b84eac24b671c069083cf3e77c310e1861c126b187e3a6ad",
+    "frontend/messages/fr.json": "51eddcf0369d16aed2e96f08fbbdef4dd583f7bcc1273b096a7270a5d988ea2d",
+    "frontend/messages/ja.json": "327917ece79b881c10e14c7234ccf1b895057b582415cac204c75180b7f035d1",
+    "frontend/messages/ko.json": "8e9b2073b9b55ee9313302488bf8bd561b02e6084f155b29e707ccbd52e990aa",
+    "frontend/messages/pt-BR.json": "901dd47300ff300d14603d4a1e371eb43f5f56c681d5750319d1cf25e7bd3121",
+    "frontend/messages/zh-Hans.json": "0c99bf651f0921d53941c1887927b47efa917b2a7d83689bd8ac7361308c6f3f"
+  },
+  "checks": {
+    "focused": {
+      "sessionId": 4877,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-unit-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-unit-v2.exit",
+      "tests": 73,
+      "exitCode": 0,
+      "logSha256": "4c340bb119dcee9964fe964aae9d1f0f6c0c78fd291f886032cde122b51dc6d0"
+    },
+    "nvkeSuite": {
+      "sessionId": 12920,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-unit-v3.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-unit-v3.exit",
+      "tests": 1743,
+      "files": 86,
+      "exitCode": 0,
+      "logSha256": "6cbe68ab0b18b294943f412c58e528fb16c15b1b9937cee0d43bc3c5f931dbc0"
+    },
+    "storybook": {
+      "sessionId": 4829,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-storybook-v4.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-storybook-v4.exit",
+      "exitCode": 0,
+      "logSha256": "9032f2920a5c8f1261a13379f5c15fae86307db03db37f27dad66f0a056fcaaa"
+    },
+    "nextProduction": {
+      "sessionId": 52314,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-next-v3.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-next-v3.exit",
+      "exitCode": 0,
+      "logSha256": "aca672dd86536cad3ee05face68dab0f7b010569562df37b702fbac41fcc088c"
+    },
+    "lint": {
+      "sessionId": 6347,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-lint-v3.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-lint-v3.exit",
+      "errors": 0,
+      "baselineWarnings": 89,
+      "exitCode": 0,
+      "logSha256": "47a41dbdc55adf75dbb704e8ef18a974dea4d64d81b073e603c89bdecbca889c"
+    },
+    "finalTypes": {
+      "sessionId": 10519,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-post-review-types-v4.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-post-review-types-v4.exit",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nvkeStoryRenders": {
+      "sessionId": 85092,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-stories-v5.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-stories-v5.exit",
+      "tests": 489,
+      "unrelatedStoriesExcluded": 4876,
+      "exitCode": 0,
+      "logSha256": "0d567c5d92878708d6ac3e247720bdad216bf564109aa5d393c1523f43c3fbfe"
+    },
+    "chromiumPanelAndOperation": {
+      "sessionId": 41088,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-panel-browser-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-panel-browser-v2.exit",
+      "cases": 17,
+      "locales": 8,
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "narrowWidth": 768,
+      "exitCode": 0,
+      "logSha256": "d8c0e81cd11d6ece54bfd85ff10da09fd4b69b22cdeac176c24e01e50b88b590"
+    },
+    "format": {
+      "sessionId": 95389,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-format-v5.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-format-v5.exit",
+      "exitCode": 0,
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    "actualApiNative": {
+      "sessionId": 80748,
+      "status": "queued-after-actual-cli-proof",
+      "logPath": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.exit",
+      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-queue-v3.exit"
+    }
+  },
+  "retainedFailures": [
+    {
+      "sessionId": 12421,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-unit-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-unit-v1.exit",
+      "exitCode": 1,
+      "logSha256": "1ebce7af8405e4132a8096424981362e592ef619084f2b02aa2f07bbbd2300be"
+    },
+    {
+      "sessionId": 30439,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-types-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-types-v1.exit",
+      "exitCode": 2,
+      "logSha256": "b0329c38a4001ab88d4c8f9ee7bca868a1cb66c6dd1ec9e8ec5ebdd1f9303379"
+    },
+    {
+      "sessionId": 94034,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-format-v4.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-ui-format-v4.exit",
+      "exitCode": 1,
+      "logSha256": "24baedf83117cca9e5db12b1dca489de580c79d33281f2d915d3e525792a6269"
+    }
+  ],
+  "retainedNonQualification": [
+    {
+      "logPath": "/tmp/astrolift-nvke-image-binding-ui-post-review-stories-v4.log",
+      "status": "selector-matched-no-cases",
+      "testsSkipped": 5365,
+      "interpretation": "Uppercase selector matched no filename. Corrected /nvke/ selection renders 489 NVKE stories; unrelated stories are deliberately excluded."
+    },
+    {
+      "logPath": "/tmp/astrolift-nvke-image-binding-browser-app-agent-queue-v2.log",
+      "status": "queue-harness-failed-before-browser-execution",
+      "interpretation": "kqueue lacks a context-manager protocol. The corrected queue uses explicit close and waits for the same live CLI predecessor; no native or browser proof was restarted."
+    }
+  ],
+  "coverage": [
+    "Pure translated panel and states were built/reviewed in Storybook before operation-screen wiring",
+    "Private exact image-proof maps are closed-schema, duplicate-safe, canonically ordered and source/budget checked",
+    "Browser storage retains only exact source metadata, selected binding UUID and input hash; private selections are cleared after attempts",
+    "Explicit read/retry recovery performs no automatic RPC on reload and uses no-cache, redacted diagnostics and organization-scoped transport",
+    "Actor/source/workload epoch changes and stale results are rejected; original mutation byte/selection budgets cannot be relaxed by later caller changes",
+    "Composed operation permission/pending state, eight locales, narrow layout, light/dark and absence of public image references are qualified"
+  ],
+  "visualInspection": {
+    "paths": [
+      "/tmp/astrolift-nvke-image-binding-panel-v2-full.png",
+      "/tmp/astrolift-nvke-image-binding-panel-narrow.png",
+      "/tmp/astrolift-nvke-image-binding-panel-v2-dark.png",
+      "/tmp/astrolift-nvke-image-binding-operation-v2.png"
+    ],
+    "inspected": true
+  },
+  "limits": [
+    "Actual Chromium/App/Postgres/native mTLS qualification is pending; local Storybook/transport tests do not prove it",
+    "Complete operator/platform/credential/rewrite/import/fresh-use/linked-admission closure remains required",
+    "No main merge or deployment"
+  ]
+}

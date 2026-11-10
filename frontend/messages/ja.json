@@ -18353,6 +18353,37 @@
       "imageUseCount": "イメージ使用数",
       "imageReferenceCount": "一意のイメージ参照数",
       "issueCount": "関連付けの問題数"
+    },
+    "installImageBinding": {
+      "maximumBytes": "読み取りバイト数の上限",
+      "timeoutSeconds": "タイムアウト（秒）",
+      "originalOnly": "この UUID の元の設定を使用してください。保存された非公開の意図は置き換えられません。",
+      "loading": "関連付けを読み込み中…",
+      "artifactDigest": "レコード SHA-256",
+      "title": "イメージの関連付け",
+      "help": "確認済みインベントリの各使用箇所に保存済みイメージ証拠を関連付けます。",
+      "closureRequired": "続行にはワークロードとプラットフォームの完全な検証、元の認証情報の同等性、フェーズ使用時の新しい検証、および関連付けられた実行許可が必要です。",
+      "settingsHelp": "各証拠と上限を確認してください。復旧には同じ設定を保持してください。",
+      "invalidInput": "異なる UUID、正確なイメージ選択、上限を確認してください。",
+      "prepare": "証拠を関連付け",
+      "review": "保存済み関連付けを確認",
+      "retry": "保存済み関連付けを再試行",
+      "failed": "関連付けを確認できませんでした。UUID を保持し、保存済み記録を確認してください。",
+      "parentRequired": "まず正確なプラン、チャート、ツリー、インベントリを確認してください。",
+      "unavailable": "保存済み関連付けはこのソースと一致しません。",
+      "unloaded": "既存の UUID を確認するか、新しい関連付けを作成してください。",
+      "sourceDigest": "ソース SHA-256",
+      "bindingsHelp": "各参照に sourceKind（local または registry）、artifactId、artifactDigest を指定します。イメージが不要な場合のみ {} を使います。",
+      "workloadDigest": "インベントリのダイジェスト",
+      "imageUseCount": "イメージ使用数",
+      "imageBindings": "保存済みイメージ証拠（JSON）",
+      "maximumImageBytes": "イメージのバイト上限",
+      "bindingDigest": "関連付けダイジェスト",
+      "imageCount": "関連付けたイメージ",
+      "importCount": "インポート",
+      "rewriteCount": "提案された書き換え",
+      "verifiedImageBytes": "検証済みイメージバイト数",
+      "workloadIssueCount": "ワークロードの問題"
     }
   }
 }
