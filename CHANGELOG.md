@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Confidential task admission accepts the observed EKS Pod Identity `AWS_STS_REGIONAL_ENDPOINTS=regional` injection and can revalidate already admitted identity fields (#2668). Other STS values, duplicate environment names, dynamic identity values and unrelated injected fields remain refused.
+
 - Task-family agents can opt into operator-enabled confidential EKS Pods (#2668). Each run encrypts its task environment and all image layers, generates policy from the final admitted Pod with signed AWS tools, and grants its dedicated KMS key only for the predicted PCR17 and EKS service identity. Recovery and cleanup bind to the saved task, image, policy and Pod UID. The path requires explicit cluster configuration and a baked non-root image; live KMS release/refusal qualification remains pending. Operator-wide confidential runtime selection remains refused.
 
 - Agent task and box hardening now refuses operator-wide `AGENT_RUNTIME_CLASS=confidential-sandbox` because that setting alone cannot generate final per-run policies or deliver secrets after attestation (#2668). Task dispatch refuses before provider lookup or credential provisioning; ordinary and isolated runtimes retain their behavior.

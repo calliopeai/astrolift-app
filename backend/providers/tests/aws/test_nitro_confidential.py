@@ -148,6 +148,9 @@ def pipeline(tmp_path, monkeypatch):
         container = result["spec"]["containers"][0]
         if not any(item["name"] == "AWS_CONTAINER_CREDENTIALS_FULL_URI" for item in container["env"]):
             container["env"] += [
+                {"name": "AWS_STS_REGIONAL_ENDPOINTS", "value": "regional"},
+                {"name": "AWS_DEFAULT_REGION", "value": "us-west-2"},
+                {"name": "AWS_REGION", "value": "us-west-2"},
                 {"name": "AWS_CONTAINER_CREDENTIALS_FULL_URI", "value": "http://169.254.170.23/v1/credentials"},
                 {
                     "name": "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
@@ -201,7 +204,14 @@ def test_only_encrypted_image_and_final_policy_reach_kubernetes(pipeline):
     public = json.dumps({"pod": pod, "checkpoint": checkpoint})
     assert "synthetic-secret" not in public
     assert pod["spec"]["containers"][0]["env"][0] == {"name": "ASTROLIFT_CONFIDENTIAL_TASK_ID", "value": TASK}
-    assert len(pod["spec"]["containers"][0]["env"]) == 3
+    assert {item["name"] for item in pod["spec"]["containers"][0]["env"]} == {
+        "ASTROLIFT_CONFIDENTIAL_TASK_ID",
+        "AWS_STS_REGIONAL_ENDPOINTS",
+        "AWS_DEFAULT_REGION",
+        "AWS_REGION",
+        "AWS_CONTAINER_CREDENTIALS_FULL_URI",
+        "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
+    }
     assert pod["spec"]["serviceAccountName"] == "confidential-runner"
     assert checkpoint["pcr17"] == PCR
     assert checkpoint["attestation_verified"] is False
@@ -313,3 +323,42 @@ def test_eks_confidential_prerequisites_fail_closed(pipeline, failure):
     driver._k8s_cache["test"] = SimpleNamespace(get=lambda **kwargs: runtime)
     with pytest.raises(ValueError):
         driver.validate_confidential_task("test", "agents", config)
+
+
+def test_already_admitted_identity_environment_can_be_revalidated(pipeline):
+    final, _ = confidential.prepare_run(**pipeline.arguments)
+    assert {row["name"]: row["value"] for row in final["spec"]["containers"][0]["env"]}[
+        "AWS_STS_REGIONAL_ENDPOINTS"
+    ] == "regional"
+    confidential.validate_admitted(final, deepcopy(final), 42042, 42042)
+
+
+@pytest.mark.parametrize("value", ["legacy", "", "us-west-2"])
+def test_regional_sts_identity_environment_rejects_other_values(pipeline, value):
+    final, _ = confidential.prepare_run(**pipeline.arguments)
+    expected = deepcopy(final)
+    next(row for row in final["spec"]["containers"][0]["env"] if row["name"] == "AWS_STS_REGIONAL_ENDPOINTS")[
+        "value"
+    ] = value
+    with pytest.raises(ValueError, match="standard EKS Pod Identity"):
+        confidential.validate_admitted(final, expected, 42042, 42042)
+
+
+@pytest.mark.parametrize("variant", ["duplicate", "dynamic", "extra"])
+def test_identity_environment_rejects_ambiguous_or_non_identity_entries(pipeline, variant):
+    final, _ = confidential.prepare_run(**pipeline.arguments)
+    expected = deepcopy(final)
+    env = final["spec"]["containers"][0]["env"]
+    if variant == "duplicate":
+        env.append({"name": "AWS_REGION", "value": "us-west-2"})
+        message = "duplicate environment"
+    elif variant == "dynamic":
+        entry = next(row for row in env if row["name"] == "AWS_STS_REGIONAL_ENDPOINTS")
+        entry.pop("value")
+        entry["valueFrom"] = {"fieldRef": {"fieldPath": "metadata.name"}}
+        message = "only literal values"
+    else:
+        env.append({"name": "AWS_ROLE_ARN", "value": "arn:aws:iam::123456789012:role/other"})
+        message = "non-identity environment"
+    with pytest.raises(ValueError, match=message):
+        confidential.validate_admitted(final, expected, 42042, 42042)

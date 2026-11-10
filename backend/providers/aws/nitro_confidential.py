@@ -246,9 +246,25 @@ def validate_admitted(pod: dict[str, Any], expected: dict[str, Any], uid: int, g
         "AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE",
         "AWS_REGION",
         "AWS_DEFAULT_REGION",
+        "AWS_STS_REGIONAL_ENDPOINTS",
     }
     env = container.get("env", [])
-    if [item for item in env if item.get("name") not in allowed] != expected_env:
+    if not isinstance(env, list) or any(
+        not isinstance(item, dict) or not isinstance(item.get("name"), str) for item in env
+    ):
+        raise ValueError("confidential admission returned malformed environment entries")
+    names = [item["name"] for item in env]
+    if len(names) != len(set(names)):
+        raise ValueError("confidential admission returned duplicate environment names")
+    if any(
+        set(item) != {"name", "value"} or not isinstance(item["value"], str) for item in env if item["name"] in allowed
+    ):
+        raise ValueError("confidential identity environment must contain only literal values")
+    # Revalidation also accepts an expected Pod that already carries the exact
+    # identity projection, as required when regenerating its final policy.
+    if [item for item in env if item["name"] not in allowed] != [
+        item for item in expected_env if item.get("name") not in allowed
+    ]:
         raise ValueError("confidential admission injected non-identity environment variables")
     native = {item["name"]: item.get("value") for item in env if item.get("name") in allowed}
     token_root = "/var/run/secrets/pods.eks.amazonaws.com/serviceaccount"
@@ -259,6 +275,7 @@ def validate_admitted(pod: dict[str, Any], expected: dict[str, Any], uid: int, g
             "http://169.254.170.23/v1/credentials",
             "http://[fd00:ec2::23]/v1/credentials",
         }
+        or ("AWS_STS_REGIONAL_ENDPOINTS" in native and native["AWS_STS_REGIONAL_ENDPOINTS"] != "regional")
         or any(
             native[name] != original["containers"][0]["image"].split(".")[3]
             for name in ("AWS_REGION", "AWS_DEFAULT_REGION")
