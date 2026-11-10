@@ -20,6 +20,7 @@ from nvke import _operator_install_plan_context as context_protocol
 from nvke import _operator_install_plan_image as image_protocol
 from nvke import _operator_install_plan_tree as tree_protocol
 from nvke import _operator_install_plan_verification as verification_protocol
+from nvke import _operator_install_plan_workload as workload_protocol
 from nvke._operator_install_review import project as project_install_review
 from nvke._private_http import private_http
 from nvke.client import NvkeError, validate_endpoint_url
@@ -652,12 +653,18 @@ class OperatorAgentClient:
             read_only=True,
         )
 
-    def _install_plan_image_source(
-        self, job_id: str, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    def _install_plan_artifact_source(
+        self,
+        job_id: str,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        capability_name: str,
     ) -> dict[str, Any]:
         original = self._install_plan_source(job_id, intent)
         identity = self.identity()
-        for name in ("installPlanCharts", "installPlanTree", image_protocol.capability_name(body)):
+        for name in ("installPlanCharts", "installPlanTree", capability_name):
             image_protocol.capability(identity.get(name))
         parents = {**body, "chartArtifactId": chart_artifact_id, "chartArtifactDigest": chart_artifact_digest}
         metadata, publication = self._install_plan_tree_source(job_id, intent, parents)
@@ -673,6 +680,104 @@ class OperatorAgentClient:
         if tree["treeDigest"] != body["treeDigest"]:
             raise NvkeError("SOURCE_CHANGED", "The execution tree no longer matches the reviewed digest")
         return {"original": original, "identity": identity, "metadata": metadata, "charts": publication, "tree": tree}
+
+    def _install_plan_image_source(
+        self, job_id: str, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        source = self._install_plan_artifact_source(
+            job_id, intent, body, chart_artifact_id, chart_artifact_digest, image_protocol.capability_name(body)
+        )
+        if "workloadId" in body:
+            workload = self.install_plan_workload(
+                job_id,
+                intent=intent,
+                chart_artifact_id=chart_artifact_id,
+                chart_artifact_digest=chart_artifact_digest,
+                body={
+                    **{key: body[key] for key in ("format", "planId", "planDigest", "treeId", "treeDigest")},
+                    "artifactId": body["workloadId"],
+                },
+            )
+            if workload["workloadDigest"] != body["workloadDigest"]:
+                raise NvkeError("SOURCE_CHANGED", "The workload inventory no longer matches the reviewed digest")
+            source["workload"] = workload
+        return source
+
+    def _install_plan_workload(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        read_only: bool,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = workload_protocol.request(
+                body, job_id=job_id, chart_artifact_id=chart_artifact_id, read_only=read_only
+            )
+            if (
+                not isinstance(intent, str)
+                or not _SHA.fullmatch(intent)
+                or not isinstance(chart_artifact_digest, str)
+                or not _SHA.fullmatch(chart_artifact_digest)
+            ):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError("INVALID_INPUT", "Use a reviewed tree and bounded workload-inventory request") from None
+        try:
+            workload_protocol.capability(self.identity().get("installPlanWorkloadInventory"))
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError("OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm workload inventory") from None
+        try:
+            source = self._install_plan_artifact_source(
+                job_id, intent, body, chart_artifact_id, chart_artifact_digest, "installPlanWorkloadInventory"
+            )
+            path = "/v1/jobs/" + job_id + "/install-plan-workload-inventory"
+            data = (
+                self._request(
+                    "GET", path, params={key: value for key, value in body.items() if key != "format"}, intent=intent
+                )
+                if read_only
+                else self._request("POST", path, body=body, intent=intent)
+            )
+            result = workload_protocol.summary(data, body=body, item_count=source["metadata"]["itemCount"])
+            if (
+                self._install_plan_artifact_source(
+                    job_id, intent, body, chart_artifact_id, chart_artifact_digest, "installPlanWorkloadInventory"
+                )
+                != source
+            ):
+                raise ValueError
+            return result
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+
+    def prepare_install_plan_workload(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_workload(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=False,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+        )
+
+    def install_plan_workload(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_workload(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=True,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+        )
 
     def _install_plan_image(
         self,

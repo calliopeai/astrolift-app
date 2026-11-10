@@ -1,0 +1,85 @@
+{
+  "format": 1,
+  "scope": "sdk-workload-inventory-and-workload-linked-registry-image",
+  "status": "sdk-locally-exercised-application-cli-ui-and-release-pending",
+  "sourceSha256": {
+    "backend/providers/nvke/_operator_install_plan_workload.py": "da89e617dd2d2051bfc0679a80993c7b2e2b534d50831dcf11d88b6009646b9e",
+    "backend/providers/nvke/_operator_install_plan_image.py": "ff3ecfdfb577c7f2a467735f6e35138bad61de2f1c16342e00cafeb020e8bee8",
+    "backend/providers/nvke/operator_agent_client.py": "1e59363ec071aee7a6ca63e49d6447d7c57d60100241bea530278c2c6511c779",
+    "backend/providers/tests/nvke/test_operator_install_plan.py": "bc8fce12524b1ea5f60f50c4558b90c7d99da0201562b9d66ee609fd47c4cd4a",
+    "backend/providers/tests/nvke/test_operator_install_plan_workload.py": "ab9752415842d6e516cb7ccba84121916b5a5bc8a42356675c80299a9d850db3",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_workload_driver.py": "2a039bb9890521984efe200320b69efbec7c8412670336b0f5f513713d4b8acd"
+  },
+  "operatorSourceManifest": {
+    "path": "/tmp/astrolift-nvke-workload-agent-v2-source.json",
+    "sha256": "3d3bf8315e258ffbf7604a6ce9b1440fdc2f769d189bcbf152e9d33ecafb5567"
+  },
+  "checks": {
+    "focusedSDK": {
+      "sessionId": 38291,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-sdk-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-sdk-v1.log",
+      "logSha256": "051d3992188171cf2953dd82d6f93120051fdd8d568883863801939354205c8c",
+      "passed": 84,
+      "skipped": 0
+    },
+    "sdkRegression": {
+      "sessionId": 81132,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-sdk-regression-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-sdk-regression-v2.log",
+      "logSha256": "190e9db48012377a37ab759690e7eafe4d1768686dbf9cb8e75f4f40950e9e71",
+      "passed": 917,
+      "skipped": 29
+    },
+    "nativeSDK": {
+      "sessionId": 6410,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-sdk-native-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-sdk-native-v1.log",
+      "logSha256": "4d49003867425349081273ca02ccd6a11d738c08c2871d8fecf7dda13860ee0b",
+      "coverage": [
+        "real SDK and authenticated operator-agent routes",
+        "original uncertain native operation preserved",
+        "workload inventory lost reply and cold recovery without rerender",
+        "workload-linked registry reference absent from graph/images.txt",
+        "registry lost reply and cold recovery without acquisition",
+        "same UUID retains one acquisition attempt",
+        "private paths references and credentials absent from public summaries",
+        "continuation remains unauthorized"
+      ]
+    },
+    "static": {
+      "sessionId": null,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-sdk-static-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-sdk-static-v1.log",
+      "logSha256": "899431ded41f52f0e596057b046dea82d3c0e3557b51b29f591e62f24ab0c713"
+    },
+    "mypy": {
+      "sessionId": 3152,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-sdk-mypy-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-sdk-mypy-v1.log",
+      "logSha256": "fb9ce13c52b62974644165e4cda9de2322a8970d74e3e0f033d3ec195c6647f2",
+      "sourceFiles": 3
+    }
+  },
+  "retainedFailures": [
+    {
+      "sessionId": 70148,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-sdk-regression-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-sdk-regression-v1.log",
+      "logSha256": "772cfe2b88f84eba1f17a091df9ac5268bb831f3c16ceeda82f76485736936ad",
+      "reason": "test-extra opentelemetry-instrumentation-httpx missing; installed declared compatible 0.62b1 before successful regression"
+    }
+  ],
+  "limits": [
+    "29 gated provider/native suites are skipped in the broad SDK unit run; separate native SDK driver covers this slice",
+    "Native agent source reflects the recorded source snapshot, not a merged or deployed runtime",
+    "Intermittent macOS source-notification refusals in separate agent route runs remain under investigation",
+    "Application persistence/API, CLI, browser, full signed closure and linked continuation remain release work"
+  ]
+}

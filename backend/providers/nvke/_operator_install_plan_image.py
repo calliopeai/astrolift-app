@@ -15,27 +15,39 @@ BASE = {"format", "artifactId", "planId", "planDigest", "treeId", "treeDigest", 
 WRITE_FIELDS = {"maximumBytes", "maximumCalls", "timeoutSeconds"}
 LOCAL_BASE = (BASE - {"policy"}) | {"sourceKind"}
 LOCAL_WRITE_FIELDS = {"maximumBytes", "timeoutSeconds"}
+WORKLOAD = {"workloadId", "workloadDigest"}
 DIGEST = re.compile(r"(?:sha256:[0-9a-f]{64}|sha512:[0-9a-f]{128})\Z")
 
 
 def capability_name(body: dict[str, Any]) -> str:
-    return "installPlanLocalImage" if body.get("sourceKind") == "local" else "installPlanImage"
+    if body.get("sourceKind") == "local":
+        return "installPlanLocalImage"
+    return "installPlanWorkloadImage" if "workloadId" in body else "installPlanImage"
 
 
 def read_fields(body: dict[str, Any]) -> set[str]:
-    return LOCAL_BASE if body.get("sourceKind") == "local" else BASE
+    if body.get("sourceKind") == "local":
+        return LOCAL_BASE
+    return BASE | (WORKLOAD if "workloadId" in body else set())
 
 
 def request(body: Any, *, job_id: str, chart_artifact_id: str, read_only: bool) -> dict[str, Any]:
     local = isinstance(body, dict) and body.get("sourceKind") == "local"
     fields, limits = (LOCAL_BASE, LOCAL_WRITE_FIELDS) if local else (BASE, WRITE_FIELDS)
+    linked = isinstance(body, dict) and bool(set(body) & WORKLOAD)
+    if linked and not local:
+        fields = fields | WORKLOAD
     if not isinstance(body, dict) or set(body) != fields | (set() if read_only else limits):
         raise ValueError
     integer(body["format"], 1, 1)
     ids = [
         identifier(value) for value in (job_id, chart_artifact_id, body["artifactId"], body["planId"], body["treeId"])
     ]
-    if len(set(ids)) != 5:
+    if linked:
+        ids.append(identifier(body["workloadId"]))
+        if not isinstance(body["workloadDigest"], str) or not SHA.fullmatch(body["workloadDigest"]):
+            raise ValueError
+    if len(set(ids)) != (6 if linked else 5):
         raise ValueError
     if any(not isinstance(body[key], str) or not SHA.fullmatch(body[key]) for key in ("planDigest", "treeDigest")):
         raise ValueError
@@ -62,6 +74,7 @@ def request(body: Any, *, job_id: str, chart_artifact_id: str, read_only: bool) 
 
 def summary(data: Any, *, body: dict[str, Any]) -> dict[str, Any]:
     local = body.get("sourceKind") == "local"
+    linked = "workloadId" in body
     if not isinstance(data, dict) or set(data) != (
         {
             "format",
@@ -77,9 +90,12 @@ def summary(data: Any, *, body: dict[str, Any]) -> dict[str, Any]:
             "continuationAuthorized",
         }
         | ({"sourceKind"} if local else set())
+        | ({"sourceKind", *WORKLOAD} if linked else set())
     ):
         raise ValueError
     if local and (data["sourceKind"] != "local" or data["rootDigest"] != body["reference"].partition("@")[2]):
+        raise ValueError
+    if linked and (data["sourceKind"] != "registry" or any(data[key] != body[key] for key in WORKLOAD)):
         raise ValueError
     integer(data["format"], 1, 1)
     integer(data["blobCount"], 1, 100000)
