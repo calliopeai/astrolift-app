@@ -5,6 +5,7 @@ from astrolift_clusters.schema.mutations import ClustersMutation
 from astrolift_clusters.schema.nvke import NvkeMutation, NvkeQuery
 from astrolift_clusters.schema.nvke_install_plan_charts import NvkeInstallPlanChartsMutation
 from astrolift_clusters.schema.nvke_install_plan_contexts import NvkeInstallPlanContextMutation
+from astrolift_clusters.schema.nvke_install_plan_images import NvkeInstallPlanImageMutation
 from astrolift_clusters.schema.nvke_install_plan_trees import NvkeInstallPlanTreeMutation
 from astrolift_clusters.schema.nvke_install_plan_verifications import NvkeInstallPlanVerificationMutation
 from astrolift_clusters.schema.nvke_install_plans import NvkeInstallPlanMutation, NvkeInstallPlanQuery
@@ -26,6 +27,7 @@ __all__ = [
     "NvkeInstallPlanChartsMutation",
     "NvkeInstallPlanTreeMutation",
     "NvkeInstallPlanContextMutation",
+    "NvkeInstallPlanImageMutation",
     "NvkeInstallPlanVerificationMutation",
     "NvkeOperatorMutation",
     "NvkeQuery",

@@ -1,0 +1,94 @@
+{
+  "format": 1,
+  "scope": "typed-image-prepare-review-recovery-graphql-and-generated-client-contracts",
+  "status": "postgres-api-audit-permission-and-generated-types-qualified-operator-ui-cli-and-physical-app-flow-pending",
+  "sourceSha256": {
+    "backend/astrolift_clusters/nvke_install_plan_images.py": "b1af46717ebe7b09d42a1a10055cfbf01104cbd2dee9c255307c118f17c3f890",
+    "backend/astrolift_clusters/schema/nvke_install_plan_images.py": "6453290fea41d8c26dda99e3bf57dc0fb8520d27e2cbe95bfff806818e115526",
+    "backend/astrolift_clusters/schema/__init__.py": "ea1066b8efb0557c85f93a0ce66b415774b23c593f92518aaa357289079dfe08",
+    "backend/config/schema.py": "e17271a2c3ffc1875fc912c9c33129198fc8494584fe2d2ca9aff97382a45d8a",
+    "backend/core/schema/audit.py": "bf61212986e0744101a20caf21f33190163359aef89c4a08f4be9120c85226b2",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_images.py": "df2c35d52c98e7f4534e3408fa5ed9718a3d87a74bdf0826df38f62c7fbc5693",
+    "backend/schema.graphql": "6dae444badb3ce32797600a71c45f3e6727118b6568b0e5c8e77918d4507ac1c",
+    "frontend/schema.graphql": "6dae444badb3ce32797600a71c45f3e6727118b6568b0e5c8e77918d4507ac1c",
+    "frontend/graphql/nvke/nvke-install-plan-image.mutations.ts": "a8e77f927828c0b9f105a8a9d021c7bf8c3b98624adf0c62a380302ec3217dab",
+    "frontend/graphql/nvke/nvke-install-plan-image.queries.ts": "b38232a97822c45fe3960bdd638fdb4968c1e8f7e773c9367ce1248a03fa5758",
+    "frontend/graphql/__generated__/schema.ts": "198e3ac74b8f1f172b81b15550c22e141f187211f46ad01122c581cbbb46e052",
+    "frontend/graphql/__generated__/operations.ts": "efe01b63607760b8a340b980e5c6bda7223ed01a63aac777f28b05e5361a40a6"
+  },
+  "checks": {
+    "postgresAPI": {
+      "sessionId": 53369,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-graphql.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-graphql.exit",
+      "logSha256": "cdb6dcc3dea6c1725b384a633fd90658b3fb9899a7db7895aa32a13bac5ea894",
+      "passed": 15,
+      "skipped": 0,
+      "seconds": 66.78,
+      "scope": "Twelve service cases plus typed prepare/review/recovery, request-body audit redaction, denied access and tenant isolation; actual Postgres/original-agent TLS with controlled image SDK responses."
+    },
+    "permissionBoundaries": {
+      "sessionId": 38453,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-permission-boundaries.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-permission-boundaries.exit",
+      "logSha256": "d9b1f3c16ace667a57e70d7829bb18b80227e9c95fb41c0cf78982d3d836e325",
+      "passed": 3,
+      "deselected": 15,
+      "skipped": 0,
+      "seconds": 21.6,
+      "scope": "Another current admin or replacement token may read metadata but cannot repeat the original private intent; revocation during remote prepare prevents publication."
+    },
+    "schemaExport": {
+      "sessionId": 88243,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-contract-export.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-contract-export.exit",
+      "logSha256": "25d89ce4eab6439f445977a389ebf7224bee5af044eaa064c3c660a00a7109a2"
+    },
+    "schemaDrift": {
+      "sessionId": 71166,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-contract-check.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-contract-check.exit",
+      "logSha256": "942191ebddaa62c1b040e1f45fe9e5003f9157225851e1d8b851c92f6507afb1"
+    },
+    "frontendCodegen": {
+      "sessionId": 81561,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-codegen.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-codegen.exit",
+      "logSha256": "88c5199bf8d00d42362ac5da2c4b149ce023b8105433ef1780553ecea9a783c8"
+    },
+    "frontendTypecheck": {
+      "sessionId": 81561,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-typecheck.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-typecheck.exit",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frontendESLint": {
+      "sessionId": 24781,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-frontend-eslint.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-frontend-eslint.exit",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frontendFormat": {
+      "sessionId": 24781,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-images-frontend-format-check.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-images-frontend-format-check.exit",
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    }
+  },
+  "agentRuntimeRevision": "1c641137f05bdfffae658d2583fc5dd4d8647e84",
+  "nativeSDKQualification": "management-registry-image-sdk-local.json",
+  "remaining": [
+    "CLI commands and Storybook-first controls, explicit recovery journal and all supported locales.",
+    "Physical application -> agent -> authenticated registry qualification, browser recovery and Linux runtime qualification.",
+    "Local images, complete rendered workload/platform/credential/import/use-time evidence, linked native admission and live deployment."
+  ],
+  "continuationAuthorized": false
+}

@@ -10084,6 +10084,7 @@ export type Mutation = {
   prepareNvkeOperatorInstallPlan: NvkeOperatorInstallPlanTypeMutationResult;
   prepareNvkeOperatorInstallPlanCharts: NvkeOperatorInstallPlanChartsTypeMutationResult;
   prepareNvkeOperatorInstallPlanContext: NvkeOperatorInstallPlanContextTypeMutationResult;
+  prepareNvkeOperatorInstallPlanImage: NvkeOperatorInstallPlanImageTypeMutationResult;
   prepareNvkeOperatorInstallPlanTree: NvkeOperatorInstallPlanTreeTypeMutationResult;
   prepareNvkeOperatorInstallPlanVerification: NvkeOperatorInstallPlanVerificationTypeMutationResult;
   previewManagedServiceMatch: ManagedServiceMatchPlanPayloadMutationResult;
@@ -10121,6 +10122,7 @@ export type Mutation = {
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   recoverNvkeOperatorInstallPlanChartsPreparation: NvkeOperatorInstallPlanChartsTypeMutationResult;
   recoverNvkeOperatorInstallPlanContextPreparation: NvkeOperatorInstallPlanContextTypeMutationResult;
+  recoverNvkeOperatorInstallPlanImagePreparation: NvkeOperatorInstallPlanImageTypeMutationResult;
   recoverNvkeOperatorInstallPlanPreparation: NvkeOperatorInstallPlanTypeMutationResult;
   recoverNvkeOperatorInstallPlanTreePreparation: NvkeOperatorInstallPlanTreeTypeMutationResult;
   recoverNvkeOperatorInstallPlanVerificationPreparation: NvkeOperatorInstallPlanVerificationTypeMutationResult;
@@ -10201,6 +10203,7 @@ export type Mutation = {
   reviewNvkeOperatorInstallPlan: NvkeOperatorInstallPlanTypeMutationResult;
   reviewNvkeOperatorInstallPlanCharts: NvkeOperatorInstallPlanChartsTypeMutationResult;
   reviewNvkeOperatorInstallPlanContext: NvkeOperatorInstallPlanContextTypeMutationResult;
+  reviewNvkeOperatorInstallPlanImage: NvkeOperatorInstallPlanImageTypeMutationResult;
   reviewNvkeOperatorInstallPlanTree: NvkeOperatorInstallPlanTreeTypeMutationResult;
   reviewNvkeOperatorInstallPlanVerification: NvkeOperatorInstallPlanVerificationTypeMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
@@ -11609,6 +11612,11 @@ export type MutationPrepareNvkeOperatorInstallPlanContextArgs = {
 };
 
 
+export type MutationPrepareNvkeOperatorInstallPlanImageArgs = {
+  input: PrepareNvkeOperatorInstallPlanImageInput;
+};
+
+
 export type MutationPrepareNvkeOperatorInstallPlanTreeArgs = {
   input: PrepareNvkeOperatorInstallPlanTreeInput;
 };
@@ -11765,6 +11773,11 @@ export type MutationRecoverNvkeOperatorInstallPlanChartsPreparationArgs = {
 
 export type MutationRecoverNvkeOperatorInstallPlanContextPreparationArgs = {
   input: NvkeOperatorInstallPlanContextReviewInput;
+};
+
+
+export type MutationRecoverNvkeOperatorInstallPlanImagePreparationArgs = {
+  input: NvkeOperatorInstallPlanImageReviewInput;
 };
 
 
@@ -12158,6 +12171,11 @@ export type MutationReviewNvkeOperatorInstallPlanChartsArgs = {
 
 export type MutationReviewNvkeOperatorInstallPlanContextArgs = {
   input: NvkeOperatorInstallPlanContextReviewInput;
+};
+
+
+export type MutationReviewNvkeOperatorInstallPlanImageArgs = {
+  input: NvkeOperatorInstallPlanImageReviewInput;
 };
 
 
@@ -13756,6 +13774,60 @@ export type NvkeOperatorInstallPlanHeaderType = {
   source: NvkeOperatorInstallPlanSourceType;
 };
 
+export type NvkeOperatorInstallPlanImageReviewInput = {
+  artifactId: Scalars['GUID']['input'];
+  chartArtifactDigest: Scalars['String']['input'];
+  chartArtifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedChartArtifactVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedTreeVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  treeDigest: Scalars['String']['input'];
+  treeId: Scalars['GUID']['input'];
+};
+
+export type NvkeOperatorInstallPlanImageType = {
+  artifactDigest: Scalars['String']['output'];
+  authorityId: Scalars['GUID']['output'];
+  authorityVersion: Scalars['Int']['output'];
+  blobCount: Scalars['Int']['output'];
+  bytes: Scalars['String']['output'];
+  captureDigest: Scalars['String']['output'];
+  chartArtifactDigest: Scalars['String']['output'];
+  chartArtifactId: Scalars['GUID']['output'];
+  chartArtifactVersion: Scalars['Int']['output'];
+  continuationAuthorized: Scalars['Boolean']['output'];
+  executionState: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  observedAt: Scalars['String']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  planDigest: Scalars['String']['output'];
+  planId: Scalars['GUID']['output'];
+  planVersion: Scalars['Int']['output'];
+  rootDigest: Scalars['String']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  sourceDigest: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  treeDigest: Scalars['String']['output'];
+  treeId: Scalars['GUID']['output'];
+  treeVersion: Scalars['Int']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorInstallPlanImageTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanImageType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeOperatorInstallPlanInfrastructureType = {
   apiReady: Scalars['Boolean']['output'];
   clusterUid: Scalars['GUID']['output'];
@@ -14472,6 +14544,24 @@ export type PrepareNvkeOperatorInstallPlanContextInput = {
   item: Scalars['String']['input'];
   operationId: Scalars['GUID']['input'];
   ordinal: Scalars['Int']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  requestText: Scalars['String']['input'];
+  treeDigest: Scalars['String']['input'];
+  treeId: Scalars['GUID']['input'];
+};
+
+export type PrepareNvkeOperatorInstallPlanImageInput = {
+  chartArtifactDigest: Scalars['String']['input'];
+  chartArtifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedChartArtifactVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedTreeVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
   planDigest: Scalars['String']['input'];
   planId: Scalars['GUID']['input'];
   requestText: Scalars['String']['input'];
@@ -22507,6 +22597,29 @@ export type RetryNvkeInstallPlanContextMutationVariables = Exact<{
 export type RetryNvkeInstallPlanContextMutation = { recoverNvkeOperatorInstallPlanContextPreparation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, planDigest: string, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, item: string, ordinal: number, captureDigest: string, frozenChartSha256: string, contextDigest: string, documentCount: number, lookupCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean } | null } };
 
 export type NvkeInstallPlanContextFieldsFragment = { id: string, version: number, status: string, planId: string, planVersion: number, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, planDigest: string, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, item: string, ordinal: number, captureDigest: string, frozenChartSha256: string, contextDigest: string, documentCount: number, lookupCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean };
+
+export type PrepareNvkeInstallPlanImageMutationVariables = Exact<{
+  input: PrepareNvkeOperatorInstallPlanImageInput;
+}>;
+
+
+export type PrepareNvkeInstallPlanImageMutation = { prepareNvkeOperatorInstallPlanImage: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, rootDigest: string, bytes: string, blobCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean } | null } };
+
+export type ReviewNvkeInstallPlanImageMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanImageReviewInput;
+}>;
+
+
+export type ReviewNvkeInstallPlanImageMutation = { reviewNvkeOperatorInstallPlanImage: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, rootDigest: string, bytes: string, blobCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean } | null } };
+
+export type RetryNvkeInstallPlanImageMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanImageReviewInput;
+}>;
+
+
+export type RetryNvkeInstallPlanImageMutation = { recoverNvkeOperatorInstallPlanImagePreparation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, rootDigest: string, bytes: string, blobCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean } | null } };
+
+export type NvkeInstallPlanImageFieldsFragment = { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, rootDigest: string, bytes: string, blobCount: number, observedAt: string, executionState: string, continuationAuthorized: boolean };
 
 export type PrepareNvkeInstallPlanTreeMutationVariables = Exact<{
   input: PrepareNvkeOperatorInstallPlanTreeInput;

@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from django.db.models import F
+from django.utils import timezone
 from nvke.client import NvkeError
 from nvke.operator_agent_client import OperatorAgentClient
 
@@ -180,3 +181,204 @@ def test_tampered_ciphertext_refuses_private_retry_before_peer_call(image_fixtur
         with pytest.raises(NvkeError) as error:
             images.recover_preparation(artifact_id=f.body["artifactId"], **f.review)
     assert error.value.code == "PREPARATION_UNAVAILABLE" and len(f.calls) == 1
+
+
+def review_input(f):
+    from astrolift_clusters.tests.test_nvke_install_plan_contexts import review_input as parent_review
+
+    return {key: value for key, value in parent_review(f.parent).items() if key not in {"item", "ordinal"}}
+
+
+FIELDS = "ok errors{code} data{id version status planId planDigest chartArtifactId chartArtifactDigest treeId treeDigest artifactDigest sourceDigest captureDigest rootDigest bytes blobCount observedAt executionState continuationAuthorized}"
+
+
+def test_typed_schema_prepare_review_retry_and_private_audit(image_fixture):
+    import json
+
+    from astrolift_clusters.tests.test_nvke_schema import execute
+    from core.schema.audit import MutationAuditLog
+
+    f = image_fixture
+    action = "prepareNvkeOperatorInstallPlanImage"
+    response = execute(
+        f.state.world,
+        "mutation($alias:PrepareNvkeOperatorInstallPlanImageInput!){"
+        + action
+        + "(input:$alias){"
+        + FIELDS
+        + "}}",
+        {"alias": {**review_input(f), "requestText": json.dumps(f.body)}},
+    )
+    assert response.errors is None and response.data[action]["ok"]
+    result = response.data[action]["data"]
+    assert result["id"] == f.body["artifactId"]
+    assert result["planDigest"] == f.body["planDigest"] and result["treeDigest"] == f.body["treeDigest"]
+    assert result["rootDigest"] == f.result["rootDigest"] and not result["continuationAuthorized"]
+    for action in ("reviewNvkeOperatorInstallPlanImage", "recoverNvkeOperatorInstallPlanImagePreparation"):
+        response = execute(
+            f.state.world,
+            "mutation($v:NvkeOperatorInstallPlanImageReviewInput!){" + action + "(input:$v){" + FIELDS + "}}",
+            {"v": {**review_input(f), "artifactId": f.body["artifactId"]}},
+        )
+        assert (
+            response.errors is None
+            and response.data[action]["ok"]
+            and response.data[action]["data"] == result
+        )
+    audit = MutationAuditLog.objects.filter(operation="nvke.operator_install_plan_image_prepare").latest(
+        "timestamp"
+    )
+    assert f.body["reference"] not in str(audit.variables) and f.body["maximumBytes"] not in str(
+        audit.variables
+    )
+    assert [kind for kind, _ in f.calls] == ["prepare", "read", "prepare"]
+
+
+def test_rejected_body_and_denied_actor_are_redacted_before_service_mutation(image_fixture):
+    import json
+
+    from django.utils import timezone
+
+    from astrolift_clusters.tests.test_nvke_schema import execute
+    from astrolift_identity.models import RoleBinding
+    from core.schema.audit import MutationAuditLog
+
+    f = image_fixture
+    action = "prepareNvkeOperatorInstallPlanImage"
+    query = (
+        "mutation($renamed:PrepareNvkeOperatorInstallPlanImageInput!){"
+        + action
+        + "(input:$renamed){ok errors{code}}}"
+    )
+    for text in (json.dumps({**f.body, "credentials": "PRIVATE_IMAGE"}), "invalid PRIVATE_IMAGE"):
+        response = execute(f.state.world, query, {"renamed": {**review_input(f), "requestText": text}})
+        assert response.errors is None and not response.data[action]["ok"]
+        audit = MutationAuditLog.objects.filter(operation="nvke.operator_install_plan_image_prepare").latest(
+            "timestamp"
+        )
+        assert "PRIVATE_IMAGE" not in str(audit.variables)
+    RoleBinding.objects.filter(user=f.state.world.user).update(deleted_at=timezone.now())
+    response = execute(
+        f.state.world, query, {"renamed": {**review_input(f), "requestText": json.dumps(f.body)}}
+    )
+    assert response.errors is None and not response.data[action]["ok"]
+    assert not NvkeInstallPlanImage.objects.exists() and not f.calls
+
+
+def test_other_tenant_cannot_review_image_evidence(image_fixture):
+    from astrolift_clusters.tests.test_nvke_sites import world as world_fixture
+    from core.permissions import PermissionDenied
+
+    f = image_fixture
+    with context(f.state.world):
+        images.prepare(body=f.body, **f.review)
+    other = world_fixture.__wrapped__()
+    with context(other), pytest.raises((NvkeError, PermissionDenied)):
+        images.read(artifact_id=f.body["artifactId"], **{**f.review, "expected_actor_id": other.user.pk})
+    assert [kind for kind, _ in f.calls] == ["prepare"]
+
+
+def test_another_current_admin_can_read_but_cannot_retry_original_private_intent(image_fixture):
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import Member, RoleBinding
+    from core.permissions import Permission
+    from core.tests.utils.scope_world import bind_role
+
+    f = image_fixture
+    with context(f.state.world):
+        images.prepare(body=f.body, **f.review)
+    caller = get_user_model().objects.create(username="image-admin-" + uuid4().hex, is_active=True)
+    Member.objects.create(user=caller, scope_kind="ORG", scope_id=f.state.world.org.pk)
+    bind_role(
+        caller,
+        permissions=[Permission.NVKE_ADMIN, Permission.NVKE_READ],
+        kind="ORG",
+        scope_id=f.state.world.org.pk,
+        slug="image-admin-" + uuid4().hex,
+    )
+    RoleBinding.objects.filter(user=f.state.world.user).update(deleted_at=timezone.now())
+    with context(SimpleNamespace(org=f.state.world.org, user=caller)):
+        assert (
+            images.read(artifact_id=f.body["artifactId"], **{**f.review, "expected_actor_id": caller.pk})[
+                "metadata"
+            ]
+            == f.result
+        )
+        with pytest.raises(NvkeError) as error:
+            images.recover_preparation(
+                artifact_id=f.body["artifactId"], **{**f.review, "expected_actor_id": caller.pk}
+            )
+        assert error.value.code == "PRECONDITION"
+    assert [kind for kind, _ in f.calls] == ["prepare", "read"]
+
+
+def test_new_token_can_read_but_cannot_repeat_original_private_intent(image_fixture):
+
+    from astrolift_identity.api_tokens import mint_token, reset_current_api_token, set_current_api_token
+    from astrolift_identity.models import ApiToken
+
+    f = image_fixture
+
+    def token():
+        issued = mint_token()
+        return ApiToken.objects.create(
+            user=f.state.world.user,
+            organization=f.state.world.org,
+            name="chart token",
+            token_hash=issued.token_hash,
+            token_last_4=issued.last4,
+            scopes=["admin", "read"],
+        )
+
+    original, replacement = token(), token()
+    mark = set_current_api_token(original)
+    try:
+        with context(f.state.world):
+            images.prepare(body=f.body, **f.review)
+    finally:
+        reset_current_api_token(mark)
+    ApiToken.objects.filter(pk=original.pk).update(is_revoked=True)
+    mark = set_current_api_token(replacement)
+    try:
+        with context(f.state.world):
+            assert images.read(artifact_id=f.body["artifactId"], **f.review)["metadata"] == f.result
+            with pytest.raises(NvkeError) as error:
+                images.recover_preparation(artifact_id=f.body["artifactId"], **f.review)
+            assert error.value.code == "PRECONDITION"
+    finally:
+        reset_current_api_token(mark)
+    assert [kind for kind, _ in f.calls] == ["prepare", "read"]
+
+
+def test_token_revoked_during_remote_prepare_cannot_publish(image_fixture, monkeypatch):
+    from astrolift_clusters.nvke_sites import NvkeSiteError
+    from astrolift_identity.api_tokens import mint_token, reset_current_api_token, set_current_api_token
+    from astrolift_identity.models import ApiToken
+    from core.permissions import PermissionDenied
+
+    f = image_fixture
+    issued = mint_token()
+    token = ApiToken.objects.create(
+        user=f.state.world.user,
+        organization=f.state.world.org,
+        name="chart revoked token",
+        token_hash=issued.token_hash,
+        token_last_4=issued.last4,
+        scopes=["admin", "read"],
+    )
+
+    def revoked(*_a, **_k):
+        ApiToken.objects.filter(pk=token.pk).update(is_revoked=True)
+        return copy.deepcopy(f.result)
+
+    monkeypatch.setattr(OperatorAgentClient, "prepare_install_plan_image", revoked)
+    mark = set_current_api_token(token)
+    try:
+        with context(f.state.world), pytest.raises((PermissionDenied, NvkeSiteError)) as error:
+            images.prepare(body=f.body, **f.review)
+        if isinstance(error.value, NvkeSiteError):
+            assert error.value.code == "AUTHORITY_REVOKED"
+    finally:
+        reset_current_api_token(mark)
+    assert NvkeInstallPlanImage.objects.get(guid=f.body["artifactId"]).summary == {}
