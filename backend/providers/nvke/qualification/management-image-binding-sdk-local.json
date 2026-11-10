@@ -34,6 +34,22 @@
       "tests": 1,
       "skipped": 0,
       "seconds": 429.92
+    },
+    "pairedBrowserActualNative": {
+      "sessionId": 80748,
+      "status": "complete",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 1377.63,
+      "logPath": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.log",
+      "logSha256": "2e9fcaffecd99fce825b2cd216fa7ab771854b2cb4749e1601d9555913c6e737",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.exit",
+      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-queue-v3.exit",
+      "appSourceRevision": "8790e0811",
+      "commandSourceRevision": "d241426",
+      "agentSourceRevision": "c67a6fe",
+      "interpretation": "Actual compiled CLI plus Chromium/Storybook hook through App/Postgres/native mutual TLS: browser binding publication loses its reply after durable App publication and cold agent restart; reload makes no automatic RPC; explicit original read and retained retry preserve artifact/capture/binding digests and observation time. Browser binding has one native attempt, unchanged registry request counts, unchanged original/native/guard/parent evidence, no private request/reference/selected-image/bearer leakage to recovery storage, and continuation stays false."
     }
   },
   "coverage": [
@@ -44,7 +60,7 @@
     "Recovery preserves observation/digests/attempt identity, performs no registry acquisition or rerender and keeps native files/guards/parents unchanged"
   ],
   "limits": [
-    "App encrypted intent and typed GraphQL controls plus actual compiled CLI/native pairing are now qualified; browser/native pairing remains required",
+    "App encrypted intent and typed GraphQL controls plus actual compiled CLI/native pairing are now qualified; browser/native pairing is also qualified on the pinned agent snapshot",
     "Image binding does not establish operator/node-platform/credential/rewrite/import/fresh-use or execution admission closure",
     "No main merge or deployment",
     "The paired agent common suite now passes 106 cases on each runtime after the documented Linux qualification VM clock repair. This SDK native proof ran on macOS."
