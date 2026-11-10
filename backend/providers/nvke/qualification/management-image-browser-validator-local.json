@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "scope": "browser-registry-image-request-and-metadata-validation",
+  "status": "62-contracts-eslint-and-full-typescript-qualified-ui-pending",
+  "sourceSha256": {
+    "frontend/lib/nvke/operator-install-plan-image.ts": "cf2924662389e978e85b4d53027868fc40ecb90af886daf81853b255cff808df",
+    "frontend/lib/nvke/operator-install-plan-image.test.ts": "9e4f158664844d902eb7e9fc0d8908bb42600228a1331de098a2239dcde47386"
+  },
+  "checks": {
+    "sessionId": 49560,
+    "logPath": "/tmp/astrolift-nvke-app-image-validator-v2.log",
+    "exitMarker": "/tmp/astrolift-nvke-app-image-validator-v2.exit",
+    "exitCode": 0,
+    "logSha256": "9f0fb8bc93199fe5ef5783d0f67e27eb5ea56a4232a572a364a4a3171cf957c5",
+    "tests": 62,
+    "skipped": 0,
+    "eslint": "passed",
+    "fullTypeScript": "passed"
+  },
+  "limits": [
+    "Pure validators only; image UI, browser recovery journal, hooks and live browser/API integration remain pending.",
+    "No native continuation authorization, main merge or deployment."
+  ],
+  "retainedInitialFailure": {
+    "logPath": "/tmp/astrolift-nvke-app-image-validator.log",
+    "exitCode": 1,
+    "reason": "One test changed the plan digest to its existing fixture value; corrected to a distinct digest. Additional trailing-newline cases were added during review."
+  }
+}
