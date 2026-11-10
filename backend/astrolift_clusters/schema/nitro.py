@@ -19,7 +19,6 @@ from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
-
 if TYPE_CHECKING:
     GUID = NewType("GUID", str)
 else:
