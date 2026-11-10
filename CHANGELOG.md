@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Confidential preparation supports `noexec` memory workspaces by separating verified public tool snapshots from private inputs. Subprocess scratch and Skopeo temporary files are explicitly confined to the private memory workspace (#2668).
+
 - Add an inspect-first, Conflict-bound real-App confidential negative adapter (#2668), with pinned checkpoint/Pod/image/key ownership, unchanged attestation policy checks, a callback-guarded probe and UID-bound clone cleanup. Live execution and authoritative KMS audit remain separate qualification gates.
 
 - Restore required EKS driver instrumentation on Nitro preparation, cleanup, apply and readiness operations (#2668), with confidential payload and error redaction.

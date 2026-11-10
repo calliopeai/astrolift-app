@@ -170,7 +170,12 @@ mandatory task and ownership tags.
 
 The backend Docker image installs pinned AWS runtime tools for amd64/arm64,
 verifying the pinned manifest, AWS signature, archive and binary hashes. Each
-run verifies the installed signed tools again. Preparation resolves the real
+run verifies the installed signed tools again. A private executable snapshot in
+`/tmp` contains only the public AWS binaries and verification key, so the
+confidential workspace can remain mounted `noexec`. `/tmp` must be writable and
+permit execution. Registry credentials, image layers and all subprocess scratch
+stay in the memory workspace; Skopeo receives an explicit private `--tmpdir`.
+Preparation resolves the real
 Brief and task credentials, adds them and the original executable to a private
 OCI layer, and encrypts **every layer** with a new per-run KMS key. Kubernetes
 receives an immutable encrypted image, bootstrap entrypoint and public task ID;
