@@ -57,11 +57,20 @@ def template(resources):
         ("workflow", 'workflow_type = "work"\ntask_queue = "work"'),
     ],
 )
-def test_isolation_reaches_every_supported_controller(kind, extra):
-    manifest, resources = render(source('nitro_sandbox = {mode = "isolated"}', kind, extra))
-    assert manifest.serialized["workloads"][0]["nitro_sandbox"]["mode"] == "isolated"
-    assert template(resources)["spec"]["runtimeClassName"] == "isolated-sandbox"
-    assert "sandbox.amazonaws.com/policy" not in template(resources)["metadata"].get("annotations", {})
+@pytest.mark.parametrize("mode", ["isolated", "confidential"])
+def test_isolation_reaches_every_supported_controller(kind, extra, mode):
+    policy = ', policy = "generated=="' if mode == "confidential" else ""
+    manifest, resources = render(source(f'nitro_sandbox = {{mode = "{mode}"{policy}}}', kind, extra))
+    assert manifest.serialized["workloads"][0]["nitro_sandbox"]["mode"] == mode
+    pod = template(resources)
+    assert pod["spec"]["runtimeClassName"] == f"{mode}-sandbox"
+    assert pod["spec"]["tolerations"] == [
+        {"key": "astrolift.dev/nitro-only", "operator": "Equal", "value": "true", "effect": "NoSchedule"}
+    ]
+    annotations = pod["metadata"].get("annotations", {})
+    assert annotations.get("sandbox.amazonaws.com/policy") == (
+        "generated==" if mode == "confidential" else None
+    )
     if kind in {"agent", "workflow"}:
         assert template(resources)["metadata"]["annotations"]["astrolift.dev/workload-kind"] == kind
 
@@ -70,6 +79,7 @@ def test_omitted_setting_preserves_normalized_shape_and_render():
     manifest, resources = render(source())
     assert "nitro_sandbox" not in manifest.serialized["workloads"][0]
     assert "runtimeClassName" not in template(resources)["spec"]
+    assert "tolerations" not in template(resources)["spec"]
     opted_in, _ = render(source('nitro_sandbox = {mode = "isolated"}'))
     assert manifest_hash(manifest.serialized) != manifest_hash(opted_in.serialized)
 
@@ -96,6 +106,8 @@ def test_mixed_workloads_do_not_inherit_the_neighbors_sandbox():
     }
     assert pods["worker"]["runtimeClassName"] == "isolated-sandbox"
     assert "runtimeClassName" not in pods["ordinary"]
+    assert "tolerations" not in pods["ordinary"]
+    assert pods["worker"]["tolerations"][0]["key"] == "astrolift.dev/nitro-only"
 
 
 @pytest.mark.parametrize(
@@ -194,3 +206,32 @@ def test_confidential_task_selector_defers_policy_to_the_final_run_pod():
 def test_task_agent_variants_requiring_final_run_policy_or_network_workflows_are_rejected(block):
     with pytest.raises(ManifestError, match="task-family agents"):
         parse_raw(source(block, kind="agent"))
+
+
+@pytest.mark.parametrize(
+    "kind,extra",
+    [
+        ("deployment", ""),
+        ("statefulset", 'storage_size = "1Gi"'),
+        ("cronjob", 'schedule = "0 * * * *"'),
+        ("agent", 'run_family = "service"'),
+        ("workflow", 'workflow_type = "work"\ntask_queue = "work"'),
+        ("task", ""),
+    ],
+)
+def test_ordinary_controller_has_no_dedicated_nitro_scheduling(kind, extra):
+    _, resources = render(source(kind=kind, extra=extra))
+    pod = template(resources)["spec"]
+    assert "runtimeClassName" not in pod
+    assert "tolerations" not in pod
+
+
+def test_final_manifest_selection_reuses_scheduling_without_duplicate_tolerations():
+    from copy import deepcopy
+
+    from astrolift_manifest.render import _apply_nitro_sandbox
+
+    manifest, resources = render(source('nitro_sandbox = {mode = "confidential", policy = "generated=="}'))
+    original = deepcopy(resources)
+    _apply_nitro_sandbox(manifest.workloads[0], resources)
+    assert resources == original

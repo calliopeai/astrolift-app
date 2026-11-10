@@ -47,6 +47,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from astrolift_manifest.nitro_scheduling import apply_nitro_scheduling
 from astrolift_manifest.types import (
     ContainerManifest,
     NormalizedManifest,
@@ -276,6 +277,7 @@ def _apply_nitro_sandbox(workload: WorkloadManifest, resources: list[dict[str, A
         else:
             continue
         pod["spec"]["runtimeClassName"] = f"{sandbox['mode']}-sandbox"
+        apply_nitro_scheduling(pod["spec"])
         annotations = {}
         if sandbox["policy"]:
             annotations["sandbox.amazonaws.com/policy"] = sandbox["policy"]

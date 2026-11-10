@@ -63,9 +63,10 @@ namespace, configuration fingerprint and signed tool-manifest SHA.
 
 Workers recheck their own current process before preparing Briefs or task
 secrets. API readiness therefore cannot authorize a misconfigured worker. Task
-Pods using either Nitro runtime receive exactly the dedicated pool toleration
+Pods and supported manifest-rendered controller templates using either Nitro
+runtime receive exactly the dedicated pool toleration
 `astrolift.dev/nitro-only=true:NoSchedule` before admission and confidential
-policy generation. Ordinary task Pods receive no such toleration. The installer
+policy generation. Ordinary workloads receive no such toleration. The installer
 owns Auto Mode, its bounded custom NodeClass/NodePool and namespace associations;
 the App does not enable global runtime selection or provision capacity.
 

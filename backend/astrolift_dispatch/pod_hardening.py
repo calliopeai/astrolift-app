@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from django.conf import settings
 
+from astrolift_manifest.nitro_scheduling import apply_nitro_scheduling
+
 #: uid/gid of the ``agent`` user in every astrolift-agents image; the
 #: default for the ``AGENT_POD_UID`` / ``AGENT_POD_GID`` Constance settings.
 AGENT_UID = 42042
@@ -78,21 +80,6 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False, spec=None) -> di
             pod_spec["affinity"] = scheduling["affinity"]
     apply_nitro_scheduling(pod_spec)
     return pod_spec
-
-
-def apply_nitro_scheduling(pod_spec: dict) -> None:
-    """Permit only selected Nitro runtimes onto the dedicated sandbox pool."""
-    if pod_spec.get("runtimeClassName") not in {"isolated-sandbox", "confidential-sandbox"}:
-        return
-    toleration = {
-        "key": "astrolift.dev/nitro-only",
-        "operator": "Equal",
-        "value": "true",
-        "effect": "NoSchedule",
-    }
-    tolerations = pod_spec.setdefault("tolerations", [])
-    if toleration not in tolerations:
-        tolerations.append(toleration)
 
 
 class AgentRuntimeClassError(RuntimeError):
