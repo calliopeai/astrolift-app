@@ -98,22 +98,25 @@ it("requires an explicit reset mode and both acknowledgements, preserves event s
   const p = props();
   render(<NvkeWorkflowPanel {...p} />, { wrapper });
   openReset();
+  const form = within(screen.getByLabelText(copy.rationale).closest("form")!);
   fireEvent.change(screen.getByLabelText(copy.rationale), { target: { value: "PRIVATE_REASON" } });
   fireEvent.change(screen.getByLabelText(copy.evidence), { target: { value: "PRIVATE_EVIDENCE" } });
-  fireEvent.click(screen.getByRole("button", { name: messages.nvke.reviewRequest }));
+  fireEvent.click(form.getByRole("button", { name: messages.nvke.reviewRequest }));
   await screen.findByRole("alert");
   expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("combobox"));
+  fireEvent.click(form.getByRole("combobox"));
   fireEvent.click(await screen.findByRole("option", { name: "restart_rewrite" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: copy.boundaryAck }));
-  fireEvent.click(screen.getByRole("checkbox", { name: copy.nodeAck }));
-  fireEvent.click(screen.getByRole("button", { name: messages.nvke.reviewRequest }));
+  fireEvent.click(form.getByRole("checkbox", { name: copy.boundaryAck }));
+  fireEvent.click(form.getByRole("checkbox", { name: copy.nodeAck }));
+  fireEvent.click(form.getByRole("button", { name: messages.nvke.reviewRequest }));
   const review = await screen.findByRole("alertdialog");
   expect(review).toHaveTextContent("9007199254740993");
   expect(review).toHaveTextContent("9007199254740992");
   expect(review).toHaveTextContent(WORKFLOW_HISTORY.runId);
   expect(review).not.toHaveTextContent("PRIVATE");
-  confirm();
+  fireEvent.click(
+    within(review).getByRole("button", { name: messages.shared.confirmation.confirm })
+  );
   await waitFor(() => expect(p.onRequest).toHaveBeenCalledOnce());
   expect(p.onRequest).toHaveBeenCalledWith({
     mode: "reset",

@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "scope": "workflow-reset-ui-regression-query-cost",
+  "status": "focused-regressions-and-lint-qualified-integrated-suite-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/nvke-workflows.test.tsx": "963f7bd02b301f483b62f1ab544f211a2f982c0817c06fffbf1a7764d21ff109"
+  },
+  "checks": {
+    "workflowRegressions": {
+      "passed": 18,
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-verification-workflow-scoped-queries.log",
+      "logSha256": "b5c86b08e38098652d66d2c39b7b6d824277c5670ec2fcbf7049702dc6075c98"
+    },
+    "changedSourceLint": {
+      "exitCode": 0
+    }
+  },
+  "change": "Scope reset form role queries to the form and reuse the already-observed confirmation dialog. Preserve every event-string, acknowledgement, exact request, privacy and cleanup assertion; five-second test budget remains unchanged.",
+  "remaining": [
+    "Integrated full NVKE UI suite, final local release gates and actual paired/live acceptance."
+  ]
+}
