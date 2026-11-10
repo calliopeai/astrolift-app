@@ -49,6 +49,9 @@ try {
       );
       const source = cfg.fixture.source;
       const expected = {
+        workloadId: cfg.fixture.workload?.id ?? null,
+        expectedWorkloadVersion: cfg.fixture.workload?.version ?? null,
+        workloadDigest: cfg.fixture.workload?.workloadDigest ?? null,
         operationId: source.operation.id,
         expectedActorId: cfg.fixture.scope.actorId,
         expectedSiteVersion: source.site.version,
@@ -67,6 +70,12 @@ try {
       for (const [key, value] of Object.entries(expected))
         assert.equal(payload.variables.input[key], value);
       const text = payload.variables.input.requestText;
+      if (payload.operationName === "PrepareNvkeInstallPlanImage") {
+        const body = JSON.parse(text);
+        assert.equal(body.reference, cfg.reference);
+        assert.equal(body.workloadId, cfg.fixture.workload?.id);
+        assert.equal(body.workloadDigest, cfg.fixture.workload?.workloadDigest);
+      } else assert.equal(text, undefined);
       const journalBeforeCall = await page.evaluate(
         (artifactId) =>
           Object.values(localStorage).some((value) => {
@@ -193,11 +202,17 @@ try {
     cfg.artifactId
   );
   assert.equal(journal.inputSha256, calls[0].inputSha256);
+  assert.equal(journal.workloadId, cfg.fixture.workload?.id);
+  assert.equal(journal.workloadVersion, cfg.fixture.workload?.version);
+  assert.equal(journal.workloadDigest, cfg.fixture.workload?.workloadDigest);
   assert.equal(await page.getByRole("button", { name: /execute|continue|resume/i }).count(), 0);
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
       passed: true,
+      workloadId: cfg.fixture.workload?.id,
+      workloadVersion: cfg.fixture.workload?.version,
+      workloadDigest: cfg.fixture.workload?.workloadDigest,
       calls: calls.map((c) => c.name),
       artifactDigest: digest,
       captureDigest: capture,

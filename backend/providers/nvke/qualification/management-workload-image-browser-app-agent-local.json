@@ -1,0 +1,64 @@
+{
+  "format": 1,
+  "scope": "actual-workload-bound-registry-browser-api-native-recovery",
+  "status": "owned-client-api-postgres-native-browser-qualification-passed-release-incomplete",
+  "checks": {
+    "actualBrowserApiNative": {
+      "sessionId": 77587,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-image-browser-app-agent-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-image-browser-app-agent-v1.log",
+      "logSha256": "2da748e172b015271d8ddd944ea3124bfac09c09cd2bd7e37460dfb07d9618ce",
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 989.28
+    },
+    "frontendTypes": {
+      "sessionId": 94277,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-image-browser-types-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-image-browser-types-v1.log",
+      "logSha256": "0258b5926b8941e1e8150423f37ced703fed0cea3bc0ffc1d4d9b22d4f7b691f"
+    },
+    "changedFrontendLint": {
+      "sessionId": 94277,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-image-browser-lint-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-image-browser-lint-v1.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "appSourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImagePanel.api.stories.tsx": "6aa783bbbfb6a1f26785d627e473463755c937bb1d26712ee3ff7c9ef372315d",
+    "frontend/e2e/nvke-install-plan-image-api-runner.mjs": "0c19ab46361b8356cea9a382200cf2eaa0b0d490e890d6cde714ac4215c9acaa",
+    "frontend/graphql/nvke/use-nvke-install-plan-image.ts": "7e77e92e8f8a1a40a22c66ebfe01ca7187b8dc4c2f78cc142b7b0da597da2e6b",
+    "backend/astrolift_clusters/nvke_install_plan_images.py": "25c877cac018d41cdb91b61524f45852bf47ad7537a217b11974ec1a273682f9"
+  },
+  "clientFixtureSha256": {
+    "scripts/integration/test_nvke_install_plan_tree.py": "ddb529470ebd79961dfd902a881ae7279bfbdcdecfe80f62ca313ba131b530c9",
+    "scripts/integration/image_browser_qualification.py": "1c104ea51eeaad6573f1e8bdc6bee55873f1ce808853c08c517673c6f9e880b4",
+    "scripts/integration/image_cli_qualification.py": "ac4bda867bc6d66210762129b1109fd02c9b8c548cc7bd67d033af58f821e78f",
+    "scripts/integration/workload_cli_qualification.py": "02f6aedbbab38721a4d8a803881d8d89fb526ad59bcb2a80f6d9474f905dc52e"
+  },
+  "runtimePins": {
+    "appBase": "145259dcb",
+    "cliCommand": "201ed23",
+    "cliFixtureBase": "f048c36",
+    "opscode": "58b643a0a50f71d822deade7fb633b98acded4f9"
+  },
+  "coverage": [
+    "Actual compiled CLI and Chromium use the App API, real PostgreSQL and authenticated native agent with controlled Kubernetes/registry fixtures",
+    "Observed Pod reference is absent from images.txt and requires exact signed workload authority for acquisition",
+    "Browser validates exact reviewed workload UUID/version/digest on all prepare/read/retry calls; private body keeps its workload ID/digest",
+    "Image publication is durable before a deliberately dropped browser reply; native agent restarts before the lost reply reaches Chromium",
+    "Reload performs no RPC; explicit historical review and retained-private-intent retry preserve artifact/capture/root digests and observation time",
+    "Before-RPC journal retains exact workload metadata and input SHA without raw reference, policy, limits or bearer; private preparation text is not resent by read/retry",
+    "One browser image collection attempt; parent App/native artifacts, original operation, native guards and run inventory remain unchanged; continuation stays false"
+  ],
+  "limits": [
+    "Controlled fixture renders one Pod and two native items; full live NVKE installation is not qualified by this case",
+    "Actual CLI portion checks registry request count across cold read/retry; browser portion checks no automatic RPC and stable durable evidence after cold restart",
+    "Signed aggregate closure, operator/generated-workload proof, node platforms, original credentials, execution rewrite/import/use and linked continuation remain incomplete",
+    "Full baseline/release gates, main merge and deployment remain required"
+  ]
+}

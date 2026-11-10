@@ -3,6 +3,7 @@ import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useNvkeInstallPlanImage } from "@/graphql/nvke/use-nvke-install-plan-image";
+import type { NvkeInstallPlanWorkload } from "@/lib/nvke/operator-install-plan-workload";
 import type { NvkeBrowserScope } from "@/lib/nvke/recovery";
 import { NvkeOperatorInstallPlanImagePanel } from "./NvkeOperatorInstallPlanImagePanel";
 import type { NvkeOperatorInstallPlanTreePanelProps } from "./NvkeOperatorInstallPlanTreePanel";
@@ -10,6 +11,7 @@ import { INSTALL_TREE_PROPS } from "./NvkeOperatorInstallPlanTreePanel.stories";
 
 export type ImageApiFixture = {
   scope: NvkeBrowserScope;
+  workload?: NvkeInstallPlanWorkload;
   source: Partial<NvkeOperatorInstallPlanTreePanelProps>;
 };
 declare global {
@@ -33,6 +35,7 @@ function HookPanel({ fixture }: { fixture: ImageApiFixture }) {
       operation: { ...INSTALL_TREE_PROPS.operation, ...fixture.source.operation },
       authority: { ...INSTALL_TREE_PROPS.authority!, ...fixture.source.authority },
     },
+    workload: fixture.workload,
     pending: false,
   });
   return panel ? <NvkeOperatorInstallPlanImagePanel {...panel} /> : null;
