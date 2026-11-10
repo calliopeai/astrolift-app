@@ -1,0 +1,27 @@
+{
+  "format": 1,
+  "scope": "combined-verification-api-client-browser-and-recovery",
+  "status": "sources-combined-integrated-ui-suite-running",
+  "sourceRevisionBeforeReceipt": "ddad914c974ecc0a14d0b74de00e2e9562c25f12",
+  "includes": [
+    "Source-bound verification App API and generated contracts",
+    "Bounded client context graph snapshots",
+    "Eight-locale verification controls, metadata-only recovery hook and operation-screen wiring",
+    "Controlled browser reload proof and actual API browser acceptance harness",
+    "Workflow reset query-cost fix with unchanged assertions and timeout"
+  ],
+  "checks": {
+    "nvkeUi": {
+      "status": "running",
+      "sessionId": 8919,
+      "exitMarker": "/tmp/astrolift-nvke-verification-integrated-ui.exit",
+      "logPath": "/tmp/astrolift-nvke-verification-integrated-ui.log",
+      "workers": 2
+    }
+  },
+  "remaining": [
+    "Exact combined UI/static/build qualification and final runtime pin after native authority-check optimization.",
+    "Actual CLI/browser App/agent acceptance, full surface and live qualification, adversarial final review, coordinated PRs/main merge and CONFLICT deployment."
+  ],
+  "continuationAuthorized": false
+}
