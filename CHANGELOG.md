@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an inspect-first, Conflict-bound real-App confidential negative adapter (#2668), with pinned checkpoint/Pod/image/key ownership, unchanged attestation policy checks, a callback-guarded probe and UID-bound clone cleanup. Live execution and authoritative KMS audit remain separate qualification gates.
+
 - Restore required EKS driver instrumentation on Nitro preparation, cleanup, apply and readiness operations (#2668), with confidential payload and error redaction.
 
 - Manifest-selected Nitro Deployments, StatefulSets, Jobs, CronJobs and service-family agents now receive the dedicated pool toleration, shared with task dispatch (#2668). Ordinary workloads keep their existing scheduling.

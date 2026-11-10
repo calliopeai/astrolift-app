@@ -1,0 +1,78 @@
+Conflict real-App confidential qualification: controlled negative adapter
+
+Scope: operator-only helper, not an App API. Infrastructure/release gates and root
+phase authorization precede all live use. Default inspect performs only App/Cloud
+reads. submit explicitly performs two admission dry-runs and one create-only Pod
+POST. No mode writes KMS policies/grants, creates keys, pushes/deletes images,
+changes App data, or deletes the positive Pod. Disposable runner guards are intact.
+
+Prepare positive:
+- EKS conflict-astrolift/us-west-2 must be ACTIVE >=1.36, shared cluster GUID
+  01a05978-b271-77f3-a56e-6d92742c7f99; org conflict, astrolift-agents-conflict.
+- Register the exact bytes of backend/scripts/nitro_app_qualification_probe.py as
+  the primary container args[0], command ["python3", "-c"], using base image
+  docker.io/calliopeai/astrolift-agent-base@sha256:80b2aaccda598f7d33c5fb996e92c033a044c4b1547490d08a17df5b5dd4434b.
+  Use the qualification TOML/request preparation as a starting point, replacing
+  its embedded probe with these exact bytes. Do not reformat the embedded source.
+- Spec: non-root UID/GID/fsGroup42042; no installs, model/gateway/VNC/volume
+  bindings; scoped nonce secret; real runAstroliftAgent dispatch with immutable
+  compatibility Brief. No LLM credential required. Keep positive running for
+  900 seconds after its public finding; allow sufficient preparation/task budget.
+- Verify positive finding (non-root contract check, nonce hash and Brief IDs/hash)
+  in task.result.findings. Do not edit its Container or EnvSpec after dispatch.
+  QUALIFICATION_PUBLIC_VARIANT must be absent from all original inputs; its
+  clone-only value 'negative' causes the sealed command to exit70 before callbacks.
+  The pinned base image and approved registered command are part of this trust
+  boundary; this helper cannot independently decrypt/inspect the sealed capsule.
+
+Run inside an authorized controller-equivalent Python environment with read access
+  to the real App database, matching DJANGO_SETTINGS_MODULE and configured
+  NITRO_CONFIDENTIAL_TASKS_CONFIG. Use backend/providers:backend on PYTHONPATH.
+  AWS and Kubernetes clients are derived from the selected App cluster/provider;
+  arbitrary ambient kubeconfig and an operator-supplied checkpoint are not used.
+  Provider STS/PodIdentity/runtime prerequisites are checked even for inspect.
+  Capture from the real task, privately: task GUID, positive Pod UID, and SHA256
+  of json.dumps(task.dispatch_target['nitro_confidential'], sort_keys=True).encode().
+  The full checkpoint/Pod may contain policy or operational data: do not log them.
+
+Common arguments (substitute actual values; no commands below were executed):
+  python backend/scripts/qualify_nitro_app_negative.py \
+    --task TASK_GUID --positive-uid POSITIVE_POD_UID \
+    --checkpoint-sha256 CHECKPOINT_SHA256 --receipt /private/negative.json
+
+This defaults to inspect. It checks the real running AgentTask, frozen target,
+  registered guarded probe/unchanged definition, positive finding/Brief, full
+  prepared Pod hash, immutable per-task ECR tag/digest, exact key ownership and
+  Enabled original PCR17/PCR8 policy. Any refusal blocks submission.
+
+Append --action submit --seconds 120 to the same command only after gate approval.
+  Signed tools generate policy from final admission, using the positive ciphertext
+  image/runtime role/service account and original capsule task ID. The clone gets
+  a random name/task label, negative guard and deadline30..300s. Its predicted
+  PCR17 must differ. Positive identity/key/policy are rechecked immediately before
+  create; state is fsynced privately before and after submission. Existing receipts
+  refuse duplicate submit. Original grant is never widened or rewritten.
+
+For subsequent commands add --receipt-sha256 SHA256_OF_EXACT_RECEIPT_BYTES.
+  Recompute after every local receipt update. --action observe records bounded
+  status plus Enabled/unchanged-policy evidence while positive remains running.
+  It NEVER treats Pod failure as attestation proof. Any running/terminated guest,
+  including exit70, is a failed negative. Correlate authoritative KMS denial to
+  this key/runtime session/request window separately; denied events can redact
+  PCR/request/key details. Unattributable denial or no guest is inconclusive.
+  Observe at useful boundaries; no continuous watcher or live log/exec is needed.
+
+--action cleanup checks its saved random label, manifest hash and exact clone UID,
+  then deletes only that Pod using UID+resourceVersion preconditions. It works
+  after positive completion too; it does not require an Enabled positive key.
+  An absent clone is idempotent. Missing recorded UID or replacement Pod refuses
+  deletion: investigate privately and use an independently reviewed UID-bound
+  recovery; never rerun submit or delete by name. A create/network/receipt-write
+  failure may leave a deadline-bounded clone whose UID needs such recovery.
+
+Before positive exits, collect authoritative request-time denial evidence and
+  controlled key state, then cleanup the clone. Allow normal App completion and
+  image/key cleanup; verify completed result.output and positive Pod exit0.
+  Retain receipt, immutable revisions, observations, policy/PCR hashes, KMS audit
+  events and cleanup evidence. checkpoint.attestation_verified stays false.
+  Metadata/Pod status or disposable-cluster receipts alone do not qualify Conflict.
