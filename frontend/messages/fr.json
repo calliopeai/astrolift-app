@@ -18246,6 +18246,32 @@
       "loading": "Chargement du contexte de rendu enregistré…",
       "unavailable": "Le contexte enregistré ne correspond pas à l’arbre, à l’élément ou à la source actuels. Examinez-le à nouveau.",
       "unloaded": "Examinez un UUID de contexte existant ou capturez-en un nouveau."
+    },
+    "installVerification": {
+      "title": "Vérification du rendu",
+      "help": "Revérifiez le contexte sélectionné via l’agent d’origine. Les enregistrements conservés gardent leur date d’observation initiale.",
+      "verificationRequired": "La poursuite exige encore des contrôles actuels lors de la phase, l’équivalence des ressources et des identifiants d’origine, la validation des schémas, de toutes les images et de l’autorisation liée.",
+      "contextId": "UUID du contexte",
+      "contextVersion": "Version du contexte",
+      "maximumBytes": "Limite d’octets lus",
+      "maximumCaptureAgeSeconds": "Âge maximal de la capture en secondes",
+      "maximumCalls": "Limite d’appels de lecture",
+      "timeoutSeconds": "Délai en secondes",
+      "originalOnly": "Utilisez les paramètres d’origine pour cet UUID. Son intention privée conservée ne peut pas être remplacée.",
+      "settingsHelp": "Définissez des limites de lecture pour ce contexte. Une nouvelle observation exige un nouvel UUID ; conservez les paramètres d’origine pour la récupération.",
+      "invalidInput": "Vérifiez l’UUID distinct et les limites de lecture canoniques et bornées.",
+      "prepare": "Vérifier le contexte",
+      "review": "Consulter la vérification conservée",
+      "retry": "Réessayer la vérification conservée",
+      "failed": "La vérification n’a pas pu être confirmée. Conservez son UUID et inspectez l’enregistrement.",
+      "parentRequired": "Examinez d’abord le contexte préparé exact et ses artefacts parents.",
+      "loading": "Chargement de la vérification conservée…",
+      "unavailable": "La vérification conservée ne correspond pas à ce contexte ou à la source examinée.",
+      "unloaded": "Consultez un UUID de vérification existant ou créez une nouvelle observation.",
+      "artifactDigest": "SHA-256 de l’enregistrement",
+      "verificationDigest": "SHA-256 de la vérification",
+      "requests": "Requêtes de lecture",
+      "bytes": "Octets lus"
     }
   }
 }

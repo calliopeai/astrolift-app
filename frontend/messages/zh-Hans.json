@@ -18243,6 +18243,32 @@
       "loading": "正在加载已保存的渲染上下文…",
       "unavailable": "已保存的上下文与当前执行树、项目或来源不匹配。请重新审核。",
       "unloaded": "请检查现有上下文 UUID 或采集新的上下文。"
+    },
+    "installVerification": {
+      "title": "渲染验证",
+      "help": "通过原始代理重新检查所选上下文。已保存的记录保留原始观测时间。",
+      "verificationRequired": "继续执行前仍需在阶段使用时进行最新检查，确认资源及原始凭据等价性，校验模式和所有镜像，并取得关联的执行准入。",
+      "contextId": "上下文 UUID",
+      "contextVersion": "上下文版本",
+      "maximumBytes": "读取字节数上限",
+      "maximumCaptureAgeSeconds": "捕获结果的最大时长（秒）",
+      "maximumCalls": "读取调用次数上限",
+      "timeoutSeconds": "超时（秒）",
+      "originalOnly": "请使用此 UUID 的原始设置。已保留的私有意图不可替换。",
+      "settingsHelp": "设置此上下文的读取上限。新观测需要新的 UUID；请保留原始设置以便恢复。",
+      "invalidInput": "请检查不重复的 UUID，以及符合规范且在范围内的读取上限。",
+      "prepare": "验证渲染上下文",
+      "review": "查看已保存的验证",
+      "retry": "重试保留的验证",
+      "failed": "无法确认验证结果。请保留其 UUID 并检查已保存的记录。",
+      "parentRequired": "请先检查准确的已准备上下文及其父级制品。",
+      "loading": "正在加载已保存的验证…",
+      "unavailable": "已保存的验证与此上下文或已审核的来源不匹配。",
+      "unloaded": "查看现有验证 UUID，或创建新的观测。",
+      "artifactDigest": "记录 SHA-256",
+      "verificationDigest": "验证 SHA-256",
+      "requests": "读取请求数",
+      "bytes": "读取字节数"
     }
   }
 }

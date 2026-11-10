@@ -18243,6 +18243,32 @@
       "loading": "저장된 렌더링 컨텍스트 로드 중…",
       "unavailable": "저장된 컨텍스트가 현재 트리, 항목 또는 소스와 일치하지 않습니다. 다시 검토하세요.",
       "unloaded": "기존 컨텍스트 UUID를 검토하거나 새 컨텍스트를 수집하세요."
+    },
+    "installVerification": {
+      "title": "렌더링 검증",
+      "help": "원래 에이전트를 통해 선택한 컨텍스트를 다시 확인합니다. 저장된 레코드는 원래 관측 시각을 유지합니다.",
+      "verificationRequired": "계속하려면 단계 사용 시점의 최신 검사, 리소스와 원래 자격 증명의 동등성 확인, 스키마 검증, 모든 이미지 검증 및 연결된 실행 승인이 필요합니다.",
+      "contextId": "컨텍스트 UUID",
+      "contextVersion": "컨텍스트 버전",
+      "maximumBytes": "읽기 바이트 제한",
+      "maximumCaptureAgeSeconds": "캡처의 최대 경과 시간(초)",
+      "maximumCalls": "읽기 호출 제한",
+      "timeoutSeconds": "제한 시간(초)",
+      "originalOnly": "이 UUID의 원래 설정을 사용하세요. 저장된 비공개 의도는 교체할 수 없습니다.",
+      "settingsHelp": "이 컨텍스트의 읽기 한도를 설정하세요. 새 관측에는 새 UUID가 필요합니다. 복구를 위해 원래 설정을 보존하세요.",
+      "invalidInput": "중복되지 않는 UUID와 정규 형식의 제한된 읽기 값을 확인하세요.",
+      "prepare": "컨텍스트 검증",
+      "review": "저장된 검증 확인",
+      "retry": "저장된 검증 재시도",
+      "failed": "검증을 확인할 수 없습니다. UUID를 보존하고 저장된 레코드를 확인하세요.",
+      "parentRequired": "먼저 정확한 준비된 컨텍스트와 상위 아티팩트를 확인하세요.",
+      "loading": "저장된 검증을 불러오는 중…",
+      "unavailable": "저장된 검증이 이 컨텍스트 또는 검토한 소스와 일치하지 않습니다.",
+      "unloaded": "기존 검증 UUID를 확인하거나 새 관측을 만드세요.",
+      "artifactDigest": "레코드 SHA-256",
+      "verificationDigest": "검증 SHA-256",
+      "requests": "읽기 요청 수",
+      "bytes": "읽은 바이트 수"
     }
   }
 }
