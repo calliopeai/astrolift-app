@@ -4471,6 +4471,36 @@ export type AstroliftNavTreeWorkflow = {
   slug: Scalars['String']['output'];
 };
 
+export type AstroliftNitroReadinessCheck = {
+  code: Scalars['String']['output'];
+  evidence: Scalars['JSON']['output'];
+  message: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+};
+
+export type AstroliftNitroTaskMode = {
+  checks: Array<AstroliftNitroReadinessCheck>;
+  enabled: Scalars['Boolean']['output'];
+  mode: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+};
+
+export type AstroliftNitroTaskReadiness = {
+  checkedAt: Scalars['DateTime']['output'];
+  clusterId: Scalars['GUID']['output'];
+  modes: Array<AstroliftNitroTaskMode>;
+  namespace: Scalars['String']['output'];
+  source: Scalars['JSON']['output'];
+  sourceToken: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type AstroliftNitroTaskReadinessMutationResult = {
+  data?: Maybe<AstroliftNitroTaskReadiness>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftNotification = {
   body: Scalars['String']['output'];
   createdAt: Scalars['DateTime']['output'];
@@ -7654,6 +7684,13 @@ export type ClusteragentkeyissuedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type ConfigureNitroTasksInput = {
+  clusterId: Scalars['GUID']['input'];
+  expectedSource: Scalars['String']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  taskModes: Array<Scalars['String']['input']>;
+};
+
 export type ConfigureProviderPluginInput = {
   config: Scalars['JSON']['input'];
   organizationScoped: Scalars['Boolean']['input'];
@@ -9817,6 +9854,7 @@ export type Mutation = {
   cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
   commitConversationTransfer: AstroliftConversationTransferMutationResult;
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
+  configureNitroTasks: AstroliftNitroTaskReadinessMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
@@ -10607,6 +10645,11 @@ export type MutationCommitConversationTransferArgs = {
 
 export type MutationConfigureAgentTaskCallbacksArgs = {
   allowedHosts: Array<Scalars['String']['input']>;
+};
+
+
+export type MutationConfigureNitroTasksArgs = {
+  input: ConfigureNitroTasksInput;
 };
 
 
@@ -13397,6 +13440,7 @@ export type Query = {
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
   astroliftMyUiPreferences?: Maybe<AstroliftUiPreferences>;
   astroliftNavTree?: Maybe<AstroliftNavTree>;
+  astroliftNitroTaskReadiness: AstroliftNitroTaskReadinessMutationResult;
   astroliftObservabilityRetention: Array<ObservabilityRetentionType>;
   astroliftOrgMembersForApprovalPicker: Array<AstroliftApproverUser>;
   astroliftOrganization?: Maybe<AstroliftOrganization>;
@@ -14956,6 +15000,11 @@ export type QueryAstroliftMyNotificationsArgs = {
 export type QueryAstroliftMyNotificationsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryAstroliftNitroTaskReadinessArgs = {
+  clusterId: Scalars['GUID']['input'];
 };
 
 

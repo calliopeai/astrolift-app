@@ -11558,6 +11558,31 @@
       "refusedToast": "Öffentliche Apps beendet; jede App ist hinter der Anmeldung.",
       "changeFailed": "Änderung fehlgeschlagen.",
       "refreshWarning": "Die Änderung wurde angenommen, aber die Clusterdetails konnten nicht aktualisiert werden. Aktualisieren Sie die Ansicht, um den aktuellen Zustand zu sehen."
+    },
+    "nitro": {
+      "title": "Nitro-Aufgabenisolation",
+      "description": "Aktivieren Sie unterstützte Sandbox-Modi für Agentenaufgaben dieses Clusters. Stellen Sie die Infrastruktur separat bereit.",
+      "refresh": "Voraussetzungen prüfen",
+      "checking": "Wird geprüft…",
+      "retry": "Erneut versuchen",
+      "failed": "Nitro-Voraussetzungen konnten nicht geprüft werden.",
+      "unsupported": "Nitro-Aufgaben sind für diesen Anbieter nicht verfügbar.",
+      "isolated": "Isoliert",
+      "confidential": "Vertraulich",
+      "ready": "Voraussetzungen erfüllt",
+      "notReady": "Voraussetzungen fehlen",
+      "unknown": "Status unbekannt",
+      "enabled": "Aufgaben aktiviert",
+      "disabled": "Aufgaben deaktiviert",
+      "enable": "{mode}-Aufgaben aktivieren",
+      "disable": "{mode}-Aufgaben deaktivieren",
+      "saving": "Wird gespeichert…",
+      "workerCheck": "Worker prüfen die Voraussetzungen vor jeder Aufgabe erneut.",
+      "source": "Nachweise",
+      "noProof": "Die Prüfung betrifft die Konfiguration, nicht die Attestierung.",
+      "namespace": "Agent-Namespace",
+      "saved": "Nitro-Aufgabeneinstellungen gespeichert.",
+      "saveFailed": "Nitro-Aufgabeneinstellungen konnten nicht gespeichert werden."
     }
   },
   "obsPanelReason": {

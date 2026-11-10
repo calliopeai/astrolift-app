@@ -99,6 +99,7 @@ DEFAULT_API_VERSION_FOR_KIND: dict[str, str] = {
     "ClusterRoleBinding": "rbac.authorization.k8s.io/v1",
     "HorizontalPodAutoscaler": "autoscaling/v2",
     "PodDisruptionBudget": "policy/v1",
+    "RuntimeClass": "node.k8s.io/v1",
 }
 
 
@@ -338,6 +339,21 @@ class KubernetesDynamicClient:
         return obj
 
     # ---- public API ----------------------------------------------
+
+    def admit_pod(self, *, namespace: str, manifest: dict[str, Any]) -> dict[str, Any]:
+        """Return server admission's final named Pod without persisting or scheduling it."""
+        if manifest.get("apiVersion") != "v1" or manifest.get("kind") != "Pod":
+            raise ValueError("Pod admission requires a v1 Pod")
+        if not (manifest.get("metadata") or {}).get("name"):
+            raise ValueError("Pod admission requires an explicit name")
+        self._refresh_token()
+        return self._to_dict(
+            self._resource_for("v1", "Pod").create(
+                namespace=namespace,
+                body=manifest,
+                dry_run="All",
+            )
+        )
 
     def create_manifest(
         self,
@@ -598,6 +614,7 @@ class KubernetesDynamicClient:
         *,
         kind: str,
         namespace: str | None = None,
+        request_timeout: tuple[int, int] | None = None,
     ) -> list[dict[str, Any]]:
         """List resources of ``kind`` (cluster- or namespace-scoped).
 
@@ -607,7 +624,8 @@ class KubernetesDynamicClient:
         api_version, resolved_kind = split_kind(kind)
         resource = self._resource_for(api_version, resolved_kind)
         request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
-        obj = resource.get(namespace=request_namespace)
+        options = {"_request_timeout": request_timeout} if request_timeout is not None else {}
+        obj = resource.get(namespace=request_namespace, **options)
         return self._to_dict(obj).get("items", []) or []
 
     def delete(

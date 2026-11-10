@@ -249,6 +249,8 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "faas_output_dir": w.faas_output_dir,
         "containers": [_container_dict(c) for c in w.containers],
     }
+    if w.nitro_sandbox is not None:
+        out["nitro_sandbox"] = dict(w.nitro_sandbox)
     # Only when declared (#2432), so a workload without them hashes as before.
     if w.brains:
         out["brains"] = list(w.brains)

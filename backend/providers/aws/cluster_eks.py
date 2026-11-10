@@ -99,6 +99,7 @@ from aws._eks_auth import mint_eks_token
 from aws._errors import NotFoundError, map_client_error
 from aws._knative import KNATIVE_OPERATOR_MANIFESTS
 from aws._naming import iam_role_name
+from aws.nitro_sandboxes import discover_runtimes, preflight_manifests
 from aws.session import aws_client, aws_session
 from k8s_native.central_auth import central_auth_component
 from k8s_native.edge_gateway import alb_front, edge_component
@@ -316,6 +317,7 @@ class EKSClusterDriver(ClusterDriver):
         monotonic_clock: Callable[[], float] | None = None,
     ) -> None:
         self._config = config
+        self._nitro_clients = {"eks": eks_client, "sts": sts_client, "ec2": ec2_client}
         if eks_client is not None:
             self._eks = eks_client
         else:
@@ -390,6 +392,98 @@ class EKSClusterDriver(ClusterDriver):
     # ---- apply / delete -------------------------------------------
 
     @driver_op(cloud="aws", driver="cluster")
+    def validate_confidential_task(self, cluster: str, namespace: str, config: Any) -> None:
+        config.validate()
+        from aws.nitro_readiness import effective_role_matches
+
+        identity = self._sts.get_caller_identity()
+        if not effective_role_matches(identity, config.key_admin_arn):
+            raise ValueError("confidential task effective provider role differs from the configured key administrator")
+        if identity["Account"] != config.registry.split(".")[0]:
+            raise ValueError("confidential task provider identity differs from the configured AWS account")
+        if config.registry.split(".")[3] != self._config.region:
+            raise ValueError("confidential registry and EKS cluster must use the same region")
+        response = self._eks.list_pod_identity_associations(
+            clusterName=self._config.cluster_name,
+            namespace=namespace,
+            serviceAccount=config.service_account,
+        )
+        associations = response.get("associations", [])
+        if response.get("nextToken") or len(associations) != 1:
+            raise ValueError("confidential task service account requires exactly one EKS Pod Identity association")
+        association = self._eks.describe_pod_identity_association(
+            clusterName=self._config.cluster_name,
+            associationId=associations[0]["associationId"],
+        )["association"]
+        if association.get("roleArn") != config.runtime_role_arn:
+            raise ValueError("confidential Pod Identity role differs from the configured attestation principal")
+        runtime = self._k8s(cluster).get(
+            kind="node.k8s.io/v1/RuntimeClass", namespace=None, name="confidential-sandbox"
+        )
+        if (
+            not runtime
+            or runtime.get("handler") != "confidential-sandbox"
+            or runtime.get("metadata", {}).get("deletionTimestamp")
+            or runtime.get("metadata", {}).get("name") != "confidential-sandbox"
+        ):
+            raise ValueError("confidential-sandbox runtime is unavailable")
+
+    @driver_op(
+        cloud="aws",
+        driver="cluster",
+        audit=True,
+        redact_args=("config", "pod", "secret", "callback_hash", "save"),
+        redact_errors=True,
+    )
+    def prepare_confidential_task(
+        self,
+        cluster: str,
+        namespace: str,
+        *,
+        config: Any,
+        pod: dict[str, Any],
+        secret: Any,
+        task_id: str,
+        callback_hash: str,
+        save: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        from aws.nitro_confidential import prepare_run
+
+        self.validate_confidential_task(cluster, namespace, config)
+        session = aws_session(region=self._config.region, credential=self._config.credential)
+        credentials = session.get_credentials().get_frozen_credentials()
+        env = {
+            **os.environ,
+            "AWS_ACCESS_KEY_ID": credentials.access_key,
+            "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
+            "AWS_DEFAULT_REGION": self._config.region,
+            "AWS_REGION": self._config.region,
+        }
+        if credentials.token:
+            env["AWS_SESSION_TOKEN"] = credentials.token
+        else:
+            env.pop("AWS_SESSION_TOKEN", None)
+        return prepare_run(
+            config=config,
+            pod=pod,
+            secret=secret,
+            task_id=task_id,
+            callback_hash=callback_hash,
+            kms=session.client("kms"),
+            ecr=session.client("ecr"),
+            env=env,
+            admit=lambda manifest: self._k8s(cluster).admit_pod(namespace=namespace, manifest=manifest),
+            save=save,
+        )
+
+    @driver_op(cloud="aws", driver="cluster", audit=True, redact_args=("checkpoint",), redact_errors=True)
+    def cleanup_confidential_task(self, checkpoint: dict[str, Any]) -> None:
+        from aws.nitro_confidential import cleanup_run
+
+        session = aws_session(region=self._config.region, credential=self._config.credential)
+        cleanup_run(checkpoint, kms=session.client("kms"), ecr=session.client("ecr"))
+
+    @driver_op(cloud="aws", driver="cluster", redact_args=("manifests",), redact_errors=True)
     def apply_manifests(
         self,
         cluster: str,
@@ -400,6 +494,9 @@ class EKSClusterDriver(ClusterDriver):
         create_only: bool = False,
     ) -> ApplyResult:
         client = self._k8s(cluster)
+        sandbox_errors = preflight_manifests(client, manifests, namespace)
+        if sandbox_errors:
+            return ApplyResult(created=[], updated=[], unchanged=[], errors=sandbox_errors)
         created: list[str] = []
         updated: list[str] = []
         unchanged: list[str] = []
@@ -983,14 +1080,47 @@ class EKSClusterDriver(ClusterDriver):
             follow=follow,
         )
 
+    def _nitro_client(self, service: str) -> Any:
+        from botocore.config import Config
+
+        client = self._nitro_clients.get(service)
+        if client is None:
+            client = aws_client(
+                service,
+                region=self._config.region,
+                credential=self._config.credential,
+                config=Config(connect_timeout=3, read_timeout=5, retries={"total_max_attempts": 1}),
+            )
+            self._nitro_clients[service] = client
+        return client
+
+    @driver_op(cloud="aws", driver="cluster", redact_args=("config",), redact_errors=True)
+    def probe_nitro_readiness(self, cluster: str, namespace: str, config: Any = None) -> dict[str, Any]:
+        from aws.nitro_readiness import collect_readiness
+
+        return collect_readiness(self, cluster, namespace, config)
+
     # ---- bring-into-management (#316) -----------------------------
 
     @driver_op(cloud="aws", driver="cluster")
     def probe_capabilities(self, cluster: ClusterContext) -> dict[str, Any]:
-        return probe_cluster_capabilities(
+        capabilities = probe_cluster_capabilities(
             backend=self._management_backend,
             cluster=self._resolve_eks_auth_context(cluster),
         )
+        capabilities["nitro_sandboxes"] = self._probe_nitro_sandboxes(cluster)
+        return capabilities
+
+    def _probe_nitro_sandboxes(self, cluster: ClusterContext) -> dict[str, Any]:
+        try:
+            probe = getattr(self._management_backend, "list_runtime_classes", None)
+            if not callable(probe):
+                return {"status": "unknown", "runtime_classes": []}
+            context = self._resolve_eks_auth_context(cluster)
+            return discover_runtimes(probe(auth=context.to_auth()))
+        except Exception:
+            # RBAC can withhold RuntimeClass reads without invalidating other capabilities.
+            return {"status": "unknown", "runtime_classes": []}
 
     @driver_op(cloud="aws", driver="cluster", audit=True, sensitive_kind="cluster.bring_into_management")
     def bring_into_management(
@@ -999,12 +1129,18 @@ class EKSClusterDriver(ClusterDriver):
         *,
         run_preflight: bool = True,
     ) -> ManagementReport:
-        return run_bring_into_management(
+        report = run_bring_into_management(
             backend=self._management_backend,
             cluster=self._resolve_eks_auth_context(cluster),
             run_preflight=run_preflight,
             cluster_rbac=not cluster_rbac_withheld(),
         )
+        if report.success:
+            return replace(
+                report,
+                capabilities={**report.capabilities, "nitro_sandboxes": self._probe_nitro_sandboxes(cluster)},
+            )
+        return report
 
     @driver_op(cloud="aws", driver="cluster")
     def read_job_status(self, cluster: ClusterContext, *, namespace: str, job_name: str) -> JobStatus:

@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- Restore required EKS driver instrumentation on Nitro preparation, cleanup, apply and readiness operations (#2668), with confidential payload and error redaction.
+
+- Manifest-selected Nitro Deployments, StatefulSets, Jobs, CronJobs and service-family agents now receive the dedicated pool toleration, shared with task dispatch (#2668). Ordinary workloads keep their existing scheduling.
+
+- AWS cluster settings now review Nitro task prerequisites and explicitly enable isolated/confidential modes per cluster (#2668). Version/source-bound writes require cluster management authority, and workers recheck their own prerequisites before preparing secrets. Both task runtimes tolerate only the dedicated Nitro pool taint; readiness does not claim attestation.
+
+- EKS Nitro readiness now reports version, runtime and prepared-node prerequisites separately from attestation (#2668). Confidential checks verify the effective key-admin role, exact agent-namespace Pod Identity, immutable ECR, signed tools and an 8 GiB tmpfs budget before task secret preparation.
+
+- Add a reproducible confidential EKS qualification script with guarded positive/negative runs, private checkpoints, explicit cleanup and safety tests (#2668). A negative-only resume preserves the original image, key and grant; an explicitly hashed observation can replace a naturally removed positive Pod only after an API 404. KMS audit evidence remains required.
+
+- Confidential Pod recovery and cleanup tolerate the two region/zone labels Kubernetes adds during scheduling (#2668). Task labels, all other labels, image, policy and other Pod fields remain bound to the prepared hash.
+
+- Confidential policy generation supplies private ECR credentials through an ephemeral `HOME/.docker/config.json`, the path read by the signed AWS tool (#2668). The generator retains normal image and layer fetching, and the controller's existing home configuration is untouched.
+
+- Confidential task admission accepts the observed EKS Pod Identity `AWS_STS_REGIONAL_ENDPOINTS=regional` injection and can revalidate already admitted identity fields (#2668). Other STS values, duplicate environment names, dynamic identity values and unrelated injected fields remain refused.
+
+- Task-family agents can opt into operator-enabled confidential EKS Pods (#2668). Each run encrypts its task environment and all image layers, generates policy from the final admitted Pod with signed AWS tools, and grants its dedicated KMS key only for the predicted PCR17 and EKS service identity. Recovery and cleanup bind to the saved task, image, policy and Pod UID. The path requires explicit cluster configuration and a baked non-root image; live KMS release/refusal qualification remains pending. Operator-wide confidential runtime selection remains refused.
+
+- Agent task and box hardening now refuses operator-wide `AGENT_RUNTIME_CLASS=confidential-sandbox` because that setting alone cannot generate final per-run policies or deliver secrets after attestation (#2668). Task dispatch refuses before provider lookup or credential provisioning; ordinary and isolated runtimes retain their behavior.
+
+- Task-family agent workloads can select `nitro_sandbox = { mode = "isolated" }` (#2668). Dispatch checks the workload's stored selector and AWS runtime before provisioning, refuses operator-runtime/GPU conflicts, and does not recover Jobs with malformed pod templates or a different runtime. Custom-policy and network-isolated task variants remain rejected.
+
+- Workloads can explicitly select an EKS Nitro Sandbox with `nitro_sandbox = { mode = "isolated" }` or confidential mode with an externally generated policy (#2668). Supported controller templates retain the selection through parsing, normalization, stored manifests and rendering. Unsupported workload paths, GPU use and incompatible network isolation settings are rejected; omitted settings preserve existing output. Policy generation, attestation verification and automatic runtime provisioning remain operator responsibilities.
+
+- AWS EKS reports installed Nitro Sandbox runtime classes in cluster capabilities and preflights explicitly sandboxed Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job and CronJob manifests before applying a batch. Missing runtimes, missing confidential Cedar policies, host networking, user namespaces, GPU requests and network probes in network-isolated sandboxes are refused. Runtime detection reports configuration only; attestation and host provisioning remain operator responsibilities.
+
 - Remove the retired Rocketchat token API and profile-sync hook, runtime profile-ID fields, and leftover Metabase environment configuration. Existing profile/history ID data is preserved. Regenerate the GraphQL contracts without the chat mutation.
 
 - The Envoy edge no longer cuts a response at 15 seconds, and the ALB in front of it no longer idles out at 60 (#2651). App routes named no timeout, so Envoy's default route timeout of 15 s covered the whole response. SSE streams were cut every 15 s, an answer that waited on an AI model got a 504, and the ALB ended any response silent for a minute. Every HTTPRoute rule that reaches an app's Service (gated or public, a brain's `/mcp`, a custom domain) now carries Gateway API `timeouts.request`. The default is `0s`, no cap: a response may run as long as it keeps sending. An operator can cap it in whole seconds with `ASTROLIFT_EDGE_REQUEST_TIMEOUT_SECONDS` (set it on web and worker; a value that is not whole seconds from 0 to 99999 renders the default with a warning). Silence is bounded at 300 s, in two places. The edge's ClientTrafficPolicy sets `timeout.http.streamIdleTimeout: 300s`. Every ALB Ingress the platform renders in front of the edge (the wildcard front, each app's rule in its org's ALB group, custom-domain fronts) sets `alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=300`, keeping any other attributes. The 300 s is fixed, not a setting, because the AWS Load Balancer Controller refuses a group whose Ingresses disagree on an attribute. Timeouts go on the route rather than in a BackendTrafficPolicy because Envoy Gateway attaches one such policy per route, and `edge-access-denied` already holds every gated route. Rollout: an app's routes and its ALB rule pick this up on its next deploy or Reprovision; the first app re-applied in a group sets the group's ALB to 300 s. The ClientTrafficPolicy and the wildcard front come from the cluster's recipe, so run the cluster's Install / reconcile.

@@ -51,7 +51,7 @@ def resolve_task_target(task):
         if not target.get("docker_daemon_id") or target["docker_daemon_id"] != docker_daemon_id():
             raise RuntimeError("Task belongs to a different Docker daemon")
         return backend, None, namespace
-    if backend != "k8s_job" or not target.get("cluster_guid"):
+    if backend not in {"k8s_job", "k8s_confidential_pod"} or not target.get("cluster_guid"):
         raise RuntimeError("Task dispatch backend or cluster is unknown")
     cluster = TenantCluster.all_objects.filter(guid=target["cluster_guid"]).first()
     if cluster is None or cluster.organization_id not in (None, task.organization_id):
@@ -64,9 +64,16 @@ def resolve_task_target(task):
 def freeze_task_target(task, *, backend: str, cluster, namespace: str):
     if task.dispatch_target:
         return resolve_task_target(task)
-    if backend not in {"k8s_job", "local_docker"}:
+    from astrolift_dispatch.nitro_sandbox import selected_task_runtime
+
+    runtime = selected_task_runtime(task.agent_definition, getattr(task, "environment_spec", None))
+    if runtime and backend != "k8s_job":
+        raise RuntimeError("Nitro Sandbox task selectors require the Kubernetes dispatch backend")
+    if runtime == "confidential-sandbox":
+        backend = "k8s_confidential_pod"
+    if backend not in {"k8s_job", "k8s_confidential_pod", "local_docker"}:
         raise RuntimeError(f"Unsupported agent dispatch backend {backend!r}")
-    if backend == "k8s_job" and (
+    if backend in {"k8s_job", "k8s_confidential_pod"} and (
         cluster is None or cluster.organization_id not in (None, task.organization_id)
     ):
         raise RuntimeError("Agent dispatch cluster is missing or belongs to another organization")

@@ -11,11 +11,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     iputils-ping \
     traceroute \
+    skopeo \
+    openssl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip pipenv wheel
 
 WORKDIR /astrolift
+
+COPY scripts/install_nitro_runtime.py /tmp/install_nitro_runtime.py
+RUN python /tmp/install_nitro_runtime.py && rm /tmp/install_nitro_runtime.py
 
 # Render only verified collector archives offline. Both image architectures
 # install a checksum-pinned executable; no runtime download or local kubeconfig.
