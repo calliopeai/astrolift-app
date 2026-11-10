@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "source-bound-browser-image-api-qualification-driver",
-  "status": "155-local-contracts-eslint-syntax-and-typescript-qualified-real-api-run-pending",
+  "status": "actual-browser-cli-app-postgres-pinned-agent-image-recovery-qualified",
   "sourceSha256": {
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanImagePanel.api.stories.tsx": "efe7cd7946dee5d8586fd5d2ca7ed8cd589dbc906bfb83358ec7107ab8c8a16e",
     "frontend/components/screens/nvke/nvke-operator-install-plan-image-stories.test.tsx": "efde0b9b51e3ad1f12a5854714f4b9afe80793e10990e5c2eb9ab40d5e903210",
@@ -22,9 +22,29 @@
     },
     "realBrowserAppAgent": {
       "sessionId": 74598,
-      "status": "pending",
+      "status": "terminal",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 790.74,
       "logPath": "/tmp/astrolift-nvke-image-browser-app-agent.log",
-      "exitMarker": "/tmp/astrolift-nvke-image-browser-app-agent.exit"
+      "exitMarker": "/tmp/astrolift-nvke-image-browser-app-agent.exit",
+      "logSha256": "07cbc61478f5b6022d14179cd5dfeb50bfec606c691317bc85c5296f5ae1a59d",
+      "report": {
+        "passed": true,
+        "calls": [
+          "PrepareNvkeInstallPlanImage",
+          "ReviewNvkeInstallPlanImage",
+          "RetryNvkeInstallPlanImage"
+        ],
+        "artifactDigest": "cd6142f63b53991f246fc14dd6ccf474bb420f09d2f063933a81cce01f52494c",
+        "captureDigest": "ae09411959c5bd899e56dada18abfa81229dc5456ade2f1a7176dc9acaa165c8",
+        "rootDigest": "sha256:860385d1866d8d66c77108f9c043ace38a7de1fe3fcdf2c19dfae52512666a28",
+        "observedAt": "2026-11-10T09:25:49.362628+00:00",
+        "pageErrors": []
+      },
+      "privateLogPath": "/private/var/folders/c8/l3r0mzqx13dgdr6t5mn3gpjh0000gn/T/pytest-of-ragelink/pytest-7769/test_compiled_cli_tree_prepare0/image-browser-private.log",
+      "privateLogSha256": "d5beeba60f4be7cdc8c57c50bcfbed4ea6e877aa3c22cc2c3d8414b8a5bf41bd"
     }
   },
   "driverAssertions": [
@@ -34,8 +54,10 @@
     "Saved artifact/capture/root digests and observation time survive historical recovery; storage contains no reference/policy/bearer/request text."
   ],
   "limits": [
-    "The real browser/API/native run is pending; local contracts alone do not qualify that integration.",
     "The owned Storybook fixture is not actual Next login/route acceptance.",
-    "Image/workload/platform/credential closure, phase use and linked native admission remain open; no main merge or deployment."
-  ]
+    "Image/workload/platform/credential closure, phase use and linked native admission remain open; no main merge or deployment.",
+    "Owned Storybook page forwards real API requests; this does not qualify actual Next login/route acceptance.",
+    "Original failure/deployment readiness uses controlled fixtures. No live production installation, image/platform/credential closure or linked admission is claimed."
+  ],
+  "agentRevision": "572b87b4efec2252597efc05cee4189facd35571"
 }
