@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "encrypted-signed-image-binding-intent-and-typed-graphql",
-  "status": "postgres-api-and-final-reviewed-source-qualified-cli-browser-release-incomplete",
+  "status": "api-and-compiled-cli-native-qualified-browser-proof-running-release-incomplete",
   "sourceBaseRevision": "56482a046",
   "sourceSha256": {
     "backend/astrolift_clusters/migrations/0045_nvke_install_plan_image_binding.py": "487d42bc586618051e5ae3e25c2bd316485af147a445f80c3eb5429b66dea111",
@@ -83,6 +83,20 @@
           "logPath": "/tmp/astrolift-nvke-image-binding-app-static-v1-3.log"
         }
       ]
+    },
+    "compiledCliActualNative": {
+      "sessionId": 29441,
+      "status": "complete",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 1257.51,
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-app-agent-v1.log",
+      "logSha256": "c72ec4529ade119abe21001a43a8faf390143480ca41db90d5cefe4c8eefe9d0",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-app-agent-v1.exit",
+      "commandSourceRevision": "d241426",
+      "agentSourceRevision": "c67a6fe",
+      "interpretation": "Actual compiled CLI/App/Postgres/native mutual TLS covers lost plan/chart/tree/context/workload/image/binding replies, cold original-artifact reads and retained retries, unchanged parent/native/guard files, one attempt and unchanged registry read counts."
     }
   },
   "retainedFailures": [
@@ -105,9 +119,9 @@
   ],
   "limits": [
     "SDK/native mTLS proof is qualified separately in management-image-binding-sdk-local.json",
-    "CLI/browser pairing and operator/platform/credential/rewrite/import/fresh-use/linked-admission closure remain open",
+    "Browser pairing and operator/platform/credential/rewrite/import/fresh-use/linked-admission closure remain open",
     "No main merge or deployment",
-    "The final focused API proof qualifies backend source at 87039b49b. CLI/browser pairing and combined full client/native proof remain required."
+    "The final focused API proof qualifies backend source at 87039b49b. Actual compiled CLI/native pairing is qualified; browser/native qualification remains required."
   ],
   "sourceRevision": "87039b49b"
 }

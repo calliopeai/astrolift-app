@@ -120,10 +120,24 @@
     },
     "actualApiNative": {
       "sessionId": 80748,
-      "status": "queued-after-actual-cli-proof",
+      "status": "running-after-qualified-cli-predecessor",
       "logPath": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.log",
       "exitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-v2.exit",
       "queueExitMarker": "/tmp/astrolift-nvke-image-binding-browser-app-agent-queue-v3.exit"
+    },
+    "compiledCliPredecessor": {
+      "sessionId": 29441,
+      "status": "complete",
+      "exitCode": 0,
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 1257.51,
+      "logPath": "/tmp/astrolift-nvke-image-binding-cli-app-agent-v1.log",
+      "logSha256": "c72ec4529ade119abe21001a43a8faf390143480ca41db90d5cefe4c8eefe9d0",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-cli-app-agent-v1.exit",
+      "commandSourceRevision": "d241426",
+      "agentSourceRevision": "c67a6fe",
+      "interpretation": "Actual compiled CLI/App/Postgres/native mutual TLS covers lost plan/chart/tree/context/workload/image/binding replies, cold original-artifact reads and retained retries, unchanged parent/native/guard files, one attempt and unchanged registry read counts."
     }
   },
   "retainedFailures": [
