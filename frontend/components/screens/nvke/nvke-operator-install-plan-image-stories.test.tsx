@@ -4,9 +4,11 @@ import { runStory } from "@/test/run-story";
 import * as preview from "@/.storybook/preview";
 import * as stories from "./NvkeOperatorInstallPlanImagePanel.stories";
 import * as operation from "./NvkeOperationScreen.stories";
+import * as api from "./NvkeOperatorInstallPlanImagePanel.api.stories";
 setProjectAnnotations(preview);
 it.each([
   ...Object.entries(composeStories(stories)),
+  ...Object.entries(composeStories(api)),
   ...Object.entries(composeStories(operation)).filter(([name]) =>
     name.startsWith("InstallPlanImage")
   ),

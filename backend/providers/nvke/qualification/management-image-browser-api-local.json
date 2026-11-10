@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "scope": "source-bound-browser-image-api-qualification-driver",
+  "status": "155-local-contracts-eslint-syntax-and-typescript-qualified-real-api-run-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImagePanel.api.stories.tsx": "efe7cd7946dee5d8586fd5d2ca7ed8cd589dbc906bfb83358ec7107ab8c8a16e",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-image-stories.test.tsx": "efde0b9b51e3ad1f12a5854714f4b9afe80793e10990e5c2eb9ab40d5e903210",
+    "frontend/e2e/nvke-install-plan-image-api-runner.mjs": "210a882ff3398aeea537451bd2d2da6a02f53ab7e2e7d8a3c86884596d029926"
+  },
+  "checks": {
+    "localDriver": {
+      "sessionId": 39427,
+      "logPath": "/tmp/astrolift-nvke-image-browser-driver-final.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-browser-driver-final.exit",
+      "logSha256": "816b2802a35ab3957fd835a3197712ad410cfcb10b0174c43816ac231a95adcd",
+      "exitCode": 0,
+      "tests": 155,
+      "skipped": 0,
+      "eslint": "passed",
+      "nodeSyntax": "passed",
+      "fullTypeScript": "passed"
+    },
+    "realBrowserAppAgent": {
+      "sessionId": 74598,
+      "status": "pending",
+      "logPath": "/tmp/astrolift-nvke-image-browser-app-agent.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-browser-app-agent.exit"
+    }
+  },
+  "driverAssertions": [
+    "Loopback-only real API forwarding with redirect/retry disabled; bearer remains in the Node-side driver.",
+    "Exact original/plan/chart/tree binding and journal-before-request digest proof.",
+    "Lost reply followed by reload causes no automatic RPC; explicit review and retry carry no replacement private text.",
+    "Saved artifact/capture/root digests and observation time survive historical recovery; storage contains no reference/policy/bearer/request text."
+  ],
+  "limits": [
+    "The real browser/API/native run is pending; local contracts alone do not qualify that integration.",
+    "The owned Storybook fixture is not actual Next login/route acceptance.",
+    "Image/workload/platform/credential closure, phase use and linked native admission remain open; no main merge or deployment."
+  ]
+}
