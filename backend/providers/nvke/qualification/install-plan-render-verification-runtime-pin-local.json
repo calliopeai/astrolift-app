@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "sdk-context-and-verification-current-native-runtime-pin",
-  "status": "current-runtime-agent-sdk-and-compiled-cli-qualified-browser-acceptance-running",
+  "status": "current-runtime-agent-sdk-compiled-cli-and-real-browser-qualified",
   "agentRevision": "c93fe5f5dcafd870dd6d34211a4a034b600b1b70",
   "sourceSha256": {
     "backend/providers/tests/nvke/test_operator_install_plan_context_mtls.py": "438b2608c499b605c4edfd2e2082033c4ca9da614f71f60c8f24d5055551c2d0",
@@ -41,13 +41,18 @@
       "logSha256": "3b583937364ab21cf5d1301336d932b5248251e460e6bd4b19c050438eca5051"
     },
     "browserAppAcceptance": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 39376,
-      "exitMarker": "/tmp/astrolift-nvke-verification-browser-v1.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-browser-v1.exit",
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 0,
+      "seconds": 1229.16,
+      "logSha256": "7db9d725b95b2cda38fb2811a5268aceed4d4cac28bb267c53cfddd1e340641a"
     }
   },
   "remaining": [
-    "Finish actual browser/App/native run; compiled CLI acceptance passed on this reviewed runtime with unchanged timeout budgets.",
+    "Actual browser and compiled CLI acceptance passed. Final full-surface/source integration and release remain open.",
     "Original resource/credential/schema/image/phase-use and exactly-once admission, full surface/live qualification and coordinated release remain open."
   ],
   "continuationAuthorized": false
