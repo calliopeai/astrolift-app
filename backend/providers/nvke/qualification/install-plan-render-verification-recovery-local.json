@@ -63,9 +63,14 @@
       "scope": "Journal before preparation, explicit metadata-only review, retained selection after reload with zero automatic calls. Controlled Apollo fixture; actual backend qualification remains pending."
     },
     "postBuildTimeoutDiagnosis": {
-      "status": "running",
+      "status": "failed",
       "sessionId": 14884,
-      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-post-build-timeouts.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-post-build-timeouts.exit",
+      "exitCode": 1,
+      "passed": 28,
+      "failed": 1,
+      "logSha256": "6cb40d65258a4f608303a95e964f2447a362f851eab88840392376a2273a8844",
+      "failure": "Existing workflow reset acknowledgement/privacy case exceeded five seconds. Metrics and Temporal files passed after production Storybook finished; test and component bytes match prior qualified controls source. No timeout limits changed."
     }
   },
   "implemented": [
