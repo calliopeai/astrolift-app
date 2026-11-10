@@ -1,0 +1,53 @@
+{
+  "format": 1,
+  "scope": "full-upstream-coverage-ledger-platform-checkpoint",
+  "status": "immutable-paired-source-and-catalog-qualified-release-incomplete",
+  "sourceBaseRevision": "f43fa3442",
+  "sourceSha256": {
+    "backend/providers/scripts/nvke_evidence.json": "4b5709df11e9c7c402d8492a6e6dd32be0878aa5d4ee17852b582afcf1eb592c",
+    "docs/providers/nvke.md": "14b4be0bfe32349d21d2774b4a573220e3d08dcd15c5fb1dbd156910eb5e63ff"
+  },
+  "pairedRepositories": {
+    "app": {
+      "name": "calliopeai/astrolift-app"
+    },
+    "cli": {
+      "name": "calliopeai/astrolift-cli",
+      "revision": "efff667002feebd111486fd97e1243fc13d8d35d"
+    },
+    "opscode": {
+      "name": "calliopeai/astrolift-opscode",
+      "revision": "8d110c4aa42ce03f3279b17b7cc18111367d83ea"
+    }
+  },
+  "checks": {
+    "paired": {
+      "status": "complete",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-coverage-platform-checkpoint-paired-v1.log",
+      "logSha256": "cb5f9f5a983e063e1e3381e88b41362850fd6d1e4e8346440d1c0531e78af4b0",
+      "exitMarker": "/tmp/astrolift-nvke-coverage-platform-checkpoint-paired-v1.exit"
+    },
+    "tests": {
+      "status": "complete",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-coverage-platform-checkpoint-tests-v1.log",
+      "logSha256": "c6d4ac01e302843da1b19af68f34ab4317117777ad618f9e4730ae9fb1ce36be",
+      "exitMarker": "/tmp/astrolift-nvke-coverage-platform-checkpoint-tests-v1.exit",
+      "tests": 30,
+      "skipped": 0,
+      "seconds": 0.37
+    }
+  },
+  "sessionId": 22824,
+  "coverage": [
+    "All 88 actions, six resources, three workflows, 18 metric families, 36 executable commands and 14 operator families keep explicit mappings, scoped evidence and remaining work",
+    "Eight newly inspected client/native/platform/node/import/transport observations are linked; paired repository references point to pushed immutable commits",
+    "Every paired evidence blob and optional symbol is checked against its pinned repository commit; generated documentation matches the catalog",
+    "Qualification levels are unchanged; source inventory and wiring do not become claims of complete or live support"
+  ],
+  "limits": [
+    "This check verifies coverage/source traceability, not current execution of every linked suite or deployed behavior",
+    "Installation/execution closure, remaining native runtime/lifecycle/physical scenarios, final full local gates/adversarial review/PRs/merge and CONFLICT deployment/live validation remain required"
+  ]
+}
