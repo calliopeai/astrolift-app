@@ -44,13 +44,12 @@ export const installPlanImageFormSchema = z
   .strict();
 export type NvkeInstallPlanImageForm = z.infer<typeof installPlanImageFormSchema>;
 
-export const installPlanImageSchema = z
+export const installPlanImageMetadataSchema = z
   .object({
     __typename: z.literal("NvkeOperatorInstallPlanImageType").optional(),
     id: guid,
     version,
     status: z.literal("prepared"),
-    sourceKind: z.literal("registry").optional(),
     planId: guid,
     planVersion: version,
     planDigest: digest,
@@ -90,9 +89,12 @@ export const installPlanImageSchema = z
     (row) =>
       new Set([row.id, row.treeId, row.chartArtifactId, row.planId, row.operationId]).size === 5
   );
+export const installPlanImageSchema = installPlanImageMetadataSchema.safeExtend({
+  sourceKind: z.literal("registry").optional(),
+});
 export type NvkeInstallPlanImage = z.infer<typeof installPlanImageSchema>;
 
-function source(
+export function installPlanImageSource(
   parent: NvkeInstallPlan,
   publication: NvkeInstallPlanCharts,
   execution: NvkeInstallPlanTree
@@ -110,7 +112,7 @@ export function installPlanImageRequest(
   execution: NvkeInstallPlanTree
 ) {
   const form = installPlanImageFormSchema.parse(values);
-  const { plan, charts, tree } = source(parent, publication, execution);
+  const { plan, charts, tree } = installPlanImageSource(parent, publication, execution);
   if (new Set([form.artifactId, tree.id, charts.id, plan.id, plan.operationId]).size !== 5)
     throw new Error("INVALID_IMAGE_IDENTITY");
   return {
@@ -137,7 +139,20 @@ export function validateInstallPlanImage(
   limits?: Pick<NvkeInstallPlanImageForm, "maximumBytes">
 ) {
   const row = installPlanImageSchema.parse(value);
-  const { plan, charts, tree } = source(parent, publication, execution);
+  validateInstallPlanImageSource(row, parent, publication, execution, artifactId);
+  if (limits && BigInt(row.bytes) > BigInt(bytes.parse(limits.maximumBytes)))
+    throw new Error("IMAGE_BUDGET_EXCEEDED");
+  return row;
+}
+
+export function validateInstallPlanImageSource(
+  row: z.infer<typeof installPlanImageMetadataSchema>,
+  parent: NvkeInstallPlan,
+  publication: NvkeInstallPlanCharts,
+  execution: NvkeInstallPlanTree,
+  artifactId: string
+) {
+  const { plan, charts, tree } = installPlanImageSource(parent, publication, execution);
   if (
     row.id !== artifactId ||
     row.planId !== plan.id ||
@@ -157,7 +172,4 @@ export function validateInstallPlanImage(
     row.authorityVersion !== plan.authorityVersion
   )
     throw new Error("IMAGE_SOURCE_CHANGED");
-  if (limits && BigInt(row.bytes) > BigInt(bytes.parse(limits.maximumBytes)))
-    throw new Error("IMAGE_BUDGET_EXCEEDED");
-  return row;
 }
