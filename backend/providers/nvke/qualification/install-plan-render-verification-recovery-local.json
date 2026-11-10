@@ -44,14 +44,40 @@
       "scope": "Two workers removed three timeouts; metrics, Temporal and one workflow timeout remain. Diagnose after concurrent builds complete; no timeout increases."
     },
     "fullTypeScript": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 2138,
-      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-types.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-types.exit",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "productionStorybook": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 38082,
-      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-storybook.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-storybook.exit",
+      "exitCode": 0,
+      "logSha256": "5a71f8a619158f117a1c49f290cc57eb22b12d0a909105db9b3a3fc7cd6a08eb"
+    },
+    "controlledChromium": {
+      "exitCode": 0,
+      "stories": 2,
+      "pageErrors": 0,
+      "reportSha256": "99642a5c39de0c44da2ada43f97cb5f9fc3764731f0b827ed07bfb28594e3631",
+      "scope": "Journal before preparation, explicit metadata-only review, retained selection after reload with zero automatic calls. Controlled Apollo fixture; actual backend qualification remains pending."
+    },
+    "postBuildTimeoutDiagnosis": {
+      "status": "failed",
+      "sessionId": 14884,
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-post-build-timeouts.exit",
+      "exitCode": 1,
+      "passed": 28,
+      "failed": 1,
+      "logSha256": "6cb40d65258a4f608303a95e964f2447a362f851eab88840392376a2273a8844",
+      "failure": "Existing workflow reset acknowledgement/privacy case exceeded five seconds. Metrics and Temporal files passed after production Storybook finished; test and component bytes match prior qualified controls source. No timeout limits changed."
+    },
+    "productionNext": {
+      "status": "running",
+      "sessionId": 99148,
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-next.exit"
     }
   },
   "implemented": [
@@ -61,8 +87,8 @@
     "Storybook pure screen and controlled Apollo loss-before/after-retention scenarios precede route wiring."
   ],
   "remaining": [
-    "Resolve broader UI timeout failures and finish full TypeScript and production Storybook checks.",
-    "Run Chromium controlled persistence/reload checks and actual App/agent browser acceptance.",
+    "Resolve remaining workflow-reset UI timeout; full TypeScript and Storybook passed.",
+    "Actual App/agent browser acceptance; controlled Chromium check passed.",
     "Production Next build, full surface/live qualification and coordinated release remain open."
   ],
   "continuationAuthorized": false
