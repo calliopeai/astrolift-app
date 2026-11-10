@@ -75,9 +75,11 @@
       "failure": "Existing workflow reset acknowledgement/privacy case exceeded five seconds. Metrics and Temporal files passed after production Storybook finished; test and component bytes match prior qualified controls source. No timeout limits changed."
     },
     "productionNext": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 99148,
-      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-next.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-next.exit",
+      "exitCode": 0,
+      "logSha256": "cc5529a1d870745b9e6b0ab08d2af23340af987f19e55698e543a7507890a676"
     }
   },
   "implemented": [
@@ -89,7 +91,7 @@
   "remaining": [
     "Resolve remaining workflow-reset UI timeout; full TypeScript and Storybook passed.",
     "Actual App/agent browser acceptance; controlled Chromium check passed.",
-    "Production Next build, full surface/live qualification and coordinated release remain open."
+    "Combined source/type/UI qualification, actual paired acceptance, full surface/live qualification and coordinated release remain open; this recovery source passed the production Next build."
   ],
   "continuationAuthorized": false
 }
