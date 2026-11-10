@@ -11,7 +11,7 @@ from aws.nitro_confidential import POLICY, key_policy, prepared_pod_hash
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from astrolift_agents.models import AgentEnvironmentSpec, AgentTask, Brief
+from astrolift_agents.models import AgentEnvironmentSpec, AgentSecretBindingOverride, AgentTask, Brief
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_clusters.nitro import confidential_config
 from astrolift_manifest.tests.test_persist import _scaffold
@@ -30,7 +30,7 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def inspection(settings, tmp_path, monkeypatch):
+def inspection(settings, tmp_path, monkeypatch, request):
     app = _scaffold()
     org = app.organization
     org.slug = "conflict"
@@ -79,6 +79,27 @@ def inspection(settings, tmp_path, monkeypatch):
         run_as_non_root=True,
         allow_install=False,
     )
+    nonce_binding = AgentSecretBindingOverride.objects.create(
+        environment_spec=environment,
+        env_var="ASTROLIFT_QUALIFICATION_SECRET",
+        uri=f"agents/{org.guid}/projects/{app.project.guid}/qualification",
+    )
+    scenario = getattr(request, "param", None)
+    guard = None
+    if scenario in {
+        "guard_active",
+        "guard_removed",
+        "guard_deleted",
+        "guard_deleted_before",
+        "guard_renamed",
+    }:
+        guard = AgentSecretBindingOverride.objects.create(
+            environment_spec=environment,
+            env_var="QUALIFICATION_PUBLIC_VARIANT",
+            uri=f"agents/{org.guid}/projects/{app.project.guid}/guard",
+        )
+        if scenario == "guard_deleted_before":
+            guard.soft_delete()
     brief = Brief.objects.create(organization=org, registered_app=app, content_hash="b" * 64, status="ready")
     task = AgentTask.objects.create(
         organization=org,
@@ -145,6 +166,28 @@ def inspection(settings, tmp_path, monkeypatch):
         ]
     }
     task.save()
+    if scenario == "guard_removed":
+        guard.removed = True
+        guard.save()
+    elif scenario == "guard_deleted":
+        guard.soft_delete()
+    elif scenario == "guard_renamed":
+        guard.env_var = "OTHER_SECRET"
+        guard.save()
+    elif scenario == "nonce_changed":
+        nonce_binding.uri += "-changed"
+        nonce_binding.save()
+    elif scenario == "nonce_removed":
+        nonce_binding.removed = True
+        nonce_binding.save()
+    elif scenario == "nonce_deleted":
+        nonce_binding.soft_delete()
+    elif scenario == "nonce_added":
+        AgentSecretBindingOverride.objects.create(
+            environment_spec=environment,
+            env_var="NEW_SECRET",
+            uri=nonce_binding.uri,
+        )
     driver = Mock()
     driver._config.cluster_name = probe.CLUSTER_NAME
     driver._config.region = "us-west-2"
@@ -236,4 +279,35 @@ def test_cli_inspect_refuses_changed_persisted_authority(inspection, change):
     kms.describe_key.assert_not_called()
     k8s.admit_pod.assert_not_called()
     k8s._resource_for.assert_not_called()
+    assert not receipt.exists()
+
+
+@pytest.mark.parametrize(
+    "inspection",
+    [
+        "guard_active",
+        "guard_removed",
+        "guard_deleted",
+        "guard_deleted_before",
+        "guard_renamed",
+        "nonce_changed",
+        "nonce_removed",
+        "nonce_deleted",
+        "nonce_added",
+    ],
+    indirect=True,
+)
+def test_cli_refuses_effective_historical_or_changed_override_before_pod_or_mutation(inspection):
+    task, _, environment, _, k8s, kms, ecr, receipt = inspection
+    # Native override CRUD does not bump the parent spec, so its timestamp alone
+    # cannot prove that the sealed task's original bindings were guard-free.
+    assert environment.updated_at <= task.created_at
+    with pytest.raises(ValueError, match="secret binding"):
+        probe.main()
+    k8s.get.assert_not_called()
+    k8s.admit_pod.assert_not_called()
+    k8s._resource_for.assert_not_called()
+    kms.describe_key.assert_not_called()
+    kms.put_key_policy.assert_not_called()
+    ecr.describe_images.assert_not_called()
     assert not receipt.exists()

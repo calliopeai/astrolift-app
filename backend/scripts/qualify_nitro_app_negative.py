@@ -65,6 +65,30 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
+def verify_binding_authority(task):
+    from astrolift_agents.models import AgentSecretBindingOverride
+    from astrolift_dispatch.agent_secrets import effective_secret_refs
+
+    spec = task.environment_spec
+    if spec is None:
+        raise ValueError("qualification needs an environment spec")
+    if any(row["env_var"] == "QUALIFICATION_PUBLIC_VARIANT" for row in effective_secret_refs(spec)):
+        raise ValueError("effective secret binding overrides the negative callback guard")
+    # Removing/renaming a binding after sealing cannot remove it from the capsule.
+    # Include tombstones and soft-deleted rows, not just the current effective refs.
+    history = AgentSecretBindingOverride.all_objects.filter(environment_spec_id=spec.pk).only(
+        "env_var", "created_at", "updated_at", "deleted_at"
+    )
+    if any(
+        row.env_var == "QUALIFICATION_PUBLIC_VARIANT"
+        or row.created_at > task.created_at
+        or row.updated_at > task.created_at
+        or (row.deleted_at is not None and row.deleted_at > task.created_at)
+        for row in history
+    ):
+        raise ValueError("secret binding history contains the negative guard or changed after dispatch")
+
+
 def verify_positive(task, pod, config, expected_uid, expected_checkpoint):
     from aws.nitro_confidential import POLICY, prepared_pod_hash
 
@@ -371,6 +395,7 @@ def main():
         task = AgentTask.all_objects.select_related(
             "organization", "brief", "agent_definition", "environment_spec"
         ).get(guid=args.task, deleted_at__isnull=True)
+        verify_binding_authority(task)
         return task, k8s.get(kind="Pod", namespace=NAMESPACE, name="agent-task-" + uuid.UUID(args.task).hex)
 
     state = {}

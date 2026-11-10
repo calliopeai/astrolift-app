@@ -19,7 +19,11 @@ Prepare positive:
   compatibility Brief. No LLM credential required. Keep positive running for
   900 seconds after its public finding; allow sufficient preparation/task budget.
 - Verify positive finding (non-root contract check, nonce hash and Brief IDs/hash)
-  in task.result.findings. Do not edit its Container or EnvSpec after dispatch.
+  in task.result.findings. Do not edit its Container, EnvSpec or binding overrides after dispatch.
+  Effective secret refs and complete override history (including removed and
+  soft-deleted rows) are checked on each fresh CLI task load. Any reserved guard
+  binding or override created/updated/deleted after dispatch refuses qualification.
+  A nonce override created before dispatch is accepted.
   QUALIFICATION_PUBLIC_VARIANT must be absent from all original inputs; its
   clone-only value 'negative' causes the sealed command to exit70 before callbacks.
   The pinned base image and approved registered command are part of this trust
