@@ -1,12 +1,12 @@
 """Retired chat endpoints stay absent while profile updates remain local."""
 
 import pytest
+import requests
 from django.contrib.auth import get_user_model
 from django.db import connection
 
 from config.schema import schema
 from core.models import Profile
-from core.utils.request_handler import RequestHandler
 
 pytestmark = pytest.mark.django_db
 
@@ -20,7 +20,7 @@ def test_profile_name_update_does_not_call_external_integrations(monkeypatch):
     def refuse_network(*args, **kwargs):
         pytest.fail("Profile name updates must not call an external integration")
 
-    monkeypatch.setattr(RequestHandler, "make_request", refuse_network)
+    monkeypatch.setattr(requests.Session, "request", refuse_network)
     user = get_user_model().objects.create_user(
         username="retired-hooks", first_name="Before", last_name="Name"
     )
