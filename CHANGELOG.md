@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore required EKS driver instrumentation on Nitro preparation, cleanup, apply and readiness operations (#2668), with confidential payload and error redaction.
+
 - Manifest-selected Nitro Deployments, StatefulSets, Jobs, CronJobs and service-family agents now receive the dedicated pool toleration, shared with task dispatch (#2668). Ordinary workloads keep their existing scheduling.
 
 - AWS cluster settings now review Nitro task prerequisites and explicitly enable isolated/confidential modes per cluster (#2668). Version/source-bound writes require cluster management authority, and workers recheck their own prerequisites before preparing secrets. Both task runtimes tolerate only the dedicated Nitro pool taint; readiness does not claim attestation.

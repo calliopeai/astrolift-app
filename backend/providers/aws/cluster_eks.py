@@ -428,6 +428,13 @@ class EKSClusterDriver(ClusterDriver):
         ):
             raise ValueError("confidential-sandbox runtime is unavailable")
 
+    @driver_op(
+        cloud="aws",
+        driver="cluster",
+        audit=True,
+        redact_args=("config", "pod", "secret", "callback_hash", "save"),
+        redact_errors=True,
+    )
     def prepare_confidential_task(
         self,
         cluster: str,
@@ -469,12 +476,14 @@ class EKSClusterDriver(ClusterDriver):
             save=save,
         )
 
+    @driver_op(cloud="aws", driver="cluster", audit=True, redact_args=("checkpoint",), redact_errors=True)
     def cleanup_confidential_task(self, checkpoint: dict[str, Any]) -> None:
         from aws.nitro_confidential import cleanup_run
 
         session = aws_session(region=self._config.region, credential=self._config.credential)
         cleanup_run(checkpoint, kms=session.client("kms"), ecr=session.client("ecr"))
 
+    @driver_op(cloud="aws", driver="cluster", redact_args=("manifests",), redact_errors=True)
     def apply_manifests(
         self,
         cluster: str,
@@ -1085,6 +1094,7 @@ class EKSClusterDriver(ClusterDriver):
             self._nitro_clients[service] = client
         return client
 
+    @driver_op(cloud="aws", driver="cluster", redact_args=("config",), redact_errors=True)
     def probe_nitro_readiness(self, cluster: str, namespace: str, config: Any = None) -> dict[str, Any]:
         from aws.nitro_readiness import collect_readiness
 
