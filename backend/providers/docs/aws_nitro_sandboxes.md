@@ -243,7 +243,7 @@ implementation checks, not a complete repository CI run or a live AWS rollout.
 These historical checks did not exercise a real EKS sandbox workload,
 confidential KMS release/refusal, ECS task or EC2 host VM lifecycle. The gated
 confidential task implementation described above was added subsequently; live
-KMS release/refusal remains unqualified.
+KMS release/refusal was not qualified at that checkpoint; the later live evidence and activation boundary are recorded below.
 
 ## Isolated task-family selector qualification (2026-11-09)
 
@@ -347,3 +347,46 @@ original positive source revision and audit provenance. After collecting the
 negative audit evidence, explicit `--cleanup` verifies Pod ownership, removes
 the run image and confirms the key is PendingDeletion. Keep its admin role
 until every tagged test key is retired.
+
+
+## Live qualification and activation boundary (2026-11-10)
+
+The bounded amd64 qualification completed on a disposable private EKS 1.37
+Auto Mode cluster. The encrypted agent asserted its secret and exited zero.
+Fourteen accepted KMS Decrypt audit events recorded the predicted PCR17 and
+`PCR8:ServiceName=eks.amazonaws.com`. A changed-policy Pod using the same image
+and Enabled key failed to start at KMS Decrypt. Two CloudTrail AccessDenied
+events correlate to its runtime role, key and controlled unchanged-grant window;
+one has the exact request ID from the runtime failure. Denials redact recipient
+measurements, so the negative PCR17 is a signed-generator prediction, not an
+independently observed denied-call measurement.
+
+Direct-mode EC2 start, recovery, guest boot, stop and cleanup also passed on a
+disposable parent. This does not qualify confidential EC2 orchestration. All
+disposable compute and network resources were removed; the three task keys were
+verified PendingDeletion for November 17. The immutable operator receipts are:
+
+- [Direct EC2 lifecycle](https://github.com/calliopeai/astrolift-opscode/blob/0c57d4f490d09432b5602e6269dc5d2f4d409953/aws/qualification/nitro-direct-20261110.json)
+- [Confidential release and refusal](https://github.com/calliopeai/astrolift-opscode/blob/0c57d4f490d09432b5602e6269dc5d2f4d409953/aws/qualification/nitro-confidential-20261110.json)
+- [Resource cleanup](https://github.com/calliopeai/astrolift-opscode/blob/0c57d4f490d09432b5602e6269dc5d2f4d409953/aws/qualification/nitro-cleanup-20261110.json)
+
+Qualification does not install or enable Nitro on an existing cluster. Deploy
+an application build containing this implementation, prepare genuine sandbox
+runtime/node capacity, and run preflight from a network location that can reach
+the target Kubernetes API. Then opt in a workload through `nitro_sandbox`.
+Confidential tasks additionally require the ECR, role, Pod Identity and
+cluster-GUID operator configuration described above on both API and workers.
+Do not use an operator-wide runtime default as a shortcut for preparing a mixed
+cluster fleet.
+
+Installer-managed activation is still a separate integration. The installer
+already shares plain environment between API and workers, so it can carry the
+configuration. Its existing standard EKS node provisioning does not install
+Nitro runtime capacity or provision these confidential-task prerequisites.
+A supported installer flow must explicitly provision/reconcile compatible node
+capacity, runtime readiness, the private run repository, distinct trusted
+key-admin and parent-visible runtime permissions, and Pod Identity. It must
+surface unknown readiness honestly, preserve per-workload opt-in, and retain
+key retirement authority until every owned task key is PendingDeletion.
+A console enablement switch and automatic prerequisite reconciliation are not
+implemented by these App checkpoints.
