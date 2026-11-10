@@ -11555,6 +11555,31 @@
       "refusedToast": "公開アプリを停止しました。すべてのアプリにサインインが必要です。",
       "changeFailed": "変更に失敗しました。",
       "refreshWarning": "変更は受け付けましたが、クラスターの詳細を再取得できませんでした。画面を更新して現在の状態を確認してください。"
+    },
+    "nitro": {
+      "title": "Nitro タスクの分離",
+      "description": "このクラスターのエージェントタスクで対応するサンドボックスモードを有効にします。インフラは別途準備してください。",
+      "refresh": "前提条件を確認",
+      "checking": "確認中…",
+      "retry": "再試行",
+      "failed": "Nitro の前提条件を確認できませんでした。",
+      "unsupported": "このプロバイダーでは Nitro タスクを利用できません。",
+      "isolated": "分離",
+      "confidential": "機密",
+      "ready": "前提条件を満たしています",
+      "notReady": "前提条件が不足しています",
+      "unknown": "状態が不明です",
+      "enabled": "タスクが有効です",
+      "disabled": "タスクが無効です",
+      "enable": "{mode}タスクを有効にする",
+      "disable": "{mode}タスクを無効にする",
+      "saving": "保存中…",
+      "workerCheck": "ワーカーはタスクごとに前提条件を再確認します。",
+      "source": "証拠",
+      "noProof": "この確認は構成を検証するもので、アテステーションの検証ではありません。",
+      "namespace": "エージェントの名前空間",
+      "saved": "Nitro タスク設定を保存しました。",
+      "saveFailed": "Nitro タスク設定を保存できませんでした。"
     }
   },
   "obsPanelReason": {

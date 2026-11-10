@@ -11555,6 +11555,31 @@
       "refusedToast": "Apps públicos parados; todo app está atrás do login.",
       "changeFailed": "Falha ao alterar.",
       "refreshWarning": "A alteração foi aceita, mas não foi possível atualizar os detalhes do cluster. Atualize para ver o estado atual."
+    },
+    "nitro": {
+      "title": "Isolamento de tarefas Nitro",
+      "description": "Ative os modos de isolamento compatíveis para tarefas de agentes neste cluster. Prepare a infraestrutura separadamente.",
+      "refresh": "Verificar requisitos",
+      "checking": "Verificando…",
+      "retry": "Tentar novamente",
+      "failed": "Não foi possível verificar os requisitos do Nitro.",
+      "unsupported": "As tarefas Nitro não estão disponíveis para este provedor.",
+      "isolated": "Isolado",
+      "confidential": "Confidencial",
+      "ready": "Requisitos atendidos",
+      "notReady": "Faltam requisitos",
+      "unknown": "Estado desconhecido",
+      "enabled": "Tarefas ativadas",
+      "disabled": "Tarefas desativadas",
+      "enable": "Ativar tarefas {mode}",
+      "disable": "Desativar tarefas {mode}",
+      "saving": "Salvando…",
+      "workerCheck": "Os workers verificam os requisitos antes de cada tarefa.",
+      "source": "Evidências",
+      "noProof": "A verificação avalia a configuração, não a atestação.",
+      "namespace": "Namespace do agente",
+      "saved": "Configurações das tarefas Nitro salvas.",
+      "saveFailed": "Não foi possível salvar as configurações das tarefas Nitro."
     }
   },
   "obsPanelReason": {

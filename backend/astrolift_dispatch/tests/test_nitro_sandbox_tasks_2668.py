@@ -86,6 +86,9 @@ def test_actual_render_keeps_security_baseline_and_ordinary_output():
     )
     expected = deepcopy(baseline)
     expected["spec"]["template"]["spec"]["runtimeClassName"] = "isolated-sandbox"
+    expected["spec"]["template"]["spec"]["tolerations"] = [
+        {"key": "astrolift.dev/nitro-only", "operator": "Equal", "value": "true", "effect": "NoSchedule"}
+    ]
     assert isolated == expected
     assert isolated["spec"]["template"]["spec"]["automountServiceAccountToken"] is False
 
@@ -174,7 +177,25 @@ def test_confidential_preflight_refuses_even_with_policy_before_runtime_lookup(m
 
 @override_settings(AGENT_RUNTIME_CLASS="")
 def test_missing_runtime_refuses_before_managed_model_provisioning(monkeypatch):
-    provider = SimpleNamespace(get_manifest=lambda *args: None)
+    from django.utils import timezone
+
+    cluster = SimpleNamespace(
+        provider_config={"nitro_sandboxes": {"task_modes": ["isolated"]}},
+        provider_plugin=SimpleNamespace(slug="aws"),
+        slug="target",
+        guid="target",
+        version=1,
+        is_active=True,
+        lifecycle="managed",
+    )
+    provider = SimpleNamespace(
+        get_manifest=lambda *args: None,
+        probe_nitro_readiness=lambda *args: {
+            "checked_at": timezone.now().isoformat(),
+            "source": {},
+            "modes": {"isolated": {"state": "ready", "checks": []}},
+        },
+    )
     monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda cluster: provider)
     monkeypatch.setattr(
         "core.cluster_management._context_for_cluster", lambda cluster: SimpleNamespace(slug="target")
@@ -190,7 +211,7 @@ def test_missing_runtime_refuses_before_managed_model_provisioning(monkeypatch):
         environment_spec=SimpleNamespace(image_tag="registry.example/agent:1", managed_model=True, gpu=0),
     )
     task.agent_definition = workload()
-    result = K8sJobSpawner(object(), "team").spawn(task)
+    result = K8sJobSpawner(cluster, "team").spawn(task)
     assert not result.ok
     assert "not available" in result.error
 
@@ -241,3 +262,16 @@ def test_recovery_refuses_null_or_list_pod_template_fields(monkeypatch, path, ma
     assert not result.ok
     assert result.external_id == "agent-task-task1"
     assert result.error == "Existing agent Job has a malformed pod template"
+
+
+@pytest.mark.parametrize("runtime", ["", "gvisor", "isolated-sandbox", "confidential-sandbox"])
+@override_settings(AGENT_RUNTIME_CLASS="")
+def test_dedicated_pool_toleration_is_runtime_scoped_and_idempotent(runtime):
+    from astrolift_dispatch.pod_hardening import apply_nitro_scheduling
+
+    pod = {"runtimeClassName": runtime, "tolerations": [{"key": "existing", "operator": "Exists"}]}
+    apply_nitro_scheduling(pod)
+    apply_nitro_scheduling(pod)
+    nitro = [row for row in pod["tolerations"] if row["key"] == "astrolift.dev/nitro-only"]
+    assert len(nitro) == (1 if runtime in {"isolated-sandbox", "confidential-sandbox"} else 0)
+    assert pod["tolerations"][0]["key"] == "existing"

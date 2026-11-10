@@ -26,6 +26,49 @@ inside Nitro, that nodes can schedule it, or that KMS accepted its attestation.
 The managed platform ClusterRole grants only `get` and `list` on runtime classes;
 operators managing their own RBAC must grant these reads separately.
 
+## Task readiness and explicit enablement
+
+Open `/clusters/<slug>/settings?section=nitro` for the AWS cluster. The
+`astroliftNitroTaskReadiness(clusterId)` GraphQL query reports each task mode as
+`ready`, `not_ready`, or `unknown`, separately from its saved enabled state.
+Both reads and writes require `cluster.manage` in the owning organization;
+shared clusters additionally require a platform operator. Team-bound bearers
+cannot manage these organization resources.
+
+`configureNitroTasks(input: {clusterId, expectedVersion, expectedSource,
+taskModes})` stores the explicit intent in
+`provider_config.nitro_sandboxes.task_modes`. Modes default to an empty list.
+The mutation rechecks prerequisites, refuses a stale cluster version or source
+fingerprint, locks and rechecks write authority, and changes no infrastructure.
+Only newly enabled modes require a ready verdict; an enabled mode can still be
+disabled when infrastructure becomes unreachable. Readiness and opt-in are
+configuration evidence, not proof of attestation.
+
+All EKS paths require version 1.36 or later. An Auto Mode cluster can be ready
+for provisioning before any sandbox nodes exist. Manual capacity requires
+observed ready, schedulable nodes with the AWS sandbox label and allocatable
+slots, the supported kernel/containerd versions, and running EC2 parents with
+Nitro Enclaves enabled. RuntimeClass inventory alone remains insufficient.
+AWS probes use the cluster credential's effective session, including AssumeRole;
+the configured key-admin role must match that effective STS role.
+
+API and worker processes need the identical per-cluster confidential configuration,
+signed runtime tools and a writable memory-backed workspace of at least 8 GiB,
+with at least 1 GiB currently free. The installer mounts an 8 GiB memory
+`emptyDir` at `/dev/shm` on both deployments and reserves that memory in their
+pod budgets. The agent namespace comes from `agent_namespace(org_slug)`, not
+the installer namespace. Pod Identity must match that namespace, service account,
+cluster and runtime role exactly. Source evidence includes the cluster ARN,
+namespace, configuration fingerprint and signed tool-manifest SHA.
+
+Workers recheck their own current process before preparing Briefs or task
+secrets. API readiness therefore cannot authorize a misconfigured worker. Task
+Pods using either Nitro runtime receive exactly the dedicated pool toleration
+`astrolift.dev/nitro-only=true:NoSchedule` before admission and confidential
+policy generation. Ordinary task Pods receive no such toleration. The installer
+owns Auto Mode, its bounded custom NodeClass/NodePool and namespace associations;
+the App does not enable global runtime selection or provision capacity.
+
 ## Selecting a sandbox in astrolift.toml
 
 ```toml
@@ -96,7 +139,8 @@ Astrolift workload manifest.
 
 ### Operator configuration
 
-Confidential tasks are disabled unless `NITRO_CONFIDENTIAL_TASKS_CONFIG` contains
+Confidential tasks require explicit per-cluster opt-in above and a valid
+`NITRO_CONFIDENTIAL_TASKS_CONFIG` containing
 an entry keyed by the exact cluster GUID. Configure API and worker processes
 with the same JSON, for example:
 

@@ -68,6 +68,7 @@ export interface ClusterSettingsCards {
   ingressAuth?: React.ReactNode;
   authUsers?: React.ReactNode;
   bootstrapPlan?: React.ReactNode;
+  nitro?: React.ReactNode;
 }
 
 export type ClusterSettingsScreenProps = Omit<
@@ -135,6 +136,7 @@ export function ClusterSettingsScreen({
   const ingressClassT = useTranslations("clusterSettings.ingressClass");
   const ingressAuthT = useTranslations("clusterSettings.ingressAuth");
   const authUsersT = useTranslations("clusterSettings.authUsers");
+  const nitroT = useTranslations("clusterSettings.nitro");
   const fmt = useFormatters();
   const hideRestricted = useRestrictedMode(restrictedMode) === "hide";
 
@@ -334,6 +336,23 @@ export function ClusterSettingsScreen({
               </Section>
             ),
           },
+          ...(cards.nitro
+            ? [
+                {
+                  id: "nitro",
+                  title: nitroT("title"),
+                  content: (
+                    <Restricted
+                      mode={restrictedMode}
+                      allowed={access.manage}
+                      permission="cluster.manage"
+                    >
+                      {cards.nitro}
+                    </Restricted>
+                  ),
+                },
+              ]
+            : []),
           {
             id: "bootstrap",
             title: presentationT("bootstrap"),
@@ -366,7 +385,8 @@ export function ClusterSettingsScreen({
             !(
               (["ingress-class", "central-auth", "ingress-auth"].includes(section.id) &&
                 !access.update) ||
-              (section.id === "users" && !access.users)
+              (section.id === "users" && !access.users) ||
+              (section.id === "nitro" && !access.manage)
             )
         )}
         dangerZone={

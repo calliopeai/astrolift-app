@@ -185,6 +185,10 @@ class K8sJobSpawner(ContainerSpawner):
                 raise AgentRuntimeClassError(
                     "Confidential tasks require their frozen confidential Pod backend"
                 )
+            if runtime_class and not self.confidential_pod:
+                from astrolift_clusters.nitro import require_task_mode
+
+                require_task_mode(self._cluster, runtime_class.removesuffix("-sandbox"), self._namespace)
             if runtime_class:
                 preflight_agent_runtime(
                     self._cluster,
@@ -986,7 +990,7 @@ def _render_agent_job(
     """
     from astrolift_agents.services.task_timeout import admission_allowance_seconds
     from astrolift_dispatch.agent_secrets import agent_container_env, task_secret_name
-    from astrolift_dispatch.pod_hardening import harden_agent_pod
+    from astrolift_dispatch.pod_hardening import apply_nitro_scheduling, harden_agent_pod
 
     primary_container = workload.containers.filter(is_primary=True).first()
     port = primary_container.port if primary_container else 0
@@ -1108,4 +1112,5 @@ def _render_agent_job(
                 "Workload Nitro Sandbox selection conflicts with the agent runtime policy"
             )
         job["spec"]["template"]["spec"]["runtimeClassName"] = runtime_class
+    apply_nitro_scheduling(job["spec"]["template"]["spec"])
     return job

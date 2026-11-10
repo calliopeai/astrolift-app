@@ -2,34 +2,23 @@
 
 from __future__ import annotations
 
-import json
 from copy import deepcopy
-from pathlib import Path
-
-from django.conf import settings
 
 from astrolift_dispatch.spawners.base import SpawnResult, TaskStatus
 from astrolift_dispatch.spawners.k8s_job import K8sJobSpawner, _task_for_external_id
 
 
 def confidential_config(cluster):
-    from aws.nitro_confidential import ConfidentialConfig
+    from astrolift_clusters.nitro import confidential_config as configured
 
-    try:
-        configured = json.loads(settings.NITRO_CONFIDENTIAL_TASKS_CONFIG)
-        values = dict(configured[str(cluster.guid)])
-        values["runtime_directory"] = Path(values.get("runtime_directory", "/opt/astrolift/nitro"))
-        config = ConfidentialConfig(**values)
-        config.validate()
-        return config
-    except (ValueError, TypeError, KeyError, AttributeError) as exc:
-        raise ValueError("This cluster has no valid operator confidential-task configuration") from exc
+    return configured(cluster)
 
 
 class ConfidentialPodSpawner(K8sJobSpawner):
     confidential_pod = True
 
     def spawn(self, task):
+        from astrolift_dispatch.pod_hardening import AgentRuntimeClassError
         from astrolift_services.filesystem_bindings import agent_volume_bindings
         from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
@@ -50,6 +39,9 @@ class ConfidentialPodSpawner(K8sJobSpawner):
                 "managed models, gateway, VNC or filesystem bindings",
             )
         try:
+            from astrolift_clusters.nitro import require_task_mode
+
+            require_task_mode(self._cluster, "confidential", self._namespace)
             self._config = confidential_config(self._cluster)
             driver = _driver_for_cluster(self._cluster)
             context = _context_for_cluster(self._cluster)
@@ -64,6 +56,8 @@ class ConfidentialPodSpawner(K8sJobSpawner):
                         "Existing confidential Pod must be recovered before preparing another image"
                     )
                 driver.cleanup_confidential_task(old)
+        except AgentRuntimeClassError as exc:
+            return SpawnResult("", False, str(exc))
         except Exception:
             return SpawnResult(
                 "",

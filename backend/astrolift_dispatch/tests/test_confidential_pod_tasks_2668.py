@@ -31,6 +31,12 @@ def run(settings, monkeypatch):
     persist_manifest(app, normalize(parse_raw(text)), raw_text=text)
     workload = Workload.objects.select_related("registered_app").get(registered_app=app, slug="worker")
     cluster = _add_environment(app).tenant_cluster
+    from astrolift_clusters.models import ProviderPlugin
+
+    cluster.provider_plugin = ProviderPlugin.objects.get_or_create(slug="aws", defaults={"name": "AWS"})[0]
+    cluster.provider_config = {"nitro_sandboxes": {"task_modes": ["confidential"]}}
+    cluster.save()
+
     spec = AgentEnvironmentSpec.objects.create(
         organization=app.organization,
         name="Confidential",
@@ -64,6 +70,14 @@ def run(settings, monkeypatch):
         pod=None, applied=[], seen=None, cleaned=[], deleted=[], fail_apply=False, cancel_during_prepare=False
     )
 
+    from django.utils import timezone
+
+    driver.probe_nitro_readiness = lambda slug, namespace, config: {
+        "checked_at": timezone.now().isoformat(),
+        "source": {"namespace": namespace},
+        "modes": {"confidential": {"state": "ready", "checks": []}},
+    }
+
     def get_manifest(cluster, namespace, kind, name):
         if kind == "RuntimeClass":
             return {"metadata": {"name": "confidential-sandbox"}, "handler": "confidential-sandbox"}
@@ -74,6 +88,12 @@ def run(settings, monkeypatch):
         pod = deepcopy(kwargs["pod"])
         assert pod["spec"]["securityContext"]["runAsNonRoot"] is True
         assert pod["spec"]["containers"][0]["securityContext"]["capabilities"] == {"drop": ["ALL"]}
+        assert {
+            "key": "astrolift.dev/nitro-only",
+            "operator": "Equal",
+            "value": "true",
+            "effect": "NoSchedule",
+        } in pod["spec"]["tolerations"]
         driver.seen = task_environment(pod["spec"], kwargs["secret"])
         pod["spec"]["containers"][0].update(
             image="registry.example/run@sha256:" + "2" * 64,
@@ -215,3 +235,25 @@ def test_cancellation_during_image_preparation_never_creates_a_pod(run):
     assert "cancelled during confidential image" in result.error
     assert not run.driver.applied
     assert len(run.driver.cleaned) == 1
+
+
+def test_worker_drift_refuses_before_brief_secrets_or_callback(run, monkeypatch):
+    from astrolift_dispatch.pod_hardening import AgentRuntimeClassError
+
+    before = run.task.callback_token_hash
+
+    def refuse(*args):
+        raise AgentRuntimeClassError(
+            "Nitro confidential task prerequisites are not ready on this process: workspace"
+        )
+
+    def forbidden(**kwargs):
+        pytest.fail("secrets must follow worker prerequisites")
+
+    monkeypatch.setattr("astrolift_clusters.nitro.require_task_mode", refuse)
+    monkeypatch.setattr("astrolift_dispatch.agent_secrets.resolve_task_secret_manifest", forbidden)
+    result = run.spawner.spawn(run.task)
+    assert not result.ok and "workspace" in result.error
+    assert run.driver.seen is None and not run.driver.applied
+    run.task.refresh_from_db()
+    assert run.task.callback_token_hash == before

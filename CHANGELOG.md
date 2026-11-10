@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- AWS cluster settings now review Nitro task prerequisites and explicitly enable isolated/confidential modes per cluster (#2668). Version/source-bound writes require cluster management authority, and workers recheck their own prerequisites before preparing secrets. Both task runtimes tolerate only the dedicated Nitro pool taint; readiness does not claim attestation.
+
 - EKS Nitro readiness now reports version, runtime and prepared-node prerequisites separately from attestation (#2668). Confidential checks verify the effective key-admin role, exact agent-namespace Pod Identity, immutable ECR, signed tools and an 8 GiB tmpfs budget before task secret preparation.
 
 - Add a reproducible confidential EKS qualification script with guarded positive/negative runs, private checkpoints, explicit cleanup and safety tests (#2668). A negative-only resume preserves the original image, key and grant; an explicitly hashed observation can replace a naturally removed positive Pod only after an API 404. KMS audit evidence remains required.
