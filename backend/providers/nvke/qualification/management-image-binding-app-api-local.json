@@ -1,0 +1,108 @@
+{
+  "format": 1,
+  "scope": "encrypted-signed-image-binding-intent-and-typed-graphql",
+  "status": "postgres-baseline-43-pass-final-focused-qualification-running-release-incomplete",
+  "sourceBaseRevision": "56482a046",
+  "sourceSha256": {
+    "backend/astrolift_clusters/migrations/0045_nvke_install_plan_image_binding.py": "487d42bc586618051e5ae3e25c2bd316485af147a445f80c3eb5429b66dea111",
+    "backend/astrolift_clusters/models/__init__.py": "70bf3e90bffcf76b4b134c70a57068fe3d4d800c5c969f0e36ee82b90fb8e1cf",
+    "backend/astrolift_clusters/models/nvke.py": "684ccaf9e6551e6d42317b67ac0e6a296e56fb90b1f0c2347ddaf4d606843259",
+    "backend/astrolift_clusters/nvke_install_plan_charts.py": "9ad31907d5d129d6697bafa57e287437eac1b7cecc80d5e2f78a9d1d50452ac6",
+    "backend/astrolift_clusters/nvke_install_plan_contexts.py": "b8e411ce071c356d962ea429d40b70457f9e0730b072853c26a57e76c09635ff",
+    "backend/astrolift_clusters/nvke_install_plan_image_bindings.py": "7e2c5336e57fd1d35529aeb1d6a12c94b4ad2b38223347d1c64d8cb0ea8d5ad8",
+    "backend/astrolift_clusters/nvke_install_plan_images.py": "98e4cef4ce8af9413eb25bf1cdba97c05cee6dd2d3f2770917bccb7dd4e4adb8",
+    "backend/astrolift_clusters/nvke_install_plan_trees.py": "f14e0175f0ca53d58a4ef09853d2505ef2d11016ff1fdb7050ec39e47fab75e4",
+    "backend/astrolift_clusters/nvke_install_plan_verifications.py": "dde5e1d360dd64f66a031dc56270fb7c65a8414006d84a961e52555470df67f0",
+    "backend/astrolift_clusters/nvke_install_plan_workloads.py": "fef7bfda714363b31ce01a30d7d7de92bbf8c056e314e60a30a73643200f6dc5",
+    "backend/astrolift_clusters/nvke_install_plans.py": "b78c025e19e7b9523b0961cb95e21c7b2bc1dc3a5afcdcc7abfdab10741feaa4",
+    "backend/astrolift_clusters/schema/__init__.py": "b18ee2382794d929f920cec3c0db246ea4125e1983a56c6d0a6fc01fc3a8f8af",
+    "backend/astrolift_clusters/schema/nvke_install_plan_image_bindings.py": "96905234b034ce80529db089bd47c5239c42b1b361846febb7319d5788c90f87",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_image_bindings.py": "98719bfd1f5d41ee726e1d6b529504f8a4d9dc6c0cecd29c348f755277d9218c",
+    "backend/config/schema.py": "4045af94266574e10f683c668ce6cbb431f902abc7bdd45dd8e556f33e902c85",
+    "backend/core/schema/audit.py": "079f1546fc8440396227acdd25f150ddcdccc52b02714dddc0bc3824298860d5",
+    "backend/schema.graphql": "e262381550062936673f38ff2a314207c9437f16cd751c3931fa7bfb28c0d139",
+    "frontend/graphql/__generated__/operations.ts": "eec02dd90bd2265e6216d47b4af24bb17b868010587bd4837ef261e297578d35",
+    "frontend/graphql/__generated__/schema.ts": "184388d1d06bd0f4d18fb0ffbfbc623cc187f5d022a43297680d33145f19552d",
+    "frontend/schema.graphql": "e262381550062936673f38ff2a314207c9437f16cd751c3931fa7bfb28c0d139"
+  },
+  "checks": {
+    "postgresApi": {
+      "sessionId": 17977,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-app-api-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-app-api-v2.exit",
+      "exitCode": 0,
+      "logSha256": "6b5cc99ec671e6cff0c9b5b6b1bf6b4df50c0f9cddecdb4b9b5c116b9d8f16b9",
+      "tests": 43,
+      "skipped": 0,
+      "seconds": 291.86,
+      "interpretation": "Ten new binding cases and 33 existing workload/image regressions pass. This run preceded the final bulk-proof lookup/checkpoint review; the final focused run qualifies that source plus two added cases."
+    },
+    "finalFocusedPostgresApi": {
+      "sessionId": 32441,
+      "status": "running-after-successful-predecessor",
+      "logPath": "/tmp/astrolift-nvke-image-binding-app-api-v3.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-app-api-v3.exit",
+      "queueExitMarker": "/tmp/astrolift-nvke-image-binding-app-api-queue-v3.exit"
+    },
+    "contractsAndMigration": {
+      "sessionId": 90580,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-contracts-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-contracts-v1.exit",
+      "exitCode": 0,
+      "logSha256": "d75a16e51520b1597159e5604dcb04537f851695fd8233978c58f55d8f656396"
+    },
+    "static": {
+      "sessionId": 7877,
+      "exitCode": 0,
+      "results": [
+        {
+          "check": "ruff",
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-image-binding-app-static-v1-0.log"
+        },
+        {
+          "check": "format",
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-image-binding-app-static-v1-1.log"
+        },
+        {
+          "check": "sdkProtocolMypy",
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-image-binding-app-static-v1-2.log"
+        },
+        {
+          "check": "frontendTypes",
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-image-binding-app-static-v1-3.log"
+        }
+      ]
+    }
+  },
+  "retainedFailures": [
+    {
+      "sessionId": 67829,
+      "status": "complete",
+      "logPath": "/tmp/astrolift-nvke-image-binding-app-api-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-app-api-v1.exit",
+      "exitCode": 1,
+      "logSha256": "bcb246b0cb5f1111a153494b71ea4d1d5ceca984a5732ab71d7ea845a575d8d3"
+    }
+  ],
+  "coverageIntent": [
+    "Separate soft-deletable immutable model, encrypted exact private intent and source-bound publication",
+    "Current tenant/NVKE administrator authority and exact original/plan/chart/tree/workload UUID/version/digest checked throughout I/O",
+    "Selected image proofs are loaded in a bounded bulk query and remain prepared, undeleted and bound to the exact reviewed source",
+    "Lost replies retain partial private intent; historical read and explicit original caller/token retry preserve immutable public observations",
+    "Preparation audit redacts private request text including aliased and rejected inputs; public GraphQL results expose only metadata",
+    "Cross-artifact UUID reservations prevent reuse of signed image-binding IDs by existing preparation paths"
+  ],
+  "limits": [
+    "The final PostgreSQL cases are still pending; no application qualification pass is claimed",
+    "SDK/native mTLS proof is qualified separately in management-image-binding-sdk-local.json",
+    "CLI/browser pairing and operator/platform/credential/rewrite/import/fresh-use/linked-admission closure remain open",
+    "Linux common regression after runtime clock repair is pending in the Opscode evidence",
+    "No main merge or deployment"
+  ]
+}

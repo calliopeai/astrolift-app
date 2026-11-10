@@ -22,6 +22,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlanCharts,
     NvkeInstallPlanContext,
     NvkeInstallPlanImage,
+    NvkeInstallPlanImageBinding,
     NvkeInstallPlanTree,
     NvkeInstallPlanVerification,
     NvkeInstallPlanWorkload,
@@ -145,6 +146,7 @@ def prepare(*, body, **review):
                 or NvkeInstallPlanVerification.all_objects.filter(guid=plan_id).exists()
                 or NvkeInstallPlanImage.all_objects.filter(guid=plan_id).exists()
                 or NvkeInstallPlanWorkload.all_objects.filter(guid=plan_id).exists()
+                or NvkeInstallPlanImageBinding.all_objects.filter(guid=plan_id).exists()
             ):
                 raise NvkeError("CONFLICT", "This identity already identifies an operator operation")
             sealed = encrypt_at_rest(outbox.canonical(body))

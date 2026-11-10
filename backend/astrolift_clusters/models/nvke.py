@@ -552,3 +552,39 @@ class NvkeInstallPlanWorkload(BaseCoreModel):
                 name="nvke_plan_workload_known_status",
             )
         ]
+
+
+class NvkeInstallPlanImageBinding(BaseCoreModel):
+    tree = models.ForeignKey(NvkeInstallPlanTree, on_delete=models.PROTECT, related_name="image_bindings")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    source_binding = models.JSONField(default=dict)
+    request_digest = models.CharField(max_length=64)
+    input_backend_kind = models.CharField(max_length=32)
+    input_ciphertext = models.BinaryField()
+    summary = models.JSONField(default=dict)
+    status = models.CharField(
+        max_length=16, default="preparing", choices=[("preparing", "Preparing"), ("prepared", "Prepared")]
+    )
+
+    def save(self, *args, **kwargs):
+        _immutable(
+            self,
+            "guid",
+            "tree_id",
+            "actor_id",
+            "source_binding",
+            "request_digest",
+            "input_backend_kind",
+            "input_ciphertext",
+        )
+        if self.pk and type(self).all_objects.filter(pk=self.pk, status="prepared").exists():
+            _immutable(self, "summary", "status")
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=["preparing", "prepared"]),
+                name="nvke_plan_image_binding_status",
+            )
+        ]

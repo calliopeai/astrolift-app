@@ -867,3 +867,28 @@ graph-bound and rejects the tuple.
 This acquires individual image evidence. It does not establish complete image
 closure, node-platform matching, original pull-credential equivalence, immutable
 workload rewrites/imports or admission to continue the original install.
+
+### Signed image-binding observations
+
+The Python SDK exposes `prepare_install_plan_image_binding` and
+`install_plan_image_binding`. Both require the reviewed original intent,
+plan/chart/tree and workload source. Preparation accepts private
+`imageBindings`, keyed by image reference, selecting each retained image's
+`sourceKind`, artifact UUID and public keyed artifact digest. Explicit image,
+output and time budgets remain part of the immutable intent.
+
+The application adds typed `prepareNvkeOperatorInstallPlanImageBinding`,
+`reviewNvkeOperatorInstallPlanImageBinding` and
+`recoverNvkeOperatorInstallPlanImageBindingPreparation` controls. They require
+the current workload UUID, version and digest and current NVKE administrator
+authority. Private request text is encrypted and redacted from mutation audits.
+Selected image proofs must remain prepared, undeleted and bound to the same
+reviewed source; the application checks them before I/O and publication.
+
+Read after a lost response recovers the original signed observation. Explicit
+private retry requires the original caller/token and exact retained intent.
+Public results contain digests, counts, verified bytes and observation time;
+references and selections stay private. Continuation remains unauthorized.
+CLI/browser pairing and complete operator/platform/credential/rewrite/import/
+fresh-use closure remain open. See the provider qualification records for the
+actual SDK/native proof and application verification state.
