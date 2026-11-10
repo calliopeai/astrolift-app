@@ -1,0 +1,52 @@
+{
+  "format": 1,
+  "scope": "signed-image-binding-python-sdk",
+  "status": "sdk-local-qualified-app-cli-browser-and-release-incomplete",
+  "appBaseRevision": "8e3277bb8",
+  "agentRevision": "c67a6fe84b4653624de1862d5dc27fe3eb35f285",
+  "sourceSha256": {
+    "backend/providers/nvke/_operator_install_plan_image_binding.py": "e5e7f30b9696a58566373240c6a6c2a9b3ab2266f25d2285f83bcfcbbf5a7017",
+    "backend/providers/nvke/operator_agent_client.py": "f237674f97eb1bd9aa49450260f202e1a7b2ba234caedc0b96642f0cba61a139",
+    "backend/providers/tests/nvke/test_operator_install_plan.py": "f8600ed7fbd9470b8f46563dfee461f56458ce577fbe7b35238780501c3a185b",
+    "backend/providers/tests/nvke/test_operator_install_plan_image_binding.py": "9126cd710ab065d10bcf2ad21e0673e7742ce519a4528ecbe33e1e4cc1404970",
+    "backend/providers/tests/nvke/test_operator_install_plan_image_binding_mtls.py": "74099ab24c85ab71e5da2c098289221bcca791e3186264af42eeb1d3a90a9ef8",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_image_binding_driver.py": "28fbb1b53db9986c4a4c4e179aa90a38e92ff8f26627aff19c9f865171e75bdd"
+  },
+  "checks": {
+    "unitAndExistingProtocol": {
+      "sessionId": 86166,
+      "status": "complete",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-image-binding-sdk-unit-v1.log",
+      "logSha256": "9f78cd5a28935dcddb24c36eb809f44950ab7d63c666bb62bea198e63caa14e4",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-sdk-unit-v1.exit",
+      "tests": 118,
+      "skipped": 0,
+      "seconds": 2.75
+    },
+    "actualAgentMtlS": {
+      "sessionId": 39627,
+      "status": "complete",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-image-binding-sdk-mtls-v1.log",
+      "logSha256": "d5e2cca3d47db6c32dad31794d5fc94c5b1e4ed790062553b81d0deb11e37d4b",
+      "exitMarker": "/tmp/astrolift-nvke-image-binding-sdk-mtls-v1.exit",
+      "tests": 1,
+      "skipped": 0,
+      "seconds": 429.92
+    }
+  },
+  "coverage": [
+    "Closed private bindings and bounded output/image/time budgets are validated before transport",
+    "Current original receipt, capability, plan/chart/tree and exact workload are checked before and after each binding operation",
+    "Summaries bind image-use and issue counts to the reviewed workload and reject private fields, invalid budgets, changed identities and any continuation permission",
+    "Actual SDK/native-agent mTLS qualifies lost workload/image/binding replies, cold restarts and explicit original-artifact reads and same-intent retries",
+    "Recovery preserves observation/digests/attempt identity, performs no registry acquisition or rerender and keeps native files/guards/parents unchanged"
+  ],
+  "limits": [
+    "App encrypted intent and typed GraphQL controls are still under qualification; CLI/browser pairing remains required",
+    "Image binding does not establish operator/node-platform/credential/rewrite/import/fresh-use or execution admission closure",
+    "Linux common qualification remains failed on the separate clock issue; this SDK native proof ran on macOS",
+    "No main merge or deployment"
+  ]
+}

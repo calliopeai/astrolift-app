@@ -125,6 +125,9 @@ def client(
     changed_after_context=False,
     image=None,
     workload=None,
+    image_binding=None,
+    image_binding_capability=None,
+    lost_image_binding_reply=False,
     workload_capability=None,
     workload_image_capability=None,
     lost_workload_reply=False,
@@ -180,6 +183,9 @@ def client(
                     "installPlanWorkloadInventory": workload_capability
                     if workload_capability is not None
                     else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
+                    "installPlanImageBinding": image_binding_capability
+                    if image_binding_capability is not None
+                    else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
                     "installPlanWorkloadImage": workload_image_capability
                     if workload_image_capability is not None
                     else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
@@ -203,6 +209,10 @@ def client(
                 },
             )
         assert request.headers["X-Astro-Nvke-Intent"] == INTENT
+        if request.url.path.endswith("/install-plan-image-binding"):
+            if lost_image_binding_reply and request.method == "POST":
+                raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
+            return httpx.Response(200, json=image_binding)
         if request.url.path.endswith("/install-plan-workload-inventory"):
             if lost_workload_reply and request.method == "POST":
                 raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)

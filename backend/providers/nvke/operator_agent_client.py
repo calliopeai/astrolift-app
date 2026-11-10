@@ -18,6 +18,7 @@ from nvke import _operator_install_plan as install_plan_protocol
 from nvke import _operator_install_plan_charts as chart_protocol
 from nvke import _operator_install_plan_context as context_protocol
 from nvke import _operator_install_plan_image as image_protocol
+from nvke import _operator_install_plan_image_binding as binding_protocol
 from nvke import _operator_install_plan_tree as tree_protocol
 from nvke import _operator_install_plan_verification as verification_protocol
 from nvke import _operator_install_plan_workload as workload_protocol
@@ -771,6 +772,102 @@ class OperatorAgentClient:
         self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
     ) -> dict[str, Any]:
         return self._install_plan_workload(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=True,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+        )
+
+    def _install_plan_image_binding_source(
+        self, job_id: str, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        source = self._install_plan_artifact_source(
+            job_id, intent, body, chart_artifact_id, chart_artifact_digest, "installPlanImageBinding"
+        )
+        workload = self.install_plan_workload(
+            job_id,
+            intent=intent,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            body={
+                **{key: body[key] for key in ("format", "planId", "planDigest", "treeId", "treeDigest")},
+                "artifactId": body["workloadId"],
+            },
+        )
+        if workload["workloadDigest"] != body["workloadDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The workload inventory no longer matches the reviewed digest")
+        return {**source, "workload": workload}
+
+    def _install_plan_image_binding(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        read_only: bool,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = binding_protocol.request(
+                body, job_id=job_id, chart_artifact_id=chart_artifact_id, read_only=read_only
+            )
+            if (
+                not isinstance(intent, str)
+                or not _SHA.fullmatch(intent)
+                or not isinstance(chart_artifact_digest, str)
+                or not _SHA.fullmatch(chart_artifact_digest)
+            ):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError("INVALID_INPUT", "Use a reviewed tree and bounded image-binding request") from None
+        try:
+            binding_protocol.capability(self.identity().get("installPlanImageBinding"))
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError(
+                "OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm signed image bindings"
+            ) from None
+        try:
+            source = self._install_plan_image_binding_source(
+                job_id, intent, body, chart_artifact_id, chart_artifact_digest
+            )
+            path = "/v1/jobs/" + job_id + "/install-plan-image-binding"
+            data = (
+                self._request(
+                    "GET", path, params={key: value for key, value in body.items() if key != "format"}, intent=intent
+                )
+                if read_only
+                else self._request("POST", path, body=body, intent=intent)
+            )
+            result = binding_protocol.summary(data, body=body, workload=source["workload"])
+            if (
+                self._install_plan_image_binding_source(job_id, intent, body, chart_artifact_id, chart_artifact_digest)
+                != source
+            ):
+                raise ValueError
+            return result
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+
+    def prepare_install_plan_image_binding(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_image_binding(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=False,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+        )
+
+    def install_plan_image_binding(
+        self, job_id: str, *, intent: str, body: dict[str, Any], chart_artifact_id: str, chart_artifact_digest: str
+    ) -> dict[str, Any]:
+        return self._install_plan_image_binding(
             job_id,
             intent=intent,
             body=body,
