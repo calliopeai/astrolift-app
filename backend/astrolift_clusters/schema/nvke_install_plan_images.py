@@ -38,6 +38,7 @@ class NvkeOperatorInstallPlanImageType:
     id: GUID
     version: int
     status: str
+    source_kind: str
     plan_id: GUID
     plan_version: int
     plan_digest: str
@@ -69,6 +70,7 @@ def image_type(data):
     metadata = value.pop("metadata")
     return NvkeOperatorInstallPlanImageType(
         **value,
+        source_kind=metadata.get("sourceKind", "registry"),
         artifact_digest=metadata["artifactDigest"],
         source_digest=metadata["sourceDigest"],
         capture_digest=metadata["captureDigest"],

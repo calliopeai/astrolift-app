@@ -11986,6 +11986,7 @@ type NvkeOperatorInstallPlanImageType {
   id: GUID!
   version: Int!
   status: String!
+  sourceKind: String!
   planId: GUID!
   planVersion: Int!
   planDigest: String!

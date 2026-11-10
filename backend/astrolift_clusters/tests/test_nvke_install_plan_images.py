@@ -189,7 +189,7 @@ def review_input(f):
     return {key: value for key, value in parent_review(f.parent).items() if key not in {"item", "ordinal"}}
 
 
-FIELDS = "ok errors{code} data{id version status planId planDigest chartArtifactId chartArtifactDigest treeId treeDigest artifactDigest sourceDigest captureDigest rootDigest bytes blobCount observedAt executionState continuationAuthorized}"
+FIELDS = "ok errors{code} data{id version status sourceKind planId planDigest chartArtifactId chartArtifactDigest treeId treeDigest artifactDigest sourceDigest captureDigest rootDigest bytes blobCount observedAt executionState continuationAuthorized}"
 
 
 def test_typed_schema_prepare_review_retry_and_private_audit(image_fixture):
@@ -212,6 +212,7 @@ def test_typed_schema_prepare_review_retry_and_private_audit(image_fixture):
     assert response.errors is None and response.data[action]["ok"]
     result = response.data[action]["data"]
     assert result["id"] == f.body["artifactId"]
+    assert result["sourceKind"] == f.body.get("sourceKind", "registry")
     assert result["planDigest"] == f.body["planDigest"] and result["treeDigest"] == f.body["treeDigest"]
     assert result["rootDigest"] == f.result["rootDigest"] and not result["continuationAuthorized"]
     for action in ("reviewNvkeOperatorInstallPlanImage", "recoverNvkeOperatorInstallPlanImagePreparation"):
@@ -382,3 +383,34 @@ def test_token_revoked_during_remote_prepare_cannot_publish(image_fixture, monke
     finally:
         reset_current_api_token(mark)
     assert NvkeInstallPlanImage.objects.get(guid=f.body["artifactId"]).summary == {}
+
+
+@pytest.fixture
+def local_image_fixture(image_fixture):
+    f = image_fixture
+    f.body.pop("policy")
+    f.body.pop("maximumCalls")
+    f.body.update(sourceKind="local", reference="private.example.test/local@" + f.result["rootDigest"])
+    f.result["sourceKind"] = "local"
+    return f
+
+
+def test_local_image_typed_api_reports_kind_and_preserves_encrypted_intent(local_image_fixture):
+    test_typed_schema_prepare_review_retry_and_private_audit(local_image_fixture)
+    f = local_image_fixture
+    read_body = next(body for kind, body in f.calls if kind == "read")
+    assert read_body["sourceKind"] == "local"
+    assert "policy" not in read_body and "maximumCalls" not in read_body
+    row = NvkeInstallPlanImage.objects.get(guid=f.body["artifactId"])
+    assert row.summary["sourceKind"] == "local"
+
+
+def test_local_image_cannot_replace_its_kind_after_preparation(local_image_fixture):
+    f = local_image_fixture
+    with context(f.state.world):
+        images.prepare(body=f.body, **f.review)
+        changed = {key: value for key, value in f.body.items() if key != "sourceKind"}
+        changed.update(policy="reviewed", maximumCalls=64)
+        with pytest.raises(NvkeError):
+            images.prepare(body=changed, **f.review)
+    assert [kind for kind, _ in f.calls] == ["prepare"]

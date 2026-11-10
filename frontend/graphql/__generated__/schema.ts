@@ -13815,6 +13815,7 @@ export type NvkeOperatorInstallPlanImageType = {
   siteId: Scalars['GUID']['output'];
   siteVersion: Scalars['Int']['output'];
   sourceDigest: Scalars['String']['output'];
+  sourceKind: Scalars['String']['output'];
   status: Scalars['String']['output'];
   treeDigest: Scalars['String']['output'];
   treeId: Scalars['GUID']['output'];

@@ -50,6 +50,7 @@ export const installPlanImageSchema = z
     id: guid,
     version,
     status: z.literal("prepared"),
+    sourceKind: z.literal("registry").optional(),
     planId: guid,
     planVersion: version,
     planDigest: digest,

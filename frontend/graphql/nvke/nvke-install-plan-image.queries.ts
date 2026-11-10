@@ -5,6 +5,7 @@ export const NVKE_INSTALL_PLAN_IMAGE_FIELDS = gql`
     id
     version
     status
+    sourceKind
     planId
     planVersion
     planDigest

@@ -272,7 +272,7 @@ def read(*, artifact_id, **values):
         data = client.install_plan_image(
             str(original.guid),
             intent=original.request_digest,
-            body={k: v for k, v in body.items() if k not in protocol.WRITE_FIELDS},
+            body={k: v for k, v in body.items() if k in protocol.read_fields(body)},
             chart_artifact_id=str(publication.guid),
             chart_artifact_digest=values["chart_artifact_digest"],
         )

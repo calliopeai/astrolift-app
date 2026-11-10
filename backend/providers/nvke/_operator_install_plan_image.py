@@ -1,4 +1,4 @@
-"""Closed registry-image acquisition requests and non-authorizing summaries."""
+"""Closed registry/local image requests and non-authorizing summaries."""
 
 from __future__ import annotations
 
@@ -13,11 +13,23 @@ from nvke.operator_contract import identifier
 STATE = "requires-workload-platform-credential-phase-use-and-linked-admission"
 BASE = {"format", "artifactId", "planId", "planDigest", "treeId", "treeDigest", "reference", "policy"}
 WRITE_FIELDS = {"maximumBytes", "maximumCalls", "timeoutSeconds"}
+LOCAL_BASE = (BASE - {"policy"}) | {"sourceKind"}
+LOCAL_WRITE_FIELDS = {"maximumBytes", "timeoutSeconds"}
 DIGEST = re.compile(r"(?:sha256:[0-9a-f]{64}|sha512:[0-9a-f]{128})\Z")
 
 
+def capability_name(body: dict[str, Any]) -> str:
+    return "installPlanLocalImage" if body.get("sourceKind") == "local" else "installPlanImage"
+
+
+def read_fields(body: dict[str, Any]) -> set[str]:
+    return LOCAL_BASE if body.get("sourceKind") == "local" else BASE
+
+
 def request(body: Any, *, job_id: str, chart_artifact_id: str, read_only: bool) -> dict[str, Any]:
-    if not isinstance(body, dict) or set(body) != BASE | (set() if read_only else WRITE_FIELDS):
+    local = isinstance(body, dict) and body.get("sourceKind") == "local"
+    fields, limits = (LOCAL_BASE, LOCAL_WRITE_FIELDS) if local else (BASE, WRITE_FIELDS)
+    if not isinstance(body, dict) or set(body) != fields | (set() if read_only else limits):
         raise ValueError
     integer(body["format"], 1, 1)
     ids = [
@@ -27,7 +39,7 @@ def request(body: Any, *, job_id: str, chart_artifact_id: str, read_only: bool) 
         raise ValueError
     if any(not isinstance(body[key], str) or not SHA.fullmatch(body[key]) for key in ("planDigest", "treeDigest")):
         raise ValueError
-    if not isinstance(body["policy"], str) or not ITEM_NAME.fullmatch(body["policy"]):
+    if not local and (not isinstance(body["policy"], str) or not ITEM_NAME.fullmatch(body["policy"])):
         raise ValueError
     reference = body["reference"]
     if (
@@ -37,28 +49,37 @@ def request(body: Any, *, job_id: str, chart_artifact_id: str, read_only: bool) 
         or any(ord(char) <= 32 or ord(char) >= 127 or char in "?#\\" for char in reference)
     ):
         raise ValueError
+    if local and (reference.count("@") != 1 or not DIGEST.fullmatch(reference.partition("@")[2])):
+        raise ValueError
     if not read_only:
         if not 1 <= int(decimal(body["maximumBytes"])) < 2**63:
             raise ValueError
-        integer(body["maximumCalls"], 1, 4096)
+        if not local:
+            integer(body["maximumCalls"], 1, 4096)
         integer(body["timeoutSeconds"], 1, 300)
     return dict(body)
 
 
 def summary(data: Any, *, body: dict[str, Any]) -> dict[str, Any]:
-    if not isinstance(data, dict) or set(data) != {
-        "format",
-        "artifactId",
-        "artifactDigest",
-        "sourceDigest",
-        "captureDigest",
-        "observedAt",
-        "rootDigest",
-        "bytes",
-        "blobCount",
-        "executionState",
-        "continuationAuthorized",
-    }:
+    local = body.get("sourceKind") == "local"
+    if not isinstance(data, dict) or set(data) != (
+        {
+            "format",
+            "artifactId",
+            "artifactDigest",
+            "sourceDigest",
+            "captureDigest",
+            "observedAt",
+            "rootDigest",
+            "bytes",
+            "blobCount",
+            "executionState",
+            "continuationAuthorized",
+        }
+        | ({"sourceKind"} if local else set())
+    ):
+        raise ValueError
+    if local and (data["sourceKind"] != "local" or data["rootDigest"] != body["reference"].partition("@")[2]):
         raise ValueError
     integer(data["format"], 1, 1)
     integer(data["blobCount"], 1, 100000)

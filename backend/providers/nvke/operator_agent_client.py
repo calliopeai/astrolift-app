@@ -657,7 +657,7 @@ class OperatorAgentClient:
     ) -> dict[str, Any]:
         original = self._install_plan_source(job_id, intent)
         identity = self.identity()
-        for name in ("installPlanCharts", "installPlanTree", "installPlanImage"):
+        for name in ("installPlanCharts", "installPlanTree", image_protocol.capability_name(body)):
             image_protocol.capability(identity.get(name))
         parents = {**body, "chartArtifactId": chart_artifact_id, "chartArtifactDigest": chart_artifact_digest}
         metadata, publication = self._install_plan_tree_source(job_id, intent, parents)
@@ -696,10 +696,10 @@ class OperatorAgentClient:
                 raise ValueError
         except (ContractError, KeyError, ValueError, TypeError, OverflowError):
             raise NvkeError(
-                "INVALID_INPUT", "Use a reviewed tree, registry policy alias and bounded image request"
+                "INVALID_INPUT", "Use a reviewed tree and a closed bounded registry or local-image request"
             ) from None
         try:
-            image_protocol.capability(self.identity().get("installPlanImage"))
+            image_protocol.capability(self.identity().get(image_protocol.capability_name(body)))
         except (KeyError, ValueError, TypeError):
             raise NvkeError("OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm image acquisition") from None
         try:

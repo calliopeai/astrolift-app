@@ -1,0 +1,81 @@
+{
+  "format": 1,
+  "scope": "local-image-sdk-api-contract-and-registry-ui-kind-guard",
+  "status": "contracts-qualified-real-local-native-pairing-pending",
+  "sourceSha256": {
+    "backend/astrolift_clusters/nvke_install_plan_images.py": "a1fd0cb2e91f0d6dfcce4eeee39cb48c0ea7b41ce38686a74d7732c2e3003d9c",
+    "backend/astrolift_clusters/schema/nvke_install_plan_images.py": "b13f224478ddb48ec8b2288b45947200537b31fd1af54109ccf00531bc6d72e8",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_images.py": "8c4b56d0130eab89f76a82e2ac81002cb9510022704f24cc97b36fea89e17516",
+    "backend/providers/nvke/_operator_install_plan_image.py": "504cb338f5d28679909364dde9c25ca9133beadc218696153dba5170511a222f",
+    "backend/providers/nvke/operator_agent_client.py": "730c819ef2b0e5c142d4bdadbef56a5038dfb4e9b22f6716585093ccf40abab4",
+    "backend/schema.graphql": "ce012b9201cfd6c59fbbac8ba696496a41858677621d5f222182580144e0e480",
+    "frontend/graphql/__generated__/operations.ts": "6a76624b07e08036d03495379404082b76f34d77ebd8b46bc53dffb554350dda",
+    "frontend/graphql/__generated__/schema.ts": "74eb6d9dd24c36d2af285e131eaff094029f4b29eb0517b59d27e4887e7670b0",
+    "frontend/graphql/nvke/nvke-install-plan-image.queries.ts": "9018d3a0bea4a43a8520862d52c07f0c8628c7879bd8aba9884180e9cf61dca2",
+    "frontend/lib/nvke/operator-install-plan-image.test.ts": "0a94f67e84a2fd1d7b9bd90bc52ffa8a429fe93744835ec9df062399ee4cf2b3",
+    "frontend/lib/nvke/operator-install-plan-image.ts": "1c1353d9462d43b8fb081ae28703b0e15fd3f36e4e6936bc9e6eb3e36951aaf8",
+    "frontend/schema.graphql": "ce012b9201cfd6c59fbbac8ba696496a41858677621d5f222182580144e0e480",
+    "backend/providers/tests/nvke/test_operator_install_plan_local_image.py": "ce6e0c1eb705b64c9a938c25862256bb5f5a4b333fc0b620d9d43c0b8ab6095e"
+  },
+  "checks": {
+    "sdk": {
+      "sessionId": 60447,
+      "logPath": "/tmp/astrolift-nvke-local-image-sdk-contracts.log",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-sdk-contracts.exit",
+      "exitCode": 0,
+      "logSha256": "52fa766aa5b1d6dbbe676f1cc50fb74502ac62ee0cca9c5a9f1bdac7a93c9cdd"
+    },
+    "api": {
+      "sessionId": 66704,
+      "logPath": "/tmp/astrolift-nvke-local-image-app-api-contracts.log",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-app-api-contracts.exit",
+      "exitCode": 0,
+      "logSha256": "63ea017960b80ac13f08d78fd4c637fb886e27c90ee575e1ff026ee06534c547"
+    },
+    "frontend": {
+      "sessionId": 43047,
+      "logPath": "/tmp/astrolift-nvke-local-image-kind-schema-frontend.log",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-kind-schema-frontend.exit",
+      "exitCode": 0,
+      "logSha256": "959344d2e42bf95af749e6b0e848a823379535c26caf6b79e69ef04f9bbf3ed9"
+    },
+    "contracts": {
+      "sessionId": null,
+      "logPath": "/tmp/astrolift-nvke-local-image-api-final-check.log",
+      "exitMarker": "/tmp/astrolift-nvke-local-image-api-final-check.exit",
+      "exitCode": 0,
+      "logSha256": "831b2c9b22cb03970c518670e3975dd08f3c91e85b6cf80263122e004089c399"
+    }
+  },
+  "coverage": {
+    "sdk": {
+      "tests": 329,
+      "skipped": 0,
+      "strictMypySources": 2
+    },
+    "appApi": {
+      "tests": 20,
+      "skipped": 0,
+      "database": "real PostgreSQL",
+      "imageReplies": "controlled SDK image responses, real original authority fixtures"
+    },
+    "frontend": {
+      "tests": 156,
+      "skipped": 0,
+      "fullTypecheck": true,
+      "changedFileLint": true
+    },
+    "schema": "export_contracts --check, matched backend/frontend SDL and regenerated TypeScript"
+  },
+  "behavior": [
+    "Local source-kind uses independent agent capability and excludes registry policy/call budgets.",
+    "Positive read field selection preserves local kind; local summary requires the exact requested digest.",
+    "Encrypted immutable API intent binds kind; GraphQL reports sourceKind with registry default for legacy records.",
+    "Registry UI rejects local-layout evidence."
+  ],
+  "limits": [
+    "Actual local SDK/native and API/native qualification pending.",
+    "Local UI/CLI controls pending.",
+    "No native import, linked admission, merge or deployment."
+  ]
+}

@@ -162,3 +162,12 @@ it("rejects stale parents and byte-limit violations", () => {
     validateInstallPlanImage(row, plan, charts, tree, id, { maximumBytes: "PRIVATE" })
   ).toThrow();
 });
+
+it("keeps registry evidence distinct from local-layout evidence", () => {
+  expect(
+    validateInstallPlanImage({ ...row, sourceKind: "registry" }, plan, charts, tree, id).sourceKind
+  ).toBe("registry");
+  expect(() =>
+    validateInstallPlanImage({ ...row, sourceKind: "local" }, plan, charts, tree, id)
+  ).toThrow();
+});
