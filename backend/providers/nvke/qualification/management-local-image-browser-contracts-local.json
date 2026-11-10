@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "scope": "registry-and-local-browser-image-contracts",
+  "status": "166-cases-lint-and-full-typescript-qualified",
+  "sourceSha256": {
+    "frontend/lib/nvke/operator-install-plan-image.ts": "6bec208b47da3cee247011f260e9ff094ac498c0597e15398210cc4dfb780a8e",
+    "frontend/lib/nvke/operator-install-plan-local-image.ts": "be7ccc32f5ecd0f961334d14b3b6d6ee83b1e2b11f2cddc11c0571cb75cd1dd9",
+    "frontend/lib/nvke/operator-install-plan-local-image.test.ts": "2f93643af7caef20f9c5e31b65343db81beb6ee8a122817c6ed2ab35a3de2a52"
+  },
+  "checks": {
+    "sessionId": 75960,
+    "logPath": "/tmp/astrolift-nvke-local-image-browser-contract-check-v2.log",
+    "logSha256": "407543252f7e22961a9b1e29db194d2eb8b553fd7b6e6396abe5640c3ff19dfe",
+    "exitMarker": "/tmp/astrolift-nvke-local-image-browser-contract-check-v2.exit",
+    "exitCode": 0,
+    "tests": 166,
+    "skipped": 0,
+    "changedFileEslint": true,
+    "fullTypeScript": true
+  },
+  "behavior": [
+    "Common closed metadata/source validation preserves distinct registry and local schemas.",
+    "Local request omits registry-only fields and requires a digest-pinned reference.",
+    "Local preparation validates byte limits and exact requested root digest; historical rows require explicit local sourceKind.",
+    "Existing registry panel and recovery hook regression cases remain passing."
+  ],
+  "initialFailure": "The first local validator attempted to parse a complete form with a strict picked limits schema. It now selects and validates only the two declared limits fields before comparing the result.",
+  "limits": [
+    "Local panel/recovery hook and actual browser/API/native qualification tracked separately.",
+    "No phase-use proof, native admission, main merge or deployment."
+  ]
+}
