@@ -179,6 +179,31 @@ EC2 host VM lifecycle has been exercised. Task-family confidential/custom-policy
 confidential generation/attestation automation and the other support boundaries
 above remain open.
 
+## Isolated task-family selector qualification (2026-11-09)
+
+Signed implementation checkpoint `6f77b09c1` adds the isolated task-family path
+above. A focused serial Django run against the existing dedicated PostgreSQL
+test database passed **62 tests**, exit 0, in **27.24 seconds**. It covers new
+selector conflicts and recovery checks, existing runtime/pod-hardening/VNC/Job
+namespace regressions, and both real persistence cases. The new persistence case
+reads the retained selector through the real Workload/app relationship and
+renders the selected runtime into the per-run Job. Ordinary rendered output is
+also compared against the selected output with only the runtime field added.
+
+The parser follow-up passed **31 tests**. A subsequent imported-package format
+guard passed **13 selector-only tests**, exit 0, in **0.33 seconds**, with eight
+unrelated cases deselected; that follow-up uses minimal settings without an app
+registry or database. Ruff passed on the changed Python files. The focused
+Django run emitted the two existing assertion-rewrite warnings for already
+imported modules. No broad build/suite, full CI run or live AWS check is implied.
+
+Remaining task-specific gaps are confidential/custom-policy/network-isolated
+variants and per-workload selection for imported packages and agent boxes.
+Dedicated console/CLI controls, automatic EKS runtime provisioning, ECS supported
+client integration, EC2 host VM lifecycle and confidential attestation evidence
+remain outside this checkpoint. Neither application nor operator branch has
+merged or deployed.
+
 ## Released Python SDK model evidence (2026-11-09)
 
 The existing providers environment uses boto3/botocore 1.43.72; the backend
