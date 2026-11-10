@@ -44,9 +44,50 @@
       "logSha256": "f084c1f929b5f1001a51e68548e686d4def86bd757d9455092cf8780da9d3011"
     },
     "nativeFailureDiagnosis": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 83169,
-      "exitMarker": "/tmp/astrolift-nvke-context-native-diagnosis.exit"
+      "exitMarker": "/tmp/astrolift-nvke-context-native-diagnosis.exit",
+      "exitCode": 0,
+      "metadataOnlyTimings": {
+        "authenticated.prepare": {
+          "calls": 1,
+          "errors": [],
+          "maximumSeconds": 292.284,
+          "seconds": 292.284
+        },
+        "capture": {
+          "calls": 1,
+          "errors": [],
+          "maximumSeconds": 279.314,
+          "seconds": 279.314
+        },
+        "context.prepare": {
+          "calls": 1,
+          "errors": [],
+          "maximumSeconds": 292.105,
+          "seconds": 292.105
+        },
+        "context.source": {
+          "calls": 148,
+          "errors": [],
+          "maximumSeconds": 1.359,
+          "seconds": 63.44
+        },
+        "helper.render": {
+          "calls": 1,
+          "errors": [],
+          "maximumSeconds": 4.332,
+          "seconds": 4.332
+        },
+        "kubernetes.read": {
+          "calls": 30,
+          "errors": [],
+          "maximumSeconds": 4.514,
+          "seconds": 66.076
+        }
+      },
+      "logSha256": "eaf4caf08c3938efabff5ed8597970f3407da6087de4b712a3ed6044bd77dbc2",
+      "scope": "Actual fixture context preparation passed in 292 seconds against unchanged 300-second limit. Two preceding mTLS gates remain failures, not erased by this diagnosis. 148 source graph loads identify remaining native repeated-validation cost."
     }
   },
   "requestComparison": {
