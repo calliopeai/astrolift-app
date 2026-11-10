@@ -367,10 +367,22 @@ def prepare_run(
                 env=env,
                 input_data=password,
             )
-        docker_auth = root / "docker-auth"
+        # The signed AWS generator reads HOME/.docker/config.json directly.
+        # Give only that subprocess an ephemeral private home; never modify
+        # the controller's home or rely solely on ignored auth-path overrides.
+        private_home = root / "registry-home"
+        private_home.mkdir(mode=0o700)
+        docker_auth = private_home / ".docker"
         docker_auth.mkdir(mode=0o700)
-        (docker_auth / "config.json").write_bytes(auth.read_bytes())
-        generator_env = {**env, "DOCKER_CONFIG": str(docker_auth), "REGISTRY_AUTH_FILE": str(auth)}
+        docker_config = docker_auth / "config.json"
+        docker_config.write_bytes(auth.read_bytes())
+        docker_config.chmod(0o600)
+        generator_env = {
+            **env,
+            "HOME": str(private_home),
+            "DOCKER_CONFIG": str(docker_auth),
+            "REGISTRY_AUTH_FILE": str(auth),
+        }
         layout = root / "source"
         command(
             [

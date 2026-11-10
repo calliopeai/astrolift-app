@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Confidential policy generation supplies private ECR credentials through an ephemeral `HOME/.docker/config.json`, the path read by the signed AWS tool (#2668). The generator retains normal image and layer fetching, and the controller's existing home configuration is untouched.
+
 - Confidential task admission accepts the observed EKS Pod Identity `AWS_STS_REGIONAL_ENDPOINTS=regional` injection and can revalidate already admitted identity fields (#2668). Other STS values, duplicate environment names, dynamic identity values and unrelated injected fields remain refused.
 
 - Task-family agents can opt into operator-enabled confidential EKS Pods (#2668). Each run encrypts its task environment and all image layers, generates policy from the final admitted Pod with signed AWS tools, and grants its dedicated KMS key only for the predicted PCR17 and EKS service identity. Recovery and cleanup bind to the saved task, image, policy and Pod UID. The path requires explicit cluster configuration and a baked non-root image; live KMS release/refusal qualification remains pending. Operator-wide confidential runtime selection remains refused.

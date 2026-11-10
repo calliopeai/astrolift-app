@@ -45,7 +45,7 @@ def pipeline(tmp_path, monkeypatch):
             ],
         },
     }
-    calls, checkpoints, policies, retired = [], [], [], []
+    calls, checkpoints, policies, retired, generator_homes = [], [], [], [], []
     encrypted = json.dumps(
         {
             "schemaVersion": 2,
@@ -96,6 +96,14 @@ def pipeline(tmp_path, monkeypatch):
         elif argv[1] == "inspect":
             return encrypted
         elif argv[1] == "--profile":
+            home = Path(env["HOME"])
+            generator_homes.append(home)
+            assert home.name == "registry-home"
+            docker_config = home / ".docker" / "config.json"
+            assert docker_config.read_bytes() == Path(env["REGISTRY_AUTH_FILE"]).read_bytes()
+            assert docker_config.stat().st_mode & 0o777 == 0o600
+            assert home.stat().st_mode & 0o777 == 0o700
+            assert "--skip-image-fetch" not in argv and "--disable-layer-pull" not in argv
             assert "--deny-logs" in argv and "--deny-termination-logs" in argv and "--deny-stream-agent-logs" in argv
             Path(argv[argv.index("--output-file-b64") + 1]).write_bytes(base64.b64encode(b"synthetic policy"))
             condition = confidential.key_policy(config, PCR)["Statement"][1]["Condition"]
@@ -195,7 +203,12 @@ def pipeline(tmp_path, monkeypatch):
         save=lambda value: checkpoints.append(deepcopy(value)),
     )
     return SimpleNamespace(
-        arguments=arguments, calls=calls, checkpoints=checkpoints, policies=policies, retired=retired
+        arguments=arguments,
+        calls=calls,
+        checkpoints=checkpoints,
+        policies=policies,
+        retired=retired,
+        generator_homes=generator_homes,
     )
 
 
@@ -362,3 +375,17 @@ def test_identity_environment_rejects_ambiguous_or_non_identity_entries(pipeline
         message = "non-identity environment"
     with pytest.raises(ValueError, match=message):
         confidential.validate_admitted(final, expected, 42042, 42042)
+
+
+def test_private_generator_home_is_removed_without_changing_operator_config(pipeline, tmp_path):
+    home = tmp_path / "operator-home"
+    docker = home / ".docker"
+    docker.mkdir(parents=True)
+    config = docker / "config.json"
+    original = b'{"auths":{"operator-registry":{"auth":"keep-existing"}}}'
+    config.write_bytes(original)
+    pipeline.arguments["env"] = {"HOME": str(home), "AWS_REGION": "us-west-2"}
+    confidential.prepare_run(**pipeline.arguments)
+    assert pipeline.arguments["env"]["HOME"] == str(home)
+    assert config.read_bytes() == original
+    assert pipeline.generator_homes and all(not path.exists() for path in pipeline.generator_homes)
