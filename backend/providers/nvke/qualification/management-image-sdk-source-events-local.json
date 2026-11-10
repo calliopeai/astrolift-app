@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "scope": "actual-sdk-to-committed-agent-to-mtls-registry-image-recovery",
+  "status": "native-image-sdk-source-events-pin-qualified",
+  "agentRevision": "572b87b4efec2252597efc05cee4189facd35571",
+  "sourceSha256": {
+    "backend/providers/tests/nvke/test_operator_install_plan_image_mtls.py": "749d598fe829ebf37bf41f8ee2e950c2b39e3d7449ed8f63132c95a799fc63ba",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_image_driver.py": "b9616bbe5fe5944033e8a18286234f993bc41cc4e9fd2bf2df89c651d05294c7"
+  },
+  "checks": {
+    "sessionId": 90167,
+    "logPath": "/tmp/astrolift-nvke-sdk-images-source-events-native.log",
+    "exitMarker": "/tmp/astrolift-nvke-sdk-images-source-events-native.exit",
+    "logSha256": "cd00787b4989babbd1015a23961c25c29258d8ab6b38092cf807070bd08edfff",
+    "exitCode": 0,
+    "tests": 1,
+    "skipped": 0,
+    "seconds": 209.72
+  },
+  "invariants": [
+    "Every Python/Go agent runtime source is compared to the full committed Git revision before execution.",
+    "Actual SDK and native agent use owned TLS registry fixtures, retained exact intent, lost-response recovery and cold offline reads.",
+    "Original operation evidence remains unchanged."
+  ],
+  "limits": [
+    "Other artifact SDK/API/CLI/browser source pins still require final release qualification.",
+    "Image UI integration and real browser/API recovery remain pending.",
+    "Full image/platform/credential closure, use-time proof and linked native admission remain open; no main merge or deployment."
+  ]
+}
