@@ -49,9 +49,23 @@
       "exitMarker": "/tmp/astrolift-nvke-verification-recovery-types.exit"
     },
     "productionStorybook": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 38082,
-      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-storybook.exit"
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-storybook.exit",
+      "exitCode": 0,
+      "logSha256": "5a71f8a619158f117a1c49f290cc57eb22b12d0a909105db9b3a3fc7cd6a08eb"
+    },
+    "controlledChromium": {
+      "exitCode": 0,
+      "stories": 2,
+      "pageErrors": 0,
+      "reportSha256": "99642a5c39de0c44da2ada43f97cb5f9fc3764731f0b827ed07bfb28594e3631",
+      "scope": "Journal before preparation, explicit metadata-only review, retained selection after reload with zero automatic calls. Controlled Apollo fixture; actual backend qualification remains pending."
+    },
+    "postBuildTimeoutDiagnosis": {
+      "status": "running",
+      "sessionId": 14884,
+      "exitMarker": "/tmp/astrolift-nvke-verification-recovery-post-build-timeouts.exit"
     }
   },
   "implemented": [
@@ -61,8 +75,8 @@
     "Storybook pure screen and controlled Apollo loss-before/after-retention scenarios precede route wiring."
   ],
   "remaining": [
-    "Resolve broader UI timeout failures and finish full TypeScript and production Storybook checks.",
-    "Run Chromium controlled persistence/reload checks and actual App/agent browser acceptance.",
+    "Resolve broader UI timeout failures and finish full TypeScript check.",
+    "Actual App/agent browser acceptance; controlled Chromium check passed.",
     "Production Next build, full surface/live qualification and coordinated release remain open."
   ],
   "continuationAuthorized": false
