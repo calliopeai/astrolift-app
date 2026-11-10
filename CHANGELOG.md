@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Confidential Pod recovery and cleanup tolerate the two region/zone labels Kubernetes adds during scheduling (#2668). Task labels, all other labels, image, policy and other Pod fields remain bound to the prepared hash.
+
 - Confidential policy generation supplies private ECR credentials through an ephemeral `HOME/.docker/config.json`, the path read by the signed AWS tool (#2668). The generator retains normal image and layer fetching, and the controller's existing home configuration is untouched.
 
 - Confidential task admission accepts the observed EKS Pod Identity `AWS_STS_REGIONAL_ENDPOINTS=regional` injection and can revalidate already admitted identity fields (#2668). Other STS values, duplicate environment names, dynamic identity values and unrelated injected fields remain refused.

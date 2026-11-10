@@ -286,7 +286,14 @@ def test_scheduler_binding_does_not_break_recovery_but_changed_environment_does(
     pod, checkpoint = confidential.prepare_run(**pipeline.arguments)
     pod["metadata"].update(uid="server-uid", resourceVersion="123", creationTimestamp="server-time")
     pod["spec"]["nodeName"] = "scheduled-node"
+    pod["metadata"].setdefault("labels", {}).update(
+        {
+            "topology.kubernetes.io/region": "us-west-2",
+            "topology.kubernetes.io/zone": "us-west-2a",
+        }
+    )
     assert confidential.prepared_pod_hash(pod) == checkpoint["pod_sha256"]
+    assert pod["metadata"]["labels"]["topology.kubernetes.io/zone"] == "us-west-2a"
     pod["spec"]["containers"][0]["env"].append({"name": "INJECTED", "value": "value"})
     assert confidential.prepared_pod_hash(pod) != checkpoint["pod_sha256"]
 
@@ -389,3 +396,23 @@ def test_private_generator_home_is_removed_without_changing_operator_config(pipe
     assert pipeline.arguments["env"]["HOME"] == str(home)
     assert config.read_bytes() == original
     assert pipeline.generator_homes and all(not path.exists() for path in pipeline.generator_homes)
+
+
+@pytest.mark.parametrize("variant", ["task-label", "other-topology-label", "image", "policy", "spec"])
+def test_recovery_hash_keeps_all_non_scheduling_authority(pipeline, variant):
+    pipeline.arguments["pod"]["metadata"]["labels"] = {"astrolift.dev/task-id": TASK}
+    pod, checkpoint = confidential.prepare_run(**pipeline.arguments)
+    pod["metadata"]["labels"].update(
+        {"topology.kubernetes.io/region": "us-west-2", "topology.kubernetes.io/zone": "us-west-2a"}
+    )
+    if variant == "task-label":
+        pod["metadata"]["labels"]["astrolift.dev/task-id"] = "another-task"
+    elif variant == "other-topology-label":
+        pod["metadata"]["labels"]["topology.kubernetes.io/rack"] = "rack"
+    elif variant == "image":
+        pod["spec"]["containers"][0]["image"] = "changed"
+    elif variant == "policy":
+        pod["metadata"]["annotations"][confidential.POLICY] += "changed"
+    else:
+        pod["spec"]["enableServiceLinks"] = True
+    assert confidential.prepared_pod_hash(pod) != checkpoint["pod_sha256"]

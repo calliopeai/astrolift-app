@@ -197,6 +197,14 @@ def prepared_pod_hash(pod: dict[str, Any]) -> str:
     if policy is not None:
         result["metadata"]["annotations"][POLICY] = policy
     result.get("spec", {}).pop("nodeName", None)
+    # PodTopologyLabels adds these two scheduling facts at binding time,
+    # after the final admitted Pod and policy have already been prepared.
+    labels = result["metadata"].get("labels")
+    if isinstance(labels, dict):
+        for name in ("topology.kubernetes.io/region", "topology.kubernetes.io/zone"):
+            labels.pop(name, None)
+        if not labels:
+            result["metadata"].pop("labels", None)
     return hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest()
 
 
