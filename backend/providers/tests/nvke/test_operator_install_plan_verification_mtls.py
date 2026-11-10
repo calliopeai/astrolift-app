@@ -27,7 +27,7 @@ import pytest
 )
 def test_real_verification_sdk_mtls_lost_reply_and_cold_recovery(tmp_path):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "7c3cbe624b31f2a33c1d9305f5fd58ef7d9bfc38"
+    revision = "c93fe5f5dcafd870dd6d34211a4a034b600b1b70"
     archive = subprocess.check_output(["git", "archive", revision, "kubernetes/nvke"], cwd=source)
     with tarfile.open(fileobj=io.BytesIO(archive)) as files:
         for entry in files:

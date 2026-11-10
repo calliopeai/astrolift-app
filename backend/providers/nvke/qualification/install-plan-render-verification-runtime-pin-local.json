@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "scope": "sdk-context-and-verification-current-native-runtime-pin",
+  "status": "native-agent-and-sdk-qualification-running",
+  "agentRevision": "c93fe5f5dcafd870dd6d34211a4a034b600b1b70",
+  "sourceSha256": {
+    "backend/providers/tests/nvke/test_operator_install_plan_context_mtls.py": "438b2608c499b605c4edfd2e2082033c4ca9da614f71f60c8f24d5055551c2d0",
+    "backend/providers/tests/nvke/test_operator_install_plan_verification_mtls.py": "00127384171290fc6dd808267db3d198042db712c84d27a26173f9f2a8c52657"
+  },
+  "checks": {
+    "ruff": {
+      "exitCode": 0
+    },
+    "sdkMTLS": {
+      "status": "running",
+      "sessionId": 58929,
+      "exitMarker": "/tmp/astrolift-nvke-recorded-frames-sdk-mtls.exit",
+      "logPath": "/tmp/astrolift-nvke-recorded-frames-sdk-mtls.log"
+    },
+    "agentRegressions": {
+      "status": "running",
+      "sessionId": 73301,
+      "exitMarker": "/tmp/astrolift-nvke-recorded-frames-agent-regressions.exit",
+      "logPath": "/tmp/astrolift-nvke-recorded-frames-agent-regressions.log"
+    }
+  },
+  "remaining": [
+    "Actual compiled CLI/App/browser acceptance at unchanged timeouts on this reviewed runtime.",
+    "Original resource/credential/schema/image/phase-use and exactly-once admission, full surface/live qualification and coordinated release remain open."
+  ],
+  "continuationAuthorized": false
+}
