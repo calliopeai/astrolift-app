@@ -42,3 +42,26 @@ def test_persisted_sandbox_survives_reload_update_and_removal():
     assert persist_manifest(app, normalize(parse_raw(ordinary)), raw_text=ordinary).hash_changed
     app.refresh_from_db()
     assert "nitro_sandbox" not in app.manifest_normalized["workloads"][0]
+
+
+def test_task_agent_dispatch_reads_its_persisted_selector(settings):
+    from astrolift_dispatch.nitro_sandbox import selected_task_runtime
+    from astrolift_dispatch.spawners.k8s_job import _render_agent_job
+    from astrolift_dispatch.tests.test_k8s_job_vnc import _FakeTask
+    from astrolift_registry.models import Workload
+
+    settings.AGENT_RUNTIME_CLASS = ""
+    app = _scaffold()
+    text = source('nitro_sandbox = {mode = "isolated"}', kind="agent")
+    persist_manifest(app, normalize(parse_raw(text)), raw_text=text)
+    row = Workload.objects.select_related("registered_app").get(registered_app=app, slug="worker")
+    runtime = selected_task_runtime(row)
+    assert runtime == "isolated-sandbox"
+    job = _render_agent_job(
+        job_name="agent-task-persisted",
+        workload=row,
+        namespace="team",
+        task=_FakeTask(guid="task-persisted", vnc_enabled=False),
+        runtime_class=runtime,
+    )
+    assert job["spec"]["template"]["spec"]["runtimeClassName"] == "isolated-sandbox"

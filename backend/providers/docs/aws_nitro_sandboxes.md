@@ -48,8 +48,11 @@ preserves the existing normalized shape and Kubernetes output. Normal deploy and
 rollback renderers consume the stored raw manifest.
 
 Supported workload kinds are deployment, statefulset, cronjob, task, workflow,
-and service-family agent. Task-family agent dispatch, Knative functions, static
-sites, provider FaaS and the unimplemented `job` workload kind reject the block.
+and agent. Service-family agents render a standing Deployment. Task-family
+agents support only isolated mode without a custom policy or network isolation;
+the selector is retained for dispatch rather than creating a standing resource.
+Knative functions, static sites, provider FaaS and the unimplemented `job`
+workload kind reject the block.
 Legacy `[[jobs]]` and `[[tasks]]` aliases must use `[[workloads]]` for sandbox
 selection. GPU requests are rejected. Network-isolated workloads cannot expose
 public services or scrape metrics, and port-serving containers must declare exec
@@ -60,6 +63,30 @@ construction. Later deploy-time injections or admission webhooks can change
 policy-pinned fields. The caller remains responsible for generating the policy
 from the exact final admitted pod spec and matching the KMS policy; this feature
 does not claim to automate confidential policy generation or verify attestation.
+
+## Task-family agent dispatch
+
+For a task-family agent, `nitro_sandbox = { mode = "isolated" }` selects the AWS
+runtime when the dispatcher creates its per-run Job. Selection is resolved from
+that Workload's own registered app and matching workload name in the stored
+normalized manifest. Another workload's selector does not apply. Omission
+preserves ordinary Job output and the existing operator runtime setting.
+
+Explicit selection cannot override a different operator `AGENT_RUNTIME_CLASS`,
+and a GPU environment spec is refused. Runtime availability and the expected
+AWS handler are checked before managed-model or credential provisioning. The
+Job retains `runtimeClassName: isolated-sandbox` after pod hardening. Recovery
+refuses to adopt an existing Job using a different runtime.
+
+Confidential mode, nonempty custom policies and network-isolated task agents
+remain rejected at parse and dispatch. Per-run task IDs, Brief/secret/model
+bindings and admission changes require a final-spec policy workflow; static
+precursor policies must not be treated as complete confidential-task support.
+The new selector applies to task-family agent Jobs registered from an Astrolift
+workload manifest. Imported agent package extensions are not interpreted as
+Astrolift workload selectors; those agents retain operator runtime behavior.
+Agent boxes continue to use
+the existing operator-wide runtime setting and do not inherit this selector.
 
 ## Applying an explicitly sandboxed workload
 
@@ -148,7 +175,7 @@ The PostgreSQL run emitted two pytest assertion-rewrite warnings for already
 imported `constance` and `anyio` modules; no tests failed. These are local
 implementation checks, not a complete repository CI run or a live AWS rollout.
 No real EKS sandbox workload, confidential KMS key release/refusal, ECS task or
-EC2 host VM lifecycle has been exercised. Task-family per-workload selectors,
+EC2 host VM lifecycle has been exercised. Task-family confidential/custom-policy/network-isolated selection,
 confidential generation/attestation automation and the other support boundaries
 above remain open.
 

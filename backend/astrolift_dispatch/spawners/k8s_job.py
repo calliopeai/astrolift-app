@@ -64,6 +64,25 @@ class K8sJobSpawner(ContainerSpawner):
             return SpawnResult(
                 external_id=job_name, ok=False, error="Existing agent Job has no matching callback credential"
             )
+        from astrolift_dispatch.nitro_sandbox import selected_task_runtime
+        from astrolift_dispatch.pod_hardening import AgentRuntimeClassError
+
+        try:
+            runtime_class = selected_task_runtime(
+                getattr(task, "agent_definition", None), getattr(task, "environment_spec", None)
+            )
+        except AgentRuntimeClassError as exc:
+            return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+        if (
+            runtime_class
+            and manifest.get("spec", {}).get("template", {}).get("spec", {}).get("runtimeClassName")
+            != runtime_class
+        ):
+            return SpawnResult(
+                external_id=job_name,
+                ok=False,
+                error="Existing agent Job does not use the workload's selected Nitro Sandbox runtime",
+            )
         return SpawnResult(external_id=job_name)
 
     def reserve_input_wait(self, task: AgentTask, seconds: int) -> None:
@@ -146,6 +165,16 @@ class K8sJobSpawner(ContainerSpawner):
 
             return SpawnResult(external_id="", ok=False, error=NON_ROOT_INSTALL_CONFLICT)
 
+        from astrolift_dispatch.nitro_sandbox import selected_task_runtime
+        from astrolift_dispatch.pod_hardening import AgentRuntimeClassError, preflight_agent_runtime
+
+        try:
+            runtime_class = selected_task_runtime(workload, requested_spec)
+            if runtime_class:
+                preflight_agent_runtime(self._cluster, {"runtimeClassName": runtime_class})
+        except AgentRuntimeClassError as exc:
+            return SpawnResult(external_id="", ok=False, error=str(exc))
+
         # UUIDv7 prefixes contain only time; truncating them collides across parallel tasks.
         job_name = f"agent-task-{str(task.guid).replace('-', '')}"
         # Mark the in-process cleanup plan before any ancillary resolution.
@@ -204,11 +233,12 @@ class K8sJobSpawner(ContainerSpawner):
             task=task,
             service_account=model_service_account,
             model_env=model_env,
+            runtime_class=runtime_class,
         )
-        from astrolift_dispatch.pod_hardening import AgentRuntimeClassError, preflight_agent_runtime
 
         try:
-            preflight_agent_runtime(self._cluster, job_manifest["spec"]["template"]["spec"])
+            if not runtime_class:
+                preflight_agent_runtime(self._cluster, job_manifest["spec"]["template"]["spec"])
         except AgentRuntimeClassError as exc:
             return SpawnResult(external_id=job_name, ok=False, error=str(exc))
 
@@ -921,6 +951,7 @@ def _render_agent_job(
     task,
     service_account: str = "",
     model_env: list[dict] | None = None,
+    runtime_class: str = "",
 ) -> dict:
     """Build a minimal batch/v1 Job manifest for an agent workload.
 
@@ -1044,4 +1075,13 @@ def _render_agent_job(
     harden_agent_pod(
         job["spec"]["template"]["spec"], non_root=bool(getattr(spec, "run_as_non_root", False)), spec=spec
     )
+    if runtime_class:
+        from astrolift_dispatch.pod_hardening import AgentRuntimeClassError
+
+        current = job["spec"]["template"]["spec"].get("runtimeClassName")
+        if runtime_class != "isolated-sandbox" or (current and current != runtime_class):
+            raise AgentRuntimeClassError(
+                "Workload Nitro Sandbox selection conflicts with the agent runtime policy"
+            )
+        job["spec"]["template"]["spec"]["runtimeClassName"] = runtime_class
     return job

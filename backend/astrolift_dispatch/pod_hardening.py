@@ -97,8 +97,13 @@ def preflight_agent_runtime(cluster, pod_spec: dict) -> None:
             f"Cannot verify agent RuntimeClass {runtime_class!r}; install it on the target cluster "
             "and allow the control plane to read RuntimeClasses, or clear AGENT_RUNTIME_CLASS."
         ) from exc
-    if not manifest or manifest.get("metadata", {}).get("deletionTimestamp"):
+    metadata = manifest.get("metadata") if isinstance(manifest, dict) else None
+    if not manifest or not isinstance(metadata, dict) or metadata.get("deletionTimestamp"):
         raise AgentRuntimeClassError(
             f"Agent RuntimeClass {runtime_class!r} is not available on the target cluster; "
             "install it before dispatch, or clear AGENT_RUNTIME_CLASS."
         )
+    if runtime_class in {"isolated-sandbox", "confidential-sandbox"} and (
+        manifest.get("handler") != runtime_class or metadata.get("name") != runtime_class
+    ):
+        raise AgentRuntimeClassError("Agent Nitro Sandbox RuntimeClass does not use the expected AWS handler")

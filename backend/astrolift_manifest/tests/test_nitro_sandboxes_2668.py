@@ -117,7 +117,7 @@ def test_invalid_blocks_are_rejected_with_a_field_path(block):
         parse_raw(source(block))
 
 
-@pytest.mark.parametrize("kind,extra", [("agent", ""), ("function", ""), ("job", "")])
+@pytest.mark.parametrize("kind,extra", [("function", ""), ("job", "")])
 def test_unimplemented_workload_paths_cannot_silently_drop_isolation(kind, extra):
     with pytest.raises(ManifestError, match="nitro_sandbox"):
         parse_raw(source('nitro_sandbox = {mode = "isolated"}', kind, extra))
@@ -165,3 +165,22 @@ nitro_sandbox = {{mode = "isolated"}}
 """
     with pytest.raises(ManifestError, match="nitro_sandbox"):
         parse_raw(text)
+
+
+def test_task_agent_selector_is_preserved_for_dispatch_not_standing_render():
+    manifest, resources = render(source('nitro_sandbox = {mode = "isolated"}', kind="agent"))
+    assert manifest.serialized["workloads"][0]["nitro_sandbox"]["mode"] == "isolated"
+    assert resources == []
+
+
+@pytest.mark.parametrize(
+    "block",
+    [
+        'nitro_sandbox = {mode = "confidential", policy = "generated=="}',
+        'nitro_sandbox = {mode = "isolated", policy = "custom=="}',
+        'nitro_sandbox = {mode = "isolated", network_isolated = true}',
+    ],
+)
+def test_task_agent_variants_requiring_final_run_policy_or_network_workflows_are_rejected(block):
+    with pytest.raises(ManifestError, match="task-family agents"):
+        parse_raw(source(block, kind="agent"))

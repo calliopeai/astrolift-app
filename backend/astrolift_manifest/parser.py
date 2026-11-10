@@ -1246,9 +1246,7 @@ def _parse_nitro_sandbox(
     block = workload["nitro_sandbox"]
     if not isinstance(block, dict) or set(block) - {"mode", "network_isolated", "policy"}:
         raise ManifestError("expected a table with mode, network_isolated and optional policy", path=path)
-    if kind not in {"deployment", "statefulset", "cronjob", "task", "workflow", "agent"} or (
-        kind == "agent" and workload.get("run_family", "task") != "service"
-    ):
+    if kind not in {"deployment", "statefulset", "cronjob", "task", "workflow", "agent"}:
         raise ManifestError("Nitro Sandbox selection is not supported for this workload family", path=path)
     mode = block.get("mode")
     if not isinstance(mode, str) or mode not in {"isolated", "confidential"}:
@@ -1262,6 +1260,16 @@ def _parse_nitro_sandbox(
     if mode == "confidential" and not policy.strip():
         raise ManifestError(
             "confidential mode requires a policy generated from the final pod spec", path=f"{path}.policy"
+        )
+    if (
+        kind == "agent"
+        and workload.get("run_family", "task") == "task"
+        and (mode != "isolated" or network_isolated or policy)
+    ):
+        raise ManifestError(
+            "task-family agents support isolated mode without policy or network isolation; "
+            "confidential policies require final per-run pod generation",
+            path=path,
         )
     if gpu:
         raise ManifestError("Nitro Sandboxes do not support GPU passthrough", path=path)
