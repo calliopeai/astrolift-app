@@ -18243,6 +18243,32 @@
       "loading": "Carregando contexto de renderização salvo…",
       "unavailable": "O contexto salvo não corresponde à árvore, ao item ou à origem atuais. Revise novamente.",
       "unloaded": "Revise um UUID de contexto existente ou capture um novo."
+    },
+    "installVerification": {
+      "title": "Verificação da renderização",
+      "help": "Verifique novamente o contexto selecionado pelo agente original. Os registros mantêm o horário original da observação.",
+      "verificationRequired": "Para continuar, ainda são necessárias verificações atuais no uso da fase, equivalência dos recursos e credenciais originais, validação dos esquemas, de todas as imagens e da autorização vinculada.",
+      "contextId": "UUID do contexto",
+      "contextVersion": "Versão do contexto",
+      "maximumBytes": "Limite de bytes lidos",
+      "maximumCaptureAgeSeconds": "Idade máxima da captura em segundos",
+      "maximumCalls": "Limite de chamadas de leitura",
+      "timeoutSeconds": "Tempo limite em segundos",
+      "originalOnly": "Use as configurações originais deste UUID. Sua intenção privada retida não pode ser substituída.",
+      "settingsHelp": "Defina limites de leitura para este contexto. Uma nova observação exige um novo UUID; mantenha as configurações originais para recuperação.",
+      "invalidInput": "Revise o UUID distinto e os limites de leitura canônicos e delimitados.",
+      "prepare": "Verificar contexto",
+      "review": "Revisar verificação salva",
+      "retry": "Tentar novamente a verificação retida",
+      "failed": "Não foi possível confirmar a verificação. Preserve o UUID e inspecione o registro retido.",
+      "parentRequired": "Revise primeiro o contexto preparado exato e seus artefatos de origem.",
+      "loading": "Carregando verificação salva…",
+      "unavailable": "A verificação salva não corresponde a este contexto ou à origem revisada.",
+      "unloaded": "Revise um UUID de verificação existente ou crie uma nova observação.",
+      "artifactDigest": "SHA-256 do registro",
+      "verificationDigest": "SHA-256 da verificação",
+      "requests": "Solicitações de leitura",
+      "bytes": "Bytes lidos"
     }
   }
 }

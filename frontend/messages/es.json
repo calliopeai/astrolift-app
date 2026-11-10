@@ -18246,6 +18246,32 @@
       "loading": "Cargando contexto de renderizado guardado…",
       "unavailable": "El contexto guardado no coincide con el árbol, el elemento o el origen actuales. Revíselo de nuevo.",
       "unloaded": "Revise un UUID de contexto existente o capture uno nuevo."
+    },
+    "installVerification": {
+      "title": "Verificación del renderizado",
+      "help": "Vuelve a comprobar el contexto seleccionado mediante el agente original. Los registros guardados conservan su hora de observación original.",
+      "verificationRequired": "Para continuar aún se requieren comprobaciones actuales al usar la fase, equivalencia de recursos y credenciales originales, validación de esquemas, revisión de todas las imágenes y autorización vinculada.",
+      "contextId": "UUID del contexto",
+      "contextVersion": "Versión del contexto",
+      "maximumBytes": "Límite de bytes leídos",
+      "maximumCaptureAgeSeconds": "Antigüedad máxima de la captura en segundos",
+      "maximumCalls": "Límite de llamadas de lectura",
+      "timeoutSeconds": "Tiempo límite en segundos",
+      "originalOnly": "Usa los ajustes originales de este UUID. Su intención privada guardada no se puede sustituir.",
+      "settingsHelp": "Define límites de lectura para este contexto. Una nueva observación requiere un UUID nuevo; conserva los ajustes originales para recuperarla.",
+      "invalidInput": "Revisa el UUID distinto y los límites de lectura canónicos y acotados.",
+      "prepare": "Verificar contexto",
+      "review": "Revisar verificación guardada",
+      "retry": "Reintentar verificación guardada",
+      "failed": "No se pudo confirmar la verificación. Conserva su UUID e inspecciona el registro guardado.",
+      "parentRequired": "Revisa primero el contexto preparado exacto y sus artefactos de origen.",
+      "loading": "Cargando verificación guardada…",
+      "unavailable": "La verificación guardada no coincide con este contexto o la fuente revisada.",
+      "unloaded": "Revisa un UUID de verificación existente o crea una nueva observación.",
+      "artifactDigest": "SHA-256 del registro",
+      "verificationDigest": "SHA-256 de verificación",
+      "requests": "Solicitudes de lectura",
+      "bytes": "Bytes leídos"
     }
   }
 }

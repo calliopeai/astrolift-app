@@ -18243,6 +18243,32 @@
       "loading": "Loading saved render context…",
       "unavailable": "The saved context does not match the current tree, item or source. Review it again.",
       "unloaded": "Review an existing context UUID or capture a new one."
+    },
+    "installVerification": {
+      "title": "Render verification",
+      "help": "Recheck the selected render context through the original agent. Saved records retain their original observation time.",
+      "verificationRequired": "Continuation still requires fresh checks at phase use, resource and original credential equivalence, schema validation, all image checks and linked admission.",
+      "contextId": "Context UUID",
+      "contextVersion": "Context version",
+      "maximumBytes": "Read byte limit",
+      "maximumCaptureAgeSeconds": "Maximum capture age in seconds",
+      "maximumCalls": "Read call limit",
+      "timeoutSeconds": "Timeout in seconds",
+      "originalOnly": "Use the original settings for this UUID. Its retained private intent cannot be replaced.",
+      "settingsHelp": "Set bounded read limits for this context. A new observation needs a new UUID; retain the original settings for recovery.",
+      "invalidInput": "Review the distinct UUID and canonical, bounded read limits.",
+      "prepare": "Verify render context",
+      "review": "Review saved verification",
+      "retry": "Retry retained verification",
+      "failed": "The verification could not be confirmed. Preserve its UUID and inspect the retained record.",
+      "parentRequired": "Review the exact prepared render context and its parents first.",
+      "loading": "Loading saved verification…",
+      "unavailable": "The saved verification does not match this context or reviewed source.",
+      "unloaded": "Review an existing verification UUID or create a new observation.",
+      "artifactDigest": "Record SHA-256",
+      "verificationDigest": "Verification SHA-256",
+      "requests": "Read requests",
+      "bytes": "Read bytes"
     }
   }
 }

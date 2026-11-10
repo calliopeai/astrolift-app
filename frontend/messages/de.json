@@ -18246,6 +18246,32 @@
       "loading": "Gespeicherter Renderkontext wird geladen…",
       "unavailable": "Der gespeicherte Kontext entspricht nicht dem aktuellen Baum, Element oder Ursprung. Prüfen Sie ihn erneut.",
       "unloaded": "Prüfen Sie eine vorhandene Kontext-UUID oder erfassen Sie einen neuen Kontext."
+    },
+    "installVerification": {
+      "title": "Renderprüfung",
+      "help": "Prüfen Sie den gewählten Renderkontext über den ursprünglichen Agenten erneut. Gespeicherte Datensätze behalten ihren ursprünglichen Beobachtungszeitpunkt.",
+      "verificationRequired": "Vor der Fortsetzung sind aktuelle Prüfungen bei Phasenstart, Ressourcen- und ursprünglicher Anmeldedatenabgleich, Schemavalidierung, Prüfung aller Images und verknüpfte Ausführungsfreigabe erforderlich.",
+      "contextId": "Kontext-UUID",
+      "contextVersion": "Kontextversion",
+      "maximumBytes": "Lesebyte-Limit",
+      "maximumCaptureAgeSeconds": "Maximales Alter der Erfassung in Sekunden",
+      "maximumCalls": "Limit der Leseaufrufe",
+      "timeoutSeconds": "Zeitlimit in Sekunden",
+      "originalOnly": "Verwenden Sie die ursprünglichen Einstellungen für diese UUID. Die gespeicherte private Absicht kann nicht ersetzt werden.",
+      "settingsHelp": "Legen Sie begrenzte Lesezugriffe für diesen Kontext fest. Eine neue Beobachtung benötigt eine neue UUID; bewahren Sie die ursprünglichen Einstellungen zur Wiederherstellung auf.",
+      "invalidInput": "Prüfen Sie die eigenständige UUID und die kanonischen, begrenzten Leseparameter.",
+      "prepare": "Renderkontext prüfen",
+      "review": "Gespeicherte Prüfung ansehen",
+      "retry": "Gespeicherte Prüfung erneut versuchen",
+      "failed": "Die Prüfung konnte nicht bestätigt werden. Bewahren Sie die UUID auf und prüfen Sie den gespeicherten Datensatz.",
+      "parentRequired": "Prüfen Sie zuerst den exakt vorbereiteten Renderkontext und seine übergeordneten Artefakte.",
+      "loading": "Gespeicherte Prüfung wird geladen…",
+      "unavailable": "Die gespeicherte Prüfung passt nicht zu diesem Kontext oder der geprüften Quelle.",
+      "unloaded": "Prüfen Sie eine vorhandene Prüfungs-UUID oder erstellen Sie eine neue Beobachtung.",
+      "artifactDigest": "Datensatz-SHA-256",
+      "verificationDigest": "Prüfungs-SHA-256",
+      "requests": "Leseanfragen",
+      "bytes": "Gelesene Bytes"
     }
   }
 }

@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "scope": "pure-verification-storybook-controls-eight-locales-and-recovery-actions",
+  "status": "unit-lint-production-storybook-and-chromium-qualified-full-types-running-hook-and-route-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanVerificationPanel.tsx": "49ae310791884e0da50c133772e369f29062a1c155a1a9cfabb7d4b88c5190e8",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanVerificationPanel.stories.tsx": "32fde34e101bcf43e6127629c89e84b805e7a25f59c47a5f79d544e73da121a3",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-verification.test.tsx": "8d87355e10ff383220857b2a3dca179fe25e4fb4979652256b749c7a1e8b36f4",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-verification-stories.test.tsx": "0ea2c546babc2797a246bee8f09f5eee7d375f1a2c89c272336ae860acd410b3",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-verification-locales.test.ts": "ce02271c3eb7817d8e3af117a08847fcd515c78509fd5516d669a43cc41b05cf",
+    "frontend/messages/en.json": "b713cca03d19fc37e7909d6f12dae4b52c5afb3ea5517c7e8f4968962f83a54c",
+    "frontend/messages/de.json": "226155aa0a0fb222edd34238b68184968392bbe0b46a78b647c98360b3d68a9f",
+    "frontend/messages/es.json": "fb0845031e1cedc540861eb974af054c24d7ed25cbdbd32bce29c97ac90df7de",
+    "frontend/messages/fr.json": "23b5a572c162102635f21364173b53282d4c02258c24c1c8e9221c44b9b205ed",
+    "frontend/messages/pt-BR.json": "a66e0846dfbcd7d932564e395a50cbb5297a09c43e0492df0ecddaaf36cf3d45",
+    "frontend/messages/ja.json": "c15732040088f6017895726150253a07abd7faa00e894ae2262630ab777f504d",
+    "frontend/messages/ko.json": "283677ca50eedbefb0e90a2129f7525b9674cede7060aa38a2d0f6e5016e8791",
+    "frontend/messages/zh-Hans.json": "9750c9ec5f4226adf237295b2489084091a79ad6e18ac23b01ff1be00e3441e6"
+  },
+  "checks": {
+    "focused": {
+      "passed": 82,
+      "skipped": 0,
+      "exitCode": 0,
+      "seconds": 35.42,
+      "logSha256": "f68b8c2c2e0fcfc8deae52eb1d085acba6d9da8a4382b055fc7e1c96db1d2f8d"
+    },
+    "eslint": "passed for new panel, stories and tests",
+    "prettier": "all changed components/tests/messages formatted",
+    "productionStorybook": {
+      "exitCode": 0,
+      "output": "/tmp/astrolift-nvke-verification-controls-storybook-static",
+      "logSha256": "11a0362f704ddf20417493e1c2b444d9809a53400d1b57897308fd427e67da3f"
+    },
+    "actualChromium": {
+      "exitCode": 0,
+      "stories": 23,
+      "pageErrors": 0,
+      "reportSha256": "aca0e053b49dea2fce2d899b6d5a6a1272a53918a5a0d950cd23ade8e1f81daa",
+      "visualReview": "Inspected desktop,768px and Japanese captures: labels/hashes/actions fit, wrapped metadata stays readable; preserved uncertain-install and historical-observation text visible.",
+      "screenshotSha256": {
+        "/tmp/astrolift-nvke-verification-controls-full.png": "7418286d3f9df4623f8b00e989ca384e736b24584007dbd4bf08c5968aeb03c2",
+        "/tmp/astrolift-nvke-verification-controls-width-768.png": "2e3818c80e859a04b7b4271c58ca960a267cbe3eb087151deb72391bbe173edf",
+        "/tmp/astrolift-nvke-verification-controls-japanese.png": "3ec49ce91b1d6a91ab7a0fc5cac5b461ddb46c3ff7b4caf25d56d07db7a463ba"
+      },
+      "scope": "Built pure Storybook fixtures with controlled callbacks; not actual App/browser/auth acceptance. Owned loopback static server stopped after inspection."
+    },
+    "fullTypeScript": {
+      "status": "pending",
+      "sessionId": 7377,
+      "logPath": "/tmp/astrolift-nvke-verification-controls-types.log",
+      "exitMarker": "/tmp/astrolift-nvke-verification-controls-types.exit"
+    }
+  },
+  "implemented": [
+    "Pure panel requires reviewed plan/chart/tree/context, exact item selection, current verified authority, admin review access and original uncertain install. Invalid or stale source blocks callbacks and hides mismatched observation metadata.",
+    "Prepared/uncertain IDs remain selected; preparation is disabled after an uncertain result, settings cleared, and only explicit review/private retry offered. Duplicate private requests are not auto-replayed.",
+    "Metadata only: signed observation/index hashes, original capture/chart/context bindings, read counts/bytes and historical timestamp. Original uncertain state and future phase/resource/credential/schema/image/admission requirements remain explicit.",
+    "Full,unloaded,missing context,loading,pending,lost reply,restricted reviewer,stale parents/context/source,wrong selection,unverified authority,original-input recovery,new selection and768px stories; all eight locale catalogs include the complete new copy."
+  ],
+  "remaining": [
+    "Inspect final full TypeScript before final controls qualification.",
+    "Implement private metadata-only recovery journal and current-authority/epoch hook, then actual operation-screen wiring.",
+    "Actual compiled CLI/App/new-agent and browser acceptance, broad UI regressions, Next build and final full-surface gates remain outstanding."
+  ],
+  "continuationAuthorized": false
+}
