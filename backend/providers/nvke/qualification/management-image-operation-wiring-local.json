@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "registry-image-controls-in-operation-screen-and-central-controller",
-  "status": "1385-frontend-regressions-and-composed-browser-states-qualified-production-builds-pending",
+  "status": "1385-frontend-regressions-composed-browser-states-and-production-builds-qualified-real-api-integration-pending",
   "sourceSha256": {
     "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "95c1a1c61e8c169b1ea2c496780a41194707ed041fc513d88e183ec507a36805",
     "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "9da39d9efeb384b304a40d877b7e4adaa8ef8b58943e44aeac5929022e631a2f",
@@ -48,12 +48,24 @@
     },
     "productionBuilds": {
       "sessionId": 45122,
-      "status": "pending",
-      "nextLogPath": "/tmp/astrolift-nvke-image-next-build.log",
-      "nextExitMarker": "/tmp/astrolift-nvke-image-next-build.exit",
-      "storybookLogPath": "/tmp/astrolift-nvke-image-storybook-build.log",
-      "storybookExitMarker": "/tmp/astrolift-nvke-image-storybook-build.exit",
-      "combinedExitMarker": "/tmp/astrolift-nvke-image-integration-builds.exit"
+      "status": "terminal",
+      "exitCode": 0,
+      "checks": {
+        "next": {
+          "logPath": "/tmp/astrolift-nvke-image-next-build.log",
+          "exitMarker": "/tmp/astrolift-nvke-image-next-build.exit",
+          "logSha256": "0511894c78c9532ca18f7a9a3e1949a113bae3e435dba871dbb8d1dead05ad36",
+          "exitCode": 0
+        },
+        "storybook": {
+          "logPath": "/tmp/astrolift-nvke-image-storybook-build.log",
+          "exitMarker": "/tmp/astrolift-nvke-image-storybook-build.exit",
+          "logSha256": "9ba0e8c7f9024f81e984a0a94af9cf280a9352a2d992a8c372e56a71760d1f58",
+          "exitCode": 0
+        }
+      },
+      "combinedExitMarker": "/tmp/astrolift-nvke-image-integration-builds.exit",
+      "sourceParity": "All recorded frontend source hashes match the frozen build inputs."
     }
   },
   "implemented": [
@@ -63,7 +75,7 @@
   ],
   "limits": [
     "Real browser -> App/Postgres -> final native agent/registry recovery qualification remains pending.",
-    "Final production builds and complete release gates remain pending.",
-    "Full image/platform/credential closure, use-time proof and linked native admission remain open; no main merge or deployment."
+    "Full image/platform/credential closure, use-time proof and linked native admission remain open; no main merge or deployment.",
+    "Complete release gates, actual Next login/route acceptance and live validation remain pending."
   ]
 }
