@@ -614,6 +614,7 @@ class KubernetesDynamicClient:
         *,
         kind: str,
         namespace: str | None = None,
+        request_timeout: tuple[int, int] | None = None,
     ) -> list[dict[str, Any]]:
         """List resources of ``kind`` (cluster- or namespace-scoped).
 
@@ -623,7 +624,8 @@ class KubernetesDynamicClient:
         api_version, resolved_kind = split_kind(kind)
         resource = self._resource_for(api_version, resolved_kind)
         request_namespace = namespace if bool(getattr(resource, "namespaced", namespace is not None)) else None
-        obj = resource.get(namespace=request_namespace)
+        options = {"_request_timeout": request_timeout} if request_timeout is not None else {}
+        obj = resource.get(namespace=request_namespace, **options)
         return self._to_dict(obj).get("items", []) or []
 
     def delete(

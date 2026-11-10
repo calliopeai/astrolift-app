@@ -317,6 +317,7 @@ class EKSClusterDriver(ClusterDriver):
         monotonic_clock: Callable[[], float] | None = None,
     ) -> None:
         self._config = config
+        self._nitro_clients = {"eks": eks_client, "sts": sts_client, "ec2": ec2_client}
         if eks_client is not None:
             self._eks = eks_client
         else:
@@ -393,12 +394,17 @@ class EKSClusterDriver(ClusterDriver):
     @driver_op(cloud="aws", driver="cluster")
     def validate_confidential_task(self, cluster: str, namespace: str, config: Any) -> None:
         config.validate()
-        if self._sts.get_caller_identity()["Account"] != config.registry.split(".")[0]:
+        from aws.nitro_readiness import effective_role_matches
+
+        identity = self._sts.get_caller_identity()
+        if not effective_role_matches(identity, config.key_admin_arn):
+            raise ValueError("confidential task effective provider role differs from the configured key administrator")
+        if identity["Account"] != config.registry.split(".")[0]:
             raise ValueError("confidential task provider identity differs from the configured AWS account")
         if config.registry.split(".")[3] != self._config.region:
             raise ValueError("confidential registry and EKS cluster must use the same region")
         response = self._eks.list_pod_identity_associations(
-            clusterName=cluster,
+            clusterName=self._config.cluster_name,
             namespace=namespace,
             serviceAccount=config.service_account,
         )
@@ -406,7 +412,7 @@ class EKSClusterDriver(ClusterDriver):
         if response.get("nextToken") or len(associations) != 1:
             raise ValueError("confidential task service account requires exactly one EKS Pod Identity association")
         association = self._eks.describe_pod_identity_association(
-            clusterName=cluster,
+            clusterName=self._config.cluster_name,
             associationId=associations[0]["associationId"],
         )["association"]
         if association.get("roleArn") != config.runtime_role_arn:
@@ -1065,6 +1071,25 @@ class EKSClusterDriver(ClusterDriver):
             follow=follow,
         )
 
+    def _nitro_client(self, service: str) -> Any:
+        from botocore.config import Config
+
+        client = self._nitro_clients.get(service)
+        if client is None:
+            client = aws_client(
+                service,
+                region=self._config.region,
+                credential=self._config.credential,
+                config=Config(connect_timeout=3, read_timeout=5, retries={"total_max_attempts": 1}),
+            )
+            self._nitro_clients[service] = client
+        return client
+
+    def probe_nitro_readiness(self, cluster: str, namespace: str, config: Any = None) -> dict[str, Any]:
+        from aws.nitro_readiness import collect_readiness
+
+        return collect_readiness(self, cluster, namespace, config)
+
     # ---- bring-into-management (#316) -----------------------------
 
     @driver_op(cloud="aws", driver="cluster")
@@ -1102,7 +1127,8 @@ class EKSClusterDriver(ClusterDriver):
         )
         if report.success:
             return replace(
-                report, capabilities={**report.capabilities, "nitro_sandboxes": self._probe_nitro_sandboxes(cluster)}
+                report,
+                capabilities={**report.capabilities, "nitro_sandboxes": self._probe_nitro_sandboxes(cluster)},
             )
         return report
 
