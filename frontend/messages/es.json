@@ -18272,6 +18272,32 @@
       "verificationDigest": "SHA-256 de verificación",
       "requests": "Solicitudes de lectura",
       "bytes": "Bytes leídos"
+    },
+    "installImage": {
+      "maximumBytes": "Límite de bytes leídos",
+      "maximumCalls": "Límite de llamadas de lectura",
+      "timeoutSeconds": "Tiempo límite en segundos",
+      "originalOnly": "Usa los ajustes originales de este UUID. Su intención privada guardada no se puede sustituir.",
+      "loading": "Cargando imagen guardada…",
+      "artifactDigest": "SHA-256 del registro",
+      "bytes": "Bytes leídos",
+      "title": "Imagen de registro",
+      "help": "Capture una imagen mediante el agente original con una política de registro revisada. La evidencia guardada conserva la fecha de observación original.",
+      "closureRequired": "Continuar requiere verificar las cargas y plataformas, la equivalencia de credenciales originales, comprobaciones recientes de fase y admisión vinculada.",
+      "reference": "Referencia de imagen",
+      "policy": "Alias de política revisada",
+      "settingsHelp": "Elija la imagen, la política revisada y los límites de captura. Conserve la configuración original exacta para recuperar.",
+      "invalidInput": "Revise el UUID distinto, la referencia de imagen, el alias de política y los límites de captura.",
+      "prepare": "Capturar imagen",
+      "review": "Revisar imagen guardada",
+      "retry": "Reintentar captura retenida",
+      "failed": "No se pudo confirmar la captura. Conserve su UUID y revise el registro retenido.",
+      "parentRequired": "Revise primero el plan preparado, la publicación de gráficos y el árbol de ejecución exactos.",
+      "unavailable": "La imagen guardada no coincide con el origen revisado.",
+      "unloaded": "Revise un UUID de imagen existente o capture una imagen nueva.",
+      "sourceDigest": "SHA-256 del origen",
+      "rootDigest": "Resumen raíz OCI",
+      "blobCount": "Blobs capturados"
     }
   }
 }

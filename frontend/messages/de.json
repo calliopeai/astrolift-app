@@ -18272,6 +18272,32 @@
       "verificationDigest": "Prüfungs-SHA-256",
       "requests": "Leseanfragen",
       "bytes": "Gelesene Bytes"
+    },
+    "installImage": {
+      "maximumBytes": "Lesebyte-Limit",
+      "maximumCalls": "Limit der Leseaufrufe",
+      "timeoutSeconds": "Zeitlimit in Sekunden",
+      "originalOnly": "Verwenden Sie die ursprünglichen Einstellungen für diese UUID. Die gespeicherte private Absicht kann nicht ersetzt werden.",
+      "loading": "Gespeichertes Image wird geladen…",
+      "artifactDigest": "Datensatz-SHA-256",
+      "bytes": "Gelesene Bytes",
+      "title": "Registry-Image",
+      "help": "Erfassen Sie ein Image über den ursprünglichen Agenten mit einer geprüften Registry-Richtlinie. Gespeicherte Nachweise behalten den ursprünglichen Beobachtungszeitpunkt.",
+      "closureRequired": "Die Fortsetzung erfordert vollständige Workload- und Plattformprüfung, gleichwertige ursprüngliche Zugangsdaten, aktuelle Phasenprüfungen und verknüpfte Zulassung.",
+      "reference": "Image-Referenz",
+      "policy": "Alias der geprüften Richtlinie",
+      "settingsHelp": "Wählen Sie Image, geprüfte Richtlinie und begrenzte Erfassungswerte. Bewahren Sie die genauen ursprünglichen Einstellungen zur Wiederherstellung auf.",
+      "invalidInput": "Prüfen Sie die eigenständige UUID, Image-Referenz, den Richtlinienalias und die Erfassungsgrenzen.",
+      "prepare": "Image erfassen",
+      "review": "Gespeichertes Image prüfen",
+      "retry": "Gespeicherte Erfassung erneut versuchen",
+      "failed": "Die Erfassung konnte nicht bestätigt werden. Bewahren Sie die UUID auf und prüfen Sie den gespeicherten Datensatz.",
+      "parentRequired": "Prüfen Sie zuerst den genauen vorbereiteten Plan, die Chart-Veröffentlichung und den Ausführungsbaum.",
+      "unavailable": "Das gespeicherte Image entspricht nicht der geprüften Quelle.",
+      "unloaded": "Prüfen Sie eine vorhandene Image-UUID oder erfassen Sie ein neues Image.",
+      "sourceDigest": "Quell-SHA-256",
+      "rootDigest": "OCI-Wurzeldigest",
+      "blobCount": "Erfasste Blobs"
     }
   }
 }

@@ -18269,6 +18269,32 @@
       "verificationDigest": "검증 SHA-256",
       "requests": "읽기 요청 수",
       "bytes": "읽은 바이트 수"
+    },
+    "installImage": {
+      "maximumBytes": "읽기 바이트 제한",
+      "maximumCalls": "읽기 호출 제한",
+      "timeoutSeconds": "제한 시간(초)",
+      "originalOnly": "이 UUID의 원래 설정을 사용하세요. 저장된 비공개 의도는 교체할 수 없습니다.",
+      "loading": "저장된 이미지 불러오는 중…",
+      "artifactDigest": "레코드 SHA-256",
+      "bytes": "읽은 바이트 수",
+      "title": "레지스트리 이미지",
+      "help": "검토된 레지스트리 정책을 사용해 원래 에이전트를 통해 이미지를 캡처합니다. 저장된 증거는 원래 관측 시간을 유지합니다.",
+      "closureRequired": "계속하려면 워크로드와 플랫폼의 완전한 검증, 원래 자격 증명의 동등성, 단계 사용 시 최신 확인 및 연결된 실행 승인이 필요합니다.",
+      "reference": "이미지 참조",
+      "policy": "검토된 정책 별칭",
+      "settingsHelp": "이미지, 검토된 정책 및 캡처 한도를 선택하세요. 복구를 위해 정확한 원래 설정을 보존하세요.",
+      "invalidInput": "고유 UUID, 이미지 참조, 정책 별칭 및 캡처 한도를 검토하세요.",
+      "prepare": "이미지 캡처",
+      "review": "저장된 이미지 검토",
+      "retry": "보존된 캡처 재시도",
+      "failed": "캡처를 확인하지 못했습니다. UUID를 보존하고 저장된 기록을 검토하세요.",
+      "parentRequired": "먼저 정확한 준비된 계획, 차트 게시 및 실행 트리를 검토하세요.",
+      "unavailable": "저장된 이미지가 검토된 소스와 일치하지 않습니다.",
+      "unloaded": "기존 이미지 UUID를 검토하거나 새 이미지를 캡처하세요.",
+      "sourceDigest": "소스 SHA-256",
+      "rootDigest": "OCI 루트 다이제스트",
+      "blobCount": "캡처된 Blob 수"
     }
   }
 }

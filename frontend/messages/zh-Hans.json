@@ -18269,6 +18269,32 @@
       "verificationDigest": "验证 SHA-256",
       "requests": "读取请求数",
       "bytes": "读取字节数"
+    },
+    "installImage": {
+      "maximumBytes": "读取字节数上限",
+      "maximumCalls": "读取调用次数上限",
+      "timeoutSeconds": "超时（秒）",
+      "originalOnly": "请使用此 UUID 的原始设置。已保留的私有意图不可替换。",
+      "loading": "正在加载已保存的镜像…",
+      "artifactDigest": "记录 SHA-256",
+      "bytes": "读取字节数",
+      "title": "注册表镜像",
+      "help": "使用已审核的注册表策略，通过原始代理捕获镜像。保存的证据保留原始观测时间。",
+      "closureRequired": "继续执行需要完整验证工作负载和平台、原始凭据等效性、阶段使用时的最新检查以及关联的执行许可。",
+      "reference": "镜像引用",
+      "policy": "已审核策略别名",
+      "settingsHelp": "选择镜像、已审核策略及捕获限制。请保留准确的原始设置以便恢复。",
+      "invalidInput": "请检查独立 UUID、镜像引用、策略别名和捕获限制。",
+      "prepare": "捕获镜像",
+      "review": "检查已保存的镜像",
+      "retry": "重试保留的捕获",
+      "failed": "无法确认捕获结果。请保留 UUID 并检查保留的记录。",
+      "parentRequired": "请先检查准确的已准备计划、图表发布和执行树。",
+      "unavailable": "保存的镜像与审核的来源不匹配。",
+      "unloaded": "检查现有镜像 UUID 或捕获新镜像。",
+      "sourceDigest": "来源 SHA-256",
+      "rootDigest": "OCI 根摘要",
+      "blobCount": "捕获的 Blob 数"
     }
   }
 }

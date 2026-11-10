@@ -1,0 +1,75 @@
+{
+  "format": 1,
+  "scope": "pure-registry-image-panel-eight-locales-and-storybook-review",
+  "status": "124-contracts-lint-typescript-and-23-browser-stories-qualified-app-wiring-pending",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImagePanel.tsx": "13fbd9e521a0c17e14ff6fe1d489226f9e7f1fc95b2cb4f97458cdf7da868448",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImagePanel.stories.tsx": "98499e1283fc972724d7a5973db798e81376619594b6e8cabd6e42a150341c09",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-image.test.tsx": "31f8a426f0dfb9ad7952a651a2e6ac8a9189b67861e73d499bbb138b3c970ba2",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-image-stories.test.tsx": "017e58a1de3150aa6d04411582d7dadda579d3cc4fd86a4a5037e025f09cc843",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-image-locales.test.ts": "5a7cfa53788acd504e094e1995e73af42fc19b2b12c0715673fd2550627ad0e2",
+    "frontend/e2e/nvke-install-plan-image-storybook-runner.mjs": "0b17723e7b5437e83ea1a46a0a4ffbf7be6e1bacc53d0d858aeb11a53e3c2c10",
+    "frontend/messages/en.json": "b474d4fe0de349e1c6a1b94dbe6e05b80783e3b26811b0f73136f713483450a3",
+    "frontend/messages/es.json": "a9487e088d8d1d0e0488f7c3b2453c25bdcb0074effea78b4385e70defb88739",
+    "frontend/messages/de.json": "fec53f410a1f4e68280bd2fa77fd00a37483ba319d6151e2f18409cf977148a3",
+    "frontend/messages/fr.json": "dd194dcc4e6b2fe25474774e4b0b385fd28b7fb8bdb84e02df7546f2fbc16d5f",
+    "frontend/messages/pt-BR.json": "b2deac59ff0bdeff8411f8de8015788c6eed578310c3e739e0592491e402794b",
+    "frontend/messages/ja.json": "849179ef39cf4cdf040248f72101147d59596168de3c82db9e344e38917183c6",
+    "frontend/messages/ko.json": "7bb0528d0dc1d3f7d072d59026d2a7ada7eecc8f0f73990272f9439180544446",
+    "frontend/messages/zh-Hans.json": "e33ae078881e2bff70c0b3fbde068032f3b062a392348d7add7dd5646f64b6d9"
+  },
+  "checks": {
+    "contracts": {
+      "sessionId": 55337,
+      "logPath": "/tmp/astrolift-nvke-image-panel-final-contracts.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-panel-final-contracts.exit",
+      "logSha256": "be550e69bc50d9ae2c6561c59597bc7f1d9e25914006e3400f0f4490aea7615b",
+      "exitCode": 0,
+      "tests": 124,
+      "skipped": 0,
+      "eslint": "passed",
+      "fullTypeScript": "passed"
+    },
+    "browser": {
+      "sessionId": 46041,
+      "logPath": "/tmp/astrolift-nvke-image-storybook-browser-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-image-storybook-browser-v2.exit",
+      "logSha256": "cf3cde929535e052391d14fd013a1df0a97ef7bb5711c15d5d601a62cfc437cb",
+      "exitCode": 0,
+      "stories": 23,
+      "pageErrors": 0,
+      "viewportWidths": [
+        1440,
+        768
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "themeAssertions": "Explicit light/dark globals plus DOM theme assertions before capture."
+    }
+  },
+  "screenshots": {
+    "/tmp/astrolift-nvke-image-ui-full.png": "d63b7f44d50e6837c9dc1d61ecf0397b9c942fa068bda2cc4da4456ec522c4fd",
+    "/tmp/astrolift-nvke-image-ui-768.png": "4fb0e84531f00eb6fd9ca79ef5d7d75637a2150fee6f0938988851c883c9b193",
+    "/tmp/astrolift-nvke-image-ui-dark.png": "57788a17d12d6a781b28758cd9e0c47ae2e60c627515f2e710f2303165f05b6f"
+  },
+  "visualReview": "Screenshots inspected: aligned metadata, readable and wrapping digests, responsive controls, source warning and historical observation time.",
+  "retainedInitialChecks": [
+    {
+      "logPath": "/tmp/astrolift-nvke-image-panel-contracts.log",
+      "exitCode": 1,
+      "reason": "One assertion incorrectly treated a newer valid tree version as an invalid source; changed to a tree bound to the wrong chart publication."
+    },
+    {
+      "logPath": "/tmp/astrolift-nvke-image-storybook-browser.log",
+      "exitCode": 0,
+      "limit": "Initial runner inherited dark mode for initial views; light mode was not proved. Replaced by explicit-theme browser run."
+    }
+  ],
+  "limits": [
+    "Panel uses typed fixtures and callbacks; application hook/route wiring and real browser/API recovery qualification remain pending.",
+    "Historical image metadata and private capture controls do not authorize continuation.",
+    "Full workload/platform/credential closure, phase use and linked native admission remain open; no main merge or deployment."
+  ]
+}

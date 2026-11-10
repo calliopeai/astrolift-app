@@ -18269,6 +18269,32 @@
       "verificationDigest": "Verification SHA-256",
       "requests": "Read requests",
       "bytes": "Read bytes"
+    },
+    "installImage": {
+      "maximumBytes": "Read byte limit",
+      "maximumCalls": "Read call limit",
+      "timeoutSeconds": "Timeout in seconds",
+      "originalOnly": "Use the original settings for this UUID. Its retained private intent cannot be replaced.",
+      "loading": "Loading saved image…",
+      "artifactDigest": "Record SHA-256",
+      "bytes": "Read bytes",
+      "title": "Registry image",
+      "help": "Capture an image through the original agent using a reviewed registry policy. Saved evidence retains its original observation time.",
+      "closureRequired": "Continuation requires workload and platform closure, original credential equivalence, fresh phase-use checks and linked admission.",
+      "reference": "Image reference",
+      "policy": "Reviewed policy alias",
+      "settingsHelp": "Choose the image, reviewed policy and bounded capture limits. Retain the exact original settings for recovery.",
+      "invalidInput": "Review the distinct UUID, image reference, policy alias and bounded capture limits.",
+      "prepare": "Capture image",
+      "review": "Review saved image",
+      "retry": "Retry retained image capture",
+      "failed": "Image capture could not be confirmed. Preserve its UUID and review the retained record.",
+      "parentRequired": "Review the exact prepared plan, chart publication and execution tree first.",
+      "unavailable": "The saved image does not match this reviewed source.",
+      "unloaded": "Review an existing image UUID or capture a new image.",
+      "sourceDigest": "Source SHA-256",
+      "rootDigest": "OCI root digest",
+      "blobCount": "Captured blobs"
     }
   }
 }

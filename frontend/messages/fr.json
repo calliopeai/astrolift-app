@@ -18272,6 +18272,32 @@
       "verificationDigest": "SHA-256 de la vérification",
       "requests": "Requêtes de lecture",
       "bytes": "Octets lus"
+    },
+    "installImage": {
+      "maximumBytes": "Limite d’octets lus",
+      "maximumCalls": "Limite d’appels de lecture",
+      "timeoutSeconds": "Délai en secondes",
+      "originalOnly": "Utilisez les paramètres d’origine pour cet UUID. Son intention privée conservée ne peut pas être remplacée.",
+      "loading": "Chargement de l’image enregistrée…",
+      "artifactDigest": "SHA-256 de l’enregistrement",
+      "bytes": "Octets lus",
+      "title": "Image de registre",
+      "help": "Capturez une image via l’agent d’origine avec une politique de registre vérifiée. Les preuves enregistrées conservent leur date d’observation initiale.",
+      "closureRequired": "La poursuite exige une vérification complète des charges et plateformes, l’équivalence des identifiants d’origine, des contrôles de phase récents et une admission liée.",
+      "reference": "Référence de l’image",
+      "policy": "Alias de politique vérifiée",
+      "settingsHelp": "Choisissez l’image, la politique vérifiée et les limites de capture. Conservez les paramètres d’origine exacts pour la récupération.",
+      "invalidInput": "Vérifiez l’UUID distinct, la référence de l’image, l’alias de politique et les limites de capture.",
+      "prepare": "Capturer l’image",
+      "review": "Vérifier l’image enregistrée",
+      "retry": "Réessayer la capture conservée",
+      "failed": "La capture n’a pas pu être confirmée. Conservez son UUID et vérifiez l’enregistrement conservé.",
+      "parentRequired": "Vérifiez d’abord le plan préparé, la publication des charts et l’arbre d’exécution exacts.",
+      "unavailable": "L’image enregistrée ne correspond pas à cette source vérifiée.",
+      "unloaded": "Vérifiez un UUID d’image existant ou capturez une nouvelle image.",
+      "sourceDigest": "SHA-256 de la source",
+      "rootDigest": "Empreinte racine OCI",
+      "blobCount": "Blobs capturés"
     }
   }
 }
