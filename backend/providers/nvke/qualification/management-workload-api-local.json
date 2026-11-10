@@ -1,0 +1,201 @@
+{
+  "format": 1,
+  "scope": "encrypted-workload-inventory-records-and-typed-audited-api",
+  "status": "persistence-and-typed-api-locally-exercised-repository-baseline-checks-not-green-release-incomplete",
+  "sourceSha256": {
+    "backend/astrolift_clusters/migrations/0044_nvke_install_plan_workload.py": "bc61167f9a8d6379391e917b3a873f2e1ef6f082cbbd3a2336f2f434775729d0",
+    "backend/astrolift_clusters/models/__init__.py": "4050625b740f6511d826c6f0d8ed4d6a988414750954f3145ebf037a7e9e04a1",
+    "backend/astrolift_clusters/models/nvke.py": "aac35f861f7f864cd24247482c93fb9909467fc345fb10a19be97e9c7a5d3c07",
+    "backend/astrolift_clusters/nvke_install_plan_charts.py": "f3f7242fbff5fa5aec5c36fba0576d2366a9a0065512cb29798081fba85e3a9a",
+    "backend/astrolift_clusters/nvke_install_plan_contexts.py": "28715e007bfd58f7ce743a506628b7758b4765d016fc6dd90c9707041a4b0f81",
+    "backend/astrolift_clusters/nvke_install_plan_images.py": "f7c60f17c25bc2c99e3c36fcecd1507adc96721615ca98369b5d0eb879c58467",
+    "backend/astrolift_clusters/nvke_install_plan_trees.py": "eddd4d0c4da6e06b7d75d96f2fc699329a52d754abfafa136ebfb47bccb5bd1a",
+    "backend/astrolift_clusters/nvke_install_plan_verifications.py": "5a55138f38458a0df0f1bd0bf0f3f49532f4155ea4fa0a4452af897e4e8218c4",
+    "backend/astrolift_clusters/nvke_install_plan_workloads.py": "532e13f18159f26a2897e2f84b767bd6cda5bed8c929a4f86c70886851dc9f19",
+    "backend/astrolift_clusters/nvke_install_plans.py": "e22ba6e6c835157aa6b8a6d66d4a80d24bdc69a10a5d7ace5d3d7defbd96b800",
+    "backend/astrolift_clusters/schema/__init__.py": "9ac6ab5d78f5302e6b0c6ebdb1b6e889e2345d2364a185b658d566d7fdf88d85",
+    "backend/astrolift_clusters/schema/nvke_install_plan_workloads.py": "8b0c8d6da939ce0b9797d23269a80b5cfc8bee3671e61eea727c6a8e22b40673",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_workload_api.py": "3ae6aa474ae19fb97152bd90d162775b21a481072c1ec0941b98fb9a9eb076f5",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_workload_model.py": "58f8409554f8af1ac84b97f78274cf1148e210dfa6e57b232ae22f73d0b038ae",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_workloads.py": "9cd6929a96dbbb5cfeea50c6802bd6051a7f8ed05933ec74012f8267c478df53",
+    "backend/config/schema.py": "2ac910833c4ab6861eccd503ad1584fac05efda0b36c7344c59032ed4ab1a394",
+    "backend/core/schema/audit.py": "513dc00589cd22392d5a12f8fb5fe3c3cf0309c755591a35591e94f6a424aff1",
+    "backend/schema.graphql": "5396d412316b72e45cf5a0444585c5e5d083cf20cb9dd85c249a75990be1445a",
+    "frontend/graphql/__generated__/operations.ts": "f90c08d7646238cf52062a6b549f6eadfbe0410ea9d3a89833886d44c8ca1fbb",
+    "frontend/graphql/__generated__/schema.ts": "5a7742ff59fb83ca1c02176464222b27551f15493a8260ea24bbb1a416b479f2",
+    "frontend/schema.graphql": "5396d412316b72e45cf5a0444585c5e5d083cf20cb9dd85c249a75990be1445a"
+  },
+  "checks": {
+    "databaseAndAPI": {
+      "sessionId": 99332,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-api-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-api-v2.log",
+      "logSha256": "80546b450212f69ed08879de53edd117e2960f2108e45dbe5b17627bfa6d5c50",
+      "passed": 29,
+      "skipped": 0,
+      "seconds": 332.91
+    },
+    "migrationShape": {
+      "sessionId": 33085,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-migrations-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-migrations-v1.log",
+      "logSha256": "615887cb67c54b4f0e2a015bc1b6de421a31ee245c243f6267da2ce0f0e2a69a"
+    },
+    "changedPythonLint": {
+      "sessionId": null,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-api-ruff-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-api-ruff-v1.log",
+      "logSha256": "ea5e1e76d6275a7eb3ab4fa90fb6e9ed8c6cdb58b13e045c28712b32645afed0"
+    },
+    "changedPythonFormat": {
+      "sessionId": null,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-api-format-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-api-format-v1.log",
+      "logSha256": "a01e37359f8a393142f82daa96555be27c9f3aaaacb74034fa30b3f42a3f43c9"
+    },
+    "diff": {
+      "sessionId": null,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-api-diff-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-api-diff-v1.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "contracts": {
+      "sessionId": 76332,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-contracts-check-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-contracts-check-v1.log",
+      "logSha256": "ea68b34843421cfd24b012e18963fec014192015276359abf7525730cdba594c"
+    },
+    "codegen": {
+      "sessionId": 10814,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-codegen-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-codegen-v1.log",
+      "logSha256": "88c5199bf8d00d42362ac5da2c4b149ce023b8105433ef1780553ecea9a783c8"
+    },
+    "frontendTypes": {
+      "sessionId": 72673,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-frontend-types-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-frontend-types-v1.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "frontendLint": {
+      "sessionId": 72673,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-frontend-lint-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-frontend-lint-v1.log",
+      "logSha256": "47a41dbdc55adf75dbb704e8ef18a974dea4d64d81b073e603c89bdecbca889c",
+      "errors": 0,
+      "warnings": 89
+    }
+  },
+  "broaderChecksNotGreen": {
+    "backendRuff": {
+      "sessionId": null,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-backend-ruff-full-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-backend-ruff-full-v1.log",
+      "logSha256": "718ce28824050b41235a50c984126c0e7bb0b4d40636e42efee3fc10b22c6858",
+      "diagnostics": 4
+    },
+    "backendFormat": {
+      "sessionId": null,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-backend-format-full-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-backend-format-full-v1.log",
+      "logSha256": "b059f6afa0a3c5363426744ccb8d2f963ae60dff2aaba52d367b3fd6887999d4",
+      "filesWouldReformat": 68
+    },
+    "backendMypy": {
+      "sessionId": 1226,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-api-mypy-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-api-mypy-v2.log",
+      "logSha256": "a7e744df2f52d5e8837eb6834acf54bd73835a32a44248d1067a3ec9a6bafac2",
+      "diagnostics": 830,
+      "filesWithErrors": 148
+    },
+    "isolatedCommittedBaselineMypy": {
+      "sessionId": 44009,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-api-mypy-baseline-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-api-mypy-baseline-v1.log",
+      "logSha256": "c9714b026160dcdd3fba6c1db8555f2808a19b527d57838ffd858d1f5be39cca",
+      "diagnostics": 4801,
+      "filesWithErrors": 477,
+      "revision": "d0775a072"
+    },
+    "comparison": {
+      "candidateUniqueErrorFingerprints": 419,
+      "baselineUniqueErrorFingerprints": 1558,
+      "candidateOnlyErrorFingerprints": 0,
+      "lintFormatReportedFiles": 72,
+      "lintFormatReportedFilesUnchangedFromHEAD": 72,
+      "lintFormatReportedFilesDifferentFromHEAD": 0
+    }
+  },
+  "retainedFailures": [
+    {
+      "sessionId": 52828,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-backend-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-backend-v1.log",
+      "logSha256": "f8dfbf0c63c98fb5f5a01588519be9e9b16b1408bc2b4057ba0e95528faff0c7",
+      "reason": "retained Docker test database stopped and old forwarded port refused connections"
+    },
+    {
+      "sessionId": 59022,
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-workload-backend-v2.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-backend-v2.log",
+      "logSha256": "40fdd2bab58ca42f80fed7ee42e71011bd25061d083e18a1eaaa7c56f4cb6682",
+      "reason": "model cases passed but service cases skipped because explicit legacy agent fixture was not selected; not full qualification"
+    },
+    {
+      "sessionId": 35565,
+      "exitCode": 1,
+      "exitMarker": "/tmp/astrolift-nvke-workload-backend-v4.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-backend-v4.log",
+      "logSha256": "c14a25d9c04a9115aac3cd135464077eded303d95d231f61c7dd6445b5dd9da6",
+      "reason": "99 cases passed, then fixture readiness errors, explicit host filesystem exhaustion, and test database connection loss; 85 errors; not a passing regression"
+    },
+    {
+      "sessionId": 51932,
+      "exitCode": 143,
+      "exitMarker": "/tmp/astrolift-nvke-workload-api-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-workload-api-v1.log",
+      "logSha256": "fbe15e9fd1a4f6613b64883e0a5a280bd72bcc7175fc17aec312eeba558a51f8",
+      "reason": "stalled Docker start client cancelled before tests; retained daemon and containers not reset"
+    }
+  ],
+  "runtime": {
+    "database": "postgres (PostgreSQL) 17.11 (Homebrew)",
+    "databaseMode": "task-owned localhost PostgreSQL with private socket and fresh isolated Django test database; original Docker volumes untouched",
+    "agentFixtureRevision": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
+    "nativeSDKProof": "management-workload-sdk-local.json"
+  },
+  "coverage": [
+    "encrypted immutable private inventory intent before remote acquisition",
+    "protected tree relation, terminal summary immutability and soft-delete UUID retention",
+    "workload and image UUIDs reserve each other before remote mutation",
+    "soft-deleted or wrong-digest render contexts refuse collection",
+    "real PostgreSQL and authenticated native-agent original-source fixture",
+    "typed prepare historical review and explicit original-private-intent retry",
+    "resolver-entry administrator checks and rejected/denied request audit redaction",
+    "private context bindings excluded from public count/digest summaries",
+    "same original operation and tree remain fenced without native continuation"
+  ],
+  "limits": [
+    "The three typed API cases isolate SDK acquisition using fixture evidence; actual new native SDK routes are covered by the separate recorded SDK proof",
+    "Full client/API/native CLI and browser qualification, UI controls, image closure and linked continuation remain pending",
+    "Broad backend lint formatting and type checks are not green; all 72 reported lint/format files are unchanged from committed HEAD and every normalized candidate type-error fingerprint appears on the isolated committed baseline",
+    "The failed broad persistence regression must be rerun with stable disk/database resources before final release",
+    "No main merge or deployment has occurred"
+  ]
+}

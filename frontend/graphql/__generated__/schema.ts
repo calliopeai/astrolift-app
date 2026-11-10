@@ -10087,6 +10087,7 @@ export type Mutation = {
   prepareNvkeOperatorInstallPlanImage: NvkeOperatorInstallPlanImageTypeMutationResult;
   prepareNvkeOperatorInstallPlanTree: NvkeOperatorInstallPlanTreeTypeMutationResult;
   prepareNvkeOperatorInstallPlanVerification: NvkeOperatorInstallPlanVerificationTypeMutationResult;
+  prepareNvkeOperatorInstallPlanWorkload: NvkeOperatorInstallPlanWorkloadTypeMutationResult;
   previewManagedServiceMatch: ManagedServiceMatchPlanPayloadMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
@@ -10126,6 +10127,7 @@ export type Mutation = {
   recoverNvkeOperatorInstallPlanPreparation: NvkeOperatorInstallPlanTypeMutationResult;
   recoverNvkeOperatorInstallPlanTreePreparation: NvkeOperatorInstallPlanTreeTypeMutationResult;
   recoverNvkeOperatorInstallPlanVerificationPreparation: NvkeOperatorInstallPlanVerificationTypeMutationResult;
+  recoverNvkeOperatorInstallPlanWorkloadPreparation: NvkeOperatorInstallPlanWorkloadTypeMutationResult;
   redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
   refreshCiWorkflowSyncStatus: AstroliftCiWorkflowSyncStatusMutationResult;
@@ -10206,6 +10208,7 @@ export type Mutation = {
   reviewNvkeOperatorInstallPlanImage: NvkeOperatorInstallPlanImageTypeMutationResult;
   reviewNvkeOperatorInstallPlanTree: NvkeOperatorInstallPlanTreeTypeMutationResult;
   reviewNvkeOperatorInstallPlanVerification: NvkeOperatorInstallPlanVerificationTypeMutationResult;
+  reviewNvkeOperatorInstallPlanWorkload: NvkeOperatorInstallPlanWorkloadTypeMutationResult;
   revokeApiToken: SoftdeletepayloadMutationResult;
   revokeAppCertificate: AstroliftCapabilityDeprovisionPayloadMutationResult;
   revokeAstroliftSession: AstroliftRevokeAstroliftSessionPayloadMutationResult;
@@ -11627,6 +11630,11 @@ export type MutationPrepareNvkeOperatorInstallPlanVerificationArgs = {
 };
 
 
+export type MutationPrepareNvkeOperatorInstallPlanWorkloadArgs = {
+  input: PrepareNvkeOperatorInstallPlanWorkloadInput;
+};
+
+
 export type MutationPreviewManagedServiceMatchArgs = {
   input: MatchManagedServicesInput;
 };
@@ -11793,6 +11801,11 @@ export type MutationRecoverNvkeOperatorInstallPlanTreePreparationArgs = {
 
 export type MutationRecoverNvkeOperatorInstallPlanVerificationPreparationArgs = {
   input: NvkeOperatorInstallPlanVerificationReviewInput;
+};
+
+
+export type MutationRecoverNvkeOperatorInstallPlanWorkloadPreparationArgs = {
+  input: NvkeOperatorInstallPlanWorkloadReviewInput;
 };
 
 
@@ -12186,6 +12199,11 @@ export type MutationReviewNvkeOperatorInstallPlanTreeArgs = {
 
 export type MutationReviewNvkeOperatorInstallPlanVerificationArgs = {
   input: NvkeOperatorInstallPlanVerificationReviewInput;
+};
+
+
+export type MutationReviewNvkeOperatorInstallPlanWorkloadArgs = {
+  input: NvkeOperatorInstallPlanWorkloadReviewInput;
 };
 
 
@@ -14037,6 +14055,63 @@ export type NvkeOperatorInstallPlanWorkloadPageTypeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type NvkeOperatorInstallPlanWorkloadReviewInput = {
+  artifactId: Scalars['GUID']['input'];
+  chartArtifactDigest: Scalars['String']['input'];
+  chartArtifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedChartArtifactVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedTreeVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  treeDigest: Scalars['String']['input'];
+  treeId: Scalars['GUID']['input'];
+};
+
+export type NvkeOperatorInstallPlanWorkloadType = {
+  artifactDigest: Scalars['String']['output'];
+  authorityId: Scalars['GUID']['output'];
+  authorityVersion: Scalars['Int']['output'];
+  captureDigest: Scalars['String']['output'];
+  chartArtifactDigest: Scalars['String']['output'];
+  chartArtifactId: Scalars['GUID']['output'];
+  chartArtifactVersion: Scalars['Int']['output'];
+  continuationAuthorized: Scalars['Boolean']['output'];
+  executionState: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  imageReferenceCount: Scalars['Int']['output'];
+  imageUseCount: Scalars['Int']['output'];
+  issueCount: Scalars['Int']['output'];
+  itemCount: Scalars['Int']['output'];
+  observedAt: Scalars['String']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  planDigest: Scalars['String']['output'];
+  planId: Scalars['GUID']['output'];
+  planVersion: Scalars['Int']['output'];
+  resourceCount: Scalars['Int']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  sourceDigest: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  treeDigest: Scalars['String']['output'];
+  treeId: Scalars['GUID']['output'];
+  treeVersion: Scalars['Int']['output'];
+  version: Scalars['Int']['output'];
+  workloadDigest: Scalars['String']['output'];
+};
+
+export type NvkeOperatorInstallPlanWorkloadTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanWorkloadType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeOperatorInstallReviewType = {
   apiReady: Scalars['Boolean']['output'];
   authorityId: Scalars['GUID']['output'];
@@ -14610,6 +14685,24 @@ export type PrepareNvkeOperatorInstallPlanVerificationInput = {
   item: Scalars['String']['input'];
   operationId: Scalars['GUID']['input'];
   ordinal: Scalars['Int']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  requestText: Scalars['String']['input'];
+  treeDigest: Scalars['String']['input'];
+  treeId: Scalars['GUID']['input'];
+};
+
+export type PrepareNvkeOperatorInstallPlanWorkloadInput = {
+  chartArtifactDigest: Scalars['String']['input'];
+  chartArtifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedChartArtifactVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedTreeVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
   planDigest: Scalars['String']['input'];
   planId: Scalars['GUID']['input'];
   requestText: Scalars['String']['input'];

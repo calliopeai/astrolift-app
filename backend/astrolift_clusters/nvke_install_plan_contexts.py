@@ -22,6 +22,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlanImage,
     NvkeInstallPlanTree,
     NvkeInstallPlanVerification,
+    NvkeInstallPlanWorkload,
     NvkeOperation,
 )
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
@@ -247,6 +248,7 @@ def prepare(*, body, **values):
                     NvkeInstallPlanTree,
                     NvkeInstallPlanVerification,
                     NvkeInstallPlanImage,
+                    NvkeInstallPlanWorkload,
                 )
             ):
                 raise NvkeError(
