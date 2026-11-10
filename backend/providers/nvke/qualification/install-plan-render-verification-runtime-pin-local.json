@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "sdk-context-and-verification-current-native-runtime-pin",
-  "status": "native-agent-and-sdk-qualification-running",
+  "status": "current-runtime-agent-and-sdk-mtls-qualified-real-client-acceptance-pending",
   "agentRevision": "c93fe5f5dcafd870dd6d34211a4a034b600b1b70",
   "sourceSha256": {
     "backend/providers/tests/nvke/test_operator_install_plan_context_mtls.py": "438b2608c499b605c4edfd2e2082033c4ca9da614f71f60c8f24d5055551c2d0",
@@ -12,16 +12,25 @@
       "exitCode": 0
     },
     "sdkMTLS": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 58929,
       "exitMarker": "/tmp/astrolift-nvke-recorded-frames-sdk-mtls.exit",
-      "logPath": "/tmp/astrolift-nvke-recorded-frames-sdk-mtls.log"
+      "logPath": "/tmp/astrolift-nvke-recorded-frames-sdk-mtls.log",
+      "exitCode": 0,
+      "passed": 2,
+      "skipped": 0,
+      "seconds": 198.85,
+      "logSha256": "d21038680e5dee2e68f1193dfda03df52e59689611d19ec6c8ed9b6a683d9aa8"
     },
     "agentRegressions": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 73301,
       "exitMarker": "/tmp/astrolift-nvke-recorded-frames-agent-regressions.exit",
-      "logPath": "/tmp/astrolift-nvke-recorded-frames-agent-regressions.log"
+      "logPath": "/tmp/astrolift-nvke-recorded-frames-agent-regressions.log",
+      "exitCode": 0,
+      "passed": 64,
+      "skipped": 0,
+      "seconds": 292.963
     }
   },
   "remaining": [
