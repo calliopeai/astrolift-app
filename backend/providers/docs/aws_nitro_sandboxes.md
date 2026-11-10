@@ -197,6 +197,13 @@ registry or database. Ruff passed on the changed Python files. The focused
 Django run emitted the two existing assertion-rewrite warnings for already
 imported modules. No broad build/suite, full CI run or live AWS check is implied.
 
+A subsequent recovery-boundary follow-up passed **10 targeted tests**, with
+17 deselected, exit 0, in **2.89 seconds**. It covers null/list values at each
+Job spec/template/pod-spec boundary, valid and mismatched runtime recovery,
+and unchanged ordinary rendered output. Recovery now validates those objects
+before callback-credential extraction and reuses the validated pod spec for
+runtime binding. Ruff and diff checks passed; no broad suite was rerun.
+
 Remaining task-specific gaps are confidential/custom-policy/network-isolated
 variants and per-workload selection for imported packages and agent boxes.
 Dedicated console/CLI controls, automatic EKS runtime provisioning, ECS supported

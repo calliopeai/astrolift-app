@@ -51,7 +51,14 @@ class K8sJobSpawner(ContainerSpawner):
             return SpawnResult(external_id="", ok=False, error="Existing agent Job belongs to another task")
         if metadata.get("deletionTimestamp"):
             return SpawnResult(external_id=job_name, ok=False, error="Existing agent Job is being deleted")
-        containers = manifest.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
+        pod_spec = manifest
+        for field in ("spec", "template", "spec"):
+            pod_spec = pod_spec.get(field)
+            if not isinstance(pod_spec, dict):
+                return SpawnResult(
+                    external_id=job_name, ok=False, error="Existing agent Job has a malformed pod template"
+                )
+        containers = pod_spec.get("containers", [])
         keys = [
             item.get("value", "")
             for container in containers
@@ -73,11 +80,7 @@ class K8sJobSpawner(ContainerSpawner):
             )
         except AgentRuntimeClassError as exc:
             return SpawnResult(external_id=job_name, ok=False, error=str(exc))
-        if (
-            runtime_class
-            and manifest.get("spec", {}).get("template", {}).get("spec", {}).get("runtimeClassName")
-            != runtime_class
-        ):
+        if runtime_class and pod_spec.get("runtimeClassName") != runtime_class:
             return SpawnResult(
                 external_id=job_name,
                 ok=False,

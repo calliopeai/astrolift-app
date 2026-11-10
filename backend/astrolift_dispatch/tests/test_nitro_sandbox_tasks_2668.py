@@ -181,3 +181,40 @@ def test_imported_agent_package_extensions_are_not_astrolift_workload_selectors(
     assert selected_task_runtime(imported) == ""
     imported.registered_app.manifest_normalized["workloads"] = {"vendor-extension": True}
     assert selected_task_runtime(imported) == ""
+
+
+@pytest.mark.parametrize("path", [("spec",), ("spec", "template"), ("spec", "template", "spec")])
+@pytest.mark.parametrize("malformed", [None, []])
+@override_settings(AGENT_RUNTIME_CLASS="")
+def test_recovery_refuses_null_or_list_pod_template_fields(monkeypatch, path, malformed):
+    token = "synthetic-callback"
+    job = {
+        "metadata": {"name": "agent-task-task1", "labels": {"astrolift.dev/task-id": "task1"}},
+        "spec": {
+            "template": {
+                "spec": {
+                    "runtimeClassName": "isolated-sandbox",
+                    "containers": [{"env": [{"name": "ASTROLIFT_CLUSTER_KEY", "value": token}]}],
+                }
+            }
+        },
+    }
+    parent = job
+    for field in path[:-1]:
+        parent = parent[field]
+    parent[path[-1]] = malformed
+    provider = SimpleNamespace(get_manifest=lambda *args: job)
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda cluster: provider)
+    monkeypatch.setattr(
+        "core.cluster_management._context_for_cluster", lambda cluster: SimpleNamespace(slug="target")
+    )
+    task = SimpleNamespace(
+        guid="task1",
+        callback_token_hash=hashlib.sha256(token.encode()).hexdigest(),
+        agent_definition=workload(),
+        environment_spec=None,
+    )
+    result = K8sJobSpawner(object(), "team").recover(task)
+    assert not result.ok
+    assert result.external_id == "agent-task-task1"
+    assert result.error == "Existing agent Job has a malformed pod template"

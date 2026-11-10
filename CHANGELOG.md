@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Task-family agent workloads can select `nitro_sandbox = { mode = "isolated" }` (#2668). Dispatch checks the workload's stored selector and AWS runtime before provisioning, refuses operator-runtime/GPU conflicts, and does not recover Jobs running a different runtime. Confidential/custom-policy/network-isolated task variants remain rejected pending their final-run workflows.
+- Task-family agent workloads can select `nitro_sandbox = { mode = "isolated" }` (#2668). Dispatch checks the workload's stored selector and AWS runtime before provisioning, refuses operator-runtime/GPU conflicts, and does not recover Jobs with malformed pod templates or a different runtime. Confidential/custom-policy/network-isolated task variants remain rejected pending their final-run workflows.
 
 - Workloads can explicitly select an EKS Nitro Sandbox with `nitro_sandbox = { mode = "isolated" }` or confidential mode with an externally generated policy (#2668). Supported controller templates retain the selection through parsing, normalization, stored manifests and rendering. Unsupported workload paths, GPU use and incompatible network isolation settings are rejected; omitted settings preserve existing output. Policy generation, attestation verification and automatic runtime provisioning remain operator responsibilities.
 
