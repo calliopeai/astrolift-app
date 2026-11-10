@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "bounded-complete-render-context-source-snapshots",
-  "status": "unit-and-static-qualified-native-and-paired-acceptance-pending",
+  "status": "unit-and-static-qualified-native-context-failure-under-diagnosis",
   "sourceSha256": {
     "nvke/operator_agent_client.py": "00b0c3700c392febfa141b22885f539a2c460554e9028002de1f2ce17a1dfb8b",
     "tests/nvke/test_operator_install_plan_context_snapshots.py": "5742575abfab8258865dcfa6969a2cf53e88224f7fe419d15b1ef2ab48760187"
@@ -27,15 +27,26 @@
       "logPath": "/tmp/astrolift-nvke-render-dag-mypy-v4.log"
     },
     "nativeContext": {
-      "status": "running",
+      "status": "failed",
       "sessionId": 29322,
       "exitMarker": "/tmp/astrolift-nvke-render-dag-native-context-v2.exit",
-      "launcherCorrection": "Initial source selection did not match old pinned agent; rejected before runtime. Corrected to owned execution worktree without source or timeout changes."
+      "launcherCorrection": "Initial source selection did not match old pinned agent; rejected before runtime. Corrected to owned execution worktree without source or timeout changes.",
+      "exitCode": 1,
+      "failure": "Native context preparation unavailable; verification fixture failed before new verification SDK calls. Metadata-only native helper/source timings are being collected before retry.",
+      "logSha256": "03c08e721f77ade74dfbebcb4e6b2a87f742ae8ebdf0663fec37445ac3c69254"
     },
     "nativeVerification": {
-      "status": "running",
+      "status": "failed",
       "sessionId": 54292,
-      "exitMarker": "/tmp/astrolift-nvke-render-dag-native-verification.exit"
+      "exitMarker": "/tmp/astrolift-nvke-render-dag-native-verification.exit",
+      "exitCode": 1,
+      "failure": "Native context preparation unavailable; verification fixture failed before new verification SDK calls. Metadata-only native helper/source timings are being collected before retry.",
+      "logSha256": "f084c1f929b5f1001a51e68548e686d4def86bd757d9455092cf8780da9d3011"
+    },
+    "nativeFailureDiagnosis": {
+      "status": "running",
+      "sessionId": 83169,
+      "exitMarker": "/tmp/astrolift-nvke-context-native-diagnosis.exit"
     }
   },
   "requestComparison": {
