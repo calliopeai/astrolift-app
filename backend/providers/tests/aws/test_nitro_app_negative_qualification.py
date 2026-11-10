@@ -225,11 +225,13 @@ def submit_fixture(run, monkeypatch):
     monkeypatch.setattr(probe, "regenerate_negative", generate)
 
     def create(**kwargs):
-        actual = deepcopy(kwargs["manifest"])
+        actual = deepcopy(kwargs["body"])
         actual["metadata"].update(uid="negative-uid", resourceVersion="42")
         k8s.get.return_value = actual
+        return actual
 
-    k8s.create_manifest.side_effect = create
+    k8s._resource_for.return_value.create.side_effect = create
+    k8s._to_dict.side_effect = lambda value: value
 
     def execute():
         probe.submit(
@@ -266,7 +268,7 @@ def test_changed_grant_during_generation_prevents_create(run, monkeypatch):
     run.kms.get_key_policy.side_effect = [original, {"Policy": json.dumps({"Statement": []})}]
     with pytest.raises(ValueError):
         execute()
-    k8s.create_manifest.assert_not_called()
+    k8s._resource_for.return_value.create.assert_not_called()
     assert not saved
 
 
@@ -352,11 +354,11 @@ def test_no_duplicate_submit_or_unchanged_measurement(run, monkeypatch):
     monkeypatch.setattr(probe, "regenerate_negative", lambda candidate, *args: (candidate, run.checkpoint["pcr17"]))
     with pytest.raises(ValueError, match="PCR17"):
         execute()
-    k8s.create_manifest.assert_not_called()
+    k8s._resource_for.return_value.create.assert_not_called()
     state["stage"] = "prepared"
     with pytest.raises(ValueError, match="duplicate"):
         execute()
-    k8s.create_manifest.assert_not_called()
+    k8s._resource_for.return_value.create.assert_not_called()
 
 
 def test_cleanup_absent_is_idempotent_without_cloud_or_app_access(run, monkeypatch):
@@ -404,3 +406,27 @@ def test_admitted_identity_environment_stays_bound_to_checkpoint(run):
     run.pod["spec"]["containers"][0]["env"][-1]["value"] = "wrong"
     with pytest.raises(ValueError):
         probe.verify_positive(run.task, run.pod, run.config, "positive-uid", probe.digest(run.checkpoint))
+
+
+def test_submit_binds_uid_to_post_response_without_get_adoption(run, monkeypatch):
+    k8s, state, saved, execute = submit_fixture(run, monkeypatch)
+    execute()
+    k8s.get.assert_not_called()
+    assert state["uid"] == "negative-uid"
+    k8s.get.return_value["metadata"]["uid"] = "identical-replacement"
+    with pytest.raises(ValueError, match="UID"):
+        probe.cleanup(k8s, state)
+    k8s.delete.assert_not_called()
+    assert saved[1]["uid"] == "negative-uid"
+
+
+def test_create_conflict_never_reads_or_adopts_existing_pod(run, monkeypatch):
+    k8s, state, _, execute = submit_fixture(run, monkeypatch)
+    k8s._resource_for.return_value.create.side_effect = RuntimeError("create conflict")
+    with pytest.raises(RuntimeError, match="conflict"):
+        execute()
+    assert state["stage"] == "prepared" and "uid" not in state
+    k8s.get.assert_not_called()
+    with pytest.raises(ValueError, match="recorded UID"):
+        probe.cleanup(k8s, state)
+    k8s.delete.assert_not_called()

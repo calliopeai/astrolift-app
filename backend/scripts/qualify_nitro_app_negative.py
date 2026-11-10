@@ -251,16 +251,21 @@ def submit(load, config, kms, ecr, k8s, env, uid, checkpoint_hash, state, save, 
         stage="prepared",
     )
     save()
-    k8s.create_manifest(namespace=NAMESPACE, manifest=negative)
-    actual = k8s.get(kind="Pod", namespace=NAMESPACE, name=state["name"])
-    verify_clone(actual, state, require_uid=False)
-    state.update(uid=actual["metadata"]["uid"], submitted_at=now(), stage="submitted_audit_required")
+    # The SDK's create_manifest discards the response UID; bind to this POST,
+    # never to a later GET that may already describe a same-name replacement.
+    k8s._refresh_token()
+    actual = k8s._to_dict(k8s._resource_for("v1", "Pod").create(namespace=NAMESPACE, body=negative))
+    created_uid = actual.get("metadata", {}).get("uid")
+    if not created_uid:
+        raise ValueError("create response has no UID; receipt retained without adoption")
+    state.update(uid=created_uid, submitted_at=now(), stage="submitted_audit_required")
     save()
+    verify_clone(actual, state)
     if verify_key(checkpoint, config, kms, ecr) != grant:
         raise ValueError("original grant changed after submission; receipt retained for cleanup")
 
 
-def verify_clone(pod, state, *, require_uid=True):
+def verify_clone(pod, state):
     from aws.nitro_confidential import prepared_pod_hash
 
     meta = pod.get("metadata", {})
@@ -272,7 +277,7 @@ def verify_clone(pod, state, *, require_uid=True):
         or meta.get("name") != state.get("name")
         or meta.get("labels", {}).get(LABEL) != state["token"]
         or not meta.get("uid")
-        or (require_uid and meta.get("uid") != state.get("uid"))
+        or meta.get("uid") != state.get("uid")
         or prepared_pod_hash(pod) != state.get("pod_sha256")
         or meta.get("ownerReferences")
     ):

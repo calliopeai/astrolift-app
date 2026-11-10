@@ -50,7 +50,8 @@ Append --action submit --seconds 120 to the same command only after gate approva
   image/runtime role/service account and original capsule task ID. The clone gets
   a random name/task label, negative guard and deadline30..300s. Its predicted
   PCR17 must differ. Positive identity/key/policy are rechecked immediately before
-  create; state is fsynced privately before and after submission. Existing receipts
+  create; state is fsynced privately before and after submission. The clone UID is
+  taken from the create POST response, never a subsequent GET. Existing receipts
   refuse duplicate submit. Original grant is never widened or rewritten.
 
 For subsequent commands add --receipt-sha256 SHA256_OF_EXACT_RECEIPT_BYTES.
