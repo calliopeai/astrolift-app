@@ -1,0 +1,42 @@
+{
+  "format": 1,
+  "scope": "pure-local-image-panel-and-eight-locale-storybook-states",
+  "status": "170-cases-eslint-and-full-typescript-qualified-browser-and-hook-integration-pending",
+  "sourceSha256": {
+    "frontend/messages/de.json": "7b6658cf09dea8d17a9549de7d599a76d4eeb69af076c08e3681dbff2c4491b4",
+    "frontend/messages/en.json": "a587c66b5eeeabeda4446d791c7fbe372d693e353658735fb07688b8a7341af7",
+    "frontend/messages/es.json": "8e3fa7e3a6b194508d1ace395b9341b84cd0af8c9e4a6bdfb3c0ae2a3bdf276e",
+    "frontend/messages/fr.json": "bb2862805f60c3a7f7fa820514e46e719544c0822dfa34096c754b24cb65d902",
+    "frontend/messages/ja.json": "a7472fa876773ccbc83cf833623dfc891401d0c0330352e168c03f6a8910bb5d",
+    "frontend/messages/ko.json": "cfd0b06608e41fd7edf0b4688026f2be692f62ec2223df2142d01ba6e4142b58",
+    "frontend/messages/pt-BR.json": "0b923b2c57372f9234ba7b83c945607b2ddc8eaca9fa96386473fefbb03ce1bf",
+    "frontend/messages/zh-Hans.json": "0999dc71cf21b8c61f9569d7a895c1bd9e2c933e806f6268ffbd71fb6a584e30",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanLocalImagePanel.stories.tsx": "4c51529345a3acedbb2b4669b8792df98a06f991a588d976093a471a0d42211b",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanLocalImagePanel.tsx": "e7cf51c1e5c0e5d509ec253131c2e2e60b3507cbc5c216e185616d738a79b247",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-local-image-locales.test.ts": "76086ac54ad52965fdb2a3e8628af9d5fab7336829439849c7b350e003de81c5",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-local-image-stories.test.tsx": "c0683f4dd9e28eefe8f4b3045d63221b8d802292543dcf78ae1406e61c585f4e",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-local-image.test.tsx": "7485afb9a1b9a012d710cede5f0616bfa48e8f09d8b36a6027a2660e9da20c74"
+  },
+  "checks": {
+    "sessionId": 68627,
+    "logPath": "/tmp/astrolift-nvke-local-image-ui-check.log",
+    "logSha256": "92edd38b4e9f7a3aa17c79a3620d7183ec6f0428cf45a9ec8b822b91d31e7360",
+    "exitMarker": "/tmp/astrolift-nvke-local-image-ui-check.exit",
+    "exitCode": 0,
+    "tests": 170,
+    "skipped": 0,
+    "changedFileEslint": true,
+    "fullTypeScript": true
+  },
+  "coverage": [
+    "Typed Storybook states in all eight locales, local pinned-reference form and closed metadata validation.",
+    "Permission/source/parent guards, retained UUID recovery, explicit retry and private input clearing.",
+    "Local form excludes registry policy and call-count controls.",
+    "Current registry browser validator regression cases remain passing."
+  ],
+  "limits": [
+    "Actual Chromium visual/interaction review pending.",
+    "Operation-screen hook/recovery wiring and actual API/native browser proof pending.",
+    "No native admission, main merge or deployment."
+  ]
+}
