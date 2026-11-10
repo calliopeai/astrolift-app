@@ -19,6 +19,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlan,
     NvkeInstallPlanCharts,
     NvkeInstallPlanContext,
+    NvkeInstallPlanImage,
     NvkeInstallPlanTree,
     NvkeInstallPlanVerification,
     NvkeOperation,
@@ -234,6 +235,7 @@ def prepare(*, body, **values):
                     NvkeInstallPlanCharts,
                     NvkeInstallPlanTree,
                     NvkeInstallPlanContext,
+                    NvkeInstallPlanImage,
                 )
             ):
                 raise NvkeError(

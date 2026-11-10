@@ -19,6 +19,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlan,
     NvkeInstallPlanCharts,
     NvkeInstallPlanContext,
+    NvkeInstallPlanImage,
     NvkeInstallPlanTree,
     NvkeInstallPlanVerification,
     NvkeOperation,
@@ -170,6 +171,7 @@ def prepare(*, body, plan_id, expected_plan_version, plan_digest, **review):
                 or NvkeInstallPlanTree.all_objects.filter(guid=artifact_id).exists()
                 or NvkeInstallPlanContext.all_objects.filter(guid=artifact_id).exists()
                 or NvkeInstallPlanVerification.all_objects.filter(guid=artifact_id).exists()
+                or NvkeInstallPlanImage.all_objects.filter(guid=artifact_id).exists()
             ):
                 raise NvkeError("CONFLICT", "This identity already identifies another operation or plan")
             sealed = encrypt_at_rest(outbox.canonical(body))

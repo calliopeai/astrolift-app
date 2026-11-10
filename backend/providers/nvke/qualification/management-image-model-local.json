@@ -1,0 +1,89 @@
+{
+  "format": 1,
+  "scope": "durable-image-preparation-model-and-cross-kind-identity-reservation",
+  "status": "durable-image-model-and-cross-kind-native-identity-qualified-API-surface-pending",
+  "sourceSha256": {
+    "astrolift_clusters/models/nvke.py": "119a76b1ef476b4167109b46f02b0edd40aeaa271685f32ad41452c3e56011a2",
+    "astrolift_clusters/models/__init__.py": "a2b52e5a64db776300f91bb14821eac45829248e2e07cb043622e1486d859d57",
+    "astrolift_clusters/migrations/0043_nvke_install_plan_image.py": "bb015b016bc0d91b18784b8f238d1d961c50b9ee60b606942d077da3df2054e1",
+    "astrolift_clusters/tests/test_nvke_install_plan_image_model.py": "df32d40c33384fb2b72ac11ac7465b72d515f7b9e2d0f2a21cad241d74cfd474",
+    "astrolift_clusters/tests/test_nvke_image_identity.py": "b62cb3f781ae05218f833e14c8a2488e59f052ff968b1fd9d5c819b73e519bd0",
+    "astrolift_clusters/nvke_install_plans.py": "f6fda91bd3fd704419aba03a4d4a8c447f89b41e3047d0dc32eca69713c4af5d",
+    "astrolift_clusters/nvke_install_plan_charts.py": "bb9a977aa16bc739a0f70239872d9dbac882a34042e1fc47f60e6470125c7291",
+    "astrolift_clusters/nvke_install_plan_trees.py": "e532fbe852aebda831fa00467e043d0934349634ffaa2fa5fb5c749fe540fb99",
+    "astrolift_clusters/nvke_install_plan_contexts.py": "b1ed9239b16dd806987de5d8ff798bcb135093443dad08b051056634fd97a26a",
+    "astrolift_clusters/nvke_install_plan_verifications.py": "e539819b66afb96d0e69522fc18bba6e40420c5407b49eacbf129c75099b5ba6"
+  },
+  "checks": {
+    "models": {
+      "sessionId": 7423,
+      "status": "terminal",
+      "logPath": "/tmp/astrolift-nvke-app-image-model-db-v2.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-image-model-db-v2.exit",
+      "exitCode": 0,
+      "logSha256": "f5e6dbf317ef6334287f9103e84df9dae3426ddd1530c12803c0ee0a30e0f905",
+      "passed": 30,
+      "seconds": 70.72,
+      "scope": "New image model plus existing context/verification model encryption, protected ancestry, immutable prepared evidence, status constraints and soft-deleted UUID reservation."
+    },
+    "migrationDrift": {
+      "sessionId": 35989,
+      "status": "terminal",
+      "logPath": "/tmp/astrolift-nvke-app-image-migration-drift.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-image-migration-drift.exit",
+      "exitCode": 0,
+      "logSha256": "a03e404f4649210398a1d0b23a43c4a6c75a25eb96d48d9c13e70d486d8f32e1"
+    },
+    "crossKindAndExistingAPI": {
+      "sessionId": 16264,
+      "status": "terminal",
+      "logPath": "/tmp/astrolift-nvke-app-image-identity-regressions.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-image-identity-regressions.exit",
+      "exitCode": 0,
+      "logSha256": "cd4602c2e5a834de5812282fe3b9534f91bfc07dfd909efb85839c168f8c19b9",
+      "passed": 0,
+      "skipped": 140,
+      "seconds": 7.76,
+      "qualification": "Not qualified: explicit owned native-agent fixture was not selected. A focused actual-native three-case identity run will replace this as the gate; skipped results are retained."
+    },
+    "initialNativeIdentity": {
+      "sessionId": 65502,
+      "status": "terminal",
+      "exitCode": 1,
+      "logPath": "/tmp/astrolift-nvke-app-image-identity-native-qualified.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-image-identity-native-qualified.exit",
+      "logSha256": "e7b8af358b341debb06b70bd676a6c05c9635b53704a681745d09350055d910d",
+      "passed": 2,
+      "failures": 1,
+      "skipped": 0,
+      "seconds": 18.09,
+      "cause": "String UUID supplied to ORM create compared unequal to the identical database UUID during soft deletion. The common immutable GUID comparison now uses the UUID field canonical value; actual identity changes still refuse."
+    },
+    "qualifiedNativeIdentityAndModels": {
+      "sessionId": 21430,
+      "status": "terminal",
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-app-image-model-qualified.log",
+      "exitMarker": "/tmp/astrolift-nvke-app-image-model-qualified.exit",
+      "logSha256": "da75c607599e1f23a5673eee785140f5323d4bfa85e436c79d43d6e8b597addc",
+      "passed": 34,
+      "failures": 0,
+      "skipped": 0,
+      "seconds": 27.82,
+      "agentFixtureRevision": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
+      "scope": "31 image/context/verification model invariants and three real TLS original-agent identity cases. Each identity case checks collisions across all five existing artifact services; final image-runtime qualification is separate."
+    }
+  },
+  "retainedInitialFailure": {
+    "exitCode": 2,
+    "logPath": "/tmp/astrolift-nvke-app-image-model-db.log",
+    "exitMarker": "/tmp/astrolift-nvke-app-image-model-db.exit",
+    "cause": "Private database launcher resolved the older primary provider package. A task-owned launcher now selects this worktree in cwd and Python path; source or DB gates were not bypassed."
+  },
+  "remaining": [
+    "Source-bound application image prepare/read/retry service and REST/GraphQL/UI/CLI contracts.",
+    "Final runtime-pinned native SDK and browser qualification after large-image performance resolution.",
+    "Local image handling, rendered workload/platform/credential/import/phase-use proofs and linked native admission."
+  ],
+  "continuationAuthorized": false
+}

@@ -11,11 +11,14 @@ def _immutable(row, *fields):
         return
     original = type(row).all_objects.filter(pk=row.pk).values(*fields).first()
 
-    def comparable(value):
+    def comparable(field, value):
+        if field == "guid":
+            return row._meta.get_field(field).to_python(value)
         return bytes(value) if isinstance(value, (bytes, memoryview, bytearray)) else value
 
     if original and any(
-        comparable(getattr(row, field)) != comparable(value) for field, value in original.items()
+        comparable(field, getattr(row, field)) != comparable(field, value)
+        for field, value in original.items()
     ):
         raise ValueError("NVKE resource ownership and request identity cannot change")
 
@@ -473,5 +476,41 @@ class NvkeInstallPlanVerification(BaseCoreModel):
             models.CheckConstraint(
                 condition=models.Q(status__in=["preparing", "prepared"]),
                 name="nvke_plan_verification_status",
+            )
+        ]
+
+
+class NvkeInstallPlanImage(BaseCoreModel):
+    tree = models.ForeignKey(NvkeInstallPlanTree, on_delete=models.PROTECT, related_name="image_artifacts")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    source_binding = models.JSONField(default=dict)
+    request_digest = models.CharField(max_length=64)
+    input_backend_kind = models.CharField(max_length=32)
+    input_ciphertext = models.BinaryField()
+    summary = models.JSONField(default=dict)
+    status = models.CharField(
+        max_length=16, default="preparing", choices=[("preparing", "Preparing"), ("prepared", "Prepared")]
+    )
+
+    def save(self, *args, **kwargs):
+        _immutable(
+            self,
+            "guid",
+            "tree_id",
+            "actor_id",
+            "source_binding",
+            "request_digest",
+            "input_backend_kind",
+            "input_ciphertext",
+        )
+        if self.pk and type(self).all_objects.filter(pk=self.pk, status="prepared").exists():
+            _immutable(self, "summary", "status")
+        return super().save(*args, **kwargs)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=["preparing", "prepared"]),
+                name="nvke_plan_image_known_status",
             )
         ]
