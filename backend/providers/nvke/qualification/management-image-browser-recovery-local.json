@@ -1,0 +1,30 @@
+{
+  "format": 1,
+  "scope": "browser-registry-image-source-bound-metadata-recovery-journal",
+  "status": "18-recovery-plus-62-validator-tests-eslint-and-typescript-qualified-ui-pending",
+  "sourceSha256": {
+    "frontend/lib/nvke/install-plan-image-recovery.ts": "3a0e8d11ab2ecb3ddc60186fd39c2808d9336d4b3d731900fc7bebc8ad168c40",
+    "frontend/lib/nvke/install-plan-image-recovery.test.ts": "aa7cdb101a3b7db4f62729545755597cf27ae652cc111643026e3769970c1e1e"
+  },
+  "checks": {
+    "sessionId": 56163,
+    "logPath": "/tmp/astrolift-nvke-app-image-recovery.log",
+    "exitMarker": "/tmp/astrolift-nvke-app-image-recovery.exit",
+    "logSha256": "57133f0520127c4766f965d2fd6d06b9ad0949d79deb406a221b12fe4231d2f2",
+    "exitCode": 0,
+    "tests": 80,
+    "skipped": 0,
+    "eslint": "passed",
+    "fullTypeScript": "passed"
+  },
+  "invariants": [
+    "Only source metadata, selected artifact identity and exact-input hash are retained. Reference/policy/request/credentials are excluded.",
+    "Changed input, source versions, caller and scope cannot reuse certified intent.",
+    "Selection clearing retains immutable intent and refuses another selection.",
+    "Unavailable or silently failing storage refuses journal publication."
+  ],
+  "limits": [
+    "Pure journal helpers only; UI, hooks and real browser/API recovery proof remain pending.",
+    "No native continuation, main merge or deployment."
+  ]
+}
