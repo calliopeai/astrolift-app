@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "combined-verification-api-client-browser-and-recovery",
-  "status": "focused-timeout-fixes-qualified-full-integrated-rerun-running",
+  "status": "combined-source-full-nvke-ui-suite-qualified-runtime-paired-acceptance-pending",
   "sourceRevisionBeforeReceipt": "ddad914c974ecc0a14d0b74de00e2e9562c25f12",
   "includes": [
     "Source-bound verification App API and generated contracts",
@@ -34,12 +34,17 @@
       "scope": "Use native exact byte comparison instead of per-element deep assertion and scope Temporal controls to the form. Keep every request/privacy/cleanup assertion and unchanged five-second timeout."
     },
     "nvkeUiV2": {
-      "status": "running",
+      "status": "passed",
       "sessionId": 46722,
       "exitMarker": "/tmp/astrolift-nvke-verification-integrated-ui-v2.exit",
       "logPath": "/tmp/astrolift-nvke-verification-integrated-ui-v2.log",
       "workers": 2,
-      "sourceRevision": "d6848036a"
+      "sourceRevision": "d6848036a",
+      "exitCode": 0,
+      "passed": 1228,
+      "testFiles": 68,
+      "skipped": 0,
+      "logSha256": "1971adf7cdd68f221225dbe150ac3e7ba2cab6c9529b27d2f516f27e90948ae0"
     }
   },
   "remaining": [
