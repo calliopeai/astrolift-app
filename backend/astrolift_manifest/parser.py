@@ -1257,18 +1257,15 @@ def _parse_nitro_sandbox(
     policy = block.get("policy", "")
     if not isinstance(policy, str):
         raise ManifestError("policy must be a string", path=f"{path}.policy")
-    if mode == "confidential" and not policy.strip():
+    task_agent = kind == "agent" and workload.get("run_family", "task") == "task"
+    if mode == "confidential" and not policy.strip() and not task_agent:
         raise ManifestError(
             "confidential mode requires a policy generated from the final pod spec", path=f"{path}.policy"
         )
-    if (
-        kind == "agent"
-        and workload.get("run_family", "task") == "task"
-        and (mode != "isolated" or network_isolated or policy)
-    ):
+    if task_agent and (network_isolated or policy):
         raise ManifestError(
-            "task-family agents support isolated mode without policy or network isolation; "
-            "confidential policies require final per-run pod generation",
+            "task-family agents require automatic final-run policy generation and no network isolation; "
+            "static task policies are unsupported",
             path=path,
         )
     if gpu:

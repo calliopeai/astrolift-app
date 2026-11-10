@@ -41,7 +41,8 @@ image_ref = "registry.example/worker@sha256:..."
 
 The block accepts `mode` (`isolated` or `confidential`), `network_isolated`
 (boolean, default false), and `policy` (an external generated policy string).
-Confidential mode requires a nonempty policy. These values survive normalization,
+Controller confidential mode requires a nonempty policy. Task-family confidential
+agents generate their policy per run and reject a supplied static policy. These values survive normalization,
 persist in the registered app's manifest, participate in its hash, and render
 onto the workload's pod template without changing other workloads. Omission
 preserves the existing normalized shape and Kubernetes output. Normal deploy and
@@ -49,7 +50,8 @@ rollback renderers consume the stored raw manifest.
 
 Supported workload kinds are deployment, statefulset, cronjob, task, workflow,
 and agent. Service-family agents render a standing Deployment. Task-family
-agents support only isolated mode without a custom policy or network isolation;
+agents support isolated or operator-enabled confidential mode without a custom
+policy or network isolation;
 the selector is retained for dispatch rather than creating a standing resource.
 Knative functions, static sites, provider FaaS and the unimplemented `job`
 workload kind reject the block.
@@ -78,24 +80,77 @@ AWS handler are checked before managed-model or credential provisioning. The
 Job retains `runtimeClassName: isolated-sandbox` after pod hardening. Recovery
 refuses to adopt an existing Job using a different runtime.
 
-Confidential mode, nonempty custom policies and network-isolated task agents
-remain unsupported. Operator-wide `AGENT_RUNTIME_CLASS=confidential-sandbox`
-also refuses during task selection and shared task/box hardening, including
-imported agents and workloads without a selector. A runtime class alone cannot
-establish final-policy generation or attested secret delivery. The guard
-checkpoint passed 72 serial persistence/dispatch/runtime/render checks against
-dedicated Nitro PostgreSQL and Redis services (exit 0; 420.21 seconds), with
-dependencies installed in a separate Nitro virtual environment.
+For a task-family agent, `nitro_sandbox = { mode = "confidential" }` selects a
+separate `k8s_confidential_pod` backend. The target is frozen before dispatch;
+ordinary Jobs cannot adopt confidential Pods. Operator-wide
+`AGENT_RUNTIME_CLASS=confidential-sandbox` remains refused, including imported
+agents and boxes: it cannot supply this per-run workflow. Static task policies,
+network isolation and GPU requests remain refused.
 
-Confidential mode, nonempty custom policies and network-isolated task agents
-remain rejected at parse and dispatch. Per-run task IDs, Brief/secret/model
-bindings and admission changes require a final-spec policy workflow; static
-precursor policies must not be treated as complete confidential-task support.
-The new selector applies to task-family agent Jobs registered from an Astrolift
-workload manifest. Imported agent package extensions are not interpreted as
-Astrolift workload selectors; those agents retain operator runtime behavior.
-Agent boxes continue to use
-the existing operator-wide runtime setting and do not inherit this selector.
+The backend requires a non-root, digest-pinned, baked agent image with contract
+label `ai.astrolift.agent-image.contract` at least 7. Boot installs, managed
+models, model gateway, VNC and filesystem bindings are unsupported. Callback,
+controller, messages and MCP endpoints must use HTTPS. Imported package
+extensions do not select this backend; the selector comes from the registered
+Astrolift workload manifest.
+
+### Operator configuration
+
+Confidential tasks are disabled unless `NITRO_CONFIDENTIAL_TASKS_CONFIG` contains
+an entry keyed by the exact cluster GUID. Configure API and worker processes
+with the same JSON, for example:
+
+```json
+{
+  "CLUSTER-GUID": {
+    "registry": "123456789012.dkr.ecr.us-west-2.amazonaws.com/confidential-runs",
+    "key_admin_arn": "arn:aws:iam::123456789012:role/confidential-key-admin",
+    "runtime_role_arn": "arn:aws:iam::123456789012:role/confidential-runtime",
+    "service_account": "confidential-runner",
+    "architecture": "amd64",
+    "runtime_directory": "/opt/astrolift/nitro",
+    "temporary_root": "/dev/shm"
+  }
+}
+```
+
+Use a dedicated private ECR repository and distinct same-account key-admin and
+Pod Identity runtime roles. The runtime role must not administer KMS keys.
+The provider checks the AWS account, installed RuntimeClass and exact service
+account Pod Identity association before preparing credentials. The operator
+must provision those resources, the node runtime and suitable memory-backed
+workspace capacity; this App path does not install them. Optional
+`resource_tags` can add qualification ownership tags without replacing the
+mandatory task and ownership tags.
+
+The backend Docker image installs pinned AWS runtime tools for amd64/arm64,
+verifying the pinned manifest, AWS signature, archive and binary hashes. Each
+run verifies the installed signed tools again. Preparation resolves the real
+Brief and task credentials, adds them and the original executable to a private
+OCI layer, and encrypts **every layer** with a new per-run KMS key. Kubernetes
+receives an immutable encrypted image, bootstrap entrypoint and public task ID;
+it does not receive a plaintext task Secret or task environment. Private image
+workspaces are temporary. The encrypted image still needs normal ECR access;
+image encryption does not remove registry authorization requirements.
+
+The final named Pod is server dry-run admitted, checked for unsupported
+mutations, then passed to signed `eks-nitro-sandbox-genpolicy`. Policies deny
+exec and log access. The backend reads the generated policy file and the tool's
+PCR17/KMS-condition output, repeats admission to reject subsequent changes,
+and grants runtime `kms:Decrypt` only with matching PCR17 and
+PCR8 `ServiceName=eks.amazonaws.com`. It applies that exact policy-bound Pod
+using create-only semantics. This is policy construction; it is not evidence
+that AWS released a key.
+
+Recovery binds the task, callback hash, image digest, policy and Pod hash to a
+persisted checkpoint. Stop checks the saved authority and uses the Pod UID
+precondition, refusing replacements. Cleanup removes the matching task-tagged
+ECR image and schedules its tagged KMS key for deletion after seven days;
+failures retain a cleanup-pending checkpoint. Operators must reconcile keys
+left by a process crash between KMS creation and checkpoint persistence using
+the task/ownership tags. Keep the admin role until keys are PendingDeletion.
+Checkpoints explicitly retain `attestation_verified: false`; neither a created
+Pod nor successful policy generation upgrades that field.
 
 ## Applying an explicitly sandboxed workload
 
@@ -131,9 +186,11 @@ resource resize and device passthrough have additional AWS limitations.
 ## Support boundary
 
 The provider accepts explicit Kubernetes manifests and the manifest pipeline
-accepts the `nitro_sandbox` block above. This checkpoint does not add dedicated
-console controls, CLI commands, automatic runtime/AMI installation, Cedar generation, encrypted-image tooling, KMS policy
-management, attestation verification or a cloud execution smoke test.
+accepts the `nitro_sandbox` block above. The gated task backend adds per-run Cedar generation, encrypted-image preparation
+and KMS policy management as described above. It does not add dedicated console
+controls, CLI commands, automatic runtime/AMI installation or an attestation
+verification claim. Live encrypted-image release/refusal qualification remains
+required before enabling it for production.
 
 ECS Nitro Sandboxes are a separate integration: Managed Instances only, capacity
 provider `instanceLaunchTemplate.nitroEnclavesEnabled=true`, task definition
@@ -183,10 +240,10 @@ Additional local qualification:
 The PostgreSQL run emitted two pytest assertion-rewrite warnings for already
 imported `constance` and `anyio` modules; no tests failed. These are local
 implementation checks, not a complete repository CI run or a live AWS rollout.
-No real EKS sandbox workload, confidential KMS key release/refusal, ECS task or
-EC2 host VM lifecycle has been exercised. Task-family confidential/custom-policy/network-isolated selection,
-confidential generation/attestation automation and the other support boundaries
-above remain open.
+These historical checks did not exercise a real EKS sandbox workload,
+confidential KMS release/refusal, ECS task or EC2 host VM lifecycle. The gated
+confidential task implementation described above was added subsequently; live
+KMS release/refusal remains unqualified.
 
 ## Isolated task-family selector qualification (2026-11-09)
 
@@ -213,8 +270,10 @@ and unchanged ordinary rendered output. Recovery now validates those objects
 before callback-credential extraction and reuses the validated pod spec for
 runtime binding. Ruff and diff checks passed; no broad suite was rerun.
 
-Remaining task-specific gaps are confidential/custom-policy/network-isolated
-variants and per-workload selection for imported packages and agent boxes.
+At this isolated-selector checkpoint, confidential/custom-policy/network-isolated
+variants and per-workload selection for imported packages and agent boxes were
+still open. The later gated confidential path above addresses policy and image
+preparation; custom policies and network isolation remain unsupported.
 Dedicated console/CLI controls, automatic EKS runtime provisioning, ECS supported
 client integration, EC2 host VM lifecycle and confidential attestation evidence
 remain outside this checkpoint. Neither application nor operator branch has

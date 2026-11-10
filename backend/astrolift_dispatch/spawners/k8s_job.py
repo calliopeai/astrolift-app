@@ -29,6 +29,8 @@ VNC_PORT = 5900
 class K8sJobSpawner(ContainerSpawner):
     """Spawn agent tasks as batch/v1 K8s Jobs."""
 
+    confidential_pod = False
+
     def __init__(self, cluster, namespace: str) -> None:
         self._cluster = cluster
         self._namespace = namespace
@@ -80,6 +82,12 @@ class K8sJobSpawner(ContainerSpawner):
             )
         except AgentRuntimeClassError as exc:
             return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+        if runtime_class == "confidential-sandbox":
+            return SpawnResult(
+                external_id=job_name,
+                ok=False,
+                error="Confidential runs must recover their frozen image/policy-bound Pod backend",
+            )
         if runtime_class and pod_spec.get("runtimeClassName") != runtime_class:
             return SpawnResult(
                 external_id=job_name,
@@ -173,8 +181,16 @@ class K8sJobSpawner(ContainerSpawner):
 
         try:
             runtime_class = selected_task_runtime(workload, requested_spec)
+            if runtime_class == "confidential-sandbox" and not self.confidential_pod:
+                raise AgentRuntimeClassError(
+                    "Confidential tasks require their frozen confidential Pod backend"
+                )
             if runtime_class:
-                preflight_agent_runtime(self._cluster, {"runtimeClassName": runtime_class})
+                preflight_agent_runtime(
+                    self._cluster,
+                    {"runtimeClassName": runtime_class},
+                    allow_confidential=self.confidential_pod,
+                )
         except AgentRuntimeClassError as exc:
             return SpawnResult(external_id="", ok=False, error=str(exc))
 
@@ -478,7 +494,7 @@ class K8sJobSpawner(ContainerSpawner):
                 )
             )
             manifests.append(job_manifest)
-            result = driver.apply_manifests(ctx.slug, self._namespace, manifests)
+            result = self._apply_task_manifests(driver, ctx, task, manifests, secret_manifest)
             if not getattr(result, "ok", False):
                 error = result.summary() if hasattr(result, "summary") else "apply failed"
                 error = _redact_brains(redact(str(error), gateway_key), brains)
@@ -501,6 +517,9 @@ class K8sJobSpawner(ContainerSpawner):
             return SpawnResult(
                 external_id=job_name, ok=False, error=_redact_brains(redact(str(exc), gateway_key), brains)
             )
+
+    def _apply_task_manifests(self, driver, ctx, task, manifests, secret_manifest):
+        return driver.apply_manifests(ctx.slug, self._namespace, manifests)
 
     def _cleanup_failed_spawn(self, job_name: str) -> None:
         """Best-effort cleanup after a non-atomic multi-manifest apply.
@@ -1082,7 +1101,9 @@ def _render_agent_job(
         from astrolift_dispatch.pod_hardening import AgentRuntimeClassError
 
         current = job["spec"]["template"]["spec"].get("runtimeClassName")
-        if runtime_class != "isolated-sandbox" or (current and current != runtime_class):
+        if runtime_class not in {"isolated-sandbox", "confidential-sandbox"} or (
+            current and current != runtime_class
+        ):
             raise AgentRuntimeClassError(
                 "Workload Nitro Sandbox selection conflicts with the agent runtime policy"
             )

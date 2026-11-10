@@ -35,19 +35,21 @@ def selected_task_runtime(workload, environment_spec=None) -> str:
         or row.get("run_family", "task") != "task"
         or not isinstance(block, dict)
         or set(block) - {"mode", "network_isolated", "policy"}
-        or block.get("mode") != "isolated"
+        or not isinstance(block.get("mode"), str)
+        or block.get("mode") not in {"isolated", "confidential"}
         or block.get("network_isolated", False) is not False
         or block.get("policy", "") != ""
     ):
         raise AgentRuntimeClassError(
-            "Task-family agents support isolated Nitro Sandboxes without custom policy or network isolation; "
-            "confidential policies require final per-run pod generation"
+            "Task-family agents require isolated/confidential Nitro Sandboxes without static policy or network isolation; "
+            "confidential policy is generated from the final admitted run Pod"
         )
     configured = str(settings.AGENT_RUNTIME_CLASS or "").strip()
-    if configured and configured != "isolated-sandbox":
+    selected = f"{block['mode']}-sandbox"
+    if configured and configured != selected:
         raise AgentRuntimeClassError(
             "Workload Nitro Sandbox selection conflicts with operator AGENT_RUNTIME_CLASS"
         )
     if getattr(environment_spec, "gpu", 0):
         raise AgentRuntimeClassError("Nitro Sandbox task agents do not support GPU device passthrough")
-    return "isolated-sandbox"
+    return selected

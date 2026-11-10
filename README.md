@@ -130,6 +130,13 @@ docker compose -f docker/docker-compose.yaml exec ui npm run lint
 docker compose -f docker/docker-compose.yaml exec ui npx tsc --noEmit
 ```
 
+For an isolated verification stack, `ASTROLIFT_COMPOSE_FILE`,
+`ASTROLIFT_ENV_FILE`, `ASTROLIFT_API_CONTAINER` and `ASTROLIFT_UI_CONTAINER`
+select its Compose file, environment file and container names. Defaults use the
+standard local stack. Set all applicable overrides before running `run.sh` in a
+parallel worktree so commands address that worktree's own services.
+
+
 Schema + codegen flow when the GraphQL contract changes:
 
 ```bash

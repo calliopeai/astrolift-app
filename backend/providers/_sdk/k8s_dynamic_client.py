@@ -340,6 +340,21 @@ class KubernetesDynamicClient:
 
     # ---- public API ----------------------------------------------
 
+    def admit_pod(self, *, namespace: str, manifest: dict[str, Any]) -> dict[str, Any]:
+        """Return server admission's final named Pod without persisting or scheduling it."""
+        if manifest.get("apiVersion") != "v1" or manifest.get("kind") != "Pod":
+            raise ValueError("Pod admission requires a v1 Pod")
+        if not (manifest.get("metadata") or {}).get("name"):
+            raise ValueError("Pod admission requires an explicit name")
+        self._refresh_token()
+        return self._to_dict(
+            self._resource_for("v1", "Pod").create(
+                namespace=namespace,
+                body=manifest,
+                dry_run="All",
+            )
+        )
+
     def create_manifest(
         self,
         *,

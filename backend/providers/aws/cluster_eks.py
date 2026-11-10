@@ -391,6 +391,84 @@ class EKSClusterDriver(ClusterDriver):
     # ---- apply / delete -------------------------------------------
 
     @driver_op(cloud="aws", driver="cluster")
+    def validate_confidential_task(self, cluster: str, namespace: str, config: Any) -> None:
+        config.validate()
+        if self._sts.get_caller_identity()["Account"] != config.registry.split(".")[0]:
+            raise ValueError("confidential task provider identity differs from the configured AWS account")
+        if config.registry.split(".")[3] != self._config.region:
+            raise ValueError("confidential registry and EKS cluster must use the same region")
+        response = self._eks.list_pod_identity_associations(
+            clusterName=cluster,
+            namespace=namespace,
+            serviceAccount=config.service_account,
+        )
+        associations = response.get("associations", [])
+        if response.get("nextToken") or len(associations) != 1:
+            raise ValueError("confidential task service account requires exactly one EKS Pod Identity association")
+        association = self._eks.describe_pod_identity_association(
+            clusterName=cluster,
+            associationId=associations[0]["associationId"],
+        )["association"]
+        if association.get("roleArn") != config.runtime_role_arn:
+            raise ValueError("confidential Pod Identity role differs from the configured attestation principal")
+        runtime = self._k8s(cluster).get(
+            kind="node.k8s.io/v1/RuntimeClass", namespace=None, name="confidential-sandbox"
+        )
+        if (
+            not runtime
+            or runtime.get("handler") != "confidential-sandbox"
+            or runtime.get("metadata", {}).get("deletionTimestamp")
+            or runtime.get("metadata", {}).get("name") != "confidential-sandbox"
+        ):
+            raise ValueError("confidential-sandbox runtime is unavailable")
+
+    def prepare_confidential_task(
+        self,
+        cluster: str,
+        namespace: str,
+        *,
+        config: Any,
+        pod: dict[str, Any],
+        secret: Any,
+        task_id: str,
+        callback_hash: str,
+        save: Any,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        from aws.nitro_confidential import prepare_run
+
+        self.validate_confidential_task(cluster, namespace, config)
+        session = aws_session(region=self._config.region, credential=self._config.credential)
+        credentials = session.get_credentials().get_frozen_credentials()
+        env = {
+            **os.environ,
+            "AWS_ACCESS_KEY_ID": credentials.access_key,
+            "AWS_SECRET_ACCESS_KEY": credentials.secret_key,
+            "AWS_DEFAULT_REGION": self._config.region,
+            "AWS_REGION": self._config.region,
+        }
+        if credentials.token:
+            env["AWS_SESSION_TOKEN"] = credentials.token
+        else:
+            env.pop("AWS_SESSION_TOKEN", None)
+        return prepare_run(
+            config=config,
+            pod=pod,
+            secret=secret,
+            task_id=task_id,
+            callback_hash=callback_hash,
+            kms=session.client("kms"),
+            ecr=session.client("ecr"),
+            env=env,
+            admit=lambda manifest: self._k8s(cluster).admit_pod(namespace=namespace, manifest=manifest),
+            save=save,
+        )
+
+    def cleanup_confidential_task(self, checkpoint: dict[str, Any]) -> None:
+        from aws.nitro_confidential import cleanup_run
+
+        session = aws_session(region=self._config.region, credential=self._config.credential)
+        cleanup_run(checkpoint, kms=session.client("kms"), ecr=session.client("ecr"))
+
     def apply_manifests(
         self,
         cluster: str,

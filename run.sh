@@ -11,10 +11,10 @@ die()     { echo -e "  ${RED}✗${NC} $*" >&2; exit 1; }
 banner()  { echo -e "\n${BOLD}${CYAN}▶ $*${NC}"; }
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$REPO_DIR/backend/config/local.env"
-COMPOSE="docker compose -f $REPO_DIR/docker/docker-compose.yaml"
-API_CONTAINER="astrolift-local"
-UI_CONTAINER="ui"
+ENV_FILE="${ASTROLIFT_ENV_FILE:-$REPO_DIR/backend/config/local.env}"
+COMPOSE="docker compose -f ${ASTROLIFT_COMPOSE_FILE:-$REPO_DIR/docker/docker-compose.yaml}"
+API_CONTAINER="${ASTROLIFT_API_CONTAINER:-astrolift-local}"
+UI_CONTAINER="${ASTROLIFT_UI_CONTAINER:-ui}"
 API_PORT=8000
 UI_PORT=3000
 

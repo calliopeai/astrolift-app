@@ -91,9 +91,10 @@ def validate_agent_runtime(runtime_class: str) -> None:
         )
 
 
-def preflight_agent_runtime(cluster, pod_spec: dict) -> None:
+def preflight_agent_runtime(cluster, pod_spec: dict, *, allow_confidential: bool = False) -> None:
     runtime_class = pod_spec.get("runtimeClassName")
-    validate_agent_runtime(runtime_class)
+    if not allow_confidential:
+        validate_agent_runtime(runtime_class)
     if not runtime_class:
         return
     from core.cluster_management import _context_for_cluster, _driver_for_cluster

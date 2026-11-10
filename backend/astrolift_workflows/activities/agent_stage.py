@@ -482,7 +482,7 @@ def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
     startup_pods = None
     if task.external_id:
         backend, cluster, namespace = _placement_for_task(task)
-        if backend == "k8s_job":
+        if backend in {"k8s_job", "k8s_confidential_pod"}:
             from astrolift_agents.services.startup_diagnostic import observe_startup
 
             startup_pods = observe_startup(task, cluster=cluster, namespace=namespace, task_id=str(task.guid))
@@ -539,7 +539,7 @@ def _poll_agent_task_locked(task_pk: int) -> dict[str, Any]:
     # ErrImagePull) fall through and get another poll.
     fatal = (
         _fatal_pod_wait_reason(cluster, namespace, str(task.guid), startup_pods)
-        if backend == "k8s_job"
+        if backend in {"k8s_job", "k8s_confidential_pod"}
         else None
     )
     if fatal:

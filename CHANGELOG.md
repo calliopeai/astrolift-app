@@ -2,9 +2,11 @@
 
 ## Unreleased
 
+- Task-family agents can opt into operator-enabled confidential EKS Pods (#2668). Each run encrypts its task environment and all image layers, generates policy from the final admitted Pod with signed AWS tools, and grants its dedicated KMS key only for the predicted PCR17 and EKS service identity. Recovery and cleanup bind to the saved task, image, policy and Pod UID. The path requires explicit cluster configuration and a baked non-root image; live KMS release/refusal qualification remains pending. Operator-wide confidential runtime selection remains refused.
+
 - Agent task and box hardening now refuses operator-wide `AGENT_RUNTIME_CLASS=confidential-sandbox` because that setting alone cannot generate final per-run policies or deliver secrets after attestation (#2668). Task dispatch refuses before provider lookup or credential provisioning; ordinary and isolated runtimes retain their behavior.
 
-- Task-family agent workloads can select `nitro_sandbox = { mode = "isolated" }` (#2668). Dispatch checks the workload's stored selector and AWS runtime before provisioning, refuses operator-runtime/GPU conflicts, and does not recover Jobs with malformed pod templates or a different runtime. Confidential/custom-policy/network-isolated task variants remain rejected pending their final-run workflows.
+- Task-family agent workloads can select `nitro_sandbox = { mode = "isolated" }` (#2668). Dispatch checks the workload's stored selector and AWS runtime before provisioning, refuses operator-runtime/GPU conflicts, and does not recover Jobs with malformed pod templates or a different runtime. Custom-policy and network-isolated task variants remain rejected.
 
 - Workloads can explicitly select an EKS Nitro Sandbox with `nitro_sandbox = { mode = "isolated" }` or confidential mode with an externally generated policy (#2668). Supported controller templates retain the selection through parsing, normalization, stored manifests and rendering. Unsupported workload paths, GPU use and incompatible network isolation settings are rejected; omitted settings preserve existing output. Policy generation, attestation verification and automatic runtime provisioning remain operator responsibilities.
 

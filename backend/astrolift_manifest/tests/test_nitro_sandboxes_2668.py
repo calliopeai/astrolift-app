@@ -12,7 +12,7 @@ from astrolift_manifest.render import render_manifests
 
 
 def source(block: str = "", kind: str = "deployment", extra: str = "", container: str = "") -> str:
-    return f'''
+    return f"""
 name = "worker"
 [[workloads]]
 name = "worker"
@@ -23,7 +23,7 @@ kind = "{kind}"
 name = "worker"
 image_ref = "worker@sha256:abc"
 {container}
-'''
+"""
 
 
 def render(text: str):
@@ -170,6 +170,16 @@ nitro_sandbox = {{mode = "isolated"}}
 def test_task_agent_selector_is_preserved_for_dispatch_not_standing_render():
     manifest, resources = render(source('nitro_sandbox = {mode = "isolated"}', kind="agent"))
     assert manifest.serialized["workloads"][0]["nitro_sandbox"]["mode"] == "isolated"
+    assert resources == []
+
+
+def test_confidential_task_selector_defers_policy_to_the_final_run_pod():
+    manifest, resources = render(source('nitro_sandbox = {mode = "confidential"}', kind="agent"))
+    assert manifest.serialized["workloads"][0]["nitro_sandbox"] == {
+        "mode": "confidential",
+        "network_isolated": False,
+        "policy": "",
+    }
     assert resources == []
 
 
