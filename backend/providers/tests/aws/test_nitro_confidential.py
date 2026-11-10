@@ -3,6 +3,8 @@
 import base64
 import hashlib
 import json
+import shutil
+import subprocess
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -45,7 +47,7 @@ def pipeline(tmp_path, monkeypatch):
             ],
         },
     }
-    calls, checkpoints, policies, retired, generator_homes = [], [], [], [], []
+    calls, checkpoints, policies, retired, generator_homes, environments = [], [], [], [], [], []
     encrypted = json.dumps(
         {
             "schemaVersion": 2,
@@ -63,6 +65,12 @@ def pipeline(tmp_path, monkeypatch):
 
     def tool(argv, *, env, input_data=None):
         calls.append(argv)
+        environments.append(dict(env))
+        if argv[0] == config.skopeo:
+            assert argv[1] == "--tmpdir"
+            assert argv[2] == env["TMPDIR"] == env["TMP"] == env["TEMP"]
+            assert Path(argv[2]).is_relative_to(Path(config.temporary_root))
+            argv = [argv[0], *argv[3:]]
         if argv[1] == "login":
             Path(argv[argv.index("--authfile") + 1]).write_text(json.dumps({"auths": {}}))
         elif argv[1] == "--override-os":
@@ -209,7 +217,67 @@ def pipeline(tmp_path, monkeypatch):
         policies=policies,
         retired=retired,
         generator_homes=generator_homes,
+        environments=environments,
     )
+
+
+def test_public_tools_are_separate_from_confidential_inputs_and_scratch(pipeline, monkeypatch):
+    snapshots = []
+
+    def public_tools(directory, temporary, env):
+        workspace = Path(env["TMPDIR"])
+        assert not temporary.is_relative_to(workspace)
+        assert workspace.is_dir() and temporary.is_dir()
+        assert temporary.stat().st_mode & 0o777 == 0o700
+        for name in ("genpolicy", "keyprovider", "aws-runtime.pub"):
+            (temporary / name).write_text("public verified tool material")
+        snapshots.append(temporary)
+        return temporary / "genpolicy", temporary / "keyprovider"
+
+    monkeypatch.setattr(confidential, "verified_tools", public_tools)
+    original_command = confidential.command
+
+    def confined_command(argv, *, env, input_data=None):
+        workspace = Path(env["TMPDIR"])
+        assert workspace.is_relative_to(Path(pipeline.arguments["config"].temporary_root))
+        assert env["TMP"] == env["TEMP"] == str(workspace)
+        assert sorted(row.name for row in snapshots[0].iterdir()) == ["aws-runtime.pub", "genpolicy", "keyprovider"]
+        assert all("synthetic-secret" not in row.read_text() for row in snapshots[0].iterdir())
+        return original_command(argv, env=env, input_data=input_data)
+
+    monkeypatch.setattr(confidential, "command", confined_command)
+    confidential.prepare_run(**pipeline.arguments)
+    assert snapshots and all(not root.exists() for root in snapshots)
+    assert all(not Path(env["TMPDIR"]).exists() for env in pipeline.environments)
+
+
+def test_public_tool_snapshot_executes_when_private_tmpfs_is_noexec(pipeline, monkeypatch):
+    mountinfo = Path("/proc/self/mountinfo")
+    if not mountinfo.exists() or not Path("/dev/shm").is_dir():
+        pytest.skip("requires a Linux noexec memory workspace")
+    mounts = [line for line in mountinfo.read_text().splitlines() if " /dev/shm " in line]
+    if not mounts or "noexec" not in mounts[0].split(" - ")[0].split()[5].split(","):
+        pytest.skip("the memory workspace is executable on this host")
+    pipeline.arguments["config"].temporary_root = "/dev/shm"
+    snapshots = []
+
+    def public_tools(directory, temporary, env):
+        blocked = Path(env["TMPDIR"]) / "public-tool-must-not-execute-here"
+        shutil.copyfile("/bin/true", blocked)
+        blocked.chmod(0o700)
+        with pytest.raises(PermissionError):
+            subprocess.run([str(blocked)], check=True, capture_output=True)
+        for name in ("genpolicy", "keyprovider"):
+            target = temporary / name
+            shutil.copyfile("/bin/true", target)
+            target.chmod(0o700)
+            subprocess.run([str(target)], check=True, capture_output=True)
+        snapshots.append(temporary)
+        return temporary / "genpolicy", temporary / "keyprovider"
+
+    monkeypatch.setattr(confidential, "verified_tools", public_tools)
+    confidential.prepare_run(**pipeline.arguments)
+    assert snapshots and all(not root.exists() for root in snapshots)
 
 
 def test_only_encrypted_image_and_final_policy_reach_kubernetes(pipeline):

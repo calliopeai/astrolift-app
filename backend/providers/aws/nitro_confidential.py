@@ -355,15 +355,23 @@ def prepare_run(
         "registry": config.registry,
         "attestation_verified": False,
     }
-    with tempfile.TemporaryDirectory(prefix="astro-confidential-", dir=config.temporary_root) as work:
+    with (
+        tempfile.TemporaryDirectory(prefix="astro-confidential-", dir=config.temporary_root) as work,
+        tempfile.TemporaryDirectory(prefix="astro-public-tools-", dir="/tmp") as public_tools,
+    ):
         root = Path(work)
-        generator, keyprovider = verified_tools(config.runtime_directory, root, env)
+        # The private tmpfs may be noexec. Only the verified public binaries and
+        # their public verification key belong in the executable snapshot.
+        # Credentials, image layers and subprocess scratch remain in the tmpfs.
+        env = {**env, "TMPDIR": str(root), "TMP": str(root), "TEMP": str(root)}
+        generator, keyprovider = verified_tools(config.runtime_directory, Path(public_tools), env)
+        skopeo = [config.skopeo, "--tmpdir", str(root)]
         auth = root / "registry-auth.json"
         for token in ecr.get_authorization_token()["authorizationData"]:
             password = base64.b64decode(token["authorizationToken"]).split(b":", 1)[1]
             command(
                 [
-                    config.skopeo,
+                    *skopeo,
                     "login",
                     "--authfile",
                     str(auth),
@@ -394,7 +402,7 @@ def prepare_run(
         layout = root / "source"
         command(
             [
-                config.skopeo,
+                *skopeo,
                 "--override-os",
                 "linux",
                 "--override-arch",
@@ -460,7 +468,7 @@ def prepare_run(
             image = config.registry + ":" + task_id
             command(
                 [
-                    config.skopeo,
+                    *skopeo,
                     "copy",
                     "--authfile",
                     str(auth),
@@ -479,7 +487,7 @@ def prepare_run(
             checkpoint["image"] = config.registry + "@" + digest
             save(checkpoint)
             raw = command(
-                [config.skopeo, "inspect", "--authfile", str(auth), "--raw", "docker://" + checkpoint["image"]], env=env
+                [*skopeo, "inspect", "--authfile", str(auth), "--raw", "docker://" + checkpoint["image"]], env=env
             )
             if "sha256:" + hashlib.sha256(raw).hexdigest() != digest:
                 raise ValueError("encrypted registry manifest does not match its recorded digest")
