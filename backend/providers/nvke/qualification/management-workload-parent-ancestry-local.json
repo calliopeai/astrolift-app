@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-11T21:25:11.000985+00:00",
+  "recordedAt": "2026-11-11T21:49:07.926472+00:00",
   "scope": "Workload-parent SDK read amplification reduction for image bindings and descendants",
-  "status": "controlled-regression-and-strict-types-qualified-current-native-pairing-pending",
+  "status": "controlled-regression-strict-types-and-current-sdk-native-correspondence-qualified",
   "sourceParent": "30606b44c",
   "sourceSha256": {
     "backend/providers/nvke/operator_agent_client.py": "cda138018385c8c3af4231f9fec09f45c8eed8827c71f5415004956cfd145cf9",
@@ -67,8 +67,29 @@
     "Existing malformed-response, changed-workload, changed-source, lost-reply and image/payload/pull/node/correspondence regressions pass"
   ],
   "limits": [
-    "The passing native SDK/agent correspondence record in Ops 9e24ae1 used the earlier SDK dependency implementation; it is not current-native proof for this optimization",
-    "A freshly frozen SDK/native pairing must qualify the new dependency before release",
-    "No timeout or source/authentication guard changed; no full App/browser/native, full NVKE, main merge or deployment claim"
-  ]
+    "Current native correspondence proof covers this shared workload helper through its actual SDK call path; complete App/CLI/browser pairing remains separate",
+    "No timeout or source/authentication guard changed; no full NVKE, main merge or deployment claim"
+  ],
+  "nativeRequalification": {
+    "appRevision": "ce813f2bd23b105ac98ebe291d5b5d7365919960",
+    "report": "/tmp/astrolift-nvke-pull-runtime-sdk-agent-linux-v6.json",
+    "reportSha256": "2d3e109669a83b2199fd7515437d815507f51fe08e316a30d4796ffb8ca94954",
+    "result": {
+      "exitCode": 0,
+      "elapsedSeconds": 1059.232702624984,
+      "sourceManifest": "/tmp/astrolift-nvke-pull-runtime-sdk-agent-linux-v6.sources.json",
+      "sourceManifestMatches": true,
+      "sourceFiles": 229,
+      "network": "none",
+      "user": "0:0",
+      "privilegedNestedRuntime": true,
+      "cpus": 2,
+      "memoryGiB": 2,
+      "expectedCases": 1,
+      "sdkSourcesUnchanged": true,
+      "sdkSourceFiles": 252,
+      "log": "/tmp/astrolift-nvke-pull-runtime-sdk-agent-linux-v6.log"
+    },
+    "scope": "Actual SDK/agent mTLS correspondence on privileged nested Linux containerd with controlled Kubernetes peers; not App/CLI/browser or physical installation proof"
+  }
 }
