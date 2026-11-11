@@ -26,6 +26,7 @@ def reserved(identity, *, excluding):
             models.NvkeInstallPlanImmutableExecution,
             models.NvkeInstallPlanNodePlatforms,
             models.NvkeInstallPlanPullAuthority,
+            models.NvkeInstallPlanPullSecretAnalysis,
         )
         if model is not excluding
     )
