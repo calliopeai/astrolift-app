@@ -207,3 +207,11 @@ def test_changed_parent_after_interpretation_refuses_returned_summary():
         call(sdk)
     assert error.value.code == "SOURCE_CHANGED"
     assert sum(method == "POST" for method, _, _ in calls) == 1
+
+
+def test_each_parent_is_read_once_per_ancestry_boundary():
+    sdk, calls = peer()
+    with sdk:
+        assert call(sdk) == summary()
+    for suffix in ("pull-authority", "image-binding"):
+        assert sum(path.endswith("/install-plan-" + suffix) for _, path, _ in calls) == 2

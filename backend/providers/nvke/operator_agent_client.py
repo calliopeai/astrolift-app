@@ -1104,15 +1104,18 @@ class OperatorAgentClient:
                 )
                 parent_body = {key: value for key, value in body.items() if key in immutable_protocol.BASE}
                 parent_body["artifactId"] = body["pullAuthorityId"]
-                captured = self.install_plan_pull_authority(
-                    job_id,
-                    intent=intent,
+                immutable_protocol.capability(self.identity().get("installPlanPullAuthority"), read_only=True)
+                captured = pull_authority_protocol.summary(
+                    self._request(
+                        "GET",
+                        "/v1/jobs/" + job_id + "/install-plan-pull-authority",
+                        params={key: value for key, value in parent_body.items() if key != "format"},
+                        intent=intent,
+                    ),
                     body=parent_body,
-                    chart_artifact_id=chart_artifact_id,
-                    chart_artifact_digest=chart_artifact_digest,
-                    workload_id=workload_id,
-                    workload_digest=workload_digest,
+                    source=source,
                 )
+                immutable_protocol.capability(self.identity().get("installPlanPullAuthority"), read_only=True)
                 if captured["authorityDigest"] != body["pullAuthorityDigest"]:
                     raise NvkeError("SOURCE_CHANGED", "The pull observation no longer matches its reviewed digest")
                 return {**source, "pullAuthority": captured}
