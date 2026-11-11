@@ -166,6 +166,18 @@ def test_stale_outcome_of_an_earlier_attempt_is_not_this_attempts_result(run, ec
     assert not result.ok and "without a result" in result.error
 
 
+def test_a_refused_launch_settles_the_run_and_retires_its_checkpoint(run, ecs, monkeypatch):  # noqa: F811
+    def denied(config):
+        raise PermissionError("AccessDeniedException: arn:aws:iam::123456789012:role/control-task")
+
+    monkeypatch.setattr(nitro_preparation, "_client", denied)
+    run.task.dispatch_target = {**run.task.dispatch_target, "nitro_confidential": {"task_id": "orphaned"}}
+    run.task.save(update_fields=["dispatch_target", "updated_at", "version"])
+    result = run.spawner.spawn(run.task)
+    assert not result.ok and "could not be run" in result.error and "arn:aws" not in result.error
+    assert run.driver.cleaned == [{"task_id": "orphaned"}]
+
+
 def test_malformed_preparation_configuration_refuses_before_secrets(run, settings, monkeypatch):  # noqa: F811
     settings.NITRO_PREPARATION_TASK = json.dumps({**CONFIG, "subnets": []})
     monkeypatch.setattr(

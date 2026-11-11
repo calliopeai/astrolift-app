@@ -71,7 +71,14 @@ class ConfidentialPodSpawner(K8sJobSpawner):
             )
         if not remote:
             return super().spawn(task)
-        ok, error = nitro_preparation.prepare(task)
+        try:
+            ok, error = nitro_preparation.prepare(task)
+        except Exception:  # noqa: BLE001 - settle and retire the run instead of stranding it
+            ok, error = (
+                False,
+                "The confidential preparation task could not be run; verify its task definition "
+                "and the control-plane role's permission to start it",
+            )
         task.refresh_from_db()
         result = self.recover(task) if ok else None
         if result is None:
