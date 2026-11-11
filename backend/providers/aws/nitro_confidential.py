@@ -224,6 +224,7 @@ def validate_admitted(pod: dict[str, Any], expected: dict[str, Any], uid: int, g
         or spec.get("hostIPC")
         or spec.get("hostUsers") is False
         or spec.get("shareProcessNamespace")
+        or spec.get("securityContext", {}).get("fsGroup") != original.get("securityContext", {}).get("fsGroup")
         or (spec.get("nodeSelector") or {}).get("kubernetes.io/arch") != original["nodeSelector"]["kubernetes.io/arch"]
         or spec.get("enableServiceLinks") is not False
     ):

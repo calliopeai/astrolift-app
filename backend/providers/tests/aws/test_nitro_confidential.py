@@ -469,6 +469,21 @@ def test_already_admitted_identity_environment_can_be_revalidated(pipeline):
     confidential.validate_admitted(final, deepcopy(final), 42042, 42042)
 
 
+def test_admission_cannot_reintroduce_the_omitted_volume_fs_group(pipeline):
+    admit = pipeline.arguments["admit"]
+
+    def mutate(value):
+        result = admit(value)
+        result["spec"]["securityContext"]["fsGroup"] = 42042
+        return result
+
+    pipeline.arguments["admit"] = mutate
+    with pytest.raises(ValueError, match="protected run boundary"):
+        confidential.prepare_run(**pipeline.arguments)
+    assert len(pipeline.policies) == 1  # No attestation grant is installed after rejected admission.
+    assert len(pipeline.retired) == 1
+
+
 @pytest.mark.parametrize("value", ["legacy", "", "us-west-2"])
 def test_regional_sts_identity_environment_rejects_other_values(pipeline, value):
     final, _ = confidential.prepare_run(**pipeline.arguments)

@@ -126,12 +126,18 @@ def inspection(settings, tmp_path, monkeypatch, request):
         "spec": {
             "runtimeClassName": "confidential-sandbox",
             "serviceAccountName": config.service_account,
-            "securityContext": {"runAsUser": 42042, "runAsGroup": 42042, "fsGroup": 42042},
+            "securityContext": {
+                "runAsUser": 42042,
+                "runAsGroup": 42042,
+                "runAsNonRoot": True,
+                "seccompProfile": {"type": "RuntimeDefault"},
+            },
             "containers": [
                 {
                     "name": "probe",
                     "image": image,
                     "env": [{"name": "ASTROLIFT_CONFIDENTIAL_TASK_ID", "value": compact}],
+                    "securityContext": {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}},
                 }
             ],
         },
@@ -255,6 +261,23 @@ def test_cli_default_inspect_loads_actual_checkpoint_and_relations_without_write
     kms.put_key_policy.assert_not_called()
     kms.create_key.assert_not_called()
     ecr.put_image.assert_not_called()
+
+
+@pytest.mark.parametrize("fs_group", [42042, 0, None])
+def test_cli_rejects_fs_group_even_when_checkpoint_measures_the_legacy_shape(inspection, fs_group):
+    task, _, _, _, k8s, kms, _, receipt = inspection
+    pod = k8s.get.return_value
+    pod["spec"]["securityContext"]["fsGroup"] = fs_group
+    checkpoint = task.dispatch_target["nitro_confidential"]
+    checkpoint["pod_sha256"] = prepared_pod_hash(pod)
+    task.save()
+    sys.argv[sys.argv.index("--checkpoint-sha256") + 1] = probe.digest(checkpoint)
+    with pytest.raises(ValueError, match="sandbox security context"):
+        probe.main()
+    kms.describe_key.assert_not_called()
+    kms.put_key_policy.assert_not_called()
+    k8s._resource_for.assert_not_called()
+    assert not receipt.exists()
 
 
 @pytest.mark.parametrize("change", ["checkpoint", "probe", "environment", "deleted_task"])

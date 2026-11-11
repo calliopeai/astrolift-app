@@ -29,7 +29,7 @@ NAMESPACE = "qualification"
 SERVICE_ACCOUNT = "confidential-runner"
 SOURCE_REVISION = "2be74d5f4"
 SOURCE_HASHES = {
-    "nitro_confidential.py": "c0a9fd64ca936c7d5c8632eb83aa1bb0fbe4dfc533dcea6c6b381167ed245d21",
+    "nitro_confidential.py": "9f8154db80c0a8fb4d0feea95fecb7d42c2f204d6543d68ef82bf441547ebf64",
     "nitro_confidential_image.py": "2d5dd02b21ee4b086f7ae2626599dc864884e9327d016da7411e78765a7a5cdb",
 }
 

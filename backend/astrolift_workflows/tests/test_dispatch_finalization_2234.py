@@ -77,6 +77,8 @@ def physical(cluster, monkeypatch):
 
         def stop(self, external_id, *, expected_task_guid):
             assert external_id == f"agent-task-{expected_task_guid.replace('-', '')}"
+            if before_stop := state.get("before_stop"):
+                before_stop()
             state["stopped"].append((external_id, expected_task_guid))
             if state.get("stop_error"):
                 raise ConnectionError(MARKER)
@@ -129,6 +131,67 @@ def test_uncertain_stop_is_durable_and_blocks_old_dispatch_callbacks(callback_ta
     assert len(physical["spawned"]) == 1
     physical["confirmed"] = True
     assert finalization.finalize_dispatch_sync(task.pk, proof, "timed_out")["status"] == "timed_out"
+
+
+def test_cancel_finalization_without_dispatch_handler_commits_revocation_before_stop(callback_task, physical):
+    from django.db import connection
+
+    from astrolift_registry.brain_runs import CANCELLED
+    from astrolift_registry.models import BrainRunBinding, BrainTokenKey
+
+    task, row, _ = callback_task
+    proof = execution(task)
+    agent_stage._spawn_agent_task_sync(task.pk, proof)
+    binding = BrainRunBinding.objects.create(
+        organization=task.organization, agent_task=task, slug="cancel-test", source="requested"
+    )
+    key = BrainTokenKey.objects.create(
+        run_binding=binding, kid=str(uuid4()), private_key_ciphertext=b"unused", public_jwk={}
+    )
+    observed = []
+
+    def before_stop():
+        # No cancellation handler is invoked: finalization must own this intent.
+        assert not connection.in_atomic_block
+        task.refresh_from_db()
+        row.refresh_from_db()
+        binding.refresh_from_db()
+        assert task.cancel_requested_at and task.dispatch_execution["final_reason"] == "cancelled"
+        assert binding.revoked_at and binding.revoked_reason == CANCELLED
+        assert not BrainTokenKey.objects.filter(pk=key.pk).exists()
+        assert task.status == "provisioning" and not row.final_event_id
+        observed.append((task.cancel_requested_at, binding.revoked_at))
+
+    physical["before_stop"] = before_stop
+    physical["confirmed"] = False
+    for _ in range(2):
+        with pytest.raises(ApplicationError, match="not yet confirmed"):
+            finalization.finalize_dispatch_sync(task.pk, proof, "cancelled")
+    assert observed[0] == observed[1]
+    physical["confirmed"] = True
+    assert finalization.finalize_dispatch_sync(task.pk, proof, "cancelled")["status"] == "cancelled"
+    assert observed == [observed[0]] * 3
+    task.refresh_from_db()
+    row.refresh_from_db()
+    assert task.failure is None and row.final_event_id and row.generation == 1
+    assert len(physical["spawned"]) == 1 and len(physical["stopped"]) == 3
+    finalization.finalize_dispatch_sync(task.pk, proof, "cancelled")
+    row.refresh_from_db()
+    assert row.generation == 1 and len(physical["stopped"]) == 3
+
+
+@pytest.mark.parametrize("changed", ["run_id", "actor", "workflow_id"])
+def test_cancel_finalization_rejects_changed_execution_before_intent(callback_task, physical, changed):
+    task, row, _ = callback_task
+    proof = execution(task)
+    agent_stage._spawn_agent_task_sync(task.pk, proof)
+    replacement = {**proof, changed: {"kind": "system"} if changed == "actor" else "other"}
+    with pytest.raises(ApplicationError):
+        finalization.finalize_dispatch_sync(task.pk, replacement, "cancelled")
+    task.refresh_from_db()
+    row.refresh_from_db()
+    assert task.cancel_requested_at is None and not task.dispatch_execution.get("final_reason")
+    assert not row.final_event_id and not physical["stopped"]
 
 
 @pytest.mark.parametrize("status", ["completed", "cancelled", "failed", "timed_out"])
