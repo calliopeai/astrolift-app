@@ -129,5 +129,16 @@
     "status": "passed",
     "exitCode": 0,
     "sourceCommit": "efe5016a1"
+  },
+  "nativePeerHarness": {
+    "status": "static checks passed; actual native run pending",
+    "sources": {
+      "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.api.stories.tsx": "d51d9c5518c52c0ce5f8af8c95ddfe59b2a99cd0421189895d4edb48322fbb98",
+      "frontend/e2e/nvke-install-plan-node-platforms-api-runner.mjs": "93dcdf205dee3fbdd9bee4bbb466862932bd7726aac1d25c9068556480313ca3"
+    },
+    "checkLogPath": "/tmp/astrolift-nvke-node-platform-peer-ui-v1.log",
+    "checkExitPath": "/tmp/astrolift-nvke-node-platform-peer-ui-v1.exit",
+    "checkExitCode": 0,
+    "scope": "full TypeScript, targeted ESLint and JavaScript syntax; actual Storybook entry discovered"
   }
 }
