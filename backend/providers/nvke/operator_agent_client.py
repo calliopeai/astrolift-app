@@ -22,6 +22,7 @@ from nvke import _operator_install_plan_image_binding as binding_protocol
 from nvke import _operator_install_plan_immutable as immutable_protocol
 from nvke import _operator_install_plan_node_platforms as node_platform_protocol
 from nvke import _operator_install_plan_pull_authority as pull_authority_protocol
+from nvke import _operator_install_plan_pull_secret_analysis as pull_secret_analysis_protocol
 from nvke import _operator_install_plan_tree as tree_protocol
 from nvke import _operator_install_plan_verification as verification_protocol
 from nvke import _operator_install_plan_workload as workload_protocol
@@ -1038,6 +1039,132 @@ class OperatorAgentClient:
         workload_digest: str,
     ) -> dict[str, Any]:
         return self._install_plan_pull_authority(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=True,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            workload_id=workload_id,
+            workload_digest=workload_digest,
+        )
+
+    def _install_plan_pull_secret_analysis(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        read_only: bool,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = pull_secret_analysis_protocol.request(
+                body,
+                job_id=job_id,
+                chart_artifact_id=chart_artifact_id,
+                workload_id=workload_id,
+                read_only=read_only,
+            )
+            if any(
+                not isinstance(v, str) or not _SHA.fullmatch(v)
+                for v in (
+                    intent,
+                    chart_artifact_digest,
+                    workload_digest,
+                )
+            ):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError("INVALID_INPUT", "Use the reviewed image binding, explicit image uses and bounds") from None
+        capability = "installPlanPullSecretAnalysis"
+        try:
+            pull_secret_analysis_protocol.capability(self.identity().get(capability), read_only=read_only)
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError(
+                "OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm private pull Secret analysis controls"
+            ) from None
+        try:
+
+            def ancestry() -> dict[str, Any]:
+                source = self._install_plan_immutable_source(
+                    job_id,
+                    intent,
+                    body,
+                    chart_artifact_id=chart_artifact_id,
+                    chart_artifact_digest=chart_artifact_digest,
+                    workload_id=workload_id,
+                    workload_digest=workload_digest,
+                    payload_bindings=None,
+                )
+                parent_body = {key: value for key, value in body.items() if key in immutable_protocol.BASE}
+                parent_body["artifactId"] = body["pullAuthorityId"]
+                captured = self.install_plan_pull_authority(
+                    job_id,
+                    intent=intent,
+                    body=parent_body,
+                    chart_artifact_id=chart_artifact_id,
+                    chart_artifact_digest=chart_artifact_digest,
+                    workload_id=workload_id,
+                    workload_digest=workload_digest,
+                )
+                if captured["authorityDigest"] != body["pullAuthorityDigest"]:
+                    raise NvkeError("SOURCE_CHANGED", "The pull observation no longer matches its reviewed digest")
+                return {**source, "pullAuthority": captured}
+
+            source = ancestry()
+            path = "/v1/jobs/" + job_id + "/install-plan-pull-secret-analysis"
+            data = (
+                self._request("GET", path, params={k: v for k, v in body.items() if k != "format"}, intent=intent)
+                if read_only
+                else self._request("POST", path, body=body, intent=intent)
+            )
+            result = pull_secret_analysis_protocol.summary(data, body=body, source=source)
+            if ancestry() != source:
+                raise _invalid_response()
+            pull_secret_analysis_protocol.capability(self.identity().get(capability), read_only=read_only)
+            return result
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+
+    def prepare_install_plan_pull_secret_analysis(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+    ) -> dict[str, Any]:
+        return self._install_plan_pull_secret_analysis(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=False,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            workload_id=workload_id,
+            workload_digest=workload_digest,
+        )
+
+    def install_plan_pull_secret_analysis(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+    ) -> dict[str, Any]:
+        return self._install_plan_pull_secret_analysis(
             job_id,
             intent=intent,
             body=body,
