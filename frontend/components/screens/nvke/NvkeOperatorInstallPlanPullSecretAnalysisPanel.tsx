@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -283,12 +283,18 @@ function PullSecretAnalysisControls(props: NvkeOperatorInstallPlanPullSecretAnal
       >
         <div className="max-w-xl space-y-2">
           <Label htmlFor={`${id}-artifactId`}>{common("artifactId")}</Label>
-          <Input
-            id={`${id}-artifactId`}
-            {...form.register("artifactId")}
-            {...(savedId ? { value: savedId } : {})}
-            disabled={!enabled || !!savedId}
-            spellCheck={false}
+          <Controller
+            control={form.control}
+            name="artifactId"
+            render={({ field }) => (
+              <Input
+                {...field}
+                id={`${id}-artifactId`}
+                value={savedId ?? field.value}
+                disabled={!enabled || !!savedId}
+                spellCheck={false}
+              />
+            )}
           />
           {!savedId && (
             <Button
