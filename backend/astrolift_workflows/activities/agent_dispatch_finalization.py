@@ -110,6 +110,17 @@ def finalize_dispatch_sync(task_pk: int, execution: dict[str, Any], reason: str)
                 "final_activity_id": execution["activity_id"],
             }
             task.save(update_fields=["dispatch_execution", "updated_at", "version"])
+            if reason == "cancelled" and not task.cancel_requested_at:
+                from django.utils import timezone
+
+                from astrolift_registry.brain_runs import CANCELLED, revoke_run
+
+                # Temporal may finalize before the dispatch activity handles its
+                # cancellation. Commit intent and revoke access before cleanup,
+                # even when that handler never runs or cannot acquire this lock.
+                task.cancel_requested_at = timezone.now()
+                task.save(update_fields=["cancel_requested_at", "updated_at", "version"])
+                revoke_run(task, CANCELLED)
             external_id = task.external_id or task.dispatch_target.get("planned_external_id", "")
             unproven_effect = not external_id and task.status not in {
                 AgentTask.Status.DRAFT,
