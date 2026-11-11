@@ -1,0 +1,95 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-11T19:44:25.608683+00:00",
+  "scope": "Read-only SDK control for original analysis/admitted-Pod/enrolled-Node correspondence",
+  "status": "178-contract-regression-tests-format-lint-strict-types-qualified-actual-sdk-agent-pairing-pending",
+  "sourceParent": "c2ce06ef65247ab4cca5b07b0ec3ebec82d1441f",
+  "sourceSha256": {
+    "backend/providers/nvke/_operator_install_plan_pull_runtime.py": "a98fb39a35b5600cbb25cce9cc13db6292c29a962263dd802eb7c5e30cb00c56",
+    "backend/providers/nvke/operator_agent_client.py": "a6be1d8c0d3a03a8cc58fd96170ec44a2cb592b39fddea43305e8ccebc56a843",
+    "backend/providers/tests/nvke/test_operator_install_plan_pull_runtime.py": "5136e21ed676bbd700f709bfd6b5f71dd85753fbf438f13ba6a54245f5a6b903"
+  },
+  "checks": [
+    {
+      "path": "/tmp/astrolift-nvke-pull-runtime-sdk-v1.json",
+      "sha256": "831b3e212d4cabed9485f3c56a84861bd467707fa13adf61dad495d066ef5c92",
+      "result": [
+        {
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "-m",
+            "pytest",
+            "-c",
+            "/dev/null",
+            "--confcutdir=tests/nvke",
+            "-p",
+            "no:cacheprovider",
+            "tests/nvke/test_operator_install_plan_pull_runtime.py",
+            "tests/nvke/test_operator_install_plan_node_platforms.py",
+            "tests/nvke/test_operator_install_plan_pull_secret_analysis.py",
+            "tests/nvke/test_operator_install_plan_pull_authority.py",
+            "tests/nvke/test_operator_install_plan_immutable.py",
+            "-q"
+          ],
+          "exitCode": 0,
+          "log": "/tmp/astrolift-nvke-pull-runtime-sdk-v1-0.log"
+        },
+        {
+          "command": [
+            "/opt/homebrew/bin/ruff",
+            "check",
+            "nvke/_operator_install_plan_pull_runtime.py",
+            "nvke/operator_agent_client.py",
+            "tests/nvke/test_operator_install_plan_pull_runtime.py"
+          ],
+          "exitCode": 0,
+          "log": "/tmp/astrolift-nvke-pull-runtime-sdk-v1-1.log"
+        },
+        {
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "-m",
+            "mypy",
+            "--strict",
+            "nvke/_operator_install_plan_pull_runtime.py",
+            "nvke/operator_agent_client.py"
+          ],
+          "exitCode": 0,
+          "log": "/tmp/astrolift-nvke-pull-runtime-sdk-v1-2.log"
+        }
+      ]
+    },
+    {
+      "path": "/tmp/astrolift-nvke-pull-runtime-sdk-format-v1.json",
+      "sha256": "167b05297bf3e3d68d53dfe1eb34ed57dbc9b7120483f54c0b4e172e4ddb82f5",
+      "result": [
+        {
+          "command": [
+            "/opt/homebrew/bin/ruff",
+            "format",
+            "--check",
+            "nvke/_operator_install_plan_pull_runtime.py",
+            "nvke/operator_agent_client.py",
+            "tests/nvke/test_operator_install_plan_pull_runtime.py"
+          ],
+          "exitCode": 0,
+          "log": "/tmp/astrolift-nvke-pull-runtime-sdk-format-v1-0.log"
+        }
+      ]
+    }
+  ],
+  "coverage": [
+    "Closed request contains only exact original IDs/digests; all IDs distinct from job/chart/workload/other parents; preflight rejects invalid input before HTTP",
+    "Read-only capability checked before and after; no execution or private-selector request fields accepted",
+    "Common ancestry validates once per before/after pass; direct pull/analysis/node metadata reads each occur exactly twice, using the same validated common source and full per-parent protocol validation",
+    "Agent metadata must match exact original index digests; complete metadata and capabilities rechecked after correspondence response",
+    "Closed response binds analysis/pull/node capture digests, image-use count, selected node-count bounds, raw/published observation time bounds, exact source IDs and continuation false",
+    "Malformed, private, aliased, changed-source, changed-capability and continuation responses refuse; lost GET is not automatically repeated and private exception details are excluded"
+  ],
+  "limits": [
+    "Controlled SDK transport peers are contract evidence, not actual SDK/agent pairing; the independently passing native agent test is recorded in Ops",
+    "No App GraphQL/CLI/browser route for this new correspondence control yet",
+    "Read-only historical correspondence does not establish live phase freshness, actual registry authorization or complete native installation",
+    "Existing whole-backend lint/type/format baseline failures remain; no full App green gate, final PR/main merge or CONFLICT deployment claimed"
+  ]
+}

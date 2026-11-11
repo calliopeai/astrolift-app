@@ -22,6 +22,7 @@ from nvke import _operator_install_plan_image_binding as binding_protocol
 from nvke import _operator_install_plan_immutable as immutable_protocol
 from nvke import _operator_install_plan_node_platforms as node_platform_protocol
 from nvke import _operator_install_plan_pull_authority as pull_authority_protocol
+from nvke import _operator_install_plan_pull_runtime as pull_runtime_protocol
 from nvke import _operator_install_plan_pull_secret_analysis as pull_secret_analysis_protocol
 from nvke import _operator_install_plan_tree as tree_protocol
 from nvke import _operator_install_plan_verification as verification_protocol
@@ -1174,6 +1175,102 @@ class OperatorAgentClient:
             workload_id=workload_id,
             workload_digest=workload_digest,
         )
+
+    def install_plan_pull_runtime_correspondence(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = pull_runtime_protocol.request(
+                body, job_id=job_id, chart_artifact_id=chart_artifact_id, workload_id=workload_id
+            )
+            if any(
+                not isinstance(value, str) or not _SHA.fullmatch(value)
+                for value in (intent, chart_artifact_digest, workload_digest)
+            ):
+                raise ValueError
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError("INVALID_INPUT", "Use exact reviewed analysis and node/platform digests") from None
+        capability = "installPlanPullRuntimeCorrespondence"
+        try:
+            pull_runtime_protocol.capability(self.identity().get(capability))
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError(
+                "OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm read-only pull runtime correspondence"
+            ) from None
+        try:
+
+            def ancestry() -> dict[str, Any]:
+                source = self._install_plan_immutable_source(
+                    job_id,
+                    intent,
+                    body,
+                    chart_artifact_id=chart_artifact_id,
+                    chart_artifact_digest=chart_artifact_digest,
+                    workload_id=workload_id,
+                    workload_digest=workload_digest,
+                    payload_bindings=None,
+                )
+                identity = self.identity()
+                for name in ("installPlanPullAuthority", "installPlanPullSecretAnalysis", "installPlanNodePlatforms"):
+                    immutable_protocol.capability(identity.get(name), read_only=True)
+                prefix = "/v1/jobs/" + job_id
+
+                def read(suffix: str, query: dict[str, Any]) -> dict[str, Any]:
+                    return self._request(
+                        "GET",
+                        prefix + suffix,
+                        params={key: value for key, value in query.items() if key != "format"},
+                        intent=intent,
+                    )
+
+                query = {key: body[key] for key in immutable_protocol.BASE}
+                query["artifactId"] = body["pullAuthorityId"]
+                pull = pull_authority_protocol.summary(
+                    read("/install-plan-pull-authority", query), body=query, source=source
+                )
+                if pull["authorityDigest"] != body["pullAuthorityDigest"]:
+                    raise NvkeError("SOURCE_CHANGED", "The original pull observation changed")
+                source["pullAuthority"] = pull
+                query = {key: body[key] for key in pull_secret_analysis_protocol.BASE}
+                analysis = pull_secret_analysis_protocol.summary(
+                    read("/install-plan-pull-secret-analysis", query), body=query, source=source
+                )
+                if analysis["authorityDigest"] != body["analysisDigest"]:
+                    raise NvkeError("SOURCE_CHANGED", "The original Secret analysis changed")
+                source["analysis"] = analysis
+                query = {key: body[key] for key in immutable_protocol.BASE}
+                query["artifactId"] = body["nodePlatformId"]
+                platforms = node_platform_protocol.summary(
+                    read("/install-plan-node-platforms", query), body=query, source=source
+                )
+                if platforms["platformDigest"] != body["nodePlatformDigest"]:
+                    raise NvkeError("SOURCE_CHANGED", "The original node/platform observation changed")
+                source["nodePlatforms"] = platforms
+                return source
+
+            source = ancestry()
+            data = self._request(
+                "GET",
+                "/v1/jobs/" + job_id + "/install-plan-pull-runtime-correspondence",
+                params={key: value for key, value in body.items() if key != "format"},
+                intent=intent,
+            )
+            result = pull_runtime_protocol.summary(data, body=body, source=source)
+            if ancestry() != source:
+                raise _invalid_response()
+            pull_runtime_protocol.capability(self.identity().get(capability))
+            return result
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
 
     def _install_plan_node_platforms(
         self,
