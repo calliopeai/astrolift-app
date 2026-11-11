@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "Storybook-first node/platform controls, metadata-only recovery controller and operation-page wiring",
-  "status": "wired and locally qualified; production build and actual paired native clients remain pending",
+  "status": "wired and locally qualified including production build; actual paired native clients remain pending",
   "sources": {
     "frontend/lib/nvke/operator-install-plan-node-platforms.ts": "5fb93e42cd544593d2338c0eccb8be4333ebb55eca10d1dfb58633aad8a023ea",
     "frontend/lib/nvke/operator-install-plan-node-platforms.test.ts": "d09674570b4c9a6a5d294f4c0347f73291ae9f65f1ce117cdfd91f758a73d826",
@@ -104,7 +104,6 @@
     "operation guards disable node controls and block cancel/download while node requests are pending"
   ],
   "remaining": [
-    "production build result",
     "actual paired API/CLI/browser node-stage qualification",
     "source-event investigation and final native admission requirements"
   ],
@@ -127,6 +126,8 @@
     "sessionId": 96401,
     "logPath": "/tmp/astrolift-nvke-node-controller-build-v1.log",
     "exitPath": "/tmp/astrolift-nvke-node-controller-build-v1.exit",
-    "status": "pending"
+    "status": "passed",
+    "exitCode": 0,
+    "sourceCommit": "efe5016a1"
   }
 }
