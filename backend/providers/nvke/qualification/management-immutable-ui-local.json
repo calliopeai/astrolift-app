@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "immutable-artifact-frontend-controls",
-  "status": "frontend-qualified-combined-native-acceptance-pending",
+  "status": "frontend-and-pinned-native-cli-browser-recovery-qualified-release-incomplete",
   "implementationRevision": "2ed01aa25",
   "sourceSha256": {
     "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "b756028c1d4b56e21832721c68c59df9669c6cb35f7480735fb06609297ff8d3",
@@ -86,15 +86,25 @@
     "screenshots": "/tmp/astrolift-nvke-immutable-storybook-screenshots-v3"
   },
   "combinedNativeRun": {
-    "status": "pending",
+    "status": "complete",
     "sessionId": 88454,
     "metadataPath": "/tmp/astrolift-nvke-immutable-browser-native-v1.json",
     "logPath": "/tmp/astrolift-nvke-immutable-browser-native-v1.log",
     "exitMarker": "/tmp/astrolift-nvke-immutable-browser-native-v1.exit",
-    "scope": "Compiled CLI then browser/App/Postgres/native-agent lost-response and cold recovery; not a frontend-only proof."
+    "scope": "Compiled CLI then browser/App/Postgres/native-agent lost-response and cold recovery; not a frontend-only proof.",
+    "exitCode": 0,
+    "tests": 1,
+    "skipped": 0,
+    "seconds": 4983.75,
+    "revisions": {
+      "cli": "627924eedb40ff1f162948fab8ef8b61f0fa3c02",
+      "app": "2ed01aa25601d641cc7e92471f7fcabd43a3a5fb",
+      "ops": "65a0833483f101514604798f536f68c11a4ecd1f"
+    },
+    "canonicalQualification": "astrolift-opscode/kubernetes/nvke/qualification/management-immutable-clients-native-local.json"
   },
   "limits": [
-    "Controlled Storybook and frontend tests do not establish actual App/native recovery.",
+    "The pinned native run qualifies actual CLI and controlled browser hook/panel recovery. Full live operation-page navigation and later revisions remain separately gated.",
     "Preparation does not authorize continuation; remaining fresh proofs and linked admission remain open.",
     "No main merge, deployment or live qualification claim."
   ]

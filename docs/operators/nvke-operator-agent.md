@@ -930,9 +930,14 @@ server's retained private intent. Source changes invalidate displayed evidence.
 
 The scoped frontend suite passes 1,867 tests, all 516 NVKE stories render, and
 Chromium checks 26 immutable-control stories across eight locales and light/dark
-themes. The production frontend build also passes. The combined compiled CLI,
-browser, App/Postgres and native-agent recovery qualification is still running;
-these frontend results do not establish that combined result. Fresh resource,
+themes. The production frontend build also passes. The pinned combined compiled
+CLI, Chromium hook/panel, App/Postgres and native-agent recovery case passes in
+4,983.75 seconds, with no skips. It prepares all phase payloads and sealed trees,
+discards replies and cold-restarts the owned agent, then explicitly reviews and
+retries the retained UUIDs without repeated rewrite/assembly or registry reads.
+All three detached source trees and the compiled CLI remain unchanged. This
+controlled browser peer does not qualify full live operation-page navigation or
+later revisions. Fresh resource,
 operator/defaulting, node/importer, credential, availability and phase-use proofs
 and linked admission remain open. Neither preparation authorizes continuation.
 Exact frontend sources and run handles are recorded in
