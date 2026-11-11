@@ -1,0 +1,43 @@
+{
+  "format": 1,
+  "scope": "encrypted node/platform observation persistence and cross-kind UUID reservation",
+  "status": "local PostgreSQL model qualified; API wiring pending",
+  "sources": {
+    "backend/astrolift_clusters/models/nvke.py": "bcd8ed6283519e72681b985913cd17ff7f8a86765b41aec693316c09768b7fd4",
+    "backend/astrolift_clusters/models/__init__.py": "f2afd82798da1f1aad408723eff0c11e589f7e2a9dcc247e57d0ed1bf3d484e6",
+    "backend/astrolift_clusters/nvke_artifact_identity.py": "daf66afb0f19028c5ea3b543ffbbd446f7e463ea16317342e3ae61f497ae2ab0",
+    "backend/astrolift_clusters/migrations/0047_nvke_node_platform_observations.py": "92a6a899f607795a1d5fbbf10067a6ee11676b6ff56737d82dc937c4398c6787",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_immutable_model.py": "88b13d22fee2bdd1adc63afa3b48d8cd4ebb2407802dc176c30cb0a8a27af9f5"
+  },
+  "checks": [
+    {
+      "runnerPid": 65589,
+      "logPath": "/tmp/astrolift-nvke-node-platform-model-pg-v3.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-model-pg-v3.exit",
+      "exitCode": 0,
+      "passed": 36,
+      "skipped": 0,
+      "database": "real PostgreSQL",
+      "scope": "new node/platform and existing payload/execution model integrity, encryption and tombstone reservations"
+    },
+    {
+      "runnerPid": 65387,
+      "logPath": "/tmp/astrolift-nvke-node-platform-model-pg-v2.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-model-pg-v2.exit",
+      "exitCode": 0,
+      "scope": "migration dry-run reports no changes; model source unchanged since this check"
+    },
+    {
+      "runnerPid": 65860,
+      "logPath": "/tmp/astrolift-nvke-node-platform-model-contracts-v1.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-model-contracts-v1.exit",
+      "exitCode": 0,
+      "scope": "export_contracts --check; persistence adds no GraphQL fields yet"
+    }
+  ],
+  "remaining": [
+    "App prepare/review/retry API and encrypted-intent workflow",
+    "CLI and Storybook-first UI",
+    "actual paired clients and final native admission proofs"
+  ]
+}

@@ -10,6 +10,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlanImageBinding,
     NvkeInstallPlanImagePayload,
     NvkeInstallPlanImmutableExecution,
+    NvkeInstallPlanNodePlatforms,
     NvkeInstallPlanTree,
 )
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
@@ -19,7 +20,9 @@ from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
 pytestmark = pytest.mark.django_db
 
 
-@pytest.fixture(params=[NvkeInstallPlanImagePayload, NvkeInstallPlanImmutableExecution])
+@pytest.fixture(
+    params=[NvkeInstallPlanImagePayload, NvkeInstallPlanImmutableExecution, NvkeInstallPlanNodePlatforms]
+)
 def retained(site, request):  # noqa: F811
     original = operation(site)
     encrypted = encrypt_at_rest(b'{"reference":"private.example.test/owned:reviewed","policy":"reviewed"}')
@@ -108,3 +111,12 @@ def test_equivalent_string_uuid_can_be_saved_but_a_different_uuid_still_refuses(
     retained.guid = str(uuid4())
     with pytest.raises(ValueError):
         retained.save(update_fields=["guid"])
+
+
+def test_artifact_id_stays_reserved_across_kinds_after_soft_delete(retained):
+    from astrolift_clusters import nvke_artifact_identity as identities
+
+    assert identities.reserved(retained.guid, excluding=NvkeInstallPlanImageBinding)
+    assert not identities.reserved(retained.guid, excluding=type(retained))
+    retained.soft_delete()
+    assert identities.reserved(retained.guid, excluding=NvkeInstallPlanImageBinding)
