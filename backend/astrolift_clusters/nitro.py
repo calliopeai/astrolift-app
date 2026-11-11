@@ -71,7 +71,12 @@ def review(cluster, *, namespace=None):
             probe = getattr(driver, "probe_nitro_readiness", None)
             if not callable(probe):
                 raise ValueError("provider readiness unavailable")
-            report = probe(cluster.slug, namespace, config)
+            from astrolift_clusters import nitro_preparation
+
+            preparation = nitro_preparation.readiness()
+            report = probe(
+                cluster.slug, namespace, config, **({"preparation": preparation} if preparation else {})
+            )
         except Exception:
             report = {
                 "checked_at": timezone.now().isoformat(),

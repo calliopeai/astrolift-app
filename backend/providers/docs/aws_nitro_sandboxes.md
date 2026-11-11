@@ -61,6 +61,19 @@ the installer namespace. Pod Identity must match that namespace, service account
 cluster and runtime role exactly. Source evidence includes the cluster ARN,
 namespace, configuration fingerprint and signed tool-manifest SHA.
 
+An operator can move preparation out of the always-on processes (#2678).
+`NITRO_PREPARATION_TASK` names an ECS task definition built from the same image
+and role: a JSON object with `cluster` (ARN), `task_definition`, `container`,
+`subnets` and `security_groups`. The worker then starts that task for each
+confidential run, waits for it, and adopts the Pod it created through the same
+recovery validation a restarted worker uses. The task reads the run from the
+database; only the task id travels through ECS. API and worker need no memory
+workspace, and readiness reports `preparation_task` (the task definition must be
+active with at least 16 GiB, since Fargate sizes the workspace at half the task
+memory) in place of `workspace`. The run stays in `PROVISIONING` while the task
+starts and prepares the image. Without the setting, preparation runs in the
+worker as described above.
+
 Skopeo must support the ocicrypt `provider:` encryption protocol. The backend
 image builds Skopeo 1.21.0 from its pinned upstream commit with vendored
 dependencies; Bookworm's packaged Skopeo lacks this protocol. Every image build

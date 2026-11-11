@@ -1095,10 +1095,12 @@ class EKSClusterDriver(ClusterDriver):
         return client
 
     @driver_op(cloud="aws", driver="cluster", redact_args=("config",), redact_errors=True)
-    def probe_nitro_readiness(self, cluster: str, namespace: str, config: Any = None) -> dict[str, Any]:
+    def probe_nitro_readiness(
+        self, cluster: str, namespace: str, config: Any = None, preparation: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         from aws.nitro_readiness import collect_readiness
 
-        return collect_readiness(self, cluster, namespace, config)
+        return collect_readiness(self, cluster, namespace, config, preparation)
 
     # ---- bring-into-management (#316) -----------------------------
 

@@ -223,6 +223,26 @@ def test_confidential_readiness_records_safe_source_and_only_read_operations(inv
     assert all(not name.startswith(("create", "put", "apply", "delete")) for name, _ in state["calls"])
 
 
+def test_an_on_demand_preparation_task_stands_in_for_this_process_workspace(inventory, monkeypatch):
+    from aws import nitro_readiness
+    from aws.nitro_readiness import check, collect_readiness
+
+    driver, config, _ = inventory
+    monkeypatch.setattr(
+        nitro_readiness, "workspace_readiness", lambda path: check("workspace", "not_ready", "no memory")
+    )
+    assert (
+        collect_readiness(driver, "alias", "astrolift-agents-org", config)["modes"]["confidential"]["state"]
+        == "not_ready"
+    )
+    result = collect_readiness(
+        driver, "alias", "astrolift-agents-org", config, check("preparation_task", "ready", "on demand")
+    )
+    codes = [row["code"] for row in result["modes"]["confidential"]["checks"]]
+    assert result["modes"]["confidential"]["state"] == "ready", result
+    assert "preparation_task" in codes and "workspace" not in codes
+
+
 @pytest.mark.parametrize(
     "change", ["old_version", "foreign_role", "foreign_namespace", "mutable_registry", "missing_runtime"]
 )

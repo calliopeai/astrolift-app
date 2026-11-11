@@ -564,6 +564,10 @@ CALLIOPE_LICENSE_PUBLIC_KEY = os.environ.get("CALLIOPE_LICENSE_PUBLIC_KEY", "").
 
 AGENT_RUNTIME_CLASS = env_str("AGENT_RUNTIME_CLASS", "")
 NITRO_CONFIDENTIAL_TASKS_CONFIG = env_str("NITRO_CONFIDENTIAL_TASKS_CONFIG", "{}")
+# The on-demand ECS task that prepares confidential images (#2678): a JSON object
+# naming its cluster, task_definition, container, subnets and security_groups.
+# Empty prepares them in this process, which then needs the memory workspace.
+NITRO_PREPARATION_TASK = env_str("NITRO_PREPARATION_TASK", "")
 
 CONSTANCE_CONFIG = {
     "VLLM_FRONTEND_DEFAULT": (
