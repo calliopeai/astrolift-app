@@ -97,6 +97,28 @@ never automatically retried.
 
 This records observations, not workload ownership, native kubelet/plugin or
 original/proposed registry credential correspondence, pull availability, fresh
-phase use or linked admission. Continuation stays false. Browser controls and
-full NVKE release/deployment remain pending. Local evidence is recorded in
+phase use or linked admission. Continuation stays false. Full NVKE
+release/deployment remains pending. Local API evidence is recorded in
 `backend/providers/nvke/qualification/management-workload-pull-authority-api-local.json`.
+
+The operation screen now provides matching Pod pull observation controls. Its
+Storybook fixtures cover preparation, retained-intent recovery, missing or stale
+parents, permissions, pending operations, and all eight locales. The browser
+requires the exact reviewed immutable ancestry and a current verified agent.
+The strict private selection is a namespace/Pod-to-live-UID map with distinct
+UIDs; observation byte, Kubernetes request, and time limits are bounded.
+
+The controller writes only source metadata, artifact identity and the input digest
+to its recovery journal before POST. It sends private selection text with
+no-cache/redacted diagnostics and clears the form after the response, including
+lost replies. Reloading a retained identity performs no RPC. Review and retry are
+explicit; retry uses the original encrypted server intent. Source epochs reject
+stale A-to-B-to-A replies, and the existing operation lock coordinates concurrent
+controllers. Revoked permission or changed ancestry clears private input and hides
+old observations. No installation continuation is exposed.
+
+Local browser evidence is recorded in
+`backend/providers/nvke/qualification/management-workload-pull-authority-browser-local.json`.
+This covers the panel, controller and composed operation screen. Actual compiled
+CLI/App/SDK/agent/browser pairing and complete route-navigation qualification for
+this new stage remain pending; earlier Node-platform pairing does not cover it.

@@ -17626,7 +17626,7 @@
       "title": "Ursprünglicher nativer Auftrag",
       "help": "Prüfen Sie den ursprünglichen Agentbeleg und laden Sie private Artefakte nach Prüfung von Identität und Hash herunter.",
       "artifacts": "Private Artefakte",
-      "size": "Bytes",
+      "size": "Datenmenge (Byte)",
       "download": "Private Datei herunterladen",
       "load": "Ursprünglichen Beleg lesen",
       "reconcile": "Ursprünglichen Auftrag abgleichen",
@@ -18056,7 +18056,7 @@
       "optional": "LaunchLayer darf unkonfiguriert sein.",
       "crds": "Erforderliche APIs eingerichtet",
       "managerAvailable": "Manager verfügbar",
-      "manager": "Manager",
+      "manager": "Verwaltung",
       "readyReplicas": "Bereite Replikate",
       "desiredReplicas": "Gewünschte Replikate",
       "secret": "Referenz auf Zugangsdaten-Secret",
@@ -18114,7 +18114,7 @@
       "workloads": "Workload-Beobachtungen",
       "search": "Workloads suchen",
       "kind": "Typ",
-      "generation": "Generation",
+      "generation": "Erzeugungsstand",
       "observedGeneration": "Beobachtete Generation",
       "desired": "Gewünschte Replikate",
       "readyCount": "Bereite Replikate",
@@ -18474,6 +18474,22 @@
       "pairCount": "Image-Knoten-Paare",
       "issueCount": "Offene Prüfungen",
       "invalidInput": "Eindeutige UUID, exakten Knoten-/UID-Umfang, Laufzeitprofile und Grenzwerte prüfen."
+    },
+    "installPullAuthority": {
+      "title": "Pod-Pull-Beobachtungen",
+      "help": "Zugelassene Pods und ihre Image-Pull-Referenzen für diese Image-Bindung prüfen.",
+      "closureRequired": "Eigentümerschaft, Kubelet-Zugangsdaten, Registry-Zuordnung und verknüpfte Installationsfreigabe müssen noch geprüft werden.",
+      "selectedPods": "Ausgewählte Pods (privates JSON)",
+      "podsHelp": "Jeden namespace/pod seiner aktuellen UID zuordnen. Zugelassene Pod-Pull-Referenzen und aktuelle ServiceAccounts werden getrennt gelesen; Image-Pull-Zugriff wird damit nicht nachgewiesen.",
+      "limitsTitle": "Beobachtungsgrenzen",
+      "limitsHelp": "Diese Grenzen beschränken lesende Kubernetes-Anfragen und gespeicherte Nachweise.",
+      "maximumCalls": "Maximale Kubernetes-Anfragen",
+      "invalidInput": "Eine eigene Artefakt-ID, gültige namespace/pod-UIDs und ausreichende Beobachtungsgrenzen eingeben.",
+      "authorityDigest": "Prüfsumme der Pull-Beobachtung",
+      "podCount": "Pods",
+      "serviceAccountCount": "Dienstkonten",
+      "secretCount": "Secret-Referenzen",
+      "missingReferenceCount": "Fehlende Referenzen"
     }
   }
 }

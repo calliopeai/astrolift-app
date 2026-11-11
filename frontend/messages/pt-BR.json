@@ -17623,7 +17623,7 @@
       "title": "Trabalho nativo original",
       "help": "Inspecione o recibo original do agente e baixe os artefatos privados após revisar a identidade e o hash.",
       "artifacts": "Artefatos privados",
-      "size": "Bytes",
+      "size": "Tamanho em bytes",
       "download": "Baixar arquivo privado",
       "load": "Ler recibo original",
       "reconcile": "Conciliar trabalho original",
@@ -18145,7 +18145,7 @@
       "retry": "Repetir preparação retida",
       "unconfirmed": "A resposta não foi confirmada. Guarde o UUID e revise o plano antes de tentar novamente. A nova tentativa usa a intenção original retida no servidor.",
       "items": "Itens de implantação",
-      "ordinal": "Ordinal",
+      "ordinal": "Posição",
       "name": "Nome",
       "type": "Tipo proposto",
       "originalType": "Tipo original",
@@ -18471,6 +18471,22 @@
       "pairCount": "Pares imagem/nó",
       "issueCount": "Verificações pendentes",
       "invalidInput": "Revise o UUID distinto, o escopo exato de nós/UID, os perfis de execução e os limites."
+    },
+    "installPullAuthority": {
+      "title": "Observações de download dos Pods",
+      "help": "Revise os Pods admitidos e suas referências de download para este vínculo de imagens.",
+      "closureRequired": "A propriedade, as credenciais do kubelet, a correspondência do registro e a aprovação vinculada da instalação ainda precisam ser verificadas.",
+      "selectedPods": "Pods selecionados (JSON privado)",
+      "podsHelp": "Associe cada namespace/pod ao UID atual. As referências do Pod admitido e as ServiceAccounts atuais são lidas separadamente; isso não comprova acesso ao download.",
+      "limitsTitle": "Limites de observação",
+      "limitsHelp": "Estes limites restringem as solicitações de leitura ao Kubernetes e as evidências retidas.",
+      "maximumCalls": "Máximo de solicitações ao Kubernetes",
+      "invalidInput": "Informe um ID de artefato distinto, UIDs namespace/pod válidos e limites suficientes.",
+      "authorityDigest": "Resumo da observação de download",
+      "podCount": "Pods",
+      "serviceAccountCount": "Contas de serviço",
+      "secretCount": "Referências a Secrets",
+      "missingReferenceCount": "Referências ausentes"
     }
   }
 }

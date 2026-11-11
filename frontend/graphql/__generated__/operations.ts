@@ -23379,6 +23379,29 @@ export type RetryNvkeInstallPlanNodePlatformsMutation = { recoverNvkeOperatorIns
 
 export type NvkeInstallPlanNodePlatformsFieldsFragment = { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, platformDigest: string, nodeCount: number, contentCount: number, imageReferenceCount: number, pairCount: number, issueCount: number };
 
+export type PrepareNvkeInstallPlanPullAuthorityMutationVariables = Exact<{
+  input: PrepareNvkeOperatorInstallPlanPullAuthorityInput;
+}>;
+
+
+export type PrepareNvkeInstallPlanPullAuthorityMutation = { prepareNvkeOperatorInstallPlanPullAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, authorityDigest: string, podCount: number, serviceAccountCount: number, secretCount: number, missingReferenceCount: number } | null } };
+
+export type ReviewNvkeInstallPlanPullAuthorityMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanPullAuthorityReviewInput;
+}>;
+
+
+export type ReviewNvkeInstallPlanPullAuthorityMutation = { reviewNvkeOperatorInstallPlanPullAuthority: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, authorityDigest: string, podCount: number, serviceAccountCount: number, secretCount: number, missingReferenceCount: number } | null } };
+
+export type RetryNvkeInstallPlanPullAuthorityMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanPullAuthorityReviewInput;
+}>;
+
+
+export type RetryNvkeInstallPlanPullAuthorityMutation = { recoverNvkeOperatorInstallPlanPullAuthorityPreparation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, authorityDigest: string, podCount: number, serviceAccountCount: number, secretCount: number, missingReferenceCount: number } | null } };
+
+export type NvkeInstallPlanPullAuthorityFieldsFragment = { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, authorityDigest: string, podCount: number, serviceAccountCount: number, secretCount: number, missingReferenceCount: number };
+
 export type PrepareNvkeInstallPlanTreeMutationVariables = Exact<{
   input: PrepareNvkeOperatorInstallPlanTreeInput;
 }>;

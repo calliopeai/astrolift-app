@@ -18471,6 +18471,22 @@
       "pairCount": "이미지/노드 쌍",
       "issueCount": "미해결 확인 사항",
       "invalidInput": "중복되지 않는 UUID, 정확한 노드/UID 범위, 런타임 프로필 및 제한을 확인하세요."
+    },
+    "installPullAuthority": {
+      "title": "Pod 이미지 가져오기 관측",
+      "help": "이 이미지 바인딩에 대해 승인된 Pod와 이미지 가져오기 참조를 검토합니다.",
+      "closureRequired": "소유 관계, kubelet 자격 증명, 레지스트리 대응 관계 및 연결된 설치 승인은 여전히 검증해야 합니다.",
+      "selectedPods": "선택한 Pod (비공개 JSON)",
+      "podsHelp": "각 namespace/pod를 현재 UID에 매핑합니다. 승인된 Pod의 가져오기 참조와 현재 ServiceAccount를 별도로 읽으며, 이미지 가져오기 권한을 증명하지 않습니다.",
+      "limitsTitle": "관측 제한",
+      "limitsHelp": "Kubernetes 읽기 전용 요청과 보관할 증거의 양을 제한합니다.",
+      "maximumCalls": "최대 Kubernetes 요청 수",
+      "invalidInput": "고유한 아티팩트 ID, 유효한 namespace/pod UID 및 충분한 관측 제한을 입력하세요.",
+      "authorityDigest": "가져오기 관측 다이제스트",
+      "podCount": "Pod 수",
+      "serviceAccountCount": "ServiceAccount 수",
+      "secretCount": "Secret 참조 수",
+      "missingReferenceCount": "누락된 참조 수"
     }
   }
 }

@@ -1,0 +1,300 @@
+{
+  "format": 1,
+  "status": "browser-controls-locally-qualified-real-client-pairing-pending",
+  "recordedAt": "2026-11-11T14:55:09.481281+00:00",
+  "sourceParent": "6f551d66b6975da4f63e1fc5d3a40496b80eb287",
+  "sourceFiles": {
+    "frontend/components/screens/nvke/NvkeOperationScreen.pull-authority.test.tsx": "29faee4bec3f115a3fce40842c63c5632dc82fe3b3546cc9faaeb799b09e4e26",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.api.stories.tsx": "ee5163e248c057db98ea0a6a4b3fe9ebb7ed1cf71f8e7da1f5d5094b39774f50",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.stories.tsx": "aaecc426ea5132f9ffd58976a43deafcf083db78cc6080f9e666d259db46c03b",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.test.tsx": "7dfa75f04b485f0acfbc359aef27e026197a0be8a91525a8514a417046b5e454",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.tsx": "bdaebc9ecf1833b6fb7e88dafa9f656923ac77d12e5b45487e6bb2a28ce4bee1",
+    "frontend/e2e/nvke-install-plan-pull-authority-storybook-runner.mjs": "ee10f25ef9933b4a6e816b0b22e53db1bca20821aabf2790a0ac927327787835",
+    "frontend/graphql/nvke/nvke-install-plan-pull-authority.mutations.ts": "600311a19b4de24e2ca76ca0c943186b69afa03f6d333c5da2db0ce53c862929",
+    "frontend/graphql/nvke/nvke-install-plan-pull-authority.queries.ts": "13e344344a5b35df98893bc740cc3916d97ada11072836d8e15776e537568389",
+    "frontend/graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx": "e11c776eaaefda8587f806c2a0737f264bc65cf34c9796812c437e9da67c4dfd",
+    "frontend/graphql/nvke/use-nvke-install-plan-pull-authority.ts": "ddf1e56a3a0ca92f067d2a22abfe4269ab9b5dca15e11ff4ba314b43f1c80db0",
+    "frontend/lib/nvke/operator-install-plan-pull-authority.test.ts": "3ca3cf89122ec9372bbddc5f1ed98ba467c6003f3af93344e972799e7d84f72a",
+    "frontend/lib/nvke/operator-install-plan-pull-authority.ts": "5f76cd91a8dbd5256f89f8e847d10a0670f1cbbfa43cba78170d3b84f9593193",
+    "docs/providers/nvke-access.md": "923d9f594a1d5f040bc629cfc86c6117d6db1a14d1415b4b9f4eca78d725528a",
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "a3c3c68de515bcbb40578c679b7639e793f308178bda843aa87123aeb8e3d3b1",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "693761ba92400dec8162284debde492363c0159a9b31caacac1ad3cba8dcf467",
+    "frontend/components/screens/nvke/types.ts": "c79b76b3c9b5ffed8ad116757c8b2a9b6dc9a299e9ecb6eceeb5c443b97fdc70",
+    "frontend/graphql/__generated__/operations.ts": "575c5b45069b7efb439565ba3313c5a888f24f25d26f29324e8cd238551f9d91",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "a701a9bd40c481549ae80d15792e0ab583f17bdd95e31e2093f17b0765659ad5",
+    "frontend/lib/nvke/install-plan-immutable-recovery.test.ts": "61dfae62e8ee02a9dc6987d73db5b485ef4e0132b2aab3accac3629b1dd20f5f",
+    "frontend/lib/nvke/install-plan-immutable-recovery.ts": "c93a68eb39d9849b344a9a676e77207b9af944e65d0c55d09bd7f0080c8a32a0",
+    "frontend/messages/de.json": "35362481fc38a36893c84f30281f061f5163bd1193d84e8937788c104bb61e24",
+    "frontend/messages/en.json": "09dad559dc9ae2455fb1175a832db83176cb461977feaf5163e65c1308646ac9",
+    "frontend/messages/es.json": "191d84ad5174396a23e0c520f3c86502c3bd212d872b3cbc9d7a103c42b9f5e8",
+    "frontend/messages/fr.json": "d044fcfe8695f2ec2a520b2ecea51aeebaca999ed213b5ec1d828493f2735f5c",
+    "frontend/messages/ja.json": "bf2a3cc761f66d590751925ed5754ec6704a8850682b899b4f67c8564daeb7f9",
+    "frontend/messages/ko.json": "b9ff82bfa4e5118b082d98d0de7e821e2f691ed94fe163e22bff9b5a24c7f077",
+    "frontend/messages/pt-BR.json": "3e63e2296675cdd1d22f4cb9e9d8ec5f66cd50430d3177b518c88c304d776624",
+    "frontend/messages/zh-Hans.json": "ff9374e16a12f345fc42ccfbbc0c223335e9867fa5000fb6bc29deb961d36c54"
+  },
+  "checks": [
+    {
+      "command": [
+        "node_modules/.bin/prettier",
+        "--write",
+        "components/screens/nvke/NvkeOperationScreen.pull-authority.test.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.api.stories.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.stories.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.test.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.tsx",
+        "e2e/nvke-install-plan-pull-authority-storybook-runner.mjs",
+        "graphql/nvke/nvke-install-plan-pull-authority.mutations.ts",
+        "graphql/nvke/nvke-install-plan-pull-authority.queries.ts",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.ts",
+        "lib/nvke/operator-install-plan-pull-authority.test.ts",
+        "lib/nvke/operator-install-plan-pull-authority.ts",
+        "components/screens/nvke/NvkeOperationScreen.stories.tsx",
+        "components/screens/nvke/NvkeOperationScreen.tsx",
+        "components/screens/nvke/types.ts",
+        "graphql/nvke/use-nvke-operation.ts",
+        "lib/nvke/install-plan-immutable-recovery.test.ts",
+        "lib/nvke/install-plan-immutable-recovery.ts",
+        "messages/de.json",
+        "messages/en.json",
+        "messages/es.json",
+        "messages/fr.json",
+        "messages/ja.json",
+        "messages/ko.json",
+        "messages/pt-BR.json",
+        "messages/zh-Hans.json"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-pull-ui-integration-v1-0.log",
+      "logSha256": "17fbc969612f1bde6b3f35d0d72adec214663aa2da9a779f0be8b4071465c785"
+    },
+    {
+      "command": [
+        "/Users/ragelink/.local/bin/npm",
+        "run",
+        "codegen"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-pull-ui-integration-v1-1.log",
+      "logSha256": "88c5199bf8d00d42362ac5da2c4b149ce023b8105433ef1780553ecea9a783c8"
+    },
+    {
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "lib/nvke/operator-install-plan-pull-authority.test.ts",
+        "lib/nvke/install-plan-immutable-recovery.test.ts",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx",
+        "graphql/nvke/use-nvke-install-plan-node-platforms.test.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.test.tsx",
+        "components/screens/nvke/NvkeOperationScreen.pull-authority.test.tsx",
+        "components/screens/nvke/NvkeOperationScreen.node-platforms.test.tsx"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-pull-ui-integration-v1-2.log",
+      "logSha256": "fd2465c423b22b1ba129dfe8176e5a6ba73189bda96e292133950c221b821f66"
+    },
+    {
+      "command": [
+        "node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-pull-ui-integration-v1-3.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "node_modules/.bin/eslint",
+        "components/screens/nvke/NvkeOperationScreen.pull-authority.test.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.api.stories.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.stories.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.test.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.tsx",
+        "e2e/nvke-install-plan-pull-authority-storybook-runner.mjs",
+        "graphql/nvke/nvke-install-plan-pull-authority.mutations.ts",
+        "graphql/nvke/nvke-install-plan-pull-authority.queries.ts",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.ts",
+        "lib/nvke/operator-install-plan-pull-authority.test.ts",
+        "lib/nvke/operator-install-plan-pull-authority.ts",
+        "components/screens/nvke/NvkeOperationScreen.stories.tsx",
+        "components/screens/nvke/NvkeOperationScreen.tsx",
+        "components/screens/nvke/types.ts",
+        "graphql/nvke/use-nvke-operation.ts",
+        "lib/nvke/install-plan-immutable-recovery.test.ts",
+        "lib/nvke/install-plan-immutable-recovery.ts"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-pull-ui-integration-v1-4.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "focusedTests": {
+    "files": 7,
+    "passed": 177,
+    "failed": 0,
+    "log": "/tmp/astrolift-nvke-pull-ui-integration-v1-2.log"
+  },
+  "contracts": {
+    "passed": 40,
+    "failed": 0,
+    "log": "/tmp/astrolift-nvke-pull-ui-contracts-v2.log",
+    "logSha256": "c5affc3009538728fdc9961615403f7765934fd3165544f4dcff71396fd6fad9"
+  },
+  "browser": {
+    "log": "/tmp/astrolift-nvke-pull-ui-browser-v4.log",
+    "logSha256": "0d6f0daad46d7e879bab0d1adbd0c6f3e1338c3f246769ea296ca0787a446344",
+    "results": {
+      "stories": [
+        {
+          "story": "observed",
+          "locale": "en"
+        },
+        {
+          "story": "unloaded",
+          "locale": "en"
+        },
+        {
+          "story": "prepare-lost-reply",
+          "locale": "en"
+        },
+        {
+          "story": "parent-required",
+          "locale": "en"
+        },
+        {
+          "story": "loading",
+          "locale": "en"
+        },
+        {
+          "story": "pending",
+          "locale": "en"
+        },
+        {
+          "story": "lost-reply",
+          "locale": "en"
+        },
+        {
+          "story": "other-reviewer",
+          "locale": "en"
+        },
+        {
+          "story": "read-only",
+          "locale": "en"
+        },
+        {
+          "story": "stale-binding",
+          "locale": "en"
+        },
+        {
+          "story": "stale-source",
+          "locale": "en"
+        },
+        {
+          "story": "unverified",
+          "locale": "en"
+        },
+        {
+          "story": "original-preparation-recovery",
+          "locale": "en"
+        },
+        {
+          "story": "choose-another-artifact",
+          "locale": "en"
+        },
+        {
+          "story": "narrow",
+          "locale": "en"
+        },
+        {
+          "story": "german",
+          "locale": "de"
+        },
+        {
+          "story": "spanish",
+          "locale": "es"
+        },
+        {
+          "story": "french",
+          "locale": "fr"
+        },
+        {
+          "story": "portuguese",
+          "locale": "pt-BR"
+        },
+        {
+          "story": "japanese",
+          "locale": "ja"
+        },
+        {
+          "story": "korean",
+          "locale": "ko"
+        },
+        {
+          "story": "chinese",
+          "locale": "zh-Hans"
+        }
+      ],
+      "compositions": [
+        "install-pull-authority",
+        "install-pull-authority-read-only",
+        "install-pull-authority-pending"
+      ],
+      "locales": 8,
+      "darkModes": 2,
+      "pageErrors": []
+    },
+    "screenshots": {
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-de-375.png": "cb3cdadf89148389a35d5b4f104a3e46d40df0c138d31a5e81dd783fffc59237",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-en-375.png": "417dbb392896a516dcdd20cdbf5dc8edb2d1ef38be59f83580b5069f50edc927",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-es-375.png": "cc155e0c17e398864639cbf9d598b47be50202a808cd840565c03fb229338484",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-fr-375.png": "ecc14a717c0c83c8245d65ed17b499172afd3de89e4be54fe23e8dbdc0e1dbab",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-ja-375.png": "6a3596f133a3bc5d0ef958913cf05377df77ca72f41db824c71669808865e548",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-ko-375.png": "9e19f48bf5e1e80d45171df8722ac67326bdec0bb45c126a8df999f64986fe6c",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-pt-BR-375.png": "1397f729b575ee1356959a0bad5259c2c9ca98945ca263e0e857f3b08ababca1",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/form-zh-Hans-375.png": "621aaa3b1877a3bb062432587752318da907a016b74ffd973439c191be2d94cf",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/install-pull-authority-pending.png": "955f3b90be8915f75d3ef8d529dbe0533cd1bc3d48081449f0ce14514408a464",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/install-pull-authority-read-only.png": "9a1050f23d44e9bbedd305d857330a3b8c4b21777932b42cd40ac9510e8673a8",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/install-pull-authority.png": "1badd8f3de4e12ffb04927a715c6b518f19a21787960f5d2513897b3ac067001",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/lost-reply.png": "59294dc79e0754d86e44a04fef4c74eb9bee0e22fed9d9301340ae6cf12fe4a4",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/observed-dark-375.png": "b9dc11fe9c5b59b40a58b3ebb947ec15d6cc2aab72f341ea0a122d7eae9d96b9",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/observed-dark-768.png": "49d4e7783338579e60ba9f765614ff84f0af58bd62cb782377fdfa5047983e45",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/observed-light-375.png": "20daa6ce6dc0beb16fe32f22cc4d40d72cc679b11775d9aa95565e9cb6339a4d",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/observed-light-768.png": "cbb53324beeaf76bf1329f098aacc9599661890a57a06b4051a2a52ac9344fe1",
+      "/tmp/astrolift-nvke-pull-authority-ui-v4-screenshots/observed-light.png": "79840bd866bd3152c550a8993c1736bbe53b934723737c2a668909e675558347"
+    },
+    "visualReview": [
+      "Spanish private form at 375px",
+      "English observation in dark mode at 375px"
+    ]
+  },
+  "retainedFailures": [
+    {
+      "log": "/tmp/astrolift-nvke-pull-ui-browser-v1.log",
+      "exitMarker": "/tmp/astrolift-nvke-pull-ui-browser-v1.exit",
+      "reason": "Qualification driver used the wrong Storybook ID; terminated only the owned browser driver, corrected ID, reran successfully."
+    },
+    {
+      "log": "/tmp/astrolift-nvke-pull-ui-contracts-v1.log",
+      "exitCode": 1,
+      "reason": "Four locale gates caught untranslated ServiceAccount labels plus existing NVKE copy. Translated text without changing the gate; all 40 contract tests pass in v2."
+    }
+  ],
+  "guarantees": [
+    "Current verified admin and exact immutable source ancestry",
+    "Private scope excluded from local recovery journal and Apollo cache",
+    "Explicit review/retry after ambiguous response; no automatic POST retry",
+    "Form cleared after response and on reviewed source/permission changes",
+    "Source epoch and operation lock preserve stale-response/overlap refusals",
+    "No install continuation; original uncertain operation preserved"
+  ],
+  "limits": [
+    "Actual compiled CLI/App/SDK/agent/browser pairing for this stage remains pending",
+    "Full live operation-route navigation remains pending",
+    "No native credential correspondence, image availability, phase use or linked admission qualified by this UI proof",
+    "Broad backend mypy remains failing as recorded in management-workload-pull-authority-api-local.json; this UI proof does not make the release merge-ready",
+    "Full NVKE lifecycle surface, final PRs, merges, deployment and live validation remain incomplete"
+  ]
+}

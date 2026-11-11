@@ -179,9 +179,9 @@ it("isolates artifact kinds and refuses changed kind or duplicate metadata", () 
   expect(() => readSelectedInstallPlanImmutable(s, source)).toThrow();
 });
 
-it("isolates all three artifact kinds and rejects copied or private node platform records", () => {
+it("isolates all four artifact kinds and rejects copied or private node platform records", () => {
   const s = storage();
-  const sources = (["payload", "execution", "platform"] as const).map((mode) => ({
+  const sources = (["payload", "execution", "platform", "pull-authority"] as const).map((mode) => ({
     ...source,
     mode,
   }));
@@ -192,6 +192,7 @@ it("isolates all three artifact kinds and rejects copied or private node platfor
     "nvke-install-plan-image-payload",
     "nvke-install-plan-immutable-execution-tree",
     "nvke-install-plan-node-platforms",
+    "nvke-install-plan-pull-authority",
   ]);
   sources.forEach((scope, index) => {
     expect(readInstallPlanImmutableJournal(s, scope, chosen)).toEqual(records[index]);
@@ -221,4 +222,21 @@ it("isolates all three artifact kinds and rejects copied or private node platfor
   expect(readInstallPlanImmutableJournal(s, platform, chosen)).toEqual(records[2]);
   expect(readSelectedInstallPlanImmutable(s, sources[0])).toEqual(chosen);
   expect(readSelectedInstallPlanImmutable(s, sources[1])).toEqual(chosen);
+});
+
+it("keeps pull observation journals private and separate from every other artifact kind", () => {
+  const s = storage(),
+    pull = { ...source, mode: "pull-authority" as const };
+  const record = saveInstallPlanImmutableJournal(s, pull, chosen, "a".repeat(64));
+  const key = installPlanImmutableRecoveryKey(pull) + ":intent:" + chosen.artifactId;
+  for (const change of [
+    { selectedPods: { "private/pod": "private-uid" } },
+    { maximumCalls: 512 },
+    { credentials: "PRIVATE" },
+    { kind: "nvke-install-plan-node-platforms" },
+    { mode: "platform" },
+  ]) {
+    s.items.set(key, JSON.stringify({ ...record, ...change }));
+    expect(() => readInstallPlanImmutableJournal(s, pull, chosen)).toThrow();
+  }
 });

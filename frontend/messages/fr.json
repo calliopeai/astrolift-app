@@ -18119,7 +18119,7 @@
       "desired": "Réplicas souhaités",
       "readyCount": "Réplicas prêts",
       "updated": "Réplicas mis à jour",
-      "observation": "Observation",
+      "observation": "Relevé",
       "unknown": "Inconnu",
       "ready": "Observé prêt",
       "requiresReview": "Examen requis",
@@ -18474,6 +18474,22 @@
       "pairCount": "Paires image/nœud",
       "issueCount": "Vérifications en attente",
       "invalidInput": "Vérifiez l’UUID distinct, le périmètre exact des nœuds/UID, les profils d’exécution et les limites."
+    },
+    "installPullAuthority": {
+      "title": "Observations de téléchargement des Pods",
+      "help": "Examinez les Pods admis et leurs références de téléchargement pour cette liaison d’images.",
+      "closureRequired": "La propriété, les identifiants du kubelet, la correspondance du registre et l’approbation liée de l’installation restent à vérifier.",
+      "selectedPods": "Pods sélectionnés (JSON privé)",
+      "podsHelp": "Associez chaque namespace/pod à son UID actuel. Les références du Pod admis et les ServiceAccounts actuels sont lus séparément ; cela ne prouve pas l’accès au téléchargement.",
+      "limitsTitle": "Limites d’observation",
+      "limitsHelp": "Ces limites bornent les requêtes Kubernetes en lecture seule et les preuves conservées.",
+      "maximumCalls": "Nombre maximal de requêtes Kubernetes",
+      "invalidInput": "Saisissez un ID d’artefact distinct, des UID namespace/pod valides et des limites suffisantes.",
+      "authorityDigest": "Empreinte de l’observation de téléchargement",
+      "podCount": "Pods",
+      "serviceAccountCount": "Comptes de service",
+      "secretCount": "Références aux Secrets",
+      "missingReferenceCount": "Références manquantes"
     }
   }
 }

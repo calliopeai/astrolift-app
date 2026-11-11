@@ -18471,6 +18471,22 @@
       "pairCount": "Image/node pairs",
       "issueCount": "Unresolved checks",
       "invalidInput": "Review the distinct UUID, exact node/UID scope, runtime profiles and limits."
+    },
+    "installPullAuthority": {
+      "title": "Pod pull observations",
+      "help": "Review the admitted Pods and their image pull references for this image binding.",
+      "closureRequired": "Ownership, kubelet credentials, registry correspondence, and linked installation approval still require verification.",
+      "selectedPods": "Selected Pods (private JSON)",
+      "podsHelp": "Map each namespace/pod to its current UID. The observation reads admitted Pod pull references and current ServiceAccounts separately; it does not prove image pull access.",
+      "limitsTitle": "Observation limits",
+      "limitsHelp": "These limits bound read-only Kubernetes requests and retained evidence.",
+      "maximumCalls": "Maximum Kubernetes requests",
+      "invalidInput": "Enter a distinct artifact ID, valid namespace/pod UIDs, and sufficient observation limits.",
+      "authorityDigest": "Pull observation digest",
+      "podCount": "Pods",
+      "serviceAccountCount": "ServiceAccounts",
+      "secretCount": "Secret references",
+      "missingReferenceCount": "Missing references"
     }
   }
 }

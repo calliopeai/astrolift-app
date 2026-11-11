@@ -36,7 +36,7 @@ const sourceShape = {
   workloadId: guid,
   workloadVersion: version,
   workloadDigest: digest,
-  mode: z.enum(["payload", "execution", "platform"]),
+  mode: z.enum(["payload", "execution", "platform", "pull-authority"]),
   bindingId: guid,
   bindingVersion: version,
   bindingDigest: digest,
@@ -64,6 +64,7 @@ const schema = z
       "nvke-install-plan-image-payload",
       "nvke-install-plan-immutable-execution-tree",
       "nvke-install-plan-node-platforms",
+      "nvke-install-plan-pull-authority",
     ]),
     ...sourceShape,
     ...selectionSchema.shape,
@@ -77,7 +78,7 @@ export type NvkeInstallPlanImmutableJournalSource = NvkeInstallPlanTreeJournalSo
   workloadId: string;
   workloadVersion: number;
   workloadDigest: string;
-  mode: "payload" | "execution" | "platform";
+  mode: "payload" | "execution" | "platform" | "pull-authority";
   bindingId: string;
   bindingVersion: number;
   bindingDigest: string;
@@ -101,7 +102,8 @@ export const installPlanImmutableRecoveryKey = (source: NvkeInstallPlanImmutable
 const intentKey = (source: NvkeInstallPlanImmutableJournalSource, artifactId: string) =>
   installPlanImmutableRecoveryKey(source) + ":intent:" + artifactId;
 
-function recordKind(mode: "payload" | "execution" | "platform") {
+function recordKind(mode: "payload" | "execution" | "platform" | "pull-authority") {
+  if (mode === "pull-authority") return "nvke-install-plan-pull-authority" as const;
   if (mode === "platform") return "nvke-install-plan-node-platforms" as const;
   return mode === "payload"
     ? ("nvke-install-plan-image-payload" as const)

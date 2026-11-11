@@ -18471,6 +18471,22 @@
       "pairCount": "镜像/节点配对",
       "issueCount": "待解决的检查",
       "invalidInput": "请核对唯一 UUID、准确的节点/UID 范围、运行时配置及限制。"
+    },
+    "installPullAuthority": {
+      "title": "Pod 镜像拉取观测",
+      "help": "查看此镜像绑定对应的已准入 Pod 及其镜像拉取引用。",
+      "closureRequired": "仍需验证所有权、kubelet 凭据、镜像仓库对应关系及关联的安装批准。",
+      "selectedPods": "所选 Pod（私有 JSON）",
+      "podsHelp": "将每个 namespace/pod 映射到当前 UID。观测会分别读取已准入 Pod 的拉取引用和当前 ServiceAccount，不能证明镜像拉取权限。",
+      "limitsTitle": "观测限制",
+      "limitsHelp": "限制 Kubernetes 只读请求数量和保留的证据量。",
+      "maximumCalls": "最大 Kubernetes 请求数",
+      "invalidInput": "请输入独立的制品 ID、有效的 namespace/pod UID 和足够的观测限制。",
+      "authorityDigest": "拉取观测摘要",
+      "podCount": "Pod 数量",
+      "serviceAccountCount": "ServiceAccount 数量",
+      "secretCount": "Secret 引用数量",
+      "missingReferenceCount": "缺失引用数量"
     }
   }
 }

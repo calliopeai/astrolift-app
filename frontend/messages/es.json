@@ -17626,7 +17626,7 @@
       "title": "Trabajo nativo original",
       "help": "Inspeccione el recibo original del agente y descargue sus artefactos privados tras revisar su identidad y hash.",
       "artifacts": "Artefactos privados",
-      "size": "Bytes",
+      "size": "Tamaño en bytes",
       "download": "Descargar archivo privado",
       "load": "Leer recibo original",
       "reconcile": "Conciliar trabajo original",
@@ -18148,7 +18148,7 @@
       "retry": "Reintentar preparación retenida",
       "unconfirmed": "La respuesta no está confirmada. Conserve el UUID y revise el plan antes de reintentar. El reintento usa la intención original retenida en el servidor.",
       "items": "Elementos de despliegue",
-      "ordinal": "Ordinal",
+      "ordinal": "Posición",
       "name": "Nombre",
       "type": "Tipo propuesto",
       "originalType": "Tipo original",
@@ -18474,6 +18474,22 @@
       "pairCount": "Pares imagen/nodo",
       "issueCount": "Comprobaciones pendientes",
       "invalidInput": "Revisa el UUID distinto, el ámbito exacto de nodos/UID, los perfiles de ejecución y los límites."
+    },
+    "installPullAuthority": {
+      "title": "Observaciones de descarga de Pods",
+      "help": "Revisa los Pods admitidos y sus referencias de descarga para este vínculo de imágenes.",
+      "closureRequired": "Aún se deben verificar la propiedad, las credenciales del kubelet, la correspondencia del registro y la aprobación vinculada de instalación.",
+      "selectedPods": "Pods seleccionados (JSON privado)",
+      "podsHelp": "Asocia cada namespace/pod con su UID actual. La observación lee por separado las referencias del Pod admitido y las ServiceAccounts actuales; no demuestra acceso de descarga.",
+      "limitsTitle": "Límites de observación",
+      "limitsHelp": "Estos límites acotan las solicitudes de solo lectura a Kubernetes y las pruebas conservadas.",
+      "maximumCalls": "Máximo de solicitudes a Kubernetes",
+      "invalidInput": "Introduce un ID de artefacto distinto, UID válidos de namespace/pod y límites suficientes.",
+      "authorityDigest": "Resumen de observación de descarga",
+      "podCount": "Pods",
+      "serviceAccountCount": "Cuentas de servicio",
+      "secretCount": "Referencias a Secrets",
+      "missingReferenceCount": "Referencias ausentes"
     }
   }
 }

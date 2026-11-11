@@ -18471,6 +18471,22 @@
       "pairCount": "イメージとノードの組み合わせ",
       "issueCount": "未解決の確認事項",
       "invalidInput": "重複しない UUID、正確なノード/UID の範囲、ランタイムプロファイル、制限を確認してください。"
+    },
+    "installPullAuthority": {
+      "title": "Pod のイメージ取得の観測",
+      "help": "このイメージの関連付けについて、受理済み Pod とイメージ取得の参照を確認します。",
+      "closureRequired": "所有関係、kubelet の認証情報、レジストリとの対応、リンクされたインストール承認は、引き続き検証が必要です。",
+      "selectedPods": "選択する Pod（非公開 JSON）",
+      "podsHelp": "各 namespace/pod を現在の UID に対応付けます。受理済み Pod の取得参照と現在の ServiceAccount は別々に読み取られます。イメージ取得権限の証明にはなりません。",
+      "limitsTitle": "観測の上限",
+      "limitsHelp": "Kubernetes への読み取り専用リクエストと保存する証拠の量を制限します。",
+      "maximumCalls": "Kubernetes リクエストの最大数",
+      "invalidInput": "他と異なるアーティファクト ID、有効な namespace/pod の UID、十分な観測上限を入力してください。",
+      "authorityDigest": "取得観測のダイジェスト",
+      "podCount": "Pod 数",
+      "serviceAccountCount": "ServiceAccount 数",
+      "secretCount": "Secret 参照数",
+      "missingReferenceCount": "欠落した参照数"
     }
   }
 }

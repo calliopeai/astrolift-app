@@ -1,3 +1,4 @@
+import { INSTALL_PULL_AUTHORITY_PROPS } from "./NvkeOperatorInstallPlanPullAuthorityPanel.stories";
 import { INSTALL_NODE_PLATFORMS_PROPS } from "./NvkeOperatorInstallPlanNodePlatformsPanel.stories";
 import {
   INSTALL_IMMUTABLE_PAYLOAD_PROPS,
@@ -381,4 +382,18 @@ export const InstallNodePlatformsReadOnly: Story = {
 };
 export const InstallNodePlatformsPending: Story = {
   args: { ...InstallNodePlatforms.args, pending: true },
+};
+
+export const InstallPullAuthority: Story = {
+  args: {
+    ...InstallNodePlatforms.args,
+    operatorInstallPlanNodePlatforms: null,
+    operatorInstallPlanPullAuthority: INSTALL_PULL_AUTHORITY_PROPS,
+  },
+};
+export const InstallPullAuthorityReadOnly: Story = {
+  args: { ...InstallPullAuthority.args, canAct: false },
+};
+export const InstallPullAuthorityPending: Story = {
+  args: { ...InstallPullAuthority.args, pending: true },
 };
