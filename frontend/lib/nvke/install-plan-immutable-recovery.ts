@@ -36,14 +36,45 @@ const sourceShape = {
   workloadId: guid,
   workloadVersion: version,
   workloadDigest: digest,
-  mode: z.enum(["payload", "execution", "platform", "pull-authority"]),
+  mode: z.enum(["payload", "execution", "platform", "pull-authority", "pull-secret-analysis"]),
   bindingId: guid,
   bindingVersion: version,
   bindingDigest: digest,
+  pullAuthorityId: guid.optional(),
+  pullAuthorityVersion: version.optional(),
+  pullAuthorityDigest: digest.optional(),
 };
+const exactPullSource = (row: {
+  mode: string;
+  operationId: string;
+  planId: string;
+  chartArtifactId: string;
+  treeId: string;
+  workloadId: string;
+  bindingId: string;
+  pullAuthorityId?: string;
+  pullAuthorityVersion?: number;
+  pullAuthorityDigest?: string;
+}) =>
+  row.mode === "pull-secret-analysis"
+    ? typeof row.pullAuthorityId === "string" &&
+      row.pullAuthorityVersion !== undefined &&
+      row.pullAuthorityDigest !== undefined &&
+      ![
+        row.operationId,
+        row.planId,
+        row.chartArtifactId,
+        row.treeId,
+        row.workloadId,
+        row.bindingId,
+      ].includes(row.pullAuthorityId)
+    : row.pullAuthorityId === undefined &&
+      row.pullAuthorityVersion === undefined &&
+      row.pullAuthorityDigest === undefined;
 const sourceSchema = z
   .object(sourceShape)
   .strict()
+  .refine(exactPullSource)
   .refine(
     (row) =>
       new Set([
@@ -65,12 +96,14 @@ const schema = z
       "nvke-install-plan-immutable-execution-tree",
       "nvke-install-plan-node-platforms",
       "nvke-install-plan-pull-authority",
+      "nvke-install-plan-pull-secret-analysis",
     ]),
     ...sourceShape,
     ...selectionSchema.shape,
     inputSha256: digest,
   })
-  .strict();
+  .strict()
+  .refine(exactPullSource);
 export type NvkeInstallPlanImmutableJournalSource = NvkeInstallPlanTreeJournalSource & {
   treeId: string;
   treeVersion: number;
@@ -78,7 +111,10 @@ export type NvkeInstallPlanImmutableJournalSource = NvkeInstallPlanTreeJournalSo
   workloadId: string;
   workloadVersion: number;
   workloadDigest: string;
-  mode: "payload" | "execution" | "platform" | "pull-authority";
+  mode: "payload" | "execution" | "platform" | "pull-authority" | "pull-secret-analysis";
+  pullAuthorityId?: string;
+  pullAuthorityVersion?: number;
+  pullAuthorityDigest?: string;
   bindingId: string;
   bindingVersion: number;
   bindingDigest: string;
@@ -98,11 +134,15 @@ export const installPlanImmutableRecoveryKey = (source: NvkeInstallPlanImmutable
     source.workloadId,
     source.bindingId,
     source.mode,
+    ...(source.mode === "pull-secret-analysis"
+      ? [source.pullAuthorityId, source.pullAuthorityVersion, source.pullAuthorityDigest]
+      : []),
   ]);
 const intentKey = (source: NvkeInstallPlanImmutableJournalSource, artifactId: string) =>
   installPlanImmutableRecoveryKey(source) + ":intent:" + artifactId;
 
-function recordKind(mode: "payload" | "execution" | "platform" | "pull-authority") {
+function recordKind(mode: NvkeInstallPlanImmutableJournalSource["mode"]) {
+  if (mode === "pull-secret-analysis") return "nvke-install-plan-pull-secret-analysis" as const;
   if (mode === "pull-authority") return "nvke-install-plan-pull-authority" as const;
   if (mode === "platform") return "nvke-install-plan-node-platforms" as const;
   return mode === "payload"
@@ -153,7 +193,8 @@ function choice(source: NvkeInstallPlanImmutableJournalSource, value: unknown) {
       source.treeId,
       source.workloadId,
       source.bindingId,
-    ]).size !== 7
+    ]).size !== 7 ||
+    selected.artifactId === source.pullAuthorityId
   )
     throw new NvkeRecoveryError("INVALID_RECOVERY");
   return selected;

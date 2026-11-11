@@ -1,4 +1,5 @@
 "use client";
+import { NvkeOperatorInstallPlanPullSecretAnalysisPanel } from "./NvkeOperatorInstallPlanPullSecretAnalysisPanel";
 import { NvkeOperatorInstallPlanPullAuthorityPanel } from "./NvkeOperatorInstallPlanPullAuthorityPanel";
 
 import { DownloadIcon, RefreshCwIcon } from "lucide-react";
@@ -71,6 +72,7 @@ export function NvkeOperationScreen({
   operatorInstallPlanImmutableExecution,
   operatorInstallPlanNodePlatforms,
   operatorInstallPlanPullAuthority,
+  operatorInstallPlanPullSecretAnalysis,
   operatorInstallPlanLocalImage,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
@@ -280,6 +282,13 @@ export function NvkeOperationScreen({
           {...operatorInstallPlanPullAuthority}
           canReview={operatorInstallPlanPullAuthority.canReview && canAct && !error}
           pending={pending || operatorInstallPlanPullAuthority.pending}
+        />
+      )}
+      {operatorInstallPlanPullSecretAnalysis && (
+        <NvkeOperatorInstallPlanPullSecretAnalysisPanel
+          {...operatorInstallPlanPullSecretAnalysis}
+          canReview={operatorInstallPlanPullSecretAnalysis.canReview && canAct && !error}
+          pending={pending || operatorInstallPlanPullSecretAnalysis.pending}
         />
       )}
       {operatorInstallPlanImagePayload && (

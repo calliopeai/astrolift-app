@@ -18487,6 +18487,25 @@
       "serviceAccountCount": "ServiceAccount 数量",
       "secretCount": "Secret 引用数量",
       "missingReferenceCount": "缺失引用数量"
+    },
+    "installPullSecretAnalysis": {
+      "title": "镜像凭据候选",
+      "help": "为选定的镜像使用位置解析已准入 Pod 的拉取 Secret。",
+      "closureRequired": "仍需验证 kubelet 配置、凭据插件、仓库访问、工作负载所有权及关联的安装批准。",
+      "imageSelections": "镜像使用位置（私密 JSON）",
+      "imagesHelp": "提供 namespace/pod、已准入 Pod 中的镜像指针及明确的 ensureSecretPulledImages 布尔值。此设置描述解析条件，并非已验证的节点配置。",
+      "limitsTitle": "解析限制",
+      "limitsHelp": "限制私密输入和辅助程序输出。解析不会向 Kubernetes 或仓库发送新请求。",
+      "maximumHelperBytes": "辅助程序输出的最大字节数",
+      "invalidInput": "请输入独立的制品 ID、包含明确设置的有效镜像使用位置及足够的限额。",
+      "authorityDigest": "凭据解析摘要",
+      "pullAuthorityDigest": "源拉取观测摘要",
+      "imageUseCount": "镜像使用位置",
+      "candidateCount": "Secret 候选",
+      "missingReferenceCount": "缺失的拉取 Secret 引用",
+      "analyzedAt": "解析时间",
+      "sourceObservedAt": "源观测时间",
+      "parentRequired": "解析镜像凭据前，请审查确切的拉取观测。"
     }
   }
 }

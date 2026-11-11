@@ -18490,6 +18490,25 @@
       "serviceAccountCount": "Cuentas de servicio",
       "secretCount": "Referencias a Secrets",
       "missingReferenceCount": "Referencias ausentes"
+    },
+    "installPullSecretAnalysis": {
+      "title": "Credenciales candidatas de imagen",
+      "help": "Interpreta los Secrets de descarga de los Pods admitidos para los usos de imagen seleccionados.",
+      "closureRequired": "Aún deben verificarse la configuración de kubelet, los complementos de credenciales, el acceso al registro, la propiedad de las cargas y la aprobación de instalación vinculada.",
+      "imageSelections": "Usos de imagen (JSON privado)",
+      "imagesHelp": "Indica namespace/pod, un puntero de imagen del Pod admitido y el booleano explícito ensureSecretPulledImages. Este valor describe la interpretación, no una configuración de nodo verificada.",
+      "limitsTitle": "Límites de interpretación",
+      "limitsHelp": "Limita la entrada privada y la salida del auxiliar. La interpretación no realiza nuevas solicitudes a Kubernetes ni al registro.",
+      "maximumHelperBytes": "Máximo de bytes de salida del auxiliar",
+      "invalidInput": "Indica un ID de artefacto distinto, usos de imagen válidos con ajustes explícitos y límites suficientes.",
+      "authorityDigest": "Resumen de la interpretación de credenciales",
+      "pullAuthorityDigest": "Resumen de la observación de descarga de origen",
+      "imageUseCount": "Usos de imagen",
+      "candidateCount": "Secrets candidatos",
+      "missingReferenceCount": "Referencias de Secrets de descarga ausentes",
+      "analyzedAt": "Hora de interpretación",
+      "sourceObservedAt": "Hora de observación de origen",
+      "parentRequired": "Revisa la observación de descarga exacta antes de interpretar las credenciales de imagen."
     }
   }
 }

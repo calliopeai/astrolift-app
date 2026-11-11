@@ -1,3 +1,4 @@
+import { INSTALL_PULL_SECRET_ANALYSIS_PROPS } from "./NvkeOperatorInstallPlanPullSecretAnalysisPanel.stories";
 import { INSTALL_PULL_AUTHORITY_PROPS } from "./NvkeOperatorInstallPlanPullAuthorityPanel.stories";
 import { INSTALL_NODE_PLATFORMS_PROPS } from "./NvkeOperatorInstallPlanNodePlatformsPanel.stories";
 import {
@@ -396,4 +397,17 @@ export const InstallPullAuthorityReadOnly: Story = {
 };
 export const InstallPullAuthorityPending: Story = {
   args: { ...InstallPullAuthority.args, pending: true },
+};
+
+export const InstallPullSecretAnalysis: Story = {
+  args: {
+    ...InstallPullAuthority.args,
+    operatorInstallPlanPullSecretAnalysis: INSTALL_PULL_SECRET_ANALYSIS_PROPS,
+  },
+};
+export const InstallPullSecretAnalysisReadOnly: Story = {
+  args: { ...InstallPullSecretAnalysis.args, canAct: false },
+};
+export const InstallPullSecretAnalysisPending: Story = {
+  args: { ...InstallPullSecretAnalysis.args, pending: true },
 };

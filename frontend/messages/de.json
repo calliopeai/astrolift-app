@@ -18490,6 +18490,25 @@
       "serviceAccountCount": "Dienstkonten",
       "secretCount": "Secret-Referenzen",
       "missingReferenceCount": "Fehlende Referenzen"
+    },
+    "installPullSecretAnalysis": {
+      "title": "Kandidaten für Image-Zugangsdaten",
+      "help": "Pull-Secrets zugelassener Pods für ausgewählte Image-Verwendungen auswerten.",
+      "closureRequired": "Kubelet-Konfiguration, Zugangsdaten-Plugins, Registry-Zugriff, Workload-Zuordnung und verknüpfte Installationsfreigabe müssen noch geprüft werden.",
+      "imageSelections": "Image-Verwendungen (privates JSON)",
+      "imagesHelp": "Namespace/Pod, einen Image-Pointer des zugelassenen Pods und den expliziten booleschen Wert ensureSecretPulledImages angeben. Diese Einstellung beschreibt die Auswertung, keine geprüfte Knotenkonfiguration.",
+      "limitsTitle": "Grenzen der Auswertung",
+      "limitsHelp": "Private Eingaben und Helper-Ausgabe begrenzen. Die Auswertung sendet keine neuen Kubernetes- oder Registry-Anfragen.",
+      "maximumHelperBytes": "Maximale Helper-Ausgabe in Bytes",
+      "invalidInput": "Eine eindeutige Artefakt-ID, gültige Image-Verwendungen mit expliziten Einstellungen und ausreichende Grenzen angeben.",
+      "authorityDigest": "Prüfsumme der Zugangsdaten-Auswertung",
+      "pullAuthorityDigest": "Prüfsumme der ursprünglichen Pull-Beobachtung",
+      "imageUseCount": "Image-Verwendungen",
+      "candidateCount": "Secret-Kandidaten",
+      "missingReferenceCount": "Fehlende Pull-Secret-Verweise",
+      "analyzedAt": "Zeitpunkt der Auswertung",
+      "sourceObservedAt": "Zeitpunkt der Quellbeobachtung",
+      "parentRequired": "Vor der Auswertung die genaue Pull-Beobachtung prüfen."
     }
   }
 }

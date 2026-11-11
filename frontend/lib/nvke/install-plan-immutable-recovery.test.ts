@@ -240,3 +240,55 @@ it("keeps pull observation journals private and separate from every other artifa
     expect(() => readInstallPlanImmutableJournal(s, pull, chosen)).toThrow();
   }
 });
+
+it("binds Secret interpretation recovery to the exact pull parent without changing legacy storage keys", () => {
+  expect(installPlanImmutableRecoveryKey(source)).toBe(
+    "astrolift.nvke.install-plan-immutable.v1:" +
+      JSON.stringify([
+        source.server,
+        source.organizationId,
+        source.actorId,
+        source.operationId,
+        source.planId,
+        source.chartArtifactId,
+        source.treeId,
+        source.workloadId,
+        source.bindingId,
+        source.mode,
+      ])
+  );
+  const selected = {
+    ...source,
+    mode: "pull-secret-analysis" as const,
+    pullAuthorityId: "84cd76e5-12ab-46fe-a89c-abc123abcd78",
+    pullAuthorityVersion: 2,
+    pullAuthorityDigest: "7".repeat(64),
+  };
+  const s = storage();
+  const saved = saveInstallPlanImmutableJournal(s, selected, chosen, "e".repeat(64));
+  expect(saved.kind).toBe("nvke-install-plan-pull-secret-analysis");
+  expect(readSelectedInstallPlanImmutable(s, selected)).toEqual(chosen);
+  expect(readInstallPlanImmutableJournal(s, selected, chosen)).toEqual(saved);
+  for (const change of [
+    { pullAuthorityVersion: 3 },
+    { pullAuthorityDigest: "8".repeat(64) },
+    { pullAuthorityId: "85cd76e5-12ab-46fe-a89c-abc123abcd78" },
+  ]) {
+    expect(readSelectedInstallPlanImmutable(s, { ...selected, ...change })).toBeNull();
+    expect(readInstallPlanImmutableJournal(s, { ...selected, ...change }, chosen)).toBeNull();
+  }
+  expect(() =>
+    saveInstallPlanImmutableJournal(
+      s,
+      selected,
+      { artifactId: selected.pullAuthorityId },
+      "e".repeat(64)
+    )
+  ).toThrow();
+  for (const invalid of [
+    { ...source, mode: "pull-secret-analysis" as const },
+    { ...selected, pullAuthorityId: source.bindingId },
+    { ...selected, mode: "payload" as const },
+  ])
+    expect(() => saveInstallPlanImmutableJournal(s, invalid, chosen, "e".repeat(64))).toThrow();
+});

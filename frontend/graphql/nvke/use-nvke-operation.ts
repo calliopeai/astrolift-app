@@ -1,4 +1,5 @@
 "use client";
+import { useNvkeInstallPlanPullSecretAnalysis } from "./use-nvke-install-plan-pull-secret-analysis";
 
 import { useRef, useState } from "react";
 import { useApolloClient } from "@apollo/client/react";
@@ -384,6 +385,21 @@ export const useNvkeOperation = (
         operatorInstallPlanNodePlatforms?.pending
       ),
   });
+  const operatorInstallPlanPullSecretAnalysis = useNvkeInstallPlanPullSecretAnalysis({
+    context,
+    source: operatorInstallPlanTree,
+    workload: operatorInstallPlanWorkload,
+    imageBinding: operatorInstallPlanImageBinding,
+    pullAuthority: operatorInstallPlanPullAuthority,
+    pending:
+      immutableParentPending ||
+      Boolean(
+        operatorInstallPlanImagePayload?.pending ||
+        operatorInstallPlanImmutableExecution?.pending ||
+        operatorInstallPlanNodePlatforms?.pending ||
+        operatorInstallPlanPullAuthority?.pending
+      ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -406,6 +422,7 @@ export const useNvkeOperation = (
       operatorInstallPlanImmutableExecution?.pending ||
       operatorInstallPlanNodePlatforms?.pending ||
       operatorInstallPlanPullAuthority?.pending ||
+      operatorInstallPlanPullSecretAnalysis?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -467,6 +484,7 @@ export const useNvkeOperation = (
     operatorInstallPlanImmutableExecution,
     operatorInstallPlanNodePlatforms,
     operatorInstallPlanPullAuthority,
+    operatorInstallPlanPullSecretAnalysis,
     diagnostics,
     maintenance,
     credentials,
@@ -495,7 +513,8 @@ export const useNvkeOperation = (
         operatorInstallPlanImagePayload?.pending ||
         operatorInstallPlanImmutableExecution?.pending ||
         operatorInstallPlanNodePlatforms?.pending ||
-        operatorInstallPlanPullAuthority?.pending
+        operatorInstallPlanPullAuthority?.pending ||
+        operatorInstallPlanPullSecretAnalysis?.pending
       ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
@@ -523,6 +542,7 @@ export const useNvkeOperation = (
         operatorInstallPlanImmutableExecution?.pending ||
         operatorInstallPlanNodePlatforms?.pending ||
         operatorInstallPlanPullAuthority?.pending ||
+        operatorInstallPlanPullSecretAnalysis?.pending ||
         !operation
       )
         return;

@@ -18487,6 +18487,25 @@
       "serviceAccountCount": "ServiceAccounts",
       "secretCount": "Secret references",
       "missingReferenceCount": "Missing references"
+    },
+    "installPullSecretAnalysis": {
+      "title": "Image credential candidates",
+      "help": "Interpret admitted Pod pull Secrets for selected image uses.",
+      "closureRequired": "Kubelet configuration, credential plugins, registry access, workload ownership and linked installation approval still need verification.",
+      "imageSelections": "Image uses (private JSON)",
+      "imagesHelp": "Provide namespace/pod, an admitted image pointer and an explicit ensureSecretPulledImages boolean. The setting describes this interpretation, not verified node configuration.",
+      "limitsTitle": "Interpretation limits",
+      "limitsHelp": "Bound private input and helper output. Interpretation makes no new Kubernetes or registry requests.",
+      "maximumHelperBytes": "Maximum helper output bytes",
+      "invalidInput": "Enter a distinct artifact ID, valid image uses with explicit feature settings, and sufficient limits.",
+      "authorityDigest": "Credential interpretation digest",
+      "pullAuthorityDigest": "Source pull observation digest",
+      "imageUseCount": "Image uses",
+      "candidateCount": "Secret candidates",
+      "missingReferenceCount": "Missing pull Secret references",
+      "analyzedAt": "Interpretation time",
+      "sourceObservedAt": "Source observation time",
+      "parentRequired": "Review the exact pull observation before interpreting image credentials."
     }
   }
 }

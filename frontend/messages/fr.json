@@ -18490,6 +18490,25 @@
       "serviceAccountCount": "Comptes de service",
       "secretCount": "Références aux Secrets",
       "missingReferenceCount": "Références manquantes"
+    },
+    "installPullSecretAnalysis": {
+      "title": "Identifiants candidats des images",
+      "help": "Interpréter les Secrets de téléchargement des Pods admis pour les usages sélectionnés.",
+      "closureRequired": "La configuration kubelet, les plugins d’identifiants, l’accès au registre, la propriété des charges et l’approbation d’installation liée restent à vérifier.",
+      "imageSelections": "Usages des images (JSON privé)",
+      "imagesHelp": "Fournir namespace/pod, un pointeur d’image du Pod admis et le booléen explicite ensureSecretPulledImages. Ce réglage décrit l’interprétation, pas une configuration de nœud vérifiée.",
+      "limitsTitle": "Limites d’interprétation",
+      "limitsHelp": "Limiter l’entrée privée et la sortie de l’auxiliaire. L’interprétation n’émet aucune nouvelle requête Kubernetes ou au registre.",
+      "maximumHelperBytes": "Octets de sortie maximum de l’auxiliaire",
+      "invalidInput": "Saisir un identifiant d’artefact distinct, des usages d’image valides avec des réglages explicites et des limites suffisantes.",
+      "authorityDigest": "Empreinte de l’interprétation des identifiants",
+      "pullAuthorityDigest": "Empreinte de l’observation de téléchargement source",
+      "imageUseCount": "Usages des images",
+      "candidateCount": "Secrets candidats",
+      "missingReferenceCount": "Références de Secrets de téléchargement manquantes",
+      "analyzedAt": "Heure de l’interprétation",
+      "sourceObservedAt": "Heure de l’observation source",
+      "parentRequired": "Vérifier l’observation de téléchargement exacte avant d’interpréter les identifiants des images."
     }
   }
 }

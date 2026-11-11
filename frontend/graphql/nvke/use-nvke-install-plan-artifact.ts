@@ -63,6 +63,16 @@ export type InstallPlanArtifactEnvelope =
   | undefined;
 type Policy<Form, Artifact> = {
   mode: NvkeInstallPlanImmutableJournalSource["mode"];
+  extraSource?: {
+    ready: boolean;
+    pending: boolean;
+    epoch: string;
+    binding: {
+      pullAuthorityId: string;
+      pullAuthorityVersion: number;
+      pullAuthorityDigest: string;
+    } | null;
+  };
   parse: (value: unknown) => Form;
   request: (form: Form, ...parents: Parents) => object;
   validate: (value: unknown, parents: Parents, artifactId: string, limits?: Form) => Artifact;
@@ -157,6 +167,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
     }
   }
   const ready = !!(
+    (!policy.extraSource || policy.extraSource.ready) &&
     images &&
     inventory &&
     source?.canReview &&
@@ -226,6 +237,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
           bindingId: images.id,
           bindingVersion: images.version,
           bindingDigest: images.bindingDigest,
+          ...policy.extraSource?.binding,
         })
       : "";
   const binding = useMemo(
@@ -248,6 +260,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
       args.imageBinding?.artifacts,
       args.imageBinding?.pending,
       args.pending,
+      policy.extraSource?.epoch,
       ready,
       selectionEpoch,
     ])
@@ -301,6 +314,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
       !current() ||
       busy.current ||
       args.pending ||
+      policy.extraSource?.pending ||
       args.workload?.pending ||
       args.imageBinding?.pending ||
       source?.pending ||
@@ -313,6 +327,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
       artifactId === binding.treeId ||
       artifactId === binding.workloadId ||
       artifactId === binding.bindingId ||
+      artifactId === binding.pullAuthorityId ||
       (visible.selection && visible.selection.artifactId !== artifactId)
     )
       return false;
@@ -453,6 +468,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
       !current() ||
       busy.current ||
       args.pending ||
+      policy.extraSource?.pending ||
       args.workload?.pending ||
       args.imageBinding?.pending ||
       source?.pending ||
@@ -499,6 +515,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
     allowOriginalPreparation: visible?.allowOriginalPreparation ?? false,
     pending:
       args.pending ||
+      policy.extraSource?.pending ||
       source.pending ||
       args.workload?.pending ||
       args.imageBinding?.pending ||

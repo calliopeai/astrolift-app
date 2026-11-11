@@ -18487,6 +18487,25 @@
       "serviceAccountCount": "ServiceAccount 数",
       "secretCount": "Secret 参照数",
       "missingReferenceCount": "欠落した参照数"
+    },
+    "installPullSecretAnalysis": {
+      "title": "イメージ認証情報の候補",
+      "help": "選択したイメージ使用箇所について、承認済みPodの取得用Secretを解釈します。",
+      "closureRequired": "kubelet設定、認証情報プラグイン、レジストリへのアクセス、ワークロードの所有関係、関連するインストール承認は別途検証が必要です。",
+      "imageSelections": "イメージ使用箇所（非公開JSON）",
+      "imagesHelp": "namespace/pod、承認済みPod内のイメージへのポインター、明示的な真偽値ensureSecretPulledImagesを指定してください。この設定は解釈の条件であり、検証済みのノード設定ではありません。",
+      "limitsTitle": "解釈の制限",
+      "limitsHelp": "非公開入力とヘルパー出力の上限です。解釈時にKubernetesやレジストリへ新たな要求は送信しません。",
+      "maximumHelperBytes": "ヘルパー出力の最大バイト数",
+      "invalidInput": "重複しないアーティファクトID、明示的な設定を持つ有効なイメージ使用箇所、十分な上限を入力してください。",
+      "authorityDigest": "認証情報の解釈のダイジェスト",
+      "pullAuthorityDigest": "元の取得観測のダイジェスト",
+      "imageUseCount": "イメージ使用箇所",
+      "candidateCount": "Secretの候補",
+      "missingReferenceCount": "欠落している取得用Secret参照",
+      "analyzedAt": "解釈時刻",
+      "sourceObservedAt": "元の観測時刻",
+      "parentRequired": "イメージ認証情報を解釈する前に、正確な取得観測を確認してください。"
     }
   }
 }
