@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "Storybook-first node/platform controls, metadata-only recovery controller and operation-page wiring",
-  "status": "wired and locally qualified including production build; actual paired native clients remain pending",
+  "status": "production build and actual App/CLI/browser node recovery qualified at recorded source pins",
   "sources": {
     "frontend/lib/nvke/operator-install-plan-node-platforms.ts": "5fb93e42cd544593d2338c0eccb8be4333ebb55eca10d1dfb58633aad8a023ea",
     "frontend/lib/nvke/operator-install-plan-node-platforms.test.ts": "d09674570b4c9a6a5d294f4c0347f73291ae9f65f1ce117cdfd91f758a73d826",
@@ -104,8 +104,8 @@
     "operation guards disable node controls and block cancel/download while node requests are pending"
   ],
   "remaining": [
-    "actual paired API/CLI/browser node-stage qualification",
-    "source-event investigation and final native admission requirements"
+    "final current-source repinning after runtime helper changes",
+    "source-event investigation, selected-node host binding and final native admission requirements"
   ],
   "adversarialRegression": {
     "scope": "tree pending A-to-B-to-A invalidation in payload, execution and platform modes",
@@ -131,7 +131,7 @@
     "sourceCommit": "efe5016a1"
   },
   "nativePeerHarness": {
-    "status": "static checks passed; actual native run pending",
+    "status": "actual frozen native qualification passed; see pairedNative evidence",
     "sources": {
       "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.api.stories.tsx": "d51d9c5518c52c0ce5f8af8c95ddfe59b2a99cd0421189895d4edb48322fbb98",
       "frontend/e2e/nvke-install-plan-node-platforms-api-runner.mjs": "93dcdf205dee3fbdd9bee4bbb466862932bd7726aac1d25c9068556480313ca3"
@@ -140,5 +140,25 @@
     "checkExitPath": "/tmp/astrolift-nvke-node-platform-peer-ui-v1.exit",
     "checkExitCode": 0,
     "scope": "full TypeScript, targeted ESLint and JavaScript syntax; actual Storybook entry discovered"
+  },
+  "pairedNative": {
+    "status": "passed at recorded frozen source pins",
+    "evidence": "management-node-platform-clients-native-local.json",
+    "sourcePins": {
+      "app": "34c208745ff96b4a64446986d5cf337693414b5c",
+      "cli": "5da5dae230c4bf24262605a4fe75814eb340b168",
+      "opscode": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+    },
+    "passed": 1,
+    "skipped": 0,
+    "runtimeProfiles": 5,
+    "logPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.exit",
+    "exitCode": 0,
+    "browserCalls": [
+      "PrepareNvkeInstallPlanNodePlatforms",
+      "ReviewNvkeInstallPlanNodePlatforms",
+      "RetryNvkeInstallPlanNodePlatforms"
+    ]
   }
 }

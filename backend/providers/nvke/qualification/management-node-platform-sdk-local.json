@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "SDK node/image platform observation controls; no native admission",
-  "status": "local contract and frozen mTLS SDK/agent recovery qualified; paired API/CLI/browser pending",
+  "status": "local contracts, actual frozen SDK/agent and paired App/CLI/browser recovery qualified at recorded source pins",
   "sources": {
     "backend/providers/nvke/_operator_install_plan_node_platforms.py": "6e8a2dd2c8358f403f4b8d2ff15fcdb49f51016f18a0bd721fd4d47794bcc0a2",
     "backend/providers/nvke/operator_agent_client.py": "11075499bff7189c0f94aeb16e827ce23bb95c98ac437d6d7663d5d3b6141216",
@@ -35,9 +35,8 @@
     "continuationAuthorized remains false"
   ],
   "remaining": [
-    "App persistence/GraphQL, CLI and Storybook-first UI",
-    "helper distribution and live target qualification",
-    "CPU/importer attestation, scheduling, credential correspondence, availability, phase use and linked admission"
+    "final current-source repinning and Linux agent-route qualification",
+    "selected-node CPU/importer, scheduling, credential correspondence, availability, phase use and linked admission"
   ],
   "retainedHarnessFailures": [
     {
@@ -78,5 +77,25 @@
   },
   "limitations": [
     "Active-worktree vnode source-proof refusals are retained in Ops agent qualification; a frozen source run and the frozen paired SDK run pass. The source-event cause remains under investigation."
-  ]
+  ],
+  "pairedNative": {
+    "status": "passed at recorded frozen source pins",
+    "evidence": "management-node-platform-clients-native-local.json",
+    "sourcePins": {
+      "app": "34c208745ff96b4a64446986d5cf337693414b5c",
+      "cli": "5da5dae230c4bf24262605a4fe75814eb340b168",
+      "opscode": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+    },
+    "passed": 1,
+    "skipped": 0,
+    "runtimeProfiles": 5,
+    "logPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.exit",
+    "exitCode": 0,
+    "browserCalls": [
+      "PrepareNvkeInstallPlanNodePlatforms",
+      "ReviewNvkeInstallPlanNodePlatforms",
+      "RetryNvkeInstallPlanNodePlatforms"
+    ]
+  }
 }

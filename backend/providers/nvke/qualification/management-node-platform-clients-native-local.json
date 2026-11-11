@@ -1,0 +1,64 @@
+{
+  "format": 1,
+  "scope": "actual compiled CLI and production browser controller through App/Postgres/SDK/mTLS agent node-stage recovery",
+  "status": "passed at the recorded frozen source revisions; later runtime changes require final repinning",
+  "sources": {
+    "app": "34c208745ff96b4a64446986d5cf337693414b5c",
+    "cli": "5da5dae230c4bf24262605a4fe75814eb340b168",
+    "opscode": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+  },
+  "compiledCliSha256": "eeb7dc0a849ab3d4c5002defa7097298f84199f6dc0ba5d58d3499c1d1e35c3c",
+  "helperSha256": {
+    "containerd/v2.3.0": "e0feaa7f319cbfbc9572e9d569d168c7be08ca101247e2fcea5bc10e0608f0a4",
+    "containerd/v2.3.7": "e4344a0ebf9c7c61d095e306c67fcc1effe929869bf649ddc75ac121e7a5b5c9",
+    "containerd/v2.2.3": "2c08ec1ba95136c39a7bccfe78b3d399937964df0cb74f41935861ba328afd06",
+    "containerd/v2.1.7": "60266682d7969c511c1e650712276a651f64fcd1d8a917148683775287b5f1cb",
+    "containerd/v1.7.31": "88d9027d2f85986f6aa92053bd9daedb03c9b43ce20a2956624b47b2c1247723"
+  },
+  "sourceManifestPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1-sources.json",
+  "sourceManifestSha256": "114ee1e9afaf01c112c2131342fe104f4d65f0c6d939a528e556b8f21644eb87",
+  "sourceFilesUnchanged": true,
+  "run": {
+    "sessionId": 83424,
+    "runnerPid": 15496,
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "dependencyDeprecationWarnings": 4,
+    "elapsedSeconds": 2198.392,
+    "logPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.log",
+    "logSha256": "b7bccd6370a4355cba49299d09e422ba229c85fdfb402c03830c1aa1072c8549",
+    "metadataPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.json",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.exit"
+  },
+  "browser": {
+    "passed": true,
+    "runtimeProfiles": 5,
+    "calls": [
+      "PrepareNvkeInstallPlanNodePlatforms",
+      "ReviewNvkeInstallPlanNodePlatforms",
+      "RetryNvkeInstallPlanNodePlatforms"
+    ],
+    "artifactDigest": "3f22cf7b981608785d05b9f412d15268126e01d3609768d2dd42acf7a8fc4eb0",
+    "captureDigest": "a9f9c7e975319e9a09cd7093e2bf4abd55f03b89b3240bfcd67a31cf6effbc88",
+    "rawDigest": "73ac7bab5a2286c6ce00fe06b91daee87ce2da01c3f97996504ff7696753b3ab",
+    "observedAt": "2026-11-11T07:13:26.072001+00:00",
+    "pageErrors": []
+  },
+  "verified": [
+    "actual real database and GraphQL, current SDK, mTLS agent and all five pinned runtime profile configurations",
+    "compiled CLI prepares a fresh node artifact; successful API response is deliberately lost; exact-input metadata-only journal precedes I/O",
+    "cold agent restart, explicit CLI review and retained retry preserve the original result and one preparation attempt",
+    "actual production browser hook/panel prepares another fresh artifact through authenticated GraphQL, loses the successful response, reloads without RPC, then explicitly reviews and retries",
+    "browser operations occur exactly once each: prepare, review and retry; retained read/retry send no private scope text",
+    "cold recovery refuses node recollection and new Kubernetes transports; observed Node API and registry read counts do not increase",
+    "private node names/UIDs/runtime selections are absent from browser storage and CLI journals; no automatic replay or cache retention",
+    "owned original fixture operation, admission journal and signed parent roots remain unchanged; continuation remains unauthorized"
+  ],
+  "limits": [
+    "Controlled authenticated Kubernetes Node and registry peers, not physical-node CPU/importer or scheduler/credential/availability attestation",
+    "Browser uses the production hook/panel in its owned Storybook API peer, not a full live operation-page navigation",
+    "Source pins describe this exact proof; current helper/agent source repinning is still required before final release",
+    "Original preserved live VMs were neither reset nor used for this qualification; no linked native admission, final PR merge or CONFLICT deployment was performed"
+  ]
+}

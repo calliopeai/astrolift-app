@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "current-admin node/platform prepare, review and explicit retry API; encrypted recovery and global UUID reservations",
-  "status": "local PostgreSQL/GraphQL and generated-client qualified; actual paired API/CLI/browser pending",
+  "status": "local persistence/GraphQL and actual paired compiled CLI/browser node recovery qualified at recorded source pins",
   "sources": {
     "CHANGELOG.md": "60ca8430ad004e0b9409c9f0cf200a6246547aa46509efa398821173c34c5cd9",
     "backend/astrolift_clusters/nvke_install_plan_charts.py": "1fcd57907c09f8755cdbc8be995dbc0392f3035fa48bd5bbd61209070a20af6b",
@@ -93,9 +93,28 @@
     }
   ],
   "remaining": [
-    "Storybook-first browser controls",
-    "actual paired API/compiled CLI/browser node-stage qualification",
-    "source-event refusal investigation, helper distribution and Linux agent route",
-    "CPU/importer, scheduling, credentials, availability, phase use and linked admission"
-  ]
+    "final current-source repinning and Linux agent-route qualification",
+    "source-event refusal investigation",
+    "selected-node CPU/importer, scheduling, credentials, availability, phase use and linked admission"
+  ],
+  "pairedNative": {
+    "status": "passed at recorded frozen source pins",
+    "evidence": "management-node-platform-clients-native-local.json",
+    "sourcePins": {
+      "app": "34c208745ff96b4a64446986d5cf337693414b5c",
+      "cli": "5da5dae230c4bf24262605a4fe75814eb340b168",
+      "opscode": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687"
+    },
+    "passed": 1,
+    "skipped": 0,
+    "runtimeProfiles": 5,
+    "logPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-clients-native-v1.exit",
+    "exitCode": 0,
+    "browserCalls": [
+      "PrepareNvkeInstallPlanNodePlatforms",
+      "ReviewNvkeInstallPlanNodePlatforms",
+      "RetryNvkeInstallPlanNodePlatforms"
+    ]
+  }
 }
