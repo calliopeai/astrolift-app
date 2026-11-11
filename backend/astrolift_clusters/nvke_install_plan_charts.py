@@ -18,14 +18,6 @@ from astrolift_clusters import nvke_operator_authority as authority
 from astrolift_clusters.models import (
     NvkeInstallPlan,
     NvkeInstallPlanCharts,
-    NvkeInstallPlanContext,
-    NvkeInstallPlanImage,
-    NvkeInstallPlanImageBinding,
-    NvkeInstallPlanImagePayload,
-    NvkeInstallPlanImmutableExecution,
-    NvkeInstallPlanTree,
-    NvkeInstallPlanVerification,
-    NvkeInstallPlanWorkload,
     NvkeOperation,
 )
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
@@ -169,18 +161,7 @@ def prepare(*, body, plan_id, expected_plan_version, plan_digest, **review):
                     "CONFLICT", "This artifact identity already identifies another preparation intent"
                 )
         else:
-            if (
-                NvkeOperation.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlan.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanTree.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanContext.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanVerification.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanImage.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanWorkload.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanImageBinding.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanImagePayload.all_objects.filter(guid=artifact_id).exists()
-                or NvkeInstallPlanImmutableExecution.all_objects.filter(guid=artifact_id).exists()
-            ):
+            if artifact_identity.reserved(artifact_id, excluding=NvkeInstallPlanCharts):
                 raise NvkeError("CONFLICT", "This identity already identifies another operation or plan")
             sealed = encrypt_at_rest(outbox.canonical(body))
             try:

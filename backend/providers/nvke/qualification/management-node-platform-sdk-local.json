@@ -1,7 +1,7 @@
 {
   "format": 1,
   "scope": "SDK node/image platform observation controls; no native admission",
-  "status": "local-contract-qualified; real paired agent qualification pending",
+  "status": "local contract and frozen mTLS SDK/agent recovery qualified; paired API/CLI/browser pending",
   "sources": {
     "backend/providers/nvke/_operator_install_plan_node_platforms.py": "6e8a2dd2c8358f403f4b8d2ff15fcdb49f51016f18a0bd721fd4d47794bcc0a2",
     "backend/providers/nvke/operator_agent_client.py": "11075499bff7189c0f94aeb16e827ce23bb95c98ac437d6d7663d5d3b6141216",
@@ -35,7 +35,6 @@
     "continuationAuthorized remains false"
   ],
   "remaining": [
-    "actual paired SDK/agent node-platform proof",
     "App persistence/GraphQL, CLI and Storybook-first UI",
     "helper distribution and live target qualification",
     "CPU/importer attestation, scheduling, credential correspondence, availability, phase use and linked admission"
@@ -46,5 +45,38 @@
       "exitCode": 4,
       "reason": "SDK-only runner loaded parent Django conftest without database configuration; final runner confines conftest discovery to SDK tests"
     }
+  ],
+  "nativeCheck": {
+    "runnerPid": 84139,
+    "logPath": "/tmp/astrolift-nvke-node-platform-sdk-native-macos-v1-test.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-sdk-native-macos-v1.exit",
+    "exitCode": 0,
+    "opsRevision": "ac7ab2e0f2048d5e4c10bcd6b3a886998cdca687",
+    "opsManifestPath": "/tmp/astrolift-nvke-node-platform-agent-frozen-v1-sources.json",
+    "opsFiles": 300,
+    "sdkManifestPath": "/tmp/astrolift-nvke-node-platform-sdk-frozen-v1-sources.json",
+    "sdkFiles": 94,
+    "sourcesUnchangedAfterRun": true,
+    "driverPath": "/tmp/astrolift-nvke-node-platform-sdk-native-driver-v1.py",
+    "driverSha256": "81bf94df1c8a3eb3f74fae175b54f66b014b03b6936ada30765901fdba22b476",
+    "runtimeProfiles": 5,
+    "calls": [
+      {
+        "mode": "prepare-discarded-reply",
+        "seconds": 113.482
+      },
+      {
+        "mode": "cold-read",
+        "seconds": 95.091
+      },
+      {
+        "mode": "explicit-retained-retry",
+        "seconds": 104.028
+      }
+    ],
+    "scope": "actual SDK/mTLS agent and compiled platform helpers with controlled authenticated Node API; source/admissions/registry counts unchanged, one attempt and continuation false; no physical CPU/importer attestation"
+  },
+  "limitations": [
+    "Active-worktree vnode source-proof refusals are retained in Ops agent qualification; a frozen source run and the frozen paired SDK run pass. The source-event cause remains under investigation."
   ]
 }

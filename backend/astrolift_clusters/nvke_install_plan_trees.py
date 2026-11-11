@@ -18,14 +18,7 @@ from astrolift_clusters import nvke_operator_authority as authority
 from astrolift_clusters.models import (
     NvkeInstallPlan,
     NvkeInstallPlanCharts,
-    NvkeInstallPlanContext,
-    NvkeInstallPlanImage,
-    NvkeInstallPlanImageBinding,
-    NvkeInstallPlanImagePayload,
-    NvkeInstallPlanImmutableExecution,
     NvkeInstallPlanTree,
-    NvkeInstallPlanVerification,
-    NvkeInstallPlanWorkload,
     NvkeOperation,
 )
 from core.secrets import EncryptedSecret, decrypt, encrypt_at_rest
@@ -213,21 +206,7 @@ def prepare(
                     "CONFLICT", "This tree identity already identifies another preparation intent"
                 )
         else:
-            if any(
-                model.all_objects.filter(guid=artifact_id).exists()
-                for model in (
-                    NvkeOperation,
-                    NvkeInstallPlan,
-                    NvkeInstallPlanCharts,
-                    NvkeInstallPlanContext,
-                    NvkeInstallPlanVerification,
-                    NvkeInstallPlanImage,
-                    NvkeInstallPlanWorkload,
-                    NvkeInstallPlanImageBinding,
-                    NvkeInstallPlanImagePayload,
-                    NvkeInstallPlanImmutableExecution,
-                )
-            ):
+            if artifact_identity.reserved(artifact_id, excluding=NvkeInstallPlanTree):
                 raise NvkeError(
                     "CONFLICT", "This identity already identifies an operation, plan or chart publication"
                 )

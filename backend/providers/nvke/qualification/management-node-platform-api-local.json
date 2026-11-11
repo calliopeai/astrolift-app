@@ -1,0 +1,101 @@
+{
+  "format": 1,
+  "scope": "current-admin node/platform prepare, review and explicit retry API; encrypted recovery and global UUID reservations",
+  "status": "local PostgreSQL/GraphQL and generated-client qualified; actual paired API/CLI/browser pending",
+  "sources": {
+    "CHANGELOG.md": "60ca8430ad004e0b9409c9f0cf200a6246547aa46509efa398821173c34c5cd9",
+    "backend/astrolift_clusters/nvke_install_plan_charts.py": "1fcd57907c09f8755cdbc8be995dbc0392f3035fa48bd5bbd61209070a20af6b",
+    "backend/astrolift_clusters/nvke_install_plan_contexts.py": "17485e8dcf8d7be63f44c8433921da2ca85b228f3080600fe9dd782c47c7749b",
+    "backend/astrolift_clusters/nvke_install_plan_image_bindings.py": "de6eb93d1fbb4692413206717098a389c1e24e9c49be637d0442817fb684b69c",
+    "backend/astrolift_clusters/nvke_install_plan_images.py": "801e2b34ba394fa5a1c1726d97a674515eccd7e3781c0723c7ede65d42e9932d",
+    "backend/astrolift_clusters/nvke_install_plan_node_platforms.py": "8d5753d74a2fa65cbd1671a8ba7892c127f9e1d2c74c2799a537f50ce7273592",
+    "backend/astrolift_clusters/nvke_install_plan_trees.py": "b132bae355c898e73dbb9ec8ce0b11f94916aa2320d2d6123a6ae4d0f5ed4e84",
+    "backend/astrolift_clusters/nvke_install_plan_verifications.py": "a489a8848f426b28fda2dd8d80ac773fa62a2ec172ebfc1b603c69961a720f29",
+    "backend/astrolift_clusters/nvke_install_plan_workloads.py": "b636782c0699ce15709d50d2a701d8ea5c6825d6aa450d1da6e5d4553dbd1f6a",
+    "backend/astrolift_clusters/nvke_install_plans.py": "203ef1869e3ca60ffe7ea5390ebccd331bda0962397416e2ae3bffd0d202711a",
+    "backend/astrolift_clusters/schema/__init__.py": "916d78d92c1ce662699bfa2958d6259dbcb6865fd27d246ce33fb60cd8d5ce4a",
+    "backend/astrolift_clusters/schema/nvke_install_plan_node_platforms.py": "f80ef9836be9201559ae9609b2ac9532d8b13d7ce1c81448a4e7a775f7389183",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_node_platforms.py": "a690d02c173d9875c90f014aa602c88dbb94fce0a5b0e902498a52ad2ceca68f",
+    "backend/config/schema.py": "59072c9557d00e926a835db587dbe5b3ded98707dd8dab564667bdf8ecf6eecf",
+    "backend/core/schema/audit.py": "a9151d74270478652620e8c445ca7e53f14a407688330b58f3bde6febc1e6a43",
+    "backend/schema.graphql": "352210d92c1ae3d82ab1089771cd6722b4c1560e7b4ef5023b1c5c034e86f937",
+    "frontend/graphql/__generated__/operations.ts": "5b50df1b602d2bfe7047ae233ed9a921a804c3e244c84547d18f8015cfe05eab",
+    "frontend/graphql/__generated__/schema.ts": "3540a67661853bd59afd9db9a47bf839ee99f74d2044d95e6e45f7bc73eed07a",
+    "frontend/graphql/nvke/nvke-install-plan-node-platforms.mutations.ts": "f6a43610d792b7535e4629bcd032661263cf23c789d3a522e01f7b78346f2112",
+    "frontend/graphql/nvke/nvke-install-plan-node-platforms.queries.ts": "9434f13933bfdf86bdbb77c6cda1d4f1b54d0b48b77c656bfd7cf105c9309bec",
+    "frontend/schema.graphql": "352210d92c1ae3d82ab1089771cd6722b4c1560e7b4ef5023b1c5c034e86f937"
+  },
+  "checks": [
+    {
+      "runnerPid": 69617,
+      "logPath": "/tmp/astrolift-nvke-node-platform-api-pg-v2.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-api-pg-v2.exit",
+      "exitCode": 0,
+      "passed": 77,
+      "skipped": 0,
+      "scope": "new API and existing immutable/binding/model regressions with real PostgreSQL and controlled SDK replies"
+    },
+    {
+      "runnerPid": 72295,
+      "logPath": "/tmp/astrolift-nvke-node-platform-reservations-pg-v1.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-reservations-pg-v1.exit",
+      "exitCode": 0,
+      "passed": 201,
+      "skipped": 1,
+      "scope": "all eight previous preparation paths and node/platform API, including all three current-admin GraphQL refusals; local native chart case initially lacks selected helper"
+    },
+    {
+      "runnerPid": 81838,
+      "logPath": "/tmp/astrolift-nvke-node-platform-reservation-native-chart-v1.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-reservation-native-chart-v1.exit",
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 0,
+      "scope": "the skipped local chart case separately passes through actual GraphQL/Postgres/SDK/mTLS with Helm 4 and matching legacy five-source helper; agent fixture stays at 8ad214a1a71f6b082707da5317e20a612a54ae7e"
+    },
+    {
+      "runnerPid": 84273,
+      "logPath": "/tmp/astrolift-nvke-node-platform-role-race-pg-v1.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-role-race-pg-v1.exit",
+      "exitCode": 0,
+      "passed": 1,
+      "skipped": 0,
+      "scope": "role revocation during SDK I/O refuses publication and retains preparing intent"
+    },
+    {
+      "runnerPid": 69635,
+      "resultPath": "/tmp/astrolift-nvke-node-platform-api-contracts-v1.json",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-api-contracts-v1.exit",
+      "exitCode": 0,
+      "scope": "schema export, generated operations/schema, export --check and full frontend TypeScript"
+    },
+    {
+      "runnerPid": 85827,
+      "logPath": "/tmp/astrolift-nvke-node-platform-api-precommit-v2.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-api-precommit-v2.exit",
+      "exitCode": 0,
+      "scope": "Ruff and format check for current changed Python sources"
+    },
+    {
+      "runnerPid": 84289,
+      "logPath": "/tmp/astrolift-nvke-node-platform-api-frontend-lint-v1.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-api-frontend-lint-v1.exit",
+      "exitCode": 0,
+      "scope": "ESLint and Prettier for new Apollo documents"
+    }
+  ],
+  "retainedFailures": [
+    {
+      "logPath": "/tmp/astrolift-nvke-node-platform-api-pg-v1.log",
+      "exitCode": 1,
+      "passedBeforeFailure": 7,
+      "reason": "deleted node artifact UUID was absent from older per-service reservation lists; all eight services now use the common reservation function under their existing advisory/parent locks"
+    }
+  ],
+  "remaining": [
+    "Storybook-first browser controls",
+    "actual paired API/compiled CLI/browser node-stage qualification",
+    "source-event refusal investigation, helper distribution and Linux agent route",
+    "CPU/importer, scheduling, credentials, availability, phase use and linked admission"
+  ]
+}

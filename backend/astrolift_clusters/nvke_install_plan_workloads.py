@@ -21,11 +21,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlan,
     NvkeInstallPlanCharts,
     NvkeInstallPlanContext,
-    NvkeInstallPlanImageBinding,
-    NvkeInstallPlanImagePayload,
-    NvkeInstallPlanImmutableExecution,
     NvkeInstallPlanTree,
-    NvkeInstallPlanVerification,
     NvkeInstallPlanWorkload,
     NvkeOperation,
 )
@@ -203,21 +199,7 @@ def prepare(*, body, **values):
                     "CONFLICT", "This workload identity already identifies another preparation intent"
                 )
         else:
-            if any(
-                model.all_objects.filter(guid=artifact_id).exists()
-                for model in (
-                    NvkeOperation,
-                    NvkeInstallPlan,
-                    NvkeInstallPlanCharts,
-                    NvkeInstallPlanTree,
-                    NvkeInstallPlanVerification,
-                    NvkeInstallPlanContext,
-                    images.NvkeInstallPlanImage,
-                    NvkeInstallPlanImageBinding,
-                    NvkeInstallPlanImagePayload,
-                    NvkeInstallPlanImmutableExecution,
-                )
-            ):
+            if artifact_identity.reserved(artifact_id, excluding=NvkeInstallPlanWorkload):
                 raise NvkeError(
                     "CONFLICT", "This identity already identifies another native operation or artifact"
                 )
