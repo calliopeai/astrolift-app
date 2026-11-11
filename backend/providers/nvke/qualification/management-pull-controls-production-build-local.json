@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "status": "production-frontend-build-qualified-full-release-incomplete",
+  "recordedAt": "2026-11-11T15:16:20.472695+00:00",
+  "scope": "Production Next.js build after Pod pull browser integration; separate owned source checkout and fixture Auth0 configuration",
+  "sourceRevision": "3f80c3cd07c2ab6dfaa536abab7c221e29b7582b",
+  "frontendSourceFiles": 3721,
+  "frontendSourcesChangedByBuild": false,
+  "build": {
+    "command": "npm run build",
+    "exitCode": 0,
+    "elapsedSeconds": 184.33597995806485,
+    "log": "/tmp/astrolift-nvke-pull-frontend-build-v1.log",
+    "logSha256": "a7e84b378de2b5bb7c63fcd0feb4d05ca8de7efb8fcf2c3ac1a3f4077eebb067",
+    "manifest": "/tmp/astrolift-nvke-pull-frontend-build-v1.json",
+    "manifestSha256": "5f9d4ce0170a878035daf7e99416f8afbd1c6cff09c586ef6eb5247d7d9d061c",
+    "generatedStaticPages": 168,
+    "authConfiguration": "owned fixture values; production auth branch; no real credentials or deployment"
+  },
+  "limits": [
+    "Build and prior browser qualification do not prove actual compiled CLI/App/SDK/agent/browser pairing for this stage",
+    "The first paired attempt refused source-watch enrollment in an image ancestor under the runner descriptor limit; the corrected-limit attempt is a separate retained job, not claimed passed here",
+    "Broad backend mypy remains failing as recorded in the API qualification; no check or gate was weakened",
+    "No linked native admission, full NVKE surface completion, final integration PR/merge, CONFLICT deployment or live validation is claimed"
+  ]
+}

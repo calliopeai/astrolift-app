@@ -1,0 +1,98 @@
+{
+  "format": 1,
+  "scope": "Full upstream coverage ledger reconciliation through signed Pod pull browser checkpoints",
+  "status": "catalog-and-immutable-evidence-qualified-full-release-incomplete",
+  "sourceBaseRevision": "3f80c3cd07c2ab6dfaa536abab7c221e29b7582b",
+  "sourceSha256": {
+    "backend/providers/scripts/nvke_evidence.json": "ad11b9b37d105d26128c50744ebffbc7874c9e4226391d8a16bf08e7c198199d",
+    "docs/providers/nvke.md": "a50ee6cd5e5a5c160ad0b1e812a257794a4f19bba9c03e9135334dde7e4ce201"
+  },
+  "checks": [
+    {
+      "command": [
+        "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+        "-m",
+        "scripts.nvke_coverage",
+        "--cli",
+        "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser",
+        "--opscode",
+        "/Users/ragelink/repos/lanes/astrolift-nvke-opscode-platform-resolution"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-coverage-pull-checks-v1-0.log",
+      "logSha256": "ffbf0986d1279e8423796dbb118e3722dc1707d9bd8d6626efbcb4c532d8fb29"
+    },
+    {
+      "command": [
+        "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+        "-m",
+        "scripts.nvke_coverage",
+        "--check",
+        "--cli",
+        "/Users/ragelink/repos/lanes/astrolift-nvke-cli-local-image-browser",
+        "--opscode",
+        "/Users/ragelink/repos/lanes/astrolift-nvke-opscode-platform-resolution"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-coverage-pull-checks-v1-1.log",
+      "logSha256": "cb5f9f5a983e063e1e3381e88b41362850fd6d1e4e8346440d1c0531e78af4b0"
+    },
+    {
+      "command": [
+        "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-c",
+        "/dev/null",
+        "--confcutdir=tests/nvke",
+        "-p",
+        "no:cacheprovider",
+        "tests/nvke/test_evidence.py",
+        "tests/nvke/test_contract.py"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-coverage-pull-checks-v1-2.log",
+      "logSha256": "f880e53ffa9865098cb0e675c03a6cb80981280fefd78636371a123b1bc1f1ec"
+    }
+  ],
+  "tests": {
+    "passed": 30,
+    "skipped": 0
+  },
+  "pairedRepositories": {
+    "app": {
+      "name": "calliopeai/astrolift-app"
+    },
+    "cli": {
+      "name": "calliopeai/astrolift-cli",
+      "revision": "176db846c886c4ba54e0ad2c2ba9b533dff9edfd"
+    },
+    "opscode": {
+      "name": "calliopeai/astrolift-opscode",
+      "revision": "b9569418e1ce2fab8298d580c55021160a27489e"
+    }
+  },
+  "rowCounts": {
+    "actions": 88,
+    "resources": 6,
+    "workflows": 3,
+    "metrics": 18,
+    "commands": 36,
+    "operators": 14
+  },
+  "evidenceRecords": 215,
+  "audit": {
+    "path": "/tmp/astrolift-nvke-coverage-pull-audit-v1.json",
+    "sha256": "58dc59817b9b38fee57892b35cae6b5788b1445ba4a2c7832d25e55b72e406c0",
+    "changedReferencesInspected": 7,
+    "unchangedExternalReferences": 93,
+    "newRecords": 13,
+    "qualificationLevelsChanged": false
+  },
+  "limits": [
+    "Ledger validation proves every native row is mapped with scoped evidence and remaining work; it is not execution of all linked scenarios",
+    "Historical qualification records retain their exact source revisions, failed runs and original limits",
+    "The new whole-client pairing is separate and not passed by this ledger check",
+    "Full lifecycle/runtime/credential/admission/physical-provider qualification, final green PRs/merge, deployment/live validation and executable backlog remain incomplete"
+  ]
+}
