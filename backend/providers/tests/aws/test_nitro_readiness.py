@@ -203,6 +203,7 @@ def inventory(tmp_path, monkeypatch):
         _k8s=lambda cluster: SimpleNamespace(list=listing),
     )
     monkeypatch.setattr("aws.nitro_confidential.verified_tools", lambda *args: ())
+    monkeypatch.setattr("aws.nitro_skopeo.verify_keyprovider", lambda *args: None)
     monkeypatch.setattr(
         nitro_readiness, "workspace_readiness", lambda path: nitro_readiness.check("workspace", "ready", "memory")
     )
@@ -272,4 +273,20 @@ def test_unreadable_eks_is_unknown_and_diagnostics_do_not_escape(inventory):
     state["deny_eks"] = True
     result = collect_readiness(driver, "alias", "astrolift-agents-org", config)
     assert result["modes"]["confidential"]["state"] == "unknown"
+    assert "PRIVATE-DIAGNOSTIC-MARKER" not in json.dumps(result)
+
+
+def test_missing_keyprovider_support_refuses_confidential_readiness(inventory, monkeypatch):
+    from aws.nitro_readiness import collect_readiness
+
+    def unsupported(*args):
+        raise ValueError("PRIVATE-DIAGNOSTIC-MARKER")
+
+    monkeypatch.setattr("aws.nitro_skopeo.verify_keyprovider", unsupported)
+    driver, config, _ = inventory
+    result = collect_readiness(driver, "alias", "astrolift-agents-org", config)
+    assert result["modes"]["confidential"]["state"] == "not_ready"
+    assert result["modes"]["isolated"]["state"] == "ready"
+    check = next(row for row in result["modes"]["confidential"]["checks"] if row["code"] == "image_encryption")
+    assert check["state"] == "not_ready"
     assert "PRIVATE-DIAGNOSTIC-MARKER" not in json.dumps(result)

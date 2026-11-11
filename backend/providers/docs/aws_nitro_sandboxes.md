@@ -74,6 +74,13 @@ memory) in place of `workspace`. The run stays in `PROVISIONING` while the task
 starts and prepares the image. Without the setting, preparation runs in the
 worker as described above.
 
+Skopeo must support the ocicrypt `provider:` encryption protocol. The backend
+image builds Skopeo 1.21.0 from its pinned upstream commit with vendored
+dependencies; Bookworm's packaged Skopeo lacks this protocol. Every image build
+and confidential readiness check performs an offline encryption/decryption
+round trip with a generated public fixture. This check uses no AWS credentials,
+registry or task data, and rejects an incompatible binary before task preparation.
+
 Workers recheck their own current process before preparing Briefs or task
 secrets. API readiness therefore cannot authorize a misconfigured worker. Task
 Pods and supported manifest-rendered controller templates using either Nitro

@@ -1,3 +1,16 @@
+FROM --platform=$BUILDPLATFORM golang:1.25.14-bookworm@sha256:3b4a11519ad929d1e1d261a12cff056f0c85b735253d7d861346b9c6f8b36437 AS skopeo-build
+
+ARG TARGETARCH
+WORKDIR /src
+# Bookworm's Skopeo omits the ocicrypt keyprovider protocol needed by AWS.
+RUN git init . \
+    && git remote add origin https://github.com/containers/skopeo.git \
+    && git fetch --depth=1 origin 8bd9c541f0513a3f688bdae54c5f0ec4e581f420 \
+    && git checkout --detach FETCH_HEAD \
+    && CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -mod=vendor \
+       -tags 'containers_image_openpgp exclude_graphdriver_btrfs exclude_graphdriver_devicemapper' \
+       -trimpath -ldflags='-s -w' -o /out/skopeo ./cmd/skopeo
+
 FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -11,9 +24,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     iputils-ping \
     traceroute \
-    skopeo \
+    golang-github-containers-common \
     openssl \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=skopeo-build /out/skopeo /usr/bin/skopeo
+COPY --from=skopeo-build /src/LICENSE /usr/share/doc/skopeo/LICENSE
+COPY providers/aws/nitro_skopeo.py /tmp/nitro_skopeo.py
+RUN python /tmp/nitro_skopeo.py /usr/bin/skopeo && rm /tmp/nitro_skopeo.py
 
 RUN pip install --upgrade pip pipenv wheel
 

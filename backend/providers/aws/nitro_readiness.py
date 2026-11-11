@@ -168,6 +168,7 @@ def collect_readiness(
 
     from aws.nitro_confidential import verified_tools
     from aws.nitro_sandboxes import RUNTIME_KIND
+    from aws.nitro_skopeo import verify_keyprovider
 
     source: dict[str, Any] = {
         "region": driver._config.region,
@@ -268,6 +269,23 @@ def collect_readiness(
                         "signed_tools",
                         "not_ready",
                         "Install the verified AWS tools, skopeo and openssl on API and workers.",
+                    )
+                )
+            try:
+                verify_keyprovider(config.skopeo, config.temporary_root)
+                extra.append(
+                    check(
+                        "image_encryption",
+                        "ready",
+                        "Installed Skopeo completed an offline keyprovider encryption/decryption check.",
+                    )
+                )
+            except Exception:
+                extra.append(
+                    check(
+                        "image_encryption",
+                        "not_ready",
+                        "Install Skopeo with keyprovider encryption/decryption support on API and workers.",
                     )
                 )
             try:
