@@ -156,7 +156,10 @@ def platform_checks(
     return checks
 
 
-def collect_readiness(driver: Any, cluster: str, namespace: str, config: Any = None) -> dict[str, Any]:
+def collect_readiness(
+    driver: Any, cluster: str, namespace: str, config: Any = None, preparation: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """``preparation`` replaces this process's workspace check when an on-demand task prepares images."""
     import hashlib
     import json
     import shutil
@@ -239,7 +242,7 @@ def collect_readiness(driver: Any, cluster: str, namespace: str, config: Any = N
                     "This process has valid per-cluster operator configuration.",
                 )
             )
-            extra.append(workspace_readiness(config.temporary_root))
+            extra.append(preparation or workspace_readiness(config.temporary_root))
             try:
                 if (
                     not Path(config.skopeo).is_file()

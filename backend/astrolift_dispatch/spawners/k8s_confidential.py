@@ -39,8 +39,10 @@ class ConfidentialPodSpawner(K8sJobSpawner):
                 "managed models, gateway, VNC or filesystem bindings",
             )
         try:
+            from astrolift_clusters import nitro_preparation
             from astrolift_clusters.nitro import require_task_mode
 
+            remote = nitro_preparation.launcher() is not None
             require_task_mode(self._cluster, "confidential", self._namespace)
             self._config = confidential_config(self._cluster)
             driver = _driver_for_cluster(self._cluster)
@@ -50,7 +52,9 @@ class ConfidentialPodSpawner(K8sJobSpawner):
                 raise ValueError("Confidential task images and attestation require the AWS EKS provider")
             validate(context.slug, self._namespace, self._config)
             old = (task.dispatch_target or {}).get("nitro_confidential")
-            if old:
+            # The preparation task retires a previous run itself: here it could
+            # be the key of a preparation that outlived the worker that began it.
+            if old and not remote:
                 if driver.get_manifest(context.slug, self._namespace, "Pod", self._name(task)) is not None:
                     raise ValueError(
                         "Existing confidential Pod must be recovered before preparing another image"
@@ -65,7 +69,17 @@ class ConfidentialPodSpawner(K8sJobSpawner):
                 "Confidential task prerequisites or previous-run cleanup failed; "
                 "verify signed tooling, registry and Pod Identity configuration",
             )
-        return super().spawn(task)
+        if not remote:
+            return super().spawn(task)
+        ok, error = nitro_preparation.prepare(task)
+        task.refresh_from_db()
+        result = self.recover(task) if ok else None
+        if result is None:
+            self._cleanup_failed_spawn(self._name(task))
+            return SpawnResult(
+                self._name(task), False, error or "Confidential image preparation left no recoverable Pod"
+            )
+        return result
 
     @staticmethod
     def _name(task):
