@@ -19,6 +19,7 @@ from nvke import _operator_install_plan_charts as chart_protocol
 from nvke import _operator_install_plan_context as context_protocol
 from nvke import _operator_install_plan_image as image_protocol
 from nvke import _operator_install_plan_image_binding as binding_protocol
+from nvke import _operator_install_plan_immutable as immutable_protocol
 from nvke import _operator_install_plan_tree as tree_protocol
 from nvke import _operator_install_plan_verification as verification_protocol
 from nvke import _operator_install_plan_workload as workload_protocol
@@ -874,6 +875,244 @@ class OperatorAgentClient:
             read_only=True,
             chart_artifact_id=chart_artifact_id,
             chart_artifact_digest=chart_artifact_digest,
+        )
+
+    def _install_plan_immutable_source(
+        self,
+        job_id: str,
+        intent: str,
+        body: dict[str, Any],
+        *,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+        payload_bindings: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        binding_body = {
+            **{k: body[k] for k in ("format", "planId", "planDigest", "treeId", "treeDigest")},
+            "artifactId": body["bindingId"],
+            "workloadId": workload_id,
+            "workloadDigest": workload_digest,
+        }
+        binding_body = binding_protocol.request(
+            binding_body, job_id=job_id, chart_artifact_id=chart_artifact_id, read_only=True
+        )
+        source = self._install_plan_image_binding_source(
+            job_id, intent, binding_body, chart_artifact_id, chart_artifact_digest
+        )
+        data = self._request(
+            "GET",
+            "/v1/jobs/" + job_id + "/install-plan-image-binding",
+            params={k: v for k, v in binding_body.items() if k != "format"},
+            intent=intent,
+        )
+        binding = binding_protocol.summary(data, body=binding_body, workload=source["workload"])
+        if binding["bindingDigest"] != body["bindingDigest"]:
+            raise NvkeError("SOURCE_CHANGED", "The image binding no longer matches the reviewed digest")
+        source["binding"] = binding
+        if payload_bindings is not None:
+            if len(payload_bindings) != source["metadata"]["itemCount"]:
+                raise NvkeError("SOURCE_CHANGED", "Select an immutable payload for every original phase")
+            selected = {}
+            for name, row in payload_bindings.items():
+                query = {
+                    **{k: body[k] for k in immutable_protocol.BASE if k != "artifactId"},
+                    "artifactId": row["artifactId"],
+                    "item": name,
+                }
+                data = self._request(
+                    "GET",
+                    "/v1/jobs/" + job_id + "/install-plan-image-payload",
+                    params={k: v for k, v in query.items() if k != "format"},
+                    intent=intent,
+                )
+                value = immutable_protocol.summary(data, body=query, source=source, tree=False)
+                if value["artifactDigest"] != row["artifactDigest"]:
+                    raise NvkeError("SOURCE_CHANGED", "A phase payload no longer matches its reviewed digest")
+                selected[name] = value
+            source["payloads"] = selected
+        return source
+
+    def _install_plan_immutable(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        read_only: bool,
+        tree: bool,
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+        payload_bindings: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        self._bound()
+        try:
+            body = immutable_protocol.request(
+                body,
+                job_id=job_id,
+                chart_artifact_id=chart_artifact_id,
+                workload_id=workload_id,
+                read_only=read_only,
+                tree=tree,
+            )
+            if any(
+                not isinstance(v, str) or not _SHA.fullmatch(v)
+                for v in (intent, chart_artifact_digest, workload_digest)
+            ):
+                raise ValueError
+            selected = None
+            if tree:
+                selected = immutable_protocol.selections(
+                    payload_bindings if read_only else body["payloadBindings"],
+                    reserved={
+                        job_id,
+                        chart_artifact_id,
+                        workload_id,
+                        body["artifactId"],
+                        body["planId"],
+                        body["treeId"],
+                        body["bindingId"],
+                    },
+                )
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise NvkeError(
+                "INVALID_INPUT", "Use the reviewed binding, original phase payloads and explicit bounds"
+            ) from None
+        capability_name = "installPlanImmutableExecutionTree" if tree else "installPlanImagePayload"
+        try:
+            immutable_protocol.capability(self.identity().get(capability_name), read_only=read_only)
+        except (KeyError, ValueError, TypeError):
+            raise NvkeError(
+                "OPERATOR_CONTROL_UNSUPPORTED", "The agent does not confirm immutable artifact controls"
+            ) from None
+        try:
+
+            def ancestry() -> dict[str, Any]:
+                return self._install_plan_immutable_source(
+                    job_id,
+                    intent,
+                    body,
+                    chart_artifact_id=chart_artifact_id,
+                    chart_artifact_digest=chart_artifact_digest,
+                    workload_id=workload_id,
+                    workload_digest=workload_digest,
+                    payload_bindings=selected,
+                )
+
+            source = ancestry()
+            path = (
+                "/v1/jobs/"
+                + job_id
+                + ("/install-plan-immutable-execution-tree" if tree else "/install-plan-image-payload")
+            )
+            data = (
+                self._request("GET", path, params={k: v for k, v in body.items() if k != "format"}, intent=intent)
+                if read_only
+                else self._request("POST", path, body=body, intent=intent)
+            )
+            result = immutable_protocol.summary(data, body=body, source=source, tree=tree)
+            if ancestry() != source:
+                raise _invalid_response()
+            immutable_protocol.capability(self.identity().get(capability_name), read_only=read_only)
+            return result
+        except (ContractError, KeyError, ValueError, TypeError, OverflowError):
+            raise _invalid_response() from None
+
+    def prepare_install_plan_image_payload(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+    ) -> dict[str, Any]:
+        return self._install_plan_immutable(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=False,
+            tree=False,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            workload_id=workload_id,
+            workload_digest=workload_digest,
+        )
+
+    def install_plan_image_payload(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+    ) -> dict[str, Any]:
+        return self._install_plan_immutable(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=True,
+            tree=False,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            workload_id=workload_id,
+            workload_digest=workload_digest,
+        )
+
+    def prepare_install_plan_immutable_execution_tree(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+    ) -> dict[str, Any]:
+        return self._install_plan_immutable(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=False,
+            tree=True,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            workload_id=workload_id,
+            workload_digest=workload_digest,
+        )
+
+    def install_plan_immutable_execution_tree(
+        self,
+        job_id: str,
+        *,
+        intent: str,
+        body: dict[str, Any],
+        chart_artifact_id: str,
+        chart_artifact_digest: str,
+        workload_id: str,
+        workload_digest: str,
+        payload_bindings: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._install_plan_immutable(
+            job_id,
+            intent=intent,
+            body=body,
+            read_only=True,
+            tree=True,
+            chart_artifact_id=chart_artifact_id,
+            chart_artifact_digest=chart_artifact_digest,
+            workload_id=workload_id,
+            workload_digest=workload_digest,
+            payload_bindings=payload_bindings,
         )
 
     def _install_plan_image(

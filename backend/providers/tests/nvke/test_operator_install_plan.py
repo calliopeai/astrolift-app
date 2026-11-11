@@ -126,6 +126,12 @@ def client(
     image=None,
     workload=None,
     image_binding=None,
+    image_payloads=None,
+    immutable_execution=None,
+    image_payload_capability=None,
+    immutable_execution_capability=None,
+    lost_image_payload_reply=False,
+    lost_immutable_execution_reply=False,
     image_binding_capability=None,
     lost_image_binding_reply=False,
     workload_capability=None,
@@ -183,6 +189,12 @@ def client(
                     "installPlanWorkloadInventory": workload_capability
                     if workload_capability is not None
                     else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
+                    "installPlanImagePayload": image_payload_capability
+                    if image_payload_capability is not None
+                    else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
+                    "installPlanImmutableExecutionTree": immutable_execution_capability
+                    if immutable_execution_capability is not None
+                    else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
                     "installPlanImageBinding": image_binding_capability
                     if image_binding_capability is not None
                     else {"format": 1, "prepare": True, "readOnly": True, "continuation": False},
@@ -209,6 +221,19 @@ def client(
                 },
             )
         assert request.headers["X-Astro-Nvke-Intent"] == INTENT
+        if request.url.path.endswith("/install-plan-image-payload"):
+            if lost_image_payload_reply and request.method == "POST":
+                raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
+            artifact_id = (
+                json.loads(request.content)["artifactId"]
+                if request.method == "POST"
+                else request.url.params["artifactId"]
+            )
+            return httpx.Response(200, json=(image_payloads or {}).get(artifact_id))
+        if request.url.path.endswith("/install-plan-immutable-execution-tree"):
+            if lost_immutable_execution_reply and request.method == "POST":
+                raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
+            return httpx.Response(200, json=immutable_execution)
         if request.url.path.endswith("/install-plan-image-binding"):
             if lost_image_binding_reply and request.method == "POST":
                 raise httpx.ReadError("PRIVATE_PEER_DIAGNOSTIC", request=request)
