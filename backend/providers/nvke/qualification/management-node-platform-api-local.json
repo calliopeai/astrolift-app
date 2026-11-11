@@ -93,7 +93,7 @@
     }
   ],
   "remaining": [
-    "final current-source repinning and Linux agent-route qualification",
+    "final current-source combined repinning",
     "source-event refusal investigation",
     "selected-node CPU/importer, scheduling, credentials, availability, phase use and linked admission"
   ],
@@ -116,5 +116,21 @@
       "ReviewNvkeInstallPlanNodePlatforms",
       "RetryNvkeInstallPlanNodePlatforms"
     ]
+  },
+  "linuxAgentRoute": {
+    "scope": "direct current-source mTLS agent route with all five profiles; separate from the paired App/browser proof",
+    "exitCode": 0,
+    "passed": 1,
+    "skipped": 0,
+    "elapsedSeconds": 296.227,
+    "metadataPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.json",
+    "logPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-platform-agent-linux-v1.exit",
+    "sourceManifestPath": "/tmp/astrolift-nvke-host-platform-linux-v2-sources.json",
+    "sourceManifestSha256": "7107248b7892205ee6d00c4b016a23fcaa61b94a3b4fc9c3c6b4e7f537d362e1",
+    "sourceManifestMatches": true,
+    "network": "none",
+    "cpus": 2,
+    "memoryGiB": 2
   }
 }
