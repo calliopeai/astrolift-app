@@ -1,0 +1,72 @@
+{
+  "format": 1,
+  "scope": "Storybook-first node/platform forms, typed metadata and pure controls",
+  "status": "pure panel and browser layout reviewed; controller and operation-route wiring pending",
+  "sources": {
+    "frontend/lib/nvke/operator-install-plan-node-platforms.ts": "5fb93e42cd544593d2338c0eccb8be4333ebb55eca10d1dfb58633aad8a023ea",
+    "frontend/lib/nvke/operator-install-plan-node-platforms.test.ts": "d09674570b4c9a6a5d294f4c0347f73291ae9f65f1ce117cdfd91f758a73d826",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.tsx": "f680ee11a6c4a4b2dc6f4a4d5024be76b627507fd1c823eea414c518e8951cb9",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.stories.tsx": "3f31aa30bf5ee37897654988ff1466a8825654201f44e16ab1bf3b340a644ad4",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.test.tsx": "134526a172966b36d62f03b6e7179c5916c940d1f34cc8764fa6f6946d43bb85",
+    "frontend/e2e/nvke-install-plan-node-platforms-storybook-runner.mjs": "270e8986129d883afd72b834137192fd0200f7d6a882c1452cc47bfe63180897",
+    "frontend/messages/en.json": "2b4387f1f8097b5c219c706512bce4ed0a61dc043ebbfeefe193c8759a63947e",
+    "frontend/messages/de.json": "1373b1de3fd5c244b71e00ec9351486ab370d1d2d30be0c2c90893754d30e5d2",
+    "frontend/messages/es.json": "326f727f1d3ac710ead2ad3b92d20b70af66614db378e5f133e76756ef075f1a",
+    "frontend/messages/fr.json": "d99972d9becef14b51552fcbf4969ca5fe493a60f4c78ce760f031a7df807b3d",
+    "frontend/messages/pt-BR.json": "0b3d010d19b5208c8b44d2a4ae09fdda3099c4ddc78bebbaf99f68fc81ac108d",
+    "frontend/messages/ja.json": "9cb8fade6c91f935b299597c68f824f2ed36b6fd7e745ec998c38729539909a8",
+    "frontend/messages/ko.json": "faacda25170b62af1fdb7a7d0908446369902cb46994f9bcc7b97b9555a85b15",
+    "frontend/messages/zh-Hans.json": "43fa8e5a113b2e71c4a063c090f2d6e3d5992e45b5fff1e3143b935f1ae2ffb3"
+  },
+  "checks": [
+    {
+      "runnerPid": 92395,
+      "logPath": "/tmp/astrolift-nvke-node-platform-ui-first-v2.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-ui-first-v2.exit",
+      "exitCode": 0,
+      "passed": 49,
+      "scope": "domain and component tests, full TypeScript and targeted ESLint"
+    },
+    {
+      "runnerPid": 93855,
+      "logPath": "/tmp/astrolift-nvke-node-platform-storybook-check-v1.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-storybook-check-v1.exit",
+      "exitCode": 0,
+      "stories": 22,
+      "locales": 8,
+      "themes": 2,
+      "pageErrors": 0,
+      "scope": "actual Chromium, lost-reply private-input clearing, source/permission/disabled states, 768/375 layouts, and all locale forms at 375px"
+    }
+  ],
+  "storybook": {
+    "runnerPid": 90846,
+    "metadataPath": "/tmp/astrolift-nvke-node-platform-storybook-v1.json",
+    "logPath": "/tmp/astrolift-nvke-node-platform-storybook-v1.log"
+  },
+  "screenshots": {
+    "directory": "/tmp/astrolift-nvke-node-platform-storybook-screenshots-v1",
+    "resultsPath": "/tmp/astrolift-nvke-node-platform-storybook-screenshots-v1/results.json",
+    "visuallyReviewed": [
+      "observed-light.png",
+      "observed-dark-375.png",
+      "form-de-375.png",
+      "form-ja-375.png"
+    ]
+  },
+  "verified": [
+    "explicit node/UID/runtime scope; duplicate JSON keys and private controls refused",
+    "canonical byte budget strings including values above 2**53",
+    "response source and pair-count consistency",
+    "private input cleared after callback completion or exception",
+    "retained UUID after lost reply; no automatic review/retry",
+    "overlapping submissions admit only one callback",
+    "native admission stays unavailable"
+  ],
+  "remaining": [
+    "metadata-only browser journal and context/epoch guards",
+    "operation-screen wiring after this Storybook review",
+    "actual paired API/CLI/browser node-stage qualification",
+    "source-event investigation and final native admission requirements"
+  ]
+}

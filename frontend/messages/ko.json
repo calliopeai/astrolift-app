@@ -18449,6 +18449,28 @@
       "phaseCount": "남은 단계",
       "skippedPhaseCount": "완료된 단계",
       "sourceObservedAt": "소스 관측 시간"
+    },
+    "installNodePlatforms": {
+      "title": "노드 및 이미지 플랫폼 관측",
+      "help": "보관된 이미지를 명시적으로 선택한 노드 및 런타임 프로필과 비교합니다.",
+      "closureRequired": "실행 승인 전에 CPU/가져오기 도구 확인, 스케줄링, 자격 증명, 이미지 가용성 및 단계별 최신 사용 확인이 여전히 필요합니다.",
+      "nodePlatforms": "선택한 노드 및 플랫폼",
+      "nodesHelp": "정확한 노드 이름을 uid, runtimeProfile, platform에 매핑하세요. platform에는 os와 architecture가 필요하며 variant, os.version, os.features는 선택 사항입니다.",
+      "limitsTitle": "제한",
+      "limitsHelp": "Kubernetes 요청 수를 선택한 노드 수 × 4 + 4 이상으로 설정하세요.",
+      "maximumImageBytes": "검증된 이미지 바이트 제한",
+      "maximumMetadataBytes": "이미지 메타데이터 바이트 제한",
+      "maximumObservationBytes": "노드 관측 바이트 제한",
+      "maximumHelperBytes": "이미지 선택 데이터 바이트 제한",
+      "maximumCalls": "Kubernetes 요청 제한",
+      "maximumPairs": "이미지/노드 쌍 제한",
+      "platformDigest": "플랫폼 관측 다이제스트",
+      "nodeCount": "선택한 노드",
+      "contentCount": "이미지 대상",
+      "imageReferenceCount": "이미지 참조",
+      "pairCount": "이미지/노드 쌍",
+      "issueCount": "미해결 확인 사항",
+      "invalidInput": "중복되지 않는 UUID, 정확한 노드/UID 범위, 런타임 프로필 및 제한을 확인하세요."
     }
   }
 }

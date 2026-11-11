@@ -18452,6 +18452,28 @@
       "phaseCount": "Fases restantes",
       "skippedPhaseCount": "Fases completadas",
       "sourceObservedAt": "Origen observado el"
+    },
+    "installNodePlatforms": {
+      "title": "Observaciones de plataformas de nodos e imágenes",
+      "help": "Compara imágenes conservadas con nodos y perfiles de ejecución seleccionados explícitamente.",
+      "closureRequired": "Antes de la admisión siguen siendo necesarias las comprobaciones de CPU/importador, planificación, credenciales, disponibilidad de imágenes y uso actualizado por fase.",
+      "nodePlatforms": "Nodos y plataformas seleccionados",
+      "nodesHelp": "Asocia nombres exactos de nodos con uid, runtimeProfile y platform. La plataforma requiere os y architecture; variant, os.version y os.features son opcionales.",
+      "limitsTitle": "Límites",
+      "limitsHelp": "Permite al menos 4 × nodos seleccionados + 4 solicitudes de Kubernetes.",
+      "maximumImageBytes": "Límite de bytes de imágenes verificadas",
+      "maximumMetadataBytes": "Límite de bytes de metadatos de imágenes",
+      "maximumObservationBytes": "Límite de bytes de observaciones de nodos",
+      "maximumHelperBytes": "Límite de bytes de datos de selección de imágenes",
+      "maximumCalls": "Límite de solicitudes de Kubernetes",
+      "maximumPairs": "Límite de pares imagen/nodo",
+      "platformDigest": "Resumen de la observación de plataformas",
+      "nodeCount": "Nodos seleccionados",
+      "contentCount": "Objetivos de imágenes",
+      "imageReferenceCount": "Referencias de imágenes",
+      "pairCount": "Pares imagen/nodo",
+      "issueCount": "Comprobaciones pendientes",
+      "invalidInput": "Revisa el UUID distinto, el ámbito exacto de nodos/UID, los perfiles de ejecución y los límites."
     }
   }
 }

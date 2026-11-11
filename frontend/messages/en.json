@@ -18449,6 +18449,28 @@
       "phaseCount": "Remaining phases",
       "skippedPhaseCount": "Completed phases",
       "sourceObservedAt": "Source observed at"
+    },
+    "installNodePlatforms": {
+      "title": "Node/image platform observations",
+      "help": "Compare retained images with explicitly selected nodes and runtime profiles.",
+      "closureRequired": "CPU/importer checks, scheduling, credentials, image availability and fresh phase use remain required before admission.",
+      "nodePlatforms": "Selected nodes and platforms",
+      "nodesHelp": "Map exact node names to uid, runtimeProfile and platform. Platform needs os and architecture; variant, os.version and os.features are optional.",
+      "limitsTitle": "Limits",
+      "limitsHelp": "Allow at least 4 × selected nodes + 4 Kubernetes requests.",
+      "maximumImageBytes": "Verified image byte limit",
+      "maximumMetadataBytes": "Image metadata byte limit",
+      "maximumObservationBytes": "Node observation byte limit",
+      "maximumHelperBytes": "Image selection data byte limit",
+      "maximumCalls": "Kubernetes request limit",
+      "maximumPairs": "Image/node pair limit",
+      "platformDigest": "Platform observation digest",
+      "nodeCount": "Selected nodes",
+      "contentCount": "Image targets",
+      "imageReferenceCount": "Image references",
+      "pairCount": "Image/node pairs",
+      "issueCount": "Unresolved checks",
+      "invalidInput": "Review the distinct UUID, exact node/UID scope, runtime profiles and limits."
     }
   }
 }

@@ -18449,6 +18449,28 @@
       "phaseCount": "残りのフェーズ",
       "skippedPhaseCount": "完了済みフェーズ",
       "sourceObservedAt": "ソース観測日時"
+    },
+    "installNodePlatforms": {
+      "title": "ノードとイメージのプラットフォーム観測",
+      "help": "保持されたイメージを、明示的に選択したノードとランタイムプロファイルと比較します。",
+      "closureRequired": "実行許可には、CPU/インポーターの確認、スケジューリング、認証情報、イメージの可用性、各フェーズでの最新の使用確認が引き続き必要です。",
+      "nodePlatforms": "選択したノードとプラットフォーム",
+      "nodesHelp": "正確なノード名を uid、runtimeProfile、platform に対応付けます。platform には os と architecture が必要です。variant、os.version、os.features は任意です。",
+      "limitsTitle": "制限",
+      "limitsHelp": "Kubernetes リクエスト数は「選択ノード数 × 4 + 4」以上にしてください。",
+      "maximumImageBytes": "検証済みイメージのバイト上限",
+      "maximumMetadataBytes": "イメージメタデータのバイト上限",
+      "maximumObservationBytes": "ノード観測のバイト上限",
+      "maximumHelperBytes": "イメージ選択データのバイト上限",
+      "maximumCalls": "Kubernetes リクエスト上限",
+      "maximumPairs": "イメージとノードの組み合わせ上限",
+      "platformDigest": "プラットフォーム観測のダイジェスト",
+      "nodeCount": "選択ノード",
+      "contentCount": "イメージ対象",
+      "imageReferenceCount": "イメージ参照",
+      "pairCount": "イメージとノードの組み合わせ",
+      "issueCount": "未解決の確認事項",
+      "invalidInput": "重複しない UUID、正確なノード/UID の範囲、ランタイムプロファイル、制限を確認してください。"
     }
   }
 }

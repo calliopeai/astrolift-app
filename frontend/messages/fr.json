@@ -18452,6 +18452,28 @@
       "phaseCount": "Phases restantes",
       "skippedPhaseCount": "Phases terminées",
       "sourceObservedAt": "Source observée le"
+    },
+    "installNodePlatforms": {
+      "title": "Observations des plateformes des nœuds et images",
+      "help": "Comparez les images conservées aux nœuds et profils d’exécution explicitement sélectionnés.",
+      "closureRequired": "Les vérifications CPU/importateur, la planification, les identifiants, la disponibilité des images et leur utilisation actuelle par phase restent nécessaires avant l’admission.",
+      "nodePlatforms": "Nœuds et plateformes sélectionnés",
+      "nodesHelp": "Associez les noms exacts des nœuds à uid, runtimeProfile et platform. La plateforme exige os et architecture ; variant, os.version et os.features sont facultatifs.",
+      "limitsTitle": "Limites",
+      "limitsHelp": "Autorisez au moins 4 × nœuds sélectionnés + 4 requêtes Kubernetes.",
+      "maximumImageBytes": "Limite en octets des images vérifiées",
+      "maximumMetadataBytes": "Limite en octets des métadonnées d’images",
+      "maximumObservationBytes": "Limite en octets des observations de nœuds",
+      "maximumHelperBytes": "Limite en octets des données de sélection d’images",
+      "maximumCalls": "Limite de requêtes Kubernetes",
+      "maximumPairs": "Limite de paires image/nœud",
+      "platformDigest": "Empreinte de l’observation des plateformes",
+      "nodeCount": "Nœuds sélectionnés",
+      "contentCount": "Cibles d’images",
+      "imageReferenceCount": "Références d’images",
+      "pairCount": "Paires image/nœud",
+      "issueCount": "Vérifications en attente",
+      "invalidInput": "Vérifiez l’UUID distinct, le périmètre exact des nœuds/UID, les profils d’exécution et les limites."
     }
   }
 }

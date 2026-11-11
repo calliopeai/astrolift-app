@@ -18449,6 +18449,28 @@
       "phaseCount": "剩余阶段",
       "skippedPhaseCount": "已完成阶段",
       "sourceObservedAt": "来源观测时间"
+    },
+    "installNodePlatforms": {
+      "title": "节点与镜像平台观测",
+      "help": "将保留的镜像与明确选择的节点和运行时配置进行比较。",
+      "closureRequired": "准入前仍需完成 CPU/导入器检查、调度、凭据、镜像可用性及各阶段的最新使用验证。",
+      "nodePlatforms": "所选节点与平台",
+      "nodesHelp": "将准确的节点名称映射到 uid、runtimeProfile 和 platform。platform 需要 os 和 architecture；variant、os.version 和 os.features 可选。",
+      "limitsTitle": "限制",
+      "limitsHelp": "Kubernetes 请求数至少应为所选节点数 × 4 + 4。",
+      "maximumImageBytes": "已验证镜像字节上限",
+      "maximumMetadataBytes": "镜像元数据字节上限",
+      "maximumObservationBytes": "节点观测字节上限",
+      "maximumHelperBytes": "镜像选择数据字节上限",
+      "maximumCalls": "Kubernetes 请求数上限",
+      "maximumPairs": "镜像/节点配对数上限",
+      "platformDigest": "平台观测摘要",
+      "nodeCount": "所选节点",
+      "contentCount": "镜像目标",
+      "imageReferenceCount": "镜像引用",
+      "pairCount": "镜像/节点配对",
+      "issueCount": "待解决的检查",
+      "invalidInput": "请核对唯一 UUID、准确的节点/UID 范围、运行时配置及限制。"
     }
   }
 }

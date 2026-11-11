@@ -18452,6 +18452,28 @@
       "phaseCount": "Verbleibende Phasen",
       "skippedPhaseCount": "Abgeschlossene Phasen",
       "sourceObservedAt": "Quelle beobachtet am"
+    },
+    "installNodePlatforms": {
+      "title": "Knoten- und Image-Plattformbeobachtungen",
+      "help": "Gespeicherte Images mit ausdrücklich ausgewählten Knoten und Laufzeitprofilen vergleichen.",
+      "closureRequired": "Vor der Zulassung sind weiterhin CPU-/Importer-Prüfungen, Planung, Zugangsdaten, Image-Verfügbarkeit und aktuelle Phasennutzung erforderlich.",
+      "nodePlatforms": "Ausgewählte Knoten und Plattformen",
+      "nodesHelp": "Exakte Knotennamen uid, runtimeProfile und platform zuordnen. Plattform benötigt os und architecture; variant, os.version und os.features sind optional.",
+      "limitsTitle": "Grenzwerte",
+      "limitsHelp": "Mindestens 4 × ausgewählte Knoten + 4 Kubernetes-Anfragen zulassen.",
+      "maximumImageBytes": "Byte-Grenze für geprüfte Images",
+      "maximumMetadataBytes": "Byte-Grenze für Image-Metadaten",
+      "maximumObservationBytes": "Byte-Grenze für Knotenbeobachtungen",
+      "maximumHelperBytes": "Byte-Grenze für Image-Auswahldaten",
+      "maximumCalls": "Grenze für Kubernetes-Anfragen",
+      "maximumPairs": "Grenze für Image-Knoten-Paare",
+      "platformDigest": "Prüfsumme der Plattformbeobachtung",
+      "nodeCount": "Ausgewählte Knoten",
+      "contentCount": "Image-Ziele",
+      "imageReferenceCount": "Image-Referenzen",
+      "pairCount": "Image-Knoten-Paare",
+      "issueCount": "Offene Prüfungen",
+      "invalidInput": "Eindeutige UUID, exakten Knoten-/UID-Umfang, Laufzeitprofile und Grenzwerte prüfen."
     }
   }
 }

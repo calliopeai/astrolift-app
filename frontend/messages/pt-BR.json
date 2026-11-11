@@ -18449,6 +18449,28 @@
       "phaseCount": "Fases restantes",
       "skippedPhaseCount": "Fases concluídas",
       "sourceObservedAt": "Origem observada em"
+    },
+    "installNodePlatforms": {
+      "title": "Observações de plataformas de nós e imagens",
+      "help": "Compare imagens preservadas com nós e perfis de execução selecionados explicitamente.",
+      "closureRequired": "Verificações de CPU/importador, agendamento, credenciais, disponibilidade de imagens e uso atualizado por fase continuam necessários antes da admissão.",
+      "nodePlatforms": "Nós e plataformas selecionados",
+      "nodesHelp": "Associe os nomes exatos dos nós a uid, runtimeProfile e platform. A plataforma exige os e architecture; variant, os.version e os.features são opcionais.",
+      "limitsTitle": "Limites",
+      "limitsHelp": "Permita pelo menos 4 × nós selecionados + 4 solicitações do Kubernetes.",
+      "maximumImageBytes": "Limite de bytes de imagens verificadas",
+      "maximumMetadataBytes": "Limite de bytes dos metadados de imagens",
+      "maximumObservationBytes": "Limite de bytes das observações de nós",
+      "maximumHelperBytes": "Limite de bytes dos dados de seleção de imagens",
+      "maximumCalls": "Limite de solicitações do Kubernetes",
+      "maximumPairs": "Limite de pares imagem/nó",
+      "platformDigest": "Resumo da observação de plataformas",
+      "nodeCount": "Nós selecionados",
+      "contentCount": "Alvos de imagens",
+      "imageReferenceCount": "Referências de imagens",
+      "pairCount": "Pares imagem/nó",
+      "issueCount": "Verificações pendentes",
+      "invalidInput": "Revise o UUID distinto, o escopo exato de nós/UID, os perfis de execução e os limites."
     }
   }
 }
