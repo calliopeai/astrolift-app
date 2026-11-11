@@ -1,0 +1,50 @@
+{
+  "format": 1,
+  "scope": "SDK node/image platform observation controls; no native admission",
+  "status": "local-contract-qualified; real paired agent qualification pending",
+  "sources": {
+    "backend/providers/nvke/_operator_install_plan_node_platforms.py": "6e8a2dd2c8358f403f4b8d2ff15fcdb49f51016f18a0bd721fd4d47794bcc0a2",
+    "backend/providers/nvke/operator_agent_client.py": "11075499bff7189c0f94aeb16e827ce23bb95c98ac437d6d7663d5d3b6141216",
+    "backend/providers/tests/nvke/test_operator_install_plan_node_platforms.py": "6f5e03314efa5222f63a73f4b82c8516e0cae981a480d1d6a54b35c0dd9987a2"
+  },
+  "checks": [
+    {
+      "runnerPid": 59743,
+      "logPath": "/tmp/astrolift-nvke-node-platform-sdk-v4.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-sdk-v4.exit",
+      "exitCode": 0,
+      "passed": 80,
+      "skipped": 0,
+      "scope": "new platform SDK and existing immutable SDK contracts; HTTP peers, no database"
+    },
+    {
+      "runnerPid": 59475,
+      "logPath": "/tmp/astrolift-nvke-node-platform-sdk-mypy-v1.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-sdk-mypy-v1.exit",
+      "exitCode": 0,
+      "scope": "strict mypy, 2 SDK source files"
+    }
+  ],
+  "verified": [
+    "closed explicit node/runtime/platform scope and decimal int64 budgets",
+    "parent binding and original ancestry validated before and after I/O",
+    "explicit prepare and offline review controls",
+    "lost reply retains ambiguity without automatic POST replay",
+    "changed signed binding refuses publication",
+    "summary excludes raw node scope, credentials and executable paths",
+    "continuationAuthorized remains false"
+  ],
+  "remaining": [
+    "actual paired SDK/agent node-platform proof",
+    "App persistence/GraphQL, CLI and Storybook-first UI",
+    "helper distribution and live target qualification",
+    "CPU/importer attestation, scheduling, credential correspondence, availability, phase use and linked admission"
+  ],
+  "retainedHarnessFailures": [
+    {
+      "logPath": "/tmp/astrolift-nvke-node-platform-sdk-v2.log",
+      "exitCode": 4,
+      "reason": "SDK-only runner loaded parent Django conftest without database configuration; final runner confines conftest discovery to SDK tests"
+    }
+  ]
+}
