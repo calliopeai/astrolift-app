@@ -10259,6 +10259,7 @@ export type Mutation = {
   reviewNvkeOperatorInstallPlanImmutableExecutionTree: NvkeOperatorInstallPlanImmutableExecutionTypeMutationResult;
   reviewNvkeOperatorInstallPlanNodePlatforms: NvkeOperatorInstallPlanNodePlatformsTypeMutationResult;
   reviewNvkeOperatorInstallPlanPullAuthority: NvkeOperatorInstallPlanPullAuthorityTypeMutationResult;
+  reviewNvkeOperatorInstallPlanPullRuntime: NvkeOperatorInstallPlanPullRuntimeTypeMutationResult;
   reviewNvkeOperatorInstallPlanPullSecretAnalysis: NvkeOperatorInstallPlanPullSecretAnalysisTypeMutationResult;
   reviewNvkeOperatorInstallPlanTree: NvkeOperatorInstallPlanTreeTypeMutationResult;
   reviewNvkeOperatorInstallPlanVerification: NvkeOperatorInstallPlanVerificationTypeMutationResult;
@@ -12336,6 +12337,11 @@ export type MutationReviewNvkeOperatorInstallPlanPullAuthorityArgs = {
 };
 
 
+export type MutationReviewNvkeOperatorInstallPlanPullRuntimeArgs = {
+  input: NvkeOperatorInstallPlanPullRuntimeReviewInput;
+};
+
+
 export type MutationReviewNvkeOperatorInstallPlanPullSecretAnalysisArgs = {
   input: NvkeOperatorInstallPlanPullSecretAnalysisReviewInput;
 };
@@ -14348,6 +14354,56 @@ export type NvkeOperatorInstallPlanPullAuthorityType = {
 
 export type NvkeOperatorInstallPlanPullAuthorityTypeMutationResult = {
   data?: Maybe<NvkeOperatorInstallPlanPullAuthorityType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeOperatorInstallPlanPullRuntimeReviewInput = {
+  analysisDigest: Scalars['String']['input'];
+  analysisId: Scalars['GUID']['input'];
+  bindingDigest: Scalars['String']['input'];
+  bindingId: Scalars['GUID']['input'];
+  chartArtifactDigest: Scalars['String']['input'];
+  chartArtifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAnalysisVersion: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedBindingVersion: Scalars['Int']['input'];
+  expectedChartArtifactVersion: Scalars['Int']['input'];
+  expectedNodePlatformVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedPullAuthorityVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedTreeVersion: Scalars['Int']['input'];
+  expectedWorkloadVersion: Scalars['Int']['input'];
+  nodePlatformDigest: Scalars['String']['input'];
+  nodePlatformId: Scalars['GUID']['input'];
+  operationId: Scalars['GUID']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  pullAuthorityDigest: Scalars['String']['input'];
+  pullAuthorityId: Scalars['GUID']['input'];
+  treeDigest: Scalars['String']['input'];
+  treeId: Scalars['GUID']['input'];
+  workloadDigest: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
+};
+
+export type NvkeOperatorInstallPlanPullRuntimeType = {
+  analysis: NvkeOperatorInstallPlanPullSecretAnalysisType;
+  continuationAuthorized: Scalars['Boolean']['output'];
+  correspondenceDigest: Scalars['String']['output'];
+  executionState: Scalars['String']['output'];
+  imageUseCount: Scalars['Int']['output'];
+  nodeCount: Scalars['Int']['output'];
+  nodeObservedAt: Scalars['String']['output'];
+  nodePlatforms: NvkeOperatorInstallPlanNodePlatformsType;
+  sourceObservedAt: Scalars['String']['output'];
+};
+
+export type NvkeOperatorInstallPlanPullRuntimeTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanPullRuntimeType>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
 };
@@ -23520,6 +23576,13 @@ export type RetryNvkeInstallPlanPullAuthorityMutationVariables = Exact<{
 export type RetryNvkeInstallPlanPullAuthorityMutation = { recoverNvkeOperatorInstallPlanPullAuthorityPreparation: { ok: boolean, errors: Array<{ code: string }>, data?: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, authorityDigest: string, podCount: number, serviceAccountCount: number, secretCount: number, missingReferenceCount: number } | null } };
 
 export type NvkeInstallPlanPullAuthorityFieldsFragment = { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, authorityDigest: string, podCount: number, serviceAccountCount: number, secretCount: number, missingReferenceCount: number };
+
+export type ReviewNvkeInstallPlanPullRuntimeMutationVariables = Exact<{
+  input: NvkeOperatorInstallPlanPullRuntimeReviewInput;
+}>;
+
+
+export type ReviewNvkeInstallPlanPullRuntimeMutation = { reviewNvkeOperatorInstallPlanPullRuntime: { ok: boolean, errors: Array<{ code: string }>, data?: { correspondenceDigest: string, imageUseCount: number, nodeCount: number, sourceObservedAt: string, nodeObservedAt: string, executionState: string, continuationAuthorized: boolean, analysis: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, analyzedAt: string, sourceObservedAt: string, pullAuthorityId: string, pullAuthorityVersion: number, pullAuthorityDigest: string, executionState: string, continuationAuthorized: boolean, authorityDigest: string, imageUseCount: number, candidateCount: number, missingReferenceCount: number }, nodePlatforms: { id: string, version: number, status: string, planId: string, planVersion: number, planDigest: string, operationId: string, operationVersion: number, siteId: string, siteVersion: number, authorityId: string, authorityVersion: number, chartArtifactId: string, chartArtifactVersion: number, chartArtifactDigest: string, treeId: string, treeVersion: number, treeDigest: string, workloadId: string, workloadVersion: number, workloadDigest: string, bindingId: string, bindingVersion: number, bindingDigest: string, artifactDigest: string, sourceDigest: string, captureDigest: string, observedAt: string, executionState: string, continuationAuthorized: boolean, platformDigest: string, nodeCount: number, contentCount: number, imageReferenceCount: number, pairCount: number, issueCount: number } } | null } };
 
 export type PrepareNvkeInstallPlanPullSecretAnalysisMutationVariables = Exact<{
   input: PrepareNvkeOperatorInstallPlanPullSecretAnalysisInput;

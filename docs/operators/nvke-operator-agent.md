@@ -942,3 +942,33 @@ operator/defaulting, node/importer, credential, availability and phase-use proof
 and linked admission remain open. Neither preparation authorizes continuation.
 Exact frontend sources and run handles are recorded in
 `backend/providers/nvke/qualification/management-immutable-ui-local.json`.
+
+## Review retained Pod/node pull correspondence
+
+The read-only `reviewNvkeOperatorInstallPlanPullRuntime` mutation joins an already
+prepared Secret analysis with an already prepared node/platform capture. Supply
+the normal original operation/site/authority/plan/chart/tree/workload/binding and
+pull-observation source pins, plus `analysisId`, `expectedAnalysisVersion`,
+`analysisDigest`, `nodePlatformId`, `expectedNodePlatformVersion` and
+`nodePlatformDigest`. Use the analysis `authorityDigest` and node `platformDigest`: these identify
+the signed private capture indexes. Their public `artifactDigest` tags identify
+a different projection and cannot be used for this join.
+
+This review requires current NVKE administrator permission and current tenant,
+caller/token and agent authority. Both retained encrypted intents and complete
+source ancestry are checked before and after the agent read. Parent status,
+versions, summaries and private intent changes refuse publication. The API holds
+short database locks at those boundaries and releases them before contacting the
+agent. It creates no artifact, prepares no parent and never retries a lost read.
+The mutation is audited as `nvke.operator_install_plan_pull_runtime_review`.
+
+The result contains the two exact public parent metadata records, an opaque
+correspondence digest, image/node counts and historical observation times. It
+contains no selected Pod/Node names, credentials or private configuration. The
+agent authenticates its private captures before matching the admitted Pod UID,
+full spec and image use to the enrolled node UID and retained kubelet setting.
+This establishes historical correspondence only. Workload ownership, scheduling,
+node-wide keyrings/plugins, registry authorization, actual image availability,
+fresh phase use and linked execution admission remain separate requirements;
+`continuationAuthorized` stays false. CLI and browser exposure for this new review
+are still pending.

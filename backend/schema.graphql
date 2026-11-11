@@ -10985,6 +10985,7 @@ type Mutation {
   prepareNvkeOperatorInstallPlanPullSecretAnalysis(input: PrepareNvkeOperatorInstallPlanPullSecretAnalysisInput!): NvkeOperatorInstallPlanPullSecretAnalysisTypeMutationResult!
   reviewNvkeOperatorInstallPlanPullSecretAnalysis(input: NvkeOperatorInstallPlanPullSecretAnalysisReviewInput!): NvkeOperatorInstallPlanPullSecretAnalysisTypeMutationResult!
   recoverNvkeOperatorInstallPlanPullSecretAnalysisPreparation(input: NvkeOperatorInstallPlanPullSecretAnalysisReviewInput!): NvkeOperatorInstallPlanPullSecretAnalysisTypeMutationResult!
+  reviewNvkeOperatorInstallPlanPullRuntime(input: NvkeOperatorInstallPlanPullRuntimeReviewInput!): NvkeOperatorInstallPlanPullRuntimeTypeMutationResult!
   prepareNvkeOperatorInstallPlanVerification(input: PrepareNvkeOperatorInstallPlanVerificationInput!): NvkeOperatorInstallPlanVerificationTypeMutationResult!
   reviewNvkeOperatorInstallPlanVerification(input: NvkeOperatorInstallPlanVerificationReviewInput!): NvkeOperatorInstallPlanVerificationTypeMutationResult!
   recoverNvkeOperatorInstallPlanVerificationPreparation(input: NvkeOperatorInstallPlanVerificationReviewInput!): NvkeOperatorInstallPlanVerificationTypeMutationResult!
@@ -12427,6 +12428,56 @@ type NvkeOperatorInstallPlanPullAuthorityTypeMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: NvkeOperatorInstallPlanPullAuthorityType
+}
+
+input NvkeOperatorInstallPlanPullRuntimeReviewInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+  expectedPlanVersion: Int!
+  planDigest: String!
+  chartArtifactId: GUID!
+  expectedChartArtifactVersion: Int!
+  chartArtifactDigest: String!
+  treeId: GUID!
+  expectedTreeVersion: Int!
+  treeDigest: String!
+  workloadId: GUID!
+  expectedWorkloadVersion: Int!
+  workloadDigest: String!
+  bindingId: GUID!
+  expectedBindingVersion: Int!
+  bindingDigest: String!
+  pullAuthorityId: GUID!
+  expectedPullAuthorityVersion: Int!
+  pullAuthorityDigest: String!
+  analysisId: GUID!
+  expectedAnalysisVersion: Int!
+  analysisDigest: String!
+  nodePlatformId: GUID!
+  expectedNodePlatformVersion: Int!
+  nodePlatformDigest: String!
+}
+
+type NvkeOperatorInstallPlanPullRuntimeType {
+  analysis: NvkeOperatorInstallPlanPullSecretAnalysisType!
+  nodePlatforms: NvkeOperatorInstallPlanNodePlatformsType!
+  correspondenceDigest: String!
+  imageUseCount: Int!
+  nodeCount: Int!
+  sourceObservedAt: String!
+  nodeObservedAt: String!
+  executionState: String!
+  continuationAuthorized: Boolean!
+}
+
+type NvkeOperatorInstallPlanPullRuntimeTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallPlanPullRuntimeType
 }
 
 input NvkeOperatorInstallPlanPullSecretAnalysisReviewInput {
