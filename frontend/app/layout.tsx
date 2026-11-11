@@ -76,7 +76,7 @@ export default async function RootLayout({
       <body className={`${plexSans.variable} ${plexMono.variable} ${dmSans.variable} antialiased`}>
         <TimezoneDetector />
         <ThemeProvider
-          attribute="class"
+          attribute={["class", "data-mode"]}
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
