@@ -64,6 +64,18 @@
       "logPath": "/tmp/astrolift-nvke-main-merge-provider-regressions-v1.log",
       "logSha256": "6244edcb385a2a7c0ac07f39cc6b09fe3496a20e3b8c7d620ac21060c0d3f46b",
       "sessionId": 15731
+    },
+    "backendPersistenceAndGraphQL": {
+      "exitCode": 0,
+      "tests": 62,
+      "skipped": 0,
+      "seconds": 160.97,
+      "sessionId": 65945,
+      "logPath": "/tmp/astrolift-nvke-main-merge-backend-regressions-v2.log",
+      "logSha256": "25f11755b8f396979e5835aada9050ac2aa44e348bbd5d7293fddeaeda00a288",
+      "exitMarker": "/tmp/astrolift-nvke-main-merge-backend-regressions-v2.exit",
+      "agentFixtureRevision": "8ad214a1a71f6b082707da5317e20a612a54ae7e",
+      "scope": "Real PostgreSQL models and GraphQL/RBAC/audit/refusal cases for immutable artifacts, existing image bindings and Nitro opt-in; preparatory SDK replies are controlled in these API cases."
     }
   },
   "schemaPreservation": {
@@ -84,5 +96,10 @@
     "Intermediate integration branch only; no final PR, merge to main or deployment.",
     "The actual CLI/browser/native qualification remains on its original detached App/CLI/Ops revisions; this merge does not upgrade that run or establish its result.",
     "Full final backend/frontend/agent gates and adversarial review remain required."
-  ]
+  ],
+  "retainedBackendHarnessFailure": {
+    "exitCode": 1,
+    "logPath": "/tmp/astrolift-nvke-main-merge-backend-regressions-v1.log",
+    "cause": "Historical agent fixture asserts exact source revision 8ad214a1; the first wrapper selected current Opscode. The rerun selects the existing clean worktree at that exact revision without changing source assertions."
+  }
 }
