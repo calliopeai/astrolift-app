@@ -609,7 +609,7 @@ describe("node platform recovery", () => {
     expect(r.result.current?.artifacts).toBeNull();
   });
 
-  it.each(["binding", "binding-pending", "workload-pending", "tree-pending"])(
+  it.each(["binding", "binding-pending", "workload-pending", "tree-pending", "operation-pending"])(
     "rejects an in-flight %s A-to-B-to-A response",
     async (kind) => {
       const h = harness(),
@@ -636,6 +636,7 @@ describe("node platform recovery", () => {
         r.rerender({ ...a, imageBinding: { ...a.imageBinding, pending: true } });
       else if (kind === "tree-pending")
         r.rerender({ ...a, source: { ...a.source, pending: true } });
+      else if (kind === "operation-pending") r.rerender({ ...a, pending: true });
       else r.rerender({ ...a, workload: { ...a.workload, pending: true } });
       r.rerender(a);
       await ready(r);

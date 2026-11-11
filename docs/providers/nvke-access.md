@@ -122,3 +122,10 @@ Local browser evidence is recorded in
 This covers the panel, controller and composed operation screen. Actual compiled
 CLI/App/SDK/agent/browser pairing and complete route-navigation qualification for
 this new stage remain pending; earlier Node-platform pairing does not cover it.
+
+The shared immutable-artifact controller also invalidates in-flight responses when
+another operation becomes pending, including a return to the same idle source.
+A late successful reply cannot repopulate the new visit; the retained intent stays
+available for explicit review/recovery. The regression was reproduced in both
+Node-platform and Pod pull controls before the guard was added. See
+`backend/providers/nvke/qualification/management-operation-pending-epoch-local.json`.

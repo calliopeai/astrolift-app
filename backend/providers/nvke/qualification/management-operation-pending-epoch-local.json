@@ -1,0 +1,85 @@
+{
+  "format": 1,
+  "status": "operation-pending-response-race-fixed-local-checks-pass",
+  "recordedAt": "2026-11-11T15:24:43.309633+00:00",
+  "scope": "Shared immutable artifact controller invalidates responses across operation pending-to-idle transitions",
+  "sourceParent": "d01e7718fee9c551b41f0516cdfaf7c4cb34883e",
+  "sourceSha256": {
+    "frontend/graphql/nvke/use-nvke-install-plan-artifact.ts": "7c85d19e3ce9cb1399c5b68488f32b10a4ecd991f2a4eaf24864e9eb408104bb",
+    "frontend/graphql/nvke/use-nvke-install-plan-node-platforms.test.tsx": "c73afed8b3585539be00806eb7e77bb8227815bfab0fc3c09e1b3c3d4c66bbf2",
+    "frontend/graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx": "2dace2f29a8b87066e192f19c5cf77de594710858d2668f251c376105aa5fe39"
+  },
+  "reproduction": {
+    "exitCode": 1,
+    "failedTests": 2,
+    "selectedTestsOnly": true,
+    "otherTestsSkippedBySelector": 78,
+    "reason": "Both Node and Pod pull controllers accepted the old successful response after operation pending changed false-to-true-to-false",
+    "log": "/tmp/astrolift-nvke-operation-epoch-red-v1.log",
+    "logSha256": "e77ace9b4d579691a777be4449d791c578301e5e41ceb19e4c5898d5a9ba974c"
+  },
+  "checks": [
+    {
+      "command": [
+        "node_modules/.bin/prettier",
+        "--write",
+        "graphql/nvke/use-nvke-install-plan-artifact.ts",
+        "graphql/nvke/use-nvke-install-plan-node-platforms.test.tsx",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-operation-epoch-green-v1-0.log",
+      "logSha256": "f0ad38741201c0aebd567205afd671914662a4f5341bc7bfb3945aa593560708"
+    },
+    {
+      "command": [
+        "node_modules/.bin/vitest",
+        "run",
+        "graphql/nvke/use-nvke-install-plan-node-platforms.test.tsx",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx",
+        "graphql/nvke/use-nvke-install-plan-immutable.test.tsx",
+        "lib/nvke/install-plan-immutable-recovery.test.ts",
+        "components/screens/nvke/NvkeOperatorInstallPlanPullAuthorityPanel.test.tsx",
+        "components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.test.tsx"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-operation-epoch-green-v1-1.log",
+      "logSha256": "d34fed39b48d160223b3f30b169e4ba7d04aee9d8e65e6df08a3cc2e8d1f9b45"
+    },
+    {
+      "command": [
+        "node_modules/.bin/eslint",
+        "graphql/nvke/use-nvke-install-plan-artifact.ts",
+        "graphql/nvke/use-nvke-install-plan-node-platforms.test.tsx",
+        "graphql/nvke/use-nvke-install-plan-pull-authority.test.tsx"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-operation-epoch-green-v1-2.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "node_modules/.bin/tsc",
+        "--noEmit"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-operation-epoch-green-v1-3.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "regressionTests": {
+    "passed": 208,
+    "files": 6,
+    "skipped": 0
+  },
+  "behavior": [
+    "Operation pending is part of the shared source epoch alongside source, actor, permission and reviewed parent guards",
+    "Old in-flight callbacks cannot publish artifacts after an intervening pending operation even if the operation returns to idle",
+    "Retained private server intent and client metadata journal are preserved; no automatic POST retry or installation continuation is introduced"
+  ],
+  "limits": [
+    "The separate actual CLI/App/SDK/agent/browser pairing job is frozen to its own earlier source revisions and is not claimed passed here",
+    "The previous production build has its own exact frontend revision; this fix still requires a new production build before release",
+    "Full native workload/credential/phase-use/linked admission qualification, lifecycle coverage, final green PRs/merge and CONFLICT deployment/live validation remain pending"
+  ]
+}

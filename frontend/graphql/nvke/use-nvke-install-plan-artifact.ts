@@ -247,6 +247,7 @@ export const useNvkeInstallPlanArtifact = <Form extends { artifactId: string }, 
       args.imageBinding?.scopeKey,
       args.imageBinding?.artifacts,
       args.imageBinding?.pending,
+      args.pending,
       ready,
       selectionEpoch,
     ])
