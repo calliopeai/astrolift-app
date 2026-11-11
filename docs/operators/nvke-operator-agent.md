@@ -982,3 +982,11 @@ are implemented and locally qualified with controlled replies. The API has 39
 real PostgreSQL tests, while the browser has 290 focused tests and actual Chromium
 Storybook coverage. Actual GraphQL/SDK/native/browser pairing for this new review
 remains pending; these local results do not establish it.
+
+The correspondence API Storybook harness uses the real HTTP link and scoped hook.
+Its browser driver reads an owned private configuration, keeps the bearer in Node
+forwarding headers, checks every source field and verifies explicit recovery after
+a deliberately lost read. The reusable
+`frontend/e2e/nvke-install-plan-pull-runtime-api-preflight.mjs` runs the driver
+against a controlled loopback endpoint; this qualifies the harness only. Actual
+App/PostgreSQL/native pairing for this view is still a separate pending gate.

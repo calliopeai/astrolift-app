@@ -1,0 +1,156 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-11T20:51:17.561779+00:00",
+  "scope": "HTTP-linked correspondence review Storybook and owned browser/API qualification driver",
+  "status": "controlled-http-browser-preflight-qualified-actual-app-native-pairing-pending",
+  "sourceParent": "b0f94f27a",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.stories.tsx": "7e771e51b35fb6485e5dafe7ecc4d53e90a54b29cdecc5712a208247210971bc",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.test.tsx": "582dc05b37496a17a8c6c9cdefac2dccfacdc1982c626fa3826a3324bb0b6d54",
+    "frontend/e2e/nvke-install-plan-pull-runtime-api-runner.mjs": "f1d9773bff12514ca34479d43e03096c20b03a1e1db052987ba589259a607c02",
+    "frontend/e2e/nvke-install-plan-pull-runtime-api-preflight.mjs": "fe88edf6b30db629ffdef319e22d4bde0e7c16512bffecacabc9b66deac8fb45"
+  },
+  "checks": {
+    "exitCode": 0,
+    "elapsedSeconds": 173.57466933410615,
+    "checks": [
+      {
+        "command": [
+          "./node_modules/.bin/prettier",
+          "--check",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.stories.tsx",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.test.tsx",
+          "e2e/nvke-install-plan-pull-runtime-api-runner.mjs",
+          "graphql/nvke/use-nvke-operation.ts",
+          "components/screens/nvke/NvkeOperationScreen.tsx",
+          "components/screens/nvke/NvkeOperationScreen.stories.tsx",
+          "components/screens/nvke/NvkeOperationScreen.pull-runtime.test.tsx",
+          "components/screens/nvke/types.ts",
+          "e2e/nvke-install-plan-pull-runtime-storybook-runner.mjs",
+          "graphql/nvke/use-nvke-install-plan-pull-runtime.ts",
+          "graphql/nvke/use-nvke-install-plan-pull-runtime.test.tsx",
+          "lib/nvke/operator-install-plan-pull-runtime.ts",
+          "lib/nvke/operator-install-plan-pull-runtime.test.ts",
+          "graphql/nvke/nvke-install-plan-pull-runtime.mutations.ts",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.tsx",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.stories.tsx",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.test.tsx",
+          "messages/en.json",
+          "messages/es.json",
+          "messages/de.json",
+          "messages/fr.json",
+          "messages/pt-BR.json",
+          "messages/ja.json",
+          "messages/ko.json",
+          "messages/zh-Hans.json"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "./node_modules/.bin/eslint",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.stories.tsx",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.test.tsx",
+          "e2e/nvke-install-plan-pull-runtime-api-runner.mjs",
+          "graphql/nvke/use-nvke-operation.ts",
+          "components/screens/nvke/NvkeOperationScreen.tsx",
+          "components/screens/nvke/NvkeOperationScreen.stories.tsx",
+          "components/screens/nvke/NvkeOperationScreen.pull-runtime.test.tsx",
+          "components/screens/nvke/types.ts",
+          "e2e/nvke-install-plan-pull-runtime-storybook-runner.mjs",
+          "graphql/nvke/use-nvke-install-plan-pull-runtime.ts",
+          "graphql/nvke/use-nvke-install-plan-pull-runtime.test.tsx",
+          "lib/nvke/operator-install-plan-pull-runtime.ts",
+          "lib/nvke/operator-install-plan-pull-runtime.test.ts",
+          "graphql/nvke/nvke-install-plan-pull-runtime.mutations.ts",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.tsx",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.stories.tsx",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.test.tsx",
+          "messages/en.json",
+          "messages/es.json",
+          "messages/de.json",
+          "messages/fr.json",
+          "messages/pt-BR.json",
+          "messages/ja.json",
+          "messages/ko.json",
+          "messages/zh-Hans.json"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "./node_modules/.bin/vitest",
+          "run",
+          "lib/nvke/operator-install-plan-pull-runtime.test.ts",
+          "lib/nvke/operator-install-plan-pull-secret-analysis.test.ts",
+          "lib/nvke/operator-install-plan-node-platforms.test.ts",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.test.tsx",
+          "graphql/nvke/use-nvke-install-plan-pull-runtime.test.tsx",
+          "graphql/nvke/use-nvke-install-plan-pull-secret-analysis.test.tsx",
+          "graphql/nvke/use-nvke-install-plan-node-platforms.test.tsx",
+          "components/screens/nvke/NvkeOperationScreen.pull-runtime.test.tsx",
+          "components/screens/nvke/NvkeOperationScreen.pull-secret-analysis.test.tsx",
+          "components/screens/nvke/NvkeOperationScreen.node-platforms.test.tsx",
+          "components/screens/nvke/NvkeOperationScreen.pull-authority.test.tsx",
+          "graphql/nvke/nvke-routes.test.tsx",
+          "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.test.tsx"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "./node_modules/.bin/tsc",
+          "--noEmit"
+        ],
+        "exitCode": 0
+      }
+    ],
+    "sourceSha256": {
+      "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.stories.tsx": "7e771e51b35fb6485e5dafe7ecc4d53e90a54b29cdecc5712a208247210971bc",
+      "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.test.tsx": "582dc05b37496a17a8c6c9cdefac2dccfacdc1982c626fa3826a3324bb0b6d54",
+      "e2e/nvke-install-plan-pull-runtime-api-runner.mjs": "f1d9773bff12514ca34479d43e03096c20b03a1e1db052987ba589259a607c02",
+      "graphql/nvke/use-nvke-operation.ts": "64e422f8cd1c66b8ec6fb25463cafb046c8e568e1b9716cfd164b8b1dde90caa",
+      "components/screens/nvke/NvkeOperationScreen.tsx": "d316ed97628a097103993067de1bf04be0b00d483b9a682c3af8c892beba9293",
+      "components/screens/nvke/NvkeOperationScreen.stories.tsx": "d6a2e8b73335fc20e1bf5bb8340e8137c6c74cafc8b32b2eb0fa8ab11b8b7cd6",
+      "components/screens/nvke/NvkeOperationScreen.pull-runtime.test.tsx": "ac27d65ed8e29aaf665f33d3a0fcc618e1fb062438040aab266da95f4cc3df1b",
+      "components/screens/nvke/types.ts": "6057193fe56afc66c2b7d7524d35152e840f51e0539bf20cf511e57634358a05",
+      "e2e/nvke-install-plan-pull-runtime-storybook-runner.mjs": "f0cb6c319225be456176144e3284f68523d102c035054609f79f7fc53a5c82db",
+      "graphql/nvke/use-nvke-install-plan-pull-runtime.ts": "b373bf9366a7aacc108bdac863cc82a377570dc92ef7dba9e43af05b2cb01581",
+      "graphql/nvke/use-nvke-install-plan-pull-runtime.test.tsx": "973a86a0c0d0a57f6d46c56f1a5caa3bb34ba61965bb5332683da28c8686f6e5",
+      "lib/nvke/operator-install-plan-pull-runtime.ts": "9aa80631d38435e8452e4d53b5b4e586242ce210c4848f02445ab3c0964cfa83",
+      "lib/nvke/operator-install-plan-pull-runtime.test.ts": "b43862919041bf37e78273e65fa21b91b90e95c593db6ea39e6f7b78da6e410f",
+      "graphql/nvke/nvke-install-plan-pull-runtime.mutations.ts": "04068d6ac1e6deaf31dfbee39238396ae11bcba65a404e094a7ee158a85e680a",
+      "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.tsx": "a5eadf0fbc4f1e4057ba14e70268d8c438a0f26501dca248291c393b6b216fa9",
+      "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.stories.tsx": "666c2b7177d0ede7ca6a831536feab178646ec635d7667998d06a4d952206807",
+      "components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.test.tsx": "cf8282d17a3ceddb9b8c34c712eb72bd6b74050fccfe35171176e7f1850927de",
+      "messages/en.json": "eea840b170dc7350d746b4740dcf6045f2d26af305c853ab919caf48cefb1d38",
+      "messages/es.json": "c7684f80b2a5432d7cc68682887b5287889e4994f4c8ebb474186c0d9617b2d0",
+      "messages/de.json": "5653b39aaac4bb5dcbf5a1473676e63faa7fbc6b8cab6bcb5c216c4a73504fe3",
+      "messages/fr.json": "b6591fde7c987eddb12cf1f15b3caa18d4ac508319a34a5182437f6833e10392",
+      "messages/pt-BR.json": "88343e9f292e23164c70d46cb7c5e2e57f3941eb706500f967629ba136835fab",
+      "messages/ja.json": "ee426ab4d339ae95b685ec341a1d1390cfdcacc6e3d9fc801fd480c7bff0f6d2",
+      "messages/ko.json": "892cecc8b7666537f9bca9aa2722697a18c7bd1c071b503fce0015e19c05dca2",
+      "messages/zh-Hans.json": "02471ecac4f9652371425a3a5ff432e5699aac99354596bbb2ad8752cdbe7508"
+    },
+    "sourcesUnchanged": true
+  },
+  "cases": 291,
+  "actualBrowserControlledHttp": {
+    "exitCode": 0,
+    "elapsedSeconds": 8.913111083209515,
+    "scope": "Actual Chromium/HTTP-link/driver against controlled owned HTTP endpoint; no real App/native result claimed",
+    "log": "/tmp/astrolift-nvke-pull-runtime-api-driver-preflight-v3.log"
+  },
+  "coverage": [
+    "Actual HttpLink and real hook/panel used with injected public source metadata; no automatic read or prepare/retry action",
+    "Node browser driver accepts only an owned 0600 regular single-link config and loopback endpoints; token remains in Node forwarding headers, not injected browser fixture",
+    "Exact complete source input verified including analysis authorityDigest/node platformDigest and actor/current organization; redirects and retries refused",
+    "Controlled local HTTP preflight verifies bearer and organization headers, two successful forwarded reads, a deliberately dropped first reply, explicit second read after reload, stable public digest and no result/credentials in storage",
+    "Reload after success clears result and sends no automatic read; focused tests cover actual HTTP-link loss/reload handling plus existing scoped epoch/controller regressions"
+  ],
+  "limits": [
+    "Controlled HTTP endpoint and valid Storybook metadata are not real App/PostgreSQL/SDK/agent/native evidence",
+    "Native SDK/agent public projection fix and earlier Secret-only CLI performance repair remain in separate active runs",
+    "No final connected API/native/browser claim, full NVKE completion, release/main merge or deployment"
+  ]
+}
