@@ -457,17 +457,23 @@ cluster-GUID operator configuration described above on both API and workers.
 Do not use an operator-wide runtime default as a shortcut for preparing a mixed
 cluster fleet.
 
-Installer-managed activation is still a separate integration. The installer
-already shares plain environment between API and workers, so it can carry the
-configuration. Its existing standard EKS node provisioning does not install
-Nitro runtime capacity or provision these confidential-task prerequisites.
-A supported installer flow must explicitly provision/reconcile compatible node
-capacity, runtime readiness, the private run repository, distinct trusted
-key-admin and parent-visible runtime permissions, and Pod Identity. It must
-surface unknown readiness honestly, preserve per-workload opt-in, and retain
-key retirement authority until every owned task key is PendingDeletion.
-A console enablement switch and automatic prerequisite reconciliation are not
-implemented by these App checkpoints.
+Installer 0.1.95 adds the ECS controller integration and on-demand preparation
+task. Follow the installer's
+[cluster activation procedure](https://github.com/calliopeai/calliope-installer/blob/main/docs/nitro-ecs-controller.md):
+prepare the owning EKS cluster, apply the dedicated Nitro prerequisites unit,
+then apply the Astro parent again to configure every API and worker task.
+The prerequisites unit owns the private run repository, controller permissions,
+runtime role, Pod Identity, task service account and optional dedicated dynamic
+Auto Mode capacity. Standard EKS node provisioning alone is insufficient.
+
+In Astro, refresh **Cluster Settings → Nitro** readiness and enable the desired
+mode only after its required checks pass. The saved per-cluster enable state and
+the workload's runtime selection are separate opt-ins. Provisioning or a ready
+verdict does not prove a confidential task has executed successfully: qualify a
+disposable workload, including a same-grant negative refusal, on the actual
+cluster. Unknown readiness needs investigation. Retain key retirement authority
+until every owned task key is PendingDeletion; removing configuration does not
+make it safe to remove key administrators.
 
 The on-demand task definition's memory check is nominal configuration evidence,
 not a guarantee of Fargate tmpfs size. The actual preparation process rechecks
