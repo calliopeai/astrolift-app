@@ -104,6 +104,7 @@ _mutation_bases = [
     AstroliftClustersSchema.NvkeInstallPlanImageBindingMutation,
     AstroliftClustersSchema.NvkeInstallPlanImmutableMutation,
     AstroliftClustersSchema.NvkeInstallPlanNodePlatformsMutation,
+    AstroliftClustersSchema.NvkeInstallPlanPullAuthorityMutation,
     AstroliftClustersSchema.NvkeInstallPlanVerificationMutation,
     AstroliftLifecycleSchema.LifecycleMutation,
     AstroliftScmSchema.ScmMutation,

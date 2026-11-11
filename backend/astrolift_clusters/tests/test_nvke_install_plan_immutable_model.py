@@ -11,6 +11,7 @@ from astrolift_clusters.models import (
     NvkeInstallPlanImagePayload,
     NvkeInstallPlanImmutableExecution,
     NvkeInstallPlanNodePlatforms,
+    NvkeInstallPlanPullAuthority,
     NvkeInstallPlanTree,
 )
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
@@ -21,7 +22,12 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture(
-    params=[NvkeInstallPlanImagePayload, NvkeInstallPlanImmutableExecution, NvkeInstallPlanNodePlatforms]
+    params=[
+        NvkeInstallPlanImagePayload,
+        NvkeInstallPlanImmutableExecution,
+        NvkeInstallPlanNodePlatforms,
+        NvkeInstallPlanPullAuthority,
+    ]
 )
 def retained(site, request):  # noqa: F811
     original = operation(site)

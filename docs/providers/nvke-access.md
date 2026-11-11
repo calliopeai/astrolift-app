@@ -67,3 +67,36 @@ The implementation follows pinned NVKE source at
 Real local tests use the unmodified CAPI v1.13.6 Cluster CRD with recorded hash/license,
 real Kubernetes UIDs, PostgreSQL receipts and controller HTTP fixtures. No CAPI
 controllers or physical workloads are provisioned by these tests.
+
+### Retained admitted-Pod pull observations
+
+Current NVKE administrators can prepare, review and explicitly recover an
+original-source-bound pull-authority observation through
+`prepareNvkeOperatorInstallPlanPullAuthority`,
+`reviewNvkeOperatorInstallPlanPullAuthority` and
+`recoverNvkeOperatorInstallPlanPullAuthorityPreparation`. The SDK provides matching
+`prepare_install_plan_pull_authority` and `install_plan_pull_authority` controls.
+The source includes the exact reviewed original operation, plan, charts, tree,
+workload and image binding, with their versions and digests.
+
+Preparation accepts a closed bounded request with explicit namespace/Pod-to-live-
+UID selections. It encrypts the complete immutable intent before the agent call.
+Artifact IDs remain reserved across all operation/artifact kinds and tombstones.
+Historical review takes no new scope or credential path; explicit preparation
+recovery uses the original caller/token and encrypted intent. Current authority
+and ancestry are checked before and after I/O. Source changes, revoked roles,
+corrupted intent and changed prepared results refuse. Request text is redacted
+from audit variables even when invalid or aliased.
+
+The agent observes admitted-Pod references separately from current ServiceAccount
+settings. Raw Secret responses stay private on the agent. The App stores only
+the encrypted selection intent and public counts, times and opaque digests.
+The SDK rejects unsupported capabilities, private/unknown response fields,
+inconsistent counts and changed source ancestry. A lost POST is ambiguous and
+never automatically retried.
+
+This records observations, not workload ownership, native kubelet/plugin or
+original/proposed registry credential correspondence, pull availability, fresh
+phase use or linked admission. Continuation stays false. Browser controls and
+full NVKE release/deployment remain pending. Local evidence is recorded in
+`backend/providers/nvke/qualification/management-workload-pull-authority-api-local.json`.

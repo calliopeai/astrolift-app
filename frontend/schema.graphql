@@ -10979,6 +10979,9 @@ type Mutation {
   prepareNvkeOperatorInstallPlanNodePlatforms(input: PrepareNvkeOperatorInstallPlanNodePlatformsInput!): NvkeOperatorInstallPlanNodePlatformsTypeMutationResult!
   reviewNvkeOperatorInstallPlanNodePlatforms(input: NvkeOperatorInstallPlanNodePlatformsReviewInput!): NvkeOperatorInstallPlanNodePlatformsTypeMutationResult!
   recoverNvkeOperatorInstallPlanNodePlatformsPreparation(input: NvkeOperatorInstallPlanNodePlatformsReviewInput!): NvkeOperatorInstallPlanNodePlatformsTypeMutationResult!
+  prepareNvkeOperatorInstallPlanPullAuthority(input: PrepareNvkeOperatorInstallPlanPullAuthorityInput!): NvkeOperatorInstallPlanPullAuthorityTypeMutationResult!
+  reviewNvkeOperatorInstallPlanPullAuthority(input: NvkeOperatorInstallPlanPullAuthorityReviewInput!): NvkeOperatorInstallPlanPullAuthorityTypeMutationResult!
+  recoverNvkeOperatorInstallPlanPullAuthorityPreparation(input: NvkeOperatorInstallPlanPullAuthorityReviewInput!): NvkeOperatorInstallPlanPullAuthorityTypeMutationResult!
   prepareNvkeOperatorInstallPlanVerification(input: PrepareNvkeOperatorInstallPlanVerificationInput!): NvkeOperatorInstallPlanVerificationTypeMutationResult!
   reviewNvkeOperatorInstallPlanVerification(input: NvkeOperatorInstallPlanVerificationReviewInput!): NvkeOperatorInstallPlanVerificationTypeMutationResult!
   recoverNvkeOperatorInstallPlanVerificationPreparation(input: NvkeOperatorInstallPlanVerificationReviewInput!): NvkeOperatorInstallPlanVerificationTypeMutationResult!
@@ -12355,6 +12358,74 @@ type NvkeOperatorInstallPlanNodePlatformsTypeMutationResult {
   data: NvkeOperatorInstallPlanNodePlatformsType
 }
 
+input NvkeOperatorInstallPlanPullAuthorityReviewInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+  expectedPlanVersion: Int!
+  planDigest: String!
+  chartArtifactId: GUID!
+  expectedChartArtifactVersion: Int!
+  chartArtifactDigest: String!
+  treeId: GUID!
+  expectedTreeVersion: Int!
+  treeDigest: String!
+  workloadId: GUID!
+  expectedWorkloadVersion: Int!
+  workloadDigest: String!
+  bindingId: GUID!
+  expectedBindingVersion: Int!
+  bindingDigest: String!
+  artifactId: GUID!
+}
+
+type NvkeOperatorInstallPlanPullAuthorityType {
+  id: GUID!
+  version: Int!
+  status: String!
+  planId: GUID!
+  planVersion: Int!
+  planDigest: String!
+  operationId: GUID!
+  operationVersion: Int!
+  siteId: GUID!
+  siteVersion: Int!
+  authorityId: GUID!
+  authorityVersion: Int!
+  chartArtifactId: GUID!
+  chartArtifactVersion: Int!
+  chartArtifactDigest: String!
+  treeId: GUID!
+  treeVersion: Int!
+  treeDigest: String!
+  workloadId: GUID!
+  workloadVersion: Int!
+  workloadDigest: String!
+  bindingId: GUID!
+  bindingVersion: Int!
+  bindingDigest: String!
+  artifactDigest: String!
+  sourceDigest: String!
+  captureDigest: String!
+  observedAt: String!
+  executionState: String!
+  continuationAuthorized: Boolean!
+  authorityDigest: String!
+  podCount: Int!
+  serviceAccountCount: Int!
+  secretCount: Int!
+  missingReferenceCount: Int!
+}
+
+type NvkeOperatorInstallPlanPullAuthorityTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: NvkeOperatorInstallPlanPullAuthorityType
+}
+
 input NvkeOperatorInstallPlanReviewInput {
   operationId: GUID!
   expectedActorId: Int!
@@ -13199,6 +13270,30 @@ input PrepareNvkeOperatorInstallPlanInput {
 }
 
 input PrepareNvkeOperatorInstallPlanNodePlatformsInput {
+  operationId: GUID!
+  expectedActorId: Int!
+  expectedSiteVersion: Int!
+  expectedAuthorityVersion: Int!
+  expectedOperationVersion: Int!
+  planId: GUID!
+  expectedPlanVersion: Int!
+  planDigest: String!
+  chartArtifactId: GUID!
+  expectedChartArtifactVersion: Int!
+  chartArtifactDigest: String!
+  treeId: GUID!
+  expectedTreeVersion: Int!
+  treeDigest: String!
+  workloadId: GUID!
+  expectedWorkloadVersion: Int!
+  workloadDigest: String!
+  bindingId: GUID!
+  expectedBindingVersion: Int!
+  bindingDigest: String!
+  requestText: String!
+}
+
+input PrepareNvkeOperatorInstallPlanPullAuthorityInput {
   operationId: GUID!
   expectedActorId: Int!
   expectedSiteVersion: Int!

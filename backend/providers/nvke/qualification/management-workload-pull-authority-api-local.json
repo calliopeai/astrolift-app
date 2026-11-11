@@ -1,0 +1,357 @@
+{
+  "format": 1,
+  "scope": "encrypted current-admin pull-observation intents, GraphQL/schema/codegen, strict SDK and actual SDK/agent mTLS recovery",
+  "status": "feature-qualified-broad-typecheck-still-failing",
+  "sourceBaseRevision": "aeb740a8f1899d29dff76e61c2b3a4a8e9f94748",
+  "sources": {
+    "backend/astrolift_clusters/migrations/0048_nvke_pull_authority_observations.py": "0d5ff8eab447f92e414c0dfec44b546636bcdb132d636860e7c7ae605d876844",
+    "backend/astrolift_clusters/models/__init__.py": "a231ada3abbf557f21b854b9bdeb2727eec8797df4c844f475f51954a6ccefc7",
+    "backend/astrolift_clusters/models/nvke.py": "d48d19ca202809f164cbfd479d006846e1d78eeab02ff76f60596861472c588a",
+    "backend/astrolift_clusters/nvke_artifact_identity.py": "63886f8003b9a7bc828ba3c5856b90bcc3376d0757d027e2d401a9fa1d189058",
+    "backend/astrolift_clusters/nvke_install_plan_pull_authority.py": "b1044c05c78e75bc43ab35be350525ad22123f35bdbe5ebb25f8aa33aceccf91",
+    "backend/astrolift_clusters/schema/__init__.py": "2540fd3ab85c993b81c237dc65d573ec7cff0dd230c47948d51d355958cd3cb5",
+    "backend/astrolift_clusters/schema/nvke_install_plan_pull_authority.py": "baced43d67becfa75115e42c3357c485dd24fae3377cc832a91468a415689a3c",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_immutable_model.py": "37cf1fbd9329bab5c8cbd46a8000a3a57641eeeb982285259605988dd15df80c",
+    "backend/astrolift_clusters/tests/test_nvke_install_plan_pull_authority.py": "05d8f690ded127e35788e69ee448d02960663199c816e53949b8ab882453e7ce",
+    "backend/config/schema.py": "451c9e4346e9b3b1766b6cab0d9fe27afc30136160c6a5be6fdd84be8e50159e",
+    "backend/core/schema/audit.py": "940cb082748147b1d654589a0c8aacde19a29195e1a275ffb82f76cfbc84d8c0",
+    "backend/providers/nvke/_operator_install_plan_pull_authority.py": "55e8b1dfa716ec45d3aaf69054d332b7f3d5f29f1e1c288a1898ddc70b9ed62e",
+    "backend/providers/nvke/operator_agent_client.py": "e522aa623afb558cddf50f68c4f7de706f1524db397b142bb09f4eabdb1c4303",
+    "backend/providers/tests/nvke/test_operator_install_plan_pull_authority.py": "1f5e4ac63c9044d99da5a19291a17cc46af514095d2649b27b1156ea0759fd51",
+    "backend/schema.graphql": "16de96959b2ff331cd2134a72c5e4d96d60a13039207c827e1ad62e8ab9e51fb",
+    "frontend/graphql/__generated__/operations.ts": "9c4b3478dbca94d39bac3035f80aae06be7a504d2307c746796bbc4373e34b1a",
+    "frontend/graphql/__generated__/schema.ts": "67f739da7c340648922e0481cd69afb1fe77290c67e304cd1d122a05cbe056a1",
+    "frontend/schema.graphql": "16de96959b2ff331cd2134a72c5e4d96d60a13039207c827e1ad62e8ab9e51fb"
+  },
+  "checks": {
+    "sdk-v1": {
+      "runnerExitCode": 0,
+      "completedChecks": [
+        {
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "-m",
+            "pytest",
+            "-c",
+            "/dev/null",
+            "--confcutdir=tests/nvke",
+            "-q",
+            "tests/nvke/test_operator_install_plan_pull_authority.py",
+            "tests/nvke/test_operator_install_plan_node_platforms.py"
+          ],
+          "exitCode": 0
+        },
+        {
+          "command": [
+            "/opt/homebrew/bin/ruff",
+            "check",
+            "nvke/_operator_install_plan_pull_authority.py",
+            "nvke/operator_agent_client.py",
+            "tests/nvke/test_operator_install_plan_pull_authority.py"
+          ],
+          "exitCode": 0
+        },
+        {
+          "command": [
+            "/opt/homebrew/bin/ruff",
+            "format",
+            "--check",
+            "nvke/_operator_install_plan_pull_authority.py",
+            "nvke/operator_agent_client.py",
+            "tests/nvke/test_operator_install_plan_pull_authority.py"
+          ],
+          "exitCode": 0
+        },
+        {
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "exitCode": 0
+        }
+      ],
+      "exitMarker": "/tmp/astrolift-nvke-pull-authority-sdk-v1.exit",
+      "resultPath": "/tmp/astrolift-nvke-pull-authority-sdk-v1.json",
+      "resultSha256": "d4ea6bcdbdb369ff4ccbc40bd894e9e407a38fe6212f4dd23192f8e7020e7361",
+      "logPath": "/tmp/astrolift-nvke-pull-authority-sdk-v1.log",
+      "logSha256": "9b13df4d06530ee332b7d3eacacde73729c8201491823f325a9c4e6ddf36b4f9"
+    },
+    "app-v2": {
+      "runnerExitCode": 1,
+      "completedChecks": [
+        {
+          "name": "migration",
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "manage.py",
+            "makemigrations",
+            "astrolift_clusters",
+            "--name",
+            "nvke_pull_authority_observations",
+            "--noinput"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-app-v2-migration.log",
+          "logSha256": "930b03cb42a557dd1f9b8387fe94b00fa6e181024605e304c7e5ccd832b8c119"
+        },
+        {
+          "name": "migration-drift",
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "manage.py",
+            "makemigrations",
+            "--check",
+            "--dry-run",
+            "--noinput"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-app-v2-migration-drift.log",
+          "logSha256": "bb1933820bca125ef0377aea1b2d49c5e78e7140ca30fa1ca0fd7cbedbe01bf5"
+        },
+        {
+          "name": "schema",
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "manage.py",
+            "export_contracts"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-app-v2-schema.log",
+          "logSha256": "00962753d2b5a9825f1df676df2aa2199a218836a364a5b5e52bebe28d1fc67f"
+        }
+      ],
+      "exitMarker": "/tmp/astrolift-nvke-pull-authority-app-v2.exit",
+      "resultPath": "/tmp/astrolift-nvke-pull-authority-app-v2.json",
+      "resultSha256": "057450b53f9cb55dcc7607e7037707040ae0a99afd999bbe5770746a85cba481",
+      "note": "Migration, drift check and schema export succeeded; missing npm launch produced runner exit 1. Codegen and PostgreSQL tests completed successfully in app-v3."
+    },
+    "app-v3": {
+      "runnerExitCode": 0,
+      "completedChecks": [
+        {
+          "name": "database-driver",
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "manage.py",
+            "shell",
+            "-c",
+            "from django.db import connection; assert connection.vendor == 'postgresql'; cursor=connection.cursor(); cursor.execute('select version()'); assert cursor.fetchone()[0].startswith('PostgreSQL 17'); cursor.close(); print('Owned PostgreSQL 17 confirmed')"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-app-v3-database-driver.log",
+          "logSha256": "3f8d28d2e844563d182e89b24397eec0eaae74e628b32f7532d0f3102a61d115"
+        },
+        {
+          "name": "codegen",
+          "command": [
+            "/Users/ragelink/.local/bin/npm",
+            "run",
+            "codegen"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-app-v3-codegen.log",
+          "logSha256": "88c5199bf8d00d42362ac5da2c4b149ce023b8105433ef1780553ecea9a783c8"
+        },
+        {
+          "name": "database-tests",
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+            "-m",
+            "pytest",
+            "--reuse-db",
+            "-p",
+            "no:cacheprovider",
+            "-q",
+            "astrolift_clusters/tests/test_nvke_install_plan_pull_authority.py",
+            "astrolift_clusters/tests/test_nvke_install_plan_node_platforms.py",
+            "astrolift_clusters/tests/test_nvke_install_plan_immutable_model.py"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-app-v3-database-tests.log",
+          "logSha256": "d281d673f86c3ceb86df7347c28ef350928afe4398d7bc6558d6ae86e274b5e7"
+        }
+      ],
+      "exitMarker": "/tmp/astrolift-nvke-pull-authority-app-v3.exit",
+      "resultPath": "/tmp/astrolift-nvke-pull-authority-app-v3.json",
+      "resultSha256": "0985fc04e479064d6b308110777ff74d7b47e62e3e97e38a4ac29c2eba13b9d3"
+    },
+    "backend-checks-v2": {
+      "runnerExitCode": 0,
+      "completedChecks": [
+        {
+          "command": [
+            "/opt/homebrew/bin/ruff",
+            "check",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/migrations/0048_nvke_pull_authority_observations.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/models/__init__.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/models/nvke.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/nvke_artifact_identity.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/nvke_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/schema/__init__.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/schema/nvke_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/tests/test_nvke_install_plan_immutable_model.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/tests/test_nvke_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/config/schema.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/core/schema/audit.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/providers/nvke/_operator_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/providers/nvke/operator_agent_client.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/providers/tests/nvke/test_operator_install_plan_pull_authority.py"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-backend-checks-v2-0.log",
+          "logSha256": "ea5e1e76d6275a7eb3ab4fa90fb6e9ed8c6cdb58b13e045c28712b32645afed0"
+        },
+        {
+          "command": [
+            "/opt/homebrew/bin/ruff",
+            "format",
+            "--check",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/migrations/0048_nvke_pull_authority_observations.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/models/__init__.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/models/nvke.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/nvke_artifact_identity.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/nvke_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/schema/__init__.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/schema/nvke_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/tests/test_nvke_install_plan_immutable_model.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/astrolift_clusters/tests/test_nvke_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/config/schema.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/core/schema/audit.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/providers/nvke/_operator_install_plan_pull_authority.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/providers/nvke/operator_agent_client.py",
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/backend/providers/tests/nvke/test_operator_install_plan_pull_authority.py"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-backend-checks-v2-1.log",
+          "logSha256": "c900cd03a709fbd0d9636d5bd2b94416a1f3d9df547c5b735db33bedd09a94e8"
+        },
+        {
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-backend-checks-v2-2.log",
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "exitMarker": "/tmp/astrolift-nvke-pull-authority-backend-checks-v2.exit",
+      "resultPath": "/tmp/astrolift-nvke-pull-authority-backend-checks-v2.json",
+      "resultSha256": "2ce249ee3e8822a69db345ed3dd17edaad235d99026d2c9299f9c98c115cf7a7"
+    },
+    "frontend-checks-v1": {
+      "runnerExitCode": 0,
+      "completedChecks": [
+        {
+          "command": [
+            "/Users/ragelink/.local/bin/npm",
+            "run",
+            "lint"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-frontend-checks-v1-0.log",
+          "logSha256": "47a41dbdc55adf75dbb704e8ef18a974dea4d64d81b073e603c89bdecbca889c"
+        },
+        {
+          "command": [
+            "/Users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/node_modules/.bin/tsc",
+            "--noEmit"
+          ],
+          "exitCode": 0,
+          "logPath": "/tmp/astrolift-nvke-pull-authority-frontend-checks-v1-1.log",
+          "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "exitMarker": "/tmp/astrolift-nvke-pull-authority-frontend-checks-v1.exit",
+      "resultPath": "/tmp/astrolift-nvke-pull-authority-frontend-checks-v1.json",
+      "resultSha256": "11a0f07f874becaf7c57e9533b7461c985826cb0dfba9d882c1e88b8b89d4eb8"
+    },
+    "actualSDKAgent": {
+      "exitCode": 0,
+      "result": {
+        "exitCode": 0,
+        "realMTLS": true,
+        "actualSourceAncestryChecks": true,
+        "lostReplyAmbiguousWithoutAutomaticRetry": true,
+        "coldReviewAndSameIntentRetry": true,
+        "pullObservationRequests": 8,
+        "reobservedRequests": 0,
+        "continuationAuthorized": false
+      },
+      "driverPath": "/tmp/astrolift-nvke-pull-authority-sdk-agent-paired-v2.py",
+      "driverSha256": "de72825967f3e210f4267c1ab74af2541bef0fb92084bf1639d11536a35af4ef",
+      "logPath": "/tmp/astrolift-nvke-pull-authority-sdk-agent-paired-v2.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitMarker": "/tmp/astrolift-nvke-pull-authority-sdk-agent-paired-v2.exit"
+    }
+  },
+  "testCounts": {
+    "sdkAndNodeSDKRegression": 58,
+    "realPostgreSQLAPIAndModelRegression": 74,
+    "actualSDKAgentPair": 1
+  },
+  "sdkSourceManifestPath": "/tmp/astrolift-nvke-pull-authority-sdk-agent-paired-v1-sdk-sources.json",
+  "sdkSourceManifestSha256": "ded351480b2ba45d9b1cf44f54fd7b18c48e873a719e646de0de4345488c26ba",
+  "typecheck": {
+    "command": "python -m mypy core config",
+    "exitCode": 1,
+    "currentErrors": 829,
+    "currentErrorFiles": 147,
+    "baselineExitCode": 1,
+    "baselineErrors": 4841,
+    "baselineErrorFiles": 481,
+    "currentErrorSignaturesAbsentFromUnchangedHEAD": 0,
+    "interpretation": "All 829 current error signatures also occur in unchanged HEAD. Import discovery differs between checkouts; the broad check remains failing and is not reported as green. No type-check flags, ignores or gates were weakened.",
+    "currentLogPath": "/tmp/astrolift-nvke-pull-authority-backend-checks-v1-2.log",
+    "currentLogSha256": "5da81484d796929f893dd6217630b51c16204823fd1ad20074b9b50f81f74632",
+    "baselineLogPath": "/tmp/astrolift-nvke-pull-authority-mypy-baseline-v1.log",
+    "baselineLogSha256": "0b1ba572e2a0fb9caa7fb61a04a295844dbea7493804cc2146c131e2447cd289"
+  },
+  "verified": [
+    "Complete immutable scope intent is encrypted before external I/O; prepared output and original source fields cannot be rewritten",
+    "Artifact UUID reservations include native/artifact kinds and soft-deleted tombstones; explicit recovery preserves the original caller/token",
+    "Current NVKE_ADMIN permission, tenant scope and exact original operation/plan/chart/tree/workload/image-binding versions checked before and after I/O",
+    "Malformed and aliased request text is audit-redacted; private scope and raw Secret responses cannot enter public output",
+    "Generated GraphQL and frontend types, real PostgreSQL 17 tests, SDK/Node SDK regression, frontend ESLint/TSC and corrected Ruff checks pass",
+    "Actual SDK/agent mTLS pair checks ancestry/capabilities, loses a reply, restarts and reviews/retries with eight observation reads and zero recollection"
+  ],
+  "limits": [
+    "Broad core/config mypy still fails as recorded; full integration/PR readiness is not claimed",
+    "Browser controls, full compiled CLI/browser pairing and final whole-client source repinning remain pending",
+    "Workload/controller/defaulting ownership, kubelet/plugin and original/proposed registry credentials, availability, fresh phase use and linked admission remain pending",
+    "Full NVKE scope, coordinated final PR/green merge, CONFLICT deployment/live validation and reasonable backlog remain pending"
+  ],
+  "retainedFailures": [
+    {
+      "name": "private-environment-runner-v1",
+      "logPath": "/tmp/astrolift-nvke-pull-authority-app-v1-migration.log",
+      "logSha256": "a707723db586e13b44a0c912792aaa51910c894cf4ae9ba6d2e40e9001904219",
+      "reason": "Runner omitted the legacy env.update setup; Django refused an unconfigured DB before generating/applying anything. Restored the existing owned PostgreSQL configuration."
+    },
+    {
+      "name": "codegen-launch-v2",
+      "errorPath": "/tmp/astrolift-nvke-pull-authority-app-v2-error.txt",
+      "reason": "Migration/drift/schema completed. Resumed codegen/tests with installed local npm instead of the assumed Homebrew path."
+    },
+    {
+      "name": "generated-migration-style",
+      "logPath": "/tmp/astrolift-nvke-pull-authority-backend-checks-v1-0.log",
+      "logSha256": "3c46850beed0ee981e3fcd07800c8c2731e7267d9169f101abc3135cb1fdec8f",
+      "reason": "Formatted Django-generated imports and passed focused Ruff; migration semantics unchanged."
+    },
+    {
+      "name": "paired-fixture-chart-lookup",
+      "errorPath": "/tmp/astrolift-nvke-pull-authority-sdk-agent-paired-v1-error.txt",
+      "reason": "First driver used context_body rather than tree_body for chart source IDs. Corrected only the driver; the real SDK/agent pair passed."
+    }
+  ],
+  "sourceIntegrity": {
+    "exitCode": 0,
+    "pid": 43052,
+    "logPath": "/tmp/astrolift-nvke-pull-integration-app-integrity-v1.log",
+    "logSha256": "7fa5bb7eabc6509018942962b08143eda1051ce392a9582d2080fa03d509c0d3",
+    "exitMarker": "/tmp/astrolift-nvke-pull-integration-app-integrity-v1.exit"
+  }
+}

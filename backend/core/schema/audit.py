@@ -108,6 +108,7 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "PrepareNvkeOperatorInstallPlanImageBindingInput.requestText",
         "PrepareNvkeOperatorInstallPlanImmutableInput.requestText",
         "PrepareNvkeOperatorInstallPlanNodePlatformsInput.requestText",
+        "PrepareNvkeOperatorInstallPlanPullAuthorityInput.requestText",
         "PrepareNvkeOperatorInstallPlanVerificationInput.requestText",
         "ConfigureNvkeTemporalAuthorityInput.address",
         "ConfigureNvkeMetricsAuthorityInput.endpoint",

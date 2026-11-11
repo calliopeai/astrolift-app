@@ -10,6 +10,7 @@ from astrolift_clusters.schema.nvke_install_plan_image_bindings import NvkeInsta
 from astrolift_clusters.schema.nvke_install_plan_images import NvkeInstallPlanImageMutation
 from astrolift_clusters.schema.nvke_install_plan_immutable import NvkeInstallPlanImmutableMutation
 from astrolift_clusters.schema.nvke_install_plan_node_platforms import NvkeInstallPlanNodePlatformsMutation
+from astrolift_clusters.schema.nvke_install_plan_pull_authority import NvkeInstallPlanPullAuthorityMutation
 from astrolift_clusters.schema.nvke_install_plan_trees import NvkeInstallPlanTreeMutation
 from astrolift_clusters.schema.nvke_install_plan_verifications import NvkeInstallPlanVerificationMutation
 from astrolift_clusters.schema.nvke_install_plan_workloads import NvkeInstallPlanWorkloadMutation
@@ -37,6 +38,7 @@ __all__ = [
     "NvkeInstallPlanImageBindingMutation",
     "NvkeInstallPlanImmutableMutation",
     "NvkeInstallPlanNodePlatformsMutation",
+    "NvkeInstallPlanPullAuthorityMutation",
     "NvkeInstallPlanVerificationMutation",
     "NvkeOperatorMutation",
     "NvkeQuery",
