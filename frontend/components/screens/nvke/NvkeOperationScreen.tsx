@@ -23,6 +23,7 @@ import { NvkeCredentialRequestPanel } from "./NvkeCredentialRequestPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { NvkeOperatorInstallPlanContextPanel } from "./NvkeOperatorInstallPlanContextPanel";
 import { NvkeOperatorInstallPlanLocalImagePanel } from "./NvkeOperatorInstallPlanLocalImagePanel";
+import { NvkeOperatorInstallPlanImmutablePanel } from "./NvkeOperatorInstallPlanImmutablePanel";
 import { NvkeOperatorInstallPlanImageBindingPanel } from "./NvkeOperatorInstallPlanImageBindingPanel";
 import { NvkeOperatorInstallPlanWorkloadPanel } from "./NvkeOperatorInstallPlanWorkloadPanel";
 import { NvkeOperatorInstallPlanImagePanel } from "./NvkeOperatorInstallPlanImagePanel";
@@ -64,6 +65,8 @@ export function NvkeOperationScreen({
   operatorInstallPlanWorkloadImage,
   operatorInstallPlanWorkload,
   operatorInstallPlanImageBinding,
+  operatorInstallPlanImagePayload,
+  operatorInstallPlanImmutableExecution,
   operatorInstallPlanLocalImage,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
@@ -259,6 +262,20 @@ export function NvkeOperationScreen({
           {...operatorInstallPlanImageBinding}
           canReview={operatorInstallPlanImageBinding.canReview && canAct && !error}
           pending={pending || operatorInstallPlanImageBinding.pending}
+        />
+      )}
+      {operatorInstallPlanImagePayload && (
+        <NvkeOperatorInstallPlanImmutablePanel
+          {...operatorInstallPlanImagePayload}
+          canReview={operatorInstallPlanImagePayload.canReview && canAct && !error}
+          pending={pending || operatorInstallPlanImagePayload.pending}
+        />
+      )}
+      {operatorInstallPlanImmutableExecution && (
+        <NvkeOperatorInstallPlanImmutablePanel
+          {...operatorInstallPlanImmutableExecution}
+          canReview={operatorInstallPlanImmutableExecution.canReview && canAct && !error}
+          pending={pending || operatorInstallPlanImmutableExecution.pending}
         />
       )}
       {operatorInstallPlanImage && (

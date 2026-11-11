@@ -1,3 +1,7 @@
+import {
+  INSTALL_IMMUTABLE_PAYLOAD_PROPS,
+  INSTALL_IMMUTABLE_EXECUTION_PROPS,
+} from "./NvkeOperatorInstallPlanImmutablePanel.stories";
 import { INSTALL_IMAGE_BINDING_PROPS } from "./NvkeOperatorInstallPlanImageBindingPanel.stories";
 import { WorkloadBound as WORKLOAD_IMAGE_STORY } from "./NvkeOperatorInstallPlanImagePanel.stories";
 import { INSTALL_WORKLOAD_PROPS } from "./NvkeOperatorInstallPlanWorkloadPanel.stories";
@@ -349,4 +353,18 @@ export const InstallPlanImageBindingReadOnly: Story = {
 };
 export const InstallPlanImageBindingPending: Story = {
   args: { ...InstallPlanImageBinding.args, pending: true },
+};
+
+export const InstallImmutableArtifacts: Story = {
+  args: {
+    ...InstallPlanImageBinding.args,
+    operatorInstallPlanImagePayload: INSTALL_IMMUTABLE_PAYLOAD_PROPS,
+    operatorInstallPlanImmutableExecution: INSTALL_IMMUTABLE_EXECUTION_PROPS,
+  },
+};
+export const InstallImmutableArtifactsReadOnly: Story = {
+  args: { ...InstallImmutableArtifacts.args, canAct: false },
+};
+export const InstallImmutableArtifactsPending: Story = {
+  args: { ...InstallImmutableArtifacts.args, pending: true },
 };

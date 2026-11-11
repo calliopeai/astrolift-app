@@ -130,6 +130,32 @@ try {
     await page.waitForFunction(() => document.documentElement.classList.contains("dark"));
     await page.screenshot({ path: `${directory}/${name}-dark.png`, fullPage: true });
   }
+  for (const name of [
+    "install-immutable-artifacts",
+    "install-immutable-artifacts-read-only",
+    "install-immutable-artifacts-pending",
+  ]) {
+    await page.goto(
+      `${base}/iframe.html?id=screens-nvke-operation--${name}&viewMode=story&globals=mode:light`,
+      { timeout: 120000 }
+    );
+    for (const title of [text.titlePayload, text.titleExecution]) {
+      const heading = page.getByRole("heading", { name: title, exact: true });
+      await heading.waitFor({ timeout: 120000 });
+      const section = heading.locator("xpath=ancestor::section[1]");
+      assert.equal(
+        await section.getByRole("button", { name: text.review, exact: true }).isEnabled(),
+        name === "install-immutable-artifacts"
+      );
+      assert(await section.getByRole("button", { name: text.prepare, exact: true }).isDisabled());
+      if (name === "install-immutable-artifacts")
+        await section.screenshot({
+          path: `${directory}/composed-${title === text.titlePayload ? "payload" : "execution"}.png`,
+        });
+    }
+    assert.equal(errors.length, 0);
+    results.push({ story: name, locale: "en" });
+  }
   writeFileSync(
     `${directory}/results.json`,
     JSON.stringify({ stories: results, pageErrors: errors, darkModes: 2 }, null, 2) + "\n"
