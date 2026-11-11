@@ -138,8 +138,17 @@ def verify_positive(task, pod, config, expected_uid, expected_checkpoint):
     ):
         raise ValueError("public capsule identity/negative guard differs")
     security = spec.get("securityContext", {})
-    if any(security.get(name) != 42042 for name in ("runAsUser", "runAsGroup", "fsGroup")):
-        raise ValueError("qualification requires the reviewed non-root UID/GID")
+    container_security = containers[0].get("securityContext", {})
+    if (
+        any(security.get(name) != 42042 for name in ("runAsUser", "runAsGroup"))
+        or "fsGroup" in security
+        or security.get("runAsNonRoot") is not True
+        or security.get("seccompProfile") != {"type": "RuntimeDefault"}
+        or container_security.get("allowPrivilegeEscalation") is not False
+        or container_security.get("privileged")
+        or container_security.get("capabilities") != {"drop": ["ALL"]}
+    ):
+        raise ValueError("qualification requires the reviewed non-root UID/GID and sandbox security context")
     if task.brief is None or task.agent_definition is None or task.environment_spec is None:
         raise ValueError("qualification needs a registered workload, Brief and environment")
     primary = task.agent_definition.containers.filter(is_primary=True).get()
