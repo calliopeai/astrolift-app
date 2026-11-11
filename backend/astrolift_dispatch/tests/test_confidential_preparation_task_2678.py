@@ -30,6 +30,10 @@ def ecs(run, settings, monkeypatch):  # noqa: F811
 
     def run_task(**kwargs):
         state.launched.append(kwargs)
+        run.task.refresh_from_db()
+        launch = run.task.dispatch_target["nitro_preparation"]
+        assert launch["request"] == kwargs and launch["run"] == kwargs["clientToken"]
+        assert kwargs["tags"] == [{"key": nitro_preparation.OWNER_TAG, "value": CONFIG["task_definition"]}]
         marker = kwargs["overrides"]["containerOverrides"][0]["environment"][0]
         assert marker["name"] == nitro_preparation.MARKER
         state.overrides = kwargs["overrides"]
@@ -124,20 +128,12 @@ def test_cancellation_stops_the_preparation_task_and_creates_no_pod(run, ecs):  
 
 
 def test_replacement_worker_waits_on_the_running_task_and_never_retires_its_key(run, ecs):  # noqa: F811
-    attempt = "a" * 32
-    ecs.existing = ["arn:task/earlier"]
-    ecs.overrides = {
-        "containerOverrides": [
-            {"environment": [{"name": nitro_preparation.MARKER, "value": f"{run.task.guid}:{attempt}"}]}
-        ]
-    }
+    launch = nitro_preparation._launch(run.task, CONFIG, nitro_preparation._client(CONFIG))
+    attempt = launch["run"]
+    nitro_preparation._record(
+        run.task, attempt, task_arn="arn:task/earlier", ok=False, error="earlier refusal"
+    )
     ecs.exit = 1
-    run.task.dispatch_target = {
-        **run.task.dispatch_target,
-        "nitro_confidential": {"task_id": "in-flight"},
-        "nitro_preparation": {"run": attempt, "ok": False, "error": "earlier refusal"},
-    }
-    run.task.save(update_fields=["dispatch_target", "updated_at", "version"])
     cleaned_before_wait = []
     wait = nitro_preparation.prepare
 
@@ -166,16 +162,16 @@ def test_stale_outcome_of_an_earlier_attempt_is_not_this_attempts_result(run, ec
     assert not result.ok and "without a result" in result.error
 
 
-def test_a_refused_launch_settles_the_run_and_retires_its_checkpoint(run, ecs, monkeypatch):  # noqa: F811
+def test_unknown_launcher_state_is_retryable_without_retiring_artifacts(run, ecs, monkeypatch):  # noqa: F811
     def denied(config):
-        raise PermissionError("AccessDeniedException: arn:aws:iam::123456789012:role/control-task")
+        raise PermissionError("PRIVATE-DIAGNOSTIC")
 
     monkeypatch.setattr(nitro_preparation, "_client", denied)
-    run.task.dispatch_target = {**run.task.dispatch_target, "nitro_confidential": {"task_id": "orphaned"}}
+    run.task.dispatch_target = {**run.task.dispatch_target, "nitro_confidential": {"task_id": "in-flight"}}
     run.task.save(update_fields=["dispatch_target", "updated_at", "version"])
-    result = run.spawner.spawn(run.task)
-    assert not result.ok and "could not be run" in result.error and "arn:aws" not in result.error
-    assert run.driver.cleaned == [{"task_id": "orphaned"}]
+    with pytest.raises(nitro_preparation.PreparationUncertain, match="state could not be verified"):
+        run.spawner.spawn(run.task)
+    assert run.driver.cleaned == []
 
 
 def test_malformed_preparation_configuration_refuses_before_secrets(run, settings, monkeypatch):  # noqa: F811
@@ -197,6 +193,7 @@ def test_readiness_reports_the_task_instead_of_a_local_workspace(run, ecs, monke
         "task_definition": "arn:definition/7",
         "cpu": 8192,
         "memory_mib": 32768,
+        "workspace_verified": False,
     }
     ecs.definition_memory = 8192
     assert nitro_preparation.readiness()["state"] == "not_ready"
@@ -212,3 +209,258 @@ def test_without_a_preparation_task_the_probe_keeps_its_original_call(run, setti
     # The fixture's probe accepts exactly three arguments.
     assert review(run.cluster, namespace="agents")["modes"]["confidential"]["state"] == "ready"
     assert run.spawner.spawn(run.task).ok
+
+
+def test_lost_run_task_response_reuses_durable_request_without_duplicate_producer(run, ecs, monkeypatch):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    submit = client.run_task
+    requests = []
+
+    def lost_response(**kwargs):
+        requests.append(kwargs)
+        if len(requests) == 1:
+            # AWS accepted the request; ListTasks has not observed it yet.
+            raise TimeoutError("response lost")
+        return submit(**kwargs)
+
+    client.run_task = lost_response
+    with pytest.raises(nitro_preparation.PreparationUncertain, match="launch is not confirmed"):
+        run.spawner.spawn(run.task)
+    run.task.refresh_from_db()
+    first = run.task.dispatch_target["nitro_preparation"]
+    assert first["request"]["clientToken"] == first["run"]
+    assert run.driver.cleaned == [] and not ecs.stopped
+    assert run.spawner.spawn(run.task).ok
+    assert requests[0] == requests[1]
+    assert len(ecs.launched) == 1
+
+
+def test_transient_observation_failure_preserves_live_preparer_and_checkpoint(run, ecs, monkeypatch):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    describe = client.describe_tasks
+    ecs.perform = False
+    ecs.last = "RUNNING"
+    run.task.dispatch_target = {**run.task.dispatch_target, "nitro_confidential": {"task_id": "in-flight"}}
+    run.task.save(update_fields=["dispatch_target", "updated_at", "version"])
+    client.describe_tasks = lambda **kwargs: {"tasks": [], "failures": []}
+    with pytest.raises(nitro_preparation.PreparationUncertain, match="state is not confirmed"):
+        run.spawner.spawn(run.task)
+    assert len(ecs.launched) == 1 and run.driver.cleaned == [] and not ecs.stopped
+    client.describe_tasks = describe
+    run.task.refresh_from_db()
+    run_id = run.task.dispatch_target["nitro_preparation"]["run"]
+    nitro_preparation._record(run.task, run_id, ok=False, error="finished refusal")
+    ecs.last, ecs.exit = "STOPPED", 1
+    assert not run.spawner.spawn(run.task).ok
+    assert len(ecs.launched) == 1 and len(run.driver.cleaned) == 1
+
+
+def test_stop_with_unknown_launch_keeps_artifacts_and_uses_only_started_by_filter(run, ecs):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    nitro_preparation._launch(run.task, CONFIG, client)
+    calls = []
+
+    def empty(**kwargs):
+        calls.append(kwargs)
+        return {"taskArns": []}
+
+    client.list_tasks = empty
+    with pytest.raises(nitro_preparation.PreparationUncertain, match="identity is not confirmed"):
+        run.spawner.stop(run.spawner._name(run.task))
+    assert calls == [{"cluster": CONFIG["cluster"], "startedBy": "np-" + run.task.guid.hex}]
+    assert not ecs.launched and run.driver.cleaned == []
+
+
+def test_cancelled_live_preparer_must_stop_before_key_cleanup(run, ecs):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    launch = nitro_preparation._launch(run.task, CONFIG, client)
+    nitro_preparation._record(run.task, launch["run"], task_arn="arn:task/live")
+    ecs.last = "RUNNING"
+    run.task.refresh_from_db()
+    run.task.dispatch_target = {**run.task.dispatch_target, "nitro_confidential": {"task_id": "in-flight"}}
+    run.task.save(update_fields=["dispatch_target", "updated_at", "version"])
+    cleanup = run.driver.cleanup_confidential_task
+
+    def after_stop(checkpoint):
+        assert ecs.stopped and ecs.last == "STOPPED"
+        return cleanup(checkpoint)
+
+    run.driver.cleanup_confidential_task = after_stop
+    run.spawner.stop(run.spawner._name(run.task))
+    assert len(run.driver.cleaned) == 1
+
+
+def test_stale_child_cannot_write_another_launch_outcome(run, ecs):  # noqa: F811
+    launch = nitro_preparation._launch(run.task, CONFIG, nitro_preparation._client(CONFIG))
+    with pytest.raises(nitro_preparation.PreparationUncertain, match="authority differs"):
+        nitro_preparation.perform(str(run.task.guid), "f" * 32)
+    run.task.refresh_from_db()
+    assert run.task.dispatch_target["nitro_preparation"] == launch
+    assert run.driver.seen is None
+
+
+def test_uncertain_preparation_does_not_settle_dispatch_as_failed(run, ecs, monkeypatch):  # noqa: F811
+    from astrolift_workflows.activities.agent_stage import _spawn_agent_task_sync
+
+    client = nitro_preparation._client(CONFIG)
+    client.describe_tasks = lambda **kwargs: {"tasks": [], "failures": []}
+    ecs.perform = False
+    with pytest.raises(nitro_preparation.PreparationUncertain):
+        _spawn_agent_task_sync(run.task.pk)
+    run.task.refresh_from_db()
+    assert run.task.status == run.task.Status.PROVISIONING
+    assert not run.driver.cleaned
+
+
+def test_preparer_checks_its_own_workspace_before_resolving_secrets(run, ecs, monkeypatch):  # noqa: F811
+    config = nitro_preparation._launch(run.task, CONFIG, nitro_preparation._client(CONFIG))
+    monkeypatch.setenv(nitro_preparation.MARKER, f"{run.task.guid}:{config['run']}")
+    report = run.driver.probe_nitro_readiness
+
+    def small_workspace(slug, namespace, config, preparation=None):
+        assert preparation is None
+        result = report(slug, namespace, config)
+        result["modes"]["confidential"] = {
+            "state": "not_ready",
+            "checks": [{"code": "workspace", "state": "not_ready"}],
+        }
+        return result
+
+    run.driver.probe_nitro_readiness = small_workspace
+    monkeypatch.setattr(
+        "astrolift_dispatch.agent_secrets.resolve_task_secret_manifest",
+        lambda **kwargs: pytest.fail("secrets must follow the actual preparer workspace check"),
+    )
+    assert not nitro_preparation.perform(str(run.task.guid), config["run"])
+    assert run.driver.seen is None
+
+
+def test_checkpoint_save_preserves_parent_stop_fence_and_launch_arn(run, ecs):  # noqa: F811
+    prepare = run.driver.prepare_confidential_task
+
+    def stop_during_prepare(*args, **kwargs):
+        run.task.refresh_from_db()
+        launch = run.task.dispatch_target["nitro_preparation"]
+        nitro_preparation._record(run.task, launch["run"], task_arn="arn:task/new", stop_requested=True)
+        return prepare(*args, **kwargs)
+
+    run.driver.prepare_confidential_task = stop_during_prepare
+    assert not run.spawner.spawn(run.task).ok
+    run.task.refresh_from_db()
+    launch = run.task.dispatch_target["nitro_preparation"]
+    assert launch["task_arn"] == "arn:task/new" and launch["stop_requested"] is True
+    assert run.driver.pod is None
+
+
+def test_stop_wait_is_bounded_and_never_cleans_unconfirmed_producer(run, ecs, monkeypatch):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    launch = nitro_preparation._launch(run.task, CONFIG, client)
+    nitro_preparation._record(run.task, launch["run"], task_arn="arn:task/live")
+    client.describe_tasks = lambda **kwargs: {
+        "tasks": [{"taskArn": kwargs["tasks"][0], "lastStatus": "RUNNING"}]
+    }
+    monkeypatch.setattr(nitro_preparation, "STOP_TIMEOUT_SECONDS", 0)
+    with pytest.raises(nitro_preparation.PreparationUncertain, match="still stopping"):
+        run.spawner.stop(run.spawner._name(run.task))
+    assert ecs.stopped and run.driver.cleaned == []
+
+
+def test_recovery_freezes_revision_network_and_owner_tag_across_configuration_roll(run, ecs, settings):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    launch = nitro_preparation._launch(run.task, CONFIG, client)
+    settings.NITRO_PREPARATION_TASK = json.dumps(
+        {
+            **CONFIG,
+            "task_definition": "next-family",
+            "subnets": ["next-subnet"],
+        }
+    )
+    # A replacement worker still submits the originally committed request.
+    assert run.spawner.spawn(run.task).ok
+    assert ecs.launched == [launch["request"]]
+    assert ecs.launched[0]["taskDefinition"] == "arn:definition/7"
+    assert ecs.launched[0]["tags"] == [
+        {"key": nitro_preparation.OWNER_TAG, "value": CONFIG["task_definition"]}
+    ]
+
+
+def test_expired_unknown_launch_never_replays_its_client_token(run, ecs):  # noqa: F811
+    launch = nitro_preparation._launch(run.task, CONFIG, nitro_preparation._client(CONFIG))
+    nitro_preparation._record(run.task, launch["run"], deadline=0)
+    with pytest.raises(nitro_preparation.PreparationUncertain, match="identity is not confirmed"):
+        run.spawner.spawn(run.task)
+    assert not ecs.launched and not ecs.stopped and not run.driver.cleaned
+
+
+def test_unknown_arn_stop_discovers_only_the_frozen_revision_and_nonce(run, ecs):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    launch = nitro_preparation._launch(run.task, CONFIG, client)
+    client.list_tasks = lambda **kwargs: {"taskArns": ["arn:task/other", "arn:task/owned"]}
+
+    def describe(**kwargs):
+        arn = kwargs["tasks"][0]
+        marker = f"{run.task.guid}:{launch['run']}" if arn.endswith("owned") else "another-run"
+        return {
+            "tasks": [
+                {
+                    "taskArn": arn,
+                    "taskDefinitionArn": launch["request"]["taskDefinition"],
+                    "lastStatus": "STOPPED" if ecs.stopped else "RUNNING",
+                    "overrides": {
+                        "containerOverrides": [
+                            {
+                                "name": CONFIG["container"],
+                                "environment": [{"name": nitro_preparation.MARKER, "value": marker}],
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+
+    client.describe_tasks = describe
+    nitro_preparation.stop_preparation(run.task)
+    run.task.refresh_from_db()
+    assert [item["task"] for item in ecs.stopped] == ["arn:task/owned"]
+    assert run.task.dispatch_target["nitro_preparation"]["stopped"] is True
+    assert not ecs.launched
+
+
+def test_explicit_single_task_rejection_settles_without_discovering_a_nonexistent_producer(run, ecs):  # noqa: F811
+    client = nitro_preparation._client(CONFIG)
+    submissions = []
+
+    def reject(**kwargs):
+        submissions.append(kwargs)
+        return {"tasks": [], "failures": [{"reason": "synthetic rejection with private diagnostics"}]}
+
+    client.run_task = reject
+    client.list_tasks = lambda **kwargs: pytest.fail("a rejected launch needs no discovery")
+    for _ in range(2):
+        result = run.spawner.spawn(run.task)
+        assert not result.ok and result.error == "The confidential preparation task launch was rejected"
+    run.task.refresh_from_db()
+    launch = run.task.dispatch_target["nitro_preparation"]
+    assert launch["stopped"] is True and launch["rejected"] is True
+    assert len(submissions) == 1 and not ecs.stopped
+    assert "private diagnostics" not in json.dumps(launch)
+
+
+def test_preparer_cleanup_preserves_parent_launch_updates(run, ecs, monkeypatch):  # noqa: F811
+    launch = nitro_preparation._launch(run.task, CONFIG, nitro_preparation._client(CONFIG))
+    monkeypatch.setenv(nitro_preparation.MARKER, f"{run.task.guid}:{launch['run']}")
+    run.task.dispatch_target = {**run.task.dispatch_target, "nitro_confidential": {"task_id": "in-flight"}}
+    run.task.save(update_fields=["dispatch_target", "updated_at", "version"])
+    cleanup = run.driver.cleanup_confidential_task
+
+    def parent_updates_during_cleanup(checkpoint):
+        nitro_preparation._record(run.task, launch["run"], task_arn="arn:task/new", stop_requested=True)
+        return cleanup(checkpoint)
+
+    run.driver.cleanup_confidential_task = parent_updates_during_cleanup
+    run.spawner._cleanup_run(run.spawner._name(run.task))
+    run.task.refresh_from_db()
+    state = run.task.dispatch_target
+    assert state["nitro_preparation"]["task_arn"] == "arn:task/new"
+    assert state["nitro_preparation"]["stop_requested"] is True
+    assert state["nitro_confidential"]["cleanup_complete"] is True
