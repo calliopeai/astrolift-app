@@ -6,6 +6,29 @@ from uuid import UUID
 from django.db import connection
 
 
+def reserved(identity, *, excluding):
+    """Include tombstones when reserving an ID across immutable artifact kinds."""
+    from astrolift_clusters import models
+
+    return any(
+        model.all_objects.filter(guid=identity).exists()
+        for model in (
+            models.NvkeOperation,
+            models.NvkeInstallPlan,
+            models.NvkeInstallPlanCharts,
+            models.NvkeInstallPlanTree,
+            models.NvkeInstallPlanContext,
+            models.NvkeInstallPlanVerification,
+            models.NvkeInstallPlanWorkload,
+            models.NvkeInstallPlanImage,
+            models.NvkeInstallPlanImageBinding,
+            models.NvkeInstallPlanImagePayload,
+            models.NvkeInstallPlanImmutableExecution,
+        )
+        if model is not excluding
+    )
+
+
 def lock(identity):
     if not connection.in_atomic_block or connection.vendor != "postgresql":
         raise RuntimeError("Artifact reservation requires a PostgreSQL transaction")

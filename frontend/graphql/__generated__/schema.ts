@@ -10086,6 +10086,8 @@ export type Mutation = {
   prepareNvkeOperatorInstallPlanContext: NvkeOperatorInstallPlanContextTypeMutationResult;
   prepareNvkeOperatorInstallPlanImage: NvkeOperatorInstallPlanImageTypeMutationResult;
   prepareNvkeOperatorInstallPlanImageBinding: NvkeOperatorInstallPlanImageBindingTypeMutationResult;
+  prepareNvkeOperatorInstallPlanImagePayload: NvkeOperatorInstallPlanImagePayloadTypeMutationResult;
+  prepareNvkeOperatorInstallPlanImmutableExecutionTree: NvkeOperatorInstallPlanImmutableExecutionTypeMutationResult;
   prepareNvkeOperatorInstallPlanTree: NvkeOperatorInstallPlanTreeTypeMutationResult;
   prepareNvkeOperatorInstallPlanVerification: NvkeOperatorInstallPlanVerificationTypeMutationResult;
   prepareNvkeOperatorInstallPlanWorkload: NvkeOperatorInstallPlanWorkloadTypeMutationResult;
@@ -10125,7 +10127,9 @@ export type Mutation = {
   recoverNvkeOperatorInstallPlanChartsPreparation: NvkeOperatorInstallPlanChartsTypeMutationResult;
   recoverNvkeOperatorInstallPlanContextPreparation: NvkeOperatorInstallPlanContextTypeMutationResult;
   recoverNvkeOperatorInstallPlanImageBindingPreparation: NvkeOperatorInstallPlanImageBindingTypeMutationResult;
+  recoverNvkeOperatorInstallPlanImagePayloadPreparation: NvkeOperatorInstallPlanImagePayloadTypeMutationResult;
   recoverNvkeOperatorInstallPlanImagePreparation: NvkeOperatorInstallPlanImageTypeMutationResult;
+  recoverNvkeOperatorInstallPlanImmutableExecutionTreePreparation: NvkeOperatorInstallPlanImmutableExecutionTypeMutationResult;
   recoverNvkeOperatorInstallPlanPreparation: NvkeOperatorInstallPlanTypeMutationResult;
   recoverNvkeOperatorInstallPlanTreePreparation: NvkeOperatorInstallPlanTreeTypeMutationResult;
   recoverNvkeOperatorInstallPlanVerificationPreparation: NvkeOperatorInstallPlanVerificationTypeMutationResult;
@@ -10209,6 +10213,8 @@ export type Mutation = {
   reviewNvkeOperatorInstallPlanContext: NvkeOperatorInstallPlanContextTypeMutationResult;
   reviewNvkeOperatorInstallPlanImage: NvkeOperatorInstallPlanImageTypeMutationResult;
   reviewNvkeOperatorInstallPlanImageBinding: NvkeOperatorInstallPlanImageBindingTypeMutationResult;
+  reviewNvkeOperatorInstallPlanImagePayload: NvkeOperatorInstallPlanImagePayloadTypeMutationResult;
+  reviewNvkeOperatorInstallPlanImmutableExecutionTree: NvkeOperatorInstallPlanImmutableExecutionTypeMutationResult;
   reviewNvkeOperatorInstallPlanTree: NvkeOperatorInstallPlanTreeTypeMutationResult;
   reviewNvkeOperatorInstallPlanVerification: NvkeOperatorInstallPlanVerificationTypeMutationResult;
   reviewNvkeOperatorInstallPlanWorkload: NvkeOperatorInstallPlanWorkloadTypeMutationResult;
@@ -11628,6 +11634,16 @@ export type MutationPrepareNvkeOperatorInstallPlanImageBindingArgs = {
 };
 
 
+export type MutationPrepareNvkeOperatorInstallPlanImagePayloadArgs = {
+  input: PrepareNvkeOperatorInstallPlanImmutableInput;
+};
+
+
+export type MutationPrepareNvkeOperatorInstallPlanImmutableExecutionTreeArgs = {
+  input: PrepareNvkeOperatorInstallPlanImmutableInput;
+};
+
+
 export type MutationPrepareNvkeOperatorInstallPlanTreeArgs = {
   input: PrepareNvkeOperatorInstallPlanTreeInput;
 };
@@ -11797,8 +11813,18 @@ export type MutationRecoverNvkeOperatorInstallPlanImageBindingPreparationArgs = 
 };
 
 
+export type MutationRecoverNvkeOperatorInstallPlanImagePayloadPreparationArgs = {
+  input: NvkeOperatorInstallPlanImmutableReviewInput;
+};
+
+
 export type MutationRecoverNvkeOperatorInstallPlanImagePreparationArgs = {
   input: NvkeOperatorInstallPlanImageReviewInput;
+};
+
+
+export type MutationRecoverNvkeOperatorInstallPlanImmutableExecutionTreePreparationArgs = {
+  input: NvkeOperatorInstallPlanImmutableReviewInput;
 };
 
 
@@ -12207,6 +12233,16 @@ export type MutationReviewNvkeOperatorInstallPlanImageArgs = {
 
 export type MutationReviewNvkeOperatorInstallPlanImageBindingArgs = {
   input: NvkeOperatorInstallPlanImageBindingReviewInput;
+};
+
+
+export type MutationReviewNvkeOperatorInstallPlanImagePayloadArgs = {
+  input: NvkeOperatorInstallPlanImmutableReviewInput;
+};
+
+
+export type MutationReviewNvkeOperatorInstallPlanImmutableExecutionTreeArgs = {
+  input: NvkeOperatorInstallPlanImmutableReviewInput;
 };
 
 
@@ -13874,6 +13910,52 @@ export type NvkeOperatorInstallPlanImageBindingTypeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type NvkeOperatorInstallPlanImagePayloadType = {
+  artifactDigest: Scalars['String']['output'];
+  authorityId: Scalars['GUID']['output'];
+  authorityVersion: Scalars['Int']['output'];
+  bindingDigest: Scalars['String']['output'];
+  bindingId: Scalars['GUID']['output'];
+  bindingVersion: Scalars['Int']['output'];
+  captureDigest: Scalars['String']['output'];
+  chartArtifactDigest: Scalars['String']['output'];
+  chartArtifactId: Scalars['GUID']['output'];
+  chartArtifactVersion: Scalars['Int']['output'];
+  continuationAuthorized: Scalars['Boolean']['output'];
+  executionState: Scalars['String']['output'];
+  fileCount: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  imageUseCount: Scalars['Int']['output'];
+  observedAt: Scalars['String']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  payloadBytes: Scalars['String']['output'];
+  payloadDigest: Scalars['String']['output'];
+  planDigest: Scalars['String']['output'];
+  planId: Scalars['GUID']['output'];
+  planVersion: Scalars['Int']['output'];
+  resourceCount: Scalars['Int']['output'];
+  rewriteCount: Scalars['Int']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  sourceDigest: Scalars['String']['output'];
+  sourceObservedAt: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  treeDigest: Scalars['String']['output'];
+  treeId: Scalars['GUID']['output'];
+  treeVersion: Scalars['Int']['output'];
+  version: Scalars['Int']['output'];
+  workloadDigest: Scalars['String']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorInstallPlanImagePayloadTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanImagePayloadType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type NvkeOperatorInstallPlanImageReviewInput = {
   artifactId: Scalars['GUID']['input'];
   chartArtifactDigest: Scalars['String']['input'];
@@ -13933,6 +14015,76 @@ export type NvkeOperatorInstallPlanImageTypeMutationResult = {
   data?: Maybe<NvkeOperatorInstallPlanImageType>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeOperatorInstallPlanImmutableExecutionType = {
+  artifactDigest: Scalars['String']['output'];
+  authorityId: Scalars['GUID']['output'];
+  authorityVersion: Scalars['Int']['output'];
+  bindingDigest: Scalars['String']['output'];
+  bindingId: Scalars['GUID']['output'];
+  bindingVersion: Scalars['Int']['output'];
+  bytes: Scalars['String']['output'];
+  captureDigest: Scalars['String']['output'];
+  chartArtifactDigest: Scalars['String']['output'];
+  chartArtifactId: Scalars['GUID']['output'];
+  chartArtifactVersion: Scalars['Int']['output'];
+  continuationAuthorized: Scalars['Boolean']['output'];
+  executionDigest: Scalars['String']['output'];
+  executionState: Scalars['String']['output'];
+  fileCount: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  importCount: Scalars['Int']['output'];
+  observedAt: Scalars['String']['output'];
+  operationId: Scalars['GUID']['output'];
+  operationVersion: Scalars['Int']['output'];
+  phaseCount: Scalars['Int']['output'];
+  planDigest: Scalars['String']['output'];
+  planId: Scalars['GUID']['output'];
+  planVersion: Scalars['Int']['output'];
+  siteId: Scalars['GUID']['output'];
+  siteVersion: Scalars['Int']['output'];
+  skippedPhaseCount: Scalars['Int']['output'];
+  sourceDigest: Scalars['String']['output'];
+  sourceObservedAt: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  treeDigest: Scalars['String']['output'];
+  treeId: Scalars['GUID']['output'];
+  treeVersion: Scalars['Int']['output'];
+  version: Scalars['Int']['output'];
+  workloadDigest: Scalars['String']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
+};
+
+export type NvkeOperatorInstallPlanImmutableExecutionTypeMutationResult = {
+  data?: Maybe<NvkeOperatorInstallPlanImmutableExecutionType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type NvkeOperatorInstallPlanImmutableReviewInput = {
+  artifactId: Scalars['GUID']['input'];
+  bindingDigest: Scalars['String']['input'];
+  bindingId: Scalars['GUID']['input'];
+  chartArtifactDigest: Scalars['String']['input'];
+  chartArtifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedBindingVersion: Scalars['Int']['input'];
+  expectedChartArtifactVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedTreeVersion: Scalars['Int']['input'];
+  expectedWorkloadVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  treeDigest: Scalars['String']['input'];
+  treeId: Scalars['GUID']['input'];
+  workloadDigest: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
 };
 
 export type NvkeOperatorInstallPlanInfrastructureType = {
@@ -14755,6 +14907,30 @@ export type PrepareNvkeOperatorInstallPlanImageInput = {
   treeId: Scalars['GUID']['input'];
   workloadDigest: InputMaybe<Scalars['String']['input']>;
   workloadId: InputMaybe<Scalars['GUID']['input']>;
+};
+
+export type PrepareNvkeOperatorInstallPlanImmutableInput = {
+  bindingDigest: Scalars['String']['input'];
+  bindingId: Scalars['GUID']['input'];
+  chartArtifactDigest: Scalars['String']['input'];
+  chartArtifactId: Scalars['GUID']['input'];
+  expectedActorId: Scalars['Int']['input'];
+  expectedAuthorityVersion: Scalars['Int']['input'];
+  expectedBindingVersion: Scalars['Int']['input'];
+  expectedChartArtifactVersion: Scalars['Int']['input'];
+  expectedOperationVersion: Scalars['Int']['input'];
+  expectedPlanVersion: Scalars['Int']['input'];
+  expectedSiteVersion: Scalars['Int']['input'];
+  expectedTreeVersion: Scalars['Int']['input'];
+  expectedWorkloadVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  planDigest: Scalars['String']['input'];
+  planId: Scalars['GUID']['input'];
+  requestText: Scalars['String']['input'];
+  treeDigest: Scalars['String']['input'];
+  treeId: Scalars['GUID']['input'];
+  workloadDigest: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
 };
 
 export type PrepareNvkeOperatorInstallPlanInput = {

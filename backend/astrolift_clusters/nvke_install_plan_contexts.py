@@ -21,6 +21,8 @@ from astrolift_clusters.models import (
     NvkeInstallPlanContext,
     NvkeInstallPlanImage,
     NvkeInstallPlanImageBinding,
+    NvkeInstallPlanImagePayload,
+    NvkeInstallPlanImmutableExecution,
     NvkeInstallPlanTree,
     NvkeInstallPlanVerification,
     NvkeInstallPlanWorkload,
@@ -251,6 +253,8 @@ def prepare(*, body, **values):
                     NvkeInstallPlanImage,
                     NvkeInstallPlanWorkload,
                     NvkeInstallPlanImageBinding,
+                    NvkeInstallPlanImagePayload,
+                    NvkeInstallPlanImmutableExecution,
                 )
             ):
                 raise NvkeError(

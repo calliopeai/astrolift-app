@@ -1,0 +1,85 @@
+import { gql } from "@apollo/client";
+
+export const NVKE_INSTALL_PLAN_IMAGE_PAYLOAD_FIELDS = gql`
+  fragment NvkeInstallPlanImagePayloadFields on NvkeOperatorInstallPlanImagePayloadType {
+    id
+    version
+    status
+    planId
+    planVersion
+    planDigest
+    operationId
+    operationVersion
+    siteId
+    siteVersion
+    authorityId
+    authorityVersion
+    chartArtifactId
+    chartArtifactVersion
+    chartArtifactDigest
+    treeId
+    treeVersion
+    treeDigest
+    workloadId
+    workloadVersion
+    workloadDigest
+    bindingId
+    bindingVersion
+    bindingDigest
+    artifactDigest
+    sourceDigest
+    captureDigest
+    fileCount
+    observedAt
+    sourceObservedAt
+    executionState
+    continuationAuthorized
+    payloadDigest
+    payloadBytes
+    resourceCount
+    imageUseCount
+    rewriteCount
+  }
+`;
+
+export const NVKE_INSTALL_PLAN_IMMUTABLE_EXECUTION_FIELDS = gql`
+  fragment NvkeInstallPlanImmutableExecutionFields on NvkeOperatorInstallPlanImmutableExecutionType {
+    id
+    version
+    status
+    planId
+    planVersion
+    planDigest
+    operationId
+    operationVersion
+    siteId
+    siteVersion
+    authorityId
+    authorityVersion
+    chartArtifactId
+    chartArtifactVersion
+    chartArtifactDigest
+    treeId
+    treeVersion
+    treeDigest
+    workloadId
+    workloadVersion
+    workloadDigest
+    bindingId
+    bindingVersion
+    bindingDigest
+    artifactDigest
+    sourceDigest
+    captureDigest
+    fileCount
+    observedAt
+    sourceObservedAt
+    executionState
+    continuationAuthorized
+    executionDigest
+    bytes
+    phaseCount
+    skippedPhaseCount
+    importCount
+  }
+`;

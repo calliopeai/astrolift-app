@@ -21,6 +21,8 @@ from astrolift_clusters.models import (
     NvkeInstallPlanContext,
     NvkeInstallPlanImage,
     NvkeInstallPlanImageBinding,
+    NvkeInstallPlanImagePayload,
+    NvkeInstallPlanImmutableExecution,
     NvkeInstallPlanTree,
     NvkeInstallPlanVerification,
     NvkeInstallPlanWorkload,
@@ -176,6 +178,8 @@ def prepare(*, body, plan_id, expected_plan_version, plan_digest, **review):
                 or NvkeInstallPlanImage.all_objects.filter(guid=artifact_id).exists()
                 or NvkeInstallPlanWorkload.all_objects.filter(guid=artifact_id).exists()
                 or NvkeInstallPlanImageBinding.all_objects.filter(guid=artifact_id).exists()
+                or NvkeInstallPlanImagePayload.all_objects.filter(guid=artifact_id).exists()
+                or NvkeInstallPlanImmutableExecution.all_objects.filter(guid=artifact_id).exists()
             ):
                 raise NvkeError("CONFLICT", "This identity already identifies another operation or plan")
             sealed = encrypt_at_rest(outbox.canonical(body))
