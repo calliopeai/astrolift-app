@@ -11573,6 +11573,31 @@
       "refusedToast": "Apps públicas detenidas; todas las apps están tras el inicio de sesión.",
       "changeFailed": "No se pudo aplicar el cambio.",
       "refreshWarning": "Se aceptó el cambio, pero no se pudieron actualizar los detalles del clúster. Actualiza para ver el estado actual."
+    },
+    "nitro": {
+      "title": "Aislamiento de tareas Nitro",
+      "description": "Activa los modos de aislamiento compatibles para las tareas de agentes de este clúster. Prepara la infraestructura por separado.",
+      "refresh": "Comprobar requisitos",
+      "checking": "Comprobando…",
+      "retry": "Reintentar",
+      "failed": "No se pudieron comprobar los requisitos de Nitro.",
+      "unsupported": "Las tareas Nitro no están disponibles con este proveedor.",
+      "isolated": "Aislado",
+      "confidential": "Confidencial",
+      "ready": "Requisitos listos",
+      "notReady": "Faltan requisitos",
+      "unknown": "Estado desconocido",
+      "enabled": "Tareas activadas",
+      "disabled": "Tareas desactivadas",
+      "enable": "Activar tareas {mode}",
+      "disable": "Desactivar tareas {mode}",
+      "saving": "Guardando…",
+      "workerCheck": "Los trabajadores vuelven a comprobar los requisitos antes de cada tarea.",
+      "source": "Evidencia",
+      "noProof": "La comprobación revisa la configuración; no verifica la atestación.",
+      "namespace": "Espacio de nombres del agente",
+      "saved": "Configuración de tareas Nitro guardada.",
+      "saveFailed": "No se pudo guardar la configuración de tareas Nitro."
     }
   },
   "obsPanelReason": {

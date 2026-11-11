@@ -11570,6 +11570,31 @@
       "refusedToast": "已停止公开应用；所有应用都需要登录。",
       "changeFailed": "更改失败。",
       "refreshWarning": "更改已接受，但无法刷新集群详情。请刷新以查看当前状态。"
+    },
+    "nitro": {
+      "title": "Nitro 任务隔离",
+      "description": "为此集群中的代理任务启用支持的沙箱模式。请单独准备基础设施。",
+      "refresh": "检查就绪状态",
+      "checking": "正在检查…",
+      "retry": "重试",
+      "failed": "无法检查 Nitro 就绪状态。",
+      "unsupported": "此提供商不支持 Nitro 任务。",
+      "isolated": "隔离",
+      "confidential": "机密",
+      "ready": "前提条件已满足",
+      "notReady": "缺少前提条件",
+      "unknown": "就绪状态未知",
+      "enabled": "任务已启用",
+      "disabled": "任务已禁用",
+      "enable": "启用{mode}任务",
+      "disable": "禁用{mode}任务",
+      "saving": "正在保存…",
+      "workerCheck": "工作进程会在每个任务启动前重新检查前提条件。",
+      "source": "证据",
+      "noProof": "此检查验证配置，不验证远程证明。",
+      "namespace": "代理命名空间",
+      "saved": "Nitro 任务设置已保存。",
+      "saveFailed": "无法保存 Nitro 任务设置。"
     }
   },
   "obsPanelReason": {

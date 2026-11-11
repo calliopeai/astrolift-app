@@ -4779,6 +4779,36 @@ type AstroliftNavTreeWorkflow {
   childWorkflowIds: [GUID!]!
 }
 
+type AstroliftNitroReadinessCheck {
+  code: String!
+  state: String!
+  message: String!
+  evidence: JSON!
+}
+
+type AstroliftNitroTaskMode {
+  mode: String!
+  enabled: Boolean!
+  state: String!
+  checks: [AstroliftNitroReadinessCheck!]!
+}
+
+type AstroliftNitroTaskReadiness {
+  clusterId: GUID!
+  version: Int!
+  sourceToken: String!
+  checkedAt: DateTime!
+  namespace: String!
+  source: JSON!
+  modes: [AstroliftNitroTaskMode!]!
+}
+
+type AstroliftNitroTaskReadinessMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftNitroTaskReadiness
+}
+
 type AstroliftNotification {
   id: GUID!
   userId: String!
@@ -8270,6 +8300,13 @@ type ClusteragentkeyissuedpayloadMutationResult {
   data: Clusteragentkeyissuedpayload
 }
 
+input ConfigureNitroTasksInput {
+  clusterId: GUID!
+  expectedVersion: Int!
+  expectedSource: String!
+  taskModes: [String!]!
+}
+
 input ConfigureNvkeConnectionInput {
   siteId: GUID!
   expectedSiteVersion: Int!
@@ -10612,11 +10649,6 @@ type Mutation {
   librarySetIcon(directory: ID!, file: ID!): LibrarySetIconResult!
 
   """
-  Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server.
-  """
-  generateRocketChatToken: String!
-
-  """
   Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property.
   """
   preSignedUrlImageUpload(globalId: ID!, mimetype: String!, uuid: UUID = null, metadata: JSON = null, location: UploadLocation = null, description: String = null, name: String = null, ownerContainerProperty: String = null): PreSignedUrlUploadResult!
@@ -10875,6 +10907,7 @@ type Mutation {
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!
   reissueManagedDomainCert(clusterId: GUID!, zone: String!): ReissueManagedDomainCertPayloadMutationResult!
   configureProviderPlugin(input: ConfigureProviderPluginInput!): ProviderpluginconfigpayloadMutationResult!
+  configureNitroTasks(input: ConfigureNitroTasksInput!): AstroliftNitroTaskReadinessMutationResult!
   installClusterAgent(input: InstallClusterAgentInput!): AstroliftClusterAgentInstallMutationResult!
   astroliftInstallClusterLogCollector(input: InstallClusterLogCollectorInput!): AstroliftClusterLogCollectorOperationMutationResult!
   createClusterAuthUser(input: CreateClusterAuthUserInput!): AstroliftClusterAuthUserMutationResult!
@@ -13627,6 +13660,7 @@ type Query {
   astroliftClusterCertificates(clusterId: GUID!): AstroliftClusterCertificates!
   astroliftDnsZones(dnsDriver: String!): AstroliftDnsZones!
   astroliftDnsCertificates(dnsDriver: String!): AstroliftClusterCertificates!
+  astroliftNitroTaskReadiness(clusterId: GUID!): AstroliftNitroTaskReadinessMutationResult!
   astroliftClusterAgentInstallReview(clusterId: GUID!): AstroliftClusterAgentInstallReview!
   astroliftClusterAgentInstall(installId: GUID!): AstroliftClusterAgentInstall!
   astroliftClusterLogCollectorReview(clusterId: GUID!, retentionDays: Int! = 30): AstroliftClusterLogCollectorReview!

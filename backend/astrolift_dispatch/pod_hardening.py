@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from django.conf import settings
 
+from astrolift_manifest.nitro_scheduling import apply_nitro_scheduling
+
 #: uid/gid of the ``agent`` user in every astrolift-agents image; the
 #: default for the ``AGENT_POD_UID`` / ``AGENT_POD_GID`` Constance settings.
 AGENT_UID = 42042
@@ -35,6 +37,7 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False, spec=None) -> di
     affinity a manifest workload gets (#2039).
     """
     runtime_class = str(settings.AGENT_RUNTIME_CLASS or "").strip()
+    validate_agent_runtime(runtime_class)
     if runtime_class:
         pod_spec["runtimeClassName"] = runtime_class
     pod_spec["automountServiceAccountToken"] = False
@@ -75,6 +78,7 @@ def harden_agent_pod(pod_spec: dict, *, non_root: bool = False, spec=None) -> di
         pod_spec.setdefault("tolerations", []).extend(scheduling["tolerations"])
         if "affinity" in scheduling:
             pod_spec["affinity"] = scheduling["affinity"]
+    apply_nitro_scheduling(pod_spec)
     return pod_spec
 
 
@@ -82,8 +86,18 @@ class AgentRuntimeClassError(RuntimeError):
     pass
 
 
-def preflight_agent_runtime(cluster, pod_spec: dict) -> None:
+def validate_agent_runtime(runtime_class: str | None) -> None:
+    if runtime_class == "confidential-sandbox":
+        raise AgentRuntimeClassError(
+            "Confidential agent tasks require final admitted per-run policy generation and attested "
+            "secret delivery; AGENT_RUNTIME_CLASS alone cannot enable confidential tasks"
+        )
+
+
+def preflight_agent_runtime(cluster, pod_spec: dict, *, allow_confidential: bool = False) -> None:
     runtime_class = pod_spec.get("runtimeClassName")
+    if not allow_confidential:
+        validate_agent_runtime(runtime_class)
     if not runtime_class:
         return
     from core.cluster_management import _context_for_cluster, _driver_for_cluster
@@ -97,8 +111,13 @@ def preflight_agent_runtime(cluster, pod_spec: dict) -> None:
             f"Cannot verify agent RuntimeClass {runtime_class!r}; install it on the target cluster "
             "and allow the control plane to read RuntimeClasses, or clear AGENT_RUNTIME_CLASS."
         ) from exc
-    if not manifest or manifest.get("metadata", {}).get("deletionTimestamp"):
+    metadata = manifest.get("metadata") if isinstance(manifest, dict) else None
+    if not manifest or not isinstance(metadata, dict) or metadata.get("deletionTimestamp"):
         raise AgentRuntimeClassError(
             f"Agent RuntimeClass {runtime_class!r} is not available on the target cluster; "
             "install it before dispatch, or clear AGENT_RUNTIME_CLASS."
         )
+    if runtime_class in {"isolated-sandbox", "confidential-sandbox"} and (
+        manifest.get("handler") != runtime_class or metadata.get("name") != runtime_class
+    ):
+        raise AgentRuntimeClassError("Agent Nitro Sandbox RuntimeClass does not use the expected AWS handler")

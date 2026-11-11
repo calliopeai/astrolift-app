@@ -14,11 +14,11 @@ removed rather than gated.
 from __future__ import annotations
 
 import pytest
+import requests
 from django.contrib.auth import get_user_model
 from django.test import Client
 
 from core.utils.file_export_registry import get_file_exporter
-from core.utils.request_handler import RequestHandler
 
 User = get_user_model()
 pytestmark = pytest.mark.django_db
@@ -31,11 +31,11 @@ def test_rocket_channel_history_exporter_is_no_longer_registered():
 def test_download_file_refuses_the_removed_exporter_without_touching_rocketchat(monkeypatch):
     """A plain, non-operator, non-member user hitting the old URL gets a
     plain 403 and the view never reaches the Rocket.Chat service account:
-    patching ``make_request`` to record calls and asserting it is never
+    patching ``Session.request`` to record calls and asserting it is never
     called is what proves the service-account credentials are not used,
     not just that the HTTP status looks right."""
     calls = []
-    monkeypatch.setattr(RequestHandler, "make_request", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(requests.Session, "request", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     user = User.objects.create_user(username="plain-1973", email="plain-1973@t.test", password="x")
     client = Client()

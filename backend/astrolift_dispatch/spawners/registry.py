@@ -17,6 +17,10 @@ def get_spawner(backend: str, *, cluster=None, namespace: str = "default") -> Co
         from astrolift_dispatch.spawners.k8s_job import K8sJobSpawner
 
         return K8sJobSpawner(cluster=cluster, namespace=namespace)
+    if backend == "k8s_confidential_pod":
+        from astrolift_dispatch.spawners.k8s_confidential import ConfidentialPodSpawner
+
+        return ConfidentialPodSpawner(cluster=cluster, namespace=namespace)
     if backend == "local_docker":
         from astrolift_dispatch.spawners.local_docker import LocalDockerSpawner
 

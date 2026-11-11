@@ -164,6 +164,7 @@ class WorkloadManifest:
     faas_public: bool = False
     faas_build_command: str = ""
     faas_output_dir: str = ""
+    nitro_sandbox: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

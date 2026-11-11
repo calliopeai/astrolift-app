@@ -11573,6 +11573,31 @@
       "refusedToast": "Apps publiques arrêtées ; chaque app est derrière la connexion.",
       "changeFailed": "Échec de la modification.",
       "refreshWarning": "La modification a été acceptée, mais les détails du cluster n’ont pas pu être actualisés. Actualisez la vue pour connaître l’état actuel."
+    },
+    "nitro": {
+      "title": "Isolation des tâches Nitro",
+      "description": "Activez les modes d’isolation compatibles pour les tâches d’agents de ce cluster. Préparez l’infrastructure séparément.",
+      "refresh": "Vérifier les prérequis",
+      "checking": "Vérification…",
+      "retry": "Réessayer",
+      "failed": "Impossible de vérifier les prérequis Nitro.",
+      "unsupported": "Les tâches Nitro ne sont pas disponibles pour ce fournisseur.",
+      "isolated": "Isolé",
+      "confidential": "Confidentiel",
+      "ready": "Prérequis satisfaits",
+      "notReady": "Prérequis manquants",
+      "unknown": "État inconnu",
+      "enabled": "Tâches activées",
+      "disabled": "Tâches désactivées",
+      "enable": "Activer les tâches {mode}",
+      "disable": "Désactiver les tâches {mode}",
+      "saving": "Enregistrement…",
+      "workerCheck": "Les workers revérifient les prérequis avant chaque tâche.",
+      "source": "Éléments de preuve",
+      "noProof": "La vérification porte sur la configuration, pas sur l’attestation.",
+      "namespace": "Espace de noms de l’agent",
+      "saved": "Paramètres des tâches Nitro enregistrés.",
+      "saveFailed": "Impossible d’enregistrer les paramètres des tâches Nitro."
     }
   },
   "obsPanelReason": {

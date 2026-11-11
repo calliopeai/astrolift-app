@@ -11570,6 +11570,31 @@
       "refusedToast": "Public apps stopped; every app is behind the sign-in.",
       "changeFailed": "Change failed.",
       "refreshWarning": "The change was accepted, but cluster details could not be refreshed. Refresh to see current state."
+    },
+    "nitro": {
+      "title": "Nitro task isolation",
+      "description": "Enable supported sandbox modes for agent tasks on this cluster. Provision infrastructure separately.",
+      "refresh": "Check readiness",
+      "checking": "Checking…",
+      "retry": "Try again",
+      "failed": "Could not check Nitro readiness.",
+      "unsupported": "Nitro tasks are unavailable for this provider.",
+      "isolated": "Isolated",
+      "confidential": "Confidential",
+      "ready": "Prerequisites ready",
+      "notReady": "Prerequisites missing",
+      "unknown": "Readiness unknown",
+      "enabled": "Task opt-in enabled",
+      "disabled": "Task opt-in disabled",
+      "enable": "Enable {mode} tasks",
+      "disable": "Disable {mode} tasks",
+      "saving": "Saving…",
+      "workerCheck": "Workers recheck prerequisites before every task.",
+      "source": "Evidence",
+      "noProof": "Readiness checks configuration; it does not verify attestation.",
+      "namespace": "Agent namespace",
+      "saved": "Nitro task settings saved.",
+      "saveFailed": "Could not save Nitro task settings."
     }
   },
   "obsPanelReason": {

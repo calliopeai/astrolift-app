@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+- Confidential preparation supports `noexec` memory workspaces by separating verified public tool snapshots from private inputs. Subprocess scratch and Skopeo temporary files are explicitly confined to the private memory workspace (#2668).
+
+- Add an inspect-first, Conflict-bound real-App confidential negative adapter (#2668), with pinned checkpoint/Pod/image/key ownership, unchanged attestation policy checks, a callback-guarded probe and UID-bound clone cleanup. Live execution and authoritative KMS audit remain separate qualification gates.
+
+- Restore required EKS driver instrumentation on Nitro preparation, cleanup, apply and readiness operations (#2668), with confidential payload and error redaction.
+
+- Manifest-selected Nitro Deployments, StatefulSets, Jobs, CronJobs and service-family agents now receive the dedicated pool toleration, shared with task dispatch (#2668). Ordinary workloads keep their existing scheduling.
+
+- AWS cluster settings now review Nitro task prerequisites and explicitly enable isolated/confidential modes per cluster (#2668). Version/source-bound writes require cluster management authority, and workers recheck their own prerequisites before preparing secrets. Both task runtimes tolerate only the dedicated Nitro pool taint; readiness does not claim attestation.
+
+- EKS Nitro readiness now reports version, runtime and prepared-node prerequisites separately from attestation (#2668). Confidential checks verify the effective key-admin role, exact agent-namespace Pod Identity, immutable ECR, signed tools and an 8 GiB tmpfs budget before task secret preparation.
+
+- Add a reproducible confidential EKS qualification script with guarded positive/negative runs, private checkpoints, explicit cleanup and safety tests (#2668). A negative-only resume preserves the original image, key and grant; an explicitly hashed observation can replace a naturally removed positive Pod only after an API 404. KMS audit evidence remains required.
+
+- Confidential Pod recovery and cleanup tolerate the two region/zone labels Kubernetes adds during scheduling (#2668). Task labels, all other labels, image, policy and other Pod fields remain bound to the prepared hash.
+
+- Confidential policy generation supplies private ECR credentials through an ephemeral `HOME/.docker/config.json`, the path read by the signed AWS tool (#2668). The generator retains normal image and layer fetching, and the controller's existing home configuration is untouched.
+
+- Confidential task admission accepts the observed EKS Pod Identity `AWS_STS_REGIONAL_ENDPOINTS=regional` injection and can revalidate already admitted identity fields (#2668). Other STS values, duplicate environment names, dynamic identity values and unrelated injected fields remain refused.
+
+- Task-family agents can opt into operator-enabled confidential EKS Pods (#2668). Each run encrypts its task environment and all image layers, generates policy from the final admitted Pod with signed AWS tools, and grants its dedicated KMS key only for the predicted PCR17 and EKS service identity. Recovery and cleanup bind to the saved task, image, policy and Pod UID. The path requires explicit cluster configuration and a baked non-root image; live KMS release/refusal qualification remains pending. Operator-wide confidential runtime selection remains refused.
+
+- Agent task and box hardening now refuses operator-wide `AGENT_RUNTIME_CLASS=confidential-sandbox` because that setting alone cannot generate final per-run policies or deliver secrets after attestation (#2668). Task dispatch refuses before provider lookup or credential provisioning; ordinary and isolated runtimes retain their behavior.
+
+- Task-family agent workloads can select `nitro_sandbox = { mode = "isolated" }` (#2668). Dispatch checks the workload's stored selector and AWS runtime before provisioning, refuses operator-runtime/GPU conflicts, and does not recover Jobs with malformed pod templates or a different runtime. Custom-policy and network-isolated task variants remain rejected.
+
+- Workloads can explicitly select an EKS Nitro Sandbox with `nitro_sandbox = { mode = "isolated" }` or confidential mode with an externally generated policy (#2668). Supported controller templates retain the selection through parsing, normalization, stored manifests and rendering. Unsupported workload paths, GPU use and incompatible network isolation settings are rejected; omitted settings preserve existing output. Policy generation, attestation verification and automatic runtime provisioning remain operator responsibilities.
+
+- AWS EKS reports installed Nitro Sandbox runtime classes in cluster capabilities and preflights explicitly sandboxed Pod, Deployment, StatefulSet, DaemonSet, ReplicaSet, Job and CronJob manifests before applying a batch. Missing runtimes, missing confidential Cedar policies, host networking, user namespaces, GPU requests and network probes in network-isolated sandboxes are refused. Runtime detection reports configuration only; attestation and host provisioning remain operator responsibilities.
+
+- Remove the retired Rocketchat token API and profile-sync hook, runtime profile-ID fields, and leftover Metabase environment configuration. Existing profile/history ID data is preserved. Regenerate the GraphQL contracts without the chat mutation.
 - Bind NVKE registry image acquisition and recovery to an explicitly reviewed workload inventory across the App API and browser controls. Validate the retained UUID/version/digest before acquisition and publication, retain it in image metadata and recovery journals, and refuse graph-only downgrades. Local image mode remains graph-bound (#2669).
 
 - Add source-bound NVKE workload inventory controls in all eight browser locales, with private context bindings, bounded collection and explicit saved-artifact recovery. Compiled CLI and Chromium qualification cover the real API, Postgres and authenticated native agent across lost replies and cold restart. Signed image closure and linked install continuation remain pending (#2669).

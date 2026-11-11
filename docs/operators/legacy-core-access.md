@@ -29,7 +29,7 @@ platform operator. API bearers additionally require `admin`; organization
 administrators and staff sessions do not qualify. Generic deletion keeps its
 existing seven-model allowlist.
 
-Own-account PIN, notification and Rocket.Chat token actions require an active
+Own-account PIN and notification actions require an active
 account. Their generic bearer writes require `admin`. Browser sessions keep
 the existing own-account behavior. Impersonation uses browser sessions only,
 requires active accounts and keeps the existing shared switch-group rule;

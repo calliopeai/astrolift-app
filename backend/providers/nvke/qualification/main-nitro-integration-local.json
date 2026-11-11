@@ -1,0 +1,88 @@
+{
+  "format": 1,
+  "scope": "merge-current-main-nitro-with-nvke-integration",
+  "status": "contracts-provider-regressions-and-scoped-frontend-qualified-full-release-gates-pending",
+  "nvkeParentRevision": "ef860174cb3de1da5b3cecbcd430d28bc0957b68",
+  "mainParentRevision": "3c416ec79285002a0624fe8a0321674e41dc532d",
+  "sourceSha256": {
+    "backend/astrolift_clusters/schema/__init__.py": "586609f1a61c5d8cadcaee9fe83da5517518753737ee23149ccbfe1581577434",
+    "backend/config/schema.py": "71b96bc39ef3f0d3011bac0e1cca3bdd519c512efa6adfd5f6bb6f1c584b3281",
+    "backend/schema.graphql": "8f39d3cef953e8892d5d2a6ab9183c2d6e2c9fa46b53c69a3289c9f0225bce01",
+    "backend/contracts/mcp-tools.json": "e5027402fda777a405b50ad7736adc0ea8f6bf85297aa6e863d106f408826310",
+    "frontend/schema.graphql": "8f39d3cef953e8892d5d2a6ab9183c2d6e2c9fa46b53c69a3289c9f0225bce01",
+    "frontend/graphql/__generated__/operations.ts": "b2468c871e7de39544b53ec5d739528fd312e8eaeae399a6e2c4fa652a17dd2d",
+    "frontend/graphql/__generated__/schema.ts": "ee89479906e1ae9f3922c5a434fcd994ba528c160a72269cbc6c333af7617863",
+    "backend/providers/_sdk/k8s_dynamic_client.py": "4c4a67381228e89cf492f73596e09e1c85e5a417b0f5bbcee761ad2d06160a28",
+    "backend/providers/k8s_native/management.py": "be34b03d271168d3c91daee2f6802dd00dd50327fa26d416793bffda88e07f32"
+  },
+  "checks": {
+    "schema": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-main-merge-contracts-v1-schema.log",
+      "logSha256": "0cd31f8ad8b180aa15200fbc31d2e0cde87a7b4be613f850322be36eb28220b4",
+      "sessionId": 26643
+    },
+    "codegen": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-main-merge-contracts-v1-codegen.log",
+      "logSha256": "88c5199bf8d00d42362ac5da2c4b149ce023b8105433ef1780553ecea9a783c8",
+      "sessionId": 26643
+    },
+    "contracts-check": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-main-merge-contracts-v1-contracts-check.log",
+      "logSha256": "c04e9568e9add65a5e21d9de5b28ed7809cab85429e390a980c3c33bc411323f",
+      "sessionId": 26643
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-main-merge-contracts-v1-typecheck.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sessionId": 26643
+    },
+    "nvke-tests": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-main-merge-frontend-v1-nvke-tests.log",
+      "logSha256": "99ea21cd7812c31f58ef5ab45dcc3f88094337b5f3de9a5910be2c1984d19975",
+      "sessionId": 21270
+    },
+    "lint": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-main-merge-frontend-v1-lint.log",
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sessionId": 21270
+    },
+    "build": {
+      "exitCode": 0,
+      "logPath": "/tmp/astrolift-nvke-main-merge-frontend-v1-build.log",
+      "logSha256": "bf1a4f2c18f2af9f5dd3db90fdc82d99561c6f8dca548c0d6cc942e649b4a20d",
+      "sessionId": 21270
+    },
+    "providers": {
+      "exitCode": 0,
+      "tests": 367,
+      "logPath": "/tmp/astrolift-nvke-main-merge-provider-regressions-v1.log",
+      "logSha256": "6244edcb385a2a7c0ac07f39cc6b09fe3496a20e3b8c7d620ac21060c0d3f46b",
+      "sessionId": 15731
+    }
+  },
+  "schemaPreservation": {
+    "nvke": {
+      "types": 147,
+      "rootFields": 92,
+      "preserved": true
+    },
+    "nitro": {
+      "types": 5,
+      "rootFields": 2,
+      "preserved": true
+    }
+  },
+  "schemaPreservationSessionId": 35985,
+  "resolution": "Preserve both schema groups and changelog entries, then regenerate GraphQL/MCP contracts and TypeScript clients from the merged canonical schema. Retired upstream integrations remain removed.",
+  "limits": [
+    "Intermediate integration branch only; no final PR, merge to main or deployment.",
+    "The actual CLI/browser/native qualification remains on its original detached App/CLI/Ops revisions; this merge does not upgrade that run or establish its result.",
+    "Full final backend/frontend/agent gates and adversarial review remain required."
+  ]
+}

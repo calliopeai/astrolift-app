@@ -54,6 +54,29 @@ def _resource_instance(payload: dict[str, Any]) -> MagicMock:
     return ri
 
 
+def test_admit_pod_returns_mutated_server_object_without_persisting() -> None:
+    client = _make_client()
+    request = {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {"name": "task", "namespace": "agents"},
+        "spec": {"containers": [{"name": "agent"}]},
+    }
+    admitted = {**request, "spec": {**request["spec"], "serviceAccountName": "injected"}}
+    resource = MagicMock()
+    resource.create.return_value = _resource_instance(admitted)
+    with patch.object(client, "_resource_for", return_value=resource):
+        assert client.admit_pod(namespace="agents", manifest=request) == admitted
+    resource.create.assert_called_once_with(namespace="agents", body=request, dry_run="All")
+
+
+def test_admission_refuses_controller_template_before_contacting_cluster() -> None:
+    client = _make_client()
+    with patch.object(client, "_resource_for") as lookup, pytest.raises(ValueError, match="v1 Pod"):
+        client.admit_pod(namespace="agents", manifest={"apiVersion": "batch/v1", "kind": "Job"})
+    lookup.assert_not_called()
+
+
 class _FakeDynNotFoundError(Exception):
     """Stand-in raised by the fake DynamicClient resource methods.
 

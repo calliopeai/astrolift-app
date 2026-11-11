@@ -13,7 +13,6 @@ from core.schema.mutations.feature_flags import FeatureFlagMutations
 from core.schema.mutations.library import LibraryMutations
 from core.schema.mutations.notification import NotificationMutations
 from core.schema.mutations.permissions import PermissionMutations
-from core.schema.mutations.rocketchat import RocketchatMutations
 from core.schema.mutations.upload import UploadMutations
 from core.schema.types.platform_settings import PlatformSettingsMutations
 from core.schema.mutations.user import UserMutations
@@ -25,7 +24,6 @@ class Mutation(
     NotificationMutations,
     PermissionMutations,
     LibraryMutations,
-    RocketchatMutations,
     UploadMutations,
     FeatureFlagMutations,
     PlatformSettingsMutations,

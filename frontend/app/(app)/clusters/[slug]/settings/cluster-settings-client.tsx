@@ -2,6 +2,8 @@
 
 import { BootstrapPlanView } from "@/components/screens/clusters/settings/BootstrapPlan";
 import { ManagedClusterAgent } from "@/components/screens/clusters/settings/ManagedClusterAgent";
+import { NitroTasksView } from "@/components/screens/clusters/settings/NitroTasks";
+import { useNitroTasks } from "@/components/screens/clusters/settings/use-nitro-tasks";
 import { ClusterAgentView } from "@/components/screens/clusters/settings/ClusterAgent";
 import {
   BootstrapHistoryView,
@@ -53,6 +55,10 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
               ingressAuth: <IngressAuthCard cluster={cluster} />,
               authUsers: <AuthUsersCard clusterId={cluster.id} />,
               bootstrapPlan: <BootstrapPlanCard clusterId={cluster.id} />,
+              nitro:
+                cluster.providerPluginSlug === "aws" ? (
+                  <NitroTaskCard clusterId={cluster.id} allowed={settings.access.manage} />
+                ) : undefined,
             }
           : undefined
       }
@@ -93,4 +99,23 @@ function BootstrapPlanCard({ clusterId }: { clusterId: string }) {
 
 function BootstrapHistory({ slug }: { slug: string }) {
   return <BootstrapHistoryView {...useBootstrapHistory(slug)} />;
+}
+
+function NitroTaskCard({ clusterId, allowed }: { clusterId: string; allowed: boolean }) {
+  return allowed ? (
+    <NitroTaskReadiness clusterId={clusterId} />
+  ) : (
+    <NitroTasksView
+      readiness={null}
+      loading={false}
+      saving={false}
+      readOnly
+      onRefresh={() => undefined}
+      onChange={async () => false}
+    />
+  );
+}
+
+function NitroTaskReadiness({ clusterId }: { clusterId: string }) {
+  return <NitroTasksView {...useNitroTasks(clusterId)} />;
 }
