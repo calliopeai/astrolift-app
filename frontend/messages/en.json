@@ -18506,6 +18506,22 @@
       "analyzedAt": "Interpretation time",
       "sourceObservedAt": "Source observation time",
       "parentRequired": "Review the exact pull observation before interpreting image credentials."
+    },
+    "installPullRuntime": {
+      "title": "Pod and node pull correspondence",
+      "help": "Compare the retained Pod image analysis with the enrolled node capture.",
+      "parentsRequired": "Review a Secret analysis and node capture from this exact installation first.",
+      "review": "Review correspondence",
+      "reviewing": "Reviewing…",
+      "unconfirmed": "The read was not confirmed. Review the same captures again.",
+      "analysis": "Secret analysis",
+      "nodePlatforms": "Node capture",
+      "matchedImages": "Matched image uses",
+      "matchedNodes": "Matched nodes",
+      "sourceObservedAt": "Pod observed at",
+      "nodeObservedAt": "Node observed at",
+      "digest": "Correspondence digest",
+      "closureRequired": "Historical correspondence does not authorize continuation. Ownership, scheduling, node credentials, registry access, image availability and fresh phase admission still require proof."
     }
   }
 }

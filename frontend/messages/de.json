@@ -18509,6 +18509,22 @@
       "analyzedAt": "Zeitpunkt der Auswertung",
       "sourceObservedAt": "Zeitpunkt der Quellbeobachtung",
       "parentRequired": "Vor der Auswertung die genaue Pull-Beobachtung prüfen."
+    },
+    "installPullRuntime": {
+      "title": "Pull-Zuordnung zwischen Pod und Knoten",
+      "help": "Vergleichen Sie die gespeicherte Pod-Image-Analyse mit der Aufnahme des registrierten Knotens.",
+      "parentsRequired": "Prüfen Sie zuerst eine Secret-Analyse und eine Knotenaufnahme genau dieser Installation.",
+      "review": "Zuordnung prüfen",
+      "reviewing": "Wird geprüft…",
+      "unconfirmed": "Der Lesevorgang wurde nicht bestätigt. Prüfen Sie dieselben Aufnahmen erneut.",
+      "analysis": "Secret-Analyse",
+      "nodePlatforms": "Knotenaufnahme",
+      "matchedImages": "Zugeordnete Image-Verwendungen",
+      "matchedNodes": "Zugeordnete Knoten",
+      "sourceObservedAt": "Pod beobachtet am",
+      "nodeObservedAt": "Knoten beobachtet am",
+      "digest": "Zuordnungsprüfsumme",
+      "closureRequired": "Die historische Zuordnung erlaubt keine Fortsetzung. Eigentümerschaft, Planung, Knotenzugangsdaten, Registry-Zugriff, Image-Verfügbarkeit und eine aktuelle Phasenfreigabe müssen weiterhin nachgewiesen werden."
     }
   }
 }

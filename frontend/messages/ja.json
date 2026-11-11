@@ -18506,6 +18506,22 @@
       "analyzedAt": "解釈時刻",
       "sourceObservedAt": "元の観測時刻",
       "parentRequired": "イメージ認証情報を解釈する前に、正確な取得観測を確認してください。"
+    },
+    "installPullRuntime": {
+      "title": "Pod とノードの取得対応",
+      "help": "保持された Pod イメージ分析と登録済みノードのキャプチャを比較します。",
+      "parentsRequired": "まず、このインストールに対応する Secret 分析とノードキャプチャを確認してください。",
+      "review": "対応を確認",
+      "reviewing": "確認中…",
+      "unconfirmed": "読み取りを確認できませんでした。同じキャプチャを再確認してください。",
+      "analysis": "Secret 分析",
+      "nodePlatforms": "ノードキャプチャ",
+      "matchedImages": "一致したイメージ使用数",
+      "matchedNodes": "一致したノード数",
+      "sourceObservedAt": "Pod 観測日時",
+      "nodeObservedAt": "ノード観測日時",
+      "digest": "対応ダイジェスト",
+      "closureRequired": "過去の対応だけでは続行できません。所有関係、スケジューリング、ノード認証情報、レジストリアクセス、イメージ可用性、最新フェーズの承認には引き続き証拠が必要です。"
     }
   }
 }

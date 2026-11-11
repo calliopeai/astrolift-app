@@ -18509,6 +18509,22 @@
       "analyzedAt": "Heure de l’interprétation",
       "sourceObservedAt": "Heure de l’observation source",
       "parentRequired": "Vérifier l’observation de téléchargement exacte avant d’interpréter les identifiants des images."
+    },
+    "installPullRuntime": {
+      "title": "Correspondance de téléchargement entre Pod et nœud",
+      "help": "Comparez l’analyse conservée des images du Pod avec la capture du nœud inscrit.",
+      "parentsRequired": "Examinez d’abord une analyse des Secrets et une capture de nœud de cette installation précise.",
+      "review": "Examiner la correspondance",
+      "reviewing": "Examen en cours…",
+      "unconfirmed": "La lecture n’a pas été confirmée. Examinez à nouveau les mêmes captures.",
+      "analysis": "Analyse des Secrets",
+      "nodePlatforms": "Capture du nœud",
+      "matchedImages": "Utilisations d’images correspondantes",
+      "matchedNodes": "Nœuds correspondants",
+      "sourceObservedAt": "Pod observé le",
+      "nodeObservedAt": "Nœud observé le",
+      "digest": "Empreinte de correspondance",
+      "closureRequired": "La correspondance historique n’autorise pas la poursuite. La propriété, la planification, les identifiants du nœud, l’accès au registre, la disponibilité des images et l’admission actuelle de la phase restent à prouver."
     }
   }
 }

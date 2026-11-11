@@ -18509,6 +18509,22 @@
       "analyzedAt": "Hora de interpretación",
       "sourceObservedAt": "Hora de observación de origen",
       "parentRequired": "Revisa la observación de descarga exacta antes de interpretar las credenciales de imagen."
+    },
+    "installPullRuntime": {
+      "title": "Correspondencia de descarga entre Pod y nodo",
+      "help": "Compare el análisis de imágenes del Pod conservado con la captura del nodo inscrito.",
+      "parentsRequired": "Revise primero un análisis de Secrets y una captura de nodo de esta instalación exacta.",
+      "review": "Revisar correspondencia",
+      "reviewing": "Revisando…",
+      "unconfirmed": "La lectura no se confirmó. Revise las mismas capturas otra vez.",
+      "analysis": "Análisis de Secrets",
+      "nodePlatforms": "Captura del nodo",
+      "matchedImages": "Usos de imágenes coincidentes",
+      "matchedNodes": "Nodos coincidentes",
+      "sourceObservedAt": "Pod observado el",
+      "nodeObservedAt": "Nodo observado el",
+      "digest": "Resumen de correspondencia",
+      "closureRequired": "La correspondencia histórica no autoriza continuar. Aún se requieren pruebas de propiedad, programación, credenciales del nodo, acceso al registro, disponibilidad de imágenes y admisión de la fase actual."
     }
   }
 }

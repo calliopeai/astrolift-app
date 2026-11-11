@@ -1,3 +1,7 @@
+import {
+  INSTALL_PULL_RUNTIME_PROPS,
+  PULL_RUNTIME_RESULT,
+} from "./NvkeOperatorInstallPlanPullRuntimePanel.stories";
 import { INSTALL_PULL_SECRET_ANALYSIS_PROPS } from "./NvkeOperatorInstallPlanPullSecretAnalysisPanel.stories";
 import { INSTALL_PULL_AUTHORITY_PROPS } from "./NvkeOperatorInstallPlanPullAuthorityPanel.stories";
 import { INSTALL_NODE_PLATFORMS_PROPS } from "./NvkeOperatorInstallPlanNodePlatformsPanel.stories";
@@ -410,4 +414,33 @@ export const InstallPullSecretAnalysisReadOnly: Story = {
 };
 export const InstallPullSecretAnalysisPending: Story = {
   args: { ...InstallPullSecretAnalysis.args, pending: true },
+};
+
+export const InstallPullRuntime: Story = {
+  args: {
+    ...InstallPullSecretAnalysis.args,
+    operatorInstallPlanPullRuntime: {
+      ...INSTALL_PULL_RUNTIME_PROPS,
+      correspondence: PULL_RUNTIME_RESULT,
+    },
+  },
+};
+export const InstallPullRuntimeReadOnly: Story = {
+  args: { ...InstallPullRuntime.args, canAct: false },
+};
+export const InstallPullRuntimePending: Story = {
+  args: { ...InstallPullRuntime.args, pending: true },
+};
+export const InstallPullRuntimeStaleSource: Story = {
+  args: {
+    ...InstallPullRuntime.args,
+    operatorInstallPlanPullRuntime: {
+      ...INSTALL_PULL_RUNTIME_PROPS,
+      operation: {
+        ...INSTALL_PULL_RUNTIME_PROPS.operation,
+        version: INSTALL_PULL_RUNTIME_PROPS.operation.version + 1,
+      },
+      correspondence: PULL_RUNTIME_RESULT,
+    },
+  },
 };

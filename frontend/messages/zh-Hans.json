@@ -18506,6 +18506,22 @@
       "analyzedAt": "解析时间",
       "sourceObservedAt": "源观测时间",
       "parentRequired": "解析镜像凭据前，请审查确切的拉取观测。"
+    },
+    "installPullRuntime": {
+      "title": "Pod 与节点拉取对应关系",
+      "help": "比较保留的 Pod 镜像分析与已注册节点的捕获记录。",
+      "parentsRequired": "请先检查此安装对应的 Secret 分析和节点捕获记录。",
+      "review": "检查对应关系",
+      "reviewing": "正在检查…",
+      "unconfirmed": "读取未获确认。请再次检查相同的捕获记录。",
+      "analysis": "Secret 分析",
+      "nodePlatforms": "节点捕获记录",
+      "matchedImages": "匹配的镜像使用数",
+      "matchedNodes": "匹配的节点数",
+      "sourceObservedAt": "Pod 观测时间",
+      "nodeObservedAt": "节点观测时间",
+      "digest": "对应关系摘要",
+      "closureRequired": "历史对应关系不授权继续执行。仍需证明所有权、调度、节点凭据、镜像仓库访问、镜像可用性以及当前阶段准入。"
     }
   }
 }

@@ -1,4 +1,6 @@
 "use client";
+
+import { NvkeOperatorInstallPlanPullRuntimePanel } from "./NvkeOperatorInstallPlanPullRuntimePanel";
 import { NvkeOperatorInstallPlanPullSecretAnalysisPanel } from "./NvkeOperatorInstallPlanPullSecretAnalysisPanel";
 import { NvkeOperatorInstallPlanPullAuthorityPanel } from "./NvkeOperatorInstallPlanPullAuthorityPanel";
 
@@ -73,6 +75,7 @@ export function NvkeOperationScreen({
   operatorInstallPlanNodePlatforms,
   operatorInstallPlanPullAuthority,
   operatorInstallPlanPullSecretAnalysis,
+  operatorInstallPlanPullRuntime,
   operatorInstallPlanLocalImage,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
@@ -289,6 +292,13 @@ export function NvkeOperationScreen({
           {...operatorInstallPlanPullSecretAnalysis}
           canReview={operatorInstallPlanPullSecretAnalysis.canReview && canAct && !error}
           pending={pending || operatorInstallPlanPullSecretAnalysis.pending}
+        />
+      )}
+      {operatorInstallPlanPullRuntime && (
+        <NvkeOperatorInstallPlanPullRuntimePanel
+          {...operatorInstallPlanPullRuntime}
+          canReview={operatorInstallPlanPullRuntime.canReview && canAct && !error}
+          pending={pending || operatorInstallPlanPullRuntime.pending}
         />
       )}
       {operatorInstallPlanImagePayload && (

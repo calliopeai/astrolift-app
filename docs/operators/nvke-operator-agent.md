@@ -970,6 +970,15 @@ full spec and image use to the enrolled node UID and retained kubelet setting.
 This establishes historical correspondence only. Workload ownership, scheduling,
 node-wide keyrings/plugins, registry authorization, actual image availability,
 fresh phase use and linked execution admission remain separate requirements;
-`continuationAuthorized` stays false. The CLI `agent install-plan pull-runtime review` control is implemented and
-locally qualified against controlled HTTP; actual API/native pairing and browser
-panel/hook wiring for this new review remain pending.
+`continuationAuthorized` stays false. The operation detail screen includes **Pod and node pull correspondence** after
+the analysis and node capture have been reviewed. **Review correspondence** reads
+only those exact captures. A source/caller/permission change clears the visible
+result; a lost read requires another explicit review. The result stays in memory
+and out of Apollo cache/browser storage. A shared operation lock and pending
+guards prevent concurrent preparation and operation actions during the read.
+
+The CLI `agent install-plan pull-runtime review` control and browser panel/hook
+are implemented and locally qualified with controlled replies. The API has 39
+real PostgreSQL tests, while the browser has 290 focused tests and actual Chromium
+Storybook coverage. Actual GraphQL/SDK/native/browser pairing for this new review
+remains pending; these local results do not establish it.

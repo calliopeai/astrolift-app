@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-11T20:21:35.563169+00:00",
+  "recordedAt": "2026-11-11T20:32:37.263006+00:00",
   "scope": "Read-only App GraphQL review of retained analysis/node correspondence and frontend protocol validation",
-  "status": "frontend-qualified-current-digest-semantics-postgresql-rerun-pending",
+  "status": "current-api-and-frontend-domain-qualified-panel-and-native-pairing-separate",
   "sourceParent": "f249eccaf",
   "sourceSha256": {
     "backend/astrolift_clusters/nvke_install_plan_pull_runtime.py": "038b109d3e4dbf20bb1bcba2d1747f46a634a6faef0d133a2e944dd21c6a9d65",
@@ -110,13 +110,63 @@
   },
   "frontendCases": 99,
   "postgresql": {
-    "status": "pending-no-current-pass-claimed",
-    "runner": "/tmp/astrolift-nvke-pull-runtime-api-v5.py",
-    "sessionId": 58142,
+    "exitCode": 0,
+    "elapsedSeconds": 509.0765340831131,
+    "checks": [
+      {
+        "command": [
+          "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+          "-c",
+          "import django;django.setup();from django.conf import settings;from django.db import connection;assert settings.DATABASES['default']['TEST']['NAME']=='test_nvke_pull_runtime_api_v2';connection.ensure_connection();assert connection.vendor=='postgresql';print('Verified explicit isolated test database selection')"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "check",
+          "astrolift_clusters/nvke_install_plan_pull_runtime.py",
+          "astrolift_clusters/schema/nvke_install_plan_pull_runtime.py",
+          "astrolift_clusters/tests/test_nvke_install_plan_pull_runtime.py",
+          "astrolift_clusters/schema/__init__.py",
+          "config/schema.py"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/opt/homebrew/bin/ruff",
+          "format",
+          "--check",
+          "astrolift_clusters/nvke_install_plan_pull_runtime.py",
+          "astrolift_clusters/schema/nvke_install_plan_pull_runtime.py",
+          "astrolift_clusters/tests/test_nvke_install_plan_pull_runtime.py",
+          "astrolift_clusters/schema/__init__.py",
+          "config/schema.py"
+        ],
+        "exitCode": 0
+      },
+      {
+        "command": [
+          "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+          "-m",
+          "pytest",
+          "-q",
+          "-p",
+          "conftest",
+          "-p",
+          "no:cacheprovider",
+          "--ds=nvke_pull_runtime_test_settings",
+          "astrolift_clusters/tests/test_nvke_install_plan_pull_runtime.py",
+          "--reuse-db"
+        ],
+        "exitCode": 0
+      }
+    ],
+    "isolatedTestDatabase": "test_nvke_pull_runtime_api_v2",
+    "cases": 39,
     "report": "/tmp/astrolift-nvke-pull-runtime-api-v5.json",
-    "exitMarker": "/tmp/astrolift-nvke-pull-runtime-api-v5.exit",
-    "testDatabase": "test_nvke_pull_runtime_api_v2",
-    "isolation": "Explicit early settings module; kernel process-exit dependency prevents overlap with prior API run using same owned test database"
+    "isolation": "Explicit early settings module, separate owned test database, kernel process-exit dependency prevents overlap with earlier API run"
   },
   "retainedSetupAttempts": [
     {
@@ -141,8 +191,7 @@
     "Typed schema export/code generation, frontend exact-parent metadata validation, stale counts/time/private extras/continuation refusal"
   ],
   "limits": [
-    "Actual PostgreSQL API case matrix remains pending; no pass claimed",
-    "CLI command implemented and separately controlled-HTTP/full-Go-qualified in CLI 407403f; no actual API/native command pairing or browser panel/hook wiring yet",
+    "CLI command implemented and separately controlled-HTTP/full-Go-qualified in CLI 407403f; actual API/native command pairing unqualified; Storybook-first browser panel/hook wiring is in progress and tracked separately",
     "Native SDK/agent pairing remains separately pending",
     "No new execution admission, image availability, registry authorization, ownership/scheduling, linked native continuation, deployment or full NVKE completion claimed"
   ],
