@@ -102,6 +102,9 @@ class ConfidentialPodSpawner(K8sJobSpawner):
             "spec": deepcopy(job["spec"]["template"]["spec"]),
         }
         pod["spec"]["activeDeadlineSeconds"] = job["spec"]["activeDeadlineSeconds"]
+        # Only the read-only identity projection remains: the generic volume
+        # fsGroup does not match EKS sandbox setup. Keep the process UID/GID.
+        pod["spec"].get("securityContext", {}).pop("fsGroup", None)
 
         def save(checkpoint):
             from django.db import transaction

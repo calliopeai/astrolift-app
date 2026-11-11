@@ -159,6 +159,14 @@ ordinary Jobs cannot adopt confidential Pods. Operator-wide
 agents and boxes: it cannot supply this per-run workflow. Static task policies,
 network isolation and GPU requests remain refused.
 
+Confidential task Pods retain explicit non-root UID/GID, seccomp and capability
+restrictions, and omit the shared Job baseline's volume `fsGroup` before
+admission and policy generation. Their only host-delivered volume is the
+read-only Pod Identity projection. The generic `fsGroup` causes a sandbox-level
+`SetupSandbox` policy mismatch on the qualified EKS runtime. Admission cannot
+change that field after preparation selects it. Ordinary and isolated Jobs
+retain their existing volume hardening.
+
 The backend requires a non-root, digest-pinned, baked agent image with contract
 label `ai.astrolift.agent-image.contract` at least 7. Boot installs, managed
 models, model gateway, VNC and filesystem bindings are unsupported. Callback,
