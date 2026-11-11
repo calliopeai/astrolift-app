@@ -23,6 +23,7 @@ import { NvkeCredentialRequestPanel } from "./NvkeCredentialRequestPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { NvkeOperatorInstallPlanContextPanel } from "./NvkeOperatorInstallPlanContextPanel";
 import { NvkeOperatorInstallPlanLocalImagePanel } from "./NvkeOperatorInstallPlanLocalImagePanel";
+import { NvkeOperatorInstallPlanNodePlatformsPanel } from "./NvkeOperatorInstallPlanNodePlatformsPanel";
 import { NvkeOperatorInstallPlanImmutablePanel } from "./NvkeOperatorInstallPlanImmutablePanel";
 import { NvkeOperatorInstallPlanImageBindingPanel } from "./NvkeOperatorInstallPlanImageBindingPanel";
 import { NvkeOperatorInstallPlanWorkloadPanel } from "./NvkeOperatorInstallPlanWorkloadPanel";
@@ -67,6 +68,7 @@ export function NvkeOperationScreen({
   operatorInstallPlanImageBinding,
   operatorInstallPlanImagePayload,
   operatorInstallPlanImmutableExecution,
+  operatorInstallPlanNodePlatforms,
   operatorInstallPlanLocalImage,
 }: NvkeOperationScreenProps) {
   const t = useTranslations("nvke");
@@ -262,6 +264,13 @@ export function NvkeOperationScreen({
           {...operatorInstallPlanImageBinding}
           canReview={operatorInstallPlanImageBinding.canReview && canAct && !error}
           pending={pending || operatorInstallPlanImageBinding.pending}
+        />
+      )}
+      {operatorInstallPlanNodePlatforms && (
+        <NvkeOperatorInstallPlanNodePlatformsPanel
+          {...operatorInstallPlanNodePlatforms}
+          canReview={operatorInstallPlanNodePlatforms.canReview && canAct && !error}
+          pending={pending || operatorInstallPlanNodePlatforms.pending}
         />
       )}
       {operatorInstallPlanImagePayload && (

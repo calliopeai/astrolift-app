@@ -178,6 +178,9 @@ export interface NvkeSiteScreenProps {
   onRequest: (values: NvkeRequestValues) => Promise<boolean>;
 }
 export interface NvkeOperationScreenProps {
+  operatorInstallPlanNodePlatforms?:
+    | import("./NvkeOperatorInstallPlanNodePlatformsPanel").NvkeOperatorInstallPlanNodePlatformsPanelProps
+    | null;
   operatorInstallPlanImagePayload?:
     | import("./NvkeOperatorInstallPlanImmutablePanel").NvkeOperatorInstallPlanImmutablePanelProps
     | null;

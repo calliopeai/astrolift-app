@@ -1,3 +1,4 @@
+import { INSTALL_NODE_PLATFORMS_PROPS } from "./NvkeOperatorInstallPlanNodePlatformsPanel.stories";
 import {
   INSTALL_IMMUTABLE_PAYLOAD_PROPS,
   INSTALL_IMMUTABLE_EXECUTION_PROPS,
@@ -367,4 +368,17 @@ export const InstallImmutableArtifactsReadOnly: Story = {
 };
 export const InstallImmutableArtifactsPending: Story = {
   args: { ...InstallImmutableArtifacts.args, pending: true },
+};
+
+export const InstallNodePlatforms: Story = {
+  args: {
+    ...InstallImmutableArtifacts.args,
+    operatorInstallPlanNodePlatforms: INSTALL_NODE_PLATFORMS_PROPS,
+  },
+};
+export const InstallNodePlatformsReadOnly: Story = {
+  args: { ...InstallNodePlatforms.args, canAct: false },
+};
+export const InstallNodePlatformsPending: Story = {
+  args: { ...InstallNodePlatforms.args, pending: true },
 };

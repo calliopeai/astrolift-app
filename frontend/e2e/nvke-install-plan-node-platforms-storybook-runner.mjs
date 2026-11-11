@@ -161,14 +161,52 @@ try {
     await page.screenshot({ path: `${directory}/form-${locale}-375.png`, fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1100 });
   }
+  const compositions = [];
+  for (const state of [
+    "install-node-platforms",
+    "install-node-platforms-read-only",
+    "install-node-platforms-pending",
+  ]) {
+    const url = new URL("/iframe.html", base);
+    url.searchParams.set("id", `screens-nvke-operation--${state}`);
+    url.searchParams.set("viewMode", "story");
+    await page.goto(url.href, { timeout: 120000 });
+    const region = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: copy.title, exact: true }) });
+    await region
+      .getByRole("heading", { name: copy.title, exact: true })
+      .waitFor({ timeout: 120000 });
+    for (const action of [common.prepare, common.review, common.retry]) {
+      const button = region.getByRole("button", { name: action, exact: true });
+      if (state !== "install-node-platforms" || action === common.prepare)
+        assert(await button.isDisabled());
+      else if (action === common.review) assert(await button.isEnabled());
+    }
+    assert.equal(
+      (await region.getByText("d8185d06-b9ac-4e09-a370-44897f4a72b6", { exact: true }).count()) > 0,
+      state !== "install-node-platforms-read-only"
+    );
+    await region.screenshot({ path: `${directory}/${state}.png` });
+    compositions.push(state);
+  }
   assert.equal(errors.length, 0);
   writeFileSync(
     `${directory}/results.json`,
-    JSON.stringify({ stories: results, locales: 8, darkModes: 2, pageErrors: errors }, null, 2) +
-      "\n"
+    JSON.stringify(
+      { stories: results, compositions, locales: 8, darkModes: 2, pageErrors: errors },
+      null,
+      2
+    ) + "\n"
   );
   console.log(
-    JSON.stringify({ stories: results.length, locales: 8, darkModes: 2, pageErrors: errors.length })
+    JSON.stringify({
+      stories: results.length,
+      compositions: compositions.length,
+      locales: 8,
+      darkModes: 2,
+      pageErrors: errors.length,
+    })
   );
 } finally {
   await browser.close();

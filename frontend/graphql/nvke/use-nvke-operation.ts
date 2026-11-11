@@ -34,6 +34,7 @@ import { useNvkeInstallPlan } from "./use-nvke-install-plan";
 import { useNvkeInstallPlanContext } from "./use-nvke-install-plan-context";
 import { useNvkeInstallPlanLocalImage } from "./use-nvke-install-plan-local-image";
 import { useNvkeInstallPlanImmutable } from "./use-nvke-install-plan-immutable";
+import { useNvkeInstallPlanNodePlatforms } from "./use-nvke-install-plan-node-platforms";
 import { useNvkeInstallPlanImageBinding } from "./use-nvke-install-plan-image-binding";
 import { useNvkeInstallPlanWorkload } from "./use-nvke-install-plan-workload";
 import { useNvkeInstallPlanImage } from "./use-nvke-install-plan-image";
@@ -358,6 +359,17 @@ export const useNvkeOperation = (
     mode: "execution",
     pending: immutableParentPending || Boolean(operatorInstallPlanImagePayload?.pending),
   });
+  const operatorInstallPlanNodePlatforms = useNvkeInstallPlanNodePlatforms({
+    context,
+    source: operatorInstallPlanTree,
+    workload: operatorInstallPlanWorkload,
+    imageBinding: operatorInstallPlanImageBinding,
+    pending:
+      immutableParentPending ||
+      Boolean(
+        operatorInstallPlanImagePayload?.pending || operatorInstallPlanImmutableExecution?.pending
+      ),
+  });
   const control = async (resume: boolean) => {
     if (
       !current() ||
@@ -378,6 +390,7 @@ export const useNvkeOperation = (
       operatorInstallPlanImageBinding?.pending ||
       operatorInstallPlanImagePayload?.pending ||
       operatorInstallPlanImmutableExecution?.pending ||
+      operatorInstallPlanNodePlatforms?.pending ||
       (resume && (!context.access.admin || isTooling))
     )
       return false;
@@ -437,6 +450,7 @@ export const useNvkeOperation = (
     operatorInstallPlanImageBinding,
     operatorInstallPlanImagePayload,
     operatorInstallPlanImmutableExecution,
+    operatorInstallPlanNodePlatforms,
     diagnostics,
     maintenance,
     credentials,
@@ -463,7 +477,8 @@ export const useNvkeOperation = (
         operatorInstallPlanWorkloadImage?.pending ||
         operatorInstallPlanImageBinding?.pending ||
         operatorInstallPlanImagePayload?.pending ||
-        operatorInstallPlanImmutableExecution?.pending
+        operatorInstallPlanImmutableExecution?.pending ||
+        operatorInstallPlanNodePlatforms?.pending
       ),
     canAct,
     canResume: canAct && context.access.admin && !isTooling,
@@ -489,6 +504,7 @@ export const useNvkeOperation = (
         operatorInstallPlanImageBinding?.pending ||
         operatorInstallPlanImagePayload?.pending ||
         operatorInstallPlanImmutableExecution?.pending ||
+        operatorInstallPlanNodePlatforms?.pending ||
         !operation
       )
         return;

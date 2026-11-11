@@ -1,14 +1,14 @@
 {
   "format": 1,
-  "scope": "Storybook-first node/platform forms, typed metadata and pure controls",
-  "status": "pure panel and browser layout reviewed; controller and operation-route wiring pending",
+  "scope": "Storybook-first node/platform controls, metadata-only recovery controller and operation-page wiring",
+  "status": "wired and locally qualified; production build and actual paired native clients remain pending",
   "sources": {
     "frontend/lib/nvke/operator-install-plan-node-platforms.ts": "5fb93e42cd544593d2338c0eccb8be4333ebb55eca10d1dfb58633aad8a023ea",
     "frontend/lib/nvke/operator-install-plan-node-platforms.test.ts": "d09674570b4c9a6a5d294f4c0347f73291ae9f65f1ce117cdfd91f758a73d826",
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.tsx": "f680ee11a6c4a4b2dc6f4a4d5024be76b627507fd1c823eea414c518e8951cb9",
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.stories.tsx": "3f31aa30bf5ee37897654988ff1466a8825654201f44e16ab1bf3b340a644ad4",
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanNodePlatformsPanel.test.tsx": "134526a172966b36d62f03b6e7179c5916c940d1f34cc8764fa6f6946d43bb85",
-    "frontend/e2e/nvke-install-plan-node-platforms-storybook-runner.mjs": "270e8986129d883afd72b834137192fd0200f7d6a882c1452cc47bfe63180897",
+    "frontend/e2e/nvke-install-plan-node-platforms-storybook-runner.mjs": "4d9a44b3c7705e7c7294f4548e73a18df0e5087d04776b89cbbdb10b7fda96f2",
     "frontend/messages/en.json": "2b4387f1f8097b5c219c706512bce4ed0a61dc043ebbfeefe193c8759a63947e",
     "frontend/messages/de.json": "1373b1de3fd5c244b71e00ec9351486ab370d1d2d30be0c2c90893754d30e5d2",
     "frontend/messages/es.json": "326f727f1d3ac710ead2ad3b92d20b70af66614db378e5f133e76756ef075f1a",
@@ -16,7 +16,19 @@
     "frontend/messages/pt-BR.json": "0b3d010d19b5208c8b44d2a4ae09fdda3099c4ddc78bebbaf99f68fc81ac108d",
     "frontend/messages/ja.json": "9cb8fade6c91f935b299597c68f824f2ed36b6fd7e745ec998c38729539909a8",
     "frontend/messages/ko.json": "faacda25170b62af1fdb7a7d0908446369902cb46994f9bcc7b97b9555a85b15",
-    "frontend/messages/zh-Hans.json": "43fa8e5a113b2e71c4a063c090f2d6e3d5992e45b5fff1e3143b935f1ae2ffb3"
+    "frontend/messages/zh-Hans.json": "43fa8e5a113b2e71c4a063c090f2d6e3d5992e45b5fff1e3143b935f1ae2ffb3",
+    "frontend/lib/nvke/install-plan-immutable-recovery.ts": "24ef3b81a6828989c02a69ffc0e9c815713cf1320c00cc2c201cde4d63142494",
+    "frontend/lib/nvke/install-plan-immutable-recovery.test.ts": "51539daf46fec080098002e5fe79bebae900cb0ebe755ec28f62489df0fb28f3",
+    "frontend/graphql/nvke/use-nvke-install-plan-artifact.ts": "0a4b2cbda0edbbf4ad3d554733c95c04f36160ed3804a67e835d01366e58b781",
+    "frontend/graphql/nvke/use-nvke-install-plan-immutable.ts": "40532d8fb9afd4b98e3c52555577dbc9a3736d087be90dab1c8136168e3467fb",
+    "frontend/graphql/nvke/use-nvke-install-plan-immutable.test.tsx": "b2256be64ea70e72f63ff77fc9f88fa13b6d6c7d5ff52855471a982129a443a5",
+    "frontend/graphql/nvke/use-nvke-install-plan-node-platforms.ts": "593d642f2abb5e6e40870deb8e904a35a5031c36fffb795eecacbd86010e9063",
+    "frontend/graphql/nvke/use-nvke-install-plan-node-platforms.test.tsx": "176638dc5483af03992fa0abee8a7ef459e51ee5220e247ac49d704936a13db0",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "04ef3ed458842873e94067f643b129f3bc9ede2a770ce9062b470a792767102c",
+    "frontend/components/screens/nvke/types.ts": "48a6a48d8bbe67fd9e643654ba032eb85fe6489adabdbf8c177e0165f88a05f9",
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "39fe0ce3a29a9af12e06b6c4d4380cf383c46c55b1db2f3641eec2b912c2e32c",
+    "frontend/components/screens/nvke/NvkeOperationScreen.stories.tsx": "0e4ea4df15e19a6286c31325080dc10a5fb6c04c893034784d10f051c65ad18c",
+    "frontend/components/screens/nvke/NvkeOperationScreen.node-platforms.test.tsx": "9ceb4f5bb7f7ced56c5a0b7afc0b866ab7b962071c5f4fb3f28796cef8ed2f91"
   },
   "checks": [
     {
@@ -37,6 +49,28 @@
       "themes": 2,
       "pageErrors": 0,
       "scope": "actual Chromium, lost-reply private-input clearing, source/permission/disabled states, 768/375 layouts, and all locale forms at 375px"
+    },
+    {
+      "runnerPid": 5760,
+      "sessionId": 68187,
+      "logPath": "/tmp/astrolift-nvke-node-controller-check-v3.log",
+      "exitPath": "/tmp/astrolift-nvke-node-controller-check-v3.exit",
+      "exitCode": 0,
+      "passed": 1965,
+      "testFiles": 94,
+      "scope": "all NVKE frontend tests; full TypeScript; ESLint for every changed frontend source"
+    },
+    {
+      "sessionId": 90408,
+      "logPath": "/tmp/astrolift-nvke-node-platform-storybook-check-v3.log",
+      "exitPath": "/tmp/astrolift-nvke-node-platform-storybook-check-v3.exit",
+      "exitCode": 0,
+      "stories": 22,
+      "compositions": 3,
+      "locales": 8,
+      "themes": 2,
+      "pageErrors": 0,
+      "scope": "actual Chromium pure panels plus composed operation normal/read-only/pending guards"
     }
   ],
   "storybook": {
@@ -61,12 +95,38 @@
     "private input cleared after callback completion or exception",
     "retained UUID after lost reply; no automatic review/retry",
     "overlapping submissions admit only one callback",
-    "native admission stays unavailable"
+    "native admission stays unavailable",
+    "three journal namespaces isolate artifact kinds and reject private extra fields",
+    "exact request hash is durably retained before preparation; browser stores no private node scope",
+    "lost reply and reload require explicit review/retry; no automatic RPC",
+    "actor, permission, parent and pending-state ABA changes discard stale responses",
+    "shared controller preserves existing payload/execution recovery behavior",
+    "operation guards disable node controls and block cancel/download while node requests are pending"
   ],
   "remaining": [
-    "metadata-only browser journal and context/epoch guards",
-    "operation-screen wiring after this Storybook review",
+    "production build result",
     "actual paired API/CLI/browser node-stage qualification",
     "source-event investigation and final native admission requirements"
-  ]
+  ],
+  "adversarialRegression": {
+    "scope": "tree pending A-to-B-to-A invalidation in payload, execution and platform modes",
+    "negativeLogPath": "/tmp/astrolift-nvke-node-controller-tree-aba-negative-v1.log",
+    "negativeExitPath": "/tmp/astrolift-nvke-node-controller-tree-aba-negative-v1.exit",
+    "negativeExitCode": 1,
+    "failuresBeforeFix": 3,
+    "fixed": "include parent tree pending state in the shared response epoch",
+    "positive": "all three formerly failing cases pass in the 1965-case suite"
+  },
+  "composedScreenshots": {
+    "directory": "/tmp/astrolift-nvke-node-platform-storybook-screenshots-v3",
+    "resultsPath": "/tmp/astrolift-nvke-node-platform-storybook-screenshots-v3/results.json",
+    "visuallyReviewed": "/tmp/astrolift-nvke-node-platform-storybook-screenshots-v2/install-node-platforms.png"
+  },
+  "productionBuild": {
+    "runnerPid": 6175,
+    "sessionId": 96401,
+    "logPath": "/tmp/astrolift-nvke-node-controller-build-v1.log",
+    "exitPath": "/tmp/astrolift-nvke-node-controller-build-v1.exit",
+    "status": "pending"
+  }
 }

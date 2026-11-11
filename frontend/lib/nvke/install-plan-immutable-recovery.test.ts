@@ -178,3 +178,47 @@ it("isolates artifact kinds and refuses changed kind or duplicate metadata", () 
   );
   expect(() => readSelectedInstallPlanImmutable(s, source)).toThrow();
 });
+
+it("isolates all three artifact kinds and rejects copied or private node platform records", () => {
+  const s = storage();
+  const sources = (["payload", "execution", "platform"] as const).map((mode) => ({
+    ...source,
+    mode,
+  }));
+  const records = sources.map((scope, index) =>
+    saveInstallPlanImmutableJournal(s, scope, chosen, String(index + 1).repeat(64))
+  );
+  expect(records.map((record) => record.kind)).toEqual([
+    "nvke-install-plan-image-payload",
+    "nvke-install-plan-immutable-execution-tree",
+    "nvke-install-plan-node-platforms",
+  ]);
+  sources.forEach((scope, index) => {
+    expect(readInstallPlanImmutableJournal(s, scope, chosen)).toEqual(records[index]);
+  });
+  const platform = sources[2];
+  const key = installPlanImmutableRecoveryKey(platform) + ":intent:" + chosen.artifactId;
+  for (const record of [
+    records[0],
+    records[1],
+    { ...records[2], nodePlatforms: "PRIVATE_SCOPE" },
+    { ...records[2], runtimeProfile: "containerd/v2.3.0" },
+    { ...records[2], nodeUid: "PRIVATE_UID" },
+  ]) {
+    s.items.set(key, JSON.stringify(record));
+    expect(() => readInstallPlanImmutableJournal(s, platform, chosen)).toThrow();
+  }
+  s.items.set(key, JSON.stringify(records[2]));
+  expect(() =>
+    readInstallPlanImmutableJournal(
+      s,
+      { ...platform, bindingVersion: platform.bindingVersion + 1 },
+      chosen
+    )
+  ).toThrow();
+  clearSelectedInstallPlanImmutable(s, platform, chosen);
+  expect(readSelectedInstallPlanImmutable(s, platform)).toBeNull();
+  expect(readInstallPlanImmutableJournal(s, platform, chosen)).toEqual(records[2]);
+  expect(readSelectedInstallPlanImmutable(s, sources[0])).toEqual(chosen);
+  expect(readSelectedInstallPlanImmutable(s, sources[1])).toEqual(chosen);
+});

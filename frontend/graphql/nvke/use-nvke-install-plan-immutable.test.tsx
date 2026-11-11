@@ -608,7 +608,7 @@ describe.each(["payload", "execution"] as const)("immutable %s recovery", (mode)
     }
   );
 
-  it.each(["binding", "binding-pending", "workload-pending"])(
+  it.each(["binding", "binding-pending", "workload-pending", "tree-pending"])(
     "rejects an in-flight %s A-to-B-to-A response",
     async (kind) => {
       const h = harness(),
@@ -633,6 +633,8 @@ describe.each(["payload", "execution"] as const)("immutable %s recovery", (mode)
         });
       else if (kind === "binding-pending")
         r.rerender({ ...a, imageBinding: { ...a.imageBinding, pending: true } });
+      else if (kind === "tree-pending")
+        r.rerender({ ...a, source: { ...a.source, pending: true } });
       else r.rerender({ ...a, workload: { ...a.workload, pending: true } });
       r.rerender(a);
       await ready(r);
