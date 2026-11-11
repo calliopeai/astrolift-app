@@ -1,0 +1,101 @@
+{
+  "format": 1,
+  "scope": "immutable-artifact-frontend-controls",
+  "status": "frontend-qualified-combined-native-acceptance-pending",
+  "implementationRevision": "2ed01aa25",
+  "sourceSha256": {
+    "frontend/components/screens/nvke/NvkeOperationScreen.tsx": "b756028c1d4b56e21832721c68c59df9669c6cb35f7480735fb06609297ff8d3",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImmutablePanel.api.stories.tsx": "ad78fe1b44ba9bd2ecd0b783364e9dcf7d1713a0c28c58457ab5398d158837d0",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImmutablePanel.stories.tsx": "118dcb11a47ed169bcd29d09b4ccbfeb271f9c62877e3b7828c91bded54f8929",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImmutablePanel.test.tsx": "cea21e40fe4d490cb208da7705cd5532f3980194e33c1d8b2fae6b38b5d7a07f",
+    "frontend/components/screens/nvke/NvkeOperatorInstallPlanImmutablePanel.tsx": "da7a804296fe97590e05622eb857a75f5e933bb0c847e956f457a67b39627fa0",
+    "frontend/e2e/nvke-install-plan-immutable-api-runner.mjs": "251c75500975dedb7042f21b74cbc5797aff96e45e537523610f0f323e57ba2c",
+    "frontend/graphql/nvke/nvke-install-plan-immutable.mutations.ts": "c40fe9f37dcbfdadde6650321b605f33ccae8791e7d3df5a2fd37366c6784cb0",
+    "frontend/graphql/nvke/nvke-install-plan-immutable.queries.ts": "89c0d1ef8c0d1da836f80799f7be9ebe8f044816cdae3ea35403ab47d557dd26",
+    "frontend/graphql/nvke/use-nvke-install-plan-immutable.test.tsx": "7548df4dad846b0ef65a2ab92723887984bcd884607719d04ca34698e537b382",
+    "frontend/graphql/nvke/use-nvke-install-plan-immutable.ts": "f0a87748f9bf2108056d8e6abfa30e9d8629d4f59d343e91895634a5b823da35",
+    "frontend/graphql/nvke/use-nvke-operation.ts": "0f4a937bc784ca39e2c8eedf3052704fd13ab7359dbb74261a5b867036f6586e",
+    "frontend/lib/nvke/install-plan-immutable-recovery.test.ts": "a5001153800ba2ced7b9cb9176c4f9acff849520bcaf57e764267a2c0425e92f",
+    "frontend/lib/nvke/install-plan-immutable-recovery.ts": "3beab0b9108ab87aedbf868508284c8dc37868728265fc8735aab7fe49b27553",
+    "frontend/lib/nvke/operator-install-plan-immutable.test.ts": "e2818505a8d4cacf8dcda3ff9c1593f106d584549fd665913e1d795a5cd15eaf",
+    "frontend/lib/nvke/operator-install-plan-immutable.ts": "94e953a56ec76697984a5a214b9e52cc336110114344ce95588678c8ff436ddb"
+  },
+  "checks": {
+    "immutable-ui-domain-v1": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-ui-domain-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-ui-domain-v1.log",
+      "logSha256": "de177e5a67eca11642d2b5a2bd57d2013573af34500263572842e38727d053ed",
+      "cases": 79
+    },
+    "immutable-ui-panel-v1": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-ui-panel-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-ui-panel-v1.log",
+      "logSha256": "e3fd08a02dc3db334739066d1e8a561a440b69001db65400fb93813b54f587b4",
+      "cases": 23
+    },
+    "immutable-ui-recovery-v1": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-ui-recovery-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-ui-recovery-v1.log",
+      "logSha256": "cfde39b00c1e039285fd062deefee5539787e59dae9e42839c586eb0a58f5c35",
+      "cases": 49
+    },
+    "immutable-ui-hook-v1": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-ui-hook-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-ui-hook-v1.log",
+      "logSha256": "3c7a263a65f6bbaba6dea9b87ab3b1a5f5dd6bedd21a4808862facc8ee1d91e7",
+      "cases": 97
+    },
+    "immutable-ui-wiring-v1": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-ui-wiring-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-ui-wiring-v1.log",
+      "logSha256": "fe57397b4277e829d1f71afb0cf69387729130217d87897679a2590aa49a424a",
+      "cases": 1867
+    },
+    "immutable-ui-all-stories-v1": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-ui-all-stories-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-ui-all-stories-v1.log",
+      "logSha256": "5490a2cde493a92f6f5ace5410123eb2bac844e6c5e8c30b8cad0c1bd1305b8a",
+      "cases": 516
+    },
+    "immutable-ui-browser-v3": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-ui-browser-v3.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-ui-browser-v3.log",
+      "logSha256": "3f03900b74fed1ae72b05dc07e29c891e7ed247295557c17b31b763d76e15979",
+      "cases": 26
+    },
+    "immutable-frontend-build-v1": {
+      "exitCode": 0,
+      "exitMarker": "/tmp/astrolift-nvke-immutable-frontend-build-v1.exit",
+      "logPath": "/tmp/astrolift-nvke-immutable-frontend-build-v1.log",
+      "logSha256": "8fb68029b0d5998aa1393d30417d9576ed041dfdfe55d5645b11f9a77670dd18"
+    }
+  },
+  "productionBuildSessionId": 32381,
+  "browserCoverage": {
+    "stories": 26,
+    "locales": 8,
+    "darkModes": 2,
+    "pageErrors": 0,
+    "screenshots": "/tmp/astrolift-nvke-immutable-storybook-screenshots-v3"
+  },
+  "combinedNativeRun": {
+    "status": "pending",
+    "sessionId": 88454,
+    "metadataPath": "/tmp/astrolift-nvke-immutable-browser-native-v1.json",
+    "logPath": "/tmp/astrolift-nvke-immutable-browser-native-v1.log",
+    "exitMarker": "/tmp/astrolift-nvke-immutable-browser-native-v1.exit",
+    "scope": "Compiled CLI then browser/App/Postgres/native-agent lost-response and cold recovery; not a frontend-only proof."
+  },
+  "limits": [
+    "Controlled Storybook and frontend tests do not establish actual App/native recovery.",
+    "Preparation does not authorize continuation; remaining fresh proofs and linked admission remain open.",
+    "No main merge, deployment or live qualification claim."
+  ]
+}

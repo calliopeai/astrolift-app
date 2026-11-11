@@ -901,3 +901,39 @@ attempt. Reload never starts a request: **Review saved bindings** reads the
 original artifact; **Retry retained bindings** explicitly uses the server's saved
 private intent. Changing the workload, actor or reviewed source invalidates the
 displayed evidence. Permission and pending states follow the operation screen.
+
+### Immutable phase payloads and sealed execution trees
+
+The SDK exposes `prepare_install_plan_image_payload` /
+`install_plan_image_payload` and `prepare_install_plan_immutable_execution_tree` /
+`install_plan_immutable_execution_tree`. The corresponding application controls
+prepare, review and explicitly retry retained preparation for each artifact kind.
+They require the reviewed plan, chart, tree, workload and image-binding UUIDs,
+versions and digests, plus the original site, authority, operation and caller.
+Private request text is encrypted and redacted from mutation audits.
+
+For a phase payload, select one original phase name and explicit resource, byte
+and time limits. For a sealed execution tree, supply `payloadBindings` mapping
+every original phase name, including skipped phases, to its distinct prepared
+payload UUID and public artifact digest. Every selected payload must belong to
+the same reviewed image binding. Sealing retains the original frozen credential
+bytes, phase order and skip mapping; it does not dispatch a native command.
+
+The operation screen exposes both preparations after reviewing image bindings.
+The CLI groups are `astro nvke agent install-plan image-payload` and
+`astro nvke agent install-plan immutable-execution-tree`, each with `prepare`,
+`review` and `retry-preparation`. Each client records source metadata and the
+request hash before preparation. Browser storage excludes private request text,
+phase selections and credentials. A lost response retains the artifact UUID;
+reload makes no request. Review reads that UUID, and retry explicitly reuses the
+server's retained private intent. Source changes invalidate displayed evidence.
+
+The scoped frontend suite passes 1,867 tests, all 516 NVKE stories render, and
+Chromium checks 26 immutable-control stories across eight locales and light/dark
+themes. The production frontend build also passes. The combined compiled CLI,
+browser, App/Postgres and native-agent recovery qualification is still running;
+these frontend results do not establish that combined result. Fresh resource,
+operator/defaulting, node/importer, credential, availability and phase-use proofs
+and linked admission remain open. Neither preparation authorizes continuation.
+Exact frontend sources and run handles are recorded in
+`backend/providers/nvke/qualification/management-immutable-ui-local.json`.
