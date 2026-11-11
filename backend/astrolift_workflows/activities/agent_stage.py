@@ -306,9 +306,13 @@ def _spawn_agent_task_locked(task_pk: int) -> dict[str, Any]:
     result = recover(task) if recover is not None else None
     if result is None and task.status == AgentTask.Status.RUNNING:
         return _settle_spawn_failure(task.pk, "running agent task has no recoverable Job")
+    from astrolift_clusters.nitro_preparation import PreparationUncertain
+
     try:
         if result is None:
             result = spawner.spawn(task)
+    except PreparationUncertain:
+        raise
     except Exception as exc:  # noqa: BLE001 — renderer/driver bugs must not strand PROVISIONING
         return _settle_spawn_failure(task.pk, f"spawn raised {type(exc).__name__}: {exc}")
 

@@ -69,10 +69,18 @@ confidential run, waits for it, and adopts the Pod it created through the same
 recovery validation a restarted worker uses. The task reads the run from the
 database; only the task id travels through ECS. API and worker need no memory
 workspace, and readiness reports `preparation_task` (the task definition must be
-active with at least 16 GiB, since Fargate sizes the workspace at half the task
-memory) in place of `workspace`. The run stays in `PROVISIONING` while the task
-starts and prepares the image. Without the setting, preparation runs in the
+active with at least 16 GiB nominal memory) in place of `workspace`. This does
+not establish the actual Fargate tmpfs capacity. The run stays in `PROVISIONING`
+while the task starts and prepares the image. Without the setting, preparation runs in the
 worker as described above.
+
+Before submitting to ECS, the worker saves the exact task revision, network,
+family ownership tag and idempotency token on the run. Replacement workers
+reuse that request. An unconfirmed launch or task observation leaves the run
+retryable and preserves its artifacts. Cancellation confirms that the
+preparation task has stopped before retiring its key or image; an explicit
+single-task launch rejection can settle immediately. The launch token also
+fences preparation checkpoints and outcomes against a different attempt.
 
 Skopeo must support the ocicrypt `provider:` encryption protocol. The backend
 image builds Skopeo 1.21.0 from its pinned upstream commit with vendored
@@ -460,3 +468,8 @@ surface unknown readiness honestly, preserve per-workload opt-in, and retain
 key retirement authority until every owned task key is PendingDeletion.
 A console enablement switch and automatic prerequisite reconciliation are not
 implemented by these App checkpoints.
+
+The on-demand task definition's memory check is nominal configuration evidence,
+not a guarantee of Fargate tmpfs size. The actual preparation process rechecks
+its memory-backed workspace before resolving Briefs or secrets; qualification
+must inspect that process's actual tmpfs capacity and availability.

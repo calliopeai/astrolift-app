@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from copy import deepcopy
 
 from astrolift_dispatch.spawners.base import SpawnResult, TaskStatus
@@ -73,12 +74,12 @@ class ConfidentialPodSpawner(K8sJobSpawner):
             return super().spawn(task)
         try:
             ok, error = nitro_preparation.prepare(task)
-        except Exception:  # noqa: BLE001 - settle and retire the run instead of stranding it
-            ok, error = (
-                False,
-                "The confidential preparation task could not be run; verify its task definition "
-                "and the control-plane role's permission to start it",
-            )
+        except nitro_preparation.PreparationUncertain:
+            raise
+        except Exception:
+            raise nitro_preparation.PreparationUncertain(
+                "The confidential preparation task state could not be verified"
+            ) from None
         task.refresh_from_db()
         result = self.recover(task) if ok else None
         if result is None:
@@ -103,11 +104,26 @@ class ConfidentialPodSpawner(K8sJobSpawner):
         pod["spec"]["activeDeadlineSeconds"] = job["spec"]["activeDeadlineSeconds"]
 
         def save(checkpoint):
-            task.dispatch_target = {
-                **(task.dispatch_target or {}),
-                "nitro_confidential": deepcopy(checkpoint),
-            }
-            task.save(update_fields=["dispatch_target", "updated_at", "version"])
+            from django.db import transaction
+
+            from astrolift_agents.models import AgentTask
+            from astrolift_clusters import nitro_preparation
+
+            with transaction.atomic():
+                current = AgentTask.all_objects.select_for_update().get(pk=task.pk)
+                marker = os.environ.get(nitro_preparation.MARKER)
+                if marker:
+                    launch = (current.dispatch_target or {}).get("nitro_preparation") or {}
+                    if marker != f"{task.guid}:{launch.get('run')}":
+                        raise nitro_preparation.PreparationUncertain(
+                            "Preparation checkpoint authority changed"
+                        )
+                current.dispatch_target = {
+                    **(current.dispatch_target or {}),
+                    "nitro_confidential": deepcopy(checkpoint),
+                }
+                current.save(update_fields=["dispatch_target", "updated_at", "version"])
+                task.dispatch_target = current.dispatch_target
 
         final, _ = driver.prepare_confidential_task(
             ctx.slug,
@@ -119,8 +135,12 @@ class ConfidentialPodSpawner(K8sJobSpawner):
             callback_hash=task.callback_token_hash,
             save=save,
         )
-        task.refresh_from_db(fields=["status", "cancel_requested_at"])
-        if task.cancel_requested_at or task.status in task.TERMINAL_STATUSES:
+        task.refresh_from_db(fields=["status", "cancel_requested_at", "dispatch_target"])
+        if (
+            task.cancel_requested_at
+            or task.status in task.TERMINAL_STATUSES
+            or (task.dispatch_target.get("nitro_preparation") or {}).get("stop_requested")
+        ):
             raise RuntimeError("Task ended or was cancelled during confidential image preparation")
         prefix = [row for row in manifests[:-1] if row.get("kind") != "Secret"]
         if prefix:
@@ -217,8 +237,12 @@ class ConfidentialPodSpawner(K8sJobSpawner):
         )
 
     def stop(self, external_id, *, expected_task_guid=None):
+        from astrolift_clusters.nitro_preparation import stop_preparation
         from core.cluster_management import _context_for_cluster, _driver_for_cluster
 
+        task = _task_for_external_id(external_id)
+        if task is not None:
+            stop_preparation(task)
         driver = _driver_for_cluster(self._cluster)
         ctx = _context_for_cluster(self._cluster)
         pod = driver.get_manifest(ctx.slug, self._namespace, "Pod", external_id)
@@ -284,17 +308,27 @@ class ConfidentialPodSpawner(K8sJobSpawner):
         return absent
 
     def _cleanup_run(self, external_id):
+        from astrolift_clusters.nitro_preparation import stop_preparation
         from core.cluster_management import _driver_for_cluster
 
         task = _task_for_external_id(external_id)
+        if task is not None:
+            stop_preparation(task)
         checkpoint = (task.dispatch_target or {}).get("nitro_confidential") if task else None
         if checkpoint and not checkpoint.get("cleanup_complete"):
+            from django.db import transaction
+
+            from astrolift_agents.models import AgentTask
+
             _driver_for_cluster(self._cluster).cleanup_confidential_task(checkpoint)
-            task.dispatch_target = {
-                **task.dispatch_target,
-                "nitro_confidential": {**checkpoint, "cleanup_complete": True},
-            }
-            task.save(update_fields=["dispatch_target", "updated_at", "version"])
+            with transaction.atomic():
+                current = AgentTask.all_objects.select_for_update().get(pk=task.pk)
+                if (current.dispatch_target or {}).get("nitro_confidential") == checkpoint:
+                    current.dispatch_target = {
+                        **current.dispatch_target,
+                        "nitro_confidential": {**checkpoint, "cleanup_complete": True},
+                    }
+                    current.save(update_fields=["dispatch_target", "updated_at", "version"])
 
     def cleanup_task_secret(self, external_id):
         task = _task_for_external_id(external_id)
