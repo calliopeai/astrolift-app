@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@calliopelabs/ui-astrolift/theme.css";
+@import "@calliopelabs/ui/theme.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -94,7 +94,7 @@
   --ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
 }
 
-/* ── Theme tokens — from @calliopelabs/ui-astrolift ───────────────────
+/* ── Theme tokens — from @calliopelabs/ui ───────────────────
  * Colours, status, surfaces, motion, the ground/accent/density axes and
  * their selectors come from the package's theme.css (imported above), so a
  * token change made in the library Storybook reaches this app on the next
