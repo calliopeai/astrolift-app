@@ -1,0 +1,74 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-11T21:25:11.000985+00:00",
+  "scope": "Workload-parent SDK read amplification reduction for image bindings and descendants",
+  "status": "controlled-regression-and-strict-types-qualified-current-native-pairing-pending",
+  "sourceParent": "30606b44c",
+  "sourceSha256": {
+    "backend/providers/nvke/operator_agent_client.py": "cda138018385c8c3af4231f9fec09f45c8eed8827c71f5415004956cfd145cf9",
+    "backend/providers/tests/nvke/test_operator_install_plan_image_binding.py": "0885a7641d5618b98eef82d32ba9d1a28a7608ef8e191c1012c1d6e86d143dd8"
+  },
+  "checks": [
+    {
+      "command": [
+        "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-c",
+        "/dev/null",
+        "--confcutdir=tests/nvke",
+        "-p",
+        "no:cacheprovider",
+        "tests/nvke/test_operator_install_plan_pull_runtime.py",
+        "tests/nvke/test_operator_install_plan_node_platforms.py",
+        "tests/nvke/test_operator_install_plan_pull_secret_analysis.py",
+        "tests/nvke/test_operator_install_plan_pull_authority.py",
+        "tests/nvke/test_operator_install_plan_immutable.py",
+        "tests/nvke/test_operator_install_plan_image_binding.py",
+        "tests/nvke/test_operator_install_plan_workload.py",
+        "tests/nvke/test_operator_install_plan_image.py",
+        "-q"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-workload-parent-sdk-v1-0.log"
+    },
+    {
+      "command": [
+        "/opt/homebrew/bin/ruff",
+        "check",
+        "nvke/_operator_install_plan_pull_runtime.py",
+        "nvke/operator_agent_client.py",
+        "tests/nvke/test_operator_install_plan_pull_runtime.py",
+        "tests/nvke/test_operator_install_plan_pull_secret_analysis.py",
+        "tests/nvke/test_operator_install_plan_image_binding.py"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-workload-parent-sdk-v1-1.log"
+    },
+    {
+      "command": [
+        "/Users/ragelink/repos/lanes/astrolift-nvke-app/backend/.venv/bin/python",
+        "-m",
+        "mypy",
+        "--strict",
+        "nvke/_operator_install_plan_pull_runtime.py",
+        "nvke/operator_agent_client.py"
+      ],
+      "exitCode": 0,
+      "log": "/tmp/astrolift-nvke-workload-parent-sdk-v1-2.log"
+    }
+  ],
+  "cases": 267,
+  "change": "The image-binding ancestry boundary validates the workload summary directly against its already validated original/plan/chart/tree source, checking the workload capability before and after the read. The surrounding operation still validates and compares the complete source before and after its target request. This removes the nested workload operation that repeated the whole ancestry twice again.",
+  "coverage": [
+    "One workload GET and one tree GET per image-binding before/after boundary; no automatic read retry",
+    "Exact workload request/body IDs, retained digest, counts and summary bounds remain validated",
+    "Workload capability replacement during the parent read refuses before image-binding request",
+    "Existing malformed-response, changed-workload, changed-source, lost-reply and image/payload/pull/node/correspondence regressions pass"
+  ],
+  "limits": [
+    "The passing native SDK/agent correspondence record in Ops 9e24ae1 used the earlier SDK dependency implementation; it is not current-native proof for this optimization",
+    "A freshly frozen SDK/native pairing must qualify the new dependency before release",
+    "No timeout or source/authentication guard changed; no full App/browser/native, full NVKE, main merge or deployment claim"
+  ]
+}

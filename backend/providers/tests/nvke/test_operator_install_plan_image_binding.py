@@ -172,3 +172,33 @@ def test_workload_replacement_after_response_is_rejected():
     with sdk, pytest.raises(NvkeError) as error:
         call(sdk)
     assert error.value.code == "SOURCE_CHANGED"
+
+
+def test_workload_parent_reuses_the_validated_tree_source_at_each_boundary():
+    sdk, calls = peer(image_binding=summary())
+    with sdk:
+        assert call(sdk) == summary()
+    for suffix in ("workload-inventory", "tree"):
+        assert sum(path.endswith("/install-plan-" + suffix) for _, path, _ in calls) == 2
+
+
+def test_workload_capability_replacement_during_parent_read_refuses_before_binding():
+    sdk, calls = peer(image_binding=summary())
+    original = sdk._http._transport
+    parent_read = False
+
+    def respond(request):
+        nonlocal parent_read
+        if request.url.path.endswith("/install-plan-workload-inventory"):
+            parent_read = True
+        response = original.handle_request(request)
+        if request.url.path == "/v1/identity" and parent_read:
+            data = response.json()
+            data["installPlanWorkloadInventory"] = {}
+            return httpx.Response(200, json=data)
+        return response
+
+    sdk._http._transport = httpx.MockTransport(respond)
+    with sdk, pytest.raises(NvkeError):
+        call(sdk)
+    assert not any(path.endswith("/install-plan-image-binding") for _, path, _ in calls)

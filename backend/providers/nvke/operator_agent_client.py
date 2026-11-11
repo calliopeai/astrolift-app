@@ -791,16 +791,27 @@ class OperatorAgentClient:
         source = self._install_plan_artifact_source(
             job_id, intent, body, chart_artifact_id, chart_artifact_digest, "installPlanImageBinding"
         )
-        workload = self.install_plan_workload(
-            job_id,
-            intent=intent,
-            chart_artifact_id=chart_artifact_id,
-            chart_artifact_digest=chart_artifact_digest,
-            body={
+        workload_body = workload_protocol.request(
+            {
                 **{key: body[key] for key in ("format", "planId", "planDigest", "treeId", "treeDigest")},
                 "artifactId": body["workloadId"],
             },
+            job_id=job_id,
+            chart_artifact_id=chart_artifact_id,
+            read_only=True,
         )
+        workload_protocol.capability(self.identity().get("installPlanWorkloadInventory"))
+        workload = workload_protocol.summary(
+            self._request(
+                "GET",
+                "/v1/jobs/" + job_id + "/install-plan-workload-inventory",
+                params={key: value for key, value in workload_body.items() if key != "format"},
+                intent=intent,
+            ),
+            body=workload_body,
+            item_count=source["metadata"]["itemCount"],
+        )
+        workload_protocol.capability(self.identity().get("installPlanWorkloadInventory"))
         if workload["workloadDigest"] != body["workloadDigest"]:
             raise NvkeError("SOURCE_CHANGED", "The workload inventory no longer matches the reviewed digest")
         return {**source, "workload": workload}
