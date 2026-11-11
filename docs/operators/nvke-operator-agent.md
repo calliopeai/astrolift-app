@@ -970,5 +970,6 @@ full spec and image use to the enrolled node UID and retained kubelet setting.
 This establishes historical correspondence only. Workload ownership, scheduling,
 node-wide keyrings/plugins, registry authorization, actual image availability,
 fresh phase use and linked execution admission remain separate requirements;
-`continuationAuthorized` stays false. CLI and browser exposure for this new review
-are still pending.
+`continuationAuthorized` stays false. The CLI `agent install-plan pull-runtime review` control is implemented and
+locally qualified against controlled HTTP; actual API/native pairing and browser
+panel/hook wiring for this new review remain pending.
