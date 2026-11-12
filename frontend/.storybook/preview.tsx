@@ -35,6 +35,7 @@ function AppProviders({
     root.dataset.accent = accent;
     root.dataset.density = density;
     root.classList.toggle("dark", mode === "dark");
+    root.dataset.mode = mode;
   }, [ground, accent, density, mode]);
   return (
     <NextIntlClientProvider locale="en" messages={messages}>

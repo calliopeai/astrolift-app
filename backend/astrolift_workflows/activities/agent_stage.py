@@ -45,6 +45,8 @@ from _sdk.k8s_naming import AGENT_NAMESPACE_PREFIX, agent_namespace
 from django.utils import timezone
 from temporalio import activity
 
+from astrolift_workflows.activity_heartbeat import heartbeat_while
+
 log = logging.getLogger("astrolift_workflows.activities.agent_stage")
 
 # Agent stage jobs run in a dedicated per-org namespace, separate from the
@@ -304,9 +306,13 @@ def _spawn_agent_task_locked(task_pk: int) -> dict[str, Any]:
     result = recover(task) if recover is not None else None
     if result is None and task.status == AgentTask.Status.RUNNING:
         return _settle_spawn_failure(task.pk, "running agent task has no recoverable Job")
+    from astrolift_clusters.nitro_preparation import PreparationUncertain
+
     try:
         if result is None:
             result = spawner.spawn(task)
+    except PreparationUncertain:
+        raise
     except Exception as exc:  # noqa: BLE001 — renderer/driver bugs must not strand PROVISIONING
         return _settle_spawn_failure(task.pk, f"spawn raised {type(exc).__name__}: {exc}")
 
@@ -875,7 +881,7 @@ async def execute_agent_stage(params: dict[str, Any]) -> dict[str, Any]:
     )
     try:
         task_pk = await sync_to_async(_create_agent_task_sync)(params, task_guid=task_guid)
-        spawn = await sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk)
+        spawn = await heartbeat_while(sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk))
 
         if spawn["ok"]:
             # Poll until terminal, heartbeating each cycle.
@@ -943,7 +949,9 @@ async def dispatch_agent_task(task_pk: int) -> dict[str, Any]:
     activity.heartbeat()
     try:
         execution = await execution_for_activity(task_pk)
-        spawn = await sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk, execution)
+        spawn = await heartbeat_while(
+            sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk, execution)
+        )
 
         if spawn["ok"]:
             while True:

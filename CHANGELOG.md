@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Add source-bound NVKE node/image platform prepare, review and explicit retry controls, with encrypted intent, current-admin audit redaction and shared cross-kind UUID reservations. CPU/importer, scheduling, credential, availability, phase-use and linked admission proofs remain required (#2656).
+- Confidential task images can be prepared in an on-demand ECS task instead of inside the API and worker (#2678). With `NITRO_PREPARATION_TASK` set, the worker starts the task per confidential run, waits for it and adopts its verified Pod; API and worker no longer need a memory workspace, and readiness reports the preparation task. The dispatch activity now heartbeats while a task is being spawned.
 
 - Confidential preparation supports `noexec` memory workspaces by separating verified public tool snapshots from private inputs. Subprocess scratch and Skopeo temporary files are explicitly confined to the private memory workspace (#2668).
 

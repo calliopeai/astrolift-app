@@ -46,9 +46,19 @@ def run():
             "runtimeClassName": "confidential-sandbox",
             "serviceAccountName": "runner",
             "nodeName": "bound",
-            "securityContext": {"runAsUser": 42042, "runAsGroup": 42042, "fsGroup": 42042},
+            "securityContext": {
+                "runAsUser": 42042,
+                "runAsGroup": 42042,
+                "runAsNonRoot": True,
+                "seccompProfile": {"type": "RuntimeDefault"},
+            },
             "containers": [
-                {"name": "probe", "image": image, "env": [{"name": "ASTROLIFT_CONFIDENTIAL_TASK_ID", "value": compact}]}
+                {
+                    "name": "probe",
+                    "image": image,
+                    "env": [{"name": "ASTROLIFT_CONFIDENTIAL_TASK_ID", "value": compact}],
+                    "securityContext": {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}},
+                }
             ],
         },
         "status": {"phase": "Running"},
@@ -123,6 +133,39 @@ def test_inspect_accepts_real_identity_without_writes(run):
     cp, grant = probe.inspect(run.task, run.pod, run.config, run.kms, run.ecr, "positive-uid", run.pin)
     assert cp == run.checkpoint and len(grant) == 64
     assert not hasattr(run.kms, "put_key_policy")
+
+
+@pytest.mark.parametrize(
+    "change", ["fs_group", "null_fs_group", "uid", "gid", "root", "seccomp", "capabilities", "escalation", "privileged"]
+)
+def test_measured_positive_still_requires_the_qualified_sandbox_security_context(run, change):
+    from aws.nitro_confidential import prepared_pod_hash
+
+    security = run.pod["spec"]["securityContext"]
+    container = run.pod["spec"]["containers"][0]["securityContext"]
+    if change == "fs_group":
+        security["fsGroup"] = 42042
+    elif change == "null_fs_group":
+        security["fsGroup"] = None
+    elif change == "uid":
+        security["runAsUser"] = 0
+    elif change == "gid":
+        security["runAsGroup"] = 0
+    elif change == "root":
+        security["runAsNonRoot"] = False
+    elif change == "seccomp":
+        security["seccompProfile"] = {"type": "Unconfined"}
+    elif change == "capabilities":
+        container["capabilities"]["add"] = ["SYS_ADMIN"]
+    elif change == "escalation":
+        container["allowPrivilegeEscalation"] = True
+    else:
+        container["privileged"] = True
+    run.checkpoint["pod_sha256"] = prepared_pod_hash(run.pod)
+    with pytest.raises(ValueError, match="sandbox security context"):
+        probe.inspect(run.task, run.pod, run.config, run.kms, run.ecr, "positive-uid", probe.digest(run.checkpoint))
+    run.kms.describe_key.assert_not_called()
+    run.ecr.describe_images.assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -211,6 +254,8 @@ def test_candidate_preserves_capsule_and_guard_but_has_distinct_identity(run):
         {"name": "QUALIFICATION_PUBLIC_VARIANT", "value": "negative"}
     ]
     assert candidate["spec"]["containers"][0]["image"] == run.checkpoint["image"]
+    assert candidate["spec"]["securityContext"] == original["spec"]["securityContext"]
+    assert "fsGroup" not in candidate["spec"]["securityContext"]
 
 
 def submit_fixture(run, monkeypatch):
@@ -255,6 +300,8 @@ def test_submit_never_changes_grant_and_cleanup_deletes_exact_uid(run, monkeypat
     execute()
     assert saved[0]["stage"] == "prepared" and saved[1]["uid"] == "negative-uid"
     assert state["original_grant_sha256"]
+    assert state["predicted_pcr17"] != run.checkpoint["pcr17"]
+    assert state["image"] == run.checkpoint["image"] and state["key_arn"] == run.checkpoint["key_arn"]
     assert not hasattr(run.kms, "put_key_policy")
     probe.cleanup(k8s, state)
     k8s.delete.assert_called_once_with(
@@ -430,3 +477,60 @@ def test_create_conflict_never_reads_or_adopts_existing_pod(run, monkeypatch):
     with pytest.raises(ValueError, match="recorded UID"):
         probe.cleanup(k8s, state)
     k8s.delete.assert_not_called()
+
+
+def prestart_kms_refusal():
+    return {
+        "started": False,
+        "restartCount": 0,
+        "lastState": {},
+        "state": {
+            "terminated": {
+                "reason": "StartError",
+                "exitCode": 128,
+                "startedAt": "1970-01-01T00:00:00Z",
+                "finishedAt": "2026-11-12T13:21:35Z",
+                "message": "failed to create containerd task: prepare_image: KMS Decrypt failed: AccessDeniedException",
+            }
+        },
+    }
+
+
+def test_prestart_kms_refusal_still_requires_audit(run, monkeypatch):
+    k8s, state, _, execute = submit_fixture(run, monkeypatch)
+    execute()
+    k8s.get.return_value["status"] = {"phase": "Failed", "containerStatuses": [prestart_kms_refusal()]}
+    result = probe.observe(k8s, state)
+    assert result["guest_started"] is False
+    assert result["attestation"] == "inconclusive_audit_required"
+
+
+@pytest.mark.parametrize("mutation", ["started", "restart", "prior", "timestamp", "reason", "exit", "message"])
+def test_prestart_refusal_contradictions_fail_closed(mutation):
+    row = prestart_kms_refusal()
+    if mutation == "started":
+        row["started"] = True
+    elif mutation == "restart":
+        row["restartCount"] = 1
+    elif mutation == "prior":
+        row["lastState"] = {"terminated": {"exitCode": 1}}
+    elif mutation == "timestamp":
+        row["state"]["terminated"]["startedAt"] = "2026-11-12T13:21:34Z"
+    elif mutation == "reason":
+        row["state"]["terminated"]["reason"] = "Error"
+    elif mutation == "exit":
+        row["state"]["terminated"]["exitCode"] = 1
+    else:
+        row["state"]["terminated"]["message"] = "application failed"
+    assert probe.container_creation_refused(row) is False
+
+
+def test_init_container_execution_is_negative_failure(run, monkeypatch):
+    k8s, state, _, execute = submit_fixture(run, monkeypatch)
+    execute()
+    k8s.get.return_value["status"] = {
+        "phase": "Failed",
+        "containerStatuses": [prestart_kms_refusal()],
+        "initContainerStatuses": [{"state": {"terminated": {"exitCode": 0}}}],
+    }
+    assert probe.observe(k8s, state)["guest_started"] is True

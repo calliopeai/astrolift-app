@@ -156,7 +156,10 @@ def platform_checks(
     return checks
 
 
-def collect_readiness(driver: Any, cluster: str, namespace: str, config: Any = None) -> dict[str, Any]:
+def collect_readiness(
+    driver: Any, cluster: str, namespace: str, config: Any = None, preparation: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """``preparation`` replaces this process's workspace check when an on-demand task prepares images."""
     import hashlib
     import json
     import shutil
@@ -165,6 +168,7 @@ def collect_readiness(driver: Any, cluster: str, namespace: str, config: Any = N
 
     from aws.nitro_confidential import verified_tools
     from aws.nitro_sandboxes import RUNTIME_KIND
+    from aws.nitro_skopeo import verify_keyprovider
 
     source: dict[str, Any] = {
         "region": driver._config.region,
@@ -239,7 +243,7 @@ def collect_readiness(driver: Any, cluster: str, namespace: str, config: Any = N
                     "This process has valid per-cluster operator configuration.",
                 )
             )
-            extra.append(workspace_readiness(config.temporary_root))
+            extra.append(preparation or workspace_readiness(config.temporary_root))
             try:
                 if (
                     not Path(config.skopeo).is_file()
@@ -265,6 +269,23 @@ def collect_readiness(driver: Any, cluster: str, namespace: str, config: Any = N
                         "signed_tools",
                         "not_ready",
                         "Install the verified AWS tools, skopeo and openssl on API and workers.",
+                    )
+                )
+            try:
+                verify_keyprovider(config.skopeo, config.temporary_root)
+                extra.append(
+                    check(
+                        "image_encryption",
+                        "ready",
+                        "Installed Skopeo completed an offline keyprovider encryption/decryption check.",
+                    )
+                )
+            except Exception:
+                extra.append(
+                    check(
+                        "image_encryption",
+                        "not_ready",
+                        "Install Skopeo with keyprovider encryption/decryption support on API and workers.",
                     )
                 )
             try:

@@ -61,6 +61,34 @@ the installer namespace. Pod Identity must match that namespace, service account
 cluster and runtime role exactly. Source evidence includes the cluster ARN,
 namespace, configuration fingerprint and signed tool-manifest SHA.
 
+An operator can move preparation out of the always-on processes (#2678).
+`NITRO_PREPARATION_TASK` names an ECS task definition built from the same image
+and role: a JSON object with `cluster` (ARN), `task_definition`, `container`,
+`subnets` and `security_groups`. The worker then starts that task for each
+confidential run, waits for it, and adopts the Pod it created through the same
+recovery validation a restarted worker uses. The task reads the run from the
+database; only the task id travels through ECS. API and worker need no memory
+workspace, and readiness reports `preparation_task` (the task definition must be
+active with at least 16 GiB nominal memory) in place of `workspace`. This does
+not establish the actual Fargate tmpfs capacity. The run stays in `PROVISIONING`
+while the task starts and prepares the image. Without the setting, preparation runs in the
+worker as described above.
+
+Before submitting to ECS, the worker saves the exact task revision, network,
+family ownership tag and idempotency token on the run. Replacement workers
+reuse that request. An unconfirmed launch or task observation leaves the run
+retryable and preserves its artifacts. Cancellation confirms that the
+preparation task has stopped before retiring its key or image; an explicit
+single-task launch rejection can settle immediately. The launch token also
+fences preparation checkpoints and outcomes against a different attempt.
+
+Skopeo must support the ocicrypt `provider:` encryption protocol. The backend
+image builds Skopeo 1.21.0 from its pinned upstream commit with vendored
+dependencies; Bookworm's packaged Skopeo lacks this protocol. Every image build
+and confidential readiness check performs an offline encryption/decryption
+round trip with a generated public fixture. This check uses no AWS credentials,
+registry or task data, and rejects an incompatible binary before task preparation.
+
 Workers recheck their own current process before preparing Briefs or task
 secrets. API readiness therefore cannot authorize a misconfigured worker. Task
 Pods and supported manifest-rendered controller templates using either Nitro
@@ -130,6 +158,14 @@ ordinary Jobs cannot adopt confidential Pods. Operator-wide
 `AGENT_RUNTIME_CLASS=confidential-sandbox` remains refused, including imported
 agents and boxes: it cannot supply this per-run workflow. Static task policies,
 network isolation and GPU requests remain refused.
+
+Confidential task Pods retain explicit non-root UID/GID, seccomp and capability
+restrictions, and omit the shared Job baseline's volume `fsGroup` before
+admission and policy generation. Their only host-delivered volume is the
+read-only Pod Identity projection. The generic `fsGroup` causes a sandbox-level
+`SetupSandbox` policy mismatch on the qualified EKS runtime. Admission cannot
+change that field after preparation selects it. Ordinary and isolated Jobs
+retain their existing volume hardening.
 
 The backend requires a non-root, digest-pinned, baked agent image with contract
 label `ai.astrolift.agent-image.contract` at least 7. Boot installs, managed
@@ -429,14 +465,25 @@ cluster-GUID operator configuration described above on both API and workers.
 Do not use an operator-wide runtime default as a shortcut for preparing a mixed
 cluster fleet.
 
-Installer-managed activation is still a separate integration. The installer
-already shares plain environment between API and workers, so it can carry the
-configuration. Its existing standard EKS node provisioning does not install
-Nitro runtime capacity or provision these confidential-task prerequisites.
-A supported installer flow must explicitly provision/reconcile compatible node
-capacity, runtime readiness, the private run repository, distinct trusted
-key-admin and parent-visible runtime permissions, and Pod Identity. It must
-surface unknown readiness honestly, preserve per-workload opt-in, and retain
-key retirement authority until every owned task key is PendingDeletion.
-A console enablement switch and automatic prerequisite reconciliation are not
-implemented by these App checkpoints.
+Installer 0.1.95 adds the ECS controller integration and on-demand preparation
+task. Follow the installer's
+[cluster activation procedure](https://github.com/calliopeai/calliope-installer/blob/main/docs/nitro-ecs-controller.md):
+prepare the owning EKS cluster, apply the dedicated Nitro prerequisites unit,
+then apply the Astro parent again to configure every API and worker task.
+The prerequisites unit owns the private run repository, controller permissions,
+runtime role, Pod Identity, task service account and optional dedicated dynamic
+Auto Mode capacity. Standard EKS node provisioning alone is insufficient.
+
+In Astro, refresh **Cluster Settings → Nitro** readiness and enable the desired
+mode only after its required checks pass. The saved per-cluster enable state and
+the workload's runtime selection are separate opt-ins. Provisioning or a ready
+verdict does not prove a confidential task has executed successfully: qualify a
+disposable workload, including a same-grant negative refusal, on the actual
+cluster. Unknown readiness needs investigation. Retain key retirement authority
+until every owned task key is PendingDeletion; removing configuration does not
+make it safe to remove key administrators.
+
+The on-demand task definition's memory check is nominal configuration evidence,
+not a guarantee of Fargate tmpfs size. The actual preparation process rechecks
+its memory-backed workspace before resolving Briefs or secrets; qualification
+must inspect that process's actual tmpfs capacity and availability.

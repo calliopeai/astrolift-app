@@ -179,6 +179,31 @@ def test_final_brief_secret_callback_and_hardening_precede_ciphertext_pod_apply(
     assert run.spawner.recover(run.task).ok
 
 
+@pytest.mark.parametrize("runtime", [None, "isolated-sandbox"])
+def test_only_confidential_preparation_omits_shared_volume_fs_group(run, runtime):
+    from astrolift_dispatch.pod_hardening import harden_agent_pod
+
+    ordinary = {"containers": [{"name": "agent"}]}
+    if runtime:
+        ordinary["runtimeClassName"] = runtime
+    harden_agent_pod(ordinary, non_root=True)
+    assert ordinary["securityContext"]["fsGroup"] == 42042
+    prepare = run.driver.prepare_confidential_task
+
+    def inspect_preparation(*args, **kwargs):
+        pod = kwargs["pod"]["spec"]
+        assert pod["securityContext"] == {
+            key: value for key, value in ordinary["securityContext"].items() if key != "fsGroup"
+        }
+        assert pod["containers"][0]["securityContext"] == ordinary["containers"][0]["securityContext"]
+        assert pod["containers"][0]["resources"] == ordinary["containers"][0]["resources"]
+        return prepare(*args, **kwargs)
+
+    run.driver.prepare_confidential_task = inspect_preparation
+    assert run.spawner.spawn(run.task).ok
+    assert "fsGroup" not in run.driver.pod["spec"]["securityContext"]
+
+
 @pytest.mark.parametrize("changed", ["image", "policy", "env", "credential"])
 def test_recovery_refuses_changed_run_authority_without_rotating_credentials(run, changed):
     assert run.spawner.spawn(run.task).ok
