@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-12T23:02:38.817546+00:00",
+  "recordedAt": "2026-11-12T23:44:19.116223+00:00",
   "issue": 2693,
-  "status": "focused-descriptor-diagnosis-passed-six-family-durable-setup-pending",
+  "status": "durable-context-case-passed-image-binding-driver-deadline-failed",
   "scope": "Own-process Darwin native SDK test setup only; production limits, source watchers and authority checks unchanged",
   "focusedDiagnosis": {
     "report": "/tmp/astrolift-nvke-sdk-context-descriptor-budget-v1.json",
@@ -34,13 +34,41 @@
     "monitoringDisabled": false
   },
   "pending": [
-    "Six standalone SDK context/image/image-binding/local-image/tree/render-verification native recovery cases using durable helper",
+    "Diagnose image-binding driver with phase-only markers/private delayed stack dump on adequate capacity, then qualify all six families",
     "Full release gates, native lifecycle/continuation, review, merge and deployment"
   ],
   "sixFamilyRun": {
     "report": "/tmp/astrolift-nvke-sdk-native-recovery-six-v1.json",
-    "supervisorPid": 65515,
-    "state": "running"
+    "sha256": "18aef4773e4ea25a3ee78aa72a7dd3ddba1b3dfb7c7f7ae138dbbad04953ada4",
+    "state": "failed",
+    "sourceRevision": "0ff55b689",
+    "result": {
+      "exitCode": 1,
+      "checks": {
+        "testProcessExitCode": 1,
+        "junitTotals": {
+          "tests": 2,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        },
+        "sourcesUnchanged": true,
+        "failureType": "AssertionError",
+        "failureFrames": [
+          {
+            "function": "<module>",
+            "line": 14
+          }
+        ]
+      },
+      "elapsedSeconds": 2326.28988120798,
+      "scope": "All six standalone provider SDK native recovery families using durable own-process Darwin descriptor preparation; actual mTLS/native helpers, no Django/production database or VM mutation"
+    }
   },
-  "releaseQualified": false
+  "releaseQualified": false,
+  "observedCases": {
+    "context": "passed with durable descriptor helper, 518.657 seconds",
+    "imageBinding": "driver killed at its existing 1800-second outer deadline; private driver log was empty",
+    "otherFourFamilies": "not executed after fail-fast"
+  }
 }

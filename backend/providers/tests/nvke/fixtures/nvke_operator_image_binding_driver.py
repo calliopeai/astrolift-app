@@ -1,3 +1,4 @@
+import faulthandler
 import json
 import socket
 import ssl
@@ -13,9 +14,17 @@ import test_operator_agent_workloads as fixture
 from nvke.client import NvkeError
 from nvke.operator_agent_client import OperatorAgentClient
 
+
+def phase(name):
+    print("SDK_NATIVE_IMAGE_BINDING_PHASE " + name, flush=True)
+    faulthandler.dump_traceback_later(600, repeat=False)
+
+
+phase("fixture-class-setup")
 fixture.WorkloadAgentMTLSTests.setUpClass()
 case = fixture.WorkloadAgentMTLSTests()
 try:
+    phase("fixture-setup")
     case.setUp()
     try:
         c, service, image_service = case.c, fixture.service, fixture.image_service
@@ -51,6 +60,7 @@ try:
 
             return handler, discarded, lose
 
+        phase("workload-lost-reply")
         handler, discarded, lose = lose_reply("workloadDigest")
         with (
             OperatorAgentClient(n.url, **config) as sdk,
@@ -63,6 +73,7 @@ try:
             else:
                 raise AssertionError("Lost inventory reply accepted")
         assert len(discarded) == 1
+        phase("workload-cold-recovery")
         c.restart()
         with (
             OperatorAgentClient(n.url, **config) as sdk,
@@ -85,6 +96,7 @@ try:
             "timeoutSeconds": 300,
         }
         image_query = {k: v for k, v in image.items() if k in image_service.BASE | image_service.WORKLOAD}
+        phase("image-lost-reply")
         handler, discarded, lose = lose_reply("rootDigest")
         with (
             OperatorAgentClient(n.url, **config) as sdk,
@@ -98,6 +110,7 @@ try:
                 raise AssertionError("Lost registry reply accepted")
         assert len(discarded) == 1
         reads = len(case.registry.requests)
+        phase("image-cold-recovery")
         c.restart()
         with (
             OperatorAgentClient(n.url, **config) as sdk,
@@ -127,6 +140,7 @@ try:
             "maximumBytes": "1048576",
             "timeoutSeconds": 300,
         }
+        phase("binding-lost-reply")
         handler, discarded, lose = lose_reply("bindingDigest")
         with (
             OperatorAgentClient(n.url, **config) as sdk,
@@ -139,6 +153,7 @@ try:
             else:
                 raise AssertionError("Lost binding reply accepted")
         assert len(discarded) == 1
+        phase("binding-cold-recovery")
         c.restart()
         with (
             OperatorAgentClient(n.url, **config) as sdk,
@@ -172,6 +187,11 @@ try:
         case.unchanged()
         print("imageBindingSDKNativeLostReplyAndColdRecovery PASS", flush=True)
     finally:
+        phase("fixture-cleanup")
         case.doCleanups()
 finally:
-    fixture.WorkloadAgentMTLSTests.tearDownClass()
+    try:
+        phase("fixture-class-cleanup")
+        fixture.WorkloadAgentMTLSTests.tearDownClass()
+    finally:
+        faulthandler.cancel_dump_traceback_later()
