@@ -1,0 +1,65 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T21:41:31.836166+00:00",
+  "issue": 2693,
+  "status": "frontend-exact-source-equivalence-verified-connected-native-release-pending",
+  "verifiedAppRevision": "a90f403723dbb0d8a6b95cd1919500667884f183",
+  "frontendGitTree": "07171abab61d72b309c99347311bb1c79a173a71",
+  "verification": {
+    "astrolift-nvke-app-main-sync-final-frontend-v1": {
+      "report": "/tmp/astrolift-nvke-app-main-sync-final-frontend-v1.json",
+      "sha256": "8bdad2d21fc8a64c13c2f7c30f365fb51661ff04697e1ac6987e4eb711a121d8",
+      "result": {
+        "exitCode": 0,
+        "elapsedSeconds": 1719.265106542036,
+        "checks": {
+          "types": 0,
+          "format": 0,
+          "productionBuild": 0,
+          "workingSourcesUnchanged": true,
+          "revisionUnchanged": true
+        },
+        "revision": "a26d30aa36c8e349de9599aefd4bd358e6983f36",
+        "sourceManifest": "/tmp/astrolift-nvke-app-main-sync-final-frontend-v1.sources.json",
+        "scope": "Current-main integrated frontend semantic typecheck, full format gate and production build after observed repairs; prior unchanged unit/lint evidence and current focused cases recorded separately; no final browser/backend/deployment claim"
+      }
+    },
+    "astrolift-nvke-current-main-storybook-browser-v1": {
+      "report": "/tmp/astrolift-nvke-current-main-storybook-browser-v1.json",
+      "sha256": "81e9187781faa1b55a8804303f8a256d9b2a6063fe6aed085f70794cb38876eb",
+      "result": {
+        "exitCode": 0,
+        "elapsedSeconds": 385.81289204210043,
+        "revision": "c2367f155bccc7571dcd17febc8caf70f3b4e94f",
+        "checks": {
+          "buildPid": 41131,
+          "storybookBuild": 0,
+          "browserPid": 43038,
+          "browser": 0,
+          "browserStats": {
+            "startTime": "2026-11-12T17:23:35.626Z",
+            "duration": 163840.62,
+            "expected": 315,
+            "skipped": 0,
+            "unexpected": 0,
+            "flaky": 0
+          },
+          "revisionUnchanged": true
+        },
+        "scope": "Current-main static Storybook build and actual Chromium NVKE story/accessibility/provider/journal checks using controlled UI fixtures; no native/API readiness claim"
+      }
+    }
+  },
+  "qualifiedAssertions": [
+    "The complete tracked frontend tree, including dependency lockfile and browser runners, is identical to the successful semantic typecheck/full-format/production build source",
+    "The complete tracked frontend tree is identical to the successful Storybook build and 315 Chromium fixture checks, with zero skips/failures/flakes"
+  ],
+  "scope": "Source equivalence carries existing frontend evidence to current-main-integrated release source. This is not a new test run and does not qualify connected APIs, native effects or deployed authentication.",
+  "pending": [
+    "Four real operator browser integrations",
+    "Fresh complete native install/access and exact enrolled-node hot/cold profile proof",
+    "Linked continuation and fresh phase/resource/credential/image authority",
+    "Final paired release review, green main merge and deployment"
+  ],
+  "releaseQualified": false
+}
