@@ -315,7 +315,6 @@ def test_another_current_admin_can_read_but_cannot_retry_original_private_intent
 
 
 def test_new_token_can_read_but_cannot_repeat_original_private_intent(image_fixture):
-
     from astrolift_identity.api_tokens import mint_token, reset_current_api_token, set_current_api_token
     from astrolift_identity.models import ApiToken
 

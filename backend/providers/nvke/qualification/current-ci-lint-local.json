@@ -1,0 +1,65 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T21:34:41.543639+00:00",
+  "issue": 2693,
+  "status": "full-backend-and-provider-ci-lint-format-qualified-native-lifecycle-pending",
+  "baseAppRevision": "72bf71d9e5207bc88c8882c853719db81f5b0742",
+  "verification": {
+    "ciMatchedLint": {
+      "report": "/tmp/astrolift-nvke-paired-ci-lint-v4.json",
+      "sha256": "c901054730e223adb29ef18a0c6e59f9975ac85c7a66365f7723488abf831c32",
+      "result": {
+        "exitCode": 0,
+        "checks": [
+          {
+            "name": "backend-format",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v4-backend-format.log"
+          },
+          {
+            "name": "backend-lint",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v4-backend-lint.log"
+          },
+          {
+            "name": "providers-lint",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v4-providers-lint.log"
+          },
+          {
+            "name": "providers-format",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v4-providers-format.log"
+          }
+        ],
+        "elapsedSeconds": 6.040950166992843,
+        "scope": "Exact CI backend Ruff 0.6.9, provider Ruff 0.15.0 full package checks, no source mutation"
+      }
+    },
+    "formatEquivalence": {
+      "report": "/tmp/astrolift-nvke-backend-format-ast-equivalence-v1.json",
+      "sha256": "d88de938e2ffdbfab9db9caea6515f0ddaec6dc12898ac9accad2cdaa04caa74",
+      "result": {
+        "exitCode": 0,
+        "files": [
+          "astrolift_clusters/tests/test_nvke_install_plan_images.py",
+          "astrolift_clusters/tests/test_nvke_install_plan_verifications.py"
+        ],
+        "formatterVersion": "0.6.9",
+        "syntaxTreesUnchanged": true,
+        "sourceSha256": {
+          "astrolift_clusters/tests/test_nvke_install_plan_images.py": "360f8bfc341a9ef242a2bba155a824449706df2dbb8e4c6c1566211b120dc551",
+          "astrolift_clusters/tests/test_nvke_install_plan_verifications.py": "8e3c781fe8baa38f9b08af4bcba5a64ac1f5b2e4f0bb890340c7614ecb79b736"
+        }
+      }
+    }
+  },
+  "scope": "Full backend with CI Ruff 0.6.9, full providers with Ruff 0.15.0; two NVKE test blank lines removed, syntax trees unchanged. No tests reexecuted for whitespace-only changes. Original failed run and two local installer setup failures retained separately.",
+  "pending": [
+    "Four connected operator browser integration cases",
+    "Fresh full native bootstrap/install/access and exact enrolled-node recovery qualification",
+    "Linked native continuation and fresh credential/image/resource phase use",
+    "Paired final release review/merge and deployment"
+  ],
+  "releaseQualified": false
+}
