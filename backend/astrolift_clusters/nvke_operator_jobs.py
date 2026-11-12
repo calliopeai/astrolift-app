@@ -13,7 +13,14 @@ from django.db import connection, transaction
 from django.utils import timezone
 from nvke.client import NvkeError
 from nvke.contract import upstream_revision
-from nvke.operator_contract import CATALOG, MAX_REQUEST_BYTES, ContractError, effectful, validate
+from nvke.operator_contract import (
+    CATALOG,
+    MAX_REQUEST_BYTES,
+    ContractError,
+    effectful,
+    validate,
+    validate_admission,
+)
 
 from astrolift_clusters import nvke_operations as outbox
 from astrolift_clusters import nvke_operator_authority as authority
@@ -139,6 +146,12 @@ def reserve(
                 "SURFACE_UNAVAILABLE", "Configure and verify this site's explicit operator authority"
             )
         sites._version(selected, expected_authority_version)
+        try:
+            validate_admission(request, str(site.guid))
+        except ContractError:
+            raise NvkeError(
+                "INVALID_INPUT", "Explicit bootstrap architecture requires a release artifact"
+            ) from None
         if mutates:
             active = NvkeOperation.objects.filter(site=site, authority__tooling_effectful=True).exclude(
                 status__in=["succeeded", "failed", "cancelled"]

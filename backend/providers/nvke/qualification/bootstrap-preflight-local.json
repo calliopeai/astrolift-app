@@ -1,0 +1,58 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T20:56:25.639898+00:00",
+  "issue": "calliopeai/astrolift-opscode#120",
+  "status": "paired-sdk-api-preflight-qualified-full-native-lifecycle-pending",
+  "scope": "Bound SDK submit rejects invalid bootstrap option pairing before transport; authenticated API rejects before new operation creation while existing request recovery remains first; GraphQL failure/audit data remain redacted",
+  "operatorContractProvenance": {
+    "format": 1,
+    "repository": "calliopeai/astrolift-opscode",
+    "revision": "e9b728536557cf48169f0c2427ca58c6f4c8fae6",
+    "path": "kubernetes/nvke/operator_contract.py",
+    "sha256": "06a38233ee51c0a92067d12f84d563b3c4a407e8bacd5d860329157f9ebd82f9"
+  },
+  "verification": {
+    "report": "/tmp/astrolift-nvke-bootstrap-preflight-app-v4-verified-v2.json",
+    "sha256": "7a4e459d6ce7ff68cd12b60f555a788b98f9eb050c12067b685b3fc265718f57",
+    "result": {
+      "exitCode": 0,
+      "checks": {
+        "rawPytestExitCode": 0,
+        "collectionExitCode": 0,
+        "completeCollectedScopeMatchesExecutedJUnit": true,
+        "testsPassed": 119,
+        "testsSkipped": 0,
+        "sourcesUnchanged": true
+      },
+      "elapsedSeconds": 20.004292083904147,
+      "rawReport": "/tmp/astrolift-nvke-bootstrap-preflight-app-v4.json",
+      "rawReportSha256": "49a8a6c3be3c5a75c6fb15971999bb001d45aa4e9e2343890c5373bf9e537144",
+      "correction": "The original harness expected 120 cases; actual collection and the zero-exit pytest JUnit both contain 119. The failed raw report is preserved. No tests were removed, skipped, retried or changed by this verification.",
+      "scope": "Verify all 119 actual passing operator SDK/API cases against an independent full collection and unchanged source files"
+    },
+    "junitReport": "/tmp/astrolift-nvke-bootstrap-preflight-app-v4.xml",
+    "junitSha256": "ecc0491d45465c2d9b691f5eece8f6c39143efde7af1a2779b8c5d25564db678",
+    "sourceSha256": {
+      "backend/providers/nvke/operator_contract.py": "06a38233ee51c0a92067d12f84d563b3c4a407e8bacd5d860329157f9ebd82f9",
+      "backend/providers/nvke/operator_agent_client.py": "9e223a6e50961a0ba23642425859e362e2d21627fa29acdbfef52579e66f708c",
+      "backend/astrolift_clusters/nvke_operator_jobs.py": "c94354fe9ca0abd9d9c0ddc4856344e02c12cf96968c83faba828c046f33c106",
+      "backend/providers/tests/nvke/test_operator_agent_client.py": "9e38d8644a9419dd4080c67b0dd111b60c9aa88dc85fbc0bbeb58d9496d81608",
+      "backend/astrolift_clusters/tests/test_nvke_operator.py": "9e20d2363a808699b90ef0fe9c56d73b66f0dfaf2ca669f4289a341427373291"
+    }
+  },
+  "nativeOptionRule": "For bootstrap.site, omit arch unless release names a supplied artifact. The same dependency applies to dry runs; management.install still accepts arch without release.",
+  "formatting": "The copied operator contract remains byte-identical to reviewed Ops source; its existing formatter exclusion is honored and exact source provenance is checked before tests.",
+  "testsPassed": 119,
+  "testsSkipped": 0,
+  "schemaChanged": false,
+  "preservedHistoricalRequests": true,
+  "freshArgumentRejectedBootstrapPreserved": "01a1d149-d73c-7de6-80b5-597d6c5df613",
+  "pending": [
+    "Compiled CLI and complete fresh bootstrap/install/access qualification on the distinct reviewed target",
+    "Enrolled 1.36.4 Node source/binary/profile correspondence and cold recovery",
+    "Native continuation with fresh resource/credential/image/phase proof",
+    "Full release integration/adversarial review/main merge/deployment"
+  ],
+  "releaseQualified": false,
+  "deployed": false
+}

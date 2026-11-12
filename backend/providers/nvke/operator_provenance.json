@@ -1,7 +1,7 @@
 {
   "format": 1,
   "repository": "calliopeai/astrolift-opscode",
-  "revision": "4cf7e8b1ade1427bc42b1aba8d366e88b0c16131",
+  "revision": "e9b728536557cf48169f0c2427ca58c6f4c8fae6",
   "path": "kubernetes/nvke/operator_contract.py",
-  "sha256": "96a0e1b932890bd094e9fa0ad32b081761b57aa8d099e7fbc13001dd2ab72f5f"
+  "sha256": "06a38233ee51c0a92067d12f84d563b3c4a407e8bacd5d860329157f9ebd82f9"
 }

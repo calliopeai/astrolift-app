@@ -30,7 +30,7 @@ from nvke.operator_contract import CATALOG, REVISION, canonical
 SITE, INSTANCE, JOB = str(uuid4()), str(uuid4()), str(uuid4())
 INTENT = "b" * 64
 DIGEST, PRIVATE = "a" * 64, "PRIVATE_OPERATOR_INPUT"
-PAIRED_OPSCODE_REVISION = "bc8f2e4a6b6d49770ee225c20514dec688dd90eb"
+PAIRED_OPSCODE_REVISION = "e9b728536557cf48169f0c2427ca58c6f4c8fae6"
 
 
 def payload(site=SITE):
@@ -81,6 +81,37 @@ def mock_client(data, *, status=200, checkpoint=None):
 def test_shared_operator_contract_provenance():
     verify_contract()
     assert len(CATALOG) == 17
+
+
+@pytest.mark.parametrize("arch", ["linux/amd64", "linux/arm64"])
+def test_bootstrap_architecture_without_release_is_refused_before_http(arch):
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        raise AssertionError("Invalid bootstrap must not reach transport")
+
+    body = {
+        **payload(),
+        "command": "bootstrap.site",
+        "positionals": [],
+        "options": {"sitespec": "input:site.yaml", "arch": arch},
+        "files": {"site.yaml": PRIVATE},
+    }
+    with (
+        OperatorAgentClient(
+            "https://agent.example",
+            site_id=SITE,
+            instance_id=INSTANCE,
+            bundle_manifest_sha256=DIGEST,
+            verify=ssl.create_default_context(),
+            transport=httpx.MockTransport(respond),
+        ) as client,
+        pytest.raises(NvkeError) as error,
+    ):
+        client.submit(JOB, body, intent=INTENT)
+    assert error.value.code == "INVALID_INPUT" and PRIVATE not in str(error.value)
+    assert not calls
 
 
 @pytest.mark.parametrize(

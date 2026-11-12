@@ -168,6 +168,96 @@ def test_original_request_is_private_idempotent_and_binds_all_review_inputs(conf
     assert not list((state.agent.root / "state/jobs").iterdir())
 
 
+@pytest.mark.parametrize("arch", ["linux/amd64", "linux/arm64"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_bootstrap_architecture_without_release_creates_no_operation(configured, arch, dry_run):
+    state = configured
+    text = request(
+        state,
+        command="bootstrap.site",
+        positionals=[],
+        options={"sitespec": "input:site.yaml", "arch": arch, "dry-run": dry_run},
+        files={"site.yaml": "PRIVATE_INVALID_BOOTSTRAP"},
+    )
+    before = list(NvkeOperation.all_objects.values())
+    journal = state.agent.root / "state/admissions.json"
+    original = journal.read_bytes()
+    with pytest.raises(NvkeError) as error:
+        reserve(state, request_text=text, acknowledge_infrastructure_change=True)
+    assert error.value.code == "INVALID_INPUT"
+    assert "release artifact" in str(error.value)
+    assert "PRIVATE_INVALID_BOOTSTRAP" not in str(error.value)
+    assert list(NvkeOperation.all_objects.values()) == before
+    assert journal.read_bytes() == original
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+def test_schema_bootstrap_architecture_refusal_is_redacted_and_creates_no_operation(configured):
+    from astrolift_clusters.tests.test_nvke_schema import execute
+    from core.schema.audit import MutationAuditLog
+
+    state = configured
+    text = request(
+        state,
+        command="bootstrap.site",
+        positionals=[],
+        options={"sitespec": "input:site.yaml", "arch": "linux/arm64"},
+        files={"site.yaml": "PRIVATE_INVALID_BOOTSTRAP"},
+    )
+    before = list(NvkeOperation.all_objects.values())
+    result = execute(
+        state.world,
+        """mutation($input:RequestNvkeOperatorJobInput!){requestNvkeOperatorJob(input:$input){ok errors{code} data{id}}}""",
+        {
+            "input": {
+                "siteId": str(state.site.guid),
+                "expectedActorId": state.world.user.pk,
+                "expectedSiteVersion": state.site.version,
+                "expectedAuthorityVersion": state.authority.version,
+                "requestId": str(uuid4()),
+                "requestText": text,
+                "acknowledgeInfrastructureChange": True,
+            }
+        },
+    )
+    assert result.errors is None
+    response = result.data["requestNvkeOperatorJob"]
+    assert not response["ok"] and response["errors"] == [{"code": "INVALID_INPUT"}]
+    assert response["data"] is None
+    assert "PRIVATE_INVALID_BOOTSTRAP" not in str(result.data)
+    audit = MutationAuditLog.objects.filter(operation="nvke.operator_request").latest("timestamp")
+    assert audit.variables["input"]["requestText"] == "***REDACTED***"
+    assert list(NvkeOperation.all_objects.values()) == before
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
+def test_original_bootstrap_request_remains_recoverable_after_preflight_change(configured, monkeypatch):
+    state = configured
+    identity = uuid4()
+    text = request(
+        state,
+        command="bootstrap.site",
+        positionals=[],
+        options={"sitespec": "input:site.yaml", "arch": "linux/arm64"},
+        files={"site.yaml": "PRIVATE_RETAINED_BOOTSTRAP"},
+    )
+    with monkeypatch.context() as previous_contract:
+        previous_contract.setattr(jobs, "validate_admission", lambda body, _site: body)
+        row = reserve(state, request_id=identity, request_text=text, acknowledge_infrastructure_change=True)
+    row.status, row.stage = "uncertain", "operator_review_required"
+    row.save(update_fields=["status", "stage"])
+    before = list(NvkeOperation.all_objects.values())
+
+    def no_new_admission(*_args):
+        pytest.fail("Recovery of original intent must precede new-admission validation")
+
+    monkeypatch.setattr(jobs, "validate_admission", no_new_admission)
+    recovered = reserve(state, request_id=identity, request_text=text, acknowledge_infrastructure_change=True)
+    assert recovered.pk == row.pk and recovered.status == "uncertain"
+    assert list(NvkeOperation.all_objects.values()) == before
+    assert not list((state.agent.root / "state/jobs").iterdir())
+
+
 @pytest.mark.parametrize(
     "changes",
     [
@@ -795,7 +885,9 @@ def install_review_result(state, row):
         "continuationAuthorized": False,
         "reviewerSha256": "b" * 64,
         "qualificationHelperSha256": "c" * 64,
-        "privateEvidenceSha256": {k: "e" * 64 for k in ("guard", "started", "finished", "stdout", "stderr")},
+        "privateEvidenceSha256": dict.fromkeys(
+            ("guard", "started", "finished", "stdout", "stderr"), "e" * 64
+        ),
         "workloads": [
             {
                 "name": "collector",

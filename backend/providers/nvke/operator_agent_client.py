@@ -38,7 +38,7 @@ from nvke.operator_contract import (
     REVISION,
     ContractError,
     identifier,
-    validate,
+    validate_admission,
 )
 
 if TYPE_CHECKING:
@@ -302,7 +302,7 @@ class OperatorAgentClient:
         self._bound()
         try:
             job_id = identifier(job_id)
-            validate(request, self.site_id)
+            validate_admission(request, self.site_id)
         except ContractError:
             raise NvkeError("INVALID_INPUT", "Review the pinned operator command and artifact inputs") from None
         return self._receipt(

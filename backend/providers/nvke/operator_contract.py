@@ -324,6 +324,18 @@ def validate(request: object, site_id: str) -> dict[str, Any]:
     return request
 
 
+def validate_admission(request: object, site_id: str) -> dict[str, Any]:
+    """Apply native preflight rules to new work while retaining readable history."""
+    request = validate(request, site_id)
+    if (
+        request["command"] == "bootstrap.site"
+        and "arch" in request["options"]
+        and "release" not in request["options"]
+    ):
+        raise ContractError("Bootstrap architecture requires a release artifact")
+    return request
+
+
 def effectful(request: dict[str, Any]) -> bool:
     return (
         request["command"]
