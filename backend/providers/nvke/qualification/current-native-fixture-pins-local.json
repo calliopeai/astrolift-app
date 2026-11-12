@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-12T21:45:40.839341+00:00",
+  "recordedAt": "2026-11-12T22:31:05.639944+00:00",
   "issue": 2693,
-  "status": "shared-current-ops-fixture-pin-implemented-native-and-browser-tests-pending",
+  "status": "current-sdk-api-and-five-browser-cases-qualified-native-context-failed",
   "pairedOpsRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0",
   "scope": "Common agent plus six standalone SDK mTLS recovery families share one exact reviewed Ops revision from tests/nvke/support.py. Archive and file-byte provenance checks remain enforced; no fixture source check is removed.",
   "verification": {
@@ -62,15 +62,70 @@
           "backend/providers/tests/nvke/test_operator_install_plan_verification_mtls.py": "b811eb7e9d526b66f97fea90bc352cbe04b955417fa26316548166f123e1149f"
         }
       }
+    },
+    "currentBatch": {
+      "report": "/tmp/astrolift-nvke-current-release-fixtures-v1.json",
+      "sha256": "e2ef3047a408cf423bfb5b66757bbb9fc2569387dcbf8d47b0c2c030f6616eef",
+      "result": {
+        "exitCode": 1,
+        "checks": {
+          "reusedOnlyIdleOwnedTestDatabase": true,
+          "testProcessExitCode": 1,
+          "junitTotals": {
+            "tests": 125,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "allCollectedCasesExecuted": false,
+          "sourcesUnchanged": true,
+          "failureType": "AssertionError",
+          "failureFrames": [
+            {
+              "function": "<module>",
+              "line": 32
+            }
+          ]
+        },
+        "elapsedSeconds": 1222.3000824581832,
+        "appRevision": "869844a52",
+        "opsRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0",
+        "scope": "Current pinned complete SDK/API files, six native SDK render/image/tree mTLS cold/lost-reply cases and five connected browser cases; owned idle test DB reused, real separate Temporal namespace and Chromium, no production database mutation or full install/continuation claim"
+      },
+      "passedByClass": {
+        "astrolift_clusters.tests.test_nvke_operator": 68,
+        "astrolift_clusters.tests.test_nvke_browser_integration": 1,
+        "astrolift_clusters.tests.test_nvke_credential_browser_integration": 1,
+        "astrolift_clusters.tests.test_nvke_operator_browser_integration": 2,
+        "astrolift_clusters.tests.test_nvke_provider_browser_integration": 1,
+        "providers.tests.nvke.test_operator_agent_client": 51
+      },
+      "collectedCases": 130,
+      "casesExecuted": 125,
+      "passed": 124,
+      "failed": 1,
+      "unexecutedAfterFailFast": 5,
+      "skipped": 0
     }
   },
   "pending": [
-    "Requalify complete operator SDK/API files against the shared current Ops revision",
-    "Six SDK native render/image/tree mTLS lost-reply and cold recovery cases",
-    "Five remaining browser integrations using actual local Chromium/Postgres/Temporal/mTLS",
-    "33 real local Kubernetes/envtest admission cases",
-    "Fresh complete native install/access, enrolled profile/cold, linked continuation and fresh-use authority",
+    "Four original-stop/native-generation browser cases; first bare standalone case failed before reading receipt and URLconf-readiness correction is being qualified",
+    "Resolve standalone context SDK refusal and execute all six standalone SDK recovery cases",
+    "33 owned local envtest admission cases",
+    "Retained bootstrap/controller recovery and full native install/access",
+    "Exact enrolled profile/hot-cold, native continuation and fresh phase/resource/credential/image authority",
     "Final paired release review, main merge and deployment"
   ],
-  "releaseQualified": false
+  "releaseQualified": false,
+  "qualifiedAssertions": [
+    "All 119 complete operator SDK/API cases pass against exact Ops 3ebe635",
+    "All five additional connected browser cases pass using the actual local GraphQL/Postgres/Temporal/mTLS paths; controlled fixture resource replies remain explicit"
+  ],
+  "observedFailure": {
+    "test": "test_real_context_sdk_mtls_lost_reply_and_cold_recovery",
+    "stage": "initial read of absent context",
+    "expectedCode": "OPERATOR_CONTEXT_INCOMPLETE",
+    "actualCode": "not yet diagnosed",
+    "preservedPrivateDriverLog": "/private/var/folders/c8/l3r0mzqx13dgdr6t5mn3gpjh0000gn/T/pytest-of-ragelink/pytest-7975/test_real_context_sdk_mtls_los0/context-sdk-driver.log"
+  }
 }
