@@ -49,7 +49,7 @@ jobs:
     name: classify changes
     # Drafts burn no runner minutes: CI starts when the PR is marked ready.
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       # Reads the merged pull request and its runs to decide whether a push
@@ -515,7 +515,7 @@ jobs:
     name: lint (backend)
     needs: changes
     if: ${{ needs.changes.outputs.backend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -562,7 +562,7 @@ jobs:
     name: test shard (${{ matrix.name }})
     needs: changes
     if: ${{ needs.changes.outputs.shards == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.changes.outputs.backend_test_matrix) }}
@@ -813,7 +813,7 @@ jobs:
     name: coverage map
     needs: [changes, backend-test-shard]
     if: ${{ always() && needs.changes.outputs.tier == 'nightly' && needs.changes.outputs.shards == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -846,7 +846,7 @@ jobs:
     # Skipped, not failed, for a draft: nothing ran.
     if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     needs: [changes, backend-test-shard]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       # One check for the whole matrix: the job result is success only when
       # every partition of every selected shard succeeded.
@@ -867,7 +867,7 @@ jobs:
     name: typecheck
     needs: changes
     if: ${{ needs.changes.outputs.backend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -906,7 +906,7 @@ jobs:
     needs: changes
     # Also runs when only frontend/schema.graphql changed: it is compared below.
     if: ${{ needs.changes.outputs.contracts == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -962,7 +962,7 @@ jobs:
     # The suite imports only backend/providers and the native artifact
     # scripts, so it runs when one of those (or CI itself) changes.
     if: ${{ needs.changes.outputs.providers == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend/providers
@@ -998,7 +998,7 @@ jobs:
     name: no-stub-factory gate (providers)
     needs: changes
     if: ${{ needs.changes.outputs.providers == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -1082,7 +1082,7 @@ jobs:
     name: frontend checks (lint, types, format, generated files)
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -1147,7 +1147,7 @@ jobs:
     name: frontend unit (${{ matrix.shard }}/3)
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -1188,7 +1188,7 @@ jobs:
     name: frontend layout (Storybook at 768px)
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -1235,7 +1235,7 @@ jobs:
     name: frontend routes (production build and navigation)
     needs: changes
     if: ${{ needs.changes.outputs.routes == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
@@ -1294,7 +1294,7 @@ jobs:
     name: lint (frontend)
     if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     needs: [changes, frontend-checks, frontend-unit, frontend-layout, frontend-routes]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Require every frontend job
         env:

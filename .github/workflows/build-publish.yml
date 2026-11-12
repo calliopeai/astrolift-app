@@ -45,7 +45,7 @@ env:
 jobs:
   matrix:
     name: Plan build matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       products: ${{ steps.plan.outputs.products }}
       version: ${{ steps.plan.outputs.version }}
@@ -112,7 +112,7 @@ jobs:
         include:
           - platform: linux/amd64
             suffix: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
         # arm64 disabled until we have a stable working version — re-enable by
         # adding linux/arm64 back to the platform list and the include below:
         # - platform: linux/arm64
@@ -196,7 +196,7 @@ jobs:
     name: Multi-arch manifest (${{ matrix.product }})
     needs: [matrix, build]
     if: ${{ needs.matrix.outputs.products != '[]' && (github.event_name != 'workflow_dispatch' || inputs.push) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
