@@ -1,11 +1,11 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-12T17:10:42.778531+00:00",
+  "recordedAt": "2026-11-12T17:27:31.307625+00:00",
   "sourceParent": "6695408a6dce6f51a3979d73067abf1034691ee8",
   "integratedMain": "ac3861f5aac48f8e29ee58cd2d8f40af4c265398",
   "issue": 2663,
-  "scope": "Current-main integrated frontend NVKE unit/lint, complete semantic typecheck, full formatting and production build; browser/backend/native release remain pending",
-  "status": "frontend-static-and-production-build-qualified-final-release-incomplete",
+  "scope": "Current-main integrated frontend NVKE unit/lint, semantic typecheck, full formatting, production and Storybook builds, and 315 actual Chromium fixture-story checks; connected/native release remains pending",
+  "status": "frontend-build-and-fixture-browser-qualified-final-release-incomplete",
   "sourceSha256": {
     "frontend/README.md": "5bd1308533910b4995e8a54d48c24b1e7978e0a047d09925fb17a4d08a8fd3c3",
     "frontend/components/Can.tsx": "766f207ee2f9f2e88b5df85f3c791cc4949936bfd75d9da2464ea721b97acba1",
@@ -265,6 +265,31 @@
         "sourceManifest": "/tmp/astrolift-nvke-app-main-sync-final-frontend-v1.sources.json",
         "scope": "Current-main integrated frontend semantic typecheck, full format gate and production build after observed repairs; prior unchanged unit/lint evidence and current focused cases recorded separately; no final browser/backend/deployment claim"
       }
+    },
+    "storybookBrowser": {
+      "report": "/tmp/astrolift-nvke-current-main-storybook-browser-v1.json",
+      "sha256": "81e9187781faa1b55a8804303f8a256d9b2a6063fe6aed085f70794cb38876eb",
+      "result": {
+        "exitCode": 0,
+        "elapsedSeconds": 385.81289204210043,
+        "revision": "c2367f155bccc7571dcd17febc8caf70f3b4e94f",
+        "checks": {
+          "buildPid": 41131,
+          "storybookBuild": 0,
+          "browserPid": 43038,
+          "browser": 0,
+          "browserStats": {
+            "startTime": "2026-11-12T17:23:35.626Z",
+            "duration": 163840.62,
+            "expected": 315,
+            "skipped": 0,
+            "unexpected": 0,
+            "flaky": 0
+          },
+          "revisionUnchanged": true
+        },
+        "scope": "Current-main static Storybook build and actual Chromium NVKE story/accessibility/provider/journal checks using controlled UI fixtures; no native/API readiness claim"
+      }
     }
   },
   "qualifiedAssertions": [
@@ -272,10 +297,11 @@
     "The complete format scan identified exactly 27 files; those files and three changed locale tests pass focused formatting after repair, and every other tracked frontend file matches the complete scan source hashes",
     "Three locale tables now pass only their relevant copy scopes to Vitest generics, preserving all eight locales, key-completeness/nonempty assertions and 24 passing cases without skips",
     "Changed-file ESLint and diff checks pass; production changes in this checkpoint are formatter output only",
-    "At a26d30aa3, all 6999 TypeScript inputs pass semantic checking; full format gate and Next production build pass with unchanged sources. Build reports existing Sentry deprecations and noVNC target warning; browser validation remains required."
+    "At a26d30aa3, all 6999 TypeScript inputs pass semantic checking; full format gate and Next production build pass with unchanged sources. Build reports existing Sentry deprecations and noVNC target warning; browser validation remains required.",
+    "At c2367f155, the current Storybook build and all 315 Chromium NVKE story/accessibility/provider/journal cases pass with zero skips, failures or flakes. These use controlled UI fixtures; connected API/native and deployed login/routes remain separate."
   ],
   "remainingObligations": [
-    "Shared-token Storybook/browser integration, final backend/SDK/CLI qualification and remaining native support gates",
+    "Current connected API/native browser integration, final backend/SDK/CLI qualification and remaining native support gates",
     "Adversarial final review, green coordinated PRs/history-preserving merge, CONFLICT deploy/live validation and actionable backlog"
   ],
   "protectedOriginalsAndSharedInstallerUnchanged": true

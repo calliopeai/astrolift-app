@@ -1,0 +1,216 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T18:08:18.530777+00:00",
+  "issue": 2663,
+  "testedRevision": "c2367f155bccc7571dcd17febc8caf70f3b4e94f",
+  "status": "1580-service-sdk-cases-qualified-native-fixture-gates-pending",
+  "scope": "Current-main NVKE service/SDK suite on isolated real PostgreSQL 17.11 and real Temporal; 435 fixture-gated cases not executed",
+  "verification": {
+    "report": "/tmp/astrolift-nvke-fresh-native-control-52d480bb79614bd79d07c58c766a02ae/nvke-regression-v2-result.json",
+    "sha256": "a414746f1afc9791c1865e3c095103e70fe3f9bf694c2b9c6f44ad622ca3ddf0",
+    "result": {
+      "exitCode": 0,
+      "checks": {
+        "testProcessExitCode": 0,
+        "sourcesUnchanged": true,
+        "revisionUnchanged": true,
+        "junitTotals": {
+          "tests": 2015,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 435
+        }
+      },
+      "elapsedSeconds": 2103.7045313753188,
+      "revision": "c2367f155bccc7571dcd17febc8caf70f3b4e94f",
+      "scope": "Current-main NVKE service/SDK suite on isolated real PostgreSQL test database and real Temporal regression namespace; native integration fixture requirements and skips reported separately"
+    },
+    "junitSha256": "d587fe396c0a36e5c8299ab4f97f8146d422f5b5950bda7df188180423b0e182",
+    "skipClassification": {
+      "skipped": 435,
+      "reasons": [
+        {
+          "count": 391,
+          "reason": "select the explicit owned Opscode source and private native bundle"
+        },
+        {
+          "count": 18,
+          "reason": "set NVKE_TEST_KUBECONFIG to the task-owned local envtest kubeconfig"
+        },
+        {
+          "count": 15,
+          "reason": "set NVKE_TEST_KUBECONFIG to the task-owned envtest kubeconfig"
+        },
+        {
+          "count": 5,
+          "reason": "set ASTROLIFT_NVKE_STORYBOOK to an owned static build"
+        },
+        {
+          "count": 5,
+          "reason": "Select the owned pinned agent, native bundle, Helm 4 and render helper"
+        },
+        {
+          "count": 1,
+          "reason": "Select the owned pinned Opscode runtime, native bundle, Helm 4 and helper"
+        }
+      ],
+      "files": [
+        {
+          "count": 62,
+          "file": "astrolift_clusters.tests.test_nvke_operator"
+        },
+        {
+          "count": 39,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_pull_runtime"
+        },
+        {
+          "count": 36,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_contexts"
+        },
+        {
+          "count": 34,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_trees"
+        },
+        {
+          "count": 26,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_charts"
+        },
+        {
+          "count": 21,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_pull_secret_analysis"
+        },
+        {
+          "count": 21,
+          "file": "astrolift_clusters.tests.test_nvke_install_plans"
+        },
+        {
+          "count": 20,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_images"
+        },
+        {
+          "count": 20,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_verifications"
+        },
+        {
+          "count": 18,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_workload_images"
+        },
+        {
+          "count": 17,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_immutable"
+        },
+        {
+          "count": 17,
+          "file": "providers.tests.nvke.test_datastore_integration"
+        },
+        {
+          "count": 15,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_workloads"
+        },
+        {
+          "count": 13,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_node_platforms"
+        },
+        {
+          "count": 13,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_pull_authority"
+        },
+        {
+          "count": 12,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_image_bindings"
+        },
+        {
+          "count": 8,
+          "file": "astrolift_clusters.tests.test_nvke_install_artifact_integrity"
+        },
+        {
+          "count": 6,
+          "file": "astrolift_clusters.tests.test_nvke_operator_browser_integration"
+        },
+        {
+          "count": 6,
+          "file": "providers.tests.nvke.test_operator_agent_client"
+        },
+        {
+          "count": 5,
+          "file": "astrolift_clusters.tests.test_nvke_operations"
+        },
+        {
+          "count": 4,
+          "file": "astrolift_clusters.tests.test_nvke_inventory"
+        },
+        {
+          "count": 3,
+          "file": "astrolift_clusters.tests.test_nvke_image_identity"
+        },
+        {
+          "count": 3,
+          "file": "astrolift_clusters.tests.test_nvke_install_plan_workload_api"
+        },
+        {
+          "count": 3,
+          "file": "astrolift_clusters.tests.test_nvke_resource_operations"
+        },
+        {
+          "count": 2,
+          "file": "astrolift_clusters.tests.test_nvke_access"
+        },
+        {
+          "count": 1,
+          "file": "astrolift_clusters.tests.test_nvke_provider_observations"
+        },
+        {
+          "count": 1,
+          "file": "astrolift_clusters.tests.test_nvke_browser_integration"
+        },
+        {
+          "count": 1,
+          "file": "astrolift_clusters.tests.test_nvke_credential_browser_integration"
+        },
+        {
+          "count": 1,
+          "file": "astrolift_clusters.tests.test_nvke_provider_browser_integration"
+        },
+        {
+          "count": 1,
+          "file": "providers.tests.nvke.test_infrastructure_client_integration"
+        },
+        {
+          "count": 1,
+          "file": "providers.tests.nvke.test_operator_install_plan_context_mtls"
+        },
+        {
+          "count": 1,
+          "file": "providers.tests.nvke.test_operator_install_plan_image_binding_mtls"
+        },
+        {
+          "count": 1,
+          "file": "providers.tests.nvke.test_operator_install_plan_image_mtls"
+        },
+        {
+          "count": 1,
+          "file": "providers.tests.nvke.test_operator_install_plan_local_image_mtls"
+        },
+        {
+          "count": 1,
+          "file": "providers.tests.nvke.test_operator_install_plan_tree_mtls"
+        },
+        {
+          "count": 1,
+          "file": "providers.tests.nvke.test_operator_install_plan_verification_mtls"
+        }
+      ]
+    }
+  },
+  "qualifiedAssertions": [
+    "1580 of 2015 collected cases passed; zero failures/errors. All 435 skipped cases retain their explicit native/bundle/envtest/Storybook fixture requirements and are not counted as passing.",
+    "The run used its own PostgreSQL test database and real Temporal regression namespace. A read-only observation verified 482 migrations in that test database.",
+    "All 80 selected test source hashes and the tested revision were unchanged. After the run, all tracked backend product sources still match the tested revision; only unrelated qualification metadata differs."
+  ],
+  "remainingObligations": [
+    "Activate current native/mTLS/envtest/connected-browser fixture suites with their proper owned pinned sources, bundles and helpers; this run does not replace those qualification scopes.",
+    "Fresh full native install/access/readiness, exact Kubernetes 1.36.4 profile and remaining linked-continuation/fresh-resource/credential/image authority.",
+    "Final full required release gates/adversarial review, coordinated green PRs/merge, CONFLICT deployment/live validation."
+  ],
+  "protectedOriginalsAndSharedInstallerUnchanged": true
+}
