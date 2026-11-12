@@ -1,0 +1,87 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T19:33:03.477914+00:00",
+  "issue": 2693,
+  "status": "fixture-source-pin-refreshed-native-execution-pending",
+  "scope": "Exact source review for the common SDK/API agent fixture and portable contract/refusal regression; no activated native lifecycle result",
+  "opsRevision": "bc8f2e4a6b6d49770ee225c20514dec688dd90eb",
+  "pinnedSourceFiles": {
+    "kubernetes/nvke/operator_agent.py": "a1888e28bcf372b89c47b485cda5b87d734de95742226da876dd006e78419f12",
+    "kubernetes/nvke/operator_contract.py": "96a0e1b932890bd094e9fa0ad32b081761b57aa8d099e7fbc13001dd2ab72f5f",
+    "kubernetes/nvke/management_recovery.py": "31cb3e382afa0c2c63211ec451b47e9b8af1eb889fa4c07777c690f4eab2c509",
+    "kubernetes/nvke/management_plan.py": "c9c05a4ac95a079bba8c147cfb6bac050efec3df9afd1b37784317288a5e8f40",
+    "kubernetes/nvke/management_plan_store.py": "a006c1adf4264bf29e857c430e504c9f15c830665b7baf090b5b296397cd43fe",
+    "kubernetes/nvke/management_plan_preparation.py": "688b2870fefa5304e22602c068a977e33466dd559e959789e2835dd3a0f4f12e",
+    "kubernetes/nvke/management_dependencies.py": "44530fe963b87076c6f83e1376e33a249fa24479e14d53cadfea1af30a2e5bd7",
+    "kubernetes/nvke/management_chart_archive.py": "d12ece1b474f1329bc2283a1da3c5a16a4dd8a958acaca2a1ed4bd5320fc9231",
+    "kubernetes/nvke/management_chart_materialization.py": "d820ec29a29b9bb54a64fd31a1eda8d4a61adb82b345ff6b32306d5de6c5edec",
+    "kubernetes/nvke/management_plan_chart_service.py": "4bf4fdde56b8233bb87309888e0bafb321959b87c90744261e80d67cc5a4a3e1",
+    "kubernetes/nvke/management_execution_release.py": "9462b54af790dcb6f2193844be23e2c5c8d3c02547a2659a0726af1e1d0b8a35",
+    "kubernetes/nvke/management_execution_arguments.py": "614f3b139fb10358e26e29ec18d882fe69bddd15687b308ef3984f55bedceaa7",
+    "kubernetes/nvke/management_execution_tree.py": "9794caf7b7884c89338d174df52f1cda120e4fe45eae49d6bd979b9fdf192043",
+    "kubernetes/nvke/management_template_rendering.py": "8d66571f9e50604254e7a65040f70e55df2a870f454a200f3c1ebd228cc41409",
+    "kubernetes/nvke/management_render_inputs.py": "fd462e5131390f3fb10c949ab877e1503680e271d17355f96c413fabe54f5bf7",
+    "kubernetes/nvke/management_render_discovery.py": "49896ee08f9fc2a7258210941fb2745f1cffb9757261817301af98453436ab5f",
+    "kubernetes/nvke/management_render_release.py": "8aa8c52b6a004be6da8b12565d7783daf4579f7d7d7dfac66310b2c4f2fa2ef6",
+    "kubernetes/nvke/management_render_lookup.py": "699874fa03b4dae39a84d8a2d50def3a36e20fe319e200f1117a61b81a976a51",
+    "kubernetes/nvke/management_render_capture.py": "1f8bb12129fc632180105725c30afd4d6be4667ddcde739ce397ed23bb11d7bd",
+    "kubernetes/nvke/management_render_context_store.py": "7fae6439ef59a0faa510d74da16acb4b5eb0535eb6986a5954c3418b461e2dd2",
+    "kubernetes/nvke/management_render_authenticated.py": "e09be4afc7be419a60684c951caacb403dfc06acc870f6f3108b18e0a67d4f71",
+    "kubernetes/nvke/management_render_transport.py": "07d20c0be5d7cfffc089b755690f64fdb8d0434b138f7e2e078924893cab8cd2",
+    "kubernetes/nvke/management_render_executor.py": "f57fabf099af68c62f2e0cd1392ccc28fa69a8ba92eb5817bad835aa04e02c7a",
+    "kubernetes/nvke/management_plan_context_service.py": "4c4c9393b401244ddc1e72beb035a0742e24587fba2cf5cc08190ad1e19b0d57",
+    "kubernetes/nvke/management_plan_verification_service.py": "641a2e2fc8488368f17059f09c09a9794b18dc6e8386555a1cb3a23802b8cee1",
+    "kubernetes/nvke/management_plan_image_service.py": "199b6f41a57485afbf39bc83b96294b94aea509b50821b9c48d491b84343941b",
+    "kubernetes/nvke/management_plan_image_binding_service.py": "e50b87268f4dd71cb9c5ba906113d10bf1d58f41d0173695610d5a4bfe454352",
+    "kubernetes/nvke/management_plan_image_payload_service.py": "4a6079ea7f87cb70037bbf4592d5529b0ab30cfb0516b88f9d7fd8c690e85ba3",
+    "kubernetes/nvke/management_plan_immutable_execution_service.py": "c3dbb62ae3ebc3c20202c426fe85b396204ac9a9ae435121fe94f6ef715bd14f",
+    "kubernetes/nvke/management_plan_node_platform_service.py": "42f05259cfcaedde1db4b8e3662abf6fb097cb39f80369165c35cdcb3e588c3e",
+    "kubernetes/nvke/management_plan_pull_authority_service.py": "99856a3eb463c935cb928208990941c8124406bd18948cfce17fce136ffcc8c2",
+    "kubernetes/nvke/management_plan_pull_runtime_service.py": "ec2d31a663f31966fbee746e7da1cf4e470fe90af4c9c0aed4a11e46bb84ae64",
+    "kubernetes/nvke/management_plan_pull_secret_analysis_service.py": "c90ff8541f4c4dd6f7fe9939f4cd9dbb4169a7045ad6cbfc7a2d930dcc6eb916",
+    "kubernetes/nvke/management_plan_workload_service.py": "1677905bf87c27fce30bca1a51beb7619fd742e4c8206abe5670098580ad5112",
+    "kubernetes/nvke/management_resume_selection.py": "8fb8bd25ec5080a1e79b84c6f50e8998dcddaf03987ffc70dbeb465c810bd143",
+    "kubernetes/nvke/management_frozen_chart.py": "98ef6265c22c5deb65fb3dc013fe464518533132c41ab4cbe29d50333f2f3af9",
+    "kubernetes/nvke/management_plan_tree_service.py": "7b60eec5f02ea8c071286496e8b7a55f1ac19939a6197dc95e840e4289632ae2",
+    "kubernetes/nvke/qualify_bootstrap.py": "503778540c936899e82fd246db2ca5424550048c61421aff5b4d6be161f7d616",
+    "kubernetes/nvke/tooling.py": "e9a36d2ed7eda73ebc85c69ab694a98ae01d77182ab67a37551d66789424abce",
+    "kubernetes/nvke/chart-helper/main.go": "14250535ad7ad9ad6c4dfaab37c95ceca109a0e303351ac6a4d853a67e0c2a05",
+    "kubernetes/nvke/chart-helper/render.go": "224d9233043d9022f06876724765907af24e015b190e8517b6b98d266686a87f",
+    "kubernetes/nvke/chart-helper/release.go": "a60064e25e67d4fda1ee63bdf8afa539be8d314a54c08779dc4e57b8d4759f06",
+    "kubernetes/nvke/chart-helper/go.mod": "98239bcf773f0e06f53d44e7a3167989755aba6a5a062a2ecbbda981f4d9a6b4",
+    "kubernetes/nvke/chart-helper/go.sum": "677ca72c0b966f0e5e1a68c53a3d01215d95a52440abee53588d27984d70c003"
+  },
+  "fixtureSha256": "8fecde6e562c5e34464241946a536979cd8575f60c76304c72c916ec69eba92b",
+  "portableVerification": {
+    "exitCode": 0,
+    "checks": {
+      "format": 0,
+      "lint": 0,
+      "tests": 0,
+      "junitTotals": {
+        "tests": 44,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1
+      }
+    },
+    "elapsedSeconds": 56.10600287467241,
+    "sourceSha256": "8fecde6e562c5e34464241946a536979cd8575f60c76304c72c916ec69eba92b",
+    "scope": "Portable SDK operator contract/refusal cases and focused test-file lint/format; native fixture execution tracked separately"
+  },
+  "portableSkips": [
+    {
+      "test": "test_probe_clients_cannot_submit_and_wrong_instance_cannot_retarget",
+      "reason": "select the explicit owned Opscode source and private native bundle"
+    }
+  ],
+  "pending": {
+    "sourceDependentCases": 391,
+    "report": "/tmp/astrolift-nvke-current-native-integrations-v1.json",
+    "nativeBundleBuild": "/tmp/astrolift-nvke-current-host-bundle-v1.json",
+    "nativeChartHelperBuild": "/tmp/astrolift-nvke-current-host-chart-helper-v1.json",
+    "scope": "Current committed Ops baseline; uncommitted Kubernetes 1.36.4 profile changes require their own native/Node validation and subsequent paired release qualification"
+  },
+  "releaseQualified": false,
+  "deployed": false
+}

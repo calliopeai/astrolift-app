@@ -30,6 +30,7 @@ from nvke.operator_contract import CATALOG, REVISION, canonical
 SITE, INSTANCE, JOB = str(uuid4()), str(uuid4()), str(uuid4())
 INTENT = "b" * 64
 DIGEST, PRIVATE = "a" * 64, "PRIVATE_OPERATOR_INPUT"
+PAIRED_OPSCODE_REVISION = "bc8f2e4a6b6d49770ee225c20514dec688dd90eb"
 
 
 def payload(site=SITE):
@@ -208,7 +209,7 @@ def operator_agent(tmp_path, *, site_id=None):
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
-    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+    revision = PAIRED_OPSCODE_REVISION
     for name in (
         "operator_agent.py",
         "operator_contract.py",
@@ -234,6 +235,17 @@ def operator_agent(tmp_path, *, site_id=None):
         "management_render_transport.py",
         "management_render_executor.py",
         "management_plan_context_service.py",
+        "management_plan_verification_service.py",
+        "management_plan_image_service.py",
+        "management_plan_image_binding_service.py",
+        "management_plan_image_payload_service.py",
+        "management_plan_immutable_execution_service.py",
+        "management_plan_node_platform_service.py",
+        "management_plan_pull_authority_service.py",
+        "management_plan_pull_runtime_service.py",
+        "management_plan_pull_secret_analysis_service.py",
+        "management_plan_workload_service.py",
+        "management_resume_selection.py",
         "management_frozen_chart.py",
         "management_plan_tree_service.py",
         "qualify_bootstrap.py",
@@ -621,7 +633,7 @@ def test_install_review_requires_capability_original_failure_digest_and_stable_i
 
 def test_real_tls_sdk_prepares_recovers_and_pages_sealed_plan_without_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+    revision = PAIRED_OPSCODE_REVISION
     relative = "kubernetes/nvke/test_operator_agent.py"
     assert (source / relative).read_bytes() == subprocess.check_output(
         ["git", "show", revision + ":" + relative], cwd=source
@@ -694,7 +706,7 @@ finally:
 
 def test_real_tls_sdk_chart_stage_lost_reply_recovers_without_refetch_or_native_dispatch(real_operator_agent):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+    revision = PAIRED_OPSCODE_REVISION
     for name in (
         "test_operator_agent.py",
         "test_management_chart_materialization.py",
