@@ -477,3 +477,60 @@ def test_create_conflict_never_reads_or_adopts_existing_pod(run, monkeypatch):
     with pytest.raises(ValueError, match="recorded UID"):
         probe.cleanup(k8s, state)
     k8s.delete.assert_not_called()
+
+
+def prestart_kms_refusal():
+    return {
+        "started": False,
+        "restartCount": 0,
+        "lastState": {},
+        "state": {
+            "terminated": {
+                "reason": "StartError",
+                "exitCode": 128,
+                "startedAt": "1970-01-01T00:00:00Z",
+                "finishedAt": "2026-11-12T13:21:35Z",
+                "message": "failed to create containerd task: prepare_image: KMS Decrypt failed: AccessDeniedException",
+            }
+        },
+    }
+
+
+def test_prestart_kms_refusal_still_requires_audit(run, monkeypatch):
+    k8s, state, _, execute = submit_fixture(run, monkeypatch)
+    execute()
+    k8s.get.return_value["status"] = {"phase": "Failed", "containerStatuses": [prestart_kms_refusal()]}
+    result = probe.observe(k8s, state)
+    assert result["guest_started"] is False
+    assert result["attestation"] == "inconclusive_audit_required"
+
+
+@pytest.mark.parametrize("mutation", ["started", "restart", "prior", "timestamp", "reason", "exit", "message"])
+def test_prestart_refusal_contradictions_fail_closed(mutation):
+    row = prestart_kms_refusal()
+    if mutation == "started":
+        row["started"] = True
+    elif mutation == "restart":
+        row["restartCount"] = 1
+    elif mutation == "prior":
+        row["lastState"] = {"terminated": {"exitCode": 1}}
+    elif mutation == "timestamp":
+        row["state"]["terminated"]["startedAt"] = "2026-11-12T13:21:34Z"
+    elif mutation == "reason":
+        row["state"]["terminated"]["reason"] = "Error"
+    elif mutation == "exit":
+        row["state"]["terminated"]["exitCode"] = 1
+    else:
+        row["state"]["terminated"]["message"] = "application failed"
+    assert probe.container_creation_refused(row) is False
+
+
+def test_init_container_execution_is_negative_failure(run, monkeypatch):
+    k8s, state, _, execute = submit_fixture(run, monkeypatch)
+    execute()
+    k8s.get.return_value["status"] = {
+        "phase": "Failed",
+        "containerStatuses": [prestart_kms_refusal()],
+        "initContainerStatuses": [{"state": {"terminated": {"exitCode": 0}}}],
+    }
+    assert probe.observe(k8s, state)["guest_started"] is True

@@ -317,13 +317,47 @@ def verify_clone(pod, state):
         raise ValueError("negative clone ownership/UID/hash differs")
 
 
+def container_creation_refused(row):
+    """A containerd StartError can terminate a record before the guest starts.
+
+    This recognizes only the explicit image-preparation KMS refusal shape. It
+    does not establish an attestation denial; original-key audit correlation is
+    still required. Missing or contradictory execution evidence fails closed.
+    """
+    state = row.get("state", {})
+    terminated = state.get("terminated", {})
+    message = terminated.get("message", "")
+    return (
+        set(state) == {"terminated"}
+        and row.get("started") is False
+        and row.get("restartCount") == 0
+        and not row.get("lastState")
+        and terminated.get("reason") == "StartError"
+        and terminated.get("exitCode") == 128
+        and terminated.get("startedAt") == "1970-01-01T00:00:00Z"
+        and bool(terminated.get("finishedAt"))
+        and "failed to create containerd task" in message
+        and "prepare_image: KMS Decrypt failed" in message
+        and "AccessDeniedException" in message
+    )
+
+
 def observe(k8s, state):
     pod = k8s.get(kind="Pod", namespace=NAMESPACE, name=state["name"])
     if pod is None:
         return {"absent": True, "attestation": "inconclusive_audit_required"}
     verify_clone(pod, state)
-    statuses = pod.get("status", {}).get("containerStatuses", [])
-    guest = any(any(name in row.get("state", {}) for name in ("running", "terminated")) for row in statuses)
+    status = pod.get("status", {})
+    statuses = status.get("containerStatuses", []) + status.get("initContainerStatuses", [])
+    guest = status.get("phase") in ("Running", "Succeeded") or any(
+        row.get("restartCount", 0) > 0
+        or bool(row.get("lastState"))
+        or (
+            any(name in row.get("state", {}) for name in ("running", "terminated"))
+            and not container_creation_refused(row)
+        )
+        for row in statuses
+    )
     return {
         "phase": pod.get("status", {}).get("phase"),
         "guest_started": guest,
