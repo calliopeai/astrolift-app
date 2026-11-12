@@ -23,6 +23,7 @@ from uuid import uuid4
 import pytest
 import uvicorn
 from asgiref.sync import sync_to_async
+from django.urls import resolve
 from temporalio.client import WorkflowFailureError
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
@@ -113,6 +114,8 @@ def story_origin():
 def browser_endpoint(settings, story_origin):
     from config.asgi import application
 
+    # Socket readiness must follow real URLconf/schema initialization.
+    assert callable(resolve("/app/gql/config/").func)
     settings.DEBUG = False
     settings.CORS_ALLOWED_ORIGINS = [story_origin]
     settings.CORS_ALLOW_HEADERS = (*settings.CORS_ALLOW_HEADERS, "x-astrolift-organization")

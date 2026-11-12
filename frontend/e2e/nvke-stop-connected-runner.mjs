@@ -8,6 +8,8 @@ for (const value of [config.storyOrigin, config.endpoint]) {
     throw new Error("Use owned loopback services");
 }
 let stage = "launch";
+const stopTimeout = 90000;
+let stopDiagnostics = null;
 const browser = await chromium.launch();
 const page = await browser.newPage();
 try {
@@ -41,6 +43,7 @@ try {
           config.mode === "stale_review"
             ? await route.fetch({
                 maxRedirects: 0,
+                timeout: stopTimeout,
                 postData: {
                   ...body,
                   variables: {
@@ -51,8 +54,16 @@ try {
                   },
                 },
               })
-            : await route.fetch({ maxRedirects: 0 });
+            : await route.fetch({ maxRedirects: 0, timeout: stopTimeout });
         stopResult = (await response.json()).data?.stopNvkeOperatorJob;
+        stopDiagnostics = {
+          ok: stopResult?.ok,
+          errorCodes: (stopResult?.errors ?? []).map((error) =>
+            typeof error.code === "string" && /^[A-Z_]{1,96}$/.test(error.code)
+              ? error.code
+              : "UNCLASSIFIED"
+          ),
+        };
         if (config.mode === "lost_reply")
           return await route.fulfill({ status: 503, body: "Original stop reply unconfirmed" });
         return await route.fulfill({ response });
@@ -88,7 +99,9 @@ try {
   stage = "reviewed-stop";
   await review.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect.poll(() => stops).toBe(1);
-  await expect.poll(() => stopResult?.ok).toBe(config.mode !== "stale_review");
+  await expect
+    .poll(() => stopResult?.ok, { timeout: stopTimeout })
+    .toBe(config.mode !== "stale_review");
   if (config.mode !== "confirmed") {
     await expect(panel.getByRole("alert")).toBeVisible();
     await expect(stop).toBeDisabled();
@@ -135,10 +148,10 @@ try {
   );
 } catch (error) {
   process.stderr.write(
-    `Owned original-stop qualification failed at ${stage} (${error?.name ?? "Error"})\n`
+    `Owned original-stop qualification failed at ${stage} (${error?.name ?? "Error"})\n${JSON.stringify(stopDiagnostics)}\n`
   );
   process.exitCode = 1;
 } finally {
-  await page.unrouteAll({ behavior: "wait" }).catch(() => {});
+  await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {});
   await browser.close();
 }
