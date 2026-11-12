@@ -1,0 +1,240 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T23:31:47.121165+00:00",
+  "issue": 2693,
+  "status": "33-actual-admission-cases-qualified-no-skips",
+  "scope": "Isolated host-native Kubernetes 1.36.4 API/etcd 3.6.8 asset production, six full pinned CRDs/CEL, 18 provider and 15 real PostgreSQL/Temporal backend cases; no native lifecycle or linked continuation claim",
+  "sourceRevision": "dfed05b00",
+  "sourceSha256": {
+    "tests/nvke/fixtures/build_owned_envtest.py": "0a82f3309058449d8913582a85ba03a95eb1c4255926a171b98496ed74046b4d",
+    "tests/nvke/fixtures/owned_envtest.py": "0184967fd85e18eec7408e096ffaac62c7c86c7b8ccee28fba64a45cb2d282ce"
+  },
+  "casesByClass": {
+    "astrolift_clusters.tests.test_nvke_access": 2,
+    "astrolift_clusters.tests.test_nvke_inventory": 4,
+    "astrolift_clusters.tests.test_nvke_operations": 5,
+    "astrolift_clusters.tests.test_nvke_provider_observations": 1,
+    "astrolift_clusters.tests.test_nvke_resource_operations": 3,
+    "providers.tests.nvke.test_datastore_integration": 17,
+    "providers.tests.nvke.test_infrastructure_client_integration": 1
+  },
+  "verification": {
+    "build": {
+      "report": "/tmp/astrolift-nvke-durable-host-envtest-assets-v1.json",
+      "sha256": "63a67a3cf310410b9d50b7edff38e4c8275986cc672b6b7daebc4727eeb76472",
+      "result": {
+        "exitCode": 0,
+        "checks": {
+          "buildProcessExitCode": 0,
+          "builderSourceUnchanged": true,
+          "buildReport": {
+            "exitCode": 0,
+            "assetRoot": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b",
+            "checks": [
+              {
+                "command": [
+                  "version"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-0.log"
+              },
+              {
+                "command": [
+                  "mod",
+                  "download",
+                  "-json",
+                  "k8s.io/kubernetes@v1.36.4"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-1.log"
+              },
+              {
+                "command": [
+                  "mod",
+                  "download",
+                  "-json",
+                  "go.etcd.io/etcd/server/v3@v3.6.8"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-2.log"
+              },
+              {
+                "command": [
+                  "mod",
+                  "edit",
+                  "-require=go.etcd.io/etcd/server/v3@v3.6.8"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-3.log"
+              },
+              {
+                "command": [
+                  "mod",
+                  "tidy"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-4.log"
+              },
+              {
+                "command": [
+                  "mod",
+                  "verify"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-5.log"
+              },
+              {
+                "command": [
+                  "list",
+                  "-m",
+                  "-f",
+                  "{{.Version}} {{.Sum}}",
+                  "k8s.io/kubernetes"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-6.log"
+              },
+              {
+                "command": [
+                  "list",
+                  "-m",
+                  "-f",
+                  "{{.Version}} {{.Sum}}",
+                  "go.etcd.io/etcd/server/v3"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-7.log"
+              },
+              {
+                "command": [
+                  "build",
+                  "-mod=readonly",
+                  "-trimpath",
+                  "-ldflags=-X k8s.io/component-base/version.gitVersion=v1.36.4",
+                  "-o",
+                  "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/kube-apiserver",
+                  "./src/kube-apiserver"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-8.log"
+              },
+              {
+                "command": [
+                  "build",
+                  "-mod=readonly",
+                  "-trimpath",
+                  "-o",
+                  "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/etcd",
+                  "./src/etcd"
+                ],
+                "exitCode": 0,
+                "log": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/owned-host-envtest-durable-v1/7c79d25127b941e78700b0deaa19f40b/step-9.log"
+              }
+            ],
+            "elapsedSeconds": 131.91935929097235
+          }
+        },
+        "elapsedSeconds": 132.29994562547654,
+        "scope": "Actual self-contained pinned host asset builder; no admission/lifecycle/continuation claim"
+      }
+    },
+    "static": {
+      "report": "/tmp/astrolift-nvke-durable-host-assets-static-v2.json",
+      "sha256": "2a24ed49591a95e7227219d10790a1db669717e6e55fce2e5bf408b10cb3343c",
+      "result": {
+        "exitCode": 0,
+        "checks": [
+          {
+            "command": [
+              "/opt/homebrew/bin/ruff",
+              "format",
+              "tests/nvke/fixtures/build_owned_envtest.py",
+              "tests/nvke/fixtures/owned_envtest.py"
+            ],
+            "exitCode": 0
+          },
+          {
+            "command": [
+              "/opt/homebrew/bin/ruff",
+              "check",
+              "tests/nvke/fixtures/build_owned_envtest.py",
+              "tests/nvke/fixtures/owned_envtest.py"
+            ],
+            "exitCode": 0
+          }
+        ],
+        "sourceSha256": {
+          "tests/nvke/fixtures/build_owned_envtest.py": "0a82f3309058449d8913582a85ba03a95eb1c4255926a171b98496ed74046b4d",
+          "tests/nvke/fixtures/owned_envtest.py": "0184967fd85e18eec7408e096ffaac62c7c86c7b8ccee28fba64a45cb2d282ce"
+        }
+      }
+    },
+    "admission": {
+      "report": "/tmp/astrolift-nvke-owned-host-admission-33-v2.json",
+      "sha256": "fba47d11080686d6ee476248f8dcfef148797786381896edd7b138365b03c2ae",
+      "result": {
+        "exitCode": 0,
+        "checks": {
+          "reusedOnlyIdleOwnedTestDatabase": true,
+          "sixActualCrdsEstablished": true,
+          "testProcessExitCode": 0,
+          "junitTotals": {
+            "tests": 33,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "sourcesUnchanged": true,
+          "serverExitCode": 0,
+          "ownedComponentStopMarker": true
+        },
+        "elapsedSeconds": 195.85859558265656,
+        "scope": "33 exact previously skipped cases with distinct etcd self-client certificate, resource cache readiness and metadata audit; owned source-built macOS API/etcd and six actual pinned CRDs, real idle owned PostgreSQL and separate Temporal namespace; no native lifecycle or continuation claim"
+      }
+    },
+    "previousFailedAdmission": {
+      "report": "/tmp/astrolift-nvke-owned-host-admission-33-v1.json",
+      "sha256": "10c68d14c46d0c9a84b87f93b40125bd02074a7d807dbd2825e9ef20a4daa3da",
+      "result": {
+        "exitCode": 1,
+        "checks": {
+          "reusedOnlyIdleOwnedTestDatabase": true,
+          "sixActualCrdsEstablished": true,
+          "testProcessExitCode": 1,
+          "junitTotals": {
+            "tests": 2,
+            "failures": 0,
+            "errors": 1,
+            "skipped": 0
+          },
+          "sourcesUnchanged": true,
+          "failureType": "AssertionError",
+          "failureFrames": [
+            {
+              "function": "<module>",
+              "line": 55
+            }
+          ],
+          "serverExitCode": 0,
+          "ownedComponentStopMarker": true
+        },
+        "elapsedSeconds": 876.2459789998829,
+        "scope": "33 exact previously skipped provider/backend admission cases against owned source-built macOS API/etcd and six actual pinned CRDs, real idle owned PostgreSQL and separate Temporal namespace; no native lifecycle or continuation claim"
+      }
+    }
+  },
+  "fixtureCorrections": [
+    "Separate etcd server/client-usage certificate for its authenticated internal client; API server certificate remains server-only",
+    "Use actual default-route advertise address with listener still bound only to loopback",
+    "Require successful real list reads of every served CRD resource after establishment",
+    "Metadata-only private Kubernetes audit for failed response diagnosis"
+  ],
+  "protectedOriginalsChanged": false,
+  "newVmAllocated": false,
+  "pending": [
+    "Remaining browser and standalone native SDK gates",
+    "Native full lifecycle/enrollment/phase/credential/image/resource authority and linked continuation",
+    "Coordinated final release checks/review/merge/deployment/live validation"
+  ],
+  "releaseQualified": false
+}
