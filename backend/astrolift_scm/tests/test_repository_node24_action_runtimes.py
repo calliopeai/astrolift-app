@@ -9,7 +9,12 @@ from pathlib import Path
 import pytest
 
 _WORKFLOWS = Path(__file__).resolve().parents[3] / ".github" / "workflows"
-_ORDINARY_WORKFLOWS = ("ci.yml", "build-publish.yml", "agent-host-conformance.yml")
+_ORDINARY_WORKFLOWS = (
+    "ci.yml",
+    "build-publish.yml",
+    "agent-host-conformance.yml",
+    "cancel-merged-pr-ci.yml",
+)
 _USES = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)")
 
 # These action releases declare runs.using=node24 in their upstream action.yml.
@@ -22,6 +27,7 @@ _REVIEWED_NODE24_ACTIONS = {
     "actions/cache/save@v5",
     "actions/upload-artifact@v6",
     "actions/download-artifact@v7",
+    "actions/github-script@v8",
     "docker/setup-qemu-action@v4",
     "docker/setup-buildx-action@v4",
     "docker/login-action@v4",
@@ -30,9 +36,10 @@ _REVIEWED_NODE24_ACTIONS = {
 
 _MIGRATED_NODE24_REFS = Counter(
     {
-        "actions/checkout@v5": 17,
+        "actions/checkout@v5": 19,
         "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd": 1,
-        "actions/setup-node@v5": 5,
+        "actions/setup-node@v5": 6,
+        "actions/github-script@v8": 1,
         "actions/setup-python@v6": 7,
         "actions/cache/restore@v5": 6,
         "actions/cache/save@v5": 5,
