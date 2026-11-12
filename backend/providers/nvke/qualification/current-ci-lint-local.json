@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-12T21:34:41.543639+00:00",
+  "recordedAt": "2026-11-12T21:37:55.695068+00:00",
   "issue": 2693,
   "status": "full-backend-and-provider-ci-lint-format-qualified-native-lifecycle-pending",
   "baseAppRevision": "72bf71d9e5207bc88c8882c853719db81f5b0742",
@@ -52,6 +52,37 @@
           "astrolift_clusters/tests/test_nvke_install_plan_verifications.py": "8e3c781fe8baa38f9b08af4bcba5a64ac1f5b2e4f0bb890340c7614ecb79b736"
         }
       }
+    },
+    "ciMatchedLintAfterMainMerge": {
+      "report": "/tmp/astrolift-nvke-paired-ci-lint-v5.json",
+      "sha256": "851f498583f1727408a7c1f9b7210507e91738c90f0c98d11a8d7a12ae472fe0",
+      "result": {
+        "exitCode": 0,
+        "checks": [
+          {
+            "name": "backend-format",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v5-backend-format.log"
+          },
+          {
+            "name": "backend-lint",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v5-backend-lint.log"
+          },
+          {
+            "name": "providers-lint",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v5-providers-lint.log"
+          },
+          {
+            "name": "providers-format",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v5-providers-format.log"
+          }
+        ],
+        "elapsedSeconds": 5.201439708471298,
+        "scope": "Exact CI backend Ruff 0.6.9, provider Ruff 0.15.0 full package checks, no source mutation"
+      }
     }
   },
   "scope": "Full backend with CI Ruff 0.6.9, full providers with Ruff 0.15.0; two NVKE test blank lines removed, syntax trees unchanged. No tests reexecuted for whitespace-only changes. Original failed run and two local installer setup failures retained separately.",
@@ -61,5 +92,7 @@
     "Linked native continuation and fresh credential/image/resource phase use",
     "Paired final release review/merge and deployment"
   ],
-  "releaseQualified": false
+  "releaseQualified": false,
+  "integratedMainRevision": "db0b48c6cbf82f3fb082a41bbdf8dedb22d371be",
+  "integratedMainScope": "Only the native endpoint configuration heartbeat test changes relative to the previously integrated main; no production/frontend source changes"
 }
