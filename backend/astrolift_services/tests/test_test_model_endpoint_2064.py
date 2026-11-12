@@ -254,6 +254,13 @@ def test_rate_limited_after_budget(permission_resolver, monkeypatch):
     svc = _vllm_service(app, env)
     permission_resolver.grant(Permission.APP_UPDATE)
     monkeypatch.setattr(agent_test_jobs, "await_result", lambda *a, **k: None)
+    # Keep every request in one rate bucket even across a wall-clock minute.
+    minute = timezone.now()
+    monkeypatch.setattr(
+        agent_test_jobs,
+        "dt",
+        SimpleNamespace(datetime=SimpleNamespace(now=lambda _tz: minute), UTC=agent_test_jobs.dt.UTC),
+    )
     from django.core.cache import cache
 
     cache.clear()
