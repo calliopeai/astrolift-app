@@ -26,7 +26,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from nvke.client import NvkeError
 from nvke.operator_agent_client import OperatorAgentClient, verify_contract
 from nvke.operator_contract import CATALOG, REVISION, canonical
-from tests.nvke.support import PAIRED_OPSCODE_REVISION
+from tests.nvke.support import PAIRED_OPSCODE_REVISION, prepare_owned_native_agent
 
 SITE, INSTANCE, JOB = str(uuid4()), str(uuid4()), str(uuid4())
 INTENT = "b" * 64
@@ -239,6 +239,7 @@ def operator_agent(tmp_path, *, site_id=None):
     selected, selected_bundle = os.getenv("NVKE_TEST_AGENT_OPSCODE"), os.getenv("NVKE_TEST_AGENT_BUNDLE")
     if not selected or not selected_bundle:
         pytest.skip("select the explicit owned Opscode source and private native bundle")
+    prepare_owned_native_agent()
     source, bundle = Path(selected).resolve(), Path(selected_bundle).resolve()
     revision = PAIRED_OPSCODE_REVISION
     for name in (

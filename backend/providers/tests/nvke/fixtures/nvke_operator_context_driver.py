@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import socket
 import ssl
 import sys
@@ -35,7 +36,30 @@ try:
             chart_artifact_digest=case.tree_body["chartArtifactDigest"],
         )
         query = {k: v for k, v in case.context_body.items() if k in service.BASE}
-        with OperatorAgentClient(n.url, **config) as sdk:
+        handler = n.server.RequestHandlerClass
+        reply = handler._reply
+
+        def failure_metadata(connection, status, body):
+            if status >= 400 and isinstance(body, dict):
+                code = body.get("errorCode")
+                print(
+                    "AGENT_FAILURE_METADATA",
+                    json.dumps(
+                        {
+                            "status": status,
+                            "code": code
+                            if isinstance(code, str) and re.fullmatch(r"[A-Z_]{1,96}", code)
+                            else "UNCLASSIFIED",
+                        }
+                    ),
+                    flush=True,
+                )
+            return reply(connection, status, body)
+
+        with (
+            OperatorAgentClient(n.url, **config) as sdk,
+            patch.object(handler, "_reply", side_effect=failure_metadata, autospec=True),
+        ):
             try:
                 sdk.install_plan_context(case.job, body=query, **bindings)
             except NvkeError as error:

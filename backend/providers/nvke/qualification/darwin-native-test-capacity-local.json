@@ -1,0 +1,46 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T23:02:38.817546+00:00",
+  "issue": 2693,
+  "status": "focused-descriptor-diagnosis-passed-six-family-durable-setup-pending",
+  "scope": "Own-process Darwin native SDK test setup only; production limits, source watchers and authority checks unchanged",
+  "focusedDiagnosis": {
+    "report": "/tmp/astrolift-nvke-sdk-context-descriptor-budget-v1.json",
+    "sha256": "b4d548dceed8a4e340b8257ac50b9e941f57c5095a9cd10bf155fa6f22d41453",
+    "result": {
+      "exitCode": 0,
+      "checks": {
+        "processDescriptorLimitBefore": 4096,
+        "processDescriptorLimitNow": 65536,
+        "testProcessExitCode": 0,
+        "junitTotals": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "sourcesUnchanged": true
+      },
+      "elapsedSeconds": 561.1248861672357,
+      "scope": "One standalone provider SDK context case with bounded actual agent refusal-code diagnostics; actual mTLS/native helpers, no Django/production database or VM mutation"
+    }
+  },
+  "implementation": {
+    "helper": "tests/nvke/support.py:prepare_owned_native_agent",
+    "selectedFixtureFamilies": 7,
+    "minimumDarwinProcessDescriptors": 65536,
+    "linuxBehavior": "unchanged",
+    "globalOrProductionLimitChanged": false,
+    "monitoringDisabled": false
+  },
+  "pending": [
+    "Six standalone SDK context/image/image-binding/local-image/tree/render-verification native recovery cases using durable helper",
+    "Full release gates, native lifecycle/continuation, review, merge and deployment"
+  ],
+  "sixFamilyRun": {
+    "report": "/tmp/astrolift-nvke-sdk-native-recovery-six-v1.json",
+    "supervisorPid": 65515,
+    "state": "running"
+  },
+  "releaseQualified": false
+}

@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.nvke.support import PAIRED_OPSCODE_REVISION
+from tests.nvke.support import PAIRED_OPSCODE_REVISION, prepare_owned_native_agent
 
 
 @pytest.mark.skipif(
@@ -28,6 +28,7 @@ from tests.nvke.support import PAIRED_OPSCODE_REVISION
     reason="Select the owned pinned agent, native bundle, Helm 4 and render helper",
 )
 def test_real_image_sdk_mtls_lost_reply_and_cold_recovery(tmp_path):
+    prepare_owned_native_agent()
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
     revision = PAIRED_OPSCODE_REVISION
     archive = subprocess.check_output(["git", "archive", revision, "kubernetes/nvke"], cwd=source)
