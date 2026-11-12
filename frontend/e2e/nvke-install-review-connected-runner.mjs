@@ -101,11 +101,9 @@ try {
   await page.goto(
     `${config.storyOrigin}/iframe.html?id=screens-nvke-local-agent-qualification--operation&viewMode=story&globals=a11y.manual:!true`
   );
-  const panel = page
-    .locator("section")
-    .filter({
-      has: page.getByRole("heading", { name: "Retained installation review", exact: true }),
-    });
+  const panel = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Retained installation review", exact: true }),
+  });
   const prepare = panel.getByRole("button", { name: "Prepare review", exact: true });
   await expect(prepare).toBeEnabled({ timeout: 30000 });
   expect(reviews).toBe(0);

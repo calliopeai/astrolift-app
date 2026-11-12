@@ -15,10 +15,7 @@ type ManagedDomainDefaultFor = "tenant_apps" | "preview_envs" | "both" | "none";
 
 export type AstroliftTenantCluster = GeneratedTenantCluster;
 
-export type AstroliftManagedDomain = Omit<
-  GeneratedManagedDomain,
-  "defaultFor"
-> & {
+export type AstroliftManagedDomain = Omit<GeneratedManagedDomain, "defaultFor"> & {
   defaultFor: ManagedDomainDefaultFor;
   provisionState: string;
   provisionNameservers: string[];

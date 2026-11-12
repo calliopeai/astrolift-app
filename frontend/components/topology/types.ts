@@ -14,11 +14,7 @@ export type TopologyNodeType =
   | "cache"
   | "external";
 
-export type TopologyNodeStatus =
-  | "running"
-  | "provisioning"
-  | "failed"
-  | "unknown";
+export type TopologyNodeStatus = "running" | "provisioning" | "failed" | "unknown";
 
 // Index signature is required by @xyflow/react's `Node<TData>`
 // constraint — every node-data type must be assignable to

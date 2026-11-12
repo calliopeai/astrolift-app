@@ -17,10 +17,7 @@ import { cn } from "@/lib/utils";
  * not, and `indeterminate` is a DOM property with no HTML attribute, so
  * the header "some selected" state could not be expressed in JSX at all.
  */
-function Checkbox({
-  className,
-  ...props
-}: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
+function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"

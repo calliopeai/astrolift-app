@@ -4,11 +4,7 @@ import { ChevronDownIcon } from "lucide-react";
 import * as React from "react";
 
 import { Card } from "@/components/ui/card";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
 const STORAGE_PREFIX = "astrolift.collapsible.";
@@ -84,9 +80,9 @@ export function CollapsibleCard({
     <Collapsible open={open} onOpenChange={handleChange} asChild>
       <Card className={cn("gap-0 py-0", className)}>
         <div className="flex items-center gap-2 px-4 py-3">
-          <CollapsibleTrigger className="group/cc -mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-muted/40">
+          <CollapsibleTrigger className="group/cc hover:bg-muted/40 -mx-1 flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-0.5 text-left transition-colors">
             <ChevronDownIcon className="text-muted-foreground size-4 shrink-0 transition-transform group-data-[state=closed]/cc:-rotate-90" />
-            <div className="text-base font-medium leading-snug min-w-0">{title}</div>
+            <div className="min-w-0 text-base leading-snug font-medium">{title}</div>
           </CollapsibleTrigger>
           {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
         </div>

@@ -15,7 +15,9 @@
  * Returns true when it initiated a reload; the caller should `return` early
  * (skip logging/reporting a transient error we're already recovering from).
  */
-export function maybeReloadOnChunkError(error: { name?: string; message?: string } | null | undefined): boolean {
+export function maybeReloadOnChunkError(
+  error: { name?: string; message?: string } | null | undefined
+): boolean {
   if (!error || typeof window === "undefined") return false;
   const isChunkError =
     error.name === "ChunkLoadError" ||

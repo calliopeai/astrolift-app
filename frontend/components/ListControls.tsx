@@ -72,18 +72,18 @@ export function ListControls<T>({
     <div className={`flex flex-wrap items-center gap-2 ${className ?? ""}`}>
       {/* Search */}
       {!hideSearch && (
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <div className="relative max-w-xs min-w-[180px] flex-1">
+          <SearchIcon className="text-muted-foreground absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={searchPlaceholder ?? t("search")}
-            className="pl-8 h-8 text-sm"
+            className="h-8 pl-8 text-sm"
           />
           {query && (
             <button
               onClick={() => setQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
             >
               <XIcon className="size-3.5" />
             </button>
@@ -96,7 +96,7 @@ export function ListControls<T>({
 
       {/* Page size */}
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground whitespace-nowrap">{t("perPage")}</span>
+        <span className="text-muted-foreground text-xs whitespace-nowrap">{t("perPage")}</span>
         <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
           <SelectTrigger className="h-8 w-16 text-xs">
             <SelectValue />
@@ -113,7 +113,7 @@ export function ListControls<T>({
 
       {/* Count */}
       {totalFiltered > 0 && (
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
+        <span className="text-muted-foreground text-xs whitespace-nowrap">
           {t("range", { start, end, total: totalFiltered })}
         </span>
       )}
@@ -139,7 +139,7 @@ export function ListControls<T>({
           >
             <ChevronLeftIcon className="size-3.5" />
           </Button>
-          <span className="text-xs text-muted-foreground px-1 whitespace-nowrap">
+          <span className="text-muted-foreground px-1 text-xs whitespace-nowrap">
             {pageIndex + 1} / {pageCount}
           </span>
           <Button
@@ -191,7 +191,7 @@ export function SortableHeader({
   return (
     <button
       onClick={() => onToggle(sortKey)}
-      className={`flex items-center gap-1 text-sm font-medium hover:text-foreground transition-colors ${
+      className={`hover:text-foreground flex items-center gap-1 text-sm font-medium transition-colors ${
         active ? "text-foreground" : "text-muted-foreground"
       } ${className ?? ""}`}
     >

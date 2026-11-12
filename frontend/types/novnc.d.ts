@@ -12,11 +12,7 @@ declare module "@novnc/novnc" {
   }
 
   export default class RFB extends EventTarget {
-    constructor(
-      target: HTMLElement,
-      urlOrChannel: string | WebSocket,
-      options?: RFBOptions
-    );
+    constructor(target: HTMLElement, urlOrChannel: string | WebSocket, options?: RFBOptions);
 
     /** Scale the remote framebuffer to fit the container element. */
     scaleViewport: boolean;

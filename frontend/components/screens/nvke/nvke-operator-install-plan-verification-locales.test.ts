@@ -8,11 +8,18 @@ import ja from "@/messages/ja.json";
 import ko from "@/messages/ko.json";
 import zh from "@/messages/zh-Hans.json";
 
-it.each(Object.entries({ en, de, es, fr, pt, ja, ko, zh }))(
-  "verification copy is complete in %s",
-  (_locale, messages) => {
-    const copy = messages.nvke.installVerification;
-    expect(Object.keys(copy).sort()).toEqual(Object.keys(en.nvke.installVerification).sort());
-    for (const value of Object.values(copy)) expect(value.trim().length).toBeGreaterThan(0);
-  }
-);
+it.each(
+  Object.entries({
+    en: en.nvke.installVerification,
+    de: de.nvke.installVerification,
+    es: es.nvke.installVerification,
+    fr: fr.nvke.installVerification,
+    pt: pt.nvke.installVerification,
+    ja: ja.nvke.installVerification,
+    ko: ko.nvke.installVerification,
+    zh: zh.nvke.installVerification,
+  })
+)("verification copy is complete in %s", (_locale, copy) => {
+  expect(Object.keys(copy).sort()).toEqual(Object.keys(en.nvke.installVerification).sort());
+  for (const value of Object.values(copy)) expect(value.trim().length).toBeGreaterThan(0);
+});

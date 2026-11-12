@@ -224,13 +224,27 @@ class Scanner {
         this.i++;
         const esc = this.peek();
         switch (esc) {
-          case "n": out += "\n"; break;
-          case "t": out += "\t"; break;
-          case "r": out += "\r"; break;
-          case '"': out += '"'; break;
-          case "\\": out += "\\"; break;
-          case "b": out += "\b"; break;
-          case "f": out += "\f"; break;
+          case "n":
+            out += "\n";
+            break;
+          case "t":
+            out += "\t";
+            break;
+          case "r":
+            out += "\r";
+            break;
+          case '"':
+            out += '"';
+            break;
+          case "\\":
+            out += "\\";
+            break;
+          case "b":
+            out += "\b";
+            break;
+          case "f":
+            out += "\f";
+            break;
           case "u":
           case "U": {
             const len = esc === "u" ? 4 : 8;

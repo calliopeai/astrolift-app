@@ -8,11 +8,18 @@ import ja from "@/messages/ja.json";
 import ko from "@/messages/ko.json";
 import zh from "@/messages/zh-Hans.json";
 
-it.each(Object.entries({ en, de, es, fr, pt, ja, ko, zh }))(
-  "image copy is complete in %s",
-  (_locale, messages) => {
-    const copy = messages.nvke.installLocalImage;
-    expect(Object.keys(copy).sort()).toEqual(Object.keys(en.nvke.installLocalImage).sort());
-    for (const value of Object.values(copy)) expect(value.trim().length).toBeGreaterThan(0);
-  }
-);
+it.each(
+  Object.entries({
+    en: en.nvke.installLocalImage,
+    de: de.nvke.installLocalImage,
+    es: es.nvke.installLocalImage,
+    fr: fr.nvke.installLocalImage,
+    pt: pt.nvke.installLocalImage,
+    ja: ja.nvke.installLocalImage,
+    ko: ko.nvke.installLocalImage,
+    zh: zh.nvke.installLocalImage,
+  })
+)("image copy is complete in %s", (_locale, copy) => {
+  expect(Object.keys(copy).sort()).toEqual(Object.keys(en.nvke.installLocalImage).sort());
+  for (const value of Object.values(copy)) expect(value.trim().length).toBeGreaterThan(0);
+});

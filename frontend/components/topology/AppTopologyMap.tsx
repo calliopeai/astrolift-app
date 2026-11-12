@@ -8,14 +8,7 @@ import {
   type NodeProps,
   type NodeTypes,
 } from "@xyflow/react";
-import {
-  BoxIcon,
-  CloudIcon,
-  DatabaseIcon,
-  GlobeIcon,
-  NetworkIcon,
-  ZapIcon,
-} from "lucide-react";
+import { BoxIcon, CloudIcon, DatabaseIcon, GlobeIcon, NetworkIcon, ZapIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
@@ -24,12 +17,7 @@ import { FlowGraph } from "@/components/viz/flow-graph";
 import { cn } from "@/lib/utils";
 
 import { autoLayout } from "./layout";
-import type {
-  TopologyEdge,
-  TopologyNode,
-  TopologyNodeStatus,
-  TopologyNodeType,
-} from "./types";
+import type { TopologyEdge, TopologyNode, TopologyNodeStatus, TopologyNodeType } from "./types";
 
 // ─── status styling ───────────────────────────────────────────────────────────
 
@@ -60,37 +48,35 @@ const TYPE_ICON: Record<TopologyNodeType, React.ComponentType<{ className?: stri
 
 function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
   const Icon = TYPE_ICON[data.type] ?? BoxIcon;
-  const ratio = data.replicas
-    ? `${data.replicas.ready}/${data.replicas.desired}`
-    : null;
+  const ratio = data.replicas ? `${data.replicas.ready}/${data.replicas.desired}` : null;
 
   return (
     <div
       className={cn(
-        "viz-node min-w-[180px] max-w-[220px] rounded-md border bg-background p-3 ring-1 shadow-sm",
-        STATUS_RING[data.status],
+        "viz-node bg-background max-w-[220px] min-w-[180px] rounded-md border p-3 shadow-sm ring-1",
+        STATUS_RING[data.status]
       )}
     >
       <Handle type="target" position={Position.Left} className="!bg-muted-foreground/30" />
       <Handle type="source" position={Position.Right} className="!bg-muted-foreground/30" />
 
       <div className="flex items-start gap-2">
-        <div className="mt-0.5 rounded-sm bg-muted p-1">
-          <Icon className="size-3.5 text-muted-foreground" />
+        <div className="bg-muted mt-0.5 rounded-sm p-1">
+          <Icon className="text-muted-foreground size-3.5" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className={cn("viz-node-dot size-1.5 rounded-full", STATUS_DOT[data.status])} />
-            <div className="truncate text-sm font-medium leading-tight">{data.label}</div>
+            <div className="truncate text-sm leading-tight font-medium">{data.label}</div>
           </div>
           {data.sublabel && (
-            <div className="mt-0.5 truncate font-mono text-2xs text-muted-foreground">
+            <div className="text-2xs text-muted-foreground mt-0.5 truncate font-mono">
               {data.sublabel}
             </div>
           )}
         </div>
         {ratio && (
-          <Badge variant="outline" className="font-mono text-2xs">
+          <Badge variant="outline" className="text-2xs font-mono">
             {ratio}
           </Badge>
         )}
@@ -99,16 +85,12 @@ function TopologyNodeCard({ data }: NodeProps<Node<TopologyNode>>) {
       {data.hostnames && data.hostnames.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">
           {data.hostnames.slice(0, 3).map((host) => (
-            <Badge
-              key={host}
-              variant="secondary"
-              className="font-mono text-2xs font-normal"
-            >
+            <Badge key={host} variant="secondary" className="text-2xs font-mono font-normal">
               {host}
             </Badge>
           ))}
           {data.hostnames.length > 3 && (
-            <Badge variant="outline" className="font-mono text-2xs">
+            <Badge variant="outline" className="text-2xs font-mono">
               +{data.hostnames.length - 3}
             </Badge>
           )}
@@ -167,7 +149,7 @@ export function AppTopologyMap({
     // Auto-layout runs once on mount. Callers that want to re-flow
     // when their data changes should remount via a `key` prop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    []
   );
 
   const flowEdges = React.useMemo<Edge[]>(
@@ -180,7 +162,7 @@ export function AppTopologyMap({
         animated: e.animated ?? false,
       })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    []
   );
 
   const handleNodeClick = React.useCallback(
@@ -192,7 +174,7 @@ export function AppTopologyMap({
       }
       if (node.href) router.push(node.href);
     },
-    [onNodeClick, router],
+    [onNodeClick, router]
   );
 
   return (

@@ -28,14 +28,18 @@ export function validateAgentConfig(model: AgentConfigModel): ManifestErr[] {
   const errs: ManifestErr[] = [];
 
   if (model.astrolift_version.trim() === "") {
-    errs.push({ path: "astrolift_version", message: "astrolift_version is required for an agent config." });
+    errs.push({
+      path: "astrolift_version",
+      message: "astrolift_version is required for an agent config.",
+    });
   }
 
   const skillSlugs = new Set<string>();
   model.skills.forEach((s, i) => {
     const p = `skills[${i}]`;
     if (s.slug.trim() === "") errs.push({ path: `${p}.slug`, message: "Skill slug is required." });
-    else if (skillSlugs.has(s.slug)) errs.push({ path: `${p}.slug`, message: `Duplicate skill slug "${s.slug}".` });
+    else if (skillSlugs.has(s.slug))
+      errs.push({ path: `${p}.slug`, message: `Duplicate skill slug "${s.slug}".` });
     skillSlugs.add(s.slug);
   });
 
@@ -43,7 +47,8 @@ export function validateAgentConfig(model: AgentConfigModel): ManifestErr[] {
   model.tools.forEach((t, i) => {
     const p = `tools[${i}]`;
     if (t.slug.trim() === "") errs.push({ path: `${p}.slug`, message: "Tool slug is required." });
-    else if (toolSlugs.has(t.slug)) errs.push({ path: `${p}.slug`, message: `Duplicate tool slug "${t.slug}".` });
+    else if (toolSlugs.has(t.slug))
+      errs.push({ path: `${p}.slug`, message: `Duplicate tool slug "${t.slug}".` });
     toolSlugs.add(t.slug);
     for (const { key, label } of JSON_FIELDS) {
       const { error } = parseJsonObjectField(t[key]);

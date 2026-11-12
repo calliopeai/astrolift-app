@@ -816,9 +816,10 @@ it.each(Object.entries(locales))(
       </NextIntlClientProvider>
     );
     await screen.findByRole("link", { name: messages.teams.memberships.activity });
-    expect(
-      screen.getByRole("link", { name: messages.teams.memberships.activity })
-    ).toHaveAttribute("href", `/administration/access/people/${row.person.orgMemberId}/activity`);
+    expect(screen.getByRole("link", { name: messages.teams.memberships.activity })).toHaveAttribute(
+      "href",
+      `/administration/access/people/${row.person.orgMemberId}/activity`
+    );
     expect(errors).not.toHaveBeenCalled();
   }
 );

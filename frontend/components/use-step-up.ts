@@ -79,7 +79,9 @@ export function useStepUp() {
   const { data: status, refetch: refetchStatus } = useQuery<{
     astroliftElevationStatus: AstroliftElevationStatus;
   }>(GET_ELEVATION_STATUS, { skip: !open, fetchPolicy: "cache-first" });
-  const sessionMethods = status?.astroliftElevationStatus.supportedMethods as StepUpMethod[] | undefined;
+  const sessionMethods = status?.astroliftElevationStatus.supportedMethods as
+    | StepUpMethod[]
+    | undefined;
   // The person chose the login method over their PIN, or the PIN locked.
   const [pinDeclined, setPinDeclined] = React.useState(false);
 
@@ -149,7 +151,10 @@ export function useStepUp() {
     return false;
   }
 
-  async function submit(elevateMethod: AstroliftElevationMethod, credential: string): Promise<boolean> {
+  async function submit(
+    elevateMethod: AstroliftElevationMethod,
+    credential: string
+  ): Promise<boolean> {
     try {
       const { data } = await elevate({
         variables: {

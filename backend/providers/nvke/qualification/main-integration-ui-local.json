@@ -1,0 +1,264 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T16:25:14.915424+00:00",
+  "sourceParent": "6695408a6dce6f51a3979d73067abf1034691ee8",
+  "integratedMain": "ac3861f5aac48f8e29ee58cd2d8f40af4c265398",
+  "issue": 2663,
+  "scope": "Current-main integration frontend NVKE unit/global lint evidence, observed format repairs and equivalent locale-test scoping; types/build/browser remain pending",
+  "status": "unit-lint-format-repairs-qualified-final-release-incomplete",
+  "sourceSha256": {
+    "frontend/README.md": "5bd1308533910b4995e8a54d48c24b1e7978e0a047d09925fb17a4d08a8fd3c3",
+    "frontend/components/Can.tsx": "766f207ee2f9f2e88b5df85f3c791cc4949936bfd75d9da2464ea721b97acba1",
+    "frontend/components/CopyBadge.tsx": "8933e33ae04ba0ab078d7ac0f43182ce5badb95f4a6b49d505530d9a85039a71",
+    "frontend/components/ListControls.tsx": "f02de40bf825b1088b9d647830309161bc06c27f21268d826589a0aa870d6f82",
+    "frontend/components/QuorumWidget.tsx": "988167927455b007021e29c6ec950946341b8290ca74a075020ec63329d89a98",
+    "frontend/components/SkipToContent.tsx": "39f1d93e1bfdf651f711f73a124b717b957661cac193a7c7b71b97b400f2073a",
+    "frontend/components/screens/administration/access/team-memberships/team-membership-http.test.tsx": "bf979b9a8b93399963b07faea80df99349c2f4a4409159d4493350c5ef9a42f3",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-image-locales.test.ts": "48e23e33a14c02cd976a36387af8ac3456b663d1c33697f6742e017431f93715",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-local-image-locales.test.ts": "d2f5161584c1ec4ca44850383d662b1878992a314fc6e39d6e3414804a3b49d5",
+    "frontend/components/screens/nvke/nvke-operator-install-plan-verification-locales.test.ts": "846f293900185143a99efa3b73419fd9456174175ff85fe40562bb8d17c3e074",
+    "frontend/components/topology/AppTopologyMap.tsx": "cddcd13dc97a86402fc825392bab9423e6cb57b5ea03a2b944799152e968eb0b",
+    "frontend/components/topology/index.ts": "b2d69733a5741e02d49c9dd0d5015779575a2daf5a0a8a7945d42fe1a8466f8b",
+    "frontend/components/topology/types.ts": "a9af7e0921a175fbbe6ac28e2a7ffe4a943ae5cee9eb7e8a163abfe91a00f35f",
+    "frontend/components/ui/checkbox.tsx": "fd965e4a188a9ebfa2afe80ab812de78badc51899754375b08ac9d0420d7afa1",
+    "frontend/components/ui/collapsible-card.tsx": "ae751639b808370ee2509b7ffc1405e37cb57b271ba115d27c753e3cdffd0c08",
+    "frontend/components/ui/select.tsx": "5262ab13f097f445655f730381160ea28ff35e040e65e25eee00d01df4890346",
+    "frontend/components/ui/sidebar.tsx": "1b97751116e4035182cf11c7ddd70098730d108595cfb9ed47a20e7ad4e33ad3",
+    "frontend/components/use-step-up.test.tsx": "54420c20549dd9127dd0af30a3d280b9c51792613cc66fbfc451dc8b7162ee65",
+    "frontend/components/use-step-up.ts": "f020f3898bbb75fb8362cff5dc381749cd8b41603a5db5b42abd41fbd2ba8f8d",
+    "frontend/e2e/nvke-install-review-connected-runner.mjs": "d295f28a5c9cc5969fdb820a6a3ea6928c2088fe4f831a1ab3e857a34493b996",
+    "frontend/graphql/clusters/clusters.types.ts": "f50771ca6f4317d3caf62f2e7fc276f1989de54b1fe415f1727a056960f2e632",
+    "frontend/graphql/nvke/nvke-install-plan-charts.mutations.ts": "86d360766c93704e7452d6eeec643ba0ae68285b54933699cd33604b1d69dc42",
+    "frontend/lib/apollo/provider.tsx": "62733d2b9afcbde05e87fde2093c1dd2f274b7b2307de291994346eb6b61c911",
+    "frontend/lib/chunk-reload.ts": "29940e7aaf8fe5d2c2000d1f69c894e88a2b16ce0135f541e26651335da335ef",
+    "frontend/lib/friendly-name.ts": "3e55382046059a92b3b1b118d549f7d5c4ff2a9823e36f864d2accefd3de6084",
+    "frontend/lib/manifest/agent-config-schema.ts": "9fab99ac048ccb20941a5831401d584e1e561fe7052d44171928b5c0e0dff35f",
+    "frontend/lib/manifest/toml.ts": "50e157e6cbf70121bce2b56adb4de7ba0406210aa534f5937e9af3aa4316209d",
+    "frontend/lib/nvke/operator-install-plan-immutable.ts": "d418895d6f2134cfcfdcdcb28ffee52e5dfec953abe52566791c38e5b17270f9",
+    "frontend/next.config.ts": "1d3ddbdcce8c394762c7201461a65ac8f02a31c4b7f4737a1b99c7950d17a46f",
+    "frontend/types/novnc.d.ts": "64e46e4f8b47f88a2968bd531fbbd6f576e7f065eeca393a2cfc634566721ad8"
+  },
+  "verification": {
+    "baselineUnitLint": {
+      "report": "/tmp/astrolift-nvke-app-main-sync-independent-frontend-v1.json",
+      "sha256": "297a94694126d90b2a5340482d058f646125aad1554dccac386daa649f96d354",
+      "result": {
+        "exitCode": 1,
+        "elapsedSeconds": 1331.1553556248546,
+        "checks": {
+          "nvkeUnit": 0,
+          "lint": 0,
+          "format": 1,
+          "nvkeUnitTestsPassed": 1284,
+          "nvkeUnitTestsPending": 0,
+          "workingSourcesUnchanged": true,
+          "revisionUnchanged": true
+        },
+        "revision": "6695408a6dce6f51a3979d73067abf1034691ee8",
+        "sourceManifest": "/tmp/astrolift-nvke-app-main-sync-independent-frontend-v1.sources.json",
+        "scope": "Current-main integrated NVKE unit tests and global lint/format with isolated lockfile dependencies; typecheck diagnostic and production build remain separate"
+      }
+    },
+    "focusedFormatAndLocales": {
+      "report": "/tmp/astrolift-nvke-app-main-sync-quality-fix-v1.json",
+      "sha256": "c1df95b98f0fbb8405f1acc0676c2fa11ddcbd06060d949f7db251a8f917766f",
+      "result": {
+        "exitCode": 0,
+        "elapsedSeconds": 89.64474774990231,
+        "checks": {
+          "formatWrite": 0,
+          "formatCheck": 0,
+          "localeTests": 0,
+          "changedLint": 0,
+          "diff": 0,
+          "localeTestsPassed": 24,
+          "localeTestsPending": 0
+        },
+        "files": [
+          "README.md",
+          "components/Can.tsx",
+          "components/CopyBadge.tsx",
+          "components/ListControls.tsx",
+          "components/QuorumWidget.tsx",
+          "components/SkipToContent.tsx",
+          "components/screens/administration/access/team-memberships/team-membership-http.test.tsx",
+          "components/screens/nvke/nvke-operator-install-plan-image-locales.test.ts",
+          "components/screens/nvke/nvke-operator-install-plan-local-image-locales.test.ts",
+          "components/screens/nvke/nvke-operator-install-plan-verification-locales.test.ts",
+          "components/topology/AppTopologyMap.tsx",
+          "components/topology/index.ts",
+          "components/topology/types.ts",
+          "components/ui/checkbox.tsx",
+          "components/ui/collapsible-card.tsx",
+          "components/ui/select.tsx",
+          "components/ui/sidebar.tsx",
+          "components/use-step-up.test.tsx",
+          "components/use-step-up.ts",
+          "e2e/nvke-install-review-connected-runner.mjs",
+          "graphql/clusters/clusters.types.ts",
+          "graphql/nvke/nvke-install-plan-charts.mutations.ts",
+          "lib/apollo/provider.tsx",
+          "lib/chunk-reload.ts",
+          "lib/friendly-name.ts",
+          "lib/manifest/agent-config-schema.ts",
+          "lib/manifest/toml.ts",
+          "lib/nvke/operator-install-plan-immutable.ts",
+          "next.config.ts",
+          "types/novnc.d.ts"
+        ],
+        "sourceSha256": {
+          "README.md": "5bd1308533910b4995e8a54d48c24b1e7978e0a047d09925fb17a4d08a8fd3c3",
+          "components/Can.tsx": "766f207ee2f9f2e88b5df85f3c791cc4949936bfd75d9da2464ea721b97acba1",
+          "components/CopyBadge.tsx": "8933e33ae04ba0ab078d7ac0f43182ce5badb95f4a6b49d505530d9a85039a71",
+          "components/ListControls.tsx": "f02de40bf825b1088b9d647830309161bc06c27f21268d826589a0aa870d6f82",
+          "components/QuorumWidget.tsx": "988167927455b007021e29c6ec950946341b8290ca74a075020ec63329d89a98",
+          "components/SkipToContent.tsx": "39f1d93e1bfdf651f711f73a124b717b957661cac193a7c7b71b97b400f2073a",
+          "components/screens/administration/access/team-memberships/team-membership-http.test.tsx": "bf979b9a8b93399963b07faea80df99349c2f4a4409159d4493350c5ef9a42f3",
+          "components/screens/nvke/nvke-operator-install-plan-image-locales.test.ts": "48e23e33a14c02cd976a36387af8ac3456b663d1c33697f6742e017431f93715",
+          "components/screens/nvke/nvke-operator-install-plan-local-image-locales.test.ts": "d2f5161584c1ec4ca44850383d662b1878992a314fc6e39d6e3414804a3b49d5",
+          "components/screens/nvke/nvke-operator-install-plan-verification-locales.test.ts": "846f293900185143a99efa3b73419fd9456174175ff85fe40562bb8d17c3e074",
+          "components/topology/AppTopologyMap.tsx": "cddcd13dc97a86402fc825392bab9423e6cb57b5ea03a2b944799152e968eb0b",
+          "components/topology/index.ts": "b2d69733a5741e02d49c9dd0d5015779575a2daf5a0a8a7945d42fe1a8466f8b",
+          "components/topology/types.ts": "a9af7e0921a175fbbe6ac28e2a7ffe4a943ae5cee9eb7e8a163abfe91a00f35f",
+          "components/ui/checkbox.tsx": "fd965e4a188a9ebfa2afe80ab812de78badc51899754375b08ac9d0420d7afa1",
+          "components/ui/collapsible-card.tsx": "ae751639b808370ee2509b7ffc1405e37cb57b271ba115d27c753e3cdffd0c08",
+          "components/ui/select.tsx": "5262ab13f097f445655f730381160ea28ff35e040e65e25eee00d01df4890346",
+          "components/ui/sidebar.tsx": "1b97751116e4035182cf11c7ddd70098730d108595cfb9ed47a20e7ad4e33ad3",
+          "components/use-step-up.test.tsx": "54420c20549dd9127dd0af30a3d280b9c51792613cc66fbfc451dc8b7162ee65",
+          "components/use-step-up.ts": "f020f3898bbb75fb8362cff5dc381749cd8b41603a5db5b42abd41fbd2ba8f8d",
+          "e2e/nvke-install-review-connected-runner.mjs": "d295f28a5c9cc5969fdb820a6a3ea6928c2088fe4f831a1ab3e857a34493b996",
+          "graphql/clusters/clusters.types.ts": "f50771ca6f4317d3caf62f2e7fc276f1989de54b1fe415f1727a056960f2e632",
+          "graphql/nvke/nvke-install-plan-charts.mutations.ts": "86d360766c93704e7452d6eeec643ba0ae68285b54933699cd33604b1d69dc42",
+          "lib/apollo/provider.tsx": "62733d2b9afcbde05e87fde2093c1dd2f274b7b2307de291994346eb6b61c911",
+          "lib/chunk-reload.ts": "29940e7aaf8fe5d2c2000d1f69c894e88a2b16ce0135f541e26651335da335ef",
+          "lib/friendly-name.ts": "3e55382046059a92b3b1b118d549f7d5c4ff2a9823e36f864d2accefd3de6084",
+          "lib/manifest/agent-config-schema.ts": "9fab99ac048ccb20941a5831401d584e1e561fe7052d44171928b5c0e0dff35f",
+          "lib/manifest/toml.ts": "50e157e6cbf70121bce2b56adb4de7ba0406210aa534f5937e9af3aa4316209d",
+          "lib/nvke/operator-install-plan-immutable.ts": "d418895d6f2134cfcfdcdcb28ffee52e5dfec953abe52566791c38e5b17270f9",
+          "next.config.ts": "1d3ddbdcce8c394762c7201461a65ac8f02a31c4b7f4737a1b99c7950d17a46f",
+          "types/novnc.d.ts": "64e46e4f8b47f88a2968bd531fbbd6f576e7f065eeca393a2cfc634566721ad8"
+        },
+        "scope": "Observed formatter failures and three equivalent scoped locale-test tables; global typecheck and production build remain required"
+      }
+    },
+    "compilerLoading": {
+      "report": "/tmp/astrolift-nvke-app-main-sync-type-loading-v1.json",
+      "sha256": "f027f2e9ae74da619000b8405efa88d3bf9eccae89b802a3bc45d70a9e18a5c0",
+      "result": {
+        "exitCode": 0,
+        "elapsedSeconds": 34.8175858752802,
+        "checks": {
+          "listFilesExitCode": 0,
+          "fileCount": 6999
+        },
+        "scope": "Compiler loading diagnostic; not a semantic typecheck"
+      }
+    },
+    "compilerTrace": {
+      "report": "/tmp/astrolift-nvke-app-main-sync-type-trace-v1.json",
+      "sha256": "48c92f9a1c6223f9c46004d805b4e8beb90eca3f726fb20d2dd2b00bf3140934",
+      "result": {
+        "elapsedSeconds": 181.03219466563314,
+        "checks": {
+          "diagnosticTimedOut": true,
+          "traceBytes": 11744343,
+          "slowestCompletedSourceFiles": [
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/administration/access/principal-access.test.ts",
+              "milliseconds": 21342.01450000001
+            },
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/e2e/cluster-actions.spec.ts",
+              "milliseconds": 14977.516083000004
+            },
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/nvke/nvke-operator-install-plan-image-locales.test.ts",
+              "milliseconds": 7675.165207999975
+            },
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/models/modelobservationspanel.tsx",
+              "milliseconds": 3127.5644580000044
+            },
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/apps/overview/urlcard.tsx",
+              "milliseconds": 2931.1045839999915
+            },
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/lib/nvke/operator-install-plan.ts",
+              "milliseconds": 1412.7057089999914
+            },
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/list/list-copy.test.ts",
+              "milliseconds": 1127.2110419999958
+            },
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/models/modelconnectionpolicypanel.tsx",
+              "milliseconds": 1125.2797909999938
+            }
+          ],
+          "unfinishedSourceFiles": [
+            {
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/lib/apollo/approval-required.test.ts",
+              "observedMilliseconds": 230.17891599997878
+            }
+          ],
+          "longestEvents": [
+            {
+              "name": "checkDeferredNode",
+              "milliseconds": 21303.4235,
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/administration/access/principal-access.test.ts"
+            },
+            {
+              "name": "checkVariableDeclaration",
+              "milliseconds": 21279.969375,
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/administration/access/principal-access.test.ts"
+            },
+            {
+              "name": "checkExpression",
+              "milliseconds": 21279.326875,
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/components/screens/administration/access/principal-access.test.ts"
+            },
+            {
+              "name": "processRootFiles",
+              "milliseconds": 18933.205041999998,
+              "path": null
+            },
+            {
+              "name": "checkVariableDeclaration",
+              "milliseconds": 14829.121375,
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/e2e/cluster-actions.spec.ts"
+            },
+            {
+              "name": "checkExpression",
+              "milliseconds": 14826.609041999996,
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/e2e/cluster-actions.spec.ts"
+            },
+            {
+              "name": "checkExpression",
+              "milliseconds": 2774.6074170000256,
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/messages/zh-hans.json"
+            },
+            {
+              "name": "checkExpression",
+              "milliseconds": 1718.527875,
+              "path": "/users/ragelink/repos/lanes/astrolift-nvke-app-local-image-recovery/frontend/messages/ko.json"
+            }
+          ]
+        },
+        "scope": "Bounded compiler performance diagnostic; not a passing typecheck or release gate"
+      }
+    }
+  },
+  "qualifiedAssertions": [
+    "All 1284 NVKE unit tests pass across 90 reported suites without skips on the integrated main revision; global ESLint passes",
+    "The complete format scan identified exactly 27 files; those files and three changed locale tests pass focused formatting after repair, and every other tracked frontend file matches the complete scan source hashes",
+    "Three locale tables now pass only their relevant copy scopes to Vitest generics, preserving all eight locales, key-completeness/nonempty assertions and 24 passing cases without skips",
+    "Changed-file ESLint and diff checks pass; production changes in this checkpoint are formatter output only"
+  ],
+  "remainingObligations": [
+    "Full semantic frontend typecheck: the initial cold run hit a 600-second harness deadline without a diagnostic; loading 6999 files completed in 35 seconds and a bounded trace showed progress through expensive semantic checks",
+    "Current production build, shared-token Storybook/browser integration, final backend/SDK/CLI qualification and remaining native support gates",
+    "Adversarial final review, green coordinated PRs/history-preserving merge, CONFLICT deploy/live validation and actionable backlog"
+  ],
+  "protectedOriginalsAndSharedInstallerUnchanged": true
+}

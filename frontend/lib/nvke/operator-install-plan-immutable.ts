@@ -118,17 +118,15 @@ export function installPlanImmutableFormSchema(mode: NvkeImmutableMode) {
     });
 }
 
-const baseFields = z
-  .object(installPlanWorkloadMetadataSchema.shape)
-  .omit({
-    __typename: true,
-    itemCount: true,
-    resourceCount: true,
-    imageUseCount: true,
-    imageReferenceCount: true,
-    issueCount: true,
-    executionState: true,
-  }).shape;
+const baseFields = z.object(installPlanWorkloadMetadataSchema.shape).omit({
+  __typename: true,
+  itemCount: true,
+  resourceCount: true,
+  imageUseCount: true,
+  imageReferenceCount: true,
+  issueCount: true,
+  executionState: true,
+}).shape;
 const sourceFields = {
   ...baseFields,
   workloadId: guid,

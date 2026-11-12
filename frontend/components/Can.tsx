@@ -2,10 +2,7 @@
 
 import * as React from "react";
 
-import {
-  type PermissionCheck,
-  useMyPermissions,
-} from "@/lib/permissions/use-my-permissions";
+import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 interface CanProps {
   permission: PermissionCheck;

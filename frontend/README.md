@@ -13,14 +13,14 @@ npm run dev             # http://localhost:3000
 
 ## Commands
 
-| Command              | Description                    |
-|----------------------|--------------------------------|
-| `make dev`           | Start dev server               |
-| `make build`         | Production build               |
-| `make lint`          | Run ESLint                     |
-| `make fmt`           | Format with Prettier           |
-| `make fmt-check`     | Check formatting (CI)          |
-| `make codegen`       | Generate GraphQL types         |
-| `make clean`         | Remove build artifacts         |
+| Command          | Description            |
+| ---------------- | ---------------------- |
+| `make dev`       | Start dev server       |
+| `make build`     | Production build       |
+| `make lint`      | Run ESLint             |
+| `make fmt`       | Format with Prettier   |
+| `make fmt-check` | Check formatting (CI)  |
+| `make codegen`   | Generate GraphQL types |
+| `make clean`     | Remove build artifacts |
 
 See [`bootstrap.md`](bootstrap.md) for full conventions and architecture.

@@ -4,7 +4,10 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
-const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000").replace(/\/$/, "");
+const apiOrigin = (process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000").replace(
+  /\/$/,
+  ""
+);
 
 // In dev we want the browser to talk to the API on the same origin so
 // the Django sessionid cookie (HttpOnly + SameSite=Lax) lands on the

@@ -40,9 +40,5 @@ function makeClient(): ApolloClient {
 }
 
 export function ApolloWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <ApolloNextAppProvider makeClient={makeClient}>
-      {children}
-    </ApolloNextAppProvider>
-  );
+  return <ApolloNextAppProvider makeClient={makeClient}>{children}</ApolloNextAppProvider>;
 }

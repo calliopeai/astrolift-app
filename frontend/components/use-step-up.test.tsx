@@ -53,7 +53,9 @@ function mount(supportedMethods: string[], extra: unknown[] = []) {
 function refuse(detail: Partial<StepUpEventDetail>) {
   act(() => {
     window.dispatchEvent(
-      new CustomEvent(STEP_UP_EVENT, { detail: { operationName: "StartDeployment", message: "", ...detail } })
+      new CustomEvent(STEP_UP_EVENT, {
+        detail: { operationName: "StartDeployment", message: "", ...detail },
+      })
     );
   });
 }
@@ -100,13 +102,23 @@ it("falls back to the login method when the person declines the PIN", async () =
 
 it("falls back once a wrong PIN locks it", async () => {
   const wrongPin = {
-    request: { query: ELEVATE_ADMIN_SESSION, variables: { input: { method: "pin", credential: "000000" } } },
+    request: {
+      query: ELEVATE_ADMIN_SESSION,
+      variables: { input: { method: "pin", credential: "000000" } },
+    },
     result: {
       data: {
         elevateAdminSession: {
           __typename: "MutationResult",
           ok: false,
-          errors: [{ __typename: "MutationError", code: "PERMISSION_DENIED", message: "invalid credential", field: "credential" }],
+          errors: [
+            {
+              __typename: "MutationError",
+              code: "PERMISSION_DENIED",
+              message: "invalid credential",
+              field: "credential",
+            },
+          ],
           data: null,
         },
       },
