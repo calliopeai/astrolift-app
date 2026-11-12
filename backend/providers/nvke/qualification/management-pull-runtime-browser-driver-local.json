@@ -1,8 +1,8 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-11T20:51:17.561779+00:00",
+  "recordedAt": "2026-11-12T00:59:53.702163+00:00",
   "scope": "HTTP-linked correspondence review Storybook and owned browser/API qualification driver",
-  "status": "controlled-http-browser-preflight-qualified-actual-app-native-pairing-pending",
+  "status": "controlled-http-and-actual-native-app-cli-browser-read-qualified",
   "sourceParent": "b0f94f27a",
   "sourceSha256": {
     "frontend/components/screens/nvke/NvkeOperatorInstallPlanPullRuntimePanel.api.stories.tsx": "7e771e51b35fb6485e5dafe7ecc4d53e90a54b29cdecc5712a208247210971bc",
@@ -149,8 +149,133 @@
     "Reload after success clears result and sends no automatic read; focused tests cover actual HTTP-link loss/reload handling plus existing scoped epoch/controller regressions"
   ],
   "limits": [
-    "Controlled HTTP endpoint and valid Storybook metadata are not real App/PostgreSQL/SDK/agent/native evidence",
-    "Native SDK/agent public projection fix and earlier Secret-only CLI performance repair remain in separate active runs",
-    "No final connected API/native/browser claim, full NVKE completion, release/main merge or deployment"
-  ]
+    "Controlled peers and privileged nested containerd do not prove live kubelet adoption, registry authorization, workload scheduling or physical installation",
+    "Full operation navigation/repinning, remaining provider/credential/fresh-use/linked-admission and lifecycle release obligations remain incomplete",
+    "No final PR/main merge, CONFLICT deployment, full NVKE or backlog completion claimed"
+  ],
+  "actualConnectedRead": {
+    "report": "/tmp/astrolift-nvke-pull-runtime-host-native-v3.json",
+    "reportSha256": "dc2df05fcd7b09aeca7f2f7f7e2ab2922386842264f1c121b4e050e7b6dbdc8e",
+    "result": {
+      "exitCode": 0,
+      "elapsedSeconds": 2741.280440875329,
+      "checks": {
+        "hostSdkRequestPreflight": true,
+        "hostSdkIdentityVerified": true,
+        "hostSdkEqualsAuthenticatedNativeSummary": true,
+        "noContinuationAuthorized": true,
+        "proxySessions": 170,
+        "appStageExitCode": 0,
+        "actualAppParentRegistrationAndCliBrowserRead": true,
+        "nativeBeforeAfterAndNoNewCollectionAssertions": true,
+        "sourceFilesUnchanged": true,
+        "sdkFilesUnchanged": true,
+        "ownedCleanupComplete": true
+      },
+      "cleanup": [
+        {
+          "ownedProxy": 0
+        },
+        {
+          "ownedContainer": 0
+        }
+      ],
+      "sourceFiles": 229,
+      "sdkFiles": 252,
+      "programSha256": "a85c3af1b17dc80144af8dd7dd3e262cde15cbcadcb92faa447e26423597b724",
+      "network": "none",
+      "readOnlyRoot": true,
+      "privilegedNestedRuntime": true,
+      "cpus": 2,
+      "memoryGiB": 2,
+      "scope": "Host SDK over owned opaque mTLS bridge to actual native runtime correspondence fixture. Controlled uncertain original and Kubernetes peers. Includes App/PostgreSQL/CLI/browser only if corresponding explicit check passes; not physical installation qualification."
+    },
+    "hostSdkRequestBoundaryCounts": [
+      {
+        "label": "identity",
+        "state": "passed",
+        "count": 77
+      },
+      {
+        "label": "install-plan",
+        "state": "passed",
+        "count": 24
+      },
+      {
+        "label": "install-plan-charts",
+        "state": "passed",
+        "count": 6
+      },
+      {
+        "label": "install-plan-image-binding",
+        "state": "passed",
+        "count": 2
+      },
+      {
+        "label": "install-plan-node-platforms",
+        "state": "passed",
+        "count": 2
+      },
+      {
+        "label": "install-plan-pull-authority",
+        "state": "passed",
+        "count": 2
+      },
+      {
+        "label": "install-plan-pull-runtime-correspondence",
+        "state": "passed",
+        "count": 1
+      },
+      {
+        "label": "install-plan-pull-secret-analysis",
+        "state": "passed",
+        "count": 2
+      },
+      {
+        "label": "install-plan-tree",
+        "state": "passed",
+        "count": 2
+      },
+      {
+        "label": "install-plan-workload-inventory",
+        "state": "passed",
+        "count": 2
+      },
+      {
+        "label": "other-source-read",
+        "state": "passed",
+        "count": 50
+      }
+    ],
+    "requestCountScope": "Host SDK preflight only, measured before App stage; not App/browser traffic counts",
+    "actualApp": {
+      "report": "/tmp/astrolift-nvke-pull-runtime-host-browser-v2-app.json",
+      "reportSha256": "34631ae5218a64b792b1ab3623150671d331a573d01fe7482d64979f364ec989",
+      "result": {
+        "exitCode": 0,
+        "elapsedSeconds": 1991.8629597919062,
+        "appSourceFiles": 8447,
+        "helperSourceHashes": {
+          "pull_runtime_browser_qualification.py": "0bda51fb3b1f96592a04e0745963b980d5ba5f669304ff864e914d2bb761c7d9",
+          "pull_runtime_parent_qualification.py": "deb474c762596d51675d14a66963bb72edbf0d3e816c80096f1823a88762ecae",
+          "test_nvke_pull_runtime_browser.py": "07410aed9c0bf543ea648b055a994e059b3e78d5cce1e2723868a4d99b0f9097"
+        },
+        "compiledCliBuild": {
+          "exitCode": 0,
+          "elapsedSeconds": 18.46722404193133,
+          "revision": "b644533b8c81de34cea41c363deae8f08ac6f11a",
+          "binary": "/tmp/astrolift-nvke-pull-runtime-cli-clean-build-v1/astro",
+          "binarySha256": "6035290980bb9bf1f5585fad2668f6b622814ef18427e892bf6bc34c1acfba71",
+          "cleanVcsStamp": true,
+          "scope": "Clean binary for actual runtime-correspondence client pairing; no connected read pass claimed"
+        },
+        "allFrozenSourcesUnchanged": true,
+        "isolatedTestDatabase": "test_nvke_runtime_host_browser_v1",
+        "scope": "Real App parent registration, runtime read and browser over owned native handoff; controlled original, not physical install"
+      }
+    },
+    "pytestResult": "1 passed, 4 warnings in 1984.75s",
+    "applicationSourceRevision": "ce813f2bd23b105ac98ebe291d5b5d7365919960",
+    "scope": "Controlled original uncertain-install fixture and Kubernetes/registry peers; actual native stores/containerd, host SDK/mTLS, real App/PostgreSQL, clean compiled CLI and production browser hook/panel via HTTP-backed Storybook. No physical installation or real kubelet proof."
+  }
 }
