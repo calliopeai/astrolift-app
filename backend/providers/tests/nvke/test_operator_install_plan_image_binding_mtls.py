@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.nvke.support import PAIRED_OPSCODE_REVISION
+
 
 @pytest.mark.skipif(
     not all(
@@ -27,7 +29,7 @@ import pytest
 )
 def test_real_image_binding_sdk_mtls_lost_reply_and_cold_recovery(tmp_path):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "c67a6fe"
+    revision = PAIRED_OPSCODE_REVISION
     archive = subprocess.check_output(["git", "archive", revision, "kubernetes/nvke"], cwd=source)
     with tarfile.open(fileobj=io.BytesIO(archive)) as files:
         for entry in files:

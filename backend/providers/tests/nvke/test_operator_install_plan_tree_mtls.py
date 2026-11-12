@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.nvke.support import PAIRED_OPSCODE_REVISION
+
 
 @pytest.mark.skipif(
     not all(
@@ -19,7 +21,7 @@ import pytest
 )
 def test_real_sdk_mtls_tree_lost_reply_cold_agent_recovery_and_private_retry(tmp_path):
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
-    revision = "8ad214a1a71f6b082707da5317e20a612a54ae7e"
+    revision = PAIRED_OPSCODE_REVISION
     for name in (
         "operator_agent.py",
         "operator_contract.py",

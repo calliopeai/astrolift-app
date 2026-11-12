@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+PAIRED_OPSCODE_REVISION = "3ebe6356740272773f6216b7f98c70cb08a93af0"
+
 UUID = "123e4567-e89b-12d3-a456-426614174000"
 TOKEN = "private-bearer-do-not-log"
 PUBLIC_SPECS = {

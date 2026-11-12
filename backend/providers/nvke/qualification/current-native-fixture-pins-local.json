@@ -1,0 +1,76 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-12T21:45:40.839341+00:00",
+  "issue": 2693,
+  "status": "shared-current-ops-fixture-pin-implemented-native-and-browser-tests-pending",
+  "pairedOpsRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0",
+  "scope": "Common agent plus six standalone SDK mTLS recovery families share one exact reviewed Ops revision from tests/nvke/support.py. Archive and file-byte provenance checks remain enforced; no fixture source check is removed.",
+  "verification": {
+    "static": {
+      "report": "/tmp/astrolift-nvke-fixture-pin-static-v1.json",
+      "sha256": "5c157267f15266adf69aec353ab208d76ebe3c32f81ba807f910ebe513d9a94e",
+      "result": {
+        "exitCode": 0,
+        "checks": [
+          {
+            "command": [
+              "/opt/homebrew/bin/ruff",
+              "format",
+              "backend/providers/tests/nvke/support.py",
+              "backend/providers/tests/nvke/test_operator_agent_client.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_context_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_image_binding_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_image_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_local_image_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_verification_mtls.py"
+            ],
+            "exitCode": 0
+          },
+          {
+            "command": [
+              "/opt/homebrew/bin/ruff",
+              "check",
+              "backend/providers/tests/nvke/support.py",
+              "backend/providers/tests/nvke/test_operator_agent_client.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_context_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_image_binding_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_image_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_local_image_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py",
+              "backend/providers/tests/nvke/test_operator_install_plan_verification_mtls.py"
+            ],
+            "exitCode": 0
+          },
+          {
+            "command": [
+              "git",
+              "diff",
+              "--check"
+            ],
+            "exitCode": 0
+          }
+        ],
+        "sourceSha256": {
+          "backend/providers/tests/nvke/support.py": "58928fca8394b1534de0f33353ef528915aeeddb33839f7d01f426b45b332378",
+          "backend/providers/tests/nvke/test_operator_agent_client.py": "5e81a1f2028ab8c2e9d179cea1ed56e731e36a95387599b665aa545fab3631fa",
+          "backend/providers/tests/nvke/test_operator_install_plan_context_mtls.py": "5b5679ca29ac9fd89c64b4417ef4d4b43eb463296650a4fe91c2df7ba790ccbc",
+          "backend/providers/tests/nvke/test_operator_install_plan_image_binding_mtls.py": "fcada4de9a813559175a00641d9cb8a727ba8cd23491d10f2f5b7c301376226b",
+          "backend/providers/tests/nvke/test_operator_install_plan_image_mtls.py": "a4b1055afd7cab84bab7de53e2974bd51261f4c2bd2faa21b572b6b3d9cab059",
+          "backend/providers/tests/nvke/test_operator_install_plan_local_image_mtls.py": "4624c3b617817d216f465c7d02f2e1ecc69578c402d821ec90f32bdb3f514192",
+          "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py": "b10c7c61e5dd35f0efcdb99af00390aa2ee00f8b38eaa2d8237f6263d381ede0",
+          "backend/providers/tests/nvke/test_operator_install_plan_verification_mtls.py": "b811eb7e9d526b66f97fea90bc352cbe04b955417fa26316548166f123e1149f"
+        }
+      }
+    }
+  },
+  "pending": [
+    "Requalify complete operator SDK/API files against the shared current Ops revision",
+    "Six SDK native render/image/tree mTLS lost-reply and cold recovery cases",
+    "Five remaining browser integrations using actual local Chromium/Postgres/Temporal/mTLS",
+    "33 real local Kubernetes/envtest admission cases",
+    "Fresh complete native install/access, enrolled profile/cold, linked continuation and fresh-use authority",
+    "Final paired release review, main merge and deployment"
+  ],
+  "releaseQualified": false
+}

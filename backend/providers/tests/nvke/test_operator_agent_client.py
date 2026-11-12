@@ -26,11 +26,11 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from nvke.client import NvkeError
 from nvke.operator_agent_client import OperatorAgentClient, verify_contract
 from nvke.operator_contract import CATALOG, REVISION, canonical
+from tests.nvke.support import PAIRED_OPSCODE_REVISION
 
 SITE, INSTANCE, JOB = str(uuid4()), str(uuid4()), str(uuid4())
 INTENT = "b" * 64
 DIGEST, PRIVATE = "a" * 64, "PRIVATE_OPERATOR_INPUT"
-PAIRED_OPSCODE_REVISION = "e9b728536557cf48169f0c2427ca58c6f4c8fae6"
 
 
 def payload(site=SITE):
