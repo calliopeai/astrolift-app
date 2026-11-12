@@ -1000,6 +1000,13 @@ async def test_bounded_failure_history_marks_limit_without_fetching_an_extra_eve
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
+# The production heartbeat timeout (deploy_app._NATIVE_HEARTBEAT). The SDK sends
+# a heartbeat every 0.8 of this at most, so the 2 s used before left 0.4 s of
+# slack and a loaded runner timed the activity out mid-test (#2691). The Worker
+# below caps that throttle at one second so cancellation still arrives quickly.
+_HEARTBEAT_TIMEOUT = timedelta(seconds=30)
+_HEARTBEAT_THROTTLE = timedelta(seconds=1)
+
 
 @workflow.defn(name="DeployAppWorkflow")
 class ConfigurationWorkflow:
@@ -1010,7 +1017,7 @@ class ConfigurationWorkflow:
                 configure_native_endpoint_deployment,
                 input,
                 start_to_close_timeout=timedelta(seconds=900),
-                heartbeat_timeout=timedelta(seconds=2),
+                heartbeat_timeout=_HEARTBEAT_TIMEOUT,
                 cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
@@ -1048,7 +1055,7 @@ class SameRunRecoveryWorkflow:
                     configure_native_endpoint_deployment,
                     input,
                     start_to_close_timeout=timedelta(seconds=900),
-                    heartbeat_timeout=timedelta(seconds=2),
+                    heartbeat_timeout=_HEARTBEAT_TIMEOUT,
                     retry_policy=RetryPolicy(maximum_attempts=1),
                 )
                 attempts.append(asdict(result))
@@ -1371,6 +1378,7 @@ async def run(
             activities=[configure_native_endpoint_deployment],
             activity_executor=executor,
             workflow_runner=UnsandboxedWorkflowRunner(),
+            max_heartbeat_throttle_interval=_HEARTBEAT_THROTTLE,
         ):
             try:
                 row, _, _ = await sync_to_async(dispatch_context)(w, client)
