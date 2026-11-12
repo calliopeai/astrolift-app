@@ -1,0 +1,45 @@
+name: Cancel merged PR CI
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/cancel-merged-pr-ci.yml
+      - .github/scripts/cancel-merged-pr-ci*
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test .github/scripts/cancel-merged-pr-ci.test.cjs
+
+  cancel:
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      # The write token only executes trusted base-branch code, never PR code.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const cancel = require('./.github/scripts/cancel-merged-pr-ci.cjs');
+            await cancel({ github, context, core });
