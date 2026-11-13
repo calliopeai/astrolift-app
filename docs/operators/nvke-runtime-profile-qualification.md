@@ -22,16 +22,20 @@ Completed local checks for this change:
 - Changed-source Ruff, Prettier and ESLint checks pass. Canonical frontend lint,
   type checking and the production build completed successfully.
 
-Release verification remains incomplete. The whole frontend run reported
-60 failures among 19,856 tests. After the NVKE screen correction, a serial run of
-the 21 selected suites reported 7,120 passes and 47 failures among 7,167 tests,
-with no pending tests. A separate isolated Linux run passed all 7,167 selected
-tests and canonical lint with the same source, assertions and deadlines. Its
-later typecheck exhausted Node's default 2 GB heap. This does not erase the
-earlier failures or prove the whole suite passes. A new full-suite Linux run has
-an explicit 4 GB heap, two CPU affinity and the same test deadlines; its result
-is pending. No timeout or expectation was relaxed. Local typecheck and production
-build results above remain successful.
+The exact frontend inputs now pass the full isolated Linux suite: 19,857 tests,
+zero failures or pending tests, plus canonical lint and typecheck. The initial
+production build in that run was killed with exit137; the kernel records a
+container memory-limit OOM. A build-only run with the same 8,470 tracked App
+inputs, installed dependencies and canonical `npm run build` command passes in
+464.23 seconds. It retains two CPU affinity and a 4 GB V8 heap, with the container
+limit increased from 6 GB to 10 GB. All tracked inputs remain byte-identical.
+No test deadline, expectation or TypeScript check was relaxed.
+
+Earlier macOS results remain recorded: 60 failures among 19,856 tests; after the
+NVKE screen correction, 47 failures among the 7,167 selected tests. Linux passed
+all 7,167 selected tests before the complete run above. The first selected Linux
+run's typecheck exhausted Node's default 2 GB heap. These failed runs are retained
+as resource/platform evidence; the later successful results do not relabel them.
 
 The final current Opscode pin, combined native SDK qualification, full clean
 installation/access/check, safe linked continuation and release/deployment gates
