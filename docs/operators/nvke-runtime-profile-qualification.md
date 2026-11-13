@@ -40,3 +40,12 @@ as resource/platform evidence; the later successful results do not relabel them.
 The final current Opscode pin, combined native SDK qualification, full clean
 installation/access/check, safe linked continuation and release/deployment gates
 remain open. The existing exact SDK fixture pin is unchanged by this commit.
+
+The isolated API and production Temporal worker have also adopted this App
+revision. All 20 NVKE model-table snapshots and 10 operations remain unchanged,
+with no active workflows. The worker registers 80 workflows and 220 activities;
+the current SDK accepts 2.3.4 and refuses neighboring 2.3.5. Actual scoped CLI
+reads preserve the original failed management operation at UNCERTAIN/version14.
+Current-source CLI/API/mTLS agent verification, 34-workload review and a
+controller-only remaining-install proposal pass. Private capability adoption,
+reviewed execution and platform deployment remain open.
