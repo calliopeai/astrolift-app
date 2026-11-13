@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-12T21:41:31.836166+00:00",
+  "recordedAt": "2026-11-13T01:52:33.603842+00:00",
   "issue": 2693,
   "status": "frontend-exact-source-equivalence-verified-connected-native-release-pending",
   "verifiedAppRevision": "a90f403723dbb0d8a6b95cd1919500667884f183",
@@ -48,7 +48,8 @@
         },
         "scope": "Current-main static Storybook build and actual Chromium NVKE story/accessibility/provider/journal checks using controlled UI fixtures; no native/API readiness claim"
       }
-    }
+    },
+    "laterFixtureGateRecord": "current-merged-fixture-gates-local.json"
   },
   "qualifiedAssertions": [
     "The complete tracked frontend tree, including dependency lockfile and browser runners, is identical to the successful semantic typecheck/full-format/production build source",
@@ -56,10 +57,9 @@
   ],
   "scope": "Source equivalence carries existing frontend evidence to current-main-integrated release source. This is not a new test run and does not qualify connected APIs, native effects or deployed authentication.",
   "pending": [
-    "Four real operator browser integrations",
-    "Fresh complete native install/access and exact enrolled-node hot/cold profile proof",
+    "Fresh complete native install/access",
     "Linked continuation and fresh phase/resource/credential/image authority",
-    "Final paired release review, green main merge and deployment"
+    "Coordinated current Ops/SDK source alignment, final paired release review, green main merge and deployment"
   ],
   "releaseQualified": false
 }

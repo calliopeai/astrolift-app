@@ -1,0 +1,104 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-13T01:52:33.603842+00:00",
+  "issue": 2693,
+  "status": "all-six-standalone-sdk-native-recovery-families-qualified-on-linux",
+  "appRevision": "cd4b07428ba939fe54393fac8714396c76e3ba47",
+  "pairedOpsCodeRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0",
+  "sourceFilesMatchedCurrentWorktree": 804,
+  "verification": {
+    "result": {
+      "exitCode": 0,
+      "checks": {
+        "imageArchiveVerified": true,
+        "inputsArchiveVerified": true,
+        "allInputFilesVerified": true,
+        "inputFiles": 3584,
+        "exactRuntimeImageLoaded": true,
+        "runtimeIdentity": {
+          "sourceIndex": "sha256:094338b63c9ed2e99b2ad9fcb60ab6b3ca9f91a01587fc9e94480a728618ef34",
+          "platformManifest": "sha256:4f58c71ed197398c96470d2804837c9912fa40bcb31f1393261fd9cddf9c0cc3",
+          "dockerConfig": "sha256:2f1249059323815cd9edbf9415e1eca0ff686e985003c8d6434b6137ebf58096",
+          "allRootfsDiffIdsMatched": true
+        },
+        "sdkInputFilesVerified": true,
+        "sdkAppRevision": "cd4b07428ba939fe54393fac8714396c76e3ba47",
+        "sdkOpsRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0",
+        "sdkRuntimeImage": "sha256:cae19aa166c481fdd8ee7e62465efa262a12f5f59e2ae219e2bc1e41279ddca1",
+        "testProcessExitCode": 0,
+        "privateDiagnosticsRetained": true,
+        "inputFilesUnchanged": true,
+        "ownedNetworkRemoved": true,
+        "ownedVolumeRemoved": true
+      },
+      "elapsedSeconds": 684.7523831670005,
+      "instanceId": "i-0415cf2e2f4de60e5",
+      "cpus": 2,
+      "memoryMiB": 4096,
+      "profile": "kubernetes/v1.36.4",
+      "scope": "Six standalone actual SDK mTLS/native recovery families with byte-identical pinned Git archive source on isolated ARM64 Linux; unchanged production/default budgets and all authority checks; controlled original parents, not full install/continuation qualification"
+    },
+    "report": "/Users/ragelink/repos/lanes/astrolift-nvke-linux-qualification-tools/isolated-aws-runners/da6b62a1d902/sdk-recovery-v2-retained/result.json",
+    "sha256": "1010ef48078dd2921b33419975756db8646e23e61b60aeb102e861c3cd708a74",
+    "junitTotals": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "junitSha256": "ecbb6249efefc295bf9d9ffb833e4d37643ba7e037a7948136690476f0f46a67",
+    "cases": [
+      {
+        "name": "test_real_context_sdk_mtls_lost_reply_and_cold_recovery",
+        "elapsedSeconds": 59.782
+      },
+      {
+        "name": "test_real_image_binding_sdk_mtls_lost_reply_and_cold_recovery",
+        "elapsedSeconds": 350.863
+      },
+      {
+        "name": "test_real_image_sdk_mtls_lost_reply_and_cold_recovery",
+        "elapsedSeconds": 78.062
+      },
+      {
+        "name": "test_real_local_image_sdk_mtls_lost_reply_and_cold_recovery",
+        "elapsedSeconds": 76.152
+      },
+      {
+        "name": "test_real_sdk_mtls_tree_lost_reply_cold_agent_recovery_and_private_retry",
+        "elapsedSeconds": 29.242
+      },
+      {
+        "name": "test_real_verification_sdk_mtls_lost_reply_and_cold_recovery",
+        "elapsedSeconds": 56.325
+      }
+    ],
+    "privateLogSha256": "e1255785bc9a26a85edb0675be8384b1afbc3d19724954323f7ae794bd61ee13",
+    "privateOutputSha256": "38718b2d12a605b8faaba1384325a0577e711de55049af8f04f079043b84a7c0",
+    "dependencyManifestSha256": "69314f88dbd73b4ce5bd1af3efe6de4be64fc6c40daa16ec088485860b8d34d3",
+    "package": {
+      "exitCode": 0,
+      "uri": "s3://astrolift-nvke-qual-da6b62a1d902-790347818717/qualification/da6b62a1d902/sdk-inputs-v1.tar.gz",
+      "sha256": "084167aa58d3fca0276739cda075e097991c4694091dc8b5765e097dd517c9fa",
+      "bytes": 16077197,
+      "files": 1478,
+      "appRevision": "cd4b07428ba939fe54393fac8714396c76e3ba47",
+      "opsRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0",
+      "gitArchiveByteIdentical": true,
+      "elapsedSeconds": 21.11484258249402
+    }
+  },
+  "qualifiedAssertions": [
+    "Actual SDK/mTLS and pinned native helpers retain lost-reply ambiguity, cold recovery and private retry assertions for context/image-binding/image/local-image/tree/verification.",
+    "All six pass together, zero failures/errors/skips; original driver deadlines and source-watch/authority checks unchanged.",
+    "Byte-identical real Git archive of pinned Ops commit used; all staged inputs unchanged, current provider Python/Go/TOML sources match archived inputs.",
+    "Image binding completes in350.863 seconds on supported Linux/Python3.12 runtime, versus retained Darwin1800-second timeout.",
+    "Owned fixture network and output volume removed successfully."
+  ],
+  "limitations": [
+    "Controlled failed-run/tree/image and Kubernetes fixtures; not full bootstrap/install/access or production original-source/freshness/linked-execution authority.",
+    "Current Ops6778357 contains the newly qualified native PodList parser/fixture fixes; coordinated merge/repin/requalification is still required before final release.",
+    "Final current-main sync, adversarial review, exact-release gates, PR/main merge, deployment/live proof and backlog remain incomplete."
+  ],
+  "releaseQualified": false
+}

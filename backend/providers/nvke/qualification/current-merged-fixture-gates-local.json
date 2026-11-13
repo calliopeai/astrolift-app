@@ -1,9 +1,9 @@
 {
   "format": 1,
-  "recordedAt": "2026-11-13T00:46:27.850825+00:00",
+  "recordedAt": "2026-11-13T01:52:33.603842+00:00",
   "issue": 2693,
   "sourceRevision": "b4637b504be81745e36e19084e8d7971bfeb94ee",
-  "status": "qualified-fixture-branches-integrated-native-sdk-and-lifecycle-still-incomplete",
+  "status": "admission-connected-browser-and-six-native-sdk-fixture-gates-qualified-full-lifecycle-open",
   "changedPathsSince119SdkApiAndFiveBrowserQualification": [
     "backend/astrolift_clusters/tests/test_nvke_browser_integration.py",
     "backend/astrolift_clusters/tests/test_nvke_operator_browser_integration.py",
@@ -126,14 +126,33 @@
         "elapsedSeconds": 195.85859558265656,
         "scope": "33 exact previously skipped cases with distinct etcd self-client certificate, resource cache readiness and metadata audit; owned source-built macOS API/etcd and six actual pinned CRDs, real idle owned PostgreSQL and separate Temporal namespace; no native lifecycle or continuation claim"
       }
+    },
+    "sixNativeSdkRecoveryFamilies": {
+      "record": "current-sdk-native-recovery-linux-local.json",
+      "sha256": "04fbb4440f5758ece398b9084dacaa1a13851c32a238f347b9a494bea7b1327b",
+      "junitTotals": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "pairedOpsCodeRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0"
+    },
+    "actualEnrolledProfile": {
+      "opsRevision": "6778357",
+      "record": "kubernetes/nvke/qualification/kubelet-enrolled-profile-local.json",
+      "actualCases": 3,
+      "fixtureRegressions": 3,
+      "passed": 6,
+      "skipped": 0,
+      "scope": "Paired Ops lane proof; not a claim that new Ops source is already integrated into the SDK fixture pin."
     }
   },
-  "scope": "Exact merged backend/provider lint, selected browser runner lint/format, source-equivalent prior complete SDK/API and UI production tree, actual four connected browser and 33 admission cases on their retained unchanged source manifests",
+  "scope": "Current provider SDK sources and pinned Ops3ebe635 pass all six actual native recovery families on Linux; retained33real admission and4connected browser cases pass, with prior production SDK/API/UI source-equivalent proof. Full native lifecycle and final integration remain open.",
   "pending": [
-    "Five remaining standalone SDK recovery families, including diagnosed image-binding outer deadline",
-    "Actual enrolled-profile native qualification on isolated runner",
     "Native full lifecycle and source/phase/resource/credential/image use authority plus linked continuation",
-    "Final coordinated exact-release checks/review/PRs/main merge/CONFLICT deployment and live validation"
+    "Coordinated Ops merge and SDK source repin/requalification after native parser/fixture changes",
+    "Final coordinated exact-release checks/review/PR/main merge/CONFLICT deployment and live validation"
   ],
   "releaseQualified": false
 }
