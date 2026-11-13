@@ -1,0 +1,139 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-13T00:46:27.850825+00:00",
+  "issue": 2693,
+  "sourceRevision": "b4637b504be81745e36e19084e8d7971bfeb94ee",
+  "status": "qualified-fixture-branches-integrated-native-sdk-and-lifecycle-still-incomplete",
+  "changedPathsSince119SdkApiAndFiveBrowserQualification": [
+    "backend/astrolift_clusters/tests/test_nvke_browser_integration.py",
+    "backend/astrolift_clusters/tests/test_nvke_operator_browser_integration.py",
+    "backend/providers/nvke/qualification/current-connected-browser-local.json",
+    "backend/providers/nvke/qualification/current-native-fixture-pins-local.json",
+    "backend/providers/nvke/qualification/darwin-native-test-capacity-local.json",
+    "backend/providers/nvke/qualification/owned-host-admission-local.json",
+    "backend/providers/tests/nvke/fixtures/build_owned_envtest.py",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_context_driver.py",
+    "backend/providers/tests/nvke/fixtures/nvke_operator_image_binding_driver.py",
+    "backend/providers/tests/nvke/fixtures/owned_envtest.py",
+    "backend/providers/tests/nvke/support.py",
+    "backend/providers/tests/nvke/test_operator_agent_client.py",
+    "backend/providers/tests/nvke/test_operator_install_plan_context_mtls.py",
+    "backend/providers/tests/nvke/test_operator_install_plan_image_binding_mtls.py",
+    "backend/providers/tests/nvke/test_operator_install_plan_image_mtls.py",
+    "backend/providers/tests/nvke/test_operator_install_plan_local_image_mtls.py",
+    "backend/providers/tests/nvke/test_operator_install_plan_tree_mtls.py",
+    "backend/providers/tests/nvke/test_operator_install_plan_verification_mtls.py",
+    "frontend/e2e/nvke-stop-connected-runner.mjs"
+  ],
+  "productionBackendAndUiSourcesUnchanged": true,
+  "verification": {
+    "ciLint": {
+      "report": "/tmp/astrolift-nvke-paired-ci-lint-v6.json",
+      "sha256": "c407f766cae5a7d4a3bbd11d47a96fabd7de3fe31799fbd32fce28ae00c97626",
+      "result": {
+        "exitCode": 0,
+        "checks": [
+          {
+            "name": "backend-format",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v6-backend-format.log"
+          },
+          {
+            "name": "backend-lint",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v6-backend-lint.log"
+          },
+          {
+            "name": "providers-lint",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v6-providers-lint.log"
+          },
+          {
+            "name": "providers-format",
+            "exitCode": 0,
+            "log": "/tmp/astrolift-nvke-paired-ci-lint-v6-providers-format.log"
+          }
+        ],
+        "elapsedSeconds": 3.1772876670584083,
+        "scope": "Exact CI backend Ruff 0.6.9, provider Ruff 0.15.0 full package checks, no source mutation"
+      }
+    },
+    "browserRunnerStatic": {
+      "report": "/tmp/astrolift-nvke-browser-runner-static-v1.json",
+      "sha256": "d2fc34df4f69a35f2236038708b4cab88f397986975502faed42060a5e5d2785",
+      "result": {
+        "exitCode": 0,
+        "checks": [
+          {
+            "command": [
+              "/Users/ragelink/.nvm/versions/node/v22.23.4/bin/node",
+              "node_modules/prettier/bin/prettier.cjs",
+              "--check",
+              "e2e/nvke-stop-connected-runner.mjs"
+            ],
+            "exitCode": 0
+          },
+          {
+            "command": [
+              "/Users/ragelink/.nvm/versions/node/v22.23.4/bin/node",
+              "node_modules/eslint/bin/eslint.js",
+              "e2e/nvke-stop-connected-runner.mjs"
+            ],
+            "exitCode": 0
+          }
+        ]
+      }
+    },
+    "allFourConnectedBrowser": {
+      "report": "/tmp/astrolift-nvke-browser-final-ready-v1.json",
+      "sha256": "6410beef49b1871624c4784d39929ba8e1ad99fa8c6aaa409dfe9a82139ce9fb",
+      "result": {
+        "exitCode": 0,
+        "checks": {
+          "reusedOnlyIdleOwnedTestDatabase": true,
+          "testProcessExitCode": 0,
+          "junitTotals": {
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "sourcesUnchanged": true
+        },
+        "elapsedSeconds": 269.89794404245913,
+        "scope": "All three fence modes plus actual native-generation/lost-admission/artifact/reconciliation in one batch with namespace registered before worker start, real idle PostgreSQL, Temporal and mTLS agent; unrelated original batch remains preserved"
+      }
+    },
+    "all33NativeAdmission": {
+      "report": "/tmp/astrolift-nvke-owned-host-admission-33-v2.json",
+      "sha256": "fba47d11080686d6ee476248f8dcfef148797786381896edd7b138365b03c2ae",
+      "result": {
+        "exitCode": 0,
+        "checks": {
+          "reusedOnlyIdleOwnedTestDatabase": true,
+          "sixActualCrdsEstablished": true,
+          "testProcessExitCode": 0,
+          "junitTotals": {
+            "tests": 33,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "sourcesUnchanged": true,
+          "serverExitCode": 0,
+          "ownedComponentStopMarker": true
+        },
+        "elapsedSeconds": 195.85859558265656,
+        "scope": "33 exact previously skipped cases with distinct etcd self-client certificate, resource cache readiness and metadata audit; owned source-built macOS API/etcd and six actual pinned CRDs, real idle owned PostgreSQL and separate Temporal namespace; no native lifecycle or continuation claim"
+      }
+    }
+  },
+  "scope": "Exact merged backend/provider lint, selected browser runner lint/format, source-equivalent prior complete SDK/API and UI production tree, actual four connected browser and 33 admission cases on their retained unchanged source manifests",
+  "pending": [
+    "Five remaining standalone SDK recovery families, including diagnosed image-binding outer deadline",
+    "Actual enrolled-profile native qualification on isolated runner",
+    "Native full lifecycle and source/phase/resource/credential/image use authority plus linked continuation",
+    "Final coordinated exact-release checks/review/PRs/main merge/CONFLICT deployment and live validation"
+  ],
+  "releaseQualified": false
+}
