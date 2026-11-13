@@ -92,6 +92,8 @@ it("refuses duplicate UIDs, private controls and node/platform aliases", () => {
     { "worker-a\n": node },
     { node: { ...node, UID: "alias" } },
     { node: { ...node, runtimeProfile: "containerd/v99" } },
+    { node: { ...node, runtimeProfile: "containerd/v2.3.3" } },
+    { node: { ...node, runtimeProfile: "containerd/v2.3.5" } },
     { node: { ...node, platform: { ...node.platform, helperProgram: "/PRIVATE" } } },
     { node: { ...node, platform: { ...node.platform, "os.features": [null] } } },
   ])

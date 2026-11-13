@@ -88,6 +88,26 @@ def call(sdk, *, read_only=False, value=None):
     return method(JOB, intent=INTENT, body=value, **SOURCE)
 
 
+@pytest.mark.parametrize("profile", sorted(protocol.PROFILES))
+def test_each_exact_runtime_profile_reaches_the_sdk_transport(profile):
+    sdk, calls = peer()
+    value = body()
+    value["nodePlatforms"]["owned-node"]["runtimeProfile"] = profile
+    with sdk:
+        assert call(sdk, value=value) == summary()
+    assert sum(method == "POST" for method, _, _ in calls) == 1
+
+
+@pytest.mark.parametrize("profile", ["containerd/v2.3.3", "containerd/v2.3.5", "containerd/v2.3.4+vendor"])
+def test_unqualified_neighboring_versions_refuse_before_transport(profile):
+    sdk, calls = peer()
+    value = body()
+    value["nodePlatforms"]["owned-node"]["runtimeProfile"] = profile
+    with sdk, pytest.raises(NvkeError):
+        call(sdk, value=value)
+    assert calls == []
+
+
 def test_prepare_and_offline_read_preserve_closed_summary():
     sdk, calls = peer()
     with sdk:

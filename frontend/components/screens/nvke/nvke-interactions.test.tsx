@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import messages from "@/messages/en.json";
+import { NvkeSiteScreen } from "./NvkeSiteScreen";
 import { NvkeNativePanel } from "./NvkeNativePanel";
 import { NvkeOperationScreen } from "./NvkeOperationScreen";
 import { NvkeSitesScreen } from "./NvkeSitesScreen";
@@ -303,3 +304,33 @@ it.each(["pending", "read-only", "error"])(
       ).not.toBeInTheDocument();
   }
 );
+
+it("keeps every fixed interface configuration accessible without a second table", async () => {
+  const onConfigure = vi.fn().mockResolvedValue(true);
+  const view = render(<NvkeSiteScreen {...SITE_DETAIL} onConfigure={onConfigure} />, {
+    wrapper: Context,
+  });
+  for (const surface of ["controller", "tenant", "operator", "datastore"]) {
+    const group = screen.getByRole("group", { name: surface });
+    expect(
+      within(group).getByRole("button", {
+        name: `${messages.nvke.configure} · ${surface}`,
+      })
+    ).toBeEnabled();
+  }
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: `${messages.nvke.configure} · controller`,
+    })
+  );
+  const dialog = await screen.findByRole("dialog");
+  expect(within(dialog).getByLabelText(messages.nvke.endpoint)).toHaveValue(
+    SITE_DETAIL.site!.connections.find((row) => row.surface === "CONTROLLER")!.endpoint
+  );
+  expect(onConfigure).not.toHaveBeenCalled();
+  view.unmount();
+  render(<NvkeSiteScreen {...SITE_DETAIL} access={{ ...SITE_DETAIL.access, admin: false }} />, {
+    wrapper: Context,
+  });
+  expect(screen.queryByRole("button", { name: /Configure ·/ })).not.toBeInTheDocument();
+});

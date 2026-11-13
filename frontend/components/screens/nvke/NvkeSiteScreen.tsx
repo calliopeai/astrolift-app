@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CableIcon, ClockIcon, RefreshCwIcon } from "lucide-react";
+import { ClockIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -12,7 +12,7 @@ import { PageShell } from "@/components/PageShell";
 import { type Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { useCursorTableList } from "@/components/list/use-cursor-table-list";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -47,7 +47,6 @@ import { NvkeMetricsPanel } from "./NvkeMetricsPanel";
 import { NvkeWorkloadAccessPanel } from "./NvkeWorkloadAccessPanel";
 import { connectionSchema } from "./schema";
 import {
-  fixedNvkeTable,
   nvkeSurfaces,
   type NvkeConnectionValues,
   type NvkeOperationView,
@@ -85,18 +84,6 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
   });
   const credentialMode = useWatch({ control: form.control, name: "credentialMode" });
   const allowHttp = useWatch({ control: form.control, name: "allowHttp" });
-  const connectionTable = fixedNvkeTable(
-    nvkeSurfaces.map((surface) => ({
-      surface,
-      connection: site?.connections.find((c) => c.surface === surface) ?? null,
-    }))
-  );
-  const connectionList = useCursorTableList(connectionTable, {
-    id: "nvke.connections",
-    label: t("interfaces"),
-    searchPlaceholder: "",
-    searchable: false,
-  });
   const operationList = useCursorTableList(operations, {
     id: "nvke.operations",
     label: t("operations"),
@@ -130,37 +117,6 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
     surface,
     connection: site?.connections.find((c) => c.surface === surface) ?? null,
   }));
-  const connectionColumns: Column<(typeof connections)[number]>[] = [
-    {
-      id: "surface",
-      header: t("interfaces"),
-      cell: (row) => <code>{row.surface.toLowerCase()}</code>,
-    },
-    {
-      id: "endpoint",
-      header: t("endpoint"),
-      cellClassName: "max-w-96",
-      cell: (row) => (
-        <span className="block truncate font-mono text-xs" title={row.connection?.endpoint}>
-          {row.connection?.endpoint ?? t("notConfigured")}
-        </span>
-      ),
-    },
-    {
-      id: "credentials",
-      header: t("credentials"),
-      cell: (row) => (row.connection?.hasCredentials ? t("stored") : t("none")),
-    },
-    {
-      id: "verification",
-      header: t("verification"),
-      cell: (row) => (
-        <Badge variant="outline">
-          {row.connection?.verifiedAt ? t("verified") : t("notVerified")}
-        </Badge>
-      ),
-    },
-  ];
   const operationColumns: Column<NvkeOperationView>[] = [
     {
       id: "key",
@@ -269,28 +225,57 @@ export function NvkeSiteScreen(props: NvkeSiteScreenProps) {
         ]}
       />
       <Section title={t("interfaces")} description={t("connectionsHelp")}>
-        <ListPage
-          embedded
-          bounded
-          list={connectionList}
-          rows={connections}
-          label={t("interfaces")}
-          columns={connectionColumns}
-          getRowId={(row) => row.surface}
-          rowActions={
-            access.admin
-              ? (row) => (
-                  <DropdownMenuItem
+        <div className="grid min-w-0 gap-4 md:grid-cols-2">
+          {connections.map((row) => (
+            <Card
+              key={row.surface}
+              role="group"
+              aria-labelledby={`nvke-interface-${row.surface.toLowerCase()}`}
+            >
+              <CardHeader className="flex flex-wrap items-center justify-between gap-2">
+                <h3 id={`nvke-interface-${row.surface.toLowerCase()}`} className="font-medium">
+                  <code>{row.surface.toLowerCase()}</code>
+                </h3>
+                {access.admin && (
+                  <Button
+                    variant="outline"
                     disabled={!mayConfigure}
-                    onSelect={() => openConnection(row.surface)}
+                    onClick={() => openConnection(row.surface)}
                   >
                     {t("configure")} · {row.surface.toLowerCase()}
-                  </DropdownMenuItem>
-                )
-              : undefined
-          }
-          empty={{ icon: <CableIcon />, title: t("notConfigured") }}
-        />
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <DefinitionList
+                  orientation="stack"
+                  items={[
+                    {
+                      term: t("endpoint"),
+                      description: (
+                        <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                          {row.connection?.endpoint ?? t("notConfigured")}
+                        </span>
+                      ),
+                    },
+                    {
+                      term: t("credentials"),
+                      description: row.connection?.hasCredentials ? t("stored") : t("none"),
+                    },
+                    {
+                      term: t("verification"),
+                      description: (
+                        <Badge variant="outline">
+                          {row.connection?.verifiedAt ? t("verified") : t("notVerified")}
+                        </Badge>
+                      ),
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </Section>
       {props.operatorAgent && (
         <NvkeOperatorAgentPanel

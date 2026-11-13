@@ -108,8 +108,10 @@ def platform_fixture(binding_fixture, monkeypatch):  # noqa: F811
     )
 
 
-def test_encrypted_intent_explicit_recovery_and_original_preservation(platform_fixture):
+@pytest.mark.parametrize("runtime_profile", ["containerd/v2.3.0", "containerd/v2.3.4"])
+def test_encrypted_intent_explicit_recovery_and_original_preservation(platform_fixture, runtime_profile):
     f = platform_fixture
+    f.body["nodePlatforms"]["private-node"]["runtimeProfile"] = runtime_profile
     original = type(f.binding.original).all_objects.filter(pk=f.binding.original.pk).values().get()
     with context(f.binding.state.world):
         result = artifacts.prepare(body=f.body, **f.review)

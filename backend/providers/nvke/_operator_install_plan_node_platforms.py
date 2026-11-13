@@ -14,7 +14,14 @@ from nvke._operator_install_review import SHA, timestamp
 from nvke.operator_contract import identifier
 
 STATE = "requires-attested-cpu-importer-scheduling-credentials-availability-phase-use-and-linked-admission"
-PROFILES = {"containerd/v2.3.0", "containerd/v2.3.7", "containerd/v2.2.3", "containerd/v2.1.7", "containerd/v1.7.31"}
+PROFILES = {
+    "containerd/v2.3.0",
+    "containerd/v2.3.4",
+    "containerd/v2.3.7",
+    "containerd/v2.2.3",
+    "containerd/v2.1.7",
+    "containerd/v1.7.31",
+}
 NAME = re.compile(r"[a-z0-9](?:[-a-z0-9]*[a-z0-9])?(?:\.[a-z0-9](?:[-a-z0-9]*[a-z0-9])?)*\Z")
 UID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}\Z")
 BYTE_LIMITS = {

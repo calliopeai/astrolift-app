@@ -15,6 +15,7 @@ export const NODE_PLATFORMS_STATE =
   "requires-attested-cpu-importer-scheduling-credentials-availability-phase-use-and-linked-admission";
 export const NODE_RUNTIME_PROFILES = [
   "containerd/v2.3.0",
+  "containerd/v2.3.4",
   "containerd/v2.3.7",
   "containerd/v2.2.3",
   "containerd/v2.1.7",
