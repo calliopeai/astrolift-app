@@ -1,0 +1,111 @@
+{
+  "format": 1,
+  "recordedAt": "2026-11-13T00:28:17.677113+00:00",
+  "issue": 2693,
+  "status": "all-four-connected-browser-cases-passed-in-one-prerequisite-ready-batch",
+  "sourceRevision": "acedb906474753b96139a03b7b70c60e6c1ae58e",
+  "scope": "All three reviewed original-stop fence modes and actual native-generation/lost-admission/private-artifact/reconciliation browser case; real PostgreSQL, Temporal, Chromium and mTLS agent, controlled infrastructure fence fixture",
+  "verification": {
+    "allFour": {
+      "report": "/tmp/astrolift-nvke-browser-final-ready-v1.json",
+      "sha256": "6410beef49b1871624c4784d39929ba8e1ad99fa8c6aaa409dfe9a82139ce9fb",
+      "result": {
+        "exitCode": 0,
+        "checks": {
+          "reusedOnlyIdleOwnedTestDatabase": true,
+          "testProcessExitCode": 0,
+          "junitTotals": {
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "sourcesUnchanged": true
+        },
+        "elapsedSeconds": 269.89794404245913,
+        "scope": "All three fence modes plus actual native-generation/lost-admission/artifact/reconciliation in one batch with namespace registered before worker start, real idle PostgreSQL, Temporal and mTLS agent; unrelated original batch remains preserved"
+      }
+    },
+    "nativeGenerationFocused": {
+      "report": "/tmp/astrolift-nvke-browser-generation-ready-v1.json",
+      "sha256": "cbdc4e21d951dab596890d0b81b750c6bf29fb9eb738a2b9c79b88192f9a3a71",
+      "result": {
+        "exitCode": 0,
+        "checks": {
+          "reusedOnlyIdleOwnedTestDatabase": true,
+          "testProcessExitCode": 0,
+          "junitTotals": {
+            "tests": 1,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "sourcesUnchanged": true
+        },
+        "elapsedSeconds": 157.11468595825136,
+        "scope": "One actual connected native-generation/lost-admission/artifact/reconciliation browser case with namespace registered before worker start, real idle PostgreSQL, Temporal and mTLS agent; unrelated original batch remains preserved"
+      }
+    },
+    "originalInterruptedBatch": {
+      "report": "/tmp/astrolift-nvke-connected-browser-final-four-v1.json",
+      "sha256": "2f435577c007544fc1561b561218af6852b259d9e8555d68cd1154be8a91db49",
+      "result": {
+        "exitCode": 1,
+        "checks": {
+          "testProcessExitCode": 1,
+          "junitTotals": {
+            "tests": 4,
+            "failures": 1,
+            "errors": 0,
+            "skipped": 0
+          },
+          "sourcesUnchanged": true,
+          "failureType": "AssertionError",
+          "failureFrames": [
+            {
+              "function": "<module>",
+              "line": 28
+            }
+          ]
+        },
+        "elapsedSeconds": 5038.305203416385,
+        "appRevision": "869844a52",
+        "opsRevision": "3ebe6356740272773f6216b7f98c70cb08a93af0",
+        "scope": "All three original-stop fence modes and native-generation lost-admission recovery browser case, owned static Storybook/Chromium, real PostgreSQL and Temporal, actual mTLS agent and pinned generation bundle; controlled infrastructure fence fixtures, no full install claim"
+      }
+    },
+    "interruption": {
+      "report": "/tmp/astrolift-nvke-browser-final-four-interruption-v1.json",
+      "sha256": "b8af60c6cb1e4b4cff0c03079ed7d36f68cbae32a445acc2e2670b1393475f64",
+      "result": {
+        "pid": 64369,
+        "signal": "SIGINT",
+        "reason": "Original qualification worker started with a verified missing namespace; its replacement prerequisite-ready case passed. Explicitly interrupt only the retained obsolete test run, preserving all reports and original production/native infrastructure.",
+        "originalBatch": "/tmp/astrolift-nvke-connected-browser-final-four-v1.json",
+        "replacement": "/tmp/astrolift-nvke-browser-generation-ready-v1.json",
+        "emptyOwnedAgentJobs": true,
+        "emptyOwnedNativeRuns": true,
+        "status": "terminal-original-test-exit-1-three-fence-passes-native-case-cancelled",
+        "originalSourcesUnchanged": true,
+        "replacementNativeCasePassed": true
+      }
+    }
+  },
+  "fixes": [
+    "Initialize actual URLconf/schema before socket readiness",
+    "Allow the existing two bounded native control calls to complete within the browser stop assertion budget",
+    "Do not hang browser cleanup awaiting failed routes",
+    "Register the explicit owned Temporal test namespace before creating a worker"
+  ],
+  "frontendChangesSinceQualifiedProductionTree": [
+    "frontend/e2e/nvke-stop-connected-runner.mjs"
+  ],
+  "productionUiChanged": false,
+  "originalNativeInfrastructureOrReceiptsChanged": false,
+  "pending": [
+    "Remaining standalone SDK native recovery families",
+    "Actual native enrolled profile and fresh full installation/recovery/continuation authority",
+    "Final coordinated release review/checks/merge/deployment/live validation"
+  ],
+  "releaseQualified": false
+}
