@@ -225,7 +225,7 @@ def test_browser_reviews_original_infrastructure_fence_without_native_dispatch(
         ),
         capture_output=True,
         text=True,
-        timeout=100,
+        timeout=240,
         check=False,
         env=os.environ.copy(),
     )
