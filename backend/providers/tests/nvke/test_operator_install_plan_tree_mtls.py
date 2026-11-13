@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.nvke.support import PAIRED_OPSCODE_REVISION
+from tests.nvke.support import PAIRED_OPSCODE_REVISION, prepare_owned_native_agent
 
 
 @pytest.mark.skipif(
@@ -20,6 +20,7 @@ from tests.nvke.support import PAIRED_OPSCODE_REVISION
     reason="Select the owned pinned Opscode runtime, native bundle, Helm 4 and helper",
 )
 def test_real_sdk_mtls_tree_lost_reply_cold_agent_recovery_and_private_retry(tmp_path):
+    prepare_owned_native_agent()
     source = Path(os.environ["NVKE_TEST_AGENT_OPSCODE"]).resolve()
     revision = PAIRED_OPSCODE_REVISION
     for name in (
