@@ -25,9 +25,13 @@ Completed local checks for this change:
 Release verification remains incomplete. The whole frontend run reported
 60 failures among 19,856 tests. After the NVKE screen correction, a serial run of
 the 21 selected suites reported 7,120 passes and 47 failures among 7,167 tests,
-with no pending tests. Remaining failures are outside NVKE; their cause has not
-been established. A separate isolated Linux run uses the same assertions and
-deadlines. No timeout or expectation was relaxed and neither run is called green.
+with no pending tests. A separate isolated Linux run passed all 7,167 selected
+tests and canonical lint with the same source, assertions and deadlines. Its
+later typecheck exhausted Node's default 2 GB heap. This does not erase the
+earlier failures or prove the whole suite passes. A new full-suite Linux run has
+an explicit 4 GB heap, two CPU affinity and the same test deadlines; its result
+is pending. No timeout or expectation was relaxed. Local typecheck and production
+build results above remain successful.
 
 The final current Opscode pin, combined native SDK qualification, full clean
 installation/access/check, safe linked continuation and release/deployment gates
