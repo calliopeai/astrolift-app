@@ -54,7 +54,12 @@ def authority(root):
         (
             "server",
             x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "127.0.0.1")]),
-            x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
+            [x509.oid.ExtendedKeyUsageOID.SERVER_AUTH],
+        ),
+        (
+            "etcd-server",
+            x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "owned-etcd")]),
+            [x509.oid.ExtendedKeyUsageOID.SERVER_AUTH, x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH],
         ),
         (
             "admin",
@@ -64,7 +69,7 @@ def authority(root):
                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, "system:masters"),
                 ]
             ),
-            x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
+            [x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH],
         ),
     ):
         private = ec.generate_private_key(ec.SECP256R1())
@@ -77,9 +82,9 @@ def authority(root):
             .not_valid_before(now - timedelta(minutes=1))
             .not_valid_after(now + timedelta(days=1))
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), True)
-            .add_extension(x509.ExtendedKeyUsage([usage]), False)
+            .add_extension(x509.ExtendedKeyUsage(usage), False)
         )
-        if label == "server":
+        if label != "admin":
             builder = builder.add_extension(
                 x509.SubjectAlternativeName([x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), False
             )
@@ -180,8 +185,8 @@ def main():
                 f"--listen-peer-urls={peer_url}",
                 f"--initial-advertise-peer-urls={peer_url}",
                 f"--initial-cluster=owned={peer_url}",
-                f"--cert-file={root / 'server.pem'}",
-                f"--key-file={root / 'server.key'}",
+                f"--cert-file={root / 'etcd-server.pem'}",
+                f"--key-file={root / 'etcd-server.key'}",
                 f"--trusted-ca-file={root / 'ca.pem'}",
                 "--client-cert-auth=true",
                 "--quota-backend-bytes=134217728",
@@ -191,11 +196,21 @@ def main():
         with httpx.Client(base_url=client_url, verify=context, trust_env=False, timeout=2) as etcd:
             wait(etcd, "/health")
         endpoint = f"https://127.0.0.1:{api_port}"
+        audit_policy = root / "audit-policy.json"
+        audit_policy.write_text(
+            json.dumps(
+                {
+                    "apiVersion": "audit.k8s.io/v1",
+                    "kind": "Policy",
+                    "omitStages": ["RequestReceived"],
+                    "rules": [{"level": "Metadata"}],
+                }
+            )
+        )
         spawn(
             "kube-apiserver",
             [
                 "--bind-address=127.0.0.1",
-                "--advertise-address=127.0.0.1",
                 f"--secure-port={api_port}",
                 f"--etcd-servers={client_url}",
                 f"--etcd-cafile={root / 'ca.pem'}",
@@ -212,6 +227,11 @@ def main():
                 "--anonymous-auth=false",
                 "--allow-privileged=false",
                 "--profiling=false",
+                f"--audit-policy-file={audit_policy}",
+                f"--audit-log-path={root / 'audit.log'}",
+                "--audit-log-maxsize=5",
+                "--audit-log-maxbackup=1",
+                "--audit-log-mode=blocking",
                 "--v=0",
             ],
         )
@@ -238,6 +258,20 @@ def main():
                 assert time.monotonic() < deadline and not stopped.is_set(), "CRD establishment deadline"
                 stopped.wait(0.25)
             api.post("/api/v1/namespaces", json={"metadata": {"name": "org-owned"}}).raise_for_status()
+            # Established does not imply the newly served resource's storage cache is ready.
+            for crd in crds:
+                for version in crd["spec"]["versions"]:
+                    if version["served"]:
+                        wait(
+                            api,
+                            "/apis/"
+                            + crd["spec"]["group"]
+                            + "/"
+                            + version["name"]
+                            + "/"
+                            + crd["spec"]["names"]["plural"]
+                            + "?limit=1",
+                        )
 
         def encode(name):
             return base64.b64encode((root / name).read_bytes()).decode()
