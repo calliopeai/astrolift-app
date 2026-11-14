@@ -39,7 +39,7 @@ import { ListSummary } from "@/components/list/ListSummary";
 import { Panel, PanelGrid, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import {
   isClusterLive,
   type ClusterLiveState,

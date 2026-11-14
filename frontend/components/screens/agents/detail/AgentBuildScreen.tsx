@@ -15,7 +15,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ListSummary } from "@/components/list/ListSummary";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type {
   AstroliftAgentListItem,
   AstroliftAgentSkill,

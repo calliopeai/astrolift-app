@@ -3,7 +3,7 @@
 import { InfoIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftPolicyConditionKind } from "@/graphql/__generated__/schema";
 import { cn } from "@/lib/utils";
 

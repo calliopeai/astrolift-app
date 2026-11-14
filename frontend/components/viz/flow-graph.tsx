@@ -16,7 +16,7 @@ import "@xyflow/react/dist/style.css";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 export interface FlowGraphProps {

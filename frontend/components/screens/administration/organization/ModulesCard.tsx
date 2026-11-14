@@ -5,7 +5,7 @@ import { QueryError } from "@/components/QueryError";
 import { useTranslations } from "next-intl";
 
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import type { ModuleItem, useModulesCard } from "./use-modules-card";

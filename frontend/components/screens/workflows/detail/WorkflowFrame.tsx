@@ -32,7 +32,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { useRelativeAge } from "@/lib/format";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 

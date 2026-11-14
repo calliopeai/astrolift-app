@@ -9,7 +9,7 @@ import { Restricted, useRestrictedMode } from "@/components/settings/Restricted"
 import { type SettingsSectionSpec, SettingsPage } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { RestrictedSettings } from "@/lib/display-prefs";
 
 /**

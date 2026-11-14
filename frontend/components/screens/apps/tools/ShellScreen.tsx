@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
 import type { ReviewedExecTarget } from "@/lib/exec-session";

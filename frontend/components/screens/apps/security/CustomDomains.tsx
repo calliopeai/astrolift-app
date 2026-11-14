@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 import type { useCustomDomainControl, useCustomDomains } from "./use-app-access";
 

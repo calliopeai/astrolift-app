@@ -5,7 +5,7 @@ import type * as React from "react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type {
   AstroliftPolicySimulation,
   AstroliftPolicySimulationDecision,

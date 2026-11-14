@@ -16,7 +16,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { workloadState } from "./cluster-workloads-list";

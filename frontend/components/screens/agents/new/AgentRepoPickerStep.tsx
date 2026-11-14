@@ -9,7 +9,7 @@ import { ScmEmptyConnectAction } from "@/components/ScmConnectPrompt";
 import type { UseScmConnect } from "@/components/use-scm-connect";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftRemoteRepoList, AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 import { cn } from "@/lib/utils";
 import { SourceRepositoryPicker } from "@/components/wizard/SourceRepositoryPicker";

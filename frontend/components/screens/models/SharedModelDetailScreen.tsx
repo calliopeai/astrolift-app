@@ -8,7 +8,7 @@ import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
 import { modelSourceMode, nativeModelFamily } from "./native-model-source";
 import { NativeConnectionMetadataPanel } from "./NativeConnectionMetadataPanel";

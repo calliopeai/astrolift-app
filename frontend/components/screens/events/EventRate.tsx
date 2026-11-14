@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { QueryError } from "@/components/QueryError";
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkline } from "@/components/viz";
 

@@ -5,7 +5,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 import type { useClusterLiveStats } from "./use-cluster-live-stats";
 

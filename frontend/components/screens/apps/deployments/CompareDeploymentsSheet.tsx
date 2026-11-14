@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
 import type { useDeploymentComparison } from "./use-deployment-comparison";

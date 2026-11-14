@@ -15,7 +15,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { StatusDot } from "@/components/StatusDot";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 /**

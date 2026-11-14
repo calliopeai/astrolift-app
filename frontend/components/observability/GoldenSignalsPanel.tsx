@@ -41,7 +41,7 @@ import {
 } from "@/components/observability/panel-reason";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type {
   AstroliftAppGoldenSignal,
   AstroliftAppNetworkMetrics,

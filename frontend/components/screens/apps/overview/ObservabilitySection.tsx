@@ -7,7 +7,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 
 import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { ObservabilitySummary, SparkPoint } from "./use-observability-summary";
