@@ -9,7 +9,7 @@ import { MainRail } from "@/components/shell/MainRail";
 import { ProjectsRail } from "@/components/shell/ProjectsRail";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { NAV, visibleNav } from "@/lib/shell/nav-model";
 
 /** Layout D, whole (spec 44 §4.2): main rail, content, projects rail. Try `[` and `]`. */

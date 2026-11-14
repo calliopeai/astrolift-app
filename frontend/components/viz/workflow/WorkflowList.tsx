@@ -9,7 +9,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { type ListDefinition, standardViews } from "@/components/list/list-state";
 import { selectRows, type SelectRowsSpec } from "@/components/list/select-rows";
 import { useLocalListState, type ListStateController } from "@/components/list/use-list-state";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS, type Health } from "../core/semantics";

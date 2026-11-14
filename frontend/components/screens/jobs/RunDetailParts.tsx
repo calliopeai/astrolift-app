@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import type { EmptyStateSpec } from "@/components/data-table";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

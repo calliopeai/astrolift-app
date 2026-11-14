@@ -4,7 +4,7 @@ import { LogInIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 /**
  * Listens for the custom ``astrolift:session-expired`` event dispatched

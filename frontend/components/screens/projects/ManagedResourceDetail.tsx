@@ -5,10 +5,9 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { type Column, type CursorTableController } from "@/components/data-table";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { ListPage } from "@/components/list/ListPage";
 import { useCursorTableList } from "@/components/list/use-cursor-table-list";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,

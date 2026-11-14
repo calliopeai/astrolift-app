@@ -12,7 +12,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { agentsCrumbs } from "../list/agents-list";

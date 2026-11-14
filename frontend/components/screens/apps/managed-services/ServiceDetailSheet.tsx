@@ -19,7 +19,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { ManagedResourceContextFragment } from "@/graphql/__generated__/operations";
 
 import { Badge } from "@/components/ui/badge";

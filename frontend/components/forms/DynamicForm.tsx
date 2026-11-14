@@ -6,7 +6,7 @@ import { Loader2Icon, SendIcon, CheckCircle2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type { FormDefinition, MutationError } from "@/graphql/forms/forms.types";

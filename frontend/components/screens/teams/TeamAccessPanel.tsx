@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { FolderIcon } from "lucide-react";
 
 import { ListSummary } from "@/components/list/ListSummary";

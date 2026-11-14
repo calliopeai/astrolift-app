@@ -9,7 +9,7 @@ import { Can } from "@/components/Can";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftRole } from "@/graphql/identity/identity.types";
 
 import { permissionsCrumbs } from "../access/admin-crumbs";

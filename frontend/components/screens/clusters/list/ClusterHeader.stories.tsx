@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { MoreHorizontalIcon, PlayIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { ClusterHeader } from "./ClusterHeader";
 import { CLUSTERS, LONG_CLUSTER } from "./fixtures";

@@ -8,7 +8,7 @@ import type * as React from "react";
 import { Can } from "@/components/Can";
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { accessCrumbs, grantHref, PEOPLE_HREF } from "./access-nav";
 import { PrincipalPage } from "./PrincipalPage";

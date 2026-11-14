@@ -7,7 +7,7 @@ import * as React from "react";
 
 import { diffPermissions } from "@/components/access/access-model";
 import { PermissionMatrix } from "@/components/access/PermissionMatrix";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

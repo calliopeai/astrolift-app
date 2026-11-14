@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 import { Panel, PanelGrid } from "@/components/panel/Panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { mcpUrl } from "../brain-status-model";
 import { brainHref } from "./brain-tabs-model";

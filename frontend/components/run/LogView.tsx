@@ -21,7 +21,7 @@ import { useTranslations } from "next-intl";
 
 import { classifyLogLevel, type LogLevel } from "@/components/observability/LogViewer";
 import { Panel } from "@/components/panel/Panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { formatLogTime } from "./format";

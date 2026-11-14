@@ -5,9 +5,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@calliopelabs/ui";
 import {
   Sheet,
   SheetContent,

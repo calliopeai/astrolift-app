@@ -4,7 +4,7 @@ import { ExternalLinkIcon, GitCommitIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import type { GitOpsCommit } from "./types";
 

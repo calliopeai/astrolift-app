@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { LogView } from "@/components/run/LogView";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { runDot, RUN_STATUS_DOT } from "./agent-runs-list";
 import type { AgentTask } from "./use-agent-observe";

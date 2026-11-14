@@ -5,8 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import {

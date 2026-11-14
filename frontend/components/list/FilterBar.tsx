@@ -14,7 +14,7 @@ import {
 import * as React from "react";
 
 import type { SortState } from "@/components/data-table";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,7 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@calliopelabs/ui";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ViewToggle } from "@/components/ViewToggle";
 import { useDebounce } from "@/hooks/use-debounce";

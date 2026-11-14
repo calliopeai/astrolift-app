@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { useTranslations } from "next-intl";
 import { DownloadIcon, FolderOpenIcon, CheckIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 export interface ModelHostingSourceChoiceProps {
   value: "huggingface" | "local";

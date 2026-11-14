@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

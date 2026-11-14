@@ -14,9 +14,8 @@ import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Skeleton } from "@calliopelabs/ui";
 import type { BrainCreationFieldsFragment } from "@/graphql/__generated__/operations";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";

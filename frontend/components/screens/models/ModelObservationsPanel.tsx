@@ -14,7 +14,7 @@ import { QueryError } from "@/components/QueryError";
 import { Section } from "@/components/ui/section";
 import { StatTile } from "@/components/ui/stat-tile";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Sparkline } from "@/components/viz/sparkline";
 export type ServingMetrics = NonNullable<
   GetModelDeploymentMetricsQuery["astroliftModelDeploymentMetrics"]

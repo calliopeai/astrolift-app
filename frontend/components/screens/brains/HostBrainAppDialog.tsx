@@ -10,7 +10,7 @@ import {
   type TemporaryAppPolicyState,
 } from "../apps/temporary-app-model";
 
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

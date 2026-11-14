@@ -38,8 +38,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { ListSummary } from "@/components/list/ListSummary";
 import { Panel, PanelGrid, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import {
   isClusterLive,
   type ClusterLiveState,

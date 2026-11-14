@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { localizedPipelineToken } from "./pipelines-list";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
 
@@ -13,7 +13,6 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@calliopelabs/ui";
 import { PipelineDag } from "@/components/viz";
 
 import {

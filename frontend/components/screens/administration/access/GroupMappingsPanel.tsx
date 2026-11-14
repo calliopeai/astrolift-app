@@ -16,7 +16,7 @@ import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {

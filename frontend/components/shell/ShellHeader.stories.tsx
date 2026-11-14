@@ -10,7 +10,7 @@ import { Identifier } from "@/components/Identifier";
 import { RunStatusBadge } from "@/components/jobs/RunStatusBadge";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 /** Every page's header (spec 44 §4.4): breadcrumb, title row, one row of tabs. */
 const meta: Meta<typeof ShellHeader> = { title: "Shell/ShellHeader", component: ShellHeader };

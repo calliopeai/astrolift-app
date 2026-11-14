@@ -4,9 +4,8 @@ import { HomeLayoutPicker } from "@/components/home/HomeLayoutPicker";
 import type { HomeLayoutDef, HomeLayoutKey } from "@/components/home/registry";
 import { localizedHomeLayout } from "@/components/home/registry";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 
 export interface HomeLayoutSettingsProps {
   loading?: boolean;

@@ -12,7 +12,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { selectRows } from "@/components/list/select-rows";
 import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftIdentityProvider } from "@/graphql/identity/identity.types";
 import { DOC_LINKS } from "@/lib/docs/urls";

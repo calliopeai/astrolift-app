@@ -10,7 +10,7 @@ import { adminCrumbs } from "@/components/screens/administration/insights/header
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { AlertEvent, useAlertEvents } from "./use-alerts";

@@ -9,10 +9,9 @@ import * as React from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

@@ -35,8 +35,7 @@ import {
 } from "recharts";
 
 import { panelEmptyState } from "@/components/observability/panel-reason";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import type { AstroliftPodResourceUsagePoint } from "@/graphql/__generated__/schema";
 
 import type { PodResourceUsage } from "./use-pod-resource-usage";

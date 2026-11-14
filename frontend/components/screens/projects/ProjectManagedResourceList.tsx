@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { type Column, type CursorTableController } from "@/components/data-table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { ListPage } from "@/components/list/ListPage";
 import { useCursorTableList } from "@/components/list/use-cursor-table-list";
 import type { ManagedResourceContextFragment } from "@/graphql/__generated__/operations";

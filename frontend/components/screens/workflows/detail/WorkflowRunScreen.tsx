@@ -24,7 +24,7 @@ import { formatClock } from "@/components/run/format";
 import { RunMissing } from "@/components/screens/jobs/RunDetailParts";
 import { RunOutcomeCell } from "@/components/screens/tasks/RunsScreen";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

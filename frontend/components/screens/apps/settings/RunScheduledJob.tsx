@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {

@@ -27,7 +27,7 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { Panel, type PanelSpan } from "@/components/panel/Panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { REPAIRS, type useAppDoctor } from "./use-app-doctor";
 

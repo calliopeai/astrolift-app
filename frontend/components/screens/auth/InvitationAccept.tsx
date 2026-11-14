@@ -10,7 +10,7 @@ import {
 import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { useFormatters } from "@/lib/i18n/formatters";

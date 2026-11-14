@@ -16,9 +16,8 @@ import * as React from "react";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 import type { DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

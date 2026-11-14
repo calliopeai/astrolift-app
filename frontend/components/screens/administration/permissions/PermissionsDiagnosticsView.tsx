@@ -10,7 +10,7 @@ import { PermissionPicker } from "@/components/access/PermissionPicker";
 import { PrincipalPicker } from "@/components/access/PrincipalPicker";
 import { ScopePicker } from "@/components/access/ScopePicker";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 
 import { permissionsCrumbs } from "../access/admin-crumbs";

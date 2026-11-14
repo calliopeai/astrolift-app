@@ -14,10 +14,9 @@ import type * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { AdministrationShell } from "@/components/screens/administration/organization/AdministrationShell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@calliopelabs/ui";
 import { heartbeatPresentation, isClusterLive } from "@/lib/cluster-heartbeat";
 
 import {

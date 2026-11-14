@@ -5,7 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Section } from "@/components/ui/section";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { QueryError } from "@/components/QueryError";

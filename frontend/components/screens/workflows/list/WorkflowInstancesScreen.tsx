@@ -10,8 +10,7 @@ import type { ListStateController } from "@/components/list/list-state";
 import { PermissionNote } from "@/components/settings/Restricted";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Skeleton } from "@calliopelabs/ui";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import type { WorkflowInstance } from "@/graphql/workflows/workflows.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

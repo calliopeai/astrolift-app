@@ -9,8 +9,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { type Column } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
 import { LogViewer } from "@/components/observability/LogViewer";
-import { Button } from "@/components/ui/button";
-import { Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

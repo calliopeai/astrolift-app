@@ -4,7 +4,7 @@ import { PencilIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 
 import { AXIS_ORDER, effectivePersistence } from "../substrate-cells";

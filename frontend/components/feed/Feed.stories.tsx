@@ -7,7 +7,7 @@ import * as React from "react";
 
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { Panel } from "@/components/panel/Panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { Feed, type FeedProps } from "./Feed";
 import { type FeedEvent, LONG_EVENTS, makeEvents } from "./fixtures";

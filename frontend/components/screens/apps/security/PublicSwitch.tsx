@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftAppAccess } from "@/graphql/__generated__/schema";
 
 import type { usePublicSwitch } from "./use-app-access";

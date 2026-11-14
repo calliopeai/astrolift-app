@@ -11,9 +11,8 @@ import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Skeleton } from "@calliopelabs/ui";
 
 import {
   gpuLabel,

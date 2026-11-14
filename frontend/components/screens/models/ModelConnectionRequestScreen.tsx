@@ -5,7 +5,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import type { ModelConnectionRequestFieldsFragment } from "@/graphql/__generated__/operations";
 import { connectionStatus } from "./ModelConnectionRequestsScreen";

@@ -4,8 +4,7 @@ import { AlertTriangleIcon, FlaskConicalIcon } from "lucide-react";
 import type * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import type {
   AstroliftPolicySimulation,
   AstroliftPolicySimulationDecision,

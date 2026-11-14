@@ -6,10 +6,9 @@ import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 
 import type { ZentinelleConnection } from "./zentinelle-model";

@@ -12,7 +12,7 @@ import {
 } from "@/components/screens/administration/access/access-nav";
 import { PrincipalPage } from "@/components/screens/administration/access/PrincipalPage";
 import { type TeamTab, teamTabs } from "@/components/screens/administration/access/principal-tabs";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import type { useTeamDetail } from "./use-team-detail";
 

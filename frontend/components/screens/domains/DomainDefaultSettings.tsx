@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { domainDefaultReasonKey } from "./domain-default-reasons";
 

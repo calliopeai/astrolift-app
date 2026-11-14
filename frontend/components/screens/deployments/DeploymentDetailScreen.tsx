@@ -33,7 +33,7 @@ import {
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StaleManifestNotice } from "@/components/StaleManifestNotice";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import {
   DropdownMenu,

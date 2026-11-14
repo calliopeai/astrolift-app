@@ -6,10 +6,9 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import type { AstroliftFactoryGateApp } from "@/graphql/scm/scm.types";

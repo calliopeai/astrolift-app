@@ -19,7 +19,7 @@ import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";

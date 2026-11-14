@@ -39,7 +39,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import {
   Select,

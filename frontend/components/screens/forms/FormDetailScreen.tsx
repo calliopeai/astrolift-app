@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Loader2Icon, PenLineIcon, SendIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import { Separator } from "@/components/ui/separator";
 import { StatTile } from "@/components/ui/stat-tile";

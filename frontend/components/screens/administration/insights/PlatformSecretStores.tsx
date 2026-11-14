@@ -4,9 +4,8 @@ import { CheckCircle2Icon, CircleAlertIcon, CircleDashedIcon } from "lucide-reac
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 
 import type { PlatformSecretStoresProps } from "./use-platform-secret-stores";
 

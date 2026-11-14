@@ -3,7 +3,7 @@
 import { CheckCircleIcon, CopyIcon, KeyRoundIcon, Loader2Icon, RocketIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import * as React from "react";
 import { useTranslations } from "next-intl";

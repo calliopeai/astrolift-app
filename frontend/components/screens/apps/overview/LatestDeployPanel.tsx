@@ -18,7 +18,7 @@ import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { formatElapsed } from "@/components/run/format";
 import type { useDeploymentPanel } from "@/components/screens/apps/controls/use-deployment-panel";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

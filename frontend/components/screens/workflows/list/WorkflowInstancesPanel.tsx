@@ -12,7 +12,7 @@ import { useTranslations } from "next-intl";
 import { CircleSlashIcon, Loader2Icon, OctagonXIcon, XIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { WorkflowHistoryEvent } from "@/graphql/workflows/workflows.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

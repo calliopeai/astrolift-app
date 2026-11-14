@@ -9,7 +9,7 @@
 import { ShieldCheckIcon, ShieldOffIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 export interface ElevationIndicatorProps {
   elevated: boolean;

@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { LayoutGridIcon, LayoutListIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 import type { ViewMode } from "@/hooks/use-view-toggle";
 

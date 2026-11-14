@@ -3,8 +3,7 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { QueryError } from "@/components/QueryError";
-import { Button } from "@/components/ui/button";
-import { Checkbox, Input } from "@calliopelabs/ui";
+import { Button, Checkbox, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import type { ModelConnectionPolicyFieldsFragment } from "@/graphql/__generated__/operations";
 export type ConnectionPolicyDraft = {

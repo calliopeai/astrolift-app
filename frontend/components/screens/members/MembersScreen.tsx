@@ -28,7 +28,7 @@ import {
   PEOPLE_HREF,
 } from "@/components/screens/administration/access/access-nav";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -14,9 +14,8 @@ import type { Column } from "@/components/data-table";
 import { Feed } from "@/components/feed/Feed";
 import { ListPage } from "@/components/list/ListPage";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { workloadState } from "./cluster-workloads-list";

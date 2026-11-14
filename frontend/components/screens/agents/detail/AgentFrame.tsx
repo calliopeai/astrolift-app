@@ -17,7 +17,7 @@ import * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";

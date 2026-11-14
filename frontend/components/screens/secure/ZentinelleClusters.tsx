@@ -6,9 +6,8 @@ import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 
 import type { WriteResult } from "./ZentinelleConnection";

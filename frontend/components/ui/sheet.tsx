@@ -5,7 +5,7 @@ import { Dialog as SheetPrimitive } from "radix-ui";
 import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { XIcon } from "lucide-react";
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {

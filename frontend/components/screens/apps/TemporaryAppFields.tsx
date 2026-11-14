@@ -3,8 +3,7 @@
 import { useId } from "react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
-import { Checkbox, Input } from "@calliopelabs/ui";
+import { Button, Checkbox, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import type { TemporaryAppRules, TemporaryAppValues } from "./temporary-app-model";
 import { temporaryAppValid } from "./temporary-app-model";

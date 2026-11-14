@@ -4,7 +4,7 @@ import { AlertCircleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 export interface AppErrorScreenProps {
   /** The thrown error's message; empty falls back to a generic line. */

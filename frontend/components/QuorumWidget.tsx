@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftDeploymentApprover } from "@/graphql/lifecycle/lifecycle.types";
 
 interface QuorumWidgetProps {
@@ -53,7 +53,7 @@ export function QuorumWidget({
   return (
     <section
       aria-labelledby="quorum-widget-heading"
-      className="space-y-3 rounded-md border bg-muted/30 p-3"
+      className="bg-muted/30 space-y-3 rounded-md border p-3"
     >
       <div className="flex items-center justify-between gap-2">
         <h3
@@ -108,7 +108,7 @@ function ApproverGroup({
 }) {
   return (
     <div>
-      <div className="text-muted-foreground mb-2 text-2xs font-medium tracking-wide uppercase">
+      <div className="text-muted-foreground text-2xs mb-2 font-medium tracking-wide uppercase">
         {label}
       </div>
       {approvers.length === 0 ? (
@@ -135,10 +135,7 @@ function ApproverChip({
 }) {
   const tx = useTranslations("quorumChip");
   const initials = computeInitials(approver.displayName || approver.email);
-  const ring =
-    variant === "approved"
-      ? "ring-1 ring-success"
-      : "ring-1 ring-warning";
+  const ring = variant === "approved" ? "ring-1 ring-success" : "ring-1 ring-warning";
 
   return (
     <span
@@ -147,15 +144,15 @@ function ApproverChip({
     >
       <span
         aria-hidden
-        className="bg-muted text-muted-foreground inline-flex size-6 items-center justify-center rounded-full text-2xs font-medium"
+        className="bg-muted text-muted-foreground text-2xs inline-flex size-6 items-center justify-center rounded-full font-medium"
       >
         {initials}
       </span>
       <span className="max-w-[10rem] truncate font-medium">{approver.displayName}</span>
       {variant === "approved" ? (
-        <CheckIcon className="size-3 text-success-fg" aria-hidden />
+        <CheckIcon className="text-success-fg size-3" aria-hidden />
       ) : (
-        <ClockIcon className="size-3 text-warning-fg" aria-hidden />
+        <ClockIcon className="text-warning-fg size-3" aria-hidden />
       )}
       {variant === "awaiting" && approver.mailtoUrl ? (
         <Button

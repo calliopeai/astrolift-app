@@ -7,8 +7,7 @@ import { useTranslations } from "next-intl";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,

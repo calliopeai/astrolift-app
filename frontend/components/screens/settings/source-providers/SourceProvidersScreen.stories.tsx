@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import * as React from "react";
 import { expect, userEvent, waitFor, within } from "storybook/test";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";

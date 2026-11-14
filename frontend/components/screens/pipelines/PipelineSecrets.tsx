@@ -12,9 +12,8 @@ import { ListPage } from "@/components/list/ListPage";
 import { selectRows } from "@/components/list/select-rows";
 import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import type { PipelineSecret } from "@/graphql/pipelines/pipelines.types";
 

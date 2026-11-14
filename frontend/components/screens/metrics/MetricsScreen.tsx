@@ -20,9 +20,8 @@ import type { ListStateController } from "@/components/list/list-state";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 import { MiniBar, RadialGauge, Sparkline } from "@/components/viz";
 import type {
   AstroliftAppHealthSummary,

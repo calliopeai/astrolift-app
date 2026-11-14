@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 
 import { AdministrationShell } from "./AdministrationShell";
 import { LONG_ARN, LONG_SHA, LONG_URL } from "./fixtures";

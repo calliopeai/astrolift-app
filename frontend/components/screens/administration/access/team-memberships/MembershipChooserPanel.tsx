@@ -5,7 +5,7 @@ import { UsersIcon } from "lucide-react";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 export interface MembershipChoice {
   id: string;

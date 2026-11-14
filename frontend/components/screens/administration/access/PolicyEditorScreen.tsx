@@ -21,9 +21,8 @@ import {
 import { EmptyState } from "@/components/EmptyState";
 import { Panel } from "@/components/panel/Panel";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

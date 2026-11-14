@@ -5,9 +5,8 @@ import { useTranslations } from "next-intl";
 
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { environmentCan } from "@/lib/permissions/environment-permissions";
 

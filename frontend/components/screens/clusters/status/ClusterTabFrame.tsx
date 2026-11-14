@@ -6,8 +6,7 @@ import { useTranslations } from "next-intl";
 
 import { EmptyState } from "@/components/EmptyState";
 import { ClusterHeader } from "@/components/screens/clusters/list/ClusterHeader";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 
 import type { ClusterSummary } from "./types";
 

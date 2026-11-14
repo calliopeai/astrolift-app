@@ -21,7 +21,7 @@ import type { useLogExport } from "@/components/observability/use-log-export";
 import { PageShell } from "@/components/PageShell";
 import { Panel } from "@/components/panel/Panel";
 import { LogView } from "@/components/run/LogView";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,
@@ -29,7 +29,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 

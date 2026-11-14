@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Loader2Icon, PlusIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Separator } from "@/components/ui/separator";
 import type { FormDefinition } from "@/graphql/forms/forms.types";
 

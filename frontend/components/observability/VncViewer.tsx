@@ -4,7 +4,7 @@ import { Maximize2, Minimize2, Ratio, Scan } from "lucide-react";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 type ConnectionState = "connecting" | "connected" | "closed" | "denied" | "error";

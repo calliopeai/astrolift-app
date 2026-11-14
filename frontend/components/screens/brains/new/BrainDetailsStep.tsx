@@ -3,8 +3,7 @@
 import { AlertTriangleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
-import { Checkbox, Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Checkbox, Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

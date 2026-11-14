@@ -2,7 +2,7 @@
 import { useFormatter, useTranslations } from "next-intl";
 import { Section } from "@/components/ui/section";
 import { StatTile } from "@/components/ui/stat-tile";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { QueryError } from "@/components/QueryError";
 import type { ObservationRead } from "./ModelObservationsPanel";
 import type { GetModelSubscriptionMetricsQuery } from "@/graphql/__generated__/operations";

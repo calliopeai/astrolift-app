@@ -2,7 +2,7 @@
 import { useApolloClient } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,

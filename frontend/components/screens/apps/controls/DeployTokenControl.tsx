@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { useFormatters } from "@/lib/i18n/formatters";
 

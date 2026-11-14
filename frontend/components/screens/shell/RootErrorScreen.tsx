@@ -3,7 +3,7 @@
 import { AlertCircleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 export interface RootErrorScreenProps {
   /** The thrown error's message; empty falls back to a generic line. */
