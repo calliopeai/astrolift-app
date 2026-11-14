@@ -4,11 +4,10 @@ import { AlertTriangleIcon, ServerCrashIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 
 import { agentsCrumbs } from "./catalog";
 import type { Skill } from "./use-skill";

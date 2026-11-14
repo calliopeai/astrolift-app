@@ -14,9 +14,6 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
-import { StatusDot } from "@/components/StatusDot";
 import {
   Button,
   DropdownMenu,
@@ -24,8 +21,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  EmptyState,
   Skeleton,
 } from "@calliopelabs/ui";
+import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
+import { StatusDot } from "@/components/StatusDot";
 import {
   Sheet,
   SheetContent,

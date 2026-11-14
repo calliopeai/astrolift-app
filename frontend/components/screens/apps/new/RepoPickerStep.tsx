@@ -5,11 +5,10 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState, Skeleton } from "@calliopelabs/ui";
 import { ScmEmptyConnectAction } from "@/components/ScmConnectPrompt";
 import type { UseScmConnect } from "@/components/use-scm-connect";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftRemoteRepoList, AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 import { cn } from "@/lib/utils";
 import { SourceRepositoryPicker } from "@/components/wizard/SourceRepositoryPicker";

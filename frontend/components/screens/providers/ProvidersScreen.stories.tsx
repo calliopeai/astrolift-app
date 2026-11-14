@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { CloudIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@calliopelabs/ui";
 
 import { CLOUD_PROVIDERS } from "../models/models-providers.fixtures";
 

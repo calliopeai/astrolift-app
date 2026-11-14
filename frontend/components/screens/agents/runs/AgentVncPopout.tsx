@@ -7,8 +7,7 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { ArrowLeftIcon, BotIcon, Loader2Icon, MonitorPlayIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { Button } from "@calliopelabs/ui";
+import { Button, EmptyState } from "@calliopelabs/ui";
 import { VncViewer } from "@/components/observability/VncViewer";
 
 import type { AgentVncPopoutState, VncPopoutTask } from "./use-agent-vnc-popout";

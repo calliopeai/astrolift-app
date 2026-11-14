@@ -37,8 +37,7 @@ import { AlertTriangleIcon, OctagonAlertIcon } from "lucide-react";
 import * as React from "react";
 
 import type { EmptyStateSpec } from "@/components/data-table";
-import { EmptyState } from "@/components/EmptyState";
-import { Button, Skeleton } from "@calliopelabs/ui";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 /** Columns of the 12-column grid the panel takes from `xl` up. */

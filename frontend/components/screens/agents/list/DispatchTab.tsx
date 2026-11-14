@@ -17,9 +17,8 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Input, Skeleton } from "@calliopelabs/ui";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {

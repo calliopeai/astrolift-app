@@ -21,16 +21,16 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { Badge } from "@/components/ui/badge";
 import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  EmptyState,
   Skeleton,
 } from "@calliopelabs/ui";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFormatters } from "@/lib/i18n/formatters";
 

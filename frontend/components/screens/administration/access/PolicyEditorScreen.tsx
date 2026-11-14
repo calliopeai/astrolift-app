@@ -18,10 +18,9 @@ import {
   type PolicySimulation,
   PolicySimulationPanel,
 } from "@/components/access/PolicySimulationPanel";
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Input, Skeleton } from "@calliopelabs/ui";
 import { Panel } from "@/components/panel/Panel";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Label } from "@/components/ui/label";
 import {

@@ -6,9 +6,8 @@ import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { Can } from "@/components/Can";
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState } from "@calliopelabs/ui";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
 
 import { accessCrumbs, grantHref, PEOPLE_HREF } from "./access-nav";
 import { PrincipalPage } from "./PrincipalPage";

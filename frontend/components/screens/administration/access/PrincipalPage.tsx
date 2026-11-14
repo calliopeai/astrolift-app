@@ -6,9 +6,8 @@ import type * as React from "react";
 import type { Principal } from "@/components/access/access-model";
 import { PrincipalChip } from "@/components/access/PrincipalChip";
 import type { DetailTab } from "@/components/DetailPageTabs";
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
-import { Button, Skeleton } from "@calliopelabs/ui";
 
 export interface PrincipalPageProps {
   crumbs: Crumb[];

@@ -4,10 +4,9 @@ import { LockIcon, ShieldCheckIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { DetailPageTabs } from "@/components/DetailPageTabs";
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState, Skeleton } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
-import { Skeleton } from "@calliopelabs/ui";
 
 import { ZentinelleAudit, type ZentinelleAuditProps } from "./ZentinelleAudit";
 import { type ZentinelleClusterActions, ZentinelleClusters } from "./ZentinelleClusters";

@@ -4,9 +4,8 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { BotIcon, ExpandIcon, Loader2Icon, MonitorPlayIcon, RefreshCwIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,

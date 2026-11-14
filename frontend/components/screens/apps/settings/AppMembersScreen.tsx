@@ -10,11 +10,10 @@ import { PrincipalChip } from "@/components/access/PrincipalChip";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
-import { EmptyState } from "@/components/EmptyState";
+import { Button, DropdownMenuItem, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
-import { Button, DropdownMenuItem, Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { AccessRow } from "./app-access-rows";

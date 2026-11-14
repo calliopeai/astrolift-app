@@ -22,9 +22,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PanelGrid, SkeletonRows } from "@/components/panel/Panel";
-import { ShellHeader } from "@/components/shell/ShellHeader";
 import {
   Button,
   DropdownMenu,
@@ -35,7 +32,10 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  EmptyState,
 } from "@calliopelabs/ui";
+import { PanelGrid, SkeletonRows } from "@/components/panel/Panel";
+import { ShellHeader } from "@/components/shell/ShellHeader";
 
 import { HomeLayoutPicker } from "./HomeLayoutPicker";
 import { localizedHomeLayout } from "./registry";

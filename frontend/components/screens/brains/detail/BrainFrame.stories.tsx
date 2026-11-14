@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { LayersIcon } from "lucide-react";
 import { expect, fn, userEvent, within } from "storybook/test";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@calliopelabs/ui";
 
 import { CONNECTION } from "../brains.fixtures";
 import { EVERYTHING, NOTHING } from "./brain-detail-model";

@@ -14,7 +14,16 @@ import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  EmptyState,
+  Input,
+  Skeleton,
+} from "@calliopelabs/ui";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
 import {
@@ -24,15 +33,6 @@ import {
 } from "@/components/screens/agents/skills/tool-adapters";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-  Skeleton,
-} from "@calliopelabs/ui";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,

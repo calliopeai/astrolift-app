@@ -19,12 +19,11 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { TerminalEmulator } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

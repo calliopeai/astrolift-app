@@ -17,10 +17,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { PermissionNote } from "@/components/settings/Restricted";
-import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
-import { StatusDot } from "@/components/StatusDot";
 import {
   Button,
   DropdownMenu,
@@ -28,8 +24,12 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  EmptyState,
   Skeleton,
 } from "@calliopelabs/ui";
+import { PermissionNote } from "@/components/settings/Restricted";
+import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
+import { StatusDot } from "@/components/StatusDot";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 

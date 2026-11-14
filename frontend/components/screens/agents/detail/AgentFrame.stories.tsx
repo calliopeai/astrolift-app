@@ -7,7 +7,7 @@ import { expect, within } from "storybook/test";
 
 import { LayersIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@calliopelabs/ui";
 
 import { AgentFrame } from "./AgentFrame";
 import { AGENT, LONG, PAUSED_AGENT, RUNNING_AGENT } from "./agent-detail-shell.fixtures";

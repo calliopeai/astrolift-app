@@ -4,7 +4,7 @@ import { ActivityIcon, AlertTriangleIcon, RocketIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { OverviewNotices } from "@/components/screens/apps/overview/OverviewNotices";

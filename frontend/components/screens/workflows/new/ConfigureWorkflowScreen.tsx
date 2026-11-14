@@ -11,12 +11,11 @@ import {
   Loader2Icon,
 } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Input, Skeleton } from "@calliopelabs/ui";
 import { FlowSteps } from "@/components/screens/agents/skills/FlowSteps";
 import { workflowsCrumbs } from "@/components/screens/workflows/list/workflows-list";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,

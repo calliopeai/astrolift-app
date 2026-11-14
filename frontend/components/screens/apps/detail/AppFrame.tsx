@@ -18,9 +18,6 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
-import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
-import { StatusDot } from "@/components/StatusDot";
 import {
   Button,
   DropdownMenu,
@@ -28,8 +25,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  EmptyState,
   Skeleton,
 } from "@calliopelabs/ui";
+import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
+import { StatusDot } from "@/components/StatusDot";
 import type { ProvisioningStatus } from "@/graphql/registry/registry.types";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 

@@ -15,12 +15,11 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Input, Skeleton } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
