@@ -18,7 +18,7 @@ import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,
@@ -26,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 import { AgentWorkloadPicker } from "@/components/workflows/pickers";
 

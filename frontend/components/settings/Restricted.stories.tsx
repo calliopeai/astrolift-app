@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NextIntlClientProvider } from "next-intl";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import es from "@/messages/es.json";
 import ja from "@/messages/ja.json";
 

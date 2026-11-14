@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import {
   GROUNDS,
   MIN_ACCENT_CONTRAST,

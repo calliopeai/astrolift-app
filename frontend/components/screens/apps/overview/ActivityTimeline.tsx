@@ -15,7 +15,7 @@ import { useTranslations } from "next-intl";
 import { Feed } from "@/components/feed/Feed";
 import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 import { useFormatters } from "@/lib/i18n/formatters";
 import type { AstroliftEvent } from "@/graphql/operations/operations.types";

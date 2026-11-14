@@ -13,7 +13,7 @@ import {
 import { Panel } from "@/components/panel/Panel";
 import { Restricted } from "@/components/settings/Restricted";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Label } from "@/components/ui/label";
 import {

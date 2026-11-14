@@ -8,10 +8,9 @@ import { SettingsPage, SettingsSection } from "@/components/settings/SettingsPag
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@calliopelabs/ui";
 import {
   isRestrictedSettings,
   PRODUCT_RESTRICTED_SETTINGS,

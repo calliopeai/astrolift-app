@@ -11,7 +11,7 @@ import { selectRows } from "@/components/list/select-rows";
 import { useLocalListState } from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox, Input, Skeleton } from "@calliopelabs/ui";
 import {
   Dialog,
   DialogContent,
@@ -20,11 +20,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftClusterAuthUser } from "@/graphql/__generated__/schema";
 
 import { localizedAuthUsersList, AUTH_USERS_SELECT } from "./auth-users-list";

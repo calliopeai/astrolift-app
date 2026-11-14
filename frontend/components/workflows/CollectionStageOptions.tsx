@@ -3,7 +3,7 @@
 import { useId } from "react";
 import { useTranslations } from "next-intl";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 
 export interface CollectionStageOptionsProps {

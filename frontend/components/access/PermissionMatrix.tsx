@@ -4,8 +4,7 @@ import { CheckIcon, ChevronRightIcon, MinusIcon, PlusIcon } from "lucide-react";
 import * as React from "react";
 import { useFormatter, useTranslations } from "next-intl";
 
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { Checkbox, Input } from "@calliopelabs/ui";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { cn } from "@/lib/utils";
 

@@ -7,7 +7,7 @@ import * as React from "react";
 
 import { SlugStatusHint } from "@/components/screens/projects/SlugStatusHint";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,

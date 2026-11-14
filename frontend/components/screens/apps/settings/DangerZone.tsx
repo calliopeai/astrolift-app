@@ -31,9 +31,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@calliopelabs/ui";
 
 import type { useDangerZone } from "./use-danger-zone";
 

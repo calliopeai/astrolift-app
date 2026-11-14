@@ -10,7 +10,7 @@ import { PageShell } from "@/components/PageShell";
 import { ListPage } from "@/components/list/ListPage";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import type { ModelPage } from "./ModelSubscriptionsPanel";
 import {

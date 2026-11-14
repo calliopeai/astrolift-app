@@ -15,7 +15,7 @@ import {
   type DeliveryRecord,
 } from "@/components/screens/workflows/delivery/DeliveryChannelPicker";
 import type { DeliveryChannel } from "@/components/screens/workflows/delivery/DeliveryChannelsPanel";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 

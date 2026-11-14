@@ -10,7 +10,7 @@ import { LinkIcon } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ListPage } from "@/components/list/ListPage";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import type { ModelPage, SubscriptionModel } from "./ModelSubscriptionsPanel";
 

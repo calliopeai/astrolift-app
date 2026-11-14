@@ -30,9 +30,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@calliopelabs/ui";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Textarea } from "@/components/ui/textarea";
 

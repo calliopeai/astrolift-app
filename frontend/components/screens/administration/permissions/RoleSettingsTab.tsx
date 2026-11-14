@@ -5,7 +5,7 @@ import * as React from "react";
 
 import { SettingsPage, SettingsSection } from "@/components/settings/SettingsPage";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { AstroliftRole } from "@/graphql/identity/identity.types";

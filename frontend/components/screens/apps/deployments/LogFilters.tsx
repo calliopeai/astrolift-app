@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import type { LogLevel } from "@/components/observability/LogViewer";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

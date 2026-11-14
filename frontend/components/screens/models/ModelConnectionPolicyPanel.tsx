@@ -4,9 +4,8 @@ import { useFormatter, useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Checkbox, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { ModelConnectionPolicyFieldsFragment } from "@/graphql/__generated__/operations";
 export type ConnectionPolicyDraft = {
   mode: "AUTO" | "REQUIRE_APPROVAL" | "DENY";

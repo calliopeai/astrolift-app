@@ -3,8 +3,7 @@
 import { CheckCircle2Icon, LockIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { Checkbox, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

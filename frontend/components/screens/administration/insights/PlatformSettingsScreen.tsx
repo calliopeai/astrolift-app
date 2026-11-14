@@ -13,7 +13,7 @@ import { AdministrationShell } from "@/components/screens/administration/organiz
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import {
   Select,
@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@calliopelabs/ui";
 
 import { humanizeKey } from "./feature-key";
 import { PlatformSecretStores } from "./PlatformSecretStores";

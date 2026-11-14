@@ -11,9 +11,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CopyBadge } from "@/components/CopyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   AstroliftAgentTrigger,

@@ -6,9 +6,8 @@ import { useTranslations } from "next-intl";
 import { presetLabel, scopePresentation } from "./scope-presentation";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox, Skeleton } from "@calliopelabs/ui";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftApiTokenScopeCatalog } from "@/graphql/__generated__/schema";
 import { cn } from "@/lib/utils";
 

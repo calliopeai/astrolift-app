@@ -7,7 +7,7 @@ import { BrainCircuitIcon } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import { DefinitionList } from "@/components/ui/definition-list";

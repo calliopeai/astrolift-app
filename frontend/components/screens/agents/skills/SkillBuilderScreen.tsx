@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 
 import { ADAPTER_LABEL } from "./tool-adapters";
