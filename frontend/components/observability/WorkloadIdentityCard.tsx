@@ -25,7 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftAppIdentityBinding } from "@/graphql/lifecycle/lifecycle.types";
 
 export interface WorkloadIdentityCardData {

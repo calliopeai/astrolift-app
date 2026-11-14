@@ -6,7 +6,7 @@ import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Panel } from "@/components/panel/Panel";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import type { ResourceGauge, useWorkloadResourceUsage } from "./use-workload-resource-usage";

@@ -4,7 +4,7 @@ import NextLink from "next/link";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { eventPayloadText } from "./event-source";

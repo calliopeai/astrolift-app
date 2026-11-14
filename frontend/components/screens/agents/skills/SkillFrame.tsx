@@ -9,7 +9,7 @@ import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 import { agentsCrumbs } from "./catalog";
 import type { Skill } from "./use-skill";

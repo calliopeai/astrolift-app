@@ -11,7 +11,7 @@ import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import {
   isRestrictedSettings,
   PRODUCT_RESTRICTED_SETTINGS,

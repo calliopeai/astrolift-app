@@ -6,7 +6,7 @@ import { localizedHomeLayout } from "@/components/home/registry";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 export interface HomeLayoutSettingsProps {
   loading?: boolean;

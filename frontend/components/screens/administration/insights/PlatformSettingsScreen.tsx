@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 import { humanizeKey } from "./feature-key";
 import { PlatformSecretStores } from "./PlatformSecretStores";

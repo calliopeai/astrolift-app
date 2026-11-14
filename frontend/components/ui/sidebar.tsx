@@ -17,7 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PanelLeftIcon } from "lucide-react";
 
@@ -313,7 +313,7 @@ function SidebarResizeHandle({ side }: { side: "left" | "right" }) {
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
     },
-    [state],
+    [state]
   );
 
   const onPointerMove = React.useCallback(
@@ -325,7 +325,7 @@ function SidebarResizeHandle({ side }: { side: "left" | "right" }) {
       const clamped = Math.max(SIDEBAR_WIDTH_MIN_PX, Math.min(SIDEBAR_WIDTH_MAX_PX, raw));
       setWidth(`${clamped}px`);
     },
-    [side, setWidth],
+    [side, setWidth]
   );
 
   const onPointerUp = React.useCallback(() => {
@@ -360,7 +360,7 @@ function SidebarResizeHandle({ side }: { side: "left" | "right" }) {
         // with the sidebar contents but is easy enough to grab.
         "group/handle absolute top-0 z-20 h-full w-1 cursor-col-resize touch-none transition-colors",
         side === "left" ? "right-0" : "left-0",
-        "hover:bg-sidebar-border/40 group-data-[state=collapsed]:hidden",
+        "hover:bg-sidebar-border/40 group-data-[state=collapsed]:hidden"
       )}
     />
   );

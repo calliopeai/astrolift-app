@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { QueryError } from "@/components/QueryError";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 import { agentsCrumbs } from "../skills/catalog";
 import type { EnvironmentSpec } from "./environment-specs";

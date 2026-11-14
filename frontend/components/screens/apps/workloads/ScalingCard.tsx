@@ -7,7 +7,7 @@ import * as React from "react";
 import { Panel } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import type { ScalingStatus, useWorkloadScaling } from "./use-workload-scaling";

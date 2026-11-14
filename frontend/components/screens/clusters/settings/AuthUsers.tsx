@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftClusterAuthUser } from "@/graphql/__generated__/schema";
 
 import { localizedAuthUsersList, AUTH_USERS_SELECT } from "./auth-users-list";

@@ -23,7 +23,7 @@ import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { WorkflowRunStatus } from "@/graphql/operations/operations.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

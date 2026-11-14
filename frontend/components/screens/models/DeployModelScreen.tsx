@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { type Fit, gpuFit, MODEL_CATALOG, neededGiB, serviceNameFor } from "./model-catalog";

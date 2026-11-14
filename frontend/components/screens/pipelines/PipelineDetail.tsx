@@ -13,7 +13,7 @@ import Link from "next/link";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { PipelineDag } from "@/components/viz";
 
 import {

@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { FlowGraph } from "@/components/viz/flow-graph";
 import { ProjectTopologyNode } from "./ProjectTopologyNode";
 import { buildProjectTopology, type ProjectTopologyInput } from "./project-topology-model";

@@ -17,7 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 import type { ListProjectResourceAttachmentsPageQuery } from "@/graphql/__generated__/operations";
 import type { ProjectManagedResource } from "./ProjectManagedResourceList";

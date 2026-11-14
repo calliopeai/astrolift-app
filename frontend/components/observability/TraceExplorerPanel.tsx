@@ -14,7 +14,7 @@ import {
 } from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftAppTrace, AstroliftTraceSpan } from "@/graphql/__generated__/schema";
 
 import { localizeList } from "./localize-list";

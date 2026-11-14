@@ -6,7 +6,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { QueryError } from "@/components/QueryError";
 import { Card, CardContent } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { StatTile } from "@/components/ui/stat-tile";
 
 import { ZentinelleScopeFilter, type ZentinelleScopeFilterProps } from "./ZentinelleScopeFilter";

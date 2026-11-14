@@ -6,7 +6,7 @@ import type * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftTenantCluster } from "@/graphql/clusters/clusters.types";
 
 import { type ClusterTabKey, clusterTabs } from "./ClusterTabs";

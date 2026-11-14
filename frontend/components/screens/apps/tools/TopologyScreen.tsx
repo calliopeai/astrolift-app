@@ -7,7 +7,7 @@ import * as React from "react";
 import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import type { TopologyEdge, TopologyNode } from "@/components/topology/types";
 import { AppView } from "@/components/viz/AppView";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { cn } from "@/lib/utils";
 

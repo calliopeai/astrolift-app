@@ -10,7 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ViewToggle } from "@/components/ViewToggle";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftProviderPlugin } from "@/graphql/clusters/clusters.types";
 import { cn } from "@/lib/utils";
 

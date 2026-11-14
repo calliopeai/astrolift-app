@@ -7,7 +7,7 @@ import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/panel/Panel";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import type { K8sResource, useWorkloadManifest } from "./use-workload-manifest";

@@ -3,7 +3,7 @@
 import { Building2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 /**
  * The organization, heading the projects rail. One organization per

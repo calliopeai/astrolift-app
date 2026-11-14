@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { QueryError } from "@/components/QueryError";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 import { ZentinelleScopeFilter, type ZentinelleScopeFilterProps } from "./ZentinelleScopeFilter";
 import type { ReadState, ZentinellePolicy } from "./zentinelle-model";

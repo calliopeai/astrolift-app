@@ -9,7 +9,7 @@ import type { DetailTab } from "@/components/DetailPageTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 export interface PrincipalPageProps {
   crumbs: Crumb[];

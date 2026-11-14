@@ -39,7 +39,7 @@ import * as React from "react";
 import type { EmptyStateSpec } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 /** Columns of the 12-column grid the panel takes from `xl` up. */

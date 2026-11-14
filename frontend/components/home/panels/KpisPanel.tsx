@@ -15,7 +15,7 @@ import { GaugeIcon } from "lucide-react";
 import Link from "next/link";
 
 import { Panel } from "@/components/panel/Panel";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 
 import { homePanelTitle, type HomePanelProps } from "../registry";
 import { useHomePresentation } from "./use-home-presentation";

@@ -29,7 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { ProvisioningStatus } from "@/graphql/registry/registry.types";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 

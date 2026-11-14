@@ -4,7 +4,7 @@ import { RocketIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";

@@ -8,7 +8,7 @@ import { presetLabel, scopePresentation } from "./scope-presentation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftApiTokenScopeCatalog } from "@/graphql/__generated__/schema";
 import { cn } from "@/lib/utils";
 

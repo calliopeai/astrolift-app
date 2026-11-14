@@ -36,7 +36,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@calliopelabs/ui";
 import { StatTile } from "@/components/ui/stat-tile";
 import { ProjectWorkflowTopology } from "@/components/workflows/workflow-topology";
 import type {
