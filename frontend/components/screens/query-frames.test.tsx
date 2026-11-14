@@ -22,6 +22,7 @@ import { DeployModelScreen } from "./models/DeployModelScreen";
 import { DEPLOY, CLOUD_PROVIDERS } from "./models/models-providers.fixtures";
 import { OpsScreen } from "./ops/OpsScreen";
 import { OPS_EMPTY } from "./ops/metrics-ops-shell.fixtures";
+import { UiEnvironment } from "@/providers/UiEnvironment";
 import { PipelineDetailScreen } from "./pipelines/PipelineDetail";
 import { DETAIL as PIPELINE } from "./pipelines/pipelines-previews.fixtures";
 import { CloudProvidersPanelView } from "./providers/CloudProvidersPanel";
@@ -42,7 +43,9 @@ const refusal = { name: "Error", message: "The request was refused" };
 const wrapper = ({ children }: { children: ReactNode }) => (
   <NextIntlClientProvider locale="en" messages={messages}>
     <MockedProvider mocks={[]}>
-      <ConfirmProvider>{children}</ConfirmProvider>
+      <UiEnvironment>
+        <ConfirmProvider>{children}</ConfirmProvider>
+      </UiEnvironment>
     </MockedProvider>
   </NextIntlClientProvider>
 );
