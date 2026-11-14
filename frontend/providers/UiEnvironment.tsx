@@ -23,6 +23,7 @@ export function UiEnvironment({ children }: { children: ReactNode }) {
   const shellHeader = useTranslations("shared.shellHeader");
   const primitives = useTranslations("uiPrimitives");
   const list = useTranslations("shared.list");
+  const errorScreens = useTranslations("errorScreens");
 
   const messages = useMemo<MessageOverrides>(
     () => ({
@@ -39,7 +40,14 @@ export function UiEnvironment({ children }: { children: ReactNode }) {
         failed: confirmation("failed"),
         reasonRequired: confirmation("reasonRequired"),
       },
-      states: { learnMore: list("learnMore") },
+      states: {
+        errorTitle: errorScreens("title"),
+        unexpected: errorScreens("unexpected"),
+        retry: table("retry"),
+        errorId: (digest) => errorScreens("errorId", { digest }),
+        loading: table("loading"),
+        learnMore: list("learnMore"),
+      },
       table: {
         search: table("search"),
         clearSearch: table("clearSearch"),
@@ -56,7 +64,7 @@ export function UiEnvironment({ children }: { children: ReactNode }) {
         selectPage: (label) => table("selectPage", { label }),
       },
     }),
-    [confirmation, table, shellHeader, primitives, list]
+    [confirmation, table, shellHeader, primitives, list, errorScreens]
   );
 
   return (
