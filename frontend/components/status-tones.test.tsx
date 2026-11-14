@@ -22,14 +22,18 @@ describe("status tones", () => {
     expect(screen.getByLabelText("Status: Running")).toHaveClass("text-success-fg");
   });
 
-  it("pulse only in-flight states, and not under reduced motion", () => {
+  it("pulse only the dot of in-flight states, and not under reduced motion", () => {
     render(<DeploymentStatusPill status="deploying" />);
-    expect(screen.getByLabelText("Status: Deploying")).toHaveClass(
+    const deploying = screen.getByLabelText("Status: Deploying");
+    expect(deploying).not.toHaveClass("animate-pulse");
+    expect(deploying.querySelector("[aria-hidden]")).toHaveClass(
       "animate-pulse",
       "motion-reduce:animate-none"
     );
 
     render(<DeploymentStatusPill status="failed" />);
-    expect(screen.getByLabelText("Status: Failed")).not.toHaveClass("animate-pulse");
+    expect(screen.getByLabelText("Status: Failed").querySelector("[aria-hidden]")).not.toHaveClass(
+      "animate-pulse"
+    );
   });
 });
