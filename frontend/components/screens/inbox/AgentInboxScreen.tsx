@@ -5,10 +5,9 @@ import Link from "next/link";
 import { useNow, useTranslations } from "next-intl";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, Checkbox, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import { Button, Checkbox, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {

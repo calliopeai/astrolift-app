@@ -5,13 +5,12 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 
 import {

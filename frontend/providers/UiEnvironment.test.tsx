@@ -15,6 +15,7 @@ function Probe() {
       <p>{messages.table.results(2)}</p>
       <p>{messages.breadcrumb.switchFrom("Clusters")}</p>
       <p>{messages.dialog.close}</p>
+      <p>{messages.states.learnMore}</p>
       <Link href="/clusters">clusters</Link>
     </div>
   );
@@ -34,6 +35,7 @@ describe("UiEnvironment", () => {
     expect(screen.getByText("2 résultats")).toBeInTheDocument();
     expect(screen.getByText("Changer : Clusters")).toBeInTheDocument();
     expect(screen.getByText(fr.uiPrimitives.close)).toBeInTheDocument();
+    expect(screen.getByText(fr.shared.list.learnMore)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "clusters" })).toHaveAttribute("href", "/clusters");
   });
 });

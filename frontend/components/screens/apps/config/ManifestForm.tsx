@@ -24,10 +24,9 @@ import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
+import { Button, EmptyState } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { EmptyState } from "@/components/EmptyState";
 import { Section } from "@/components/ui/section";
 import { Separator } from "@/components/ui/separator";
 import {

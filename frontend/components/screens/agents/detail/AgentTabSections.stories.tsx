@@ -6,7 +6,7 @@ import { expect, within } from "storybook/test";
 
 import { LayersIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@calliopelabs/ui";
 
 import { AgentTabSections } from "./AgentTabSections";
 

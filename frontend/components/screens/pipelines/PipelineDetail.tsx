@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { localizedPipelineToken } from "./pipelines-list";
-import { Button, Skeleton } from "@calliopelabs/ui";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
 
@@ -11,7 +11,6 @@ import { ActivityIcon, DownloadIcon, ScrollIcon, SettingsIcon, UsersIcon } from 
 import type * as React from "react";
 import Link from "next/link";
 
-import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { PipelineDag } from "@/components/viz";
 

@@ -4,9 +4,8 @@ import { AlertTriangleIcon, ServerCrashIcon } from "lucide-react";
 import type * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { ClusterHeader } from "@/components/screens/clusters/list/ClusterHeader";
-import { Button, Skeleton } from "@calliopelabs/ui";
 
 import type { ClusterSummary } from "./types";
 

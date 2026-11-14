@@ -11,11 +11,10 @@ import {
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState, Skeleton } from "@calliopelabs/ui";
 import { ListSummary } from "@/components/list/ListSummary";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 import type {
   AstroliftAgentListItem,
   AstroliftAgentSkill,

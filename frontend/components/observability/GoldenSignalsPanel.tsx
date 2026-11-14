@@ -32,14 +32,13 @@ import {
   YAxis,
 } from "recharts";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import {
   type ObservabilityPanelReason,
   type PanelEmptyMessage,
   type PanelReasonTranslator,
   panelEmptyState,
 } from "@/components/observability/panel-reason";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
   AstroliftAppGoldenSignal,

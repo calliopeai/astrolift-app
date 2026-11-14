@@ -22,6 +22,7 @@ export function UiEnvironment({ children }: { children: ReactNode }) {
   const table = useTranslations("shared.table");
   const shellHeader = useTranslations("shared.shellHeader");
   const primitives = useTranslations("uiPrimitives");
+  const list = useTranslations("shared.list");
 
   const messages = useMemo<MessageOverrides>(
     () => ({
@@ -38,6 +39,7 @@ export function UiEnvironment({ children }: { children: ReactNode }) {
         failed: confirmation("failed"),
         reasonRequired: confirmation("reasonRequired"),
       },
+      states: { learnMore: list("learnMore") },
       table: {
         search: table("search"),
         clearSearch: table("clearSearch"),
@@ -54,7 +56,7 @@ export function UiEnvironment({ children }: { children: ReactNode }) {
         selectPage: (label) => table("selectPage", { label }),
       },
     }),
-    [confirmation, table, shellHeader, primitives]
+    [confirmation, table, shellHeader, primitives, list]
   );
 
   return (

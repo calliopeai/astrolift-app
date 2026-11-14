@@ -11,9 +11,8 @@ import {
 import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState } from "@calliopelabs/ui";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@calliopelabs/ui";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";
 

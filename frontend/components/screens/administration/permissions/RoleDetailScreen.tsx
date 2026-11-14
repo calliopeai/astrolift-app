@@ -6,11 +6,10 @@ import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { summarizePermissions } from "@/components/access/access-model";
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { Panel } from "@/components/panel/Panel";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 
 import { RolePermissionsTab } from "./RolePermissionsTab";
 import { RoleSettingsTab } from "./RoleSettingsTab";

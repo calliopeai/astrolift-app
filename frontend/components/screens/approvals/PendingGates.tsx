@@ -4,10 +4,9 @@ import { ClockIcon, RefreshCwIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useFormatter, useNow, useTranslations } from "next-intl";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import type { PendingHumanGate } from "@/graphql/workflows/tiered.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

@@ -23,9 +23,8 @@ import { useTranslations } from "next-intl";
 import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState } from "@calliopelabs/ui";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Section } from "@/components/ui/section";

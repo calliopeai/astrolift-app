@@ -30,8 +30,7 @@ import * as React from "react";
 import Link from "next/link";
 import { AlertTriangleIcon, SearchXIcon } from "lucide-react";
 
-import { EmptyState } from "@/components/EmptyState";
-import { Button, Checkbox, Skeleton } from "@calliopelabs/ui";
+import { Button, Checkbox, EmptyState, Skeleton } from "@calliopelabs/ui";
 import {
   Table,
   TableBody,

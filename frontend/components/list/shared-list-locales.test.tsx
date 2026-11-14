@@ -8,8 +8,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DataTable, useRowSelection } from "@/components/data-table";
 import { fakeController } from "@/components/data-table/fixtures";
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState } from "@calliopelabs/ui";
 import { locales } from "@/i18n/config";
+import { UiEnvironment } from "@/providers/UiEnvironment";
 
 import { FilterBar } from "./FilterBar";
 import type { ListDefinition } from "./list-state";
@@ -144,7 +145,7 @@ function Page({
 function mount(locale: string, children: React.ReactNode, onError = vi.fn()) {
   return render(
     <NextIntlClientProvider locale={locale} messages={catalogs[locale]} onError={onError}>
-      {children}
+      <UiEnvironment>{children}</UiEnvironment>
     </NextIntlClientProvider>
   );
 }

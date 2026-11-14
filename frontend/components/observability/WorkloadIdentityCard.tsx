@@ -17,13 +17,12 @@ import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Skeleton } from "@calliopelabs/ui";
 import {
   type ObservabilityPanelReason,
   panelEmptyState,
 } from "@/components/observability/panel-reason";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AstroliftAppIdentityBinding } from "@/graphql/lifecycle/lifecycle.types";
 

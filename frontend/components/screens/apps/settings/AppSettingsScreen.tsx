@@ -16,10 +16,9 @@ import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
-import { EmptyState } from "@/components/EmptyState";
+import { EmptyState, Skeleton } from "@calliopelabs/ui";
 import { PageShell } from "@/components/PageShell";
 import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 
 import type { useAppSettings } from "./use-app-settings";
 

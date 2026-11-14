@@ -88,16 +88,16 @@ import {
   useRowSelection,
 } from "@/components/data-table";
 import type { CursorTableController } from "@/components/data-table";
-import { EmptyState } from "@/components/EmptyState";
-import { ShellHeader, type ShellHeaderProps } from "@/components/shell/ShellHeader";
 import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  EmptyState,
   Skeleton,
 } from "@calliopelabs/ui";
+import { ShellHeader, type ShellHeaderProps } from "@/components/shell/ShellHeader";
 import { cn } from "@/lib/utils";
 
 import { FilterBar, type FilterBarColumn } from "./FilterBar";

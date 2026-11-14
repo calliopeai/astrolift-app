@@ -18,7 +18,15 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
-import { EmptyState } from "@/components/EmptyState";
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  EmptyState,
+  Skeleton,
+} from "@calliopelabs/ui";
 import { ListPage } from "@/components/list/ListPage";
 import { type SelectRowsSpec, selectRows } from "@/components/list/select-rows";
 import {
@@ -32,14 +40,6 @@ import { PermissionNote, Restricted, useRestrictedMode } from "@/components/sett
 import { DangerAction, SettingsPage } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Skeleton,
-} from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";

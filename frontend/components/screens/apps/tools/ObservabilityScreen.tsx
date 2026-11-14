@@ -20,7 +20,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { EmptyState } from "@/components/EmptyState";
+import { Button, EmptyState, Input, Skeleton } from "@calliopelabs/ui";
 import { MetricScopePicker, PodEventsPanel, PodExpander } from "@/components/observability";
 import type { MetricScopeOptions } from "@/components/observability/MetricScopePicker";
 import type { PodEventRow } from "@/components/observability/PodEventsPanel";
@@ -42,7 +42,6 @@ import {
 import { LogFilters } from "@/components/screens/apps/deployments/LogFilters";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,
