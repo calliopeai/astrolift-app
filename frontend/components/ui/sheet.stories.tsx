@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,

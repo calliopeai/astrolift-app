@@ -42,8 +42,7 @@ import {
 import { LogFilters } from "@/components/screens/apps/deployments/LogFilters";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

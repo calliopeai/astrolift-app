@@ -4,7 +4,7 @@ import { DownloadIcon, ScrollTextIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { ZentinelleScopeFilter, type ZentinelleScopeFilterProps } from "./ZentinelleScopeFilter";
 import type { ZentinelleAuditEvent } from "./zentinelle-model";

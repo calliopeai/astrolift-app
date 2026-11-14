@@ -14,7 +14,7 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { RowSelection } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

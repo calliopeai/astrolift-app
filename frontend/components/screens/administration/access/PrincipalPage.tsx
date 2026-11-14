@@ -8,8 +8,7 @@ import { PrincipalChip } from "@/components/access/PrincipalChip";
 import type { DetailTab } from "@/components/DetailPageTabs";
 import { EmptyState } from "@/components/EmptyState";
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 
 export interface PrincipalPageProps {
   crumbs: Crumb[];

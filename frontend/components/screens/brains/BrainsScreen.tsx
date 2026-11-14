@@ -7,7 +7,7 @@ import Link from "next/link";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";
 

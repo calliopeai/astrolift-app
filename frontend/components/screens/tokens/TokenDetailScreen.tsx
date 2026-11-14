@@ -8,7 +8,7 @@ import {
 import { useTranslations, useNow } from "next-intl";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { PageShell } from "@/components/PageShell";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 

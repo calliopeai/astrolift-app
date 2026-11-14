@@ -19,7 +19,7 @@ import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -29,7 +29,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

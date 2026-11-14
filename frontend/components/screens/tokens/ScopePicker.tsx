@@ -5,8 +5,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { presetLabel, scopePresentation } from "./scope-presentation";
 
-import { Button } from "@/components/ui/button";
-import { Checkbox, Skeleton } from "@calliopelabs/ui";
+import { Button, Checkbox, Skeleton } from "@calliopelabs/ui";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { AstroliftApiTokenScopeCatalog } from "@/graphql/__generated__/schema";
 import { cn } from "@/lib/utils";

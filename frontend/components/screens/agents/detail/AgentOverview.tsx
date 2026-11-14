@@ -8,7 +8,7 @@ import * as React from "react";
 import { ListSummary } from "@/components/list/ListSummary";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 import { FleetView } from "@/components/viz/FleetView";
 import { useFormatters } from "@/lib/i18n/formatters";

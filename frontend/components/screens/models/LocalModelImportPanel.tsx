@@ -2,8 +2,7 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { UploadIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { ListPage } from "@/components/list/ListPage";
 import type { LocalArtifactFieldsFragment } from "@/graphql/__generated__/operations";

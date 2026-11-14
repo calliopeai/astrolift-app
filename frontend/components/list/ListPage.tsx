@@ -90,14 +90,13 @@ import {
 import type { CursorTableController } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
 import { ShellHeader, type ShellHeaderProps } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { FilterBar, type FilterBarColumn } from "./FilterBar";

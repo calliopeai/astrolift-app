@@ -10,7 +10,7 @@ import { RunStatusBadge } from "@/components/jobs/RunStatusBadge";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { RunPage } from "@/components/run/RunPage";
 import { appsDetailCrumbs } from "@/components/screens/deployments/apps-area";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 

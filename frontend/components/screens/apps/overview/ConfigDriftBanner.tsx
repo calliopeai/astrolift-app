@@ -21,7 +21,7 @@
 import { GitPullRequestArrowIcon, Loader2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftAppConfigDrift } from "@/graphql/registry/registry.types";
 
 import { Notice } from "./OverviewNotices";

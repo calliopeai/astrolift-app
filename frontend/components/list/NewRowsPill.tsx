@@ -4,7 +4,7 @@ import { useFormatter, useTranslations } from "next-intl";
 
 import { ArrowUpIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 /**

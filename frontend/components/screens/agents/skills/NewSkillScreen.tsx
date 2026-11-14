@@ -6,9 +6,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 
 import { agentsCrumbs } from "./catalog";

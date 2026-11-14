@@ -10,7 +10,7 @@ import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftProject, AstroliftTeam } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";

@@ -4,7 +4,7 @@ import { HourglassIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 const MINUTE = 60_000;

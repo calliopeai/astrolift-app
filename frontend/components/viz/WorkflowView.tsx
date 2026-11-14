@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 import { ExpandIcon, MinusIcon, PlusIcon, ScanIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 import {

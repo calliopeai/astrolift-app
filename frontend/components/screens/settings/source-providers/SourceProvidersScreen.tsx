@@ -27,7 +27,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   Dialog,
   DialogContent,

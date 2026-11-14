@@ -7,7 +7,7 @@ import type { Column } from "@/components/data-table";
 import { Identifier } from "@/components/Identifier";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import type { AstroliftNotification } from "@/graphql/operations/operations.types";
 import { useFormatters } from "@/lib/i18n/formatters";

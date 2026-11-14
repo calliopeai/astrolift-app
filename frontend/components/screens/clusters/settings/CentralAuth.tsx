@@ -8,8 +8,7 @@ import type { CentralAuthDraft } from "./types";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SettingsSection } from "@/components/settings/SettingsPage";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox, Input } from "@calliopelabs/ui";
+import { Button, Checkbox, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import {

@@ -6,7 +6,7 @@ import * as React from "react";
 
 import { Can } from "@/components/Can";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,7 +18,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@calliopelabs/ui";
 
 import type { useAssignProject } from "./use-assign-project";
 

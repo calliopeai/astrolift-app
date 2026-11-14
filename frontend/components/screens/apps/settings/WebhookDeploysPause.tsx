@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import { Textarea } from "@/components/ui/textarea";

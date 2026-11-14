@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS } from "../core/semantics";

@@ -18,7 +18,7 @@ import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { appsDetailCrumbs } from "@/components/screens/deployments/apps-area";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import {
   DropdownMenu,

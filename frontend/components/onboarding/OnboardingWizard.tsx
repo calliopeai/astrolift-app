@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { TemporaryAppPolicyState } from "@/components/screens/apps/temporary-app-model";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   Dialog,
   DialogContent,

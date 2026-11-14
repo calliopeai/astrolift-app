@@ -11,8 +11,7 @@ import Link from "next/link";
 import type * as React from "react";
 import { useFormatter, useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { localizedScopeLabel } from "./access-copy";

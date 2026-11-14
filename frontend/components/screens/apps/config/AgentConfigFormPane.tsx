@@ -16,7 +16,7 @@ import * as React from "react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { copyWithFeedback } from "@/lib/copy-with-feedback";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   agentModelToToml,
   tomlToAgentModel,

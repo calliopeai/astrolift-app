@@ -3,7 +3,7 @@
 import { GithubIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { Notice } from "./OverviewNotices";
 import type { useSourceConnections } from "./use-source-connections";

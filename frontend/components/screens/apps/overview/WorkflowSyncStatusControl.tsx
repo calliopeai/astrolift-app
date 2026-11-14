@@ -11,7 +11,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftCiWorkflowSyncStatus } from "@/graphql/__generated__/schema";
 import { DRIFT_BADGE, formatRelativeWebhookInstall } from "./ci-setup-meta";
 import type { CiSetupData } from "./use-ci-setup";

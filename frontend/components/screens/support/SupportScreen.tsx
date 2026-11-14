@@ -6,9 +6,8 @@ import { useTranslations } from "next-intl";
 import { EmptyState } from "@/components/EmptyState";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Card } from "@/components/ui/card";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,

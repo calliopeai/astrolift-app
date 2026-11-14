@@ -17,7 +17,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ListSummary } from "@/components/list/ListSummary";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,7 +25,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 
 import { ADAPTER_LABEL } from "./tool-adapters";

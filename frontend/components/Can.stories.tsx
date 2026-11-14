@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { Can } from "@/components/Can";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { PermissionsProvider } from "@/providers/PermissionsProvider";
 
 /**

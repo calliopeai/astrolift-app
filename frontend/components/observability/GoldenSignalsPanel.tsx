@@ -39,9 +39,8 @@ import {
   type PanelReasonTranslator,
   panelEmptyState,
 } from "@/components/observability/panel-reason";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 import type {
   AstroliftAppGoldenSignal,
   AstroliftAppNetworkMetrics,

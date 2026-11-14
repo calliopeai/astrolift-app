@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { ModelConnectionIntakePanel } from "./ModelConnectionIntakePanel";
 import { useModelConnectionIntake } from "./use-model-connection-intake";
 import { useState } from "react";

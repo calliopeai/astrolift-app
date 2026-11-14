@@ -15,7 +15,7 @@ import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ListSummary } from "@/components/list/ListSummary";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { homePanelTitle, type HomePanelProps } from "../registry";
 import { useHomePresentation } from "./use-home-presentation";

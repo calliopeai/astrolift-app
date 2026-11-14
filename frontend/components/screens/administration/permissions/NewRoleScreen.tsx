@@ -7,8 +7,7 @@ import { SCOPE_ORDER } from "@/components/access/access-model";
 import { PermissionMatrix } from "@/components/access/PermissionMatrix";
 import { RoleSummary } from "@/components/access/RoleSummary";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

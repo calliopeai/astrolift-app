@@ -10,7 +10,7 @@ import { useTranslations } from "next-intl";
 
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AstroliftOrganization } from "@/graphql/identity/identity.types";
 

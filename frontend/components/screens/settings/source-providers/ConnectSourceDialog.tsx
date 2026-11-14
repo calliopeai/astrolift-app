@@ -2,8 +2,7 @@
 
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

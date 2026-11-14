@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { toast } from "sonner";
 
 import { Toaster } from "@/components/Toaster";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 /** Toasts: the outcome of a submit, never a validation error (spec 44 §5.4). */
 const meta: Meta = { title: "Patterns/Feedback/Toaster" };

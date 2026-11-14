@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 /**
  * #427 — collapsible inline output for a run row. Renders the

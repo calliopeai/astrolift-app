@@ -17,7 +17,7 @@ import { useFormatter, useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 

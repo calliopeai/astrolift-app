@@ -7,7 +7,7 @@ import { Loader2Icon, XIcon } from "lucide-react";
 import { useTimeZone, useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   Sheet,
   SheetContent,

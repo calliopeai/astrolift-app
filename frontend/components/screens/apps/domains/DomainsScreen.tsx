@@ -24,7 +24,7 @@ import { PageShell } from "@/components/PageShell";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { DOC_LINKS } from "@/lib/docs/urls";
 import { environmentCan } from "@/lib/permissions/environment-permissions";

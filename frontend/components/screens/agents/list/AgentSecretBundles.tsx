@@ -17,9 +17,8 @@ import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@calliopelabs/ui";
 import type {
   AstroliftAgentSecretBundle,
   AstroliftAgentSecretBundleAttachment,

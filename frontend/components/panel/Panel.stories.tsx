@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { RocketIcon, ServerIcon, ServerOffIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { DEPLOY_FAILURE, LONG_ARN, LONG_SHA, LONG_URL, QUERY_ERROR, WORKLOADS } from "./fixtures";
 import { Panel, PanelGrid, SkeletonRows } from "./Panel";

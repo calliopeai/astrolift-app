@@ -20,7 +20,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { useNow } from "@/components/screens/deployments/run-support";
 import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useFormatters } from "@/lib/i18n/formatters";
 

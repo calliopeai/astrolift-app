@@ -41,7 +41,7 @@ import type { EmptyStateSpec } from "@/components/data-table";
 import { EmptyState } from "@/components/EmptyState";
 import { NewRowsPill } from "@/components/list/NewRowsPill";
 import { SkeletonRows } from "@/components/panel/Panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { type FeedGroupBy, groupItems, useHoldPlace, useLoadMore, useNearEnd } from "./use-feed";

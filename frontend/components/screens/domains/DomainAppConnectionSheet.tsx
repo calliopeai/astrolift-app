@@ -3,8 +3,7 @@
 import * as React from "react";
 import { XIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,

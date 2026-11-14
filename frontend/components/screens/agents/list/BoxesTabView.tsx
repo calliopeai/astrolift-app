@@ -8,7 +8,7 @@ import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

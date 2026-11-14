@@ -4,7 +4,7 @@ import { CheckIcon, CopyIcon } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +79,7 @@ export function CopyBadge({
       >
         <span className="truncate">{label ?? value}</span>
         {copied ? (
-          <CheckIcon className="size-3 text-success-fg" aria-hidden />
+          <CheckIcon className="text-success-fg size-3" aria-hidden />
         ) : (
           <CopyIcon className="text-muted-foreground size-3" aria-hidden />
         )}

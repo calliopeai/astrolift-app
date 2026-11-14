@@ -11,9 +11,8 @@ import { ListPage } from "@/components/list/ListPage";
 import { SettingsPage } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import {

@@ -4,7 +4,7 @@ import { KeyIcon, RefreshCwIcon, ShieldCheckIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { type Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { useFormatters } from "@/lib/i18n/formatters";
 import type { SecretProposalMetadata } from "./use-secret-proposals-queue";

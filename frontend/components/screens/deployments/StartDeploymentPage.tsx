@@ -6,9 +6,8 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

@@ -5,8 +5,7 @@ import * as React from "react";
 
 import type { ScopeNode } from "@/components/access/access-model";
 import { ScopePicker } from "@/components/access/ScopePicker";
-import { Button } from "@/components/ui/button";
-import { Checkbox, Input } from "@calliopelabs/ui";
+import { Button, Checkbox, Input } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

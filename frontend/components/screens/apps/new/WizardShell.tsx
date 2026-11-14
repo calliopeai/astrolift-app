@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 

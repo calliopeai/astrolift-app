@@ -24,7 +24,7 @@ import {
 } from "@/components/screens/agents/skills/tool-adapters";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,7 +32,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

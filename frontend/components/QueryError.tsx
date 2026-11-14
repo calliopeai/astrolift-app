@@ -1,6 +1,6 @@
 "use client";
 import { AlertTriangleIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 export interface QueryErrorProps {
   title: string;
   error?: string | { message: string } | null;

@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card } from "@/components/ui/card";
 import { environmentCan } from "@/lib/permissions/environment-permissions";
 import {
@@ -30,7 +30,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@calliopelabs/ui";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";

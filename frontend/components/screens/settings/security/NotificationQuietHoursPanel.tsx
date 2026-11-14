@@ -5,9 +5,8 @@ import { useTranslations } from "next-intl";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
-import { Button } from "@/components/ui/button";
+import { Button, Checkbox, Input, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox, Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 
 export interface QuietHoursSettings {

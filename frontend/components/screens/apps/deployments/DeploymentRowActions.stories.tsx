@@ -4,7 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import fr from "@/messages/fr.json";
 import ja from "@/messages/ja.json";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

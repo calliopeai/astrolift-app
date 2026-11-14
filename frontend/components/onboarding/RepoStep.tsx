@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
-import { Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

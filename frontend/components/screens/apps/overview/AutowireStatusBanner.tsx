@@ -21,7 +21,7 @@ import { AlertTriangleIcon, Loader2Icon, PlugZapIcon, RefreshCwIcon } from "luci
 
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { AstroliftAppAutowireStatus } from "@/graphql/registry/registry.types";
 
 import { Notice } from "./OverviewNotices";

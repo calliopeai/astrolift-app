@@ -31,8 +31,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

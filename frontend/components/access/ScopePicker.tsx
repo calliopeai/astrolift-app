@@ -13,8 +13,7 @@ import {
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
-import { Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { type ScopeKind, type ScopeNode, type ScopeRef, scopePath } from "./access-model";

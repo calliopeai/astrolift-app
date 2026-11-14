@@ -4,7 +4,7 @@ import { ShieldCheckIcon } from "lucide-react";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkflowStageExecution } from "@/graphql/workflows/tiered.types";
 

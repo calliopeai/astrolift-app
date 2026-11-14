@@ -18,7 +18,7 @@ import type { Column, EmptyStateSpec } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { appsListCrumbs } from "@/components/screens/deployments/apps-area";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

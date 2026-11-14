@@ -20,7 +20,7 @@ import * as React from "react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { tomlToModel, modelToToml, type ManifestModel } from "@/lib/manifest/model";
 import { validateManifest } from "@/lib/manifest/schema";
 

@@ -7,7 +7,7 @@ import * as React from "react";
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { useAppCan } from "@/lib/permissions/app-permissions";
 import { useFormatters } from "@/lib/i18n/formatters";
 

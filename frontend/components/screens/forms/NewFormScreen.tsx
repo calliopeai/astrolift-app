@@ -14,9 +14,8 @@ import {
 } from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";

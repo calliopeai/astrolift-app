@@ -4,7 +4,7 @@ import Link from "next/link";
 import { LinkIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { ListPage } from "@/components/list/ListPage";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { ModelConnectionRequestFieldsFragment } from "@/graphql/__generated__/operations";
 import type { ModelPage } from "./ModelSubscriptionsPanel";
 

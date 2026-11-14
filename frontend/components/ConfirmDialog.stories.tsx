@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import french from "@/messages/fr.json";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 /** One confirmation dialog, with an optional required reason (spec 44 §7). */
 const meta: Meta<typeof ConfirmDialog> = {

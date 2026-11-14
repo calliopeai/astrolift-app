@@ -22,7 +22,7 @@ import { PanelGrid } from "@/components/panel/Panel";
 import { Section } from "@/components/ui/section";
 import { StatTile } from "@/components/ui/stat-tile";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Card } from "@/components/ui/card";
 import { useFormatters } from "@/lib/i18n/formatters";
 

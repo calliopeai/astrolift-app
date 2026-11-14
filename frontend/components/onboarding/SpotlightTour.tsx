@@ -4,7 +4,7 @@ import { ArrowRightIcon, BoxIcon, RocketIcon, ServerIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader } from "@/components/ui/popover";
 
 /**

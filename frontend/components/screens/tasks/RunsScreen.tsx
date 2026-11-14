@@ -20,7 +20,7 @@ import { Identifier } from "@/components/Identifier";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,

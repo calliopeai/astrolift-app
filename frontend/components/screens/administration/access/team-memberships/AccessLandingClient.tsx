@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { PEOPLE_HREF, TEAMS_HREF } from "../access-nav";
 import { useTeamMembershipScope } from "./use-team-membership-scope";
 import { useTeamAccessNavigation } from "./use-team-access-navigation";

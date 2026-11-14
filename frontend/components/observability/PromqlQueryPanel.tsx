@@ -13,9 +13,8 @@ import {
   YAxis,
 } from "recharts";
 
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {

@@ -14,7 +14,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { providerFamily, type UseScmConnect } from "@/components/use-scm-connect";
 
 const PROVIDERS_SETUP_HREF = "/providers#source";

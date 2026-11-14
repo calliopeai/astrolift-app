@@ -5,8 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { SearchIcon, XIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import type { CursorTableController } from "./use-cursor-table";

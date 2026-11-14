@@ -26,7 +26,7 @@ import { ListSummary } from "@/components/list/ListSummary";
 import { PageShell } from "@/components/PageShell";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Sheet,
@@ -36,7 +36,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@calliopelabs/ui";
 import { StatTile } from "@/components/ui/stat-tile";
 import { ProjectWorkflowTopology } from "@/components/workflows/workflow-topology";
 import type {

@@ -4,7 +4,7 @@ import { Loader2Icon, RefreshCwIcon } from "lucide-react";
 import { useNow, useTranslations } from "next-intl";
 
 import { Can } from "@/components/Can";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFormatters } from "@/lib/i18n/formatters";

@@ -11,7 +11,7 @@ import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { RunPage } from "@/components/run/RunPage";
 import { commandText, runElapsed, runSteps } from "@/components/screens/jobs/jobs-list";
 import { RunMenu, RunMissing } from "@/components/screens/jobs/RunDetailParts";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import type { AstroliftTaskRun } from "@/graphql/lifecycle/lifecycle.types";
 

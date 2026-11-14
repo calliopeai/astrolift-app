@@ -30,9 +30,8 @@ import {
   panelEmptyState,
 } from "@/components/observability/panel-reason";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 import type {
   AstroliftAppDnsRecord,
   DnsPropagationStatus,

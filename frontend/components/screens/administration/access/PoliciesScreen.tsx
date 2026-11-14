@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { parsePolicy } from "@/components/access/policy-model";
 import { PolicySentence } from "@/components/access/PolicySentence";

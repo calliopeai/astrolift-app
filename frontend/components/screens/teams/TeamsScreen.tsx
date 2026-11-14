@@ -14,7 +14,7 @@ import {
   TEAMS_HREF,
   type AccessFunction,
 } from "@/components/screens/administration/access/access-nav";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftTeam } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";

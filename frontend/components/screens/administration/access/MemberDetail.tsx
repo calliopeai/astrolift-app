@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { DetailStatusBadge, type Dot } from "@/components/detail/EntityDetailShell";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { accessCrumbs, grantHref, PEOPLE_HREF } from "./access-nav";
 import { PrincipalPage } from "./PrincipalPage";

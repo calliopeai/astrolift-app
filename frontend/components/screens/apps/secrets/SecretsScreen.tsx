@@ -28,8 +28,7 @@ import { DetailTabSections } from "@/components/detail/DetailTabSections";
 import { ListPage } from "@/components/list/ListPage";
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@calliopelabs/ui";
+import { Button, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

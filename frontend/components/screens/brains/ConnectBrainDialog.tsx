@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { type BrainConnection, brainMcpConfig, brainMcpUrl } from "./brain-connection";

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { MoreHorizontalIcon } from "lucide-react";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { FilterBar, type FilterBarColumn } from "./FilterBar";
 import { LONG_ARN, LONG_URL, RUNS_LIST } from "./fixtures";

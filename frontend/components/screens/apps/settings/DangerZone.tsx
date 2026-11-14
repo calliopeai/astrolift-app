@@ -29,9 +29,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 
 import type { useDangerZone } from "./use-danger-zone";

@@ -24,7 +24,7 @@ import { TerminalEmulator } from "@/components/observability";
 import { PageShell } from "@/components/PageShell";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,
@@ -32,7 +32,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
 import type { ReviewedExecTarget } from "@/lib/exec-session";

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import Link from "next/link";
 import { AppChromeProvider } from "@/lib/app-chrome-context";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 
 import { PageShell } from "@/components/PageShell";
 

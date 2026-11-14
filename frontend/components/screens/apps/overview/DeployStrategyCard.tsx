@@ -13,7 +13,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Can } from "@/components/Can";
 import { Card, CardContent } from "@/components/ui/card";
 import {

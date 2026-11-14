@@ -10,8 +10,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { selectRows } from "@/components/list/select-rows";
 import { useLocalListState } from "@/components/list/use-list-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox, Input, Skeleton } from "@calliopelabs/ui";
+import { Button, Checkbox, Input, Skeleton } from "@calliopelabs/ui";
 import {
   Dialog,
   DialogContent,

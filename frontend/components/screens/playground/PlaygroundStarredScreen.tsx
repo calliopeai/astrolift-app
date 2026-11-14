@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useFormatter, useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import type { SavedSession } from "./saved-sessions";
 export type PlaygroundStarredPrompt = SavedSession;
 

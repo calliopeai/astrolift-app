@@ -8,9 +8,8 @@ import { AlertTriangleIcon, ArrowLeftIcon, ArrowRightIcon, Loader2Icon } from "l
 import { FlowSteps } from "@/components/screens/agents/skills/FlowSteps";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Input } from "@calliopelabs/ui";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkflowView } from "@/components/viz/WorkflowView";
 import { definitionLine, definitionSnapshot } from "@/components/workflows/definition-line";

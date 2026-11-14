@@ -10,8 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { Panel } from "@/components/panel/Panel";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@calliopelabs/ui";
+import { Button, Skeleton } from "@calliopelabs/ui";
 
 import { RolePermissionsTab } from "./RolePermissionsTab";
 import { RoleSettingsTab } from "./RoleSettingsTab";

@@ -22,10 +22,9 @@ import { PageShell } from "@/components/PageShell";
 import { QuorumWidget } from "@/components/QuorumWidget";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftDeployment, DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

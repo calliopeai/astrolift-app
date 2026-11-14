@@ -4,7 +4,7 @@ import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { Loader2Icon, RocketIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import {
   GET_CLUSTER_AGENT_INSTALL,

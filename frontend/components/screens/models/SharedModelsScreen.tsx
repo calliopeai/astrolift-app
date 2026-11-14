@@ -10,7 +10,7 @@ import Link from "next/link";
 import { BrainCircuitIcon, RocketIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { ListPage } from "@/components/list/ListPage";
-import { Button } from "@/components/ui/button";
+import { Button } from "@calliopelabs/ui";
 import { type InstallManagedModel, InstallManagedModelCard } from "./InstallManagedModelCard";
 import type { ModelPage } from "./ModelSubscriptionsPanel";
 import { SHARED_MODEL_STATUSES } from "./shared-models-list";

@@ -11,9 +11,8 @@ import {
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftDeploymentApprovalHistoryEntry } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

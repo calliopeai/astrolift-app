@@ -6,7 +6,7 @@ import { BotIcon, ExpandIcon, Loader2Icon, MonitorPlayIcon, RefreshCwIcon } from
 
 import { EmptyState } from "@/components/EmptyState";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, Skeleton } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
@@ -15,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Skeleton } from "@calliopelabs/ui";
 import { VncViewer } from "@/components/observability/VncViewer";
 import { cn } from "@/lib/utils";
 

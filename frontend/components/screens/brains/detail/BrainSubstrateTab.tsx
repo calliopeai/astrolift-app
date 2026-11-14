@@ -7,7 +7,7 @@ import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { PermissionNote } from "@/components/settings/Restricted";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, PILL_TONE } from "@calliopelabs/ui";
 import { DefinitionList } from "@/components/ui/definition-list";
 import {
   Dialog,
@@ -17,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PILL_TONE } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { type BrainStatusResult, resourceInFlight, resourceTone } from "../brain-status-model";
