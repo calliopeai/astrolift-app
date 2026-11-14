@@ -20,13 +20,13 @@ import { Identifier } from "@/components/Identifier";
 import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 

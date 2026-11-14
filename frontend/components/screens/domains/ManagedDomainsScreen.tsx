@@ -9,8 +9,7 @@ import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input } from "@calliopelabs/ui";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Button, DropdownMenuItem, Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

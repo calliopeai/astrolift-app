@@ -17,14 +17,15 @@ import * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Skeleton,
+} from "@calliopelabs/ui";
 import {
   Sheet,
   SheetContent,

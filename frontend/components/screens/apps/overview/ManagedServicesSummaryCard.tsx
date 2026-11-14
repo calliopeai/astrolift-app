@@ -35,16 +35,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
-import { Card } from "@/components/ui/card";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Skeleton,
+} from "@calliopelabs/ui";
+import { Card } from "@/components/ui/card";
 import { Section } from "@/components/ui/section";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFormatters } from "@/lib/i18n/formatters";

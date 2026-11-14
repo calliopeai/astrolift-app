@@ -7,7 +7,7 @@ import * as React from "react";
 import { principalOfBinding } from "@/components/access/access-model";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ListPage } from "@/components/list/ListPage";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@calliopelabs/ui";
 import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

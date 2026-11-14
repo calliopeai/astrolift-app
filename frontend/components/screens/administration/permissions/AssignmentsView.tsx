@@ -14,13 +14,13 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { RowSelection } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import type { AstroliftRoleBinding } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

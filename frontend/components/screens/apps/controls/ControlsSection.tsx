@@ -18,17 +18,18 @@ import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
-import { Card } from "@/components/ui/card";
-import { environmentCan } from "@/lib/permissions/environment-permissions";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Skeleton,
+} from "@calliopelabs/ui";
+import { Card } from "@/components/ui/card";
+import { environmentCan } from "@/lib/permissions/environment-permissions";
 import { Section } from "@/components/ui/section";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";

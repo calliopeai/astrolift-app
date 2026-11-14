@@ -6,13 +6,13 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS } from "../core/semantics";

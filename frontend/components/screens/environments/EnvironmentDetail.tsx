@@ -19,14 +19,14 @@ import { appsDetailCrumbs } from "@/components/screens/deployments/apps-area";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
-import { DefinitionList } from "@/components/ui/definition-list";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
+import { DefinitionList } from "@/components/ui/definition-list";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 
 import type { EnvironmentState } from "./use-environment";

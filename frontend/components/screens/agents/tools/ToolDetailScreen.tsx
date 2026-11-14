@@ -24,13 +24,15 @@ import {
 } from "@/components/screens/agents/skills/tool-adapters";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input, Skeleton } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Input,
+  Skeleton,
+} from "@calliopelabs/ui";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import {
   Select,

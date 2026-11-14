@@ -7,13 +7,13 @@ import type { Column } from "@/components/data-table";
 import { Identifier } from "@/components/Identifier";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 
 import { exportCsv } from "./exportCsv";
 import {

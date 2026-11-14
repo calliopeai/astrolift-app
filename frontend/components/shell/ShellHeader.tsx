@@ -11,7 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import { navLabel } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";
 

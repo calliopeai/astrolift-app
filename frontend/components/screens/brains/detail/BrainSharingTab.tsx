@@ -21,8 +21,7 @@ import { Panel } from "@/components/panel/Panel";
 import { PermissionNote, Restricted } from "@/components/settings/Restricted";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Button, DropdownMenuItem } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

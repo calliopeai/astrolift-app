@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { CheckIcon, RotateCcwIcon, StopCircleIcon, Trash2Icon, UndoIcon } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@calliopelabs/ui";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
 import { IN_FLIGHT } from "./app-deployments-format";

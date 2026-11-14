@@ -13,7 +13,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { appsListCrumbs } from "@/components/screens/deployments/apps-area";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@calliopelabs/ui";
 import type { AstroliftPreviewEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

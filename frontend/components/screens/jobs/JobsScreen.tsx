@@ -18,15 +18,15 @@ import type { Column, EmptyStateSpec } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { appsListCrumbs } from "@/components/screens/deployments/apps-area";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { jobRunStatus, type JobRow, jobRunsHref } from "./jobs-list";

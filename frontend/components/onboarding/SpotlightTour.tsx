@@ -4,8 +4,7 @@ import { ArrowRightIcon, BoxIcon, RocketIcon, ServerIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button } from "@calliopelabs/ui";
-import { Popover, PopoverAnchor, PopoverContent, PopoverHeader } from "@/components/ui/popover";
+import { Button, Popover, PopoverAnchor, PopoverContent, PopoverHeader } from "@calliopelabs/ui";
 
 /**
  * data-tour-target attribute that anchors the spotlight to a DOM
