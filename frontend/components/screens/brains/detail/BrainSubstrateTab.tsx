@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PILL_TONE } from "@/lib/status-tones";
+import { PILL_TONE } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { type BrainStatusResult, resourceInFlight, resourceTone } from "../brain-status-model";

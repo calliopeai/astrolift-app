@@ -3,7 +3,7 @@ import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type { DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
-import { IN_FLIGHT, PILL_TONE } from "@/lib/status-tones";
+import { IN_FLIGHT, PILL_TONE } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * means every surface picks up the same colour tokens, the same
  * animated pulse on in-flight states, and the same a11y label.
  *
- * Colours come from the one status map (lib/status-tones), shared with
+ * Colours come from the one status map (@calliopelabs/ui status tones), shared with
  * ``StatusDot``:
  *   running  → success (never the accent)
  *   failed   → red

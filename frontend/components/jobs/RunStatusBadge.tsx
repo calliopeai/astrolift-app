@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { PILL_TONE, type StatusTone } from "@/lib/status-tones";
+import { PILL_TONE, type StatusTone } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 /**
