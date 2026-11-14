@@ -128,9 +128,11 @@ const dataSurfacePlugin = {
         return {
           ImportDeclaration(node) {
             const source = node.source.value;
+            // The library DataTable is the same archetype as the app's.
             if (
               source !== "@/components/data-table" &&
-              !source.startsWith("@/components/data-table/")
+              !source.startsWith("@/components/data-table/") &&
+              source !== "@calliopelabs/ui"
             ) {
               return;
             }
@@ -260,13 +262,16 @@ const designTokensPlugin = {
  *   - `no-markup-in-app` — no intrinsic JSX (`<div>`, `<span>`, `<table>`…).
  *     The document shell (`html`, `head`, `body`) is the one exception; the
  *     root layout has to render it.
- *   - `no-ui-in-app` — no `@/components/ui/*` imports. Primitives compose
+ *   - `no-ui-in-app` — no `@/components/ui/*` imports, nor the same primitives
+ *     from `@calliopelabs/ui` (AppearanceScript excepted). Primitives compose
  *     into screens in `components/`, where they have stories; a route that
  *     reaches for them is building UI outside the catalog.
  *
  * Both at `error`, no allowlist: Leo chose "hard now".
  */
 const DOCUMENT_TAGS = new Set(["html", "head", "body"]);
+/** @calliopelabs/ui exports a route may use: render-only setup, not UI. */
+const APP_LIBRARY_IMPORTS = new Set(["AppearanceScript"]);
 
 const screensPlugin = {
   rules: {
@@ -304,6 +309,20 @@ const screensPlugin = {
             const source = node.source.value;
             if (typeof source === "string" && source.startsWith("@/components/ui/")) {
               context.report({ node, messageId: "ui", data: { source } });
+            }
+            // The same primitives from the library. The root layout may render
+            // the appearance boot script; types are not UI.
+            if (source === "@calliopelabs/ui" && node.importKind !== "type") {
+              for (const spec of node.specifiers) {
+                if (spec.type !== "ImportSpecifier" || spec.importKind === "type") continue;
+                const name = spec.imported.name ?? spec.imported.value;
+                if (APP_LIBRARY_IMPORTS.has(name)) continue;
+                context.report({
+                  node: spec,
+                  messageId: "ui",
+                  data: { source: `${name} from @calliopelabs/ui` },
+                });
+              }
             }
           },
         };
