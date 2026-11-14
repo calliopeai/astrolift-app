@@ -8,6 +8,7 @@ import { ConfirmProvider } from "@/hooks/use-confirm";
 import messages from "@/messages/en.json";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { PermissionsProvider } from "@/providers/PermissionsProvider";
+import { UiEnvironment } from "@/providers/UiEnvironment";
 
 import "../app/globals.css";
 
@@ -39,17 +40,19 @@ function AppProviders({
   }, [ground, accent, density, mode]);
   return (
     <NextIntlClientProvider locale="en" messages={messages}>
-      <MockedProvider mocks={[]}>
-        <PermissionsProvider value={{ granted, loading: false }}>
-          <TooltipProvider>
-            <ConfirmProvider>
-              <div className="bg-background text-foreground min-h-screen p-6 font-sans">
-                {children}
-              </div>
-            </ConfirmProvider>
-          </TooltipProvider>
-        </PermissionsProvider>
-      </MockedProvider>
+      <UiEnvironment>
+        <MockedProvider mocks={[]}>
+          <PermissionsProvider value={{ granted, loading: false }}>
+            <TooltipProvider>
+              <ConfirmProvider>
+                <div className="bg-background text-foreground min-h-screen p-6 font-sans">
+                  {children}
+                </div>
+              </ConfirmProvider>
+            </TooltipProvider>
+          </PermissionsProvider>
+        </MockedProvider>
+      </UiEnvironment>
     </NextIntlClientProvider>
   );
 }
