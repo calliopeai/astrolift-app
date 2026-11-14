@@ -1,27 +1,16 @@
-import { DOT_TONE, IN_FLIGHT } from "@calliopelabs/ui";
-import { cn } from "@/lib/utils";
+import { StatusDot as LibraryStatusDot } from "@calliopelabs/ui";
 
 type Status = "ok" | "warn" | "error" | "muted" | "pending";
 
-// Colours come from the one status map (@calliopelabs/ui status tones), so "healthy /
-// active / running" reads the same whatever accent the operator picked.
-// `pending` is the in-flight state: the info tone, pulsing.
-const statusClass: Record<Status, string> = {
-  ok: DOT_TONE.ok,
-  warn: DOT_TONE.warn,
-  error: DOT_TONE.error,
-  muted: DOT_TONE.muted,
-  pending: cn(DOT_TONE.info, IN_FLIGHT),
-};
-
+/**
+ * The library StatusDot under the app's `status` names. `pending` is the
+ * in-flight state: the info tone, pulsing. Colours are status tokens, so
+ * "healthy / active / running" reads the same whatever accent is chosen.
+ */
 export function StatusDot({ status, className }: { status: Status; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-block size-2 shrink-0 rounded-full shadow-[0_0_0_2px_var(--background)]",
-        statusClass[status],
-        className
-      )}
-    />
+  return status === "pending" ? (
+    <LibraryStatusDot tone="info" pulse className={className} />
+  ) : (
+    <LibraryStatusDot tone={status} className={className} />
   );
 }

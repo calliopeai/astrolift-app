@@ -16,7 +16,7 @@ describe("status tones", () => {
 
   it("colour a healthy dot and a running deployment with the success token", () => {
     const { container } = render(<StatusDot status="ok" />);
-    expect(container.firstElementChild).toHaveClass("bg-success");
+    expect(container.querySelector("[aria-hidden]")).toHaveClass("bg-success");
 
     render(<DeploymentStatusPill status="running" />);
     expect(screen.getByLabelText("Status: Running")).toHaveClass("text-success-fg");
