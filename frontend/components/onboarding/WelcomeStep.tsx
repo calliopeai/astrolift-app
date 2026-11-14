@@ -4,7 +4,7 @@ import { RocketIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 
 import { type OnboardingWizardState, deriveSlug } from "./types";

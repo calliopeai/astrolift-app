@@ -5,8 +5,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@calliopelabs/ui";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import type { Principal } from "./access-model";

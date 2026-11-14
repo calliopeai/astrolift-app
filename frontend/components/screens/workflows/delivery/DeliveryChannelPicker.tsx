@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { useFormatters } from "@/lib/i18n/formatters";
 

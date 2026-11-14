@@ -13,7 +13,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import type { TriggerMode } from "@/graphql/registry/registry.types";
 import { cn } from "@/lib/utils";

@@ -9,7 +9,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 
 import type { ZentinelleConnection } from "./zentinelle-model";

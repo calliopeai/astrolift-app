@@ -4,7 +4,7 @@ import { CheckIcon, SearchIcon } from "lucide-react";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { ASTROLIFT_PERMISSIONS } from "@/lib/permissions/permissions.generated";
 import { cn } from "@/lib/utils";
 

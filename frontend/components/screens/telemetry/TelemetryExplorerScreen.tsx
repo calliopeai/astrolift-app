@@ -10,7 +10,7 @@ import { type Column } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
 import { LogViewer } from "@/components/observability/LogViewer";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftAppTrace } from "@/graphql/__generated__/schema";
 import type { AppChoice, ExplorerProps, SpanResult } from "./use-scoped-explorer";
 export const TELEMETRY_SETUP =

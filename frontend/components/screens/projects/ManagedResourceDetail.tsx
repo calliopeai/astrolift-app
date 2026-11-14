@@ -8,7 +8,7 @@ import { type Column, type CursorTableController } from "@/components/data-table
 import { Button } from "@/components/ui/button";
 import { ListPage } from "@/components/list/ListPage";
 import { useCursorTableList } from "@/components/list/use-cursor-table-list";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -17,7 +17,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Skeleton } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 import type { ListProjectResourceAttachmentsPageQuery } from "@/graphql/__generated__/operations";
 import type { ProjectManagedResource } from "./ProjectManagedResourceList";

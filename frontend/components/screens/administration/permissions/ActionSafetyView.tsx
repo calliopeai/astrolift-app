@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

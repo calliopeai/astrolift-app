@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import type { FieldValues, UseFormRegister, FieldErrors, Control } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import { useTranslations } from "next-intl";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,

@@ -14,8 +14,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@calliopelabs/ui";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import { type ScopeKind, type ScopeNode, type ScopeRef, scopePath } from "./access-model";

@@ -20,7 +20,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import { cn } from "@/lib/utils";
 

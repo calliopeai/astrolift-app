@@ -6,7 +6,7 @@ import * as React from "react";
 import { SearchIcon, XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 import type { CursorTableController } from "./use-cursor-table";

@@ -8,7 +8,7 @@ import type {
 } from "@/graphql/__generated__/operations";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import type { SharedModelDraft } from "./shared-model-form";
 import {

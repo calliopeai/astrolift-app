@@ -8,7 +8,7 @@ import * as React from "react";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

@@ -18,7 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import { HelpCircle, Loader2, Send, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 
 export type WayfindingTurn = {
   question: string;

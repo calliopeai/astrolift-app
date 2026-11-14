@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { UsersIcon } from "lucide-react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { ListPage } from "@/components/list/ListPage";
 import type { ModelPage } from "./ModelSubscriptionsPanel";

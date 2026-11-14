@@ -17,7 +17,7 @@ import { useConfigCopy } from "./config-copy";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import {
   Select,

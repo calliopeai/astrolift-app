@@ -9,7 +9,7 @@ import { environmentCan } from "@/lib/permissions/environment-permissions";
 
 import { Can } from "@/components/Can";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import {

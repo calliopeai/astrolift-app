@@ -8,9 +8,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
-import { Skeleton } from "@calliopelabs/ui";
 
 import type { WriteResult } from "./ZentinelleConnection";
 import {

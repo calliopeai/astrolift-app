@@ -32,7 +32,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Skeleton } from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,
@@ -40,7 +40,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@calliopelabs/ui";
 import type { AstroliftAppLogLine } from "@/graphql/lifecycle/lifecycle.types";
 import { cn } from "@/lib/utils";
 

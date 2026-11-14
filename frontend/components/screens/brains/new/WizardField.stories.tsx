@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@calliopelabs/ui";
 
 import { WizardField } from "./WizardField";
 
