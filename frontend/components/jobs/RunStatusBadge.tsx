@@ -2,9 +2,8 @@
 
 import { useTranslations } from "next-intl";
 
-import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { PILL_TONE, type StatusTone } from "@calliopelabs/ui";
+import { PILL_TONE, StatusBadge, type StatusTone } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,19 +25,9 @@ export type RunStatus =
   | "in_progress"
   | "unknown";
 
-type Dot = "ok" | "warn" | "error" | "muted" | "pending";
-
-const DOT_PILL: Record<Dot, StatusTone> = {
-  ok: "ok",
-  warn: "warn",
-  error: "error",
-  muted: "muted",
-  pending: "info",
-};
-
-const STATUS_DOT: Record<RunStatus, Dot> = {
-  running: "pending",
-  in_progress: "pending",
+const STATUS_TONE: Record<RunStatus, StatusTone> = {
+  running: "info",
+  in_progress: "info",
   succeeded: "ok",
   failed: "error",
   superseded: "muted",
@@ -54,17 +43,17 @@ export interface RunStatusBadgeProps {
 
 export function RunStatusBadge({ status, exitCode, className }: RunStatusBadgeProps) {
   const t = useTranslations("jobs.runStatus");
-  const dot = STATUS_DOT[status] ?? "muted";
+  const tone = STATUS_TONE[status] ?? "muted";
+  const inFlight = status === "running" || status === "in_progress";
   const label = labelFor(status, t);
   // Exit code chip only when we have a concrete non-zero value —
   // ``null`` means in-flight, ``0`` is the silent success case.
   const showExit = typeof exitCode === "number" && exitCode !== 0;
   return (
     <span className={cn("inline-flex items-center gap-1.5", className)}>
-      <StatusDot status={dot} />
-      <Badge variant="outline" className={cn("capitalize", PILL_TONE[DOT_PILL[dot]])}>
+      <StatusBadge tone={tone} pulse={inFlight} className="capitalize">
         {label}
-      </Badge>
+      </StatusBadge>
       {showExit ? (
         <Badge
           variant="outline"

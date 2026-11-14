@@ -1,10 +1,8 @@
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Badge } from "@/components/ui/badge";
 import type { DeploymentStatus } from "@/graphql/lifecycle/lifecycle.types";
-import { IN_FLIGHT, PILL_TONE } from "@calliopelabs/ui";
-import { cn } from "@/lib/utils";
+import { StatusBadge, type StatusTone } from "@calliopelabs/ui";
 
 /**
  * Shared status pill for deployment rows (#411 scope B).
@@ -26,16 +24,18 @@ import { cn } from "@/lib/utils";
  */
 
 // Labels come from `apps.deployments.statuses`, keyed by the status itself.
-const STATUS_STYLES: Record<DeploymentStatus, string> = {
-  pending_approval: PILL_TONE.warn,
-  pending: PILL_TONE.warn,
-  deploying: cn(PILL_TONE.info, IN_FLIGHT),
-  redeploying: cn(PILL_TONE.info, IN_FLIGHT),
-  running: PILL_TONE.ok,
-  failed: PILL_TONE.error,
-  rolled_back: PILL_TONE.muted,
-  superseded: cn(PILL_TONE.muted, "line-through"),
+const STATUS_TONE: Record<DeploymentStatus, StatusTone> = {
+  pending_approval: "warn",
+  pending: "warn",
+  deploying: "info",
+  redeploying: "info",
+  running: "ok",
+  failed: "error",
+  rolled_back: "muted",
+  superseded: "muted",
 };
+
+const IN_FLIGHT_STATUSES = new Set<DeploymentStatus>(["deploying", "redeploying"]);
 
 interface DeploymentStatusPillProps {
   status: DeploymentStatus;
@@ -49,16 +49,14 @@ export function DeploymentStatusPill({ status, label, className }: DeploymentSta
   const pill = useTranslations("deploymentStatusPill");
   const text = label ?? t(status);
   return (
-    <Badge
-      variant="outline"
-      className={cn("font-mono font-semibold", STATUS_STYLES[status], className)}
+    <StatusBadge
+      tone={STATUS_TONE[status]}
+      pulse={IN_FLIGHT_STATUSES.has(status)}
+      struck={status === "superseded"}
+      className={className}
       aria-label={pill("label", { status: text })}
     >
-      <span
-        aria-hidden
-        className="size-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]"
-      />
       {text}
-    </Badge>
+    </StatusBadge>
   );
 }
