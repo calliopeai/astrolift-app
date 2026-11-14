@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { Fragment, type ReactNode } from "react";
 
 import messages from "@/messages/en.json";
+import { UiEnvironment } from "@/providers/UiEnvironment";
 
 /** App components always have next-intl. Keep that real context in legacy
  * behavior tests, including their own Apollo/permissions/router wrappers. */
@@ -12,7 +13,9 @@ export function renderWithIntl(ui: ReactNode, options?: RenderOptions) {
     ...options,
     wrapper: ({ children }) => (
       <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
-        <CallerWrapper>{children}</CallerWrapper>
+        <UiEnvironment>
+          <CallerWrapper>{children}</CallerWrapper>
+        </UiEnvironment>
       </NextIntlClientProvider>
     ),
   });

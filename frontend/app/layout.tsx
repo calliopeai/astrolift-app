@@ -10,6 +10,7 @@ import { getLocale, getMessages } from "next-intl/server";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/Toaster";
 import { TimezoneDetector } from "@/providers/TimezoneDetector";
+import { UiEnvironment } from "@/providers/UiEnvironment";
 import { getDirection } from "@/lib/i18n/direction";
 import "./globals.css";
 
@@ -83,13 +84,15 @@ export default async function RootLayout({
         >
           <Toaster />
           <NextIntlClientProvider locale={locale} messages={messages}>
-            <ApolloWrapper>
-              <TooltipProvider>
-                <AppearanceProvider>
-                  <ConfirmProvider>{children}</ConfirmProvider>
-                </AppearanceProvider>
-              </TooltipProvider>
-            </ApolloWrapper>
+            <UiEnvironment>
+              <ApolloWrapper>
+                <TooltipProvider>
+                  <AppearanceProvider>
+                    <ConfirmProvider>{children}</ConfirmProvider>
+                  </AppearanceProvider>
+                </TooltipProvider>
+              </ApolloWrapper>
+            </UiEnvironment>
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>
