@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { StatusDot } from "@/components/StatusDot";
 
-/** Status never follows the accent (lib/status-tones). */
+/** Status never follows the accent (@calliopelabs/ui status tones). */
 const meta: Meta = { title: "Primitives/Status/StatusDot" };
 export default meta;
 

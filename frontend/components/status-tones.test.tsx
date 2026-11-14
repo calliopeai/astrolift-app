@@ -5,7 +5,7 @@ import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { StatusDot } from "@/components/StatusDot";
 import { renderWithIntl as render } from "@/test/render-with-intl";
 
-import { DOT_TONE, PILL_TONE } from "./status-tones";
+import { DOT_TONE, PILL_TONE } from "@calliopelabs/ui";
 
 describe("status tones", () => {
   it("never colour a status with the selectable accent", () => {

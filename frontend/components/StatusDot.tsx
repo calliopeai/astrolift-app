@@ -1,9 +1,9 @@
-import { DOT_TONE, IN_FLIGHT } from "@/lib/status-tones";
+import { DOT_TONE, IN_FLIGHT } from "@calliopelabs/ui";
 import { cn } from "@/lib/utils";
 
 type Status = "ok" | "warn" | "error" | "muted" | "pending";
 
-// Colours come from the one status map (lib/status-tones), so "healthy /
+// Colours come from the one status map (@calliopelabs/ui status tones), so "healthy /
 // active / running" reads the same whatever accent the operator picked.
 // `pending` is the in-flight state: the info tone, pulsing.
 const statusClass: Record<Status, string> = {

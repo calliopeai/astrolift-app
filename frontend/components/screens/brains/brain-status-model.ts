@@ -9,7 +9,7 @@ import type {
   BrainStatusFieldsFragment,
   BrainSummaryFieldsFragment,
 } from "@/graphql/__generated__/operations";
-import type { StatusTone } from "@/lib/status-tones";
+import type { StatusTone } from "@calliopelabs/ui";
 
 export type BrainStatus = BrainStatusFieldsFragment;
 /** The cached summary a list row carries (#2444): no host reads. */
