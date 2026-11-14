@@ -22,14 +22,14 @@ import { ListPage } from "@/components/list/ListPage";
 import type { ListStateController } from "@/components/list/list-state";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import { VizLegend } from "@/components/viz/core/VizLegend";
 import { formatTriggerKind } from "@/components/screens/workflows/detail/workflow-run-state";
 import { useRelativeAge } from "@/lib/format";

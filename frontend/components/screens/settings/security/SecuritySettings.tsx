@@ -20,9 +20,8 @@ import { ListPage } from "@/components/list/ListPage";
 import { selectRows } from "@/components/list/select-rows";
 import type { ListStateController } from "@/components/list/list-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
+import { Button, DropdownMenuItem } from "@calliopelabs/ui";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Section } from "@/components/ui/section";
 import type {
   AstroliftActiveSession,

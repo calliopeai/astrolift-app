@@ -32,13 +32,14 @@ import { PermissionNote, Restricted, useRestrictedMode } from "@/components/sett
 import { DangerAction, SettingsPage } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
 import { Badge } from "@/components/ui/badge";
-import { Button, Skeleton } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Skeleton,
+} from "@calliopelabs/ui";
 import { Section } from "@/components/ui/section";
 import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";

@@ -4,13 +4,14 @@ import { PlusIcon, XIcon } from "lucide-react";
 import * as React from "react";
 import { useFormatter, useTranslations } from "next-intl";
 
-import { Button, Input } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Input,
+} from "@calliopelabs/ui";
 import {
   Select,
   SelectContent,

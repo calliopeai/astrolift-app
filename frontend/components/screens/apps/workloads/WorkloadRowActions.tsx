@@ -4,7 +4,7 @@ import { Loader2Icon, PlayIcon, ScrollTextIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@calliopelabs/ui";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
 export interface WorkloadRowActionsProps {

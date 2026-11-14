@@ -27,11 +27,10 @@ import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { adminCrumbs } from "@/components/screens/administration/insights/header";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input } from "@calliopelabs/ui";
+import { Button, DropdownMenuItem, DropdownMenuSeparator, Input } from "@calliopelabs/ui";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DefinitionList } from "@/components/ui/definition-list";
-import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import {
   Select,

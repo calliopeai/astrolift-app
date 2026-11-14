@@ -4,12 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import fr from "@/messages/fr.json";
 import ja from "@/messages/ja.json";
 
-import { Button } from "@calliopelabs/ui";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@calliopelabs/ui";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 
 import {

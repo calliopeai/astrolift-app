@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@calliopelabs/ui";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { canWatchLive, canWatchLogs, runDot, runDuration, RUN_STATUS_DOT } from "./agent-runs-list";

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@calliopelabs/ui";
 import { type NavArea, type NavFunction, navLabel } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";
 

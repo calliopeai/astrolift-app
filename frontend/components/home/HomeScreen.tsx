@@ -25,8 +25,8 @@ import * as React from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { PanelGrid, SkeletonRows } from "@/components/panel/Panel";
 import { ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -35,7 +35,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 
 import { HomeLayoutPicker } from "./HomeLayoutPicker";
 import { localizedHomeLayout } from "./registry";

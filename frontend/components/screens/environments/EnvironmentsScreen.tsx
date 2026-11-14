@@ -11,7 +11,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { appsListCrumbs } from "@/components/screens/deployments/apps-area";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenuItem } from "@calliopelabs/ui";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { environmentCan } from "@/lib/permissions/environment-permissions";
 

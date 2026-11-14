@@ -24,8 +24,7 @@ import { ListPage } from "@/components/list/ListPage";
 import { formatDuration } from "@/components/screens/apps/deployments/app-deployments-format";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Button, DropdownMenuItem } from "@calliopelabs/ui";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 

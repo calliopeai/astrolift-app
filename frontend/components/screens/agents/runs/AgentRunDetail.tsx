@@ -25,14 +25,14 @@ import { RunPage } from "@/components/run/RunPage";
 import { RunMissing } from "@/components/screens/jobs/RunDetailParts";
 import { agentRunCrumbs, statusOutcome } from "@/components/screens/tasks/runs-list";
 import { RunOutcomeCell } from "@/components/screens/tasks/RunsScreen";
-import { Button } from "@calliopelabs/ui";
-import { DefinitionList } from "@/components/ui/definition-list";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
+import { DefinitionList } from "@/components/ui/definition-list";
 import {
   Sheet,
   SheetContent,

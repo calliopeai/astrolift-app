@@ -24,14 +24,14 @@ import { formatClock } from "@/components/run/format";
 import { RunMissing } from "@/components/screens/jobs/RunDetailParts";
 import { RunOutcomeCell } from "@/components/screens/tasks/RunsScreen";
 import { StatusDot } from "@/components/StatusDot";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import { RUN_REPLAY_LEGEND, RunReplay, VizLegend, WorkflowView } from "@/components/viz";
 import type { WorkflowStageExecution } from "@/graphql/workflows/tiered.types";
 import type { WorkflowHistoryEvent } from "@/graphql/workflows/workflows.types";

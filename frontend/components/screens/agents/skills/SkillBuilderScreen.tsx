@@ -17,13 +17,14 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ListSummary } from "@/components/list/ListSummary";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
-import { Button, Input } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Input,
+} from "@calliopelabs/ui";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 

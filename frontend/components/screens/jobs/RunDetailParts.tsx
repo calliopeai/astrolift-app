@@ -9,13 +9,13 @@ import { toast } from "sonner";
 import type { EmptyStateSpec } from "@/components/data-table";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 
 /** A run detail's ⋯: its links, then Copy run ID. */
 export function RunMenu({ id, links }: { id: string; links: { label: string; href: string }[] }) {

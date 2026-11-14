@@ -28,13 +28,13 @@ import {
   PEOPLE_HREF,
 } from "@/components/screens/administration/access/access-nav";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@calliopelabs/ui";
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "@calliopelabs/ui";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftInvitation } from "@/graphql/identity/identity.types";
 import { useFormatters } from "@/lib/i18n/formatters";

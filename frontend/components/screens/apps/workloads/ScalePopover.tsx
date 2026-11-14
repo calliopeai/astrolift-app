@@ -4,8 +4,7 @@ import { Loader2Icon, ScalingIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Button, Input } from "@calliopelabs/ui";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button, Input, Popover, PopoverContent, PopoverTrigger } from "@calliopelabs/ui";
 
 import type { useScaleWorkload } from "./use-scale-workload";
 

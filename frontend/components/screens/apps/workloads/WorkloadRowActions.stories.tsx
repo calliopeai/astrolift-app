@@ -1,11 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { Button } from "@calliopelabs/ui";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@calliopelabs/ui";
 
 import { LONG } from "./app-workloads.fixtures";
 import { WorkloadRowActions, type WorkloadRowActionsProps } from "./WorkloadRowActions";
